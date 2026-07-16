@@ -7,3 +7,6 @@ pnpm-lock.yaml
 **/generated/**
 playwright-report
 test-results
+out
+# template placeholders ({{X}}) are not valid YAML flow maps — keep verbatim
+tenants/_template
