@@ -1,0 +1,37 @@
+# Tenant #1 — Spanish reformas SME, expressed as a composition (mandate §11).
+# Every identity field is synthetic (ASSUMPTIONS.md); a real intake overwrites
+# THIS FILE ONLY — no code changes.
+tenant: reformas-demo
+kernel: "^1"
+capabilities: [quoting, billing, scheduling, time, procurement, docs]
+jurisdiction: es-ES@2026-07-16
+vertical: construction/reformas
+plugins: []
+
+config:
+  locale: es-ES
+  currency: EUR
+  branding:
+    legalName: "Reformas Iberia Demo S.L." # source: synthetic
+    tradeName: "Reformas Iberia" # source: synthetic
+
+  billing:
+    seller:
+      name: "Reformas Iberia Demo S.L." # source: synthetic
+      taxId: "B00000000" # source: synthetic placeholder
+      address: "Calle Falsa 123, 28001 Madrid" # source: synthetic
+      countryCode: "ES"
+    series:
+      - { id: FAC, kind: standard, pad: 4, yearly: true }
+      - { id: RECT, kind: rectificative, pad: 4, yearly: true }
+
+  jurisdiction:
+    verifactu:
+      enabled: false # HARD GATE until certified — LEGAL_REVIEW.md #1 (deadline 2027)
+
+  vertical:
+    terminology:
+      quote: Presupuesto
+      line: Partida
+      measurement: Medición
+    materialsShareDefaultBp: 3500 # 35% contractor materials — asesor to confirm per project

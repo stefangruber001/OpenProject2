@@ -1,0 +1,30 @@
+# Tenant template — `factory new-tenant --name <id>` instantiates this.
+# Customisation is DATA: everything a tenant differs by lives in this file.
+tenant: azulejos-lopez
+kernel: "^1"
+capabilities: [quoting, billing, scheduling, time, procurement, docs]
+jurisdiction: es-ES@2026-07-16
+vertical: construction/reformas
+plugins: []
+
+config:
+  locale: es-ES
+  currency: EUR
+  branding:
+    legalName: "Azulejos López S.L.U."
+
+  billing:
+    seller:
+      name: "Azulejos López S.L.U."
+      taxId: "B00000000" # placeholder — replace with the real CIF/NIF
+      address: "Dirección fiscal pendiente"
+      countryCode: "ES"
+    series:
+      - { id: FAC, kind: standard, pad: 4, yearly: true }
+      - { id: RECT, kind: rectificative, pad: 4, yearly: true }
+
+  jurisdiction:
+    verifactu:
+      enabled: false # gated until certified — LEGAL_REVIEW.md #1
+
+  vertical: {}
