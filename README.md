@@ -1,13 +1,30 @@
 # OpenProject2
 
-A new product, starting from a professional TypeScript foundation. **The product
-isn't defined yet** — the engineering foundation below is ready for whatever it
-becomes.
+An **ERP factory** for European SMEs: a tenant spec goes in; a running,
+tested, compliance-gated ERP comes out. Kernel + capability modules +
+jurisdiction packs + vertical packs, composed at resolve time — customisation
+is data, never a fork. Tenant #1 is a Spanish _reformas_ (renovation) company.
 
 [![CI](https://github.com/stefangruber001/OpenProject2/actions/workflows/ci.yml/badge.svg)](https://github.com/stefangruber001/OpenProject2/actions/workflows/ci.yml)
 
-> **Status:** Foundation ready. See [`docs/architecture.md`](./docs/architecture.md)
-> for how it's put together.
+> **Status:** P0 foundation + P1 walking skeleton green — presupuesto →
+> factura with effective-dated IVA and persisted legal justification, chained
+> invoices, boundary-enforced architecture. See [`PROGRESS.md`](./PROGRESS.md)
+> for live state and [`docs/architecture.md`](./docs/architecture.md) +
+> [ADRs 0005–0012](./docs/adr/) for the factory design.
+>
+> ```bash
+> make bootstrap && make demo   # tenant #1 artifacts in out/reformas-demo/
+> ```
+
+## Marginal cost of tenant #N+1 (the metric that decides if this worked)
+
+| Tenant            | Human/agent minutes                                                                                | Evidence                                      |
+| ----------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| #1 reformas-demo  | n/a (built the factory)                                                                            | this repo                                     |
+| #2 azulejos-lopez | **~0.02 s create+resolve, config-only, zero code** (formal timed onboarding incl. real intake: P5) | `tenants/azulejos-lopez/`, `tenants/INDEX.md` |
+
+A flat or rising line here is a P1 defect (mandate §7).
 
 ## Tech stack
 

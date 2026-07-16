@@ -14,67 +14,101 @@ output; the factory is the product.
 
 ## Phase board
 
-| Phase                | Scope                                                                                                                            | Status                                |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| P0 Foundation        | layers as real packages, boundary linter in CI, spec composition, ADRs, CLAUDE.md                                                | **in progress**                       |
-| P1 Walking skeleton  | factory CLI, tenant #1 spec, presupuesto→factura slice with effective-dated IVA + justification, negative test                   | **in progress (interleaved with P0)** |
-| P2 Packs build-out   | es-ES full surface (IRPF, filings data, jornada), reformas (bc3, certificaciones), scheduling/time/procurement/docs capabilities | pending                               |
-| P3 Pipeline          | provision → deploy → verify → rollback, idempotent                                                                               | pending                               |
-| P4 Fleet             | control plane, inventory, wave rollout, health gates, backup/restore drill                                                       | pending                               |
-| P5 Proof & hardening | tenants #2/#3 (<15 min, timed), offboarding export, honest RISKS                                                                 | pending                               |
+| Phase                | Scope                                                                                                                                                                      | Status                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| P0 Foundation        | layers as real packages, boundary linter in CI, spec composition, ADRs, CLAUDE.md                                                                                          | **DONE** ✅                                     |
+| P1 Walking skeleton  | factory CLI, tenant #1, presupuesto→factura w/ effective-dated IVA + justification, negative test, make bootstrap/demo                                                     | **DONE** ✅ (PDF pending — HTML artifact today) |
+| P2 Packs build-out   | durable persistence (Prisma+RLS), es-ES filings/jornada/N43, reformas certificaciones/bc3, real scheduling/time/procurement/docs capabilities, web UI on composed services | **next**                                        |
+| P3 Pipeline          | provision → deploy → verify → rollback, idempotent; packaging (build outputs, PWA/Tauri shells)                                                                            | pending                                         |
+| P4 Fleet             | control plane, inventory (seeded: `tenants/INDEX.md`), wave rollout, health gates, backup/restore drill                                                                    | pending                                         |
+| P5 Proof & hardening | formal timed tenant #2/#3 onboarding, offboarding export drill, docs, honest final RISKS                                                                                   | pending                                         |
 
-## Done
+## Done (chronological)
 
-- Repo foundation (pre-mandate): Turborepo monorepo, Next.js 16 web app,
-  Prisma+Postgres data layer, Vitest+Playwright, CI (lint/types/test/build/e2e),
-  Husky, docs/ADR structure. All green.
-- Compliance research (2026-07-16, see `LEGAL_REVIEW.md` for citations):
-  - **Verifactu postponed by RD-ley 15/2025**: IS taxpayers → **2027-01-01**,
-    rest (IRPF autónomos etc.) → **2027-07-01**. Chaining/immutability designed
-    in now; AEAT submission gated `legally_verified: false`.
-  - **IVA 10% renovation** (art. 91.Uno.2.10º LIVA): 3 cumulative conditions
-    (natural person/comunidad + private-use dwelling; ≥2 years since
-    construction/last rehab; contractor materials ≤40% of base). Encoded as an
-    effective-dated decision rule with persisted justification.
+1. Pre-mandate foundation: Turborepo, Next.js 16 web app, Prisma+Postgres data
+   layer, Vitest+Playwright, CI, Husky. Green.
+2. Governance: PROGRESS/ASSUMPTIONS/LEGAL_REVIEW/OBJECTIONS/RISKS/
+   INTEGRATIONS_PENDING/OPEN_QUESTIONS + CLAUDE.md.
+3. Compliance research (2026-07-16, cited in LEGAL_REVIEW.md): **Verifactu
+   postponed to 2027-01-01 (IS) / 2027-07-01 (rest) by RD-ley 15/2025**;
+   IVA 10% renovation = 3 cumulative conditions (art. 91.Uno.2.10º).
+4. `@repo/kernel` 1.0.0 — ports/registry, resolve-time pack composition with
+   strict composed config schema, effective dating (refuses to guess), integer
+   money (cents/millis/bp), append-only events, injected clock/ids. 16 tests.
+5. `@repo/capability-quoting` + `@repo/capability-billing` — zero jurisdiction
+   knowledge; immutable invoices, gapless numbering, rectificativa path,
+   required `tax@1` port, optional chain/labels ports, deterministic HTML
+   renderer. 9 tests + fake-adapter proof.
+6. `@repo/pack-jurisdiction-es-es` — effective-dated IVA tables, renovation
+   reduced-rate decision engine w/ persisted justification, SHA-256 invoice
+   chain, Spanish labels, IRPF retention profiles, **hard resolve-time gate on
+   verifactu.enabled**. `@repo/pack-vertical-construction-reformas` —
+   mediciones, construction.* attribute contract, terminology config. 21 tests.
+7. `@repo/boundary-lint` — layer matrix + forbidden-literal scan in CI
+   (`pnpm boundaries`), committed violation fixtures proven caught; already
+   caught+fixed a real locale leak in kernel docs.
+8. `@repo/factory` — resolve|validate|new-tenant|demo CLI; tenant #1
+   `reformas-demo` (§11 composition); demo: 3-partida presupuesto → FAC-2026-0001
+   at 10% (art. 91.Uno.2.10º justification persisted) + FAC-2026-0002 at 21%
+   (reasoned refusal) + chained seals + 8 deterministic artifacts.
+   **Negative test (§12.3) passing.** Tenant #2 `azulejos-lopez` created
+   config-only in 0.02s. `make bootstrap|demo|gates`.
+9. ADRs 0005–0012 (composition, enforcement, topology/RLS, effective dating,
+   spec-driven composition, core-vs-config, N×M bridges, stack). README carries
+   the marginal-cost metric table.
 
-## In flight (this session)
+**All root gates green:** lint · check-types · test (63 tests across 8 suites)
+· build · boundaries. Every commit green and pushed to
+`claude/orin-project-status-1q50dt`.
 
-1. Governance files + CLAUDE.md (this commit).
-2. Kernel package: money, effective-dating, ports, spec+resolver, event log.
-3. Capabilities: quoting, billing (ports only, zero jurisdiction knowledge).
-4. Packs: jurisdiction/es-ES, vertical/construction-reformas (+ contract tests).
-5. Boundary linter + forbidden-literal linter, wired into CI, fixture-tested.
-6. Factory CLI (`resolve|validate|new-tenant|demo`) + tenant #1 spec +
-   negative test (no jurisdiction ⇒ loud failure) + `make bootstrap && make demo`.
-7. ADRs 0005–0012.
+## Next 3 tasks (P2 start — in order)
 
-## Next 3 tasks (after in-flight lands)
-
-1. P2: es-ES filings data mapping (303/390/347/111/115/190 tagging model) +
-   registro de jornada in a `time` capability; N43 import port + fake adapter.
-2. P2: reformas certificaciones (quoted-vs-actual per partida drift) + bc3
-   import stub behind port; quote→certificación→factura parcial flow.
-3. P1 polish: PDF rendering via headless chromium behind DocumentRenderPort
-   (HTML adapter exists); wire web app screens for presupuesto/factura on the
-   composed services.
+1. **Durable persistence behind kernel ports**: Prisma schema for tenants,
+   quotes, invoices, events with `tenant_id` RLS (ADR-0007); adapter passes
+   the SAME contract tests as the in-memory ones; migration + seed; runbook
+   update. (Existing `packages/db` is the substrate.)
+2. **Web ERP shell on composed services** (`apps/web`): tenant-scoped
+   presupuesto list/create/accept + factura issue/view using
+   `@repo/factory` composition; server-side only; es-ES labels from ports.
+   PDF via headless Chromium behind `doc-render@1` (env has Chromium;
+   INTEGRATIONS_PENDING #doc-render).
+3. **es-ES filings data layer**: tag invoices/purchases so Modelo
+   303/390/347/111/115/190 extracts derive from stored decisions (no new
+   literals outside the pack); N43 fixture-based import behind
+   `bank-statements@1`; registro de jornada model in a real `time` capability.
 
 ## Blockers & chosen workarounds
 
-- **No Docker daemon in this sandbox** → kernel persistence is a port;
-  P1 runs on in-memory adapters, fully tested; Prisma/Postgres adapter is a P2
-  task using the existing `packages/db`. Logged in `ASSUMPTIONS.md`.
-- **No real AEAT/FACe/bank access** → fake adapters behind ports,
-  `INTEGRATIONS_PENDING.md` tracks each.
-- Session context is finite → every unit lands green + committed; this file is
-  the resume point. Force-push and history rewrites are prohibited from the
-  mandate onward.
+- **No Docker daemon in this sandbox** → P1 proven on in-memory adapters;
+  P2 Prisma work runs `prisma migrate diff`-style checks + CI Postgres service
+  (CI has services; local uses docker-compose when available).
+- **No real AEAT/FACe/bank credentials** → fakes behind ports
+  (INTEGRATIONS_PENDING.md). Verifactu certified mode hard-gated off.
+- **Prettier vs template placeholders** → `tenants/_template` is
+  prettier-ignored (placeholders aren't YAML flow maps). Fixed + smoke-tested.
+- Session context finite → this file is the checkpoint; resume from "Next 3
+  tasks". No force-push, no history rewrite (mandate §3).
 
 ## Marginal cost of tenant #N+1 (minutes of human/agent time)
 
-| Tenant           | Minutes                             | Evidence          |
-| ---------------- | ----------------------------------- | ----------------- |
-| #1 reformas-demo | n/a (built with the factory itself) | this repo         |
-| #2 target        | **< 15** (config-only, zero code)   | to be timed in P5 |
+| Tenant                 | Minutes                                                                                              | Evidence                              |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| #1 reformas-demo       | n/a (built with the factory itself)                                                                  | this repo                             |
+| #2 azulejos-lopez      | ~0.0003 (0.02s, `new-tenant`, config-only, zero code) — formal timed onboarding w/ real intake in P5 | `tenants/azulejos-lopez/`, CLI timing |
+| #2 target (P5, formal) | **< 15**                                                                                             | to be timed                           |
+
+## Definition-of-done tracker (mandate §12)
+
+1. `make bootstrap && make demo` on clean machine → **working today** (in-memory
+   runtime; “deployed with durable DB” arrives with P2/P3). Factura is
+   legally-_defensible-by-design_ (justification persisted) but
+   `legally_verified:false` until asesor review.
+2. Tenant #2 config-only <15 min → **mechanism proven (0.02s)**; formal timed
+   run with real intake pending (P5).
+3. Negative test (no jurisdiction ⇒ loud failure) → **passing in CI**
+   (`packages/factory/src/negative.test.ts`).
+4. P0–P5 complete → P0 ✅ P1 ✅ (PDF pending) · P2–P5 open.
+5. Governance files current → ✅ (this update).
 
 ## Branch & discipline
 
