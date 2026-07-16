@@ -1,7 +1,8 @@
 # Contributing & branching convention
 
 This repo is worked on by two people (Stefan and Ignacio). The rules below keep
-us from stepping on each other's toes.
+us from stepping on each other's toes. New here? Start with
+[`docs/onboarding.md`](./docs/onboarding.md).
 
 ## Golden rules
 
@@ -10,6 +11,7 @@ us from stepping on each other's toes.
 2. **One branch = one focused change.** Keep branches small and short-lived.
 3. **Every PR needs a review from the other person** before it merges.
 4. **Pull `main` before you branch, and rebase often** so branches don't drift.
+5. **CI must be green.** Lint, types, tests, and build all pass before merge.
 
 ## Branch naming
 
@@ -25,12 +27,12 @@ type, then a short kebab-case description:
 
 **Types**
 
-| Type    | Use for                                  |
-|---------|------------------------------------------|
-| `feat`  | new feature or behaviour                 |
-| `fix`   | bug fix                                  |
-| `chore` | tooling, deps, config, housekeeping      |
-| `docs`  | documentation only                       |
+| Type    | Use for                             |
+| ------- | ----------------------------------- |
+| `feat`  | new feature or behaviour            |
+| `fix`   | bug fix                             |
+| `chore` | tooling, deps, config, housekeeping |
+| `docs`  | documentation only                  |
 
 **Examples**
 
@@ -64,6 +66,18 @@ git fetch origin
 git rebase origin/main
 ```
 
+## Before you open a PR
+
+Run the same checks CI runs — if these pass locally, CI should pass:
+
+```bash
+pnpm lint && pnpm check-types && pnpm test && pnpm build
+```
+
+A pre-commit hook auto-formats staged files, so formatting never shows up in
+review. The PR template will prompt you for the what/why, changes, and how to
+test.
+
 ## Merging
 
 - Use **Squash and merge** to keep `main` history clean (one commit per PR).
@@ -74,3 +88,9 @@ git rebase origin/main
 
 Short imperative summary line, e.g. `Add login form validation`. Add a body if
 the "why" isn't obvious from the diff.
+
+## Making significant decisions
+
+Changing the stack, the data model in a big way, or another architecturally
+significant choice? Write a short [ADR](./docs/adr/) in the same PR so the
+reasoning is recorded.

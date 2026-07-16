@@ -1,0 +1,21 @@
+// Prisma schema — the single source of truth for the database.
+// Docs: https://pris.ly/d/prisma-schema
+// After editing, run `pnpm db:migrate` to create a migration.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Placeholder model so the data layer is wired up, migratable, and testable.
+/// Replace it with the real domain models once the project is defined.
+model Example {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

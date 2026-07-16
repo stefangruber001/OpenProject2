@@ -1,0 +1,45 @@
+{
+  "name": "openproject2",
+  "private": true,
+  "description": "OpenProject2 monorepo root.",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md,json,css}\"",
+    "check-types": "turbo run check-types",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "db:generate": "pnpm --filter @repo/db generate",
+    "db:migrate": "pnpm --filter @repo/db migrate",
+    "db:deploy": "pnpm --filter @repo/db deploy",
+    "db:push": "pnpm --filter @repo/db push",
+    "db:studio": "pnpm --filter @repo/db studio",
+    "db:seed": "pnpm --filter @repo/db seed",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.7.4",
+    "turbo": "^2.10.5",
+    "typescript": "5.9.2"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mjs,cjs,md,json,css,yaml,yml}": "prettier --write"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "sharp"
+    ]
+  }
+}

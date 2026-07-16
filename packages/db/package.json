@@ -1,0 +1,37 @@
+{
+  "name": "@repo/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "build": "prisma generate",
+    "migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "deploy": "prisma migrate deploy",
+    "push": "dotenv -e ../../.env -- prisma db push",
+    "studio": "dotenv -e ../../.env -- prisma studio",
+    "seed": "dotenv -e ../../.env -- prisma db seed",
+    "check-types": "prisma generate && tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.3.0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "dotenv-cli": "^7.4.4",
+    "eslint": "^9.39.1",
+    "prisma": "^6.3.0",
+    "tsx": "^4.19.2",
+    "typescript": "5.9.2"
+  }
+}

@@ -1,0 +1,8 @@
+# Code owners are automatically requested for review when a PR touches their files.
+# Docs: https://docs.github.com/articles/about-code-owners
+#
+# Right now the whole repo is owned by the two of us. Once Ignacio's GitHub
+# username is known, add it here so every PR requests a review from the other
+# person automatically, e.g. `* @stefangruber001 @ignacios-handle`.
+
+* @stefangruber001
