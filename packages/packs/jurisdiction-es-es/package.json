@@ -1,0 +1,28 @@
+{
+  "name": "@repo/pack-jurisdiction-es-es",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Jurisdiction pack es-ES: effective-dated Spanish VAT rules (incl. dwelling-renovation reduced rate), retention rules, invoice chaining, document labels.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@repo/capability-billing": "workspace:*",
+    "@repo/kernel": "workspace:*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2",
+    "vitest": "^3.0.5"
+  }
+}

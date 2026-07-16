@@ -17,6 +17,9 @@ importers:
       prettier:
         specifier: ^3.7.4
         version: 3.9.5
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.1
       turbo:
         specifier: ^2.10.5
         version: 2.10.5
@@ -75,6 +78,83 @@ importers:
       tailwindcss:
         specifier: ^4.0.0
         version: 4.3.3
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/boundary-lint:
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/capabilities/billing:
+    dependencies:
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/capabilities/quoting:
+    dependencies:
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
       typescript:
         specifier: 5.9.2
         version: 5.9.2
@@ -148,6 +228,139 @@ importers:
       typescript-eslint:
         specifier: ^8.50.0
         version: 8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.2)
+
+  packages/factory:
+    dependencies:
+      '@repo/capability-billing':
+        specifier: workspace:*
+        version: link:../capabilities/billing
+      '@repo/capability-quoting':
+        specifier: workspace:*
+        version: link:../capabilities/quoting
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@repo/pack-jurisdiction-es-es':
+        specifier: workspace:*
+        version: link:../packs/jurisdiction-es-es
+      '@repo/pack-vertical-construction-reformas':
+        specifier: workspace:*
+        version: link:../packs/vertical-construction-reformas
+      yaml:
+        specifier: ^2.6.1
+        version: 2.9.0
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.1
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/kernel:
+    dependencies:
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/packs/jurisdiction-es-es:
+    dependencies:
+      '@repo/capability-billing':
+        specifier: workspace:*
+        version: link:../../capabilities/billing
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/packs/vertical-construction-reformas:
+    dependencies:
+      '@repo/capability-quoting':
+        specifier: workspace:*
+        version: link:../../capabilities/quoting
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/typescript-config: {}
 
