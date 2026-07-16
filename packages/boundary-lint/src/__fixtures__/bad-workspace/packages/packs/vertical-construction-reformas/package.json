@@ -1,0 +1,6 @@
+{
+  "name": "@repo/pack-vertical-construction-reformas",
+  "dependencies": {
+    "@repo/pack-jurisdiction-es-es": "workspace:*"
+  }
+}

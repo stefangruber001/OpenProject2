@@ -1,0 +1,6 @@
+{
+  "name": "@repo/kernel",
+  "dependencies": {
+    "@repo/pack-jurisdiction-es-es": "workspace:*"
+  }
+}

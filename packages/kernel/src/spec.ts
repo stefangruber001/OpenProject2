@@ -31,7 +31,7 @@ export const kernelConfigSchema = z.object({
   }),
 });
 
-/** `es-ES@2026-07-16` → { id: "es-ES", date: "2026-07-16" } (date optional). */
+/** `xx-XX@2026-07-16` → { id: "xx-XX", date: "2026-07-16" } (date optional). */
 export function parsePackRef(ref: string): { id: string; date?: string } {
   const at = ref.lastIndexOf("@");
   if (at === -1) return { id: ref };
@@ -66,9 +66,9 @@ export interface CapabilityManifest {
 
 /** What packs declare. Packs are the ONLY place adapters come from. */
 export interface PackManifest<C = unknown> {
-  /** Full id, e.g. "jurisdiction/es-ES" or "vertical/construction/reformas". */
+  /** Full id, e.g. "jurisdiction/xx-XX" or "vertical/some-sector". */
   id: string;
-  /** Spec-facing short id, e.g. "es-ES" or "construction/reformas". */
+  /** Spec-facing short id, e.g. "xx-XX" or "some-sector". */
   shortId: string;
   layer: "jurisdiction" | "vertical";
   version: string;

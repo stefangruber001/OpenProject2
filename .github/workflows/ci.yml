@@ -30,6 +30,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Architecture boundaries (layer matrix + forbidden literals)
+        run: pnpm boundaries
+
       - name: Type-check
         run: pnpm check-types
 
