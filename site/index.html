@@ -1,24 +1,31 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
-<title>Diorka ERP — revisión y pruebas (R1)</title>
+<title>Canei Subirats ERP — review & testing (R1)</title>
 <style>
   :root {
-    --paper:#f7f6f3; --card:#fffefb; --ink:#14181c; --ink2:#565d66; --mut:#8b9099;
-    --line:#dcdad4; --acc:#1f5fa8; --acc-soft:#e3ecf7;
+    --paper:#f7f7f5; --card:#ffffff; --ink:#1a1c18; --ink2:#4a4f45; --mut:#747474;
+    --line:#d2d2d2; --acc:#48733c; --acc-soft:#e7efe3; --spark:#f2c230;
+    --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
+    --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
   }
   @media (prefers-color-scheme: dark){ :root{
-    --paper:#131518; --card:#1b1e22; --ink:#f2f1ed; --ink2:#b9bec6; --mut:#7e848d;
-    --line:#2e3237; --acc:#6ea8e8; --acc-soft:#1d2b3d; } }
+    --paper:#14170f; --card:#1b1f16; --ink:#f0f1e9; --ink2:#c2c8ba; --mut:#8b917f;
+    --line:#2e3327; --acc:#7fae6f; --acc-soft:#21301b; } }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 var(--sans);
     display:grid;place-items:center;min-height:100vh;padding:24px}
   .wrap{max-width:640px;display:flex;flex-direction:column;gap:18px}
+  .logo{display:flex;align-items:center;gap:11px;margin-bottom:2px}
+  .logo .mark{width:34px;height:34px;border-radius:8px;background:var(--acc);position:relative;flex:none}
+  .logo .mark::after{content:"";position:absolute;right:6px;bottom:6px;width:9px;height:9px;border-radius:2px;background:var(--spark)}
+  .logo .name{font-family:var(--serif);font-weight:600;font-size:20px;line-height:1.1}
+  .logo .name small{display:block;font-family:var(--sans);font-weight:500;font-size:11px;font-style:italic;color:var(--mut)}
   .tag{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);font-weight:700}
-  h1{font-size:26px;margin:0;letter-spacing:-0.01em}
+  h1{font-family:var(--serif);font-weight:600;font-size:26px;margin:0;letter-spacing:-0.01em}
   p{margin:0;color:var(--ink2);font-size:14.5px}
   a.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:12px;
     padding:16px 18px;text-decoration:none;color:var(--ink)}
@@ -28,32 +35,39 @@
   .note{border-left:3px solid var(--acc);background:var(--acc-soft);border-radius:0 8px 8px 0;
     padding:10px 14px;font-size:12.5px;color:var(--ink2)}
   code{font-family:ui-monospace,Menlo,monospace;font-size:.9em}
+  footer{font-size:11.5px;color:var(--mut)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div>
-    <div class="tag">Diorka · ERP · Release 1</div>
-    <h1>Revisión y pruebas — presupuesto sin papel</h1>
+    <div class="logo">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="name">Canei Subirats<small>Renovations, simply complex.</small></span>
+    </div>
+    <div class="tag">ERP · Release 1</div>
+    <h1>Review &amp; testing — the paperless quote</h1>
   </div>
   <a class="card" href="frontend.html">
-    <b>🏗️ Frontend — demo interactivo</b>
-    <span>Constructor de presupuestos por catálogo (18 capítulos, mediciones), opcionales aparte,
-    aceptación con selección de opciones, factura con IVA decidido por regla legal (art.
-    91.Uno.2.10º) y sello SHA-256 encadenado, más la comparativa de proveedores. Misma lógica de
-    negocio que el sistema real.</span>
+    <b>🏗️ Frontend — interactive demo</b>
+    <span>Catalogue-first quote builder (18 chapters, measurements), optionals shown separately,
+    acceptance with option selection, an invoice whose VAT is decided by a legal rule (art.
+    91.Uno.2.10º) with a chained SHA-256 seal, plus the supplier comparison. Same business logic
+    as the real system.</span>
   </a>
   <a class="card" href="backend.html">
-    <b>🗄️ Backend — API con respuestas reales</b>
-    <span>Los endpoints del backend (composición del tenant, presupuestos, facturas con
-    justificación fiscal persistida, salud) con respuestas capturadas del servidor real en la
-    verificación del build.</span>
+    <b>🗄️ Backend — API with real responses</b>
+    <span>The backend endpoints (tenant composition, quotes, invoices with persisted fiscal
+    justification, health) with responses captured from the real server during build
+    verification.</span>
   </a>
   <div class="note">
-    Todos los datos son sintéticos (ningún dato real de clientes). El backend desplegable con base
-    de datos llega con la decisión de hosting (fase R4 del plan de entrega); mientras tanto se
-    ejecuta desde el repositorio con <code>pnpm dev</code>.
+    Working language is English; the fiscal invoice renders in es-ES (Spanish VAT). All data is
+    synthetic (no real customer data). The deployable backend with a database arrives with the
+    hosting decision (delivery phase R4); until then it runs from the repository with
+    <code>pnpm dev</code>.
   </div>
+  <footer>Canei Subirats, S.L. · Carrer de la Creu, 74, 08960 Sant Just Desvern · 659 87 67 00 · hola@caneisubirats.com</footer>
 </div>
 </body>
 </html>

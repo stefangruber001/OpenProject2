@@ -1,36 +1,49 @@
 <meta charset="utf-8" />
-<title>Diorka ERP — demo interactivo (R1)</title>
+<title>Canei Subirats ERP — interactive demo (R1)</title>
 <style>
   :root {
-    --paper: #f7f6f3; --card: #fffefb; --ink: #14181c; --ink2: #565d66; --mut: #8b9099;
-    --line: #dcdad4; --acc: #1f5fa8; --acc-soft: #e3ecf7; --ok: #1a7a4a; --opt: #a86a1f;
-    --opt-soft: #f6ecdc; --bad: #b3382e; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --paper: #f7f7f5; --card: #ffffff; --ink: #1a1c18; --ink2: #4a4f45; --mut: #747474;
+    --line: #d2d2d2; --acc: #48733c; --acc-soft: #e7efe3; --ok: #65bc7b; --opt: #a86a1f;
+    --opt-soft: #f6ecdc; --bad: #b3382e; --spark: #f2c230;
+    --serif: "Roboto Serif", Georgia, "Times New Roman", serif;
+    --sans: Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) {
-      --paper: #131518; --card: #1b1e22; --ink: #f2f1ed; --ink2: #b9bec6; --mut: #7e848d;
-      --line: #2e3237; --acc: #6ea8e8; --acc-soft: #1d2b3d; --ok: #4bbf85; --opt: #d9a45a;
+      --paper: #14170f; --card: #1b1f16; --ink: #f0f1e9; --ink2: #c2c8ba; --mut: #8b917f;
+      --line: #2e3327; --acc: #7fae6f; --acc-soft: #21301b; --ok: #65bc7b; --opt: #d9a45a;
       --opt-soft: #33291a; --bad: #e07a72;
     }
   }
   :root[data-theme="dark"] {
-    --paper: #131518; --card: #1b1e22; --ink: #f2f1ed; --ink2: #b9bec6; --mut: #7e848d;
-    --line: #2e3237; --acc: #6ea8e8; --acc-soft: #1d2b3d; --ok: #4bbf85; --opt: #d9a45a;
+    --paper: #14170f; --card: #1b1f16; --ink: #f0f1e9; --ink2: #c2c8ba; --mut: #8b917f;
+    --line: #2e3327; --acc: #7fae6f; --acc-soft: #21301b; --ok: #65bc7b; --opt: #d9a45a;
     --opt-soft: #33291a; --bad: #e07a72;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--paper); color: var(--ink);
-    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    font: 15px/1.5 var(--sans);
   }
   header.top {
-    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
-    padding: 18px 22px 14px; border-bottom: 2px solid var(--ink);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 16px 22px 14px; border-bottom: 3px solid var(--acc);
     max-width: 1060px; margin: 0 auto;
   }
-  header.top h1 { font-size: 19px; margin: 0; letter-spacing: -0.01em; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo .mark {
+    width: 30px; height: 30px; border-radius: 7px; background: var(--acc);
+    position: relative; flex: none;
+  }
+  .logo .mark::after {
+    content: ""; position: absolute; right: 5px; bottom: 5px; width: 8px; height: 8px;
+    border-radius: 2px; background: var(--spark);
+  }
+  .logo .name { font-family: var(--serif); font-weight: 600; font-size: 18px; letter-spacing: -0.01em; }
+  .logo .name small { display: block; font-family: var(--sans); font-weight: 500; font-size: 10.5px; font-style: italic; color: var(--mut); letter-spacing: 0; }
   header.top .tag { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--acc); font-weight: 700; }
-  header.top .note { margin-left: auto; font-size: 12px; color: var(--mut); }
+  header.top .note { margin-left: auto; font-size: 12px; color: var(--mut); max-width: 260px; text-align: right; }
   main { max-width: 1060px; margin: 0 auto; padding: 18px 22px 60px; display: flex; flex-direction: column; gap: 18px; }
   .tabs { display: flex; gap: 6px; }
   .tabs button {
@@ -40,13 +53,13 @@
   .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--card); background: var(--card); box-shadow: inset 0 2px 0 var(--acc); }
   .panel { background: var(--card); border: 1px solid var(--line); border-radius: 0 10px 10px 10px; padding: 18px; }
   h2 { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mut); margin: 0 0 10px; }
-  h3 { font-size: 13px; margin: 18px 0 8px; }
+  h3 { font-family: var(--serif); font-weight: 600; font-size: 14px; margin: 18px 0 8px; }
   table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
   th { text-align: left; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); border-bottom: 1.5px solid var(--line); padding: 6px 8px; }
   td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
   td.n, th.n { text-align: right; white-space: nowrap; }
   tr.optional td { color: var(--opt); }
-  tr.total td { font-weight: 700; border-top: 2px solid var(--ink); border-bottom: none; }
+  tr.total td { font-weight: 700; border-top: 2px solid var(--acc); border-bottom: none; }
   .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); align-items: end; }
   label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; font-weight: 600; color: var(--ink2); }
   input, select {
@@ -59,14 +72,12 @@
     font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; border: none;
     background: var(--acc); color: #fff; border-radius: 8px; padding: 9px 16px;
   }
-  :root[data-theme="dark"] button.primary, :root:not([data-theme="light"]) button.primary { color: #0d1117; }
-  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) button.primary { color: #fff; } }
   button.ghost { font: inherit; font-size: 12.5px; cursor: pointer; background: none; border: 1px solid var(--line); color: var(--ink2); border-radius: 8px; padding: 8px 12px; }
   .pill { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; padding: 2px 9px; border-radius: 999px; }
   .pill.draft { background: var(--opt-soft); color: var(--opt); }
   .pill.ok { background: var(--acc-soft); color: var(--acc); }
-  .doc { border: 1.5px solid var(--ink); border-radius: 10px; padding: 18px 20px; margin-top: 12px; }
-  .doc .head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 10px; }
+  .doc { border: 1.5px solid var(--acc); border-radius: 10px; padding: 18px 20px; margin-top: 12px; }
+  .doc .head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-bottom: 2px solid var(--acc); padding-bottom: 8px; margin-bottom: 10px; }
   .doc .num { font-family: var(--mono); font-weight: 700; }
   .just { background: var(--acc-soft); border-left: 3px solid var(--acc); border-radius: 0 8px 8px 0; padding: 9px 12px; font-size: 12.5px; margin-top: 10px; }
   .seal { font-family: var(--mono); font-size: 11px; color: var(--mut); margin-top: 8px; word-break: break-all; }
@@ -78,109 +89,114 @@
   .flash { animation: flash 0.7s ease-out; }
   @keyframes flash { from { background: var(--acc-soft); } to { background: transparent; } }
   @media (prefers-reduced-motion: reduce) { .flash { animation: none; } }
-  .cols { display: grid; gap: 16px; grid-template-columns: 1fr; }
-  @media (min-width: 900px) { .cols.two { grid-template-columns: 1fr 1fr; } }
 </style>
 
 <header class="top">
-  <span class="tag">Diorka · ERP</span>
-  <h1>Demo interactivo — Release 1 «Presupuesto sin papel»</h1>
-  <span class="note">misma lógica de negocio que el sistema real · datos de ejemplo, nada se envía</span>
+  <div class="logo">
+    <span class="mark" aria-hidden="true"></span>
+    <span class="name">Canei Subirats<small>Renovations, simply complex.</small></span>
+  </div>
+  <span class="tag">ERP · Release 1</span>
+  <span class="note">interactive demo · same business logic as the real system · sample data, nothing is sent</span>
 </header>
 
 <main>
   <div class="tabs" role="tablist">
-    <button role="tab" aria-selected="true" data-tab="presupuesto">Presupuesto → Factura</button>
-    <button role="tab" aria-selected="false" data-tab="comparativa">Comparativa de proveedores</button>
+    <button role="tab" aria-selected="true" data-tab="quote">Quote → Invoice</button>
+    <button role="tab" aria-selected="false" data-tab="comparison">Supplier comparison</button>
   </div>
 
-  <!-- ============ PRESUPUESTO ============ -->
-  <section class="panel" id="tab-presupuesto">
+  <!-- ============ QUOTE ============ -->
+  <section class="panel" id="tab-quote">
     <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
-      <h2 style="margin:0">Presupuesto — Reforma integral baño · C/ Balmes 24, 2º1ª</h2>
-      <span id="q-status" class="pill draft">borrador</span>
+      <h2 style="margin:0">Quote — Full bathroom renovation · C/ Balmes 24, 2º1ª</h2>
+      <span id="q-status" class="pill draft">draft</span>
     </div>
 
-    <table id="q-table" aria-label="Partidas del presupuesto"></table>
+    <table id="q-table" aria-label="Quote line items"></table>
 
     <div id="builder">
-      <h3>Añadir partida — elegir, no teclear</h3>
+      <h3>Add line item — choose, don't type</h3>
       <div class="grid">
-        <label style="grid-column: span 2">Capítulo
+        <label style="grid-column: span 2">Chapter
           <select id="f-chapter"></select>
         </label>
-        <label style="grid-column: span 2">Descripción
-          <input id="f-desc" placeholder="p. ej. Alicatado azulejo 20×60" />
+        <label style="grid-column: span 2">Description
+          <input id="f-desc" placeholder="e.g. Ceramic tiling 20×60" />
         </label>
-        <label>Unidad
+        <label>Unit
           <select id="f-unit"></select>
         </label>
-        <label>Unidades <input id="f-ud" type="number" step="0.001" value="1" /></label>
-        <label>Largo (m) <input id="f-largo" type="number" step="0.01" placeholder="—" /></label>
-        <label>Ancho (m) <input id="f-ancho" type="number" step="0.01" placeholder="—" /></label>
-        <label>Precio ud. (€) <input id="f-precio" type="number" step="0.01" /></label>
-        <label class="check"><input id="f-opt" type="checkbox" /> Opcional</label>
-        <button class="primary" id="f-add" type="button">Añadir</button>
+        <label>Units <input id="f-ud" type="number" step="0.001" value="1" /></label>
+        <label>Length (m) <input id="f-largo" type="number" step="0.01" placeholder="—" /></label>
+        <label>Width (m) <input id="f-ancho" type="number" step="0.01" placeholder="—" /></label>
+        <label>Unit price (€) <input id="f-precio" type="number" step="0.01" /></label>
+        <label class="check"><input id="f-opt" type="checkbox" /> Optional</label>
+        <button class="primary" id="f-add" type="button">Add</button>
       </div>
-      <p class="hint">La cantidad se calcula por medición: unidades × largo × ancho (céntimos enteros, sin decimales flotantes — igual que el núcleo real).</p>
+      <p class="hint">Quantity is computed from the measurement: units × length × width (whole cents, no floating-point — exactly like the real kernel).</p>
     </div>
 
     <div id="acceptbox">
-      <h3>Aceptación del cliente</h3>
+      <h3>Client acceptance</h3>
       <div id="opt-list" style="display:flex;flex-direction:column;gap:6px;font-size:13px"></div>
       <div style="margin-top:10px;display:flex;gap:10px">
-        <button class="primary" id="q-accept" type="button">Marcar como aceptado</button>
-        <button class="ghost" id="q-reset" type="button">Vaciar y empezar de cero</button>
+        <button class="primary" id="q-accept" type="button">Mark as accepted</button>
+        <button class="ghost" id="q-reset" type="button">Clear and start over</button>
       </div>
     </div>
 
     <div id="invoicebox" hidden>
-      <h3>Emitir factura — el IVA lo decide la regla, no un desplegable</h3>
+      <h3>Issue invoice — the VAT rate is decided by the rule, not a dropdown</h3>
       <div class="grid">
-        <label style="grid-column: span 2">Cliente <input id="i-name" value="María García López" /></label>
-        <label>NIF <input id="i-nif" value="00000000T" /></label>
-        <label>Destinatario
+        <label style="grid-column: span 2">Client <input id="i-name" value="María García López" /></label>
+        <label>Tax ID <input id="i-nif" value="00000000T" /></label>
+        <label>Recipient
           <select id="i-recipient">
-            <option value="individual-private">Particular</option>
-            <option value="community-of-owners">Comunidad de propietarios</option>
-            <option value="business">Empresa</option>
+            <option value="individual-private">Individual</option>
+            <option value="community-of-owners">Community of owners</option>
+            <option value="business">Business</option>
           </select>
         </label>
-        <label class="check"><input id="i-private" type="checkbox" checked /> Vivienda de uso particular</label>
-        <label>Antigüedad (años) <input id="i-age" type="number" value="15" /></label>
-        <label>Materiales (% de la base) <input id="i-mat" type="number" step="0.1" value="35" /></label>
-        <button class="primary" id="i-issue" type="button">Emitir factura</button>
+        <label class="check"><input id="i-private" type="checkbox" checked /> Private-use dwelling</label>
+        <label>Age (years) <input id="i-age" type="number" value="15" /></label>
+        <label>Materials (% of base) <input id="i-mat" type="number" step="0.1" value="35" /></label>
+        <button class="primary" id="i-issue" type="button">Issue invoice</button>
       </div>
-      <p class="hint">Prueba a cambiar «Destinatario» a Empresa, la antigüedad a 1 año o materiales a 45 % — la decisión y su justificación cambian (art. 91.Uno.2.10º LIVA).</p>
+      <p class="hint">Try switching "Recipient" to Business, age to 1 year or materials to 45 % — the decision and its justification change (art. 91.Uno.2.10º LIVA). The fiscal invoice renders in es-ES (Spanish VAT), independent of this English UI.</p>
     </div>
 
     <div id="docbox"></div>
   </section>
 
-  <!-- ============ COMPARATIVA ============ -->
-  <section class="panel" id="tab-comparativa" hidden>
-    <h2>Comparativa de proveedores — precio ausente ≠ cero · variación vs. estudio inicial</h2>
-    <div style="overflow-x:auto"><table id="c-table" aria-label="Comparativa de proveedores"></table></div>
-    <p class="hint">Edita cualquier precio y el cuadro recalcula importes, variación absoluta y porcentual por capítulo y total. Haz clic en un importe para marcarlo como <b>coste seleccionado</b> (elección explícita, nunca inferida).</p>
+  <!-- ============ COMPARISON ============ -->
+  <section class="panel" id="tab-comparison" hidden>
+    <h2>Supplier comparison — a missing price ≠ zero · variance vs. the initial estimate</h2>
+    <div style="overflow-x:auto"><table id="c-table" aria-label="Supplier comparison"></table></div>
+    <p class="hint">Edit any price and the sheet recomputes amounts, absolute and percentage variance per chapter and total. Click an amount to mark it as the <b>selected cost</b> (an explicit choice, never inferred).</p>
     <div id="c-selected" style="margin-top:10px;font-size:13.5px"></div>
   </section>
 
   <footer style="font-size:11.5px;color:var(--mut)">
-    Reglas reproducidas del sistema real: dinero en céntimos enteros · cantidades en milésimas · IVA efectivo por fecha con justificación persistida · numeración FAC-AAAA-NNNN sin huecos · encadenado SHA-256 de facturas (WebCrypto). Gate legal: <span style="font-family:var(--mono)">legally_verified:false</span> hasta revisión del asesor.
+    <div style="margin-bottom:6px">Rules mirrored from the real system: money in whole cents · quantities in thousandths · effective-dated VAT with persisted justification · gapless FAC-YYYY-NNNN numbering · SHA-256 invoice chaining (WebCrypto). Legal gate: <span style="font-family:var(--mono)">legally_verified:false</span> until the asesor's review.</div>
+    Canei Subirats, S.L. · Carrer de la Creu, 74, 08960 Sant Just Desvern · 659 87 67 00 · hola@caneisubirats.com — <b>demo, synthetic data only</b>.
   </footer>
 </main>
 
 <script type="module">
-  // ---- núcleo (espejo fiel de packages/kernel + packs) ---------------------
-  const CHAPTERS = ["Demoliciones y trabajos previos","Estructura","Albañilería y tabiquería","Revestimientos y acabados","Aparatos sanitarios","Carpintería interior","Carpintería exterior","Cocina","Pintura","Instalación eléctrica","Climatización","Ventilación","Fontanería","Saneamiento","Telecomunicaciones","Protección contra incendios","Varios y generales","Trabajos opcionales"];
+  // ---- kernel (faithful mirror of packages/kernel + packs) -----------------
+  // Chapters: canonical keys with English display labels (chapterLabels.en).
+  const CHAPTERS = ["Demolition & preliminary works","Structure","Masonry & partitions","Coverings & finishes","Sanitary fixtures","Interior joinery","Exterior joinery","Kitchen","Painting","Electrical installation","HVAC / climate control","Ventilation","Plumbing","Drainage","Telecommunications","Fire protection","Miscellaneous & general","Optional works"];
   const UNITS = ["ud","m","m²","m³","h","PA"];
   const fmt = (c) => new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR"}).format(c/100);
-  const qty = (m) => (m/1000).toLocaleString("es-ES");
+  const qty = (m) => (m/1000).toLocaleString("en-GB");
   const rdiv = (n,d) => { const s=n<0?-1:1, a=Math.abs(n), q=Math.floor(a/d), r=a-q*d; const v=s*(r*2>=d?q+1:q); return v===0?0:v; };
   const lineTotal = (qm,uc) => rdiv(qm*uc,1000);
   const applyBp = (base,bp) => rdiv(base*bp,10000);
   const millis = (u,l,a) => Math.round(u*(l||1)*(a||1)*1000);
 
+  // The invoice is a fiscal document → rendered in es-ES (Spanish), independent
+  // of the English working UI. This mirrors the real es-ES jurisdiction render.
   function decideIVA({recipient, privateUse, age, matBp}) {
     const fails = [];
     const okRecipient = recipient==="community-of-owners" || (recipient==="individual-private" && privateUse);
@@ -192,16 +208,16 @@
   }
   async function sha256(obj){ const b=new TextEncoder().encode(JSON.stringify(obj)); const h=await crypto.subtle.digest("SHA-256",b); return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
 
-  // ---- estado --------------------------------------------------------------
+  // ---- state ---------------------------------------------------------------
   let lines = [
-    { ch:"Demoliciones y trabajos previos", d:"Demolición alicatado y retirada de escombros", u:"m²", qm:millis(1,5,2.5), uc:1840, opt:false },
-    { ch:"Revestimientos y acabados", d:"Alicatado azulejo cerámico 20×60", u:"m²", qm:millis(5,2.5,1.98), uc:3200, opt:false },
-    { ch:"Fontanería", d:"Instalación fontanería completa de baño", u:"ud", qm:1000, uc:185000, opt:false },
-    { ch:"Trabajos opcionales", d:"Mampara de vidrio templado premium", u:"ud", qm:1000, uc:48000, opt:true },
+    { ch:"Demolition & preliminary works", d:"Strip tiling and remove rubble", u:"m²", qm:millis(1,5,2.5), uc:1840, opt:false },
+    { ch:"Coverings & finishes", d:"Ceramic wall tiling 20×60", u:"m²", qm:millis(5,2.5,1.98), uc:3200, opt:false },
+    { ch:"Plumbing", d:"Full bathroom plumbing installation", u:"ud", qm:1000, uc:185000, opt:false },
+    { ch:"Optional works", d:"Premium tempered-glass shower screen", u:"ud", qm:1000, uc:48000, opt:true },
   ];
   let accepted = false, facSeq = 0, chainPrev = null, chainSeq = 0;
 
-  // ---- presupuesto UI ------------------------------------------------------
+  // ---- quote UI ------------------------------------------------------------
   const $ = (id) => document.getElementById(id);
   $("f-chapter").innerHTML = CHAPTERS.map(c=>`<option>${c}</option>`).join("");
   $("f-unit").innerHTML = UNITS.map(u=>`<option${u==="m²"?" selected":""}>${u}</option>`).join("");
@@ -213,12 +229,12 @@
     const row = (l,i) => `<tr class="${l.opt?"optional":""} ${i===lines.length-1?"flash":""}">
       <td>${l.opt?"◇ ":""}${l.ch} — ${l.d}</td><td class="n">${qty(l.qm)} ${l.u}</td>
       <td class="n">${fmt(l.uc)}</td><td class="n"><b>${fmt(lineTotal(l.qm,l.uc))}</b></td></tr>`;
-    $("q-table").innerHTML = `<thead><tr><th>Concepto</th><th class="n">Cantidad</th><th class="n">Precio ud.</th><th class="n">Importe</th></tr></thead>
+    $("q-table").innerHTML = `<thead><tr><th>Item</th><th class="n">Quantity</th><th class="n">Unit price</th><th class="n">Amount</th></tr></thead>
       <tbody>${lines.map(row).join("")}
-      <tr class="total"><td colspan="3">Base (opcionales aparte: ${fmt(t.opc)})</td><td class="n">${fmt(t.base)}</td></tr></tbody>`;
-    $("opt-list").innerHTML = lines.filter(l=>l.opt).map((l)=>`<label class="check" style="padding:0"><input type="checkbox" class="optsel" data-d="${l.d}" checked /> Incluir opcional: ${l.d} (${fmt(lineTotal(l.qm,l.uc))})</label>`).join("") || `<span class="hint">Sin opcionales.</span>`;
+      <tr class="total"><td colspan="3">Base (optionals shown separately: ${fmt(t.opc)})</td><td class="n">${fmt(t.base)}</td></tr></tbody>`;
+    $("opt-list").innerHTML = lines.filter(l=>l.opt).map((l)=>`<label class="check" style="padding:0"><input type="checkbox" class="optsel" data-d="${l.d}" checked /> Include optional: ${l.d} (${fmt(lineTotal(l.qm,l.uc))})</label>`).join("") || `<span class="hint">No optionals.</span>`;
     $("builder").hidden = accepted; $("acceptbox").hidden = accepted; $("invoicebox").hidden = !accepted;
-    $("q-status").textContent = accepted ? "aceptado" : "borrador";
+    $("q-status").textContent = accepted ? "accepted" : "draft";
     $("q-status").className = "pill " + (accepted ? "ok" : "draft");
   }
 
@@ -241,14 +257,15 @@
   $("i-issue").onclick = async () => {
     const dec = decideIVA({ recipient: $("i-recipient").value, privateUse: $("i-private").checked,
       age: parseFloat($("i-age").value||"0"), matBp: Math.round(parseFloat($("i-mat").value||"0")*100) });
-    const base = totals(lines).base + totals(lines).opc; // aceptado = base + opcionales elegidas
+    const base = totals(lines).base + totals(lines).opc; // accepted = base + chosen optionals
     const cuota = applyBp(base, dec.rateBp);
     const num = `FAC-2026-${String(++facSeq).padStart(4,"0")}`;
     chainSeq += 1;
     const seal = await sha256({ seq: chainSeq, prev: chainPrev, num, total: base+cuota });
     const prev = chainPrev; chainPrev = seal;
+    // Fiscal document — Spanish (es-ES locale), as the real jurisdiction pack renders it.
     $("docbox").innerHTML = `<div class="doc">
-      <div class="head"><div><b>Factura</b> <span class="num">${num}</span><br /><span style="font-size:12px;color:var(--mut)">Diorka Reformas · CIF pendiente de validación · 17/07/2026</span></div>
+      <div class="head"><div><b>Factura</b> <span class="num">${num}</span><br /><span style="font-size:12px;color:var(--mut)">Canei Subirats, S.L. · CIF pendiente de validación · Carrer de la Creu 74, Sant Just Desvern · 17/07/2026</span></div>
       <div style="text-align:right;font-size:13px">${$("i-name").value}<br /><span style="color:var(--mut)">NIF ${$("i-nif").value}</span></div></div>
       <table><tbody>
         ${lines.map(l=>`<tr><td>${l.ch} — ${l.d}</td><td class="n">${qty(l.qm)} ${l.u}</td><td class="n">${fmt(lineTotal(l.qm,l.uc))}</td></tr>`).join("")}
@@ -256,32 +273,32 @@
         <tr><td colspan="2">IVA ${(dec.rateBp/100).toLocaleString("es-ES")} % <span style="font-family:var(--mono);font-size:11px;color:var(--mut)">(${dec.code})</span></td><td class="n">${fmt(cuota)}</td></tr>
         <tr class="total"><td colspan="2">Total</td><td class="n">${fmt(base+cuota)}</td></tr>
       </tbody></table>
-      <div class="just"><b>Justificación persistida</b> · ${dec.basis}<br />${dec.why}<br /><span style="font-family:var(--mono);font-size:11px">legally_verified: false — pendiente de revisión del asesor</span></div>
-      <div class="seal">sello #${chainSeq} · SHA-256 · ${seal}${prev?`<br />prev · ${prev}`:""}</div>
+      <div class="just"><b>Persisted justification</b> · ${dec.basis}<br />${dec.why}<br /><span style="font-family:var(--mono);font-size:11px">legally_verified: false — pending asesor review</span></div>
+      <div class="seal">seal #${chainSeq} · SHA-256 · ${seal}${prev?`<br />prev · ${prev}`:""}</div>
     </div>`;
     $("docbox").scrollIntoView({ behavior:"smooth", block:"start" });
   };
 
-  // ---- comparativa ---------------------------------------------------------
-  const BIDDERS = [{id:"study",n:"Estudio inicial"},{id:"a",n:"Contratista A"},{id:"b",n:"Contratista B"}];
+  // ---- comparison ----------------------------------------------------------
+  const BIDDERS = [{id:"study",n:"Initial estimate"},{id:"a",n:"Contractor A"},{id:"b",n:"Contractor B"}];
   const cLines = [
-    { ch:"Demoliciones", d:"Demolición y retirada", u:"m²", qm:millis(1,5,2.5), p:{study:1000,a:900,b:null} },
-    { ch:"Demoliciones", d:"Transporte a vertedero", u:"ud", qm:2000, p:{study:9500,a:11000,b:8500} },
-    { ch:"Revestimientos", d:"Alicatado 20×60", u:"m²", qm:millis(5,2.5,1.98), p:{study:3200,a:3550,b:2980} },
-    { ch:"Revestimientos", d:"Pavimento porcelánico", u:"m²", qm:millis(1,5,2.4), p:{study:2890,a:null,b:2650} },
+    { ch:"Demolition", d:"Demolition and removal", u:"m²", qm:millis(1,5,2.5), p:{study:1000,a:900,b:null} },
+    { ch:"Demolition", d:"Transport to landfill", u:"ud", qm:2000, p:{study:9500,a:11000,b:8500} },
+    { ch:"Coverings", d:"Wall tiling 20×60", u:"m²", qm:millis(5,2.5,1.98), p:{study:3200,a:3550,b:2980} },
+    { ch:"Coverings", d:"Porcelain flooring", u:"m²", qm:millis(1,5,2.4), p:{study:2890,a:null,b:2650} },
   ];
   let selection = {}; // lineIndex -> bidderId
   function cTotals(rows){ const t={}; for (const b of BIDDERS){ let sum=0, miss=0; for (const r of rows){ const p=r.p[b.id]; if (p==null) miss++; else sum+=lineTotal(r.qm,p);} t[b.id]={sum,miss}; } return t; }
-  function varCell(v, baseV){ if (baseV===0) return ""; const d=v-baseV, pct=rdiv(d*10000,Math.abs(baseV)); const cls=d>0?"var-pos":d<0?"var-neg":""; return `<div class="${cls}" style="font-size:11px">${d>0?"+":""}${fmt(d)} · ${(pct/100).toLocaleString("es-ES")} %</div>`; }
+  function varCell(v, baseV){ if (baseV===0) return ""; const d=v-baseV, pct=rdiv(d*10000,Math.abs(baseV)); const cls=d>0?"var-pos":d<0?"var-neg":""; return `<div class="${cls}" style="font-size:11px">${d>0?"+":""}${fmt(d)} · ${(pct/100).toLocaleString("en-GB")} %</div>`; }
   function renderComp(){
     const chapters = [...new Set(cLines.map(l=>l.ch))];
-    let html = `<thead><tr><th>Partida</th><th class="n">Cant.</th>${BIDDERS.map(b=>`<th class="n">${b.n}</th>`).join("")}</tr></thead><tbody>`;
+    let html = `<thead><tr><th>Line item</th><th class="n">Qty</th>${BIDDERS.map(b=>`<th class="n">${b.n}</th>`).join("")}</tr></thead><tbody>`;
     cLines.forEach((r,i)=>{
       html += `<tr><td>${r.ch} — ${r.d}</td><td class="n">${qty(r.qm)} ${r.u}</td>`;
       for (const b of BIDDERS){
         const p=r.p[b.id];
         const selCls = selection[i]===b.id ? "sel" : "";
-        if (p==null) html += `<td class="n ${selCls}"><span class="missing">SIN PRECIO</span><br /><input class="cell" data-i="${i}" data-b="${b.id}" placeholder="€/ud" type="number" step="0.01" /></td>`;
+        if (p==null) html += `<td class="n ${selCls}"><span class="missing">NO PRICE</span><br /><input class="cell" data-i="${i}" data-b="${b.id}" placeholder="€/ud" type="number" step="0.01" /></td>`;
         else {
           const tot = lineTotal(r.qm,p);
           const baseP = r.p.study; const baseTot = baseP==null?null:lineTotal(r.qm,baseP);
@@ -293,15 +310,15 @@
     const t = cTotals(cLines);
     for (const ch of chapters){
       const rows = cLines.filter(l=>l.ch===ch); const ct = cTotals(rows);
-      html += `<tr style="background:color-mix(in srgb, var(--line) 25%, transparent)"><td colspan="2"><b>Σ ${ch}</b></td>${BIDDERS.map(b=>`<td class="n"><b>${fmt(ct[b.id].sum)}</b>${ct[b.id].miss?` <span class="missing">${ct[b.id].miss} sin precio</span>`:""}${b.id!=="study"&&!ct[b.id].miss&&!ct.study.miss?varCell(ct[b.id].sum,ct.study.sum):""}</td>`).join("")}</tr>`;
+      html += `<tr style="background:color-mix(in srgb, var(--line) 25%, transparent)"><td colspan="2"><b>Σ ${ch}</b></td>${BIDDERS.map(b=>`<td class="n"><b>${fmt(ct[b.id].sum)}</b>${ct[b.id].miss?` <span class="missing">${ct[b.id].miss} no price</span>`:""}${b.id!=="study"&&!ct[b.id].miss&&!ct.study.miss?varCell(ct[b.id].sum,ct.study.sum):""}</td>`).join("")}</tr>`;
     }
-    html += `<tr class="total"><td colspan="2">Total obra</td>${BIDDERS.map(b=>`<td class="n">${fmt(t[b.id].sum)}${t[b.id].miss?` <span class="missing">${t[b.id].miss} sin precio</span>`:""}</td>`).join("")}</tr></tbody>`;
+    html += `<tr class="total"><td colspan="2">Project total</td>${BIDDERS.map(b=>`<td class="n">${fmt(t[b.id].sum)}${t[b.id].miss?` <span class="missing">${t[b.id].miss} no price</span>`:""}</td>`).join("")}</tr></tbody>`;
     $("c-table").innerHTML = html;
     const chosen = Object.entries(selection);
     const sum = chosen.reduce((s,[i,b])=>{ const r=cLines[i]; const p=r.p[b]; return p==null?s:s+lineTotal(r.qm,p); },0);
     $("c-selected").innerHTML = chosen.length
-      ? `Coste seleccionado (elección explícita): <b>${fmt(sum)}</b> en ${chosen.length} partida(s) — base de coste del presupuesto.`
-      : `<span class="hint">Aún no hay coste seleccionado — haz clic en el importe elegido de cada partida.</span>`;
+      ? `Selected cost (explicit choice): <b>${fmt(sum)}</b> across ${chosen.length} line item(s) — the quote's cost basis.`
+      : `<span class="hint">No selected cost yet — click the chosen amount for each line item.</span>`;
     document.querySelectorAll("input.cell").forEach(inp => inp.onchange = () => {
       const v = parseFloat(inp.value); if (!Number.isFinite(v)) return;
       cLines[inp.dataset.i].p[inp.dataset.b] = Math.round(v*100); renderComp();
@@ -314,8 +331,8 @@
   // ---- tabs ----------------------------------------------------------------
   document.querySelectorAll(".tabs button").forEach(btn => btn.onclick = () => {
     document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-selected", String(b===btn)));
-    $("tab-presupuesto").hidden = btn.dataset.tab!=="presupuesto";
-    $("tab-comparativa").hidden = btn.dataset.tab!=="comparativa";
+    $("tab-quote").hidden = btn.dataset.tab!=="quote";
+    $("tab-comparison").hidden = btn.dataset.tab!=="comparison";
   });
 
   renderQuote(); renderComp();
