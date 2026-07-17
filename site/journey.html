@@ -60,6 +60,14 @@
   .rail .st.done .t::before{content:"✓ ";color:var(--green);font-weight:800}
   .rail .st.cur{border-color:var(--green);box-shadow:inset 0 0 0 1.5px var(--green),0 8px 22px -12px rgba(72,115,60,.5)}
   .rail .st.cur .n{color:var(--green)}
+  .rail .st.nav{cursor:pointer}
+  .rail .st.nav:hover{border-color:var(--green);transform:translateY(-1px)}
+  .estrow{display:grid;grid-template-columns:1fr 68px 78px 84px 34px;gap:7px;align-items:center;margin-bottom:8px}
+  .estrow input{font:inherit;font-size:13.5px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 9px;min-width:0;width:100%}
+  .estrow .lt{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink);font-size:12.5px;text-align:right;white-space:nowrap}
+  .estrow .x{border:1px solid var(--line);background:var(--paper);border-radius:8px;height:34px;color:var(--muted);font-size:15px}
+  .estrow .x:hover{border-color:var(--crit);color:var(--crit)}
+  @media (max-width:600px){ .estrow{grid-template-columns:1fr 52px 64px 34px} .estrow .lt{display:none} }
 
   .stage{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:34px 38px;box-shadow:var(--shadow-lg);position:relative;overflow:hidden}
   .stage::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--green),var(--greenLt) 60%,var(--spark))}
@@ -311,9 +319,14 @@ async function idbGet(k){const db=await idb();return new Promise((res,rej)=>{con
 async function idbSet(k,v){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(STORE,"readwrite").objectStore(STORE).put(v,k);rq.onsuccess=()=>res();rq.onerror=()=>rej(rq.error);});}
 async function idbDel(k){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(STORE,"readwrite").objectStore(STORE).delete(k);rq.onsuccess=()=>res();rq.onerror=()=>rej(rq.error);});}
 
-let PROJECT = { profile:null, folders:{} };   // loaded at boot
+let PROJECT = { profile:null, folders:{}, stageData:{} };   // loaded at boot
 let S = buildS(SAMPLE);
 let step = -1;
+let reached = 0;   // furthest stage reached
+const todayISO = ()=>new Date().toISOString().slice(0,10);
+const fmtDate = iso=>{ if(!iso) return today(); const p=String(iso).split("-"); return p.length===3?p[2]+"/"+p[1]+"/"+p[0]:iso; };
+const addDaysISO = (iso,n)=>{ const d=iso?new Date(iso):new Date(); d.setDate(d.getDate()+(Number(n)||0)); return d.toISOString().slice(0,10); };
+const sdOf = i => PROJECT.stageData[i] || (PROJECT.stageData[i]={});
 let saveT; function persistSoon(){clearTimeout(saveT);saveT=setTimeout(()=>idbSet("project",PROJECT).catch(()=>{}),120);}
 
 const committed = ()=>sum(S.chapters,c=>c.committed);
@@ -576,13 +589,21 @@ function buildDocPdf(d){
   return btoa(pdf);
 }
 function invoiceDoc(){
+  const sd=sdOf(8);
   const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
+  const irpf=Math.max(0,Number(sd.irpfPct)||0); const irpfAmt=Math.round(S.revenue*irpf/100);
+  const issueISO=sd.invoiceDate||todayISO();
+  const type=sd.invoiceType||"Full";
+  const docType=type==="Deposit"?"FACTURA ANTICIPO · DEPOSIT":type==="Certification"?"CERTIFICACION · PROGRESS":"FACTURA · INVOICE";
   const lines=S.chapters.map(c=>({desc:c.chapter,amount:eurTxt(c.budget)}));
   if(S.optional.included) lines.push({desc:"Optional — "+S.optional.desc,amount:eurTxt(S.optional.amount)});
-  return { docType:"FACTURA · INVOICE", number:S.invoiceNo, dateLabel:"Fecha", dateIssued:today(),
-    dueLabel:"Vencimiento", dueOrValid:addDays(S.termsDays),
+  const totals=[["Base imponible",eurTxt(S.revenue)],["IVA "+vp+"%",eurTxt(vat)]];
+  if(irpf>0) totals.push(["Retencion IRPF -"+irpf+"%","-"+eurTxt(irpfAmt)]);
+  totals.push(["Total a pagar",eurTxt(S.revenue+vat-irpfAmt)]);
+  return { docType, number:S.invoiceNo, dateLabel:"Fecha", dateIssued:fmtDate(issueISO),
+    dueLabel:"Vencimiento", dueOrValid:fmtDate(addDaysISO(issueISO,S.termsDays)),
     buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
-    lines, totals:[["Base imponible",eurTxt(S.revenue)],["IVA "+vp+"%",eurTxt(vat)],["Total a pagar",eurTxt(S.revenue+vat)]],
+    lines, totals,
     payment:["Forma de pago: transferencia · "+S.termsDays+" dias.","IBAN: "+BRAND.iban+"   ·   Referencia: "+S.invoiceNo],
     notes:[
       "Tipo de IVA decidido por la regla aplicable (tipo reducido cuando concurren las condiciones de renovacion, art. 91.Uno.2.10 LIVA); justificacion almacenada en el documento.",
@@ -643,8 +664,18 @@ function renderLedger(){
 }
 function renderRail(){
   const r=$("#rail"); r.innerHTML="";
-  STAGES.forEach((name,i)=>{ r.append(el("div","st"+(i<step?" done":"")+(i===step?" cur":""),
-    `<div class="n">STEP ${i+1}</div><div class="t">${name}</div>`)); });
+  STAGES.forEach((name,i)=>{
+    const nav = PROJECT.profile && i<=reached;
+    const st=el("div","st"+(i<step?" done":"")+(i===step?" cur":"")+(nav?" nav":""),
+      `<div class="n">STEP ${i+1}</div><div class="t">${name}</div>`);
+    if(nav) st.onclick=()=>goToStage(i);
+    r.append(st);
+  });
+}
+function goToStage(i){
+  if(!PROJECT.profile || i<0 || i>reached) return;
+  if(i>step){ while(step<i) advance(); }
+  else { step=i; renderRail(); renderStage(); renderLedger(); window.scrollTo({top:0,behavior:"smooth"}); }
 }
 let treeUrls=[];
 function fileUrl(f){ const u=URL.createObjectURL(new Blob([b64ToBytes(f.b64)],{type:f.mime})); treeUrls.push(u); return u; }
@@ -746,6 +777,126 @@ const FLOW = [
     done:()=>{ art("13 Review request","Review-request.eml","message/rfc822",textToB64(buildEml(emailContent("review")))); log("Review request drafted — loop closed"); } },
 ];
 
+/* ---------- per-stage input fields (best-practice, every stage asks for data) ---------- */
+const FIELDS = {
+  0:[ {k:"source",label:"Lead source",type:"select",options:["Referral","Website","Phone","Repeat client","Social","Other"]},
+      {k:"enquiry",label:"Enquiry / scope",type:"text",ph:"What the customer wants"},
+      {k:"targetBudget",label:"Target budget (€)",type:"number",ph:"optional"} ],
+  1:[ {k:"visitDate",label:"Visit date",type:"date"},
+      {k:"areaM2",label:"Area (m²)",type:"number",ph:"e.g. 12.5"},
+      {k:"access",label:"Access / constraints",type:"text",ph:"lift, parking, working hours…"} ],
+  3:[ {k:"validityDays",label:"Quote valid (days)",type:"number",default:30},
+      {k:"clientNote",label:"Note to client",type:"text",ph:"shown on the quote"} ],
+  4:[ {k:"acceptanceDate",label:"Acceptance date",type:"date"},
+      {k:"acceptanceMethod",label:"Method",type:"select",options:["Signed","Email","Verbal"]},
+      {k:"depositPct",label:"Deposit agreed (%)",type:"number",ph:"e.g. 40"} ],
+  5:[ {k:"startDate",label:"Start date",type:"date"},
+      {k:"plannedEnd",label:"Planned end",type:"date"},
+      {k:"projectManager",label:"Project manager",type:"text",ph:"who runs the job"} ],
+  6:[ {k:"supplier",label:"Supplier",type:"text",ph:"chosen supplier"},
+      {k:"poNumber",label:"PO number",type:"text",ph:"PO-2026-001"},
+      {k:"deliveryDate",label:"Expected delivery",type:"date"} ],
+  7:[ {k:"billNumber",label:"Supplier bill no.",type:"text"},
+      {k:"billDate",label:"Bill date",type:"date"},
+      {k:"progressPct",label:"Site progress (%)",type:"number",ph:"0–100"} ],
+  8:[ {k:"invoiceDate",label:"Invoice date",type:"date"},
+      {k:"invoiceType",label:"Invoice type",type:"select",options:["Full","Deposit","Certification"]},
+      {k:"irpfPct",label:"IRPF retention (%)",type:"number",default:0,hint:"B2B withholding — leave 0 for private clients"} ],
+  9:[ {k:"paymentDate",label:"Payment received",type:"date"},
+      {k:"paymentMethod",label:"Method",type:"select",options:["Transfer","Card","Cash","Direct debit"]} ],
+  10:[ {k:"supPaymentDate",label:"Supplier paid on",type:"date"},
+       {k:"supPaymentMethod",label:"Method",type:"select",options:["Transfer","Card","Cash","Direct debit"]} ],
+  11:[ {k:"actualEnd",label:"Actual end date",type:"date"},
+       {k:"closeNotes",label:"Close notes / lessons",type:"text",ph:"what to price differently next time"} ],
+  12:[ {k:"reviewPlatform",label:"Review platform",type:"select",options:["Google","Trustpilot","Houzz","Facebook"]},
+       {k:"sendDate",label:"Send on",type:"date"} ],
+};
+function fieldEl(fld,val){
+  const wrapCls="field"+(fld.type==="text"?" full":"");
+  const f=el("div",wrapCls);
+  let ctrl;
+  if(fld.type==="select"){
+    ctrl=el("select"); fld.options.forEach(o=>{const op=el("option",null,o);op.value=o;if(o===val)op.selected=true;ctrl.append(op);});
+  } else {
+    ctrl=el("input"); ctrl.type=fld.type==="number"?"number":fld.type==="date"?"date":"text";
+    if(fld.type==="number")ctrl.step="any"; if(fld.ph)ctrl.placeholder=fld.ph; ctrl.value=val??"";
+  }
+  ctrl.dataset.k=fld.k;
+  f.innerHTML=`<label>${fld.label}</label>`; f.append(ctrl);
+  if(fld.hint) f.append(el("span","hint",fld.hint));
+  return f;
+}
+function stageDetailsText(i){
+  const sd=sdOf(i); const flds=FIELDS[i]||[];
+  const rows=flds.map(fl=>{ let v=sd[fl.k]; if(v==null||v==="")return null; if(fl.type==="date")v=fmtDate(v); return "  "+fl.label+": "+v; }).filter(Boolean);
+  return STAGES[i]+" — details\n"+(rows.length?rows.join("\n"):"(none entered)");
+}
+function saveStageDetails(i){ if((FIELDS[i]||[]).length) textArt(FOLDERS[i],"details.txt",stageDetailsText(i)); }
+function renderFields(wrap){
+  const flds=FIELDS[step]; if(!flds) return;
+  const sd=sdOf(step);
+  const fs=el("div","fsec"); fs.style.margin="18px 0 0";
+  fs.append(el("h4",null,"Details for this step — fill what applies"));
+  const grid=el("div","frow");
+  flds.forEach(fld=>{ const val=sd[fld.k] ?? fld.default ?? (fld.type==="date"?todayISO():""); grid.append(fieldEl(fld,val)); });
+  fs.append(grid); wrap.append(fs);
+  fs.querySelectorAll("[data-k]").forEach(ctrl=>{
+    const commit=()=>{ sd[ctrl.dataset.k]=ctrl.value; persistSoon(); saveStageDetails(step);
+      if(step===8){ regenInvoice(); } renderLedger(); };
+    ctrl.oninput=commit; ctrl.onchange=commit;
+  });
+}
+function regenInvoice(){
+  if(!S.revenue) return;
+  art("09 Invoicing",S.invoiceNo+".pdf","application/pdf",buildDocPdf(invoiceDoc()));
+  art("09 Invoicing","Invoice-email.eml","message/rfc822",textToB64(buildEml(emailContent("invoice"))));
+}
+
+/* ---------- estimator (Estimate stage) ---------- */
+function renderEstimator(wrap){
+  const sd=sdOf(2);
+  if(!sd.items){ sd.items = S.chapters.length ? S.chapters.map(c=>({desc:c.chapter,qty:1,rate:(c.budget/100)})) : [{desc:"",qty:1,rate:""}]; }
+  const box=el("div","fsec"); box.style.margin="18px 0 0";
+  box.append(el("h4",null,"Estimator — build the numbers (quantity × unit rate)"));
+  const list=el("div"); list.id="estlist"; box.append(list);
+  const add=el("button","btn sm ghost","＋ Add line"); add.type="button";
+  const tot=el("div"); tot.id="esttot"; tot.style.cssText="margin-top:10px;font-size:13.5px";
+  const apply=el("button","btn sm","→ Use as the quote"); apply.type="button"; apply.style.marginTop="12px";
+  box.append(add,tot,el("br"),apply); wrap.append(box);
+
+  const draw=()=>{
+    list.innerHTML="";
+    sd.items.forEach((it,i)=>{
+      const row=el("div","estrow");
+      row.innerHTML=`<input data-f="desc" placeholder="Work / room" value="${esc(it.desc||"")}">
+        <input data-f="qty" type="number" step="any" placeholder="Qty" value="${it.qty??""}">
+        <input data-f="rate" type="number" step="any" placeholder="€/unit" value="${it.rate??""}">
+        <span class="lt">${eur(Math.round((Number(it.qty)||0)*(Number(it.rate)||0)*100))}</span>
+        <button class="x" data-x="${i}" type="button">×</button>`;
+      row.querySelectorAll("[data-f]").forEach(inp=>inp.oninput=()=>{ it[inp.dataset.f]=inp.value; persistSoon(); total(); });
+      row.querySelector("[data-x]").onclick=()=>{ sd.items.splice(i,1); if(!sd.items.length)sd.items.push({desc:"",qty:1,rate:""}); persistSoon(); draw(); };
+      list.append(row);
+    });
+    total();
+  };
+  const sumEst=()=>sd.items.reduce((s,it)=>s+Math.round((Number(it.qty)||0)*(Number(it.rate)||0)*100),0);
+  const total=()=>{ const t=sumEst(); tot.innerHTML=`<b>Estimate:</b> ${eur(t)} – ${eur(Math.round(t*1.15))} (ex-VAT) · <span class="hint">a range to align before the detailed quote</span>`; };
+  add.onclick=()=>{ sd.items.push({desc:"",qty:1,rate:""}); persistSoon(); draw(); };
+  apply.onclick=()=>{
+    const items=sd.items.filter(it=>it.desc&&Number(it.rate)>0);
+    if(!items.length){ alert("Add at least one line with a description and rate."); return; }
+    const chapters=items.map(it=>({chapter:it.desc, budget:Math.round((Number(it.qty)||1)*(Number(it.rate)||0))}));
+    if(PROJECT.profile){ PROJECT.profile.chapters=chapters; }
+    draft.chapters=chapters.map(c=>({chapter:c.chapter,budget:c.budget}));
+    S.chapters=chapters.map(c=>({chapter:c.chapter,budget:Math.round(c.budget*100),committed:0,actual:0}));
+    persistSoon(); renderLedger(); saveStageDetails(2);
+    textArt("03 Estimate","estimate.txt","Estimator for "+S.customer+"\n"+items.map(it=>"  "+it.desc+": "+it.qty+" x "+eurTxt(Math.round(it.rate*100))+" = "+eurTxt(Math.round((it.qty||1)*it.rate*100))).join("\n")+"\nEstimate total (ex-VAT): "+eurTxt(sumEst()));
+    log("Estimate applied to the quote — "+eur(sumEst())+" across "+chapters.length+" chapters.");
+    apply.textContent="✓ Sent to the quote"; setTimeout(()=>apply.textContent="→ Use as the quote",1600);
+  };
+  draw();
+}
+
 /* ---------- intake (all operator inputs) ---------- */
 let draft = clone(SAMPLE);
 function intakeHtml(){
@@ -822,9 +973,9 @@ function startJourney(){
     const e=$("#ierr"); e.hidden=false; e.textContent=!draft.customer.trim()?"Please enter the customer name.":"Add at least one chapter with a budget.";
     return;
   }
-  PROJECT.profile=clone(draft); S=buildS(PROJECT.profile); persistSoon();
+  PROJECT.profile=clone(draft); S=buildS(PROJECT.profile); PROJECT.stageData={}; persistSoon();
   const f=$("#feed"); f.innerHTML="<div>Project loaded — "+esc(S.customer)+".</div>"; f.dataset.clean="";
-  step=-1; advance();   // → step 0
+  step=-1; reached=-1; advance();   // → step 0
 }
 
 /* ---------- stage rendering ---------- */
@@ -856,6 +1007,9 @@ function renderStage(){
   const bodyDiv=el("div",null,f.body());
   bodyDiv.querySelectorAll("table").forEach(t=>{ const w=el("div","tblwrap"); t.replaceWith(w); w.append(t); });
   wrap.append(bodyDiv);
+
+  if(step===2) renderEstimator(wrap);
+  renderFields(wrap);
 
   if(f.email){
     const c=emailContent(f.email.kind);
@@ -897,7 +1051,8 @@ function renderStage(){
   if(!isLast) $("#next").onclick=advance;
 }
 function advance(){
-  step++; renderRail(); renderStage(); renderLedger();
+  step++; if(step>reached) reached=step;
+  renderRail(); renderStage(); renderLedger();
   const f=FLOW[step]; f.done&&f.done();
   window.scrollTo({top:0,behavior:"smooth"});
 }
@@ -905,8 +1060,8 @@ function editData(){ draft=clone(PROJECT.profile||SAMPLE); step=-1; renderRail()
 
 function clearAll(){
   if(!confirm("Start over? This clears the saved project and all its files on this device."))return;
-  PROJECT={profile:null,folders:{}}; idbDel("project").catch(()=>{});
-  draft=clone(SAMPLE); S=buildS(SAMPLE); step=-1;
+  PROJECT={profile:null,folders:{},stageData:{}}; idbDel("project").catch(()=>{});
+  draft=clone(SAMPLE); S=buildS(SAMPLE); step=-1; reached=0;
   const f=$("#feed"); f.innerHTML="<div>Cleared — enter your project to begin.</div>"; f.dataset.clean="";
   renderRail(); renderLedger(); renderTree(); renderStage();
 }
@@ -915,7 +1070,7 @@ $("#dlfolder").onclick=downloadFolder;
 $("#editdata").onclick=editData;
 $("#clearall").onclick=clearAll;
 (async()=>{
-  try{ const saved=await idbGet("project"); if(saved&&saved.folders){ PROJECT=saved; if(PROJECT.profile){ draft=clone(PROJECT.profile); S=buildS(PROJECT.profile); } } }catch(e){}
+  try{ const saved=await idbGet("project"); if(saved&&saved.folders){ PROJECT=saved; PROJECT.stageData=PROJECT.stageData||{}; if(PROJECT.profile){ draft=clone(PROJECT.profile); S=buildS(PROJECT.profile); } } }catch(e){}
   renderRail(); renderLedger(); renderTree(); renderStage();
   if(PROJECT.profile){ const f=$("#feed"); f.innerHTML="<div>Saved project loaded — press “Start the journey”.</div>"; f.dataset.clean=""; }
 })();
