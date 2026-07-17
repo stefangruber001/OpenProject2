@@ -1,6 +1,8 @@
-// Prisma schema — the single source of truth for the database.
-// Docs: https://pris.ly/d/prisma-schema
-// After editing, run `pnpm db:migrate` to create a migration.
+// Prisma schema — durable substrate for the factory's kernel store ports.
+// Deliberately GENERIC: aggregates/artifacts are JSONB payloads keyed by
+// (tenant_id, kind, id). Domain shape lives in capabilities; the database is
+// infrastructure and stays jurisdiction/sector-free. Every table carries
+// tenant_id and is protected by RLS (see the migration SQL — ADR-0007).
 
 generator client {
   provider = "prisma-client-js"
@@ -11,11 +13,68 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Placeholder model so the data layer is wired up, migratable, and testable.
-/// Replace it with the real domain models once the project is defined.
-model Example {
-  id        String   @id @default(cuid())
+/// One row per tenant of the fleet.
+model Tenant {
+  id        String   @id
   name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}
+
+/// Mutable aggregates (Repository port): quotes, drafts, settings…
+model Aggregate {
+  tenantId  String   @map("tenant_id")
+  kind      String
+  id        String
+  payload   Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([tenantId, kind, id])
+  @@map("aggregates")
+}
+
+/// Immutable artifacts (AppendOnlyStore port): issued invoices…
+model Artifact {
+  tenantId  String   @map("tenant_id")
+  kind      String
+  id        String
+  payload   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([tenantId, kind, id])
+  @@map("artifacts")
+}
+
+/// Atomic counters (CounterStore port): numbering series, event sequences.
+model Counter {
+  tenantId String @map("tenant_id")
+  key      String
+  value    Int
+
+  @@id([tenantId, key])
+  @@map("counters")
+}
+
+/// Small durable state (KeyValueStore port): chain heads…
+model KvState {
+  tenantId String @map("tenant_id")
+  key      String
+  value    Json
+
+  @@id([tenantId, key])
+  @@map("kv_state")
+}
+
+/// Append-only domain events (EventLogPort).
+model Event {
+  tenantId String @map("tenant_id")
+  seq      Int
+  type     String
+  at       String
+  payload  Json
+
+  @@id([tenantId, seq])
+  @@map("events")
 }

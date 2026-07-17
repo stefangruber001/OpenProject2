@@ -3,18 +3,17 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 /**
- * Seed the database with placeholder data so a freshly cloned project has
- * something to look at. Replace this once the project defines real models.
- * Safe to run repeatedly (idempotent upsert).
+ * Seed the fleet registry with the demo tenants so a fresh database mirrors
+ * `tenants/INDEX.md`. Idempotent.
  */
 async function main() {
-  const example = await prisma.example.upsert({
-    where: { id: "seed-example" },
-    update: {},
-    create: { id: "seed-example", name: "Hello from the seed script" },
-  });
-
-  console.log(`Seeded example "${example.name}" (${example.id})`);
+  for (const t of [
+    { id: "reformas-demo", name: "Reformas Iberia Demo S.L." },
+    { id: "azulejos-lopez", name: "Azulejos López S.L.U." },
+  ]) {
+    await prisma.tenant.upsert({ where: { id: t.id }, update: { name: t.name }, create: t });
+    console.log(`Seeded tenant ${t.id}`);
+  }
 }
 
 main()

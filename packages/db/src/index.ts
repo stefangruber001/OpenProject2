@@ -15,8 +15,10 @@ if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
 
-// Re-export the generated model *types* (your Prisma models) so consumers
-// import everything database-related from `@repo/db`. Type-only avoids pulling
-// Prisma's CommonJS runtime through the bundler. For enum runtime values, import
-// from `@prisma/client` directly.
+// Durable adapters for the kernel store ports (tenant-scoped, RLS-backed).
+export * from "./stores";
+
+// Re-export the generated model *types* so consumers import everything
+// database-related from `@repo/db`. Type-only avoids pulling Prisma's
+// CommonJS runtime through the bundler.
 export type * from "@prisma/client";

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "claude/**"]
   pull_request:
 
 # Cancel superseded runs on the same ref to save minutes.
@@ -44,6 +44,47 @@ jobs:
         env:
           DATABASE_URL: postgresql://user:pass@localhost:5432/db
           NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+  persistence:
+    name: Durable adapters (Postgres + RLS contract tests)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: factory
+          POSTGRES_PASSWORD: factory
+          POSTGRES_DB: factory
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U factory"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://factory:factory@localhost:5432/factory
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations (incl. RLS policies)
+        run: pnpm --filter @repo/db exec prisma migrate deploy
+
+      - name: Seed fleet registry
+        run: pnpm --filter @repo/db exec tsx prisma/seed.ts
+
+      - name: Run store contract tests against Postgres
+        run: pnpm --filter @repo/db test
 
   e2e:
     name: End-to-end

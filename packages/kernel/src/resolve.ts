@@ -64,7 +64,16 @@ function findPack(
   return { pack, date };
 }
 
-export function resolveTenant(rawSpec: unknown, registries: Registries): ResolvedTenant {
+export interface ResolveOptions {
+  /** Infra handed to pack adapters, keyed by pack id (durable KV state etc.). */
+  packInfra?: (packId: string) => import("./spec").PackInfra | undefined;
+}
+
+export function resolveTenant(
+  rawSpec: unknown,
+  registries: Registries,
+  options: ResolveOptions = {},
+): ResolvedTenant {
   const parsed = tenantSpecSchema.safeParse(rawSpec);
   if (!parsed.success) {
     throw new FactoryError("SPEC_INVALID", `Tenant spec invalid: ${parsed.error.message}`);
@@ -147,6 +156,7 @@ export function resolveTenant(rawSpec: unknown, registries: Registries): Resolve
       tenantId: spec.tenant,
       config: config[configKey],
       kernelConfig,
+      infra: options.packInfra?.(pack.id),
     });
   }
 

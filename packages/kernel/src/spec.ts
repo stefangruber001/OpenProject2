@@ -87,4 +87,11 @@ export interface PackRegisterContext<C = unknown> {
   config: C;
   /** Kernel-level config (locale, currency, branding). */
   kernelConfig: z.infer<typeof kernelConfigSchema>;
+  /** Host-provided infrastructure for stateful adapters (durable KV, etc.). */
+  infra?: PackInfra;
+}
+
+export interface PackInfra {
+  /** Durable key-value state scoped (tenant, pack) by the host. */
+  kv?: import("./stores").KeyValueStore;
 }

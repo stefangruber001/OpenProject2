@@ -38,7 +38,8 @@ export const esPack: PackManifest<EsConfig> = {
       );
     }
     binder.bind(TAX_PORT, new EsTaxAdapter());
-    binder.bind(INVOICE_CHAIN_PORT, new EsInvoiceChainAdapter());
+    // Chain head persists via host-provided KV when available (durable in P2).
+    binder.bind(INVOICE_CHAIN_PORT, new EsInvoiceChainAdapter(ctx.infra?.kv));
     binder.bind(DOC_LABELS_PORT, ES_DOC_LABELS);
   },
 };

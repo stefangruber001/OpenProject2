@@ -68,12 +68,18 @@ output; the factory is the product.
    contract-test kits (`@repo/kernel` `src/testing/contracts.ts`); quoting,
    billing, numbering, es chain and factory composition now run on injected
    async stores. Demo output byte-identical pre/post. 58+ tests green.~~
-1. **P2.1b Durable adapters**: Prisma schema (tenant, aggregate JSONB tables,
-   counters, kv, events) with `tenant_id` RLS (ADR-0007); Prisma adapters
-   implementing the kernel store ports, passing the SAME contract kits;
-   migration SQL committed; CI job with a Postgres service runs the kits;
-   chain-head state moves to durable KV via PackRegisterContext infra hook.
-   (Existing `packages/db` is the substrate.)
+1. ~~**P2.1b Durable adapters** — LANDED (verification runs in CI):
+   generic Prisma schema (tenants, JSONB aggregates/artifacts, counters,
+   kv_state, events — layer-neutral, all `tenant_id`-keyed), migration
+   `0001_init` incl. **RLS ENABLE+FORCE + tenant_isolation policies** on every
+   table; Prisma adapters for all kernel store ports + PrismaEventLog, each
+   setting `app.tenant_id` per transaction; they run the SAME contract kits
+   (`@repo/kernel/testing`) — skipped without DATABASE_URL, executed in the
+   new CI `persistence` job (postgres:17 service, migrate deploy + seed +
+   tests); CI now also triggers on pushes to `claude/**`; chain-head durable
+   KV reachable via `resolveTenant(..., {packInfra})` hook.~~
+   **Follow-up to watch:** first CI run of the persistence job on this branch
+   — if red, fix adapters before anything else (that's the verification).
 2. **Web ERP shell on composed services** (`apps/web`): tenant-scoped
    presupuesto list/create/accept + factura issue/view using
    `@repo/factory` composition; server-side only; es-ES labels from ports.

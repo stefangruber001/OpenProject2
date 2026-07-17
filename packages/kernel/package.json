@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Factory kernel: tenancy spec, config resolution, ports, effective dating, money, events. Zero jurisdiction/sector knowledge.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/contracts.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
