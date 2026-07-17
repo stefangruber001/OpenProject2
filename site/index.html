@@ -7,8 +7,9 @@
 <title>Canei Subirats ERP — review & testing (R1)</title>
 <style>
   :root {
-    --paper:#f7f7f5; --card:#ffffff; --ink:#1a1c18; --ink2:#4a4f45; --mut:#747474;
-    --line:#d2d2d2; --acc:#48733c; --acc-soft:#e7efe3; --spark:#f2c230;
+    --paper:#faf9f6; --card:#ffffff; --ink:#171911; --ink2:#565950; --mut:#9c9f93;
+    --line:#efece6; --acc:#48733c; --acc-soft:#eef4ea; --spark:#f2c230;
+    --shadow:0 1px 2px rgba(30,40,20,.04), 0 16px 34px -20px rgba(30,40,20,.18);
     --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
     --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
   }
@@ -27,9 +28,9 @@
   .tag{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);font-weight:700}
   h1{font-family:var(--serif);font-weight:600;font-size:26px;margin:0;letter-spacing:-0.01em}
   p{margin:0;color:var(--ink2);font-size:14.5px}
-  a.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:12px;
-    padding:16px 18px;text-decoration:none;color:var(--ink)}
-  a.card:hover{border-color:var(--acc)}
+  a.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:18px 20px;text-decoration:none;color:var(--ink);box-shadow:var(--shadow);transition:transform .1s, box-shadow .18s}
+  a.card:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(30,40,20,.05), 0 22px 40px -22px rgba(30,40,20,.24)}
   a.card b{font-size:17px}
   a.card span{display:block;font-size:13px;color:var(--ink2);margin-top:4px}
   .note{border-left:3px solid var(--acc);background:var(--acc-soft);border-radius:0 8px 8px 0;
