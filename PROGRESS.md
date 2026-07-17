@@ -61,6 +61,23 @@ output; the factory is the product.
 · build · boundaries. Every commit green and pushed to
 `claude/orin-project-status-1q50dt`.
 
+10. **Canei Subirats identity + English working language** — DONE this cycle
+    (commits 91d5958, 3af7c0b, 1017827). Real client identity confirmed:
+    **Canei Subirats, S.L.** (Sant Just Desvern; their public WordPress site,
+    NOT a gestor tool — earlier note corrected). Corporate identity captured
+    durably in `docs/clients/canei-subirats/BRAND.md` (palette #48733C/#65BC7B
+    - yellow spark, Roboto Serif/Inter, logo refs, name story, voice, 5
+      services, 3 trust pillars, contact); wired as **data** into
+      `tenants/diorka` branding (kernel branding schema extended with generic,
+      jurisdiction-neutral tokens: slogan/contact/palette/typography/logo) +
+      real billing seller (CIF still pending → §11.1 workshop). UI switched to
+      **English working language** via a DATA label layer (`apps/web/lib/i18n.ts`
+      en/es/ca, `UI_LANG` env, default en) + reformas `terminologyByLang` /
+      `chapterLabels` (canonical chapter keys unchanged); fiscal locale stays
+      es-ES. Handover = flip `UI_LANG`. Published demo/backend/landing re-skinned
+      to Canei brand + English (fiscal invoice stays es-ES); Chromium-verified.
+      Gates green each commit.
+
 ## Next 3 tasks (P2 — in order)
 
 0. ~~**P2.1a Async persistence seam** — DONE: kernel store ports
