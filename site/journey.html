@@ -73,7 +73,9 @@
     border:1px solid color-mix(in srgb,var(--greenLt) 32%,transparent);border-left:3px solid var(--green);
     border-radius:6px 14px 14px 6px;padding:14px 18px;font-size:13.5px;margin:14px 0;color:var(--body)}
   .did b{color:var(--ink);font-weight:600}
-  .stage table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0}
+  .tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px 0;border-radius:10px}
+  .stage table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0;min-width:340px}
+  .tblwrap table{margin:0}
   .stage th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);border-bottom:1.5px solid var(--green);padding:8px 9px}
   .stage td{padding:8px 9px;border-bottom:1px solid var(--hair)}
   .stage td.n,.stage th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -126,11 +128,11 @@
   .field{display:flex;flex-direction:column;gap:5px}
   .field.full{grid-column:1/-1}
   .field label{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
-  .field input,.field textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+  .field input,.field textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0}
   .field textarea{min-height:66px;resize:vertical;line-height:1.5}
   .field input:focus,.field textarea:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px var(--greenSoft)}
-  .chap{display:grid;grid-template-columns:1fr 128px 36px;gap:8px;align-items:center;margin-bottom:8px}
-  .chap input{font:inherit;font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+  .chap{display:grid;grid-template-columns:1fr 118px 38px;gap:8px;align-items:center;margin-bottom:8px}
+  .chap input{font:inherit;font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-width:0;width:100%}
   .chap .x{border:1px solid var(--line);background:var(--paper);border-radius:9px;height:38px;color:var(--muted);font-size:16px;line-height:1}
   .chap .x:hover{border-color:var(--crit);color:var(--crit)}
   .err{color:var(--crit);font-size:12.5px;font-weight:600;margin-top:6px}
@@ -152,6 +154,22 @@
   .attach{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
   .filebtn{position:relative;overflow:hidden;display:inline-flex;align-items:center}
   .filebtn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:200px}
+
+  /* small screens */
+  @media (max-width:600px){
+    main{padding:14px 12px 64px;gap:16px}
+    .stage{padding:22px 18px;border-radius:16px}
+    .stage h2{font-size:23px}
+    .stage p{font-size:14px}
+    .fsec{padding:14px 14px}
+    .chap{grid-template-columns:1fr 82px 34px;gap:6px}
+    .chap input{font-size:13px;padding:8px 9px}
+    .field input,.field textarea{font-size:13.5px}
+    .actions{gap:8px}
+    .btn{padding:12px 18px;font-size:14px}
+    .top .links{gap:2px;font-size:12px}
+    .top .links a{padding:5px 7px}
+  }
 </style>
 </head>
 <body>
@@ -712,7 +730,9 @@ function renderStage(){
   wrap.append(el("div","eyebrow",`Step ${step+1} of ${STAGES.length}`));
   wrap.append(el("h2",null,STAGES[step]));
   wrap.append(el("div","cap",`capability: <b>${f.cap}</b> · folder: <b>${FOLDERS[step]}</b>`));
-  wrap.append(el("div",null,f.body()));
+  const bodyDiv=el("div",null,f.body());
+  bodyDiv.querySelectorAll("table").forEach(t=>{ const w=el("div","tblwrap"); t.replaceWith(w); w.append(t); });
+  wrap.append(bodyDiv);
 
   if(f.email){
     const c=emailContent(f.email.kind);
