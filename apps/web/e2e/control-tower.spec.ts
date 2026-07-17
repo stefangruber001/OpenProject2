@@ -8,12 +8,12 @@ test("live control tower renders computed figures from the real services", async
   // KPI + project row are computed live (margin = revenue − actual cost).
   await expect(page.getByText("Portfolio margin")).toBeVisible();
   await expect(page.getByText(/Full bathroom/)).toBeVisible();
-  await expect(page.getByText(/812,00/)).toBeVisible(); // margin €812.00
+  await expect(page.getByText(/812,00/).first()).toBeVisible(); // margin €812.00 (KPI + row)
 
   // API surface returns the same live overview.
   const res = await page.request.get("/api/diorka/control-tower");
   expect(res.ok()).toBeTruthy();
   const body = await res.json();
-  expect(body.capabilities).toBe(14);
+  expect(body.capabilities).toBe(16);
   expect(body.projects[0].marginCents).toBe(81200);
 });

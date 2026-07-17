@@ -2,7 +2,8 @@ import { test, expect } from "@playwright/test";
 
 test("tenant workspace composes, issues and serves a factura", async ({ page }) => {
   await page.goto("/reformas-demo");
-  await expect(page.getByRole("heading", { name: /Reformas Iberia/ })).toBeVisible();
+  // The tenant name renders in the brand lockup (logo wordmark), not a heading.
+  await expect(page.getByText(/Reformas Iberia/).first()).toBeVisible();
   await expect(page.getByText("jurisdiction/es-ES + vertical/construction-reformas")).toBeVisible();
 
   await page.getByRole("button", { name: /auto demo/i }).click();
