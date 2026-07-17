@@ -68,6 +68,13 @@
   .estrow .x{border:1px solid var(--line);background:var(--paper);border-radius:8px;height:34px;color:var(--muted);font-size:15px}
   .estrow .x:hover{border-color:var(--crit);color:var(--crit)}
   @media (max-width:600px){ .estrow{grid-template-columns:1fr 52px 64px 34px} .estrow .lt{display:none} }
+  .qrow{display:grid;grid-template-columns:1fr 58px 72px 78px 30px;gap:6px;align-items:center;margin-bottom:7px}
+  .qrow input{font:inherit;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 8px;min-width:0;width:100%}
+  .qrow .lt{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink);font-size:12px;text-align:right;white-space:nowrap}
+  .qrow .x{border:1px solid var(--line);background:var(--paper);border-radius:7px;height:32px;color:var(--muted);font-size:15px}
+  .qrow .x:hover{border-color:var(--crit);color:var(--crit)}
+  #catpick,#qlist select{font:inherit;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:9px 10px}
+  @media (max-width:600px){ .qrow{grid-template-columns:1fr 46px 60px 28px} .qrow .lt{display:none} }
 
   .stage{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:34px 38px;box-shadow:var(--shadow-lg);position:relative;overflow:hidden}
   .stage::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--green),var(--greenLt) 60%,var(--spark))}
@@ -291,14 +298,46 @@ const BLANK = {
 };
 const clone = o => JSON.parse(JSON.stringify(o));
 
+// Price book (catalogue) — pick items instead of typing. Prices in euros.
+const CATALOGUE = [
+  {chapter:"Demolition & preliminary works", item:"Strip old wall / floor tiling", unit:"m²", price:18},
+  {chapter:"Demolition & preliminary works", item:"Remove sanitary fixtures", unit:"ud", price:35},
+  {chapter:"Demolition & preliminary works", item:"Debris removal & skip", unit:"partida", price:280},
+  {chapter:"Coverings & finishes", item:"Porcelain wall tiling (supply + fit)", unit:"m²", price:42},
+  {chapter:"Coverings & finishes", item:"Porcelain floor tiling (supply + fit)", unit:"m²", price:46},
+  {chapter:"Coverings & finishes", item:"False ceiling with LED", unit:"m²", price:38},
+  {chapter:"Coverings & finishes", item:"Prep + paint walls & ceiling", unit:"m²", price:12},
+  {chapter:"Plumbing", item:"Relocate water point", unit:"ud", price:120},
+  {chapter:"Plumbing", item:"Shower tray + mixer (supply + fit)", unit:"ud", price:640},
+  {chapter:"Plumbing", item:"WC + basin (supply + fit)", unit:"ud", price:520},
+  {chapter:"Plumbing", item:"Aerothermal unit install", unit:"ud", price:1850},
+  {chapter:"Electrical", item:"New circuit + points", unit:"ud", price:85},
+  {chapter:"Electrical", item:"Consumer unit upgrade", unit:"ud", price:420},
+  {chapter:"Carpentry", item:"Interior door (supply + fit)", unit:"ud", price:290},
+  {chapter:"Carpentry", item:"Fitted wardrobe", unit:"ml", price:340},
+];
+const CAT_CHAPTERS = [...new Set(CATALOGUE.map(c=>c.chapter))];
+
+function chaptersFromLines(lines){
+  const by={}; const order=[];
+  lines.forEach(l=>{ if(!l.chapter||!(Number(l.qty)>0)) return;
+    const t=Math.round((Number(l.qty)||0)*(Number(l.price)||0)*100);
+    if(!(l.chapter in by)){ by[l.chapter]=0; order.push(l.chapter); }
+    by[l.chapter]+=t; });
+  return order.map(chapter=>({chapter, budget:by[chapter], committed:0, actual:0}));
+}
 function buildS(p){
   const cost=Math.max(0,Math.min(130,Number(p.costPct)||78));
+  const lines=(p.lines||[]).filter(l=>l.chapter&&Number(l.qty)>0&&Number(l.price)>0)
+    .map(l=>({chapter:l.chapter, item:(l.item||"").trim()||l.chapter, unit:l.unit||"", qty:Number(l.qty)||0, price:Math.round((Number(l.price)||0)*100)}));
+  const chapters = lines.length ? chaptersFromLines(p.lines)
+    : (p.chapters||[]).filter(c=>c.chapter&&Number(c.budget)>0)
+      .map(c=>({chapter:c.chapter, budget:Math.round(Number(c.budget)*100), committed:0, actual:0}));
   return {
     customer:(p.customer||"").trim()||"Your customer",
     email:(p.email||"").trim()||"customer@example.com",
     phone:(p.phone||"").trim(), buyerNif:(p.buyerNif||"").trim(), address:(p.address||"").trim()||"—",
-    chapters:(p.chapters||[]).filter(c=>c.chapter&&Number(c.budget)>0)
-      .map(c=>({chapter:c.chapter, budget:Math.round(Number(c.budget)*100), committed:0, actual:0})),
+    lines, chapters,
     optional:{desc:(p.optional?.desc||"").trim()||"Optional works",
       amount:Math.round((Number(p.optional?.amount)||0)*100), included:false},
     committedPct:Math.min(1.3,(cost+2)/100), actualPct:cost/100,
@@ -551,14 +590,30 @@ function buildDocPdf(d){
   [d.buyer.nif, d.buyer.address].filter(Boolean).forEach(l=>{ T(42,y,9,"F1",BODY,l); y-=12; });
   // lines table
   y-=16;
-  T(42,y,8.5,"F2",GREY,"CONCEPTO / DESCRIPTION"); TR(553,y,8.5,"F2",GREY,"IMPORTE / AMOUNT");
-  y-=7; hr(42,y,511,G); y-=17;
-  d.lines.forEach(li=>{
-    const wr=wrapTxt(li.desc,64);
-    wr.forEach((w,i)=>T(42,y-i*12,10,"F1",BODY,w));
-    TR(553,y,10,"F1",INK,li.amount);
-    y -= Math.max(1,wr.length)*12 + 7; hr(42,y+5,511,LN);
-  });
+  if(d.groups){
+    T(42,y,8,"F2",GREY,"CONCEPTO / DESCRIPTION");
+    TR(432,y,8,"F2",GREY,"CANT."); TR(492,y,8,"F2",GREY,"PRECIO"); TR(553,y,8,"F2",GREY,"IMPORTE");
+    y-=7; hr(42,y,511,G); y-=15;
+    d.groups.forEach(g=>{
+      T(42,y,9.5,"F2",G,g.chapter); y-=14;
+      g.rows.forEach(r=>{
+        const wr=wrapTxt(r.item,50);
+        wr.forEach((w,i)=>T(54,y-i*11,9.5,"F1",BODY,w));
+        TR(432,y,9.5,"F1",BODY,r.qtyLabel); TR(492,y,9.5,"F1",BODY,r.priceLabel); TR(553,y,9.5,"F1",INK,r.amount);
+        y -= Math.max(1,wr.length)*11 + 5;
+      });
+      hr(300,y+5,253,LN); TR(432,y-3,8.5,"F1",GREY,"Subtotal"); TR(553,y-3,9.5,"F2",INK,g.subtotal); y-=18;
+    });
+  } else {
+    T(42,y,8.5,"F2",GREY,"CONCEPTO / DESCRIPTION"); TR(553,y,8.5,"F2",GREY,"IMPORTE / AMOUNT");
+    y-=7; hr(42,y,511,G); y-=17;
+    d.lines.forEach(li=>{
+      const wr=wrapTxt(li.desc,64);
+      wr.forEach((w,i)=>T(42,y-i*12,10,"F1",BODY,w));
+      TR(553,y,10,"F1",INK,li.amount);
+      y -= Math.max(1,wr.length)*12 + 7; hr(42,y+5,511,LN);
+    });
+  }
   // totals
   y-=10;
   d.totals.forEach((t,i)=>{ const bold=i===d.totals.length-1;
@@ -588,6 +643,16 @@ function buildDocPdf(d){
   pdf+="trailer\n<</Size "+(objs.length+1)+"/Root 1 0 R>>\nstartxref\n"+xref+"\n%%EOF";
   return btoa(pdf);
 }
+function docGroups(includeOptional){
+  const by={}; const order=[];
+  S.lines.forEach(l=>{ if(!(l.chapter in by)){ by[l.chapter]={rows:[],sub:0}; order.push(l.chapter); }
+    const amt=Math.round((l.qty||0)*(l.price||0)); by[l.chapter].sub+=amt;
+    by[l.chapter].rows.push({item:l.item, qtyLabel:(l.qty+" "+(l.unit||"")).trim(), priceLabel:eurTxt(l.price), amount:eurTxt(amt)}); });
+  const groups=order.map(ch=>({chapter:ch, rows:by[ch].rows, subtotal:eurTxt(by[ch].sub)}));
+  if(includeOptional && S.optional.amount>0)
+    groups.push({chapter:"Opcional (aparte)", rows:[{item:S.optional.desc, qtyLabel:"1", priceLabel:eurTxt(S.optional.amount), amount:eurTxt(S.optional.amount)}], subtotal:eurTxt(S.optional.amount)});
+  return groups;
+}
 function invoiceDoc(){
   const sd=sdOf(8);
   const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
@@ -595,6 +660,7 @@ function invoiceDoc(){
   const issueISO=sd.invoiceDate||todayISO();
   const type=sd.invoiceType||"Full";
   const docType=type==="Deposit"?"FACTURA ANTICIPO · DEPOSIT":type==="Certification"?"CERTIFICACION · PROGRESS":"FACTURA · INVOICE";
+  const itemized=S.lines&&S.lines.length;
   const lines=S.chapters.map(c=>({desc:c.chapter,amount:eurTxt(c.budget)}));
   if(S.optional.included) lines.push({desc:"Optional — "+S.optional.desc,amount:eurTxt(S.optional.amount)});
   const totals=[["Base imponible",eurTxt(S.revenue)],["IVA "+vp+"%",eurTxt(vat)]];
@@ -603,7 +669,7 @@ function invoiceDoc(){
   return { docType, number:S.invoiceNo, dateLabel:"Fecha", dateIssued:fmtDate(issueISO),
     dueLabel:"Vencimiento", dueOrValid:fmtDate(addDaysISO(issueISO,S.termsDays)),
     buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
-    lines, totals,
+    lines, groups: itemized?docGroups(true):undefined, totals,
     payment:["Forma de pago: transferencia · "+S.termsDays+" dias.","IBAN: "+BRAND.iban+"   ·   Referencia: "+S.invoiceNo],
     notes:[
       "Tipo de IVA decidido por la regla aplicable (tipo reducido cuando concurren las condiciones de renovacion, art. 91.Uno.2.10 LIVA); justificacion almacenada en el documento.",
@@ -613,14 +679,16 @@ function invoiceDoc(){
 }
 function quoteDoc(accepted){
   const base=sum(S.chapters,c=>c.budget); const hasOpt=S.optional.amount>0;
+  const itemized=S.lines&&S.lines.length;
   const lines=S.chapters.map(c=>({desc:c.chapter,amount:eurTxt(c.budget)}));
   if(hasOpt) lines.push({desc:"Opcional (aparte) — "+S.optional.desc,amount:eurTxt(S.optional.amount)});
   const totals=[["Base (IVA no incl.)",eurTxt(base)]];
   if(accepted&&S.optional.included) totals.push(["Aceptado (con opcional)",eurTxt(base+S.optional.amount)]);
+  const sd3=sdOf(3); const validity=Number(sd3.validityDays)||30;
   return { docType:"PRESUPUESTO · QUOTE", number:S.quoteNo, dateLabel:"Fecha", dateIssued:today(),
-    dueLabel:"Valido hasta", dueOrValid:addDays(30),
+    dueLabel:"Valido hasta", dueOrValid:addDays(validity),
     buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
-    lines, totals,
+    lines, groups: itemized?docGroups(hasOpt):undefined, totals,
     payment:["Los trabajos opcionales solo se incluyen si los acepta.","El IVA se aplica en la factura final segun la regla legal aplicable."],
     notes:[
       "Precios validos 30 dias. Los trabajos se planifican al aceptar el presupuesto.",
@@ -897,6 +965,60 @@ function renderEstimator(wrap){
   draw();
 }
 
+/* ---------- quote builder (Quotation stage) — catalogue-first itemized lines ---------- */
+function renderQuoteBuilder(wrap){
+  const sd=sdOf(3);
+  if(!sd.lines){
+    sd.lines = (S.lines&&S.lines.length)
+      ? S.lines.map(l=>({chapter:l.chapter,item:l.item,unit:l.unit,qty:l.qty,price:l.price/100}))
+      : S.chapters.map(c=>({chapter:c.chapter,item:c.chapter,unit:"",qty:1,price:c.budget/100}));
+  }
+  const box=el("div","fsec"); box.style.margin="18px 0 0";
+  box.append(el("h4",null,"Quote builder — catalogue-first (concepto · cantidad · precio · importe)"));
+  const addbar=el("div","attach");
+  addbar.innerHTML=`<select id="catpick" style="flex:1;min-width:0"><option value="">＋ Add item from catalogue…</option>${
+    CAT_CHAPTERS.map(ch=>`<optgroup label="${esc(ch)}">${CATALOGUE.map((c,idx)=>c.chapter===ch?`<option value="${idx}">${esc(c.item)} · ${c.price} €/${esc(c.unit)}</option>`:"").join("")}</optgroup>`).join("")
+  }</select><button class="btn sm ghost" id="addcustom" type="button">＋ Custom line</button>`;
+  const list=el("div"); list.id="qlist";
+  const tot=el("div"); tot.id="qtot"; tot.style.cssText="margin-top:10px;font-size:13.5px";
+  const apply=el("button","btn sm","✓ Update quote"); apply.type="button"; apply.style.marginTop="12px";
+  box.append(addbar,list,tot,el("br"),apply); wrap.append(box);
+
+  const lineTot=ln=>Math.round((Number(ln.qty)||0)*(Number(ln.price)||0)*100);
+  const total=()=>{ const t=sd.lines.reduce((s,l)=>s+lineTot(l),0); tot.innerHTML=`<b>Quote base:</b> ${eur(t)} (ex-VAT) · ${sd.lines.length} line(s) · <span class="hint">grouped by chapter on the PDF</span>`; };
+  const draw=()=>{
+    list.innerHTML="";
+    sd.lines.forEach((ln,i)=>{
+      const row=el("div","qrow");
+      row.innerHTML=`<input data-f="item" placeholder="Concept" value="${esc(ln.item||"")}">
+        <input data-f="qty" type="number" step="any" placeholder="${esc(ln.unit||'qty')}" value="${ln.qty??""}">
+        <input data-f="price" type="number" step="any" placeholder="€/ud" value="${ln.price??""}">
+        <span class="lt">${eur(lineTot(ln))}</span>
+        <button class="x" data-x="${i}" type="button">×</button>`;
+      const upd=()=>{ row.querySelector(".lt").textContent=eur(lineTot(ln)); persistSoon(); total(); };
+      row.querySelector('[data-f="item"]').oninput=e=>{ ln.item=e.target.value; persistSoon(); };
+      row.querySelector('[data-f="qty"]').oninput=e=>{ ln.qty=e.target.value; upd(); };
+      row.querySelector('[data-f="price"]').oninput=e=>{ ln.price=e.target.value; upd(); };
+      row.querySelector("[data-x]").onclick=()=>{ sd.lines.splice(i,1); persistSoon(); draw(); };
+      list.append(row);
+    });
+    total();
+  };
+  addbar.querySelector("#catpick").onchange=e=>{ const v=e.target.value; if(v==="")return;
+    const c=CATALOGUE[+v]; sd.lines.push({chapter:c.chapter,item:c.item,unit:c.unit,qty:1,price:c.price}); e.target.value=""; persistSoon(); draw(); };
+  addbar.querySelector("#addcustom").onclick=()=>{ sd.lines.push({chapter:"Other works",item:"",unit:"",qty:1,price:""}); persistSoon(); draw(); };
+  apply.onclick=()=>{
+    const valid=sd.lines.filter(l=>l.item&&Number(l.qty)>0&&Number(l.price)>0);
+    if(!valid.length){ alert("Add at least one line with a concept, quantity and price."); return; }
+    PROJECT.profile.lines=valid.map(l=>({chapter:l.chapter||"Other works",item:l.item,unit:l.unit,qty:Number(l.qty),price:Number(l.price)}));
+    S=buildS(PROJECT.profile); persistSoon(); renderLedger();
+    art("04 Quotation",S.quoteNo+".pdf","application/pdf",buildDocPdf(quoteDoc(false)));
+    log("Quote updated — "+S.chapters.length+" chapter(s), "+valid.length+" line(s), base "+eur(sum(S.chapters,c=>c.budget)));
+    renderStage();
+  };
+  draw();
+}
+
 /* ---------- intake (all operator inputs) ---------- */
 let draft = clone(SAMPLE);
 function intakeHtml(){
@@ -1009,6 +1131,7 @@ function renderStage(){
   wrap.append(bodyDiv);
 
   if(step===2) renderEstimator(wrap);
+  if(step===3) renderQuoteBuilder(wrap);
   renderFields(wrap);
 
   if(f.email){
