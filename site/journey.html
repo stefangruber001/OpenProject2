@@ -7,9 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <style>
   :root{
-    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#3a5f31; --greenSoft:#eef4ea; --spark:#f2c230;
-    --ink:#14160f; --body:#54574c; --muted:#9a9d90; --faint:#b9bcb0;
-    --line:#ecebe4; --hair:#f3f1ec; --bg:#fbfbf9; --paper:#fff; --panel:#fcfcfa;
+    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a; --greenSoft:#e7f0e1; --greenPale:#dce8d4; --spark:#f2c230;
+    --ink:#14160f; --body:#4f5347; --muted:#8b8f80; --faint:#aab0a0;
+    --line:#dde5d6; --hair:#e7eee1; --bg:#eef3ea; --paper:#fff; --panel:#f4f8f1;
     --good:#2f7d4f; --good-bg:#eef6f0; --warn:#a56a1c; --warn-bg:#fbf3e4; --crit:#9a3b33; --crit-bg:#faedeb;
     --shadow:0 1px 2px rgba(24,32,16,.03), 0 18px 40px -24px rgba(24,32,16,.18);
     --shadow-lg:0 2px 4px rgba(24,32,16,.04), 0 34px 70px -34px rgba(24,32,16,.28);
@@ -24,8 +24,8 @@
   html{scroll-behavior:smooth}
   body{margin:0;color:var(--body);font:15px/1.6 var(--sans);letter-spacing:-.005em;
     background:
-      radial-gradient(1100px 520px at 82% -8%, rgba(72,115,60,.06), transparent 60%),
-      radial-gradient(760px 420px at 6% 2%, rgba(242,194,48,.05), transparent 55%),
+      radial-gradient(1200px 560px at 84% -10%, rgba(72,115,60,.14), transparent 60%),
+      radial-gradient(820px 460px at 4% 2%, rgba(242,194,48,.09), transparent 55%),
       var(--bg);
     -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0;letter-spacing:-.01em}
@@ -33,18 +33,19 @@
   button{font:inherit;cursor:pointer}
   ::selection{background:rgba(72,115,60,.16)}
 
-  header.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb, var(--paper) 82%, transparent);
-    backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);
-    border-bottom:1px solid var(--line);display:flex;align-items:center;gap:15px;padding:15px 28px;flex-wrap:wrap}
+  header.top{position:sticky;top:0;z-index:20;
+    background:linear-gradient(100deg,var(--greenDeep),var(--green) 60%,#537f45);
+    border-bottom:1px solid rgba(0,0,0,.12);box-shadow:0 8px 24px -16px rgba(31,53,26,.75);
+    display:flex;align-items:center;gap:15px;padding:14px 28px;flex-wrap:wrap}
   .logo{display:flex;align-items:center;gap:11px}
-  .logo svg{flex:none;filter:drop-shadow(0 4px 10px rgba(72,115,60,.28))}
-  .logo .name{font-family:var(--serif);font-weight:600;font-size:19px;color:var(--ink);line-height:1.02}
-  .logo .name small{display:block;font-family:var(--sans);font-weight:500;font-size:10.5px;font-style:italic;color:var(--muted);letter-spacing:0}
-  .top .tag{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:700;
-    border:1px solid color-mix(in srgb,var(--green) 30%,transparent);border-radius:999px;padding:5px 11px;background:var(--greenSoft)}
-  .top .links{margin-left:auto;font-size:12.5px;display:flex;gap:6px;align-items:center}
-  .top .links a{color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:9px;transition:.15s}
-  .top .links a:hover{color:var(--green);background:var(--greenSoft)}
+  .logo svg{flex:none;filter:drop-shadow(0 3px 8px rgba(0,0,0,.25))}
+  .logo .name{font-family:var(--serif);font-weight:600;font-size:19px;color:#fff;line-height:1.02}
+  .logo .name small{display:block;font-family:var(--sans);font-weight:500;font-size:10.5px;font-style:italic;color:rgba(255,255,255,.74);letter-spacing:0}
+  .top .tag{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#fff;font-weight:700;
+    border:1px solid rgba(255,255,255,.34);border-radius:999px;padding:5px 11px;background:rgba(255,255,255,.15)}
+  .top .links{margin-left:auto;font-size:12.5px;display:flex;gap:4px;align-items:center}
+  .top .links a{color:rgba(255,255,255,.82);text-decoration:none;padding:6px 10px;border-radius:9px;transition:.15s}
+  .top .links a:hover{color:#fff;background:rgba(255,255,255,.16)}
 
   main{max-width:1220px;margin:0 auto;padding:26px 24px 84px;display:grid;grid-template-columns:1fr 340px;gap:22px}
   @media (max-width:940px){main{grid-template-columns:1fr}}
@@ -121,8 +122,8 @@
 <body>
 <header class="top">
   <div class="logo">
-    <svg width="34" height="34" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
-      <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c"/>
+    <svg width="36" height="36" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
+      <rect x="1" y="1" width="38" height="38" rx="11" fill="#fff" fill-opacity="0.14" stroke="#fff" stroke-opacity="0.4"/>
       <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
       <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
       <rect x="18" y="23.5" width="4" height="5" rx="1" fill="#fff"/>

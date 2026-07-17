@@ -7,9 +7,9 @@
 <title>Canei Subirats ERP — review & testing (R1)</title>
 <style>
   :root{
-    --green:#48733c; --greenLt:#6ba85a; --greenSoft:#eef4ea; --spark:#f2c230;
-    --ink:#14160f; --body:#54574c; --muted:#9a9d90; --faint:#b9bcb0;
-    --line:#ecebe4; --hair:#f3f1ec; --bg:#fbfbf9; --paper:#fff;
+    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a; --greenSoft:#e7f0e1; --greenPale:#dce8d4; --spark:#f2c230;
+    --ink:#14160f; --body:#4f5347; --muted:#8b8f80; --faint:#aab0a0;
+    --line:#dde5d6; --hair:#e7eee1; --bg:#eef3ea; --paper:#fff;
     --shadow:0 1px 2px rgba(24,32,16,.03), 0 18px 40px -24px rgba(24,32,16,.18);
     --shadow-lg:0 2px 4px rgba(24,32,16,.04), 0 40px 80px -40px rgba(24,32,16,.3);
     --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
@@ -21,8 +21,8 @@
   html{scroll-behavior:smooth}
   body{margin:0;color:var(--body);font:16px/1.6 var(--sans);letter-spacing:-.005em;min-height:100vh;
     background:
-      radial-gradient(1200px 600px at 84% -10%, rgba(72,115,60,.09), transparent 58%),
-      radial-gradient(820px 480px at 2% 4%, rgba(242,194,48,.07), transparent 55%),
+      radial-gradient(1300px 640px at 86% -12%, rgba(72,115,60,.18), transparent 58%),
+      radial-gradient(880px 500px at 0% 3%, rgba(242,194,48,.11), transparent 55%),
       var(--bg);
     -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   h1,h2{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0;letter-spacing:-.02em}
@@ -61,8 +61,15 @@
   a.card b{font-size:16px;font-weight:600;letter-spacing:-.01em}
   a.card span{font-size:13px;color:var(--body);line-height:1.5}
   a.card .go{margin-top:auto;font-size:12px;font-weight:700;color:var(--green);letter-spacing:.01em}
-  a.card.wide{grid-column:1/-1;flex-direction:row;align-items:flex-start;gap:16px}
-  a.card.wide .ic{flex:none}
+  a.card.wide{grid-column:1/-1;flex-direction:row;align-items:flex-start;gap:16px;
+    background:linear-gradient(120deg,var(--greenDeep),var(--green) 68%,#537f45);border-color:transparent;
+    box-shadow:0 2px 4px rgba(24,32,16,.06), 0 34px 70px -34px rgba(49,83,42,.6)}
+  a.card.wide::before{background:linear-gradient(90deg,var(--spark),#fff 70%)}
+  a.card.wide b{color:#fff}
+  a.card.wide span{color:rgba(255,255,255,.85)}
+  a.card.wide .go{color:var(--spark)}
+  a.card.wide .ic{flex:none;background:rgba(255,255,255,.16)}
+  a.card.wide:hover{border-color:transparent}
   a.card.wide .bd{display:flex;flex-direction:column;gap:6px}
 
   .note{border-left:3px solid var(--green);background:var(--greenSoft);border-radius:0 12px 12px 0;
