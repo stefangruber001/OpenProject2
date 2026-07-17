@@ -2,9 +2,10 @@
 
 Source: `Proyecto_Diorka_Business_Requirements.docx` (BRD, prepared
 2026-07-17, "Draft for business validation") + evidence workbook
-`Comparatiu Joaquim Costa 2.xlsx` (referenced, not yet provided) +
-current tool `cane.gestortectic.com` (TecTic hosted "Gestor" instance,
-Catalan vendor; login-gated, 403 to anonymous access).
+`Comparatiu Joaquim Costa 2.xlsx` (referenced, not yet provided). Real
+client identity = **Canei Subirats, S.L.** (company #1); `cane.gestortectic.com`
+is their **public marketing website** (WordPress/Avada), not a data source
+(corrected 2026-07-17 — see `docs/clients/canei-subirats/BRAND.md`).
 
 Status legend: **✓ built** (works today) · **config** (data change only) ·
 **next** (queued P2.x slice) · **later** (P3+/on validation) ·

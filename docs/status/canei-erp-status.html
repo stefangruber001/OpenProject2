@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Canei Subirats ERP — Infrastructure & Delivery Status</title>
+<style>
+  :root {
+    --green:#48733c; --greenLt:#65bc7b; --spark:#f2c230;
+    --ink:#1a1c18; --body:#333333; --muted:#747474; --line:#d2d2d2; --mist:#eef1ea; --paper:#ffffff;
+    --built:#2f7d4f; --built-bg:#e7f2ec; --config:#2f6f9e; --config-bg:#e6eff6;
+    --next:#a56a1c; --next-bg:#f7edda; --later:#6a6a6a; --later-bg:#ececec;
+    --excl:#9a3b33; --excl-bg:#f6e6e4;
+    --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
+    --sans:Inter,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  @page { size: A4; margin: 15mm 14mm; }
+  * { box-sizing: border-box; }
+  html,body { margin:0; padding:0; }
+  body { font-family:var(--sans); color:var(--body); font-size:10.5px; line-height:1.5; background:var(--paper); }
+  h1,h2,h3 { font-family:var(--serif); color:var(--ink); font-weight:600; margin:0; }
+  p { margin:0 0 7px; }
+  b { color:var(--ink); }
+  .mono { font-family:var(--mono); }
+  a { color:var(--green); text-decoration:none; }
+
+  /* section as a printed page */
+  section { page-break-after: always; padding-top:2px; }
+  section:last-of-type { page-break-after: auto; }
+
+  .eyebrow { font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--green); font-weight:700; }
+  h2.sec { font-size:18px; margin:2px 0 3px; letter-spacing:-.01em; }
+  .rule { height:3px; background:var(--green); width:52px; border-radius:2px; margin:6px 0 14px; }
+  .lead { font-size:11px; color:var(--body); max-width:52em; }
+
+  /* logo lockup */
+  .logo { display:flex; align-items:center; gap:11px; }
+  .logo .mark { width:34px; height:34px; border-radius:8px; background:var(--green); position:relative; flex:none; }
+  .logo .mark::after { content:""; position:absolute; right:6px; bottom:6px; width:9px; height:9px; border-radius:2px; background:var(--spark); }
+  .logo .name { font-family:var(--serif); font-weight:600; font-size:20px; color:var(--ink); line-height:1.05; }
+  .logo .name small { display:block; font-family:var(--sans); font-weight:500; font-size:10px; font-style:italic; color:var(--muted); }
+
+  /* cover */
+  .cover { display:flex; flex-direction:column; min-height:263mm; }
+  .cover .top { display:flex; justify-content:space-between; align-items:flex-start; }
+  .cover .band { margin-top:auto; }
+  .cover h1 { font-size:34px; line-height:1.1; letter-spacing:-.015em; }
+  .cover .sub { font-size:13px; color:var(--muted); margin-top:10px; max-width:40em; }
+  .cover .meta { margin-top:26px; border-top:2px solid var(--green); padding-top:12px; display:flex; gap:34px; font-size:10px; color:var(--muted); }
+  .cover .meta b { display:block; color:var(--ink); font-size:11px; margin-top:2px; }
+  .cover .foot { margin-top:20px; font-size:9px; color:var(--muted); }
+
+  /* tables */
+  table { width:100%; border-collapse:collapse; font-size:9.6px; }
+  th { text-align:left; font-size:8.4px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); border-bottom:1.5px solid var(--green); padding:5px 7px; }
+  td { padding:5px 7px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tr.total td { font-weight:700; color:var(--ink); border-top:1.5px solid var(--ink); }
+  .n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+  /* status chips */
+  .chip { display:inline-block; font-size:8px; font-weight:700; letter-spacing:.03em; padding:1.5px 7px; border-radius:999px; white-space:nowrap; }
+  .c-built { color:var(--built); background:var(--built-bg); }
+  .c-config { color:var(--config); background:var(--config-bg); }
+  .c-next { color:var(--next); background:var(--next-bg); }
+  .c-later { color:var(--later); background:var(--later-bg); }
+  .c-excl { color:var(--excl); background:var(--excl-bg); }
+
+  /* cards */
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .card { border:1px solid var(--line); border-radius:9px; padding:11px 13px; break-inside:avoid; }
+  .card h3 { font-size:12px; margin-bottom:4px; }
+  .card .k { font-size:8.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--green); font-weight:700; }
+  .card p { font-size:9.6px; margin:3px 0 0; }
+
+  /* layer stack */
+  .stack { display:flex; flex-direction:column; gap:5px; margin:4px 0 10px; }
+  .layer { border-radius:7px; padding:8px 12px; font-size:9.6px; border:1px solid var(--line); }
+  .layer b { font-size:10.5px; }
+  .layer .desc { color:var(--muted); }
+  .l-plugin { background:#fbfbf9; }
+  .l-tenant { background:#f6f3ea; }
+  .l-vertical { background:#eaf3ec; }
+  .l-juris { background:#e9f1f6; }
+  .l-cap { background:#f2eef6; }
+  .l-kernel { background:var(--green); color:#fff; border-color:var(--green); }
+  .l-kernel b, .l-kernel .desc { color:#fff; }
+  .arrow { text-align:center; color:var(--muted); font-size:11px; margin:-1px 0; }
+
+  /* flow steps */
+  .flow { display:flex; align-items:stretch; gap:6px; margin:6px 0 12px; flex-wrap:wrap; }
+  .step { flex:1 1 0; min-width:96px; border:1px solid var(--line); border-radius:8px; padding:8px 9px; background:#fbfcfa; break-inside:avoid; }
+  .step .num { display:inline-flex; width:16px; height:16px; border-radius:50%; background:var(--green); color:#fff; font-size:9px; font-weight:700; align-items:center; justify-content:center; }
+  .step h3 { font-size:10px; margin:4px 0 2px; }
+  .step p { font-size:8.8px; color:var(--muted); margin:0; }
+
+  .note { border-left:3px solid var(--green); background:var(--mist); border-radius:0 7px 7px 0; padding:8px 11px; font-size:9.4px; margin:10px 0; }
+  .legendrow { display:flex; gap:12px; flex-wrap:wrap; font-size:8.6px; color:var(--muted); margin:8px 0 12px; align-items:center; }
+  ul.tight { margin:4px 0 8px; padding-left:16px; }
+  ul.tight li { margin:2px 0; }
+  .foot-note { font-size:8.4px; color:var(--muted); border-top:1px solid var(--line); padding-top:6px; margin-top:12px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+</style>
+</head>
+<body>
+
+<!-- ============================ COVER ============================ -->
+<section class="cover">
+  <div class="top">
+    <div class="logo">
+      <span class="mark"></span>
+      <span class="name">Canei Subirats<small>Renovations, simply complex.</small></span>
+    </div>
+    <div style="text-align:right; font-size:9px; color:var(--muted)">
+      <div class="eyebrow">Status report</div>
+      <div style="margin-top:3px">Release R0 complete · R1 in progress</div>
+    </div>
+  </div>
+
+  <div class="band">
+    <div class="eyebrow">ERP · Proyecto Diorka · Company #1</div>
+    <h1>Infrastructure &amp; Delivery Status</h1>
+    <div class="sub">What is built and running, the process flows already implemented, and what
+      remains to be built — mapped against the Business Requirements Document (BRD).</div>
+
+    <div class="meta">
+      <div>Prepared for<b>Canei Subirats, S.L.</b></div>
+      <div>Date<b>17 July 2026</b></div>
+      <div>Working language<b>English (es/ca before handover)</b></div>
+      <div>Fiscal locale<b>es-ES · EUR</b></div>
+    </div>
+    <div class="foot">
+      Source of record: BRD <span class="mono">ERP-START-INPUT</span> ·
+      <span class="mono">intake/diorka/REQUIREMENTS-MAP.md</span> ·
+      <span class="mono">docs/delivery/DIORKA-DELIVERY-PLAN.md</span>. All demo data is synthetic;
+      no real filings, emails or payments are issued. Tax content is legally-defensible by design
+      (<span class="mono">legally_verified:false</span> until the asesor's review).
+    </div>
+  </div>
+</section>
+
+<!-- ======================= EXECUTIVE SUMMARY ======================= -->
+<section>
+  <div class="eyebrow">01 · Overview</div>
+  <h2 class="sec">Where the project stands</h2>
+  <div class="rule"></div>
+
+  <p class="lead">The system is produced by an <b>ERP factory</b>: a tenant specification is composed
+  at build time from a shared kernel, capability modules, a Spanish jurisdiction pack and a
+  construction/renovation vertical pack. Canei Subirats is company&nbsp;#1. The foundation
+  (<b>Release&nbsp;R0</b>) is complete and continuously verified in CI; the paperless-quotation
+  release (<b>R1</b>) is in progress.</p>
+
+  <div class="cards" style="margin-top:8px">
+    <div class="card">
+      <div class="k">Built &amp; verified — R0</div>
+      <h3>The engine runs</h3>
+      <p>Composable architecture, Spanish VAT engine with persisted legal justification, immutable
+      invoicing with gapless numbering + SHA-256 chaining, supplier price comparison, quote options
+      &amp; versions, chapter catalogue, PostgreSQL with row-level isolation, and a web workspace —
+      all green in CI (~80 tests + live-database + browser end-to-end).</p>
+    </div>
+    <div class="card">
+      <div class="k">In progress — R1</div>
+      <h3>Quotation without paper</h3>
+      <p>Catalogue-first quote builder (minimal typing for a non-digital user), customer-facing
+      branded PDF, supplier-comparison and register screens, margin split hidden from the customer
+      document, and two-owner sign-in. This is the current build queue.</p>
+    </div>
+    <div class="card">
+      <div class="k">Corporate identity</div>
+      <h3>Their brand, as data</h3>
+      <p>Canei Subirats' palette (greens + yellow spark), Roboto Serif / Inter typography, slogan and
+      contact are captured and applied across the UI and documents as configuration — never a code
+      fork. Working in English; Spanish/Catalan is a switch before handover.</p>
+    </div>
+    <div class="card">
+      <div class="k">Gated by decisions, not code</div>
+      <h3>What we are waiting on</h3>
+      <p>The owner validation workshop (legal names/CIFs, Catalan requirement, billing habits,
+      supplier list), the asesor's tax sign-off before the first real invoice, and the EU hosting
+      decision. None are provisioned autonomously.</p>
+    </div>
+  </div>
+
+  <div class="note"><b>How to read the status labels.</b>
+    <span class="chip c-built">BUILT</span> works today ·
+    <span class="chip c-config">CONFIG</span> data change only ·
+    <span class="chip c-next">NEXT</span> queued release slice ·
+    <span class="chip c-later">LATER</span> a later release ·
+    <span class="chip c-excl">EXCLUDED</span> out of scope per BRD §10.2.</div>
+</section>
+
+<!-- ======================= INFRASTRUCTURE ======================= -->
+<section>
+  <div class="eyebrow">02 · Infrastructure in place</div>
+  <h2 class="sec">The architecture that is running</h2>
+  <div class="rule"></div>
+
+  <p class="lead">Strictly layered, top calls down only. The <b>kernel and capabilities hold zero
+  country- or sector-specific knowledge</b> — a build-time linter fails the pipeline if any tax word
+  or sector term leaks into them. Customisation for a company is data in its tenant file, so a new
+  company is configuration, not a code branch.</p>
+
+  <div class="stack">
+    <div class="layer l-plugin"><b>Plugins</b> <span class="desc">— optional extensions (none required for Canei today)</span></div>
+    <div class="arrow">▼</div>
+    <div class="layer l-tenant"><b>Tenant config (data)</b> <span class="desc">— <span class="mono">tenants/diorka</span>: identity, branding tokens, billing series, capability selection</span></div>
+    <div class="arrow">▼</div>
+    <div class="layer l-vertical"><b>Vertical pack — construction / reformas</b> <span class="desc">— measurements, chapter catalogue, quote vocabulary (en/es/ca)</span></div>
+    <div class="arrow">▼</div>
+    <div class="layer l-juris"><b>Jurisdiction pack — es-ES</b> <span class="desc">— effective-dated VAT tables, reduced-rate decision engine, invoice chaining, Spanish labels, IRPF profiles</span></div>
+    <div class="arrow">▼</div>
+    <div class="layer l-cap"><b>Capabilities</b> <span class="desc">— quoting · billing · sourcing · scheduling · time · procurement · docs (define ports; no jurisdiction knowledge)</span></div>
+    <div class="arrow">▼</div>
+    <div class="layer l-kernel"><b>Kernel</b> <span class="desc">— resolver &amp; port registry, integer money, effective dating, append-only events, storage ports</span></div>
+  </div>
+
+  <h3 style="font-size:12px; margin:6px 0 4px">Cross-cutting foundations (all verified in CI)</h3>
+  <table>
+    <thead><tr><th style="width:26%">Capability</th><th>What it guarantees</th><th style="width:20%">Status</th></tr></thead>
+    <tbody>
+      <tr><td><b>Integer money</b></td><td>All amounts in whole cents; quantities in thousandths; rounding is explicit — no floating-point drift on invoices.</td><td><span class="chip c-built">BUILT</span></td></tr>
+      <tr><td><b>Effective-dated rules</b></td><td>A VAT rule is resolved for the invoice date; the system refuses to guess when a rate is undated. The decision + legal basis are persisted on the document.</td><td><span class="chip c-built">BUILT</span></td></tr>
+      <tr><td><b>Immutable invoicing</b></td><td>Gapless <span class="mono">FAC-YYYY-NNNN</span> numbering, rectificativa path, invoices frozen once issued.</td><td><span class="chip c-built">BUILT</span></td></tr>
+      <tr><td><b>SHA-256 invoice chain</b></td><td>Each invoice seals the previous one's hash — a tamper-evident chain.</td><td><span class="chip c-built">BUILT</span></td></tr>
+      <tr><td><b>Multi-company isolation</b></td><td>PostgreSQL with row-level security; every row keyed and filtered by tenant. Cross-tenant invisibility proven in CI.</td><td><span class="chip c-built">BUILT</span></td></tr>
+      <tr><td><b>Boundary &amp; literal linter</b></td><td>Fails the build if a layer imports upward or a jurisdiction/sector literal leaks into the kernel.</td><td><span class="chip c-built">BUILT</span></td></tr>
+      <tr><td><b>Factory CLI</b></td><td><span class="mono">resolve · validate · new-tenant · demo</span> — a second company was created config-only in 0.02&nbsp;s.</td><td><span class="chip c-built">BUILT</span></td></tr>
+      <tr><td><b>Web workspace</b></td><td>Server-composed tenant runtime; lists quotes/invoices, drives quote → invoice, serves the rendered invoice.</td><td><span class="chip c-built">BUILT</span></td></tr>
+      <tr><td><b>CI pipeline</b></td><td>lint · types · ~80 tests · build · boundaries · live-Postgres RLS · browser end-to-end, on every push.</td><td><span class="chip c-built">BUILT</span></td></tr>
+    </tbody>
+  </table>
+  <div class="foot-note">Stack: Turborepo + pnpm · Next.js 16 / React 19 / TypeScript · Prisma + PostgreSQL (RLS) · Vitest + Playwright · GitHub Actions.</div>
+</section>
+
+<!-- ======================= IMPLEMENTED FLOWS ======================= -->
+<section>
+  <div class="eyebrow">03 · Process flows already implemented</div>
+  <h2 class="sec">What a user can do end-to-end today</h2>
+  <div class="rule"></div>
+
+  <h3 style="font-size:12px; margin:2px 0 2px">A · Quote → Invoice, with the VAT decided by rule</h3>
+  <div class="flow">
+    <div class="step"><span class="num">1</span><h3>Build the quote</h3><p>Pick a chapter, description, unit; quantity computed from measurement (units × length × width).</p></div>
+    <div class="step"><span class="num">2</span><h3>Options apart</h3><p>Optional works are totalled separately from the base — never inflate the headline price.</p></div>
+    <div class="step"><span class="num">3</span><h3>Client accepts</h3><p>Acceptance selects which options are included; the accepted version is frozen.</p></div>
+    <div class="step"><span class="num">4</span><h3>Issue invoice</h3><p>The reduced-rate rule (art. 91.Uno.2.10º) is evaluated from the facts — not chosen from a dropdown.</p></div>
+    <div class="step"><span class="num">5</span><h3>Sealed &amp; justified</h3><p>Legal basis persisted, gapless number, SHA-256 chain seal. Renders as an es-ES fiscal document.</p></div>
+  </div>
+  <div class="note">The rate is a <b>decision with a reason</b>: change the recipient, dwelling age or materials share
+  and the engine switches between reduced (10%) and general (21%) VAT and records exactly why —
+  <span class="mono">legally_verified:false</span> until the asesor signs off.</div>
+
+  <div class="two" style="margin-top:6px">
+    <div>
+      <h3 style="font-size:12px; margin:0 0 3px">B · Supplier comparison</h3>
+      <ul class="tight">
+        <li>Per-item and per-chapter totals across bidders vs. the initial estimate.</li>
+        <li>Absolute and % variance; a <b>missing price is shown as missing, never as zero</b>.</li>
+        <li>Selecting the winning cost is an <b>explicit choice</b>, never inferred — becomes the quote's cost basis.</li>
+      </ul>
+      <h3 style="font-size:12px; margin:4px 0 3px">C · Quote options &amp; versions</h3>
+      <ul class="tight">
+        <li>Optional lines separate from the base total.</li>
+        <li>Accepted versions frozen; a revision creates a new linked version.</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="font-size:12px; margin:0 0 3px">D · Chapter catalogue (catalogue-first)</h3>
+      <ul class="tight">
+        <li>18-chapter renovation catalogue seeded from the BRD as pack data.</li>
+        <li>Drives the "choose, don't type" quote builder for a non-digital user.</li>
+        <li>English labels now; Spanish keys preserved; Catalan labels ready.</li>
+      </ul>
+      <h3 style="font-size:12px; margin:4px 0 3px">E · Identity &amp; language</h3>
+      <ul class="tight">
+        <li>Canei Subirats brand applied across UI + documents (as data).</li>
+        <li>English working UI with an es/ca switch for handover.</li>
+        <li>Fiscal document always renders in es-ES (Spanish VAT + € formatting).</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot-note">Verified end-to-end in a real browser: a bathroom renovation quote → acceptance with an optional →
+  invoice at reduced VAT with persisted justification and a chained seal.</div>
+</section>
+
+<!-- ======================= BRD COVERAGE ======================= -->
+<section>
+  <div class="eyebrow">04 · Requirements coverage (BRD)</div>
+  <h2 class="sec">Every BRD area, mapped to status</h2>
+  <div class="rule"></div>
+  <div class="legendrow">
+    <span class="chip c-built">BUILT</span> works today
+    <span class="chip c-config">CONFIG</span> data only
+    <span class="chip c-next">NEXT</span> queued slice
+    <span class="chip c-later">LATER</span> later release
+    <span class="chip c-excl">EXCLUDED</span> BRD §10.2
+  </div>
+
+  <table>
+    <thead><tr><th style="width:50%">BRD area</th><th style="width:14%">Status</th><th>Where / plan</th></tr></thead>
+    <tbody>
+      <tr><td>Multi-company: per-entity numbering, branding, tax (ORG-01..03)</td><td><span class="chip c-built">BUILT</span></td><td>one tenant per legal entity; RLS isolation; group registry</td></tr>
+      <tr><td>Consolidated owner view across companies (ORG-04)</td><td><span class="chip c-next">NEXT</span></td><td>cross-tenant dashboard over member runtimes</td></tr>
+      <tr><td>Roles / permissions, audit of changes (ORG-05..07)</td><td><span class="chip c-next">NEXT</span></td><td>event log present; auth + roles in web shell</td></tr>
+      <tr><td>CRM: customers, leads, next actions (CRM-01..08)</td><td><span class="chip c-next">NEXT</span></td><td>new <span class="mono">crm</span> capability, after quotation slices</td></tr>
+      <tr><td>Site-visit capture, phone-first, photos (VIS-01..07)</td><td><span class="chip c-later">LATER</span></td><td>mobile form + docs port</td></tr>
+      <tr><td>Work catalogue, chapters/items, room templates (CAT-01..08)</td><td><span class="chip c-config">CONFIG</span> <span class="chip c-next">NEXT</span></td><td>chapters seeded now; item catalogue w/ prices next</td></tr>
+      <tr><td>Supplier register, dated prices with source, discounts (SUP-01..06)</td><td><span class="chip c-next">NEXT</span></td><td>price records carry source + effective date</td></tr>
+      <tr><td>Price comparison, variance, missing-price visibility (SUP-07..10)</td><td><span class="chip c-built">BUILT</span></td><td>sourcing comparison engine (this cycle)</td></tr>
+      <tr><td>Quote: chapters/items/qty/price, totals, margin split (QUO-01..06,10)</td><td><span class="chip c-built">BUILT</span> <span class="chip c-next">NEXT</span></td><td>quoting built; cost-vs-selling margin fields next</td></tr>
+      <tr><td>Optional items separate from base (QUO-07)</td><td><span class="chip c-built">BUILT</span></td><td>optional lines; base vs optional totals</td></tr>
+      <tr><td>Frozen versions + revisions (QUO-12..13)</td><td><span class="chip c-built">BUILT</span></td><td>accepted quotes frozen; linked revisions</td></tr>
+      <tr><td>Professional PDF with correct company branding (QUO-15..16)</td><td><span class="chip c-next">NEXT</span></td><td>doc-render port + Chromium PDF (R1)</td></tr>
+      <tr><td>Accepted quote → project baseline without re-entry (PRJ-01..05)</td><td><span class="chip c-next">NEXT</span></td><td>project entity over accepted version</td></tr>
+      <tr><td>Planning: labour / machinery (PLN)</td><td><span class="chip c-later">LATER</span></td><td>scheduling / time capabilities (declared, stub)</td></tr>
+      <tr><td>Purchases vs budget, returns / credits (PUR)</td><td><span class="chip c-later">LATER</span></td><td>procurement build-out; links to sourcing</td></tr>
+      <tr><td>Change orders preserving baseline (CHG)</td><td><span class="chip c-next">NEXT</span></td><td>quoted-vs-actual per chapter — a stated core pain</td></tr>
+      <tr><td>Customer invoices from quote / milestones, partials, receipts (AR-01..08)</td><td><span class="chip c-built">BUILT</span> <span class="chip c-next">NEXT</span></td><td>issue-from-quote + numbering built; receipts/allocation next</td></tr>
+      <tr><td>Supplier bills, duplicates, due lists, partial payments (AP)</td><td><span class="chip c-next">NEXT</span></td><td>mirrors AR on the purchase side</td></tr>
+      <tr><td>Margins by chapter, cash in/out view (FIN)</td><td><span class="chip c-next">NEXT</span></td><td>from sourcing-selected cost vs price + AR/AP</td></tr>
+      <tr><td>Documents / photos linked everywhere (DOC)</td><td><span class="chip c-later">LATER</span></td><td><span class="mono">docs</span> capability + storage port</td></tr>
+      <tr><td>Dashboards per owner profile + alerts (DAS)</td><td><span class="chip c-next">NEXT</span></td><td>web views over events + due lists</td></tr>
+      <tr><td>Usability for a non-digital user, minimal typing (NFR-01..02)</td><td><span class="chip c-built">BUILT</span></td><td>catalogue-pick-first design rule, applied</td></tr>
+      <tr><td>EUR + Spanish VAT (NFR-11)</td><td><span class="chip c-built">BUILT</span></td><td>es-ES pack, effective-dated, justified</td></tr>
+      <tr><td>Spanish + Catalan documents (NFR-10)</td><td><span class="chip c-config">CONFIG</span></td><td>label sets are data; ca-ES set queued</td></tr>
+      <tr><td>Reliability / backup (NFR-06,09)</td><td><span class="chip c-built">BUILT</span> <span class="chip c-later">LATER</span></td><td>Postgres + migrations; restore drill later</td></tr>
+      <tr><td>Ledger, payroll, warehouse/stock, portals, e-signature</td><td><span class="chip c-excl">EXCLUDED</span></td><td>BRD §10.2 — tracked, not built</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ======================= ROADMAP ======================= -->
+<section>
+  <div class="eyebrow">05 · What remains — delivery roadmap</div>
+  <h2 class="sec">From here to go-live</h2>
+  <div class="rule"></div>
+  <p class="lead">Strict order R1 → R4; each release is usable before the next begins. The
+  calendar-critical path is the owner workshop and the asesor sign-off — not the code.</p>
+
+  <table>
+    <thead><tr><th style="width:16%">Release</th><th>Scope</th><th style="width:16%">State</th></tr></thead>
+    <tbody>
+      <tr><td><b>R0 · Foundation</b></td><td>Composable architecture, es-ES VAT + justification, immutable invoicing + rectificativas, quote options/versions, sourcing comparison, chapter catalogue, Postgres RLS, web shell.</td><td><span class="chip c-built">DONE — CI-verified</span></td></tr>
+      <tr><td><b>R1 · Quotation without paper</b></td><td>Catalogue-first quote builder, cost/price/margin split hidden from the customer document, options/exclusions/versions UI, <b>branded PDF</b>, comparison + supplier/item registers with dated prices, two-owner sign-in. UAT = rebuild 3 real past quotes.</td><td><span class="chip c-next">IN PROGRESS</span></td></tr>
+      <tr><td><b>R2 · Project control &amp; money</b></td><td>Accepted version → immutable project baseline, change orders, purchases &amp; supplier bills (duplicates, allocation, due lists, partials), customer invoicing incl. deposits/stage/partial + receipt allocation, margin by chapter + weekly cash view, persona dashboards + alerts.</td><td><span class="chip c-later">PLANNED</span></td></tr>
+      <tr><td><b>R3 · Field &amp; documents</b></td><td>Mobile site-visit capture, documents linked everywhere, tasks, weak-connectivity hardening, Catalan labels if confirmed.</td><td><span class="chip c-later">PLANNED</span></td></tr>
+      <tr><td><b>R4 · Migration, hardening, go-live</b></td><td>Data migration (dedupe, dated prices, summary history), EU hosting + backup with restore drill, permissions hardening, gestor exports, training on real projects, parallel run, per-company cutover. Post-live: Verifactu certified mode before the 2027 deadline.</td><td><span class="chip c-later">PLANNED</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="two" style="margin-top:8px">
+    <div>
+      <h3 style="font-size:12px; margin:0 0 3px">Immediate build order</h3>
+      <ul class="tight">
+        <li>Branded quote PDF (QUO-15/16) + supplier/item registers.</li>
+        <li>AR receipts &amp; partial allocation; AP supplier bills with duplicate detection.</li>
+        <li>CRM light (customers/leads/next action) + owner dashboards.</li>
+        <li>Certificaciones / change orders — quoted-vs-actual per chapter.</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="font-size:12px; margin:0 0 3px">Inputs we need (not code)</h3>
+      <ul class="tight">
+        <li><b>Owner workshop:</b> legal names + CIFs, Catalan requirement, billing habits, supplier list, gestor export format, devices.</li>
+        <li><b>Asesor sign-off</b> on tax &amp; invoice content → <span class="mono">legally_verified:true</span> before the first real invoice.</li>
+        <li><b>EU hosting decision</b> (never provisioned autonomously) → before R4.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note"><b>Explicitly out of scope (BRD §10.2):</b> accounting ledger/filings automation,
+  payroll/HR, warehouse/stock, automatic supplier-portal access, customer self-service portal,
+  e-signature — unless later confirmed. Tracked, not forgotten.</div>
+
+  <div class="foot-note">Canei Subirats, S.L. · Carrer de la Creu, 74, 08960 Sant Just Desvern · 659 87 67 00 · hola@caneisubirats.com — internal status document, synthetic data only.</div>
+</section>
+
+</body>
+</html>
