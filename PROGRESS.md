@@ -95,6 +95,37 @@ output; the factory is the product.
     5 tests), registered + composed into `diorka` (8 capabilities, templates
     as tenant data). Chromium-verified; all gates green.
 
+12. **Remaining BRD core capabilities** — DONE this cycle (commit 71477ea).
+    Four generic, tested, kernel-only capabilities filling the biggest gaps,
+    registered + composed into `diorka` (now 12 capabilities):
+    `projects` (PRJ/CHG/FIN — immutable baseline from accepted quote,
+    committed/actual cost booking, change orders preserving baseline, margin +
+    quoted-vs-actual by chapter, forecast, margin-floor flag; 6 tests);
+    `receivables` (AR — receipts with partial allocation across invoices,
+    outstanding/overdue, aging buckets, due list; 4 tests); `payables`
+    (AP — supplier bills with duplicate supplier+number detection, partial
+    payments, due list; 4 tests); `crm` (customers, leads on a configurable
+    pipeline, next-action + overdue, pipeline summary; 4 tests). All gates
+    green; REQUIREMENTS-MAP updated (CRM/PRJ/CHG/AR/AP/FIN → built). These are
+    the domain engines behind the Control Tower; durable persistence + web UI
+    surfaces are the remaining follow-ups.
+
+## Remaining BRD topics (not yet built)
+
+- **VIS** mobile site-visit capture (photos, phone-first) — needs `docs`
+  capability + storage port + PWA shell (P3).
+- **PLN** planning / labour / machinery scheduling — `scheduling`/`time`
+  capabilities are declared stubs; build real engines.
+- **PUR** purchase orders vs budget, returns/credits — `procurement`
+  capability build-out (links sourcing selection → projects committed cost).
+- **DOC** documents/photos linked everywhere — `docs` capability + storage.
+- **ORG-04..07** consolidated owner view, roles/permissions/audit — auth +
+  cross-tenant read + event-log surfacing in the web shell.
+- **Web surfaces + durable persistence** for the new capabilities (projects,
+  AR, AP, crm) — wire services onto Prisma stores + real routes.
+- **NFR-10** Spanish/Catalan handover switch (flip `UI_LANG`, add ca doc
+  labels) — data-only.
+
 ## Next 3 tasks (P2 — in order)
 
 0. ~~**P2.1a Async persistence seam** — DONE: kernel store ports
