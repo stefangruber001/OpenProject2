@@ -110,13 +110,13 @@ output; the factory is the product.
     the domain engines behind the Control Tower; durable persistence + web UI
     surfaces are the remaining follow-ups.
 
-## Capability layer — COMPLETE (14 capabilities, zero stubs)
+## Capability layer — COMPLETE (16 capabilities, zero stubs)
 
 13. **Rest of the capability layer** — DONE (commits f23e959, c55d605):
     `procurement` (PUR), `scheduling` (PLN), `time` (labour→cost), `docs`
     (DOC + blob-store port), `visits` (VIS), `access` (ORG-05..07
     roles/permissions). With the earlier projects/receivables/payables/crm/
-    messaging, `diorka` composes **14 real, tested capabilities** — every BRD
+    messaging, `diorka` composes **16 real, tested capabilities** — every BRD
     functional area now has a domain engine (185+ tests across the repo).
 
 14. **Live app on durable storage** — DONE (commit 9f9238d): `buildServices`
