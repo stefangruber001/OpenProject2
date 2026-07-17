@@ -8,7 +8,7 @@
 # (group registry: tenants/_groups/diorka.yaml).
 tenant: diorka
 kernel: "^1"
-capabilities: [quoting, billing, sourcing, scheduling, time, procurement, docs]
+capabilities: [quoting, billing, sourcing, messaging, scheduling, time, procurement, docs]
 jurisdiction: es-ES@2026-07-17
 vertical: construction/reformas
 plugins: []
@@ -63,3 +63,57 @@ config:
     # es/ca for handover); the UI picks by UI_LANG. No per-tenant override here.
     materialsShareDefaultBp: 3500
     # chapters: uses the pack default seeded from BRD Appendix A.2
+
+  # Email is auto-drafted from lifecycle events; the user presses Send once.
+  # Templates are DATA (English working; es/ca before handover). No real send in
+  # dev — a log-only outbox is bound (INTEGRATIONS_PENDING: real provider).
+  messaging:
+    from: "hola@caneisubirats.com"
+    signature: "Canei Subirats — Renovations, simply complex."
+    templates:
+      - event: quote-sent
+        subject: "Your renovation quote — {{project}}"
+        body: |
+          Dear {{client}},
+
+          Thank you for trusting Canei Subirats with your project “{{project}}”.
+          Please find attached our detailed quote for {{amount}}, broken down by
+          chapter with clear measurements; optional works are listed separately.
+
+          You will have a single point of contact throughout, fixed deadlines and
+          our 2-year guarantee on the works.
+
+          Kind regards,
+          {{signature}}
+          {{from}}
+      - event: acceptance
+        subject: "Thank you — your project is confirmed ({{ref}})"
+        body: |
+          Dear {{client}},
+
+          We are delighted to confirm your acceptance for “{{project}}”. Your
+          project number is {{ref}}. We will schedule the works and keep you
+          updated at each milestone.
+
+          Kind regards,
+          {{signature}}
+      - event: invoice
+        subject: "Invoice {{invoice}} — {{project}}"
+        body: |
+          Dear {{client}},
+
+          Please find attached invoice {{invoice}} for the works on “{{project}}”.
+          Total due: {{amount}}. Payment terms: 15 days.
+
+          Kind regards,
+          {{signature}}
+      - event: reminder
+        subject: "Friendly reminder — invoice for {{project}}"
+        body: |
+          Dear {{client}},
+
+          Our records show invoice {{invoice}} for {{amount}} is now due. If you
+          have already arranged payment, please disregard this note.
+
+          Thank you very much,
+          {{signature}}

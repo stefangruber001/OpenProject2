@@ -12,6 +12,8 @@ export type FactoryErrorCode =
   | "MISSING_PORT_IMPLEMENTATION"
   | "IMMUTABLE"
   | "INVALID_STATE"
+  | "NO_TEMPLATE"
+  | "NO_OUTBOX"
   | "NOT_FOUND";
 
 /**
