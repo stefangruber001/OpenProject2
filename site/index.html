@@ -6,81 +6,147 @@
 <meta name="robots" content="noindex" />
 <title>Canei Subirats ERP — review & testing (R1)</title>
 <style>
-  :root {
-    --paper:#faf9f6; --card:#ffffff; --ink:#171911; --ink2:#565950; --mut:#9c9f93;
-    --line:#efece6; --acc:#48733c; --acc-soft:#eef4ea; --spark:#f2c230;
-    --shadow:0 1px 2px rgba(30,40,20,.04), 0 16px 34px -20px rgba(30,40,20,.18);
+  :root{
+    --green:#48733c; --greenLt:#6ba85a; --greenSoft:#eef4ea; --spark:#f2c230;
+    --ink:#14160f; --body:#54574c; --muted:#9a9d90; --faint:#b9bcb0;
+    --line:#ecebe4; --hair:#f3f1ec; --bg:#fbfbf9; --paper:#fff;
+    --shadow:0 1px 2px rgba(24,32,16,.03), 0 18px 40px -24px rgba(24,32,16,.18);
+    --shadow-lg:0 2px 4px rgba(24,32,16,.04), 0 40px 80px -40px rgba(24,32,16,.3);
     --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
     --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    --mono:ui-monospace,Menlo,monospace;
   }
-  @media (prefers-color-scheme: dark){ :root{
-    --paper:#14170f; --card:#1b1f16; --ink:#f0f1e9; --ink2:#c2c8ba; --mut:#8b917f;
-    --line:#2e3327; --acc:#7fae6f; --acc-soft:#21301b; } }
+  @media (prefers-color-scheme:dark){:root{
+    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --faint:#6c7263;
+    --line:#2c3126; --hair:#242a1e; --bg:#12150e; --paper:#181c12; --greenSoft:#20301b; }}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 var(--sans);
-    display:grid;place-items:center;min-height:100vh;padding:24px}
-  .wrap{max-width:640px;display:flex;flex-direction:column;gap:18px}
-  .logo{display:flex;align-items:center;gap:11px;margin-bottom:2px}
-  .logo .mark{width:34px;height:34px;border-radius:8px;background:var(--acc);position:relative;flex:none}
-  .logo .mark::after{content:"";position:absolute;right:6px;bottom:6px;width:9px;height:9px;border-radius:2px;background:var(--spark)}
-  .logo .name{font-family:var(--serif);font-weight:600;font-size:20px;line-height:1.1}
-  .logo .name small{display:block;font-family:var(--sans);font-weight:500;font-size:11px;font-style:italic;color:var(--mut)}
-  .tag{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);font-weight:700}
-  h1{font-family:var(--serif);font-weight:600;font-size:26px;margin:0;letter-spacing:-0.01em}
-  p{margin:0;color:var(--ink2);font-size:14.5px}
-  a.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:16px;
-    padding:18px 20px;text-decoration:none;color:var(--ink);box-shadow:var(--shadow);transition:transform .1s, box-shadow .18s}
-  a.card:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(30,40,20,.05), 0 22px 40px -22px rgba(30,40,20,.24)}
-  a.card b{font-size:17px}
-  a.card span{display:block;font-size:13px;color:var(--ink2);margin-top:4px}
-  .note{border-left:3px solid var(--acc);background:var(--acc-soft);border-radius:0 8px 8px 0;
-    padding:10px 14px;font-size:12.5px;color:var(--ink2)}
-  code{font-family:ui-monospace,Menlo,monospace;font-size:.9em}
-  footer{font-size:11.5px;color:var(--mut)}
+  html{scroll-behavior:smooth}
+  body{margin:0;color:var(--body);font:16px/1.6 var(--sans);letter-spacing:-.005em;min-height:100vh;
+    background:
+      radial-gradient(1200px 600px at 84% -10%, rgba(72,115,60,.09), transparent 58%),
+      radial-gradient(820px 480px at 2% 4%, rgba(242,194,48,.07), transparent 55%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  h1,h2{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0;letter-spacing:-.02em}
+  .wrap{max-width:760px;margin:0 auto;padding:72px 24px 60px;display:flex;flex-direction:column;gap:22px}
+  @media (max-width:560px){.wrap{padding:44px 18px}}
+
+  .logo{display:flex;align-items:center;gap:12px}
+  .logo svg{flex:none;filter:drop-shadow(0 5px 14px rgba(72,115,60,.3))}
+  .logo .name{font-family:var(--serif);font-weight:600;font-size:21px;color:var(--ink);line-height:1.05}
+  .logo .name small{display:block;font-family:var(--sans);font-weight:500;font-size:11px;font-style:italic;color:var(--muted)}
+
+  .hero{margin-top:8px}
+  .tag{display:inline-flex;align-items:center;gap:7px;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--green);font-weight:700;border:1px solid color-mix(in srgb,var(--green) 30%,transparent);
+    border-radius:999px;padding:6px 13px;background:var(--greenSoft);margin-bottom:16px}
+  .tag i{width:6px;height:6px;border-radius:999px;background:var(--green);display:inline-block}
+  h1{font-size:clamp(30px,5.4vw,46px);line-height:1.06}
+  h1 em{font-style:normal;color:var(--green)}
+  .lede{font-size:17px;color:var(--body);max-width:56ch;margin-top:14px}
+
+  .stats{display:flex;gap:26px;flex-wrap:wrap;margin:8px 0 2px}
+  .stat b{font-family:var(--serif);font-size:26px;color:var(--ink);display:block;line-height:1;letter-spacing:-.02em}
+  .stat span{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+  @media (max-width:560px){.cards{grid-template-columns:1fr}}
+  a.card{position:relative;display:flex;flex-direction:column;gap:7px;background:var(--paper);border:1px solid var(--line);
+    border-radius:18px;padding:20px 20px 18px;text-decoration:none;color:var(--ink);box-shadow:var(--shadow);
+    transition:transform .12s, box-shadow .2s, border-color .2s;overflow:hidden}
+  a.card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;transform:scaleX(0);transform-origin:left;
+    background:linear-gradient(90deg,var(--green),var(--greenLt) 60%,var(--spark));transition:transform .25s}
+  a.card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:color-mix(in srgb,var(--green) 34%,var(--line))}
+  a.card:hover::before{transform:scaleX(1)}
+  a.card .ic{width:40px;height:40px;border-radius:11px;background:var(--greenSoft);display:grid;place-items:center;
+    font-size:19px;margin-bottom:3px}
+  a.card b{font-size:16px;font-weight:600;letter-spacing:-.01em}
+  a.card span{font-size:13px;color:var(--body);line-height:1.5}
+  a.card .go{margin-top:auto;font-size:12px;font-weight:700;color:var(--green);letter-spacing:.01em}
+  a.card.wide{grid-column:1/-1;flex-direction:row;align-items:flex-start;gap:16px}
+  a.card.wide .ic{flex:none}
+  a.card.wide .bd{display:flex;flex-direction:column;gap:6px}
+
+  .note{border-left:3px solid var(--green);background:var(--greenSoft);border-radius:0 12px 12px 0;
+    padding:13px 17px;font-size:13px;color:var(--body)}
+  code{font-family:var(--mono);font-size:.88em;background:color-mix(in srgb,var(--green) 8%,transparent);padding:1px 6px;border-radius:5px}
+  footer{font-size:11.5px;color:var(--muted);border-top:1px solid var(--hair);padding-top:16px;margin-top:4px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div>
-    <div class="logo">
-      <span class="mark" aria-hidden="true"></span>
-      <span class="name">Canei Subirats<small>Renovations, simply complex.</small></span>
-    </div>
-    <div class="tag">ERP · Release 1</div>
-    <h1>Review &amp; testing — the paperless quote</h1>
+  <div class="logo">
+    <svg width="38" height="38" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
+      <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c"/>
+      <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="18" y="23.5" width="4" height="5" rx="1" fill="#fff"/>
+      <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230"/>
+    </svg>
+    <span class="name">Canei Subirats<small>Renovations, simply complex.</small></span>
   </div>
-  <a class="card" href="journey.html">
-    <b>▶️ End-to-End Journey — click through the whole lifecycle</b>
-    <span>Walk one renovation from first enquiry to final profit across all 12 stages (lead, site
-    visit, estimate, quote, acceptance, project, purchasing, execution, invoicing, collections,
-    supplier payments, close). A live ledger fills in committed vs actual cost, revenue, margin,
-    cash and forecast as you advance — the fastest way to test the full flow.</span>
-  </a>
-  <a class="card" href="dashboard.html">
-    <b>📊 Control Tower — customer journey dashboard</b>
-    <span>The whole business at a glance: the 12-stage customer journey (lead → profit), per-project
-    financial control (budget · committed · actual · revenue · margin · cash · forecast), the full
-    dashboard suite (pipeline, receivables, payables, cash forecast, supplier comparison, company
-    performance), auto-drafted emails you send with one click, and alerts &amp; tasks by owner.</span>
-  </a>
-  <a class="card" href="frontend.html">
-    <b>🏗️ Frontend — interactive demo</b>
-    <span>Catalogue-first quote builder (18 chapters, measurements), optionals shown separately,
-    acceptance with option selection, an invoice whose VAT is decided by a legal rule (art.
-    91.Uno.2.10º) with a chained SHA-256 seal, plus the supplier comparison. Same business logic
-    as the real system.</span>
-  </a>
-  <a class="card" href="backend.html">
-    <b>🗄️ Backend — API with real responses</b>
-    <span>The backend endpoints (tenant composition, quotes, invoices with persisted fiscal
-    justification, health) with responses captured from the real server during build
-    verification.</span>
-  </a>
+
+  <div class="hero">
+    <span class="tag"><i></i>ERP · Release 1 · review &amp; testing</span>
+    <h1>From first enquiry to a <em>five-star review</em> — one clean thread.</h1>
+    <p class="lede">The renovation business, end to end: leads, site visits, catalogue-first quotes,
+    projects, purchasing, invoicing, collections and profit — with every customer email auto-drafted
+    in full corporate identity and ready as an Outlook draft. Explore the working demo below.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b>13</b><span>lifecycle stages</span></div>
+    <div class="stat"><b>16</b><span>capabilities wired</span></div>
+    <div class="stat"><b>100%</b><span>integer-cent money</span></div>
+    <div class="stat"><b>0</b><span>data re-entry</span></div>
+  </div>
+
+  <div class="cards">
+    <a class="card wide" href="journey.html">
+      <div class="ic">▶️</div>
+      <div class="bd">
+        <b>End-to-End Journey — click through the whole lifecycle</b>
+        <span>Walk one renovation from first enquiry to final profit and the review request, across all
+        13 stages. A live ledger fills in committed vs actual cost, revenue, margin, cash and forecast as
+        you advance — and each email downloads as an Outlook draft with the PDF attached.</span>
+        <span class="go">Open the journey →</span>
+      </div>
+    </a>
+    <a class="card" href="dashboard.html">
+      <div class="ic">📊</div>
+      <b>Control Tower</b>
+      <span>The whole business at a glance: 13-stage journey, per-project financial control, the full
+      dashboard suite, auto-drafted emails and alerts &amp; tasks by owner.</span>
+      <span class="go">Open dashboard →</span>
+    </a>
+    <a class="card" href="frontend.html">
+      <div class="ic">🏗️</div>
+      <b>Frontend demo</b>
+      <span>Catalogue-first quote builder, optionals shown separately, acceptance, an invoice whose VAT
+      is decided by a legal rule with a chained SHA-256 seal, plus supplier comparison.</span>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="card" href="backend.html">
+      <div class="ic">🗄️</div>
+      <b>Backend API</b>
+      <span>Tenant composition, quotes, invoices with persisted fiscal justification and health —
+      responses captured from the real server during build verification.</span>
+      <span class="go">Open backend →</span>
+    </a>
+    <a class="card" href="journey.html">
+      <div class="ic">✉️</div>
+      <b>Premium email &amp; Outlook</b>
+      <span>Every lifecycle email carries the full CI — logo, colours, CTA, PDF — and saves straight to
+      the Outlook drafts folder, editable, nothing sent without you.</span>
+      <span class="go">See it in the journey →</span>
+    </a>
+  </div>
+
   <div class="note">
     Working language is English; the fiscal invoice renders in es-ES (Spanish VAT). All data is
-    synthetic (no real customer data). The deployable backend with a database arrives with the
-    hosting decision (delivery phase R4); until then it runs from the repository with
-    <code>pnpm dev</code>.
+    synthetic — no real customer data, and no email leaves the system. The deployable backend with a
+    database arrives with the hosting decision (delivery phase R4); until then it runs from the
+    repository with <code>pnpm dev</code>.
   </div>
   <footer>Canei Subirats, S.L. · Carrer de la Creu, 74, 08960 Sant Just Desvern · 659 87 67 00 · hola@caneisubirats.com</footer>
 </div>
