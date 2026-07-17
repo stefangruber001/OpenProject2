@@ -212,3 +212,19 @@ languages: es-ES # source: synthetic
       deposit/certificación invoicing, IRPF retention, per-step dates, supplier/PO
       numbers, change orders) are mostly surfacing existing capability fields in the
       UI — configuration, not new architecture. Logged as roadmap, not built this cycle.
+34. **Pages-email fix + interactive journey (this cycle).** (a) The Pages
+    workflow triggered on `claude/**` pushes, which the github-pages environment
+    rejects by branch protection — every branch push failed and emailed a
+    failure. Restricted the push trigger to `main` (feature branches use
+    workflow_dispatch). (b) Made the phase rail clickable (navigate to any
+    reached stage; forward replays, back reviews). (c) Added a real estimator on
+    the Estimate stage (qty × unit-rate lines → range; "Use as the quote"
+    reflows chapters + ledger) — the estimate→quote path. (d) Gave every stage
+    best-practice input fields (lead source; visit date/area; quote validity;
+    acceptance date/method/deposit; project dates/PM; supplier/PO/delivery; bill
+    no/date/progress; invoice date/type/IRPF; payment date/method; close
+    date/notes; review platform/date), persisted + saved as details.txt; the
+    invoice honours invoice date, type (full/deposit/certificación) and an IRPF
+    retention line, regenerating live. Deeper best-in-class features (catalogue
+    line-pricing, scheduling calendar, change orders) exist as capabilities and
+    remain UI-surfacing roadmap, logged in the operations guide.
