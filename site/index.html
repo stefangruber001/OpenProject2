@@ -72,6 +72,25 @@
   a.card.wide:hover{border-color:transparent}
   a.card.wide .bd{display:flex;flex-direction:column;gap:6px}
 
+  .sec{margin-top:16px}
+  .sh{font-family:var(--serif);font-weight:600;color:var(--ink);font-size:clamp(22px,3.4vw,30px);letter-spacing:-.02em}
+  .ss{font-size:15px;color:var(--body);margin:6px 0 18px;max-width:60ch}
+  .feats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media (max-width:760px){.feats{grid-template-columns:1fr 1fr}}
+  @media (max-width:520px){.feats{grid-template-columns:1fr}}
+  .feat{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:18px 18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:6px;transition:transform .12s,box-shadow .2s}
+  .feat:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+  .feat .fi{width:38px;height:38px;border-radius:11px;background:var(--greenSoft);display:grid;place-items:center;font-size:18px;margin-bottom:4px}
+  .feat b{font-size:15px;font-weight:600;color:var(--ink)}
+  .feat span{font-size:13px;color:var(--body);line-height:1.5}
+  .steps{display:flex;flex-wrap:wrap;gap:8px}
+  .steps span{font-size:12px;font-weight:600;color:var(--greenDeep);background:var(--greenSoft);border:1px solid color-mix(in srgb,var(--green) 22%,transparent);border-radius:999px;padding:7px 13px}
+  .cta{margin-top:22px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;text-decoration:none;
+    background:linear-gradient(120deg,var(--greenDeep),var(--green) 70%,#537f45);border-radius:20px;padding:24px 28px;
+    box-shadow:0 2px 4px rgba(24,32,16,.06), 0 34px 70px -34px rgba(49,83,42,.6)}
+  .cta b{display:block;font-family:var(--serif);font-size:20px;color:#fff;letter-spacing:-.01em}
+  .cta span{font-size:13.5px;color:rgba(255,255,255,.85)}
+  .cta .cta-go{background:#fff;color:var(--greenDeep);font-weight:700;font-size:14px;border-radius:12px;padding:12px 20px;white-space:nowrap}
   .note{border-left:3px solid var(--green);background:var(--greenSoft);border-radius:0 12px 12px 0;
     padding:13px 17px;font-size:13px;color:var(--body)}
   code{font-family:var(--mono);font-size:.88em;background:color-mix(in srgb,var(--green) 8%,transparent);padding:1px 6px;border-radius:5px}
@@ -156,6 +175,36 @@
       </div>
     </a>
   </div>
+
+  <section class="sec">
+    <h2 class="sh">One platform, the whole job</h2>
+    <p class="ss">Built the way best-in-class field-service software works — quoting to cash, nothing entered twice.</p>
+    <div class="feats">
+      <div class="feat"><div class="fi">📚</div><b>Catalogue quoting</b><span>A price-book of works — pick items, set quantities, get itemised quotes (concepto · cantidad · precio · importe) grouped by chapter.</span></div>
+      <div class="feat"><div class="fi">🧾</div><b>Full-CI documents</b><span>Professional quote &amp; invoice PDFs with parties, NIF/CIF, dates, VAT breakdown, IBAN, IRPF and legal notes — plus Outlook drafts.</span></div>
+      <div class="feat"><div class="fi">📈</div><b>Live P&amp;L ledger</b><span>Budget → committed → actual → revenue → margin → cash → forecast, per project, in integer-cent money.</span></div>
+      <div class="feat"><div class="fi">📸</div><b>Project folder</b><span>Site-visit photos, documents, PDFs and emails filed into a per-step folder you can download as a real .zip.</span></div>
+      <div class="feat"><div class="fi">🗓️</div><b>Scheduling &amp; change orders</b><span>Task timeline with progress, and variations that adjust the contract while the baseline stays frozen.</span></div>
+      <div class="feat"><div class="fi">⚙️</div><b>Automated end-to-end</b><span>Enter the project once; estimate, quote, project, invoice, reminders and the review request follow automatically.</span></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <h2 class="sh">How it works — 13 steps, one clean thread</h2>
+    <div class="steps">
+      <span>1 · Lead</span><span>2 · Site visit</span><span>3 · Estimate</span><span>4 · Quotation</span><span>5 · Acceptance</span>
+      <span>6 · Project</span><span>7 · Purchasing</span><span>8 · Execution</span><span>9 · Invoicing</span><span>10 · Collections</span>
+      <span>11 · Supplier payments</span><span>12 · Close</span><span>13 · Review</span>
+    </div>
+  </section>
+
+  <a class="cta" href="journey.html">
+    <div>
+      <b>Run your first project now</b>
+      <span>Open the journey, enter your own data (or load the sample), and take it from lead to a five-star review.</span>
+    </div>
+    <span class="cta-go">Start the demo →</span>
+  </a>
 
   <div class="note">
     Working language is English; the fiscal invoice renders in es-ES (Spanish VAT). All data is

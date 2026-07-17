@@ -228,3 +228,17 @@ languages: es-ES # source: synthetic
     retention line, regenerating live. Deeper best-in-class features (catalogue
     line-pricing, scheduling calendar, change orders) exist as capabilities and
     remain UI-surfacing roadmap, logged in the operations guide.
+35. **"Build further" batch (this cycle).** (a) Locked zoom on all site pages
+    (viewport maximum-scale=1/user-scalable=no + touch-action:manipulation) for
+    premium navigation; added the missing viewport meta to frontend/backend.
+    (b) Expanded the price-book catalogue to 34 items/11 chapters and shipped a
+    complete itemised sample project (~€9.1k) with prefilled stage details.
+    (c) Enhanced the estimator (catalogue quick-add, units, contingency %).
+    (d) Added a scheduling timeline (tasks + mini-Gantt) on the Project stage and
+    change orders (variations) on Execution — baseline frozen, current contract =
+    baseline + variations, invoice revenue includes approved variations, new
+    ledger row. (e) Upgraded the landing to a world-class page (feature grid,
+    how-it-works ribbon, closing CTA). All client-side in the journey demo;
+    reviewed end-to-end (full run, rail nav, valid 30-file zip, no JS errors,
+    mobile clean). Production equivalents of scheduling/change-orders exist as
+    capabilities; the demo mirrors them for the shareable link.
