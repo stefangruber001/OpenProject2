@@ -14,6 +14,7 @@ import {
   type ResolvedTenant,
 } from "@repo/kernel";
 import { QuotingService, type Quote } from "@repo/capability-quoting";
+import { SourcingService, type Comparison } from "@repo/capability-sourcing";
 import {
   BillingService,
   DEFAULT_LABELS,
@@ -29,6 +30,7 @@ export interface FactoryInfra {
   events?: EventLogPort;
   quoteStore?: Repository<Quote>;
   invoiceStore?: AppendOnlyStore<Invoice>;
+  comparisonStore?: Repository<Comparison>;
   counters?: CounterStore;
 }
 
@@ -38,6 +40,7 @@ export interface FactoryServices {
   labels: DocLabels;
   quoting?: QuotingService;
   billing?: BillingService;
+  sourcing?: SourcingService;
 }
 
 /**
@@ -74,6 +77,15 @@ export function buildServices(resolved: ResolvedTenant, infra: FactoryInfra = {}
       ports: resolved.ports,
       store: infra.invoiceStore ?? new InMemoryAppendOnlyStore<Invoice>(),
       counters: infra.counters ?? new InMemoryCounterStore(),
+    });
+  }
+  if (has("sourcing")) {
+    services.sourcing = new SourcingService({
+      tenantId: resolved.spec.tenant,
+      store: infra.comparisonStore ?? new InMemoryRepository<Comparison>(),
+      clock: common.clock,
+      idGen: common.idGen,
+      events,
     });
   }
   return services;
