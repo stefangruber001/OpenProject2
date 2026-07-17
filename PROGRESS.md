@@ -101,7 +101,7 @@ output; the factory is the product.
    **CI-verified: run #6 (faa77c5) success — gates + Postgres/RLS + e2e.**
    Current tool identified: cane.gestortectic.com = TecTic "Gestor"
    (login-gated) → migration lead in INTEGRATIONS_PENDING.~~
-3. **P2.2b Diorka-first web forms**: presupuesto creation UI (chapter picker
+3. **P2.2b Diorka-first web forms** (R1 of docs/delivery/DIORKA-DELIVERY-PLAN.md): presupuesto creation UI (chapter picker
    from pack config, partidas with mediciones, options), comparison screen
    (sourcing report), accept-with-options; PDF via `doc-render@1`
    (Chromium renderer exists). Design rule: minimal typing, catalogue-first
