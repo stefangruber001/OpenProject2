@@ -47,9 +47,25 @@ export default async function PresupuestoPage(props: {
   return (
     <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-8 px-6 py-10">
       <header className="flex flex-col gap-1">
-        <Link href={`/${tenant}`} className="text-xs text-neutral-500 underline underline-offset-2">
-          ← {rt.resolved.kernelConfig.branding.tradeName ?? tenant}
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href={`/${tenant}`}
+            className="text-xs text-neutral-500 underline underline-offset-2"
+          >
+            ← {rt.resolved.kernelConfig.branding.tradeName ?? tenant}
+          </Link>
+          <a
+            href={`/${tenant}/presupuestos/${quoteId}/print`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
+            style={{
+              backgroundColor: rt.resolved.kernelConfig.branding.palette?.brandGreen ?? "#48733c",
+            }}
+          >
+            Branded quote (print / PDF) ↗
+          </a>
+        </div>
         <h1 className="text-2xl font-bold tracking-tight">{quote.title}</h1>
         <p className="text-sm text-neutral-500">
           {t.quote} v{quote.version} ·{" "}

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { formatMoney, isFactoryError } from "@repo/kernel";
 import { getTenantRuntime } from "@/lib/tenant-runtime";
 import { controlTower } from "@/lib/control-tower";
+import { BrandLockup } from "@/components/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -46,10 +47,16 @@ export default async function ControlTowerPage(props: { params: Promise<{ tenant
 
   return (
     <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-10">
-      <header className="flex flex-col gap-1">
-        <Link href={`/${tenant}`} className="text-xs text-neutral-500 underline underline-offset-2">
-          ← {branding.tradeName ?? tenant}
-        </Link>
+      <header className="flex flex-col gap-2 border-b pb-4" style={{ borderColor: green }}>
+        <div className="flex items-center justify-between gap-4">
+          <BrandLockup branding={branding} />
+          <Link
+            href={`/${tenant}`}
+            className="text-xs text-neutral-500 underline underline-offset-2"
+          >
+            ← workspace
+          </Link>
+        </div>
         <h1 className="font-serif text-3xl font-semibold tracking-tight" style={{ color: green }}>
           Control Tower
         </h1>

@@ -1,20 +1,26 @@
 import { isFactoryError } from "@repo/kernel";
 import { renderInvoiceHtml } from "@repo/capability-billing";
 import { getTenantRuntime } from "@/lib/tenant-runtime";
+import { brandedDocument } from "@/lib/brand-doc";
 
 export const dynamic = "force-dynamic";
 
-/** Serve the deterministic invoice document (PDF conversion: pending port). */
+/** Serve the invoice as a fully brand-styled document (logo + CI + contact). */
 export async function GET(_req: Request, ctx: { params: Promise<{ tenant: string; id: string }> }) {
   const { tenant, id } = await ctx.params;
   try {
     const rt = await getTenantRuntime(tenant);
+    const { locale, branding } = rt.resolved.kernelConfig;
     const invoice = await rt.billing!.get(id);
-    const html = renderInvoiceHtml(invoice, rt.labels, rt.resolved.kernelConfig.locale);
-    return new Response(
-      `<!doctype html><html lang="${rt.resolved.kernelConfig.locale}"><head><meta charset="utf-8"><title>${invoice.displayNumber}</title></head><body>${html}</body></html>`,
-      { headers: { "content-type": "text/html; charset=utf-8" } },
-    );
+    const bodyHtml = renderInvoiceHtml(invoice, rt.labels, locale);
+    const doc = brandedDocument({
+      branding,
+      locale,
+      title: invoice.displayNumber,
+      subtitle: invoice.issueDate,
+      bodyHtml,
+    });
+    return new Response(doc, { headers: { "content-type": "text/html; charset=utf-8" } });
   } catch (e) {
     if (isFactoryError(e)) {
       return new Response(e.message, { status: e.code === "NOT_FOUND" ? 404 : 400 });

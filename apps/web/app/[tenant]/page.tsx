@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { formatMoney, isFactoryError } from "@repo/kernel";
 import { getTenantRuntime } from "@/lib/tenant-runtime";
 import { ui } from "@/lib/i18n";
+import { BrandLockup } from "@/components/brand";
 import { createDemoJob } from "./actions";
 import { createPresupuesto } from "./presupuestos/actions";
 
@@ -26,18 +27,15 @@ export default async function TenantWorkspace(props: { params: Promise<{ tenant:
 
   return (
     <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-10 px-6 py-12">
-      <header className="flex flex-col gap-1">
+      <header
+        className="flex flex-col gap-2 border-b pb-4"
+        style={{ borderColor: branding.palette?.brandGreen ?? "#48733c" }}
+      >
+        <BrandLockup branding={branding} size={44} />
         <span className="text-xs font-medium uppercase tracking-widest text-neutral-500">
-          {tenant} · {rt.resolved.report.packs.map((p) => p.id).join(" + ")}
+          {tenant} · {rt.resolved.report.packs.map((p) => p.id).join(" + ")} · kernel{" "}
+          {rt.resolved.kernelVersion}
         </span>
-        <h1 className="text-3xl font-bold tracking-tight">
-          {branding.tradeName ?? branding.legalName}
-        </h1>
-        {branding.slogan && <p className="text-sm italic text-neutral-500">{branding.slogan}</p>}
-        <p className="text-sm text-neutral-500">
-          kernel {rt.resolved.kernelVersion} · {t.ports}:{" "}
-          {rt.resolved.report.boundPorts.map((b) => b.port).join(", ")}
-        </p>
       </header>
 
       <div className="flex flex-wrap items-center gap-3">
