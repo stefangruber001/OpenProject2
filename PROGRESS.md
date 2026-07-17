@@ -110,23 +110,27 @@ output; the factory is the product.
     the domain engines behind the Control Tower; durable persistence + web UI
     surfaces are the remaining follow-ups.
 
-## Remaining BRD topics (not yet built)
+## Capability layer — COMPLETE (14 capabilities, zero stubs)
 
-- **VIS** mobile site-visit capture (photos, phone-first) — needs `docs`
-  capability + storage port + PWA shell (P3).
-- **PLN** planning / labour / machinery scheduling — `scheduling`/`time`
-  capabilities are declared stubs; build real engines.
-- ~~**PUR** purchase orders vs budget~~ — DONE (commit f23e959):
-  `procurement` capability — POs with draft→sent→received lifecycle,
-  committed-cost rollup by chapter, over-budget flag; replaces the stub.
-  Returns/credits remain a later extension.
-- **DOC** documents/photos linked everywhere — `docs` capability + storage.
-- **ORG-04..07** consolidated owner view, roles/permissions/audit — auth +
-  cross-tenant read + event-log surfacing in the web shell.
-- **Web surfaces + durable persistence** for the new capabilities (projects,
-  AR, AP, crm) — wire services onto Prisma stores + real routes.
-- **NFR-10** Spanish/Catalan handover switch (flip `UI_LANG`, add ca doc
-  labels) — data-only.
+13. **Rest of the capability layer** — DONE (commits f23e959, c55d605):
+    `procurement` (PUR), `scheduling` (PLN), `time` (labour→cost), `docs`
+    (DOC + blob-store port), `visits` (VIS), `access` (ORG-05..07
+    roles/permissions). With the earlier projects/receivables/payables/crm/
+    messaging, `diorka` composes **14 real, tested capabilities** — every BRD
+    functional area now has a domain engine (185+ tests across the repo).
+
+## Remaining (integration + UI surfaces, not missing capabilities)
+
+- **Live app on durable Postgres**: wire the capability services onto the
+  Prisma+RLS stores and real Next.js routes/actions (the web shell runs
+  quoting/billing today; the new engines are proven by unit tests + the demo
+  pages).
+- **Web surfaces**: branded quote PDF (QUO-15/16); supplier/item registers
+  (CAT/SUP UI); owner dashboards (DAS); consolidated owner view (ORG-04).
+- **PWA shell** for mobile site-visit capture (NFR-03/04) over `visits`.
+- **NFR-10** Catalan handover: flip `UI_LANG`, add a `ca` doc-label set (data).
+- **P3/P4**: provision→deploy→verify→rollback pipeline; backup/restore drill;
+  timed tenant #2 onboarding.
 
 ## Next 3 tasks (P2 — in order)
 
