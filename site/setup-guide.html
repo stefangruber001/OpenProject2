@@ -523,7 +523,7 @@
     <li>Turn on email so invoices and reminders can actually go out (or keep using Outlook drafts).</li>
   </ol>
 
-  <h4>Queued (turn on when it pays off)</h4>
+  <h4>Queued integrations (turn on when it pays off)</h4>
   <table class="avoid">
     <thead><tr><th style="width:34%">Capability</th><th>Status &amp; what it needs</th></tr></thead>
     <tbody>
@@ -536,6 +536,26 @@
       <tr><td>Owner consolidated view (multi-company)</td><td>When a second company is added — configuration only.</td></tr>
     </tbody>
   </table>
+
+  <h4>Process logic to add for full practice (step-by-step input → output)</h4>
+  <p style="font-size:12.5px">An audit of what each step needs to be fully production-ready. The documents now carry all
+  the legal essentials (parties + NIF/CIF, dates, line items, VAT breakdown, IBAN, terms, legal notes); the
+  items below deepen day-to-day practice.</p>
+  <table class="avoid">
+    <thead><tr><th style="width:20%">Step</th><th style="width:40%">Extra input to capture</th><th>Output it unlocks</th></tr></thead>
+    <tbody>
+      <tr><td>Quotation</td><td>Quantity × unit price per line (not only a chapter lump sum); measurement (medición)</td><td>Itemised quote &amp; certifiable progress billing</td></tr>
+      <tr><td>Acceptance</td><td>Acceptance date &amp; method (signature / email); deposit % agreed</td><td>Deposit invoice + audit trail</td></tr>
+      <tr><td>Invoicing</td><td>Deposit / milestone (<i>certificación</i>) invoices; IRPF retention line for B2B; series per year</td><td>Partial invoices &amp; correct withholding</td></tr>
+      <tr><td>Project</td><td>Planned start / end dates; assigned team</td><td>Scheduling &amp; overdue alerts</td></tr>
+      <tr><td>Purchasing</td><td>Supplier, PO number, expected delivery date</td><td>Delivery tracking &amp; supplier ledger</td></tr>
+      <tr><td>Execution</td><td>Supplier bill number &amp; date; change orders</td><td>Duplicate detection &amp; baseline-preserving changes</td></tr>
+      <tr><td>Collections / Payments</td><td>Payment date &amp; method (transfer / card / cash)</td><td>Exact cash-flow timing &amp; bank reconciliation</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><b>Already engineered underneath.</b> Most of these (change orders, certificaciones,
+  IRPF profiles, scheduling, supplier ledger) exist as capabilities in the platform; closing the gap is
+  surfacing their input fields in the screens — configuration and UI, not new architecture.</div>
 
   <div class="callout"><b>Adding a second company</b> is configuration, not a rebuild: a new company file plus its
   catalogue, ready in well under an hour. That is the whole point of the “factory”.</div>

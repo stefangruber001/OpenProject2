@@ -195,3 +195,20 @@ languages: es-ES # source: synthetic
     vars → deploy → config), plus runbook, backups/GDPR, roadmap, glossary.
     Recommended hosting (Vercel + managed Postgres) is a suggestion, not a
     commitment — the hosting decision stays R4.
+33. **Mobile fixes, best-practice documents, folder UX, process audit (this cycle).**
+    From operator screenshots: (a) mobile was overflowing — root cause was
+    grid/flex inputs without `min-width:0`; fixed that + wrapped wide stage tables
+    in horizontal scrollers + small-screen type/padding. (b) Generated invoice/quote
+    PDFs were too sparse — rebuilt them as full documents (seller+CIF, buyer+NIF,
+    number, issue/due or valid-until dates, line items, base/IVA/total, IBAN +
+    payment terms, and legal notes: art.91 justification, Verifactu 2027, immutable
+    - rectificativa/SHA-256, guarantee). Added the missing intake inputs (buyer
+      NIF/CIF, quote number, payment-terms days); dates auto from the browser clock.
+      Seller CIF/IBAN are honest placeholders (pending validation). (c) Project-folder
+      finder + step buttons made leaner (file-count badge, open/closed icons, current
+      folder highlighted, one primary Download button, quiet Edit/Start-over links,
+      '+ Attach file → folder'). (d) Step-by-step input→output audit added to the
+      operations guide roadmap; the deeper practical gaps (quantity×unit pricing,
+      deposit/certificación invoicing, IRPF retention, per-step dates, supplier/PO
+      numbers, change orders) are mostly surfacing existing capability fields in the
+      UI — configuration, not new architecture. Logged as roadmap, not built this cycle.
