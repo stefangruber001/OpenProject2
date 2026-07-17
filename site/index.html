@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Diorka ERP — revisión y pruebas (R1)</title>
+<style>
+  :root {
+    --paper:#f7f6f3; --card:#fffefb; --ink:#14181c; --ink2:#565d66; --mut:#8b9099;
+    --line:#dcdad4; --acc:#1f5fa8; --acc-soft:#e3ecf7;
+  }
+  @media (prefers-color-scheme: dark){ :root{
+    --paper:#131518; --card:#1b1e22; --ink:#f2f1ed; --ink2:#b9bec6; --mut:#7e848d;
+    --line:#2e3237; --acc:#6ea8e8; --acc-soft:#1d2b3d; } }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:grid;place-items:center;min-height:100vh;padding:24px}
+  .wrap{max-width:640px;display:flex;flex-direction:column;gap:18px}
+  .tag{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);font-weight:700}
+  h1{font-size:26px;margin:0;letter-spacing:-0.01em}
+  p{margin:0;color:var(--ink2);font-size:14.5px}
+  a.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;text-decoration:none;color:var(--ink)}
+  a.card:hover{border-color:var(--acc)}
+  a.card b{font-size:17px}
+  a.card span{display:block;font-size:13px;color:var(--ink2);margin-top:4px}
+  .note{border-left:3px solid var(--acc);background:var(--acc-soft);border-radius:0 8px 8px 0;
+    padding:10px 14px;font-size:12.5px;color:var(--ink2)}
+  code{font-family:ui-monospace,Menlo,monospace;font-size:.9em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <div class="tag">Diorka · ERP · Release 1</div>
+    <h1>Revisión y pruebas — presupuesto sin papel</h1>
+  </div>
+  <a class="card" href="frontend.html">
+    <b>🏗️ Frontend — demo interactivo</b>
+    <span>Constructor de presupuestos por catálogo (18 capítulos, mediciones), opcionales aparte,
+    aceptación con selección de opciones, factura con IVA decidido por regla legal (art.
+    91.Uno.2.10º) y sello SHA-256 encadenado, más la comparativa de proveedores. Misma lógica de
+    negocio que el sistema real.</span>
+  </a>
+  <a class="card" href="backend.html">
+    <b>🗄️ Backend — API con respuestas reales</b>
+    <span>Los endpoints del backend (composición del tenant, presupuestos, facturas con
+    justificación fiscal persistida, salud) con respuestas capturadas del servidor real en la
+    verificación del build.</span>
+  </a>
+  <div class="note">
+    Todos los datos son sintéticos (ningún dato real de clientes). El backend desplegable con base
+    de datos llega con la decisión de hosting (fase R4 del plan de entrega); mientras tanto se
+    ejecuta desde el repositorio con <code>pnpm dev</code>.
+  </div>
+</div>
+</body>
+</html>

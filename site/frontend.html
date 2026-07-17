@@ -1,0 +1,322 @@
+<meta charset="utf-8" />
+<title>Diorka ERP — demo interactivo (R1)</title>
+<style>
+  :root {
+    --paper: #f7f6f3; --card: #fffefb; --ink: #14181c; --ink2: #565d66; --mut: #8b9099;
+    --line: #dcdad4; --acc: #1f5fa8; --acc-soft: #e3ecf7; --ok: #1a7a4a; --opt: #a86a1f;
+    --opt-soft: #f6ecdc; --bad: #b3382e; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      --paper: #131518; --card: #1b1e22; --ink: #f2f1ed; --ink2: #b9bec6; --mut: #7e848d;
+      --line: #2e3237; --acc: #6ea8e8; --acc-soft: #1d2b3d; --ok: #4bbf85; --opt: #d9a45a;
+      --opt-soft: #33291a; --bad: #e07a72;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #131518; --card: #1b1e22; --ink: #f2f1ed; --ink2: #b9bec6; --mut: #7e848d;
+    --line: #2e3237; --acc: #6ea8e8; --acc-soft: #1d2b3d; --ok: #4bbf85; --opt: #d9a45a;
+    --opt-soft: #33291a; --bad: #e07a72;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header.top {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    padding: 18px 22px 14px; border-bottom: 2px solid var(--ink);
+    max-width: 1060px; margin: 0 auto;
+  }
+  header.top h1 { font-size: 19px; margin: 0; letter-spacing: -0.01em; }
+  header.top .tag { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--acc); font-weight: 700; }
+  header.top .note { margin-left: auto; font-size: 12px; color: var(--mut); }
+  main { max-width: 1060px; margin: 0 auto; padding: 18px 22px 60px; display: flex; flex-direction: column; gap: 18px; }
+  .tabs { display: flex; gap: 6px; }
+  .tabs button {
+    border: 1px solid var(--line); background: var(--card); color: var(--ink2);
+    padding: 7px 14px; border-radius: 8px 8px 0 0; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--card); background: var(--card); box-shadow: inset 0 2px 0 var(--acc); }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 0 10px 10px 10px; padding: 18px; }
+  h2 { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mut); margin: 0 0 10px; }
+  h3 { font-size: 13px; margin: 18px 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mut); border-bottom: 1.5px solid var(--line); padding: 6px 8px; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  td.n, th.n { text-align: right; white-space: nowrap; }
+  tr.optional td { color: var(--opt); }
+  tr.total td { font-weight: 700; border-top: 2px solid var(--ink); border-bottom: none; }
+  .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); align-items: end; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; font-weight: 600; color: var(--ink2); }
+  input, select {
+    font: inherit; font-size: 13.5px; color: var(--ink); background: var(--paper);
+    border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; min-width: 0;
+  }
+  input:focus, select:focus, button:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+  .check { flex-direction: row; align-items: center; gap: 7px; font-weight: 500; font-size: 13px; padding-bottom: 8px; }
+  button.primary {
+    font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; border: none;
+    background: var(--acc); color: #fff; border-radius: 8px; padding: 9px 16px;
+  }
+  :root[data-theme="dark"] button.primary, :root:not([data-theme="light"]) button.primary { color: #0d1117; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) button.primary { color: #fff; } }
+  button.ghost { font: inherit; font-size: 12.5px; cursor: pointer; background: none; border: 1px solid var(--line); color: var(--ink2); border-radius: 8px; padding: 8px 12px; }
+  .pill { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; padding: 2px 9px; border-radius: 999px; }
+  .pill.draft { background: var(--opt-soft); color: var(--opt); }
+  .pill.ok { background: var(--acc-soft); color: var(--acc); }
+  .doc { border: 1.5px solid var(--ink); border-radius: 10px; padding: 18px 20px; margin-top: 12px; }
+  .doc .head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 10px; }
+  .doc .num { font-family: var(--mono); font-weight: 700; }
+  .just { background: var(--acc-soft); border-left: 3px solid var(--acc); border-radius: 0 8px 8px 0; padding: 9px 12px; font-size: 12.5px; margin-top: 10px; }
+  .seal { font-family: var(--mono); font-size: 11px; color: var(--mut); margin-top: 8px; word-break: break-all; }
+  .hint { font-size: 12px; color: var(--mut); margin: 6px 0 0; }
+  .missing { color: var(--bad); font-weight: 700; font-size: 11px; letter-spacing: 0.04em; }
+  .var-pos { color: var(--bad); } .var-neg { color: var(--ok); }
+  .sel { background: var(--acc-soft); }
+  input.cell { width: 84px; text-align: right; font-variant-numeric: tabular-nums; }
+  .flash { animation: flash 0.7s ease-out; }
+  @keyframes flash { from { background: var(--acc-soft); } to { background: transparent; } }
+  @media (prefers-reduced-motion: reduce) { .flash { animation: none; } }
+  .cols { display: grid; gap: 16px; grid-template-columns: 1fr; }
+  @media (min-width: 900px) { .cols.two { grid-template-columns: 1fr 1fr; } }
+</style>
+
+<header class="top">
+  <span class="tag">Diorka · ERP</span>
+  <h1>Demo interactivo — Release 1 «Presupuesto sin papel»</h1>
+  <span class="note">misma lógica de negocio que el sistema real · datos de ejemplo, nada se envía</span>
+</header>
+
+<main>
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="presupuesto">Presupuesto → Factura</button>
+    <button role="tab" aria-selected="false" data-tab="comparativa">Comparativa de proveedores</button>
+  </div>
+
+  <!-- ============ PRESUPUESTO ============ -->
+  <section class="panel" id="tab-presupuesto">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
+      <h2 style="margin:0">Presupuesto — Reforma integral baño · C/ Balmes 24, 2º1ª</h2>
+      <span id="q-status" class="pill draft">borrador</span>
+    </div>
+
+    <table id="q-table" aria-label="Partidas del presupuesto"></table>
+
+    <div id="builder">
+      <h3>Añadir partida — elegir, no teclear</h3>
+      <div class="grid">
+        <label style="grid-column: span 2">Capítulo
+          <select id="f-chapter"></select>
+        </label>
+        <label style="grid-column: span 2">Descripción
+          <input id="f-desc" placeholder="p. ej. Alicatado azulejo 20×60" />
+        </label>
+        <label>Unidad
+          <select id="f-unit"></select>
+        </label>
+        <label>Unidades <input id="f-ud" type="number" step="0.001" value="1" /></label>
+        <label>Largo (m) <input id="f-largo" type="number" step="0.01" placeholder="—" /></label>
+        <label>Ancho (m) <input id="f-ancho" type="number" step="0.01" placeholder="—" /></label>
+        <label>Precio ud. (€) <input id="f-precio" type="number" step="0.01" /></label>
+        <label class="check"><input id="f-opt" type="checkbox" /> Opcional</label>
+        <button class="primary" id="f-add" type="button">Añadir</button>
+      </div>
+      <p class="hint">La cantidad se calcula por medición: unidades × largo × ancho (céntimos enteros, sin decimales flotantes — igual que el núcleo real).</p>
+    </div>
+
+    <div id="acceptbox">
+      <h3>Aceptación del cliente</h3>
+      <div id="opt-list" style="display:flex;flex-direction:column;gap:6px;font-size:13px"></div>
+      <div style="margin-top:10px;display:flex;gap:10px">
+        <button class="primary" id="q-accept" type="button">Marcar como aceptado</button>
+        <button class="ghost" id="q-reset" type="button">Vaciar y empezar de cero</button>
+      </div>
+    </div>
+
+    <div id="invoicebox" hidden>
+      <h3>Emitir factura — el IVA lo decide la regla, no un desplegable</h3>
+      <div class="grid">
+        <label style="grid-column: span 2">Cliente <input id="i-name" value="María García López" /></label>
+        <label>NIF <input id="i-nif" value="00000000T" /></label>
+        <label>Destinatario
+          <select id="i-recipient">
+            <option value="individual-private">Particular</option>
+            <option value="community-of-owners">Comunidad de propietarios</option>
+            <option value="business">Empresa</option>
+          </select>
+        </label>
+        <label class="check"><input id="i-private" type="checkbox" checked /> Vivienda de uso particular</label>
+        <label>Antigüedad (años) <input id="i-age" type="number" value="15" /></label>
+        <label>Materiales (% de la base) <input id="i-mat" type="number" step="0.1" value="35" /></label>
+        <button class="primary" id="i-issue" type="button">Emitir factura</button>
+      </div>
+      <p class="hint">Prueba a cambiar «Destinatario» a Empresa, la antigüedad a 1 año o materiales a 45 % — la decisión y su justificación cambian (art. 91.Uno.2.10º LIVA).</p>
+    </div>
+
+    <div id="docbox"></div>
+  </section>
+
+  <!-- ============ COMPARATIVA ============ -->
+  <section class="panel" id="tab-comparativa" hidden>
+    <h2>Comparativa de proveedores — precio ausente ≠ cero · variación vs. estudio inicial</h2>
+    <div style="overflow-x:auto"><table id="c-table" aria-label="Comparativa de proveedores"></table></div>
+    <p class="hint">Edita cualquier precio y el cuadro recalcula importes, variación absoluta y porcentual por capítulo y total. Haz clic en un importe para marcarlo como <b>coste seleccionado</b> (elección explícita, nunca inferida).</p>
+    <div id="c-selected" style="margin-top:10px;font-size:13.5px"></div>
+  </section>
+
+  <footer style="font-size:11.5px;color:var(--mut)">
+    Reglas reproducidas del sistema real: dinero en céntimos enteros · cantidades en milésimas · IVA efectivo por fecha con justificación persistida · numeración FAC-AAAA-NNNN sin huecos · encadenado SHA-256 de facturas (WebCrypto). Gate legal: <span style="font-family:var(--mono)">legally_verified:false</span> hasta revisión del asesor.
+  </footer>
+</main>
+
+<script type="module">
+  // ---- núcleo (espejo fiel de packages/kernel + packs) ---------------------
+  const CHAPTERS = ["Demoliciones y trabajos previos","Estructura","Albañilería y tabiquería","Revestimientos y acabados","Aparatos sanitarios","Carpintería interior","Carpintería exterior","Cocina","Pintura","Instalación eléctrica","Climatización","Ventilación","Fontanería","Saneamiento","Telecomunicaciones","Protección contra incendios","Varios y generales","Trabajos opcionales"];
+  const UNITS = ["ud","m","m²","m³","h","PA"];
+  const fmt = (c) => new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR"}).format(c/100);
+  const qty = (m) => (m/1000).toLocaleString("es-ES");
+  const rdiv = (n,d) => { const s=n<0?-1:1, a=Math.abs(n), q=Math.floor(a/d), r=a-q*d; const v=s*(r*2>=d?q+1:q); return v===0?0:v; };
+  const lineTotal = (qm,uc) => rdiv(qm*uc,1000);
+  const applyBp = (base,bp) => rdiv(base*bp,10000);
+  const millis = (u,l,a) => Math.round(u*(l||1)*(a||1)*1000);
+
+  function decideIVA({recipient, privateUse, age, matBp}) {
+    const fails = [];
+    const okRecipient = recipient==="community-of-owners" || (recipient==="individual-private" && privateUse);
+    if (!okRecipient) fails.push("el destinatario no es persona física para uso particular ni comunidad de propietarios");
+    if (age < 2) fails.push("la vivienda no supera los 2 años desde construcción/última rehabilitación");
+    if (matBp > 4000) fails.push(`los materiales aportados (${(matBp/100).toLocaleString("es-ES")} %) superan el 40 % de la base`);
+    if (fails.length) return { rateBp:2100, code:"ES-IVA-GENERAL", basis:"Ley 37/1992 (LIVA), art. 90.Uno; art. 91.Uno.2.10º no aplicable", why:"Tipo general: obra NO elegible — "+fails.join("; ")+"." };
+    return { rateBp:1000, code:"ES-IVA-REDUCIDO", basis:"Ley 37/1992 (LIVA), art. 91.Uno.2.10º", why:"Tipo reducido: obra de renovación en vivienda de uso particular, antigüedad ≥ 2 años y materiales dentro del límite legal." };
+  }
+  async function sha256(obj){ const b=new TextEncoder().encode(JSON.stringify(obj)); const h=await crypto.subtle.digest("SHA-256",b); return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
+
+  // ---- estado --------------------------------------------------------------
+  let lines = [
+    { ch:"Demoliciones y trabajos previos", d:"Demolición alicatado y retirada de escombros", u:"m²", qm:millis(1,5,2.5), uc:1840, opt:false },
+    { ch:"Revestimientos y acabados", d:"Alicatado azulejo cerámico 20×60", u:"m²", qm:millis(5,2.5,1.98), uc:3200, opt:false },
+    { ch:"Fontanería", d:"Instalación fontanería completa de baño", u:"ud", qm:1000, uc:185000, opt:false },
+    { ch:"Trabajos opcionales", d:"Mampara de vidrio templado premium", u:"ud", qm:1000, uc:48000, opt:true },
+  ];
+  let accepted = false, facSeq = 0, chainPrev = null, chainSeq = 0;
+
+  // ---- presupuesto UI ------------------------------------------------------
+  const $ = (id) => document.getElementById(id);
+  $("f-chapter").innerHTML = CHAPTERS.map(c=>`<option>${c}</option>`).join("");
+  $("f-unit").innerHTML = UNITS.map(u=>`<option${u==="m²"?" selected":""}>${u}</option>`).join("");
+
+  function totals(ls){ return { base: ls.filter(l=>!l.opt).reduce((s,l)=>s+lineTotal(l.qm,l.uc),0), opc: ls.filter(l=>l.opt).reduce((s,l)=>s+lineTotal(l.qm,l.uc),0) }; }
+
+  function renderQuote(){
+    const t = totals(lines);
+    const row = (l,i) => `<tr class="${l.opt?"optional":""} ${i===lines.length-1?"flash":""}">
+      <td>${l.opt?"◇ ":""}${l.ch} — ${l.d}</td><td class="n">${qty(l.qm)} ${l.u}</td>
+      <td class="n">${fmt(l.uc)}</td><td class="n"><b>${fmt(lineTotal(l.qm,l.uc))}</b></td></tr>`;
+    $("q-table").innerHTML = `<thead><tr><th>Concepto</th><th class="n">Cantidad</th><th class="n">Precio ud.</th><th class="n">Importe</th></tr></thead>
+      <tbody>${lines.map(row).join("")}
+      <tr class="total"><td colspan="3">Base (opcionales aparte: ${fmt(t.opc)})</td><td class="n">${fmt(t.base)}</td></tr></tbody>`;
+    $("opt-list").innerHTML = lines.filter(l=>l.opt).map((l)=>`<label class="check" style="padding:0"><input type="checkbox" class="optsel" data-d="${l.d}" checked /> Incluir opcional: ${l.d} (${fmt(lineTotal(l.qm,l.uc))})</label>`).join("") || `<span class="hint">Sin opcionales.</span>`;
+    $("builder").hidden = accepted; $("acceptbox").hidden = accepted; $("invoicebox").hidden = !accepted;
+    $("q-status").textContent = accepted ? "aceptado" : "borrador";
+    $("q-status").className = "pill " + (accepted ? "ok" : "draft");
+  }
+
+  $("f-add").onclick = () => {
+    const d = $("f-desc").value.trim(); const uc = Math.round(parseFloat($("f-precio").value||"0")*100);
+    if (!d || !uc) { $("f-desc").reportValidity?.(); return; }
+    lines.push({ ch:$("f-chapter").value, d, u:$("f-unit").value,
+      qm:millis(parseFloat($("f-ud").value||"1"), parseFloat($("f-largo").value)||0, parseFloat($("f-ancho").value)||0), uc, opt:$("f-opt").checked });
+    $("f-desc").value=""; $("f-precio").value=""; $("f-largo").value=""; $("f-ancho").value=""; $("f-ud").value="1"; $("f-opt").checked=false;
+    renderQuote();
+  };
+  $("q-reset").onclick = () => { lines=[]; accepted=false; $("docbox").innerHTML=""; renderQuote(); };
+  $("q-accept").onclick = () => {
+    const keep = new Set([...document.querySelectorAll(".optsel")].filter(x=>x.checked).map(x=>x.dataset.d));
+    lines = lines.filter(l=>!l.opt || keep.has(l.d));
+    if (!lines.length) return;
+    accepted = true; renderQuote();
+  };
+
+  $("i-issue").onclick = async () => {
+    const dec = decideIVA({ recipient: $("i-recipient").value, privateUse: $("i-private").checked,
+      age: parseFloat($("i-age").value||"0"), matBp: Math.round(parseFloat($("i-mat").value||"0")*100) });
+    const base = totals(lines).base + totals(lines).opc; // aceptado = base + opcionales elegidas
+    const cuota = applyBp(base, dec.rateBp);
+    const num = `FAC-2026-${String(++facSeq).padStart(4,"0")}`;
+    chainSeq += 1;
+    const seal = await sha256({ seq: chainSeq, prev: chainPrev, num, total: base+cuota });
+    const prev = chainPrev; chainPrev = seal;
+    $("docbox").innerHTML = `<div class="doc">
+      <div class="head"><div><b>Factura</b> <span class="num">${num}</span><br /><span style="font-size:12px;color:var(--mut)">Diorka Reformas · CIF pendiente de validación · 17/07/2026</span></div>
+      <div style="text-align:right;font-size:13px">${$("i-name").value}<br /><span style="color:var(--mut)">NIF ${$("i-nif").value}</span></div></div>
+      <table><tbody>
+        ${lines.map(l=>`<tr><td>${l.ch} — ${l.d}</td><td class="n">${qty(l.qm)} ${l.u}</td><td class="n">${fmt(lineTotal(l.qm,l.uc))}</td></tr>`).join("")}
+        <tr><td colspan="2">Base imponible</td><td class="n">${fmt(base)}</td></tr>
+        <tr><td colspan="2">IVA ${(dec.rateBp/100).toLocaleString("es-ES")} % <span style="font-family:var(--mono);font-size:11px;color:var(--mut)">(${dec.code})</span></td><td class="n">${fmt(cuota)}</td></tr>
+        <tr class="total"><td colspan="2">Total</td><td class="n">${fmt(base+cuota)}</td></tr>
+      </tbody></table>
+      <div class="just"><b>Justificación persistida</b> · ${dec.basis}<br />${dec.why}<br /><span style="font-family:var(--mono);font-size:11px">legally_verified: false — pendiente de revisión del asesor</span></div>
+      <div class="seal">sello #${chainSeq} · SHA-256 · ${seal}${prev?`<br />prev · ${prev}`:""}</div>
+    </div>`;
+    $("docbox").scrollIntoView({ behavior:"smooth", block:"start" });
+  };
+
+  // ---- comparativa ---------------------------------------------------------
+  const BIDDERS = [{id:"study",n:"Estudio inicial"},{id:"a",n:"Contratista A"},{id:"b",n:"Contratista B"}];
+  const cLines = [
+    { ch:"Demoliciones", d:"Demolición y retirada", u:"m²", qm:millis(1,5,2.5), p:{study:1000,a:900,b:null} },
+    { ch:"Demoliciones", d:"Transporte a vertedero", u:"ud", qm:2000, p:{study:9500,a:11000,b:8500} },
+    { ch:"Revestimientos", d:"Alicatado 20×60", u:"m²", qm:millis(5,2.5,1.98), p:{study:3200,a:3550,b:2980} },
+    { ch:"Revestimientos", d:"Pavimento porcelánico", u:"m²", qm:millis(1,5,2.4), p:{study:2890,a:null,b:2650} },
+  ];
+  let selection = {}; // lineIndex -> bidderId
+  function cTotals(rows){ const t={}; for (const b of BIDDERS){ let sum=0, miss=0; for (const r of rows){ const p=r.p[b.id]; if (p==null) miss++; else sum+=lineTotal(r.qm,p);} t[b.id]={sum,miss}; } return t; }
+  function varCell(v, baseV){ if (baseV===0) return ""; const d=v-baseV, pct=rdiv(d*10000,Math.abs(baseV)); const cls=d>0?"var-pos":d<0?"var-neg":""; return `<div class="${cls}" style="font-size:11px">${d>0?"+":""}${fmt(d)} · ${(pct/100).toLocaleString("es-ES")} %</div>`; }
+  function renderComp(){
+    const chapters = [...new Set(cLines.map(l=>l.ch))];
+    let html = `<thead><tr><th>Partida</th><th class="n">Cant.</th>${BIDDERS.map(b=>`<th class="n">${b.n}</th>`).join("")}</tr></thead><tbody>`;
+    cLines.forEach((r,i)=>{
+      html += `<tr><td>${r.ch} — ${r.d}</td><td class="n">${qty(r.qm)} ${r.u}</td>`;
+      for (const b of BIDDERS){
+        const p=r.p[b.id];
+        const selCls = selection[i]===b.id ? "sel" : "";
+        if (p==null) html += `<td class="n ${selCls}"><span class="missing">SIN PRECIO</span><br /><input class="cell" data-i="${i}" data-b="${b.id}" placeholder="€/ud" type="number" step="0.01" /></td>`;
+        else {
+          const tot = lineTotal(r.qm,p);
+          const baseP = r.p.study; const baseTot = baseP==null?null:lineTotal(r.qm,baseP);
+          html += `<td class="n ${selCls}" style="cursor:pointer" data-sel="${i}:${b.id}"><b>${fmt(tot)}</b> <span style="color:var(--mut);font-size:11px">(${fmt(p)}/ud)</span>${b.id!=="study"&&baseTot!=null?varCell(tot,baseTot):""}</td>`;
+        }
+      }
+      html += `</tr>`;
+    });
+    const t = cTotals(cLines);
+    for (const ch of chapters){
+      const rows = cLines.filter(l=>l.ch===ch); const ct = cTotals(rows);
+      html += `<tr style="background:color-mix(in srgb, var(--line) 25%, transparent)"><td colspan="2"><b>Σ ${ch}</b></td>${BIDDERS.map(b=>`<td class="n"><b>${fmt(ct[b.id].sum)}</b>${ct[b.id].miss?` <span class="missing">${ct[b.id].miss} sin precio</span>`:""}${b.id!=="study"&&!ct[b.id].miss&&!ct.study.miss?varCell(ct[b.id].sum,ct.study.sum):""}</td>`).join("")}</tr>`;
+    }
+    html += `<tr class="total"><td colspan="2">Total obra</td>${BIDDERS.map(b=>`<td class="n">${fmt(t[b.id].sum)}${t[b.id].miss?` <span class="missing">${t[b.id].miss} sin precio</span>`:""}</td>`).join("")}</tr></tbody>`;
+    $("c-table").innerHTML = html;
+    const chosen = Object.entries(selection);
+    const sum = chosen.reduce((s,[i,b])=>{ const r=cLines[i]; const p=r.p[b]; return p==null?s:s+lineTotal(r.qm,p); },0);
+    $("c-selected").innerHTML = chosen.length
+      ? `Coste seleccionado (elección explícita): <b>${fmt(sum)}</b> en ${chosen.length} partida(s) — base de coste del presupuesto.`
+      : `<span class="hint">Aún no hay coste seleccionado — haz clic en el importe elegido de cada partida.</span>`;
+    document.querySelectorAll("input.cell").forEach(inp => inp.onchange = () => {
+      const v = parseFloat(inp.value); if (!Number.isFinite(v)) return;
+      cLines[inp.dataset.i].p[inp.dataset.b] = Math.round(v*100); renderComp();
+    });
+    document.querySelectorAll("[data-sel]").forEach(td => td.onclick = () => {
+      const [i,b] = td.dataset.sel.split(":"); selection[i]=b; renderComp();
+    });
+  }
+
+  // ---- tabs ----------------------------------------------------------------
+  document.querySelectorAll(".tabs button").forEach(btn => btn.onclick = () => {
+    document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-selected", String(b===btn)));
+    $("tab-presupuesto").hidden = btn.dataset.tab!=="presupuesto";
+    $("tab-comparativa").hidden = btn.dataset.tab!=="comparativa";
+  });
+
+  renderQuote(); renderComp();
+</script>
