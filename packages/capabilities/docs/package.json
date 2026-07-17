@@ -1,0 +1,27 @@
+{
+  "name": "@repo/capability-docs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Generic document capability: a metadata register attaching documents to any entity, with tags and versions, over an injected blob-store port (fake in dev). No jurisdiction or sector knowledge.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@repo/kernel": "workspace:*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2",
+    "vitest": "^3.0.5"
+  }
+}

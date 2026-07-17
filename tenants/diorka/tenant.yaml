@@ -22,6 +22,8 @@ capabilities:
     scheduling,
     time,
     docs,
+    visits,
+    access,
   ]
 jurisdiction: es-ES@2026-07-17
 vertical: construction/reformas
@@ -131,3 +133,20 @@ config:
 
           Thank you very much,
           {{signature}}
+
+  # Roles reflect the family split (BRD): administration (wife) runs the office,
+  # operations (husband) runs the site. Data only — grant lists are the contract.
+  access:
+    roles:
+      owner: ["*"]
+      administration:
+        [
+          "crm.manage",
+          "quote.issue",
+          "invoice.issue",
+          "receivable.record",
+          "payable.record",
+          "report.view",
+        ]
+      operations:
+        ["visit.record", "time.log", "procurement.raise", "project.update", "schedule.manage"]

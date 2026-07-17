@@ -8,11 +8,13 @@ import { receivablesManifest } from "@repo/capability-receivables";
 import { payablesManifest } from "@repo/capability-payables";
 import { crmManifest } from "@repo/capability-crm";
 import { procurementManifest } from "@repo/capability-procurement";
+import { schedulingManifest } from "@repo/capability-scheduling";
+import { timeManifest } from "@repo/capability-time";
+import { docsManifest } from "@repo/capability-docs";
+import { visitsManifest } from "@repo/capability-visits";
+import { accessManifest } from "@repo/capability-access";
 import { esPack } from "@repo/pack-jurisdiction-es-es";
 import { reformasPack } from "@repo/pack-vertical-construction-reformas";
-
-/** P2 build-out pending — declared so tenant specs can already select them. */
-const stub = (id: string): CapabilityManifest => ({ id, version: "0.1.0", requiredPorts: [] });
 
 export const capabilityRegistry: ReadonlyMap<string, CapabilityManifest> = new Map(
   [
@@ -25,9 +27,11 @@ export const capabilityRegistry: ReadonlyMap<string, CapabilityManifest> = new M
     payablesManifest,
     crmManifest,
     procurementManifest,
-    stub("scheduling"),
-    stub("time"),
-    stub("docs"),
+    schedulingManifest,
+    timeManifest,
+    docsManifest,
+    visitsManifest,
+    accessManifest,
   ].map((c) => [c.id, c] as const),
 );
 

@@ -124,6 +124,34 @@ importers:
         specifier: ^3.0.5
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  packages/capabilities/access:
+    dependencies:
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
   packages/capabilities/billing:
     dependencies:
       '@repo/kernel':
@@ -153,6 +181,34 @@ importers:
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/capabilities/crm:
+    dependencies:
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/capabilities/docs:
     dependencies:
       '@repo/kernel':
         specifier: workspace:*
@@ -348,7 +404,91 @@ importers:
         specifier: ^3.0.5
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  packages/capabilities/scheduling:
+    dependencies:
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
   packages/capabilities/sourcing:
+    dependencies:
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/capabilities/time:
+    dependencies:
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/capabilities/visits:
     dependencies:
       '@repo/kernel':
         specifier: workspace:*
@@ -451,12 +591,18 @@ importers:
 
   packages/factory:
     dependencies:
+      '@repo/capability-access':
+        specifier: workspace:*
+        version: link:../capabilities/access
       '@repo/capability-billing':
         specifier: workspace:*
         version: link:../capabilities/billing
       '@repo/capability-crm':
         specifier: workspace:*
         version: link:../capabilities/crm
+      '@repo/capability-docs':
+        specifier: workspace:*
+        version: link:../capabilities/docs
       '@repo/capability-messaging':
         specifier: workspace:*
         version: link:../capabilities/messaging
@@ -475,9 +621,18 @@ importers:
       '@repo/capability-receivables':
         specifier: workspace:*
         version: link:../capabilities/receivables
+      '@repo/capability-scheduling':
+        specifier: workspace:*
+        version: link:../capabilities/scheduling
       '@repo/capability-sourcing':
         specifier: workspace:*
         version: link:../capabilities/sourcing
+      '@repo/capability-time':
+        specifier: workspace:*
+        version: link:../capabilities/time
+      '@repo/capability-visits':
+        specifier: workspace:*
+        version: link:../capabilities/visits
       '@repo/kernel':
         specifier: workspace:*
         version: link:../kernel
