@@ -75,6 +75,21 @@
   .qrow .x:hover{border-color:var(--crit);color:var(--crit)}
   #catpick,#qlist select{font:inherit;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:9px 10px}
   @media (max-width:600px){ .qrow{grid-template-columns:1fr 46px 60px 28px} .qrow .lt{display:none} }
+  .schrow{display:grid;grid-template-columns:1fr 120px 120px 56px 30px;gap:6px;align-items:center;margin-bottom:7px}
+  .schrow input{font:inherit;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 8px;min-width:0;width:100%}
+  .schrow .x{border:1px solid var(--line);background:var(--paper);border-radius:7px;height:32px;color:var(--muted);font-size:15px}
+  @media (max-width:600px){ .schrow{grid-template-columns:1fr 90px 90px 28px} .schrow .pgc{display:none} }
+  .gantt{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+  .gantt .gt{display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:center}
+  .gantt .gt .gn{font-size:11.5px;color:var(--ink);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gbar{position:relative;height:24px;background:var(--panel);border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .gbar>i{position:absolute;top:2px;bottom:2px;background:var(--greenSoft);border:1px solid var(--greenLt);border-radius:6px;overflow:hidden;display:flex;align-items:center}
+  .gbar>i>span.p{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(180deg,var(--greenLt),var(--green));opacity:.85}
+  .gbar>i>span.t{position:relative;z-index:1;font-size:10px;font-weight:700;color:var(--greenDeep);padding:0 7px;white-space:nowrap}
+  @media (max-width:600px){ .gantt .gt{grid-template-columns:84px 1fr} }
+  .corow{display:grid;grid-template-columns:1fr 100px 30px;gap:7px;align-items:center;margin-bottom:7px}
+  .corow input{font:inherit;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 9px;min-width:0;width:100%}
+  .corow .x{border:1px solid var(--line);background:var(--paper);border-radius:7px;height:34px;color:var(--muted);font-size:15px}
 
   .stage{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:34px 38px;box-shadow:var(--shadow-lg);position:relative;overflow:hidden}
   .stage::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--green),var(--greenLt) 60%,var(--spark))}
@@ -222,6 +237,7 @@
       <h3>Project ledger — live</h3>
       <div class="row big"><span class="k">Margin</span><span class="v" id="l-margin">—</span></div>
       <div class="row"><span class="k">Quote / baseline</span><span class="v" id="l-baseline">—</span></div>
+      <div class="row"><span class="k">Change orders</span><span class="v" id="l-var">—</span></div>
       <div class="row"><span class="k">Committed (PO)</span><span class="v" id="l-committed">—</span></div>
       <div class="row"><span class="k">Actual cost</span><span class="v" id="l-actual">—</span></div>
       <div class="row"><span class="k">Revenue (ex-VAT)</span><span class="v" id="l-revenue">—</span></div>
@@ -282,14 +298,42 @@ const FOLDERS = ["01 Lead","02 Site visit","03 Estimate","04 Quotation","05 Acce
 const SAMPLE = {
   customer:"Laura Puig", email:"laura.puig@example.com", phone:"600 12 34 56",
   buyerNif:"12345678Z", address:"C/ Major 18, 08950 Esplugues de Llobregat, Barcelona",
-  visitNotes:"Bathroom 5.0 × 2.5 m · strip old tiling · relocate plumbing · aerothermal unit on the terrace.",
-  chapters:[
-    {chapter:"Demolition & preliminary works", budget:230},
-    {chapter:"Coverings & finishes", budget:792},
-    {chapter:"Plumbing", budget:1850},
+  visitNotes:"Bathroom 5.0 × 2.5 m (12.5 m² floor, ~37 m² walls) · strip old tiling · relocate plumbing · aerothermal unit on the terrace · lift available, street parking.",
+  // itemised quote (real bathroom + aerothermal reform ~€8.3k)
+  lines:[
+    {chapter:"Demolition & preliminary works", item:"Strip old wall / floor tiling", unit:"m²", qty:50, price:18},
+    {chapter:"Demolition & preliminary works", item:"Remove sanitary fixtures", unit:"ud", qty:3, price:35},
+    {chapter:"Demolition & preliminary works", item:"Debris removal & skip", unit:"partida", qty:1, price:280},
+    {chapter:"Waterproofing", item:"Wet-area waterproof membrane", unit:"m²", qty:12.5, price:24},
+    {chapter:"Waterproofing", item:"Form shower slope + drain", unit:"ud", qty:1, price:140},
+    {chapter:"Plumbing", item:"Relocate water point", unit:"ud", qty:3, price:120},
+    {chapter:"Plumbing", item:"Shower tray + mixer (supply + fit)", unit:"ud", qty:1, price:640},
+    {chapter:"Plumbing", item:"WC + basin (supply + fit)", unit:"ud", qty:1, price:520},
+    {chapter:"Heating & climate", item:"Aerothermal unit install", unit:"ud", qty:1, price:1850},
+    {chapter:"Electrical", item:"New circuit + points", unit:"ud", qty:4, price:85},
+    {chapter:"Electrical", item:"Consumer unit upgrade", unit:"ud", qty:1, price:420},
+    {chapter:"Electrical", item:"Electric heated towel rail", unit:"ud", qty:1, price:210},
+    {chapter:"Coverings & finishes", item:"Porcelain wall tiling (supply + fit)", unit:"m²", qty:37, price:42},
+    {chapter:"Coverings & finishes", item:"Porcelain floor tiling (supply + fit)", unit:"m²", qty:12.5, price:46},
+    {chapter:"Coverings & finishes", item:"False ceiling with LED", unit:"m²", qty:12.5, price:38},
   ],
   optional:{desc:"Premium tempered-glass shower screen", amount:480},
   vatPct:10, quoteNo:"PRE-2026-0031", invoiceNo:"FAC-2026-0007", termsDays:15, costPct:78,
+  // a fully-worked example: prefilled stage details (dates default to today)
+  _stageData:{
+    0:{source:"Referral", enquiry:"Full bathroom refit + aerothermal heating", targetBudget:9000},
+    1:{areaM2:12.5, access:"Lift available · street parking · working hours 8:00–17:00"},
+    3:{validityDays:30, clientNote:"Includes protection of adjacent areas and a daily clean-down."},
+    4:{acceptanceMethod:"Signed", depositPct:40},
+    5:{projectManager:"Jordi Canei"},
+    6:{supplier:"Ceràmiques del Vallès", poNumber:"PO-2026-014"},
+    7:{billNumber:"A-1042", progressPct:60},
+    8:{invoiceType:"Full", irpfPct:0},
+    9:{paymentMethod:"Transfer"},
+    10:{supPaymentMethod:"Transfer"},
+    11:{closeNotes:"Aerothermal commissioning smooth; add +5% on tiling labour next time."},
+    12:{reviewPlatform:"Google"},
+  },
 };
 const BLANK = {
   customer:"", email:"", phone:"", buyerNif:"", address:"", visitNotes:"",
@@ -302,19 +346,38 @@ const clone = o => JSON.parse(JSON.stringify(o));
 const CATALOGUE = [
   {chapter:"Demolition & preliminary works", item:"Strip old wall / floor tiling", unit:"m²", price:18},
   {chapter:"Demolition & preliminary works", item:"Remove sanitary fixtures", unit:"ud", price:35},
+  {chapter:"Demolition & preliminary works", item:"Demolish partition wall", unit:"m²", price:22},
   {chapter:"Demolition & preliminary works", item:"Debris removal & skip", unit:"partida", price:280},
-  {chapter:"Coverings & finishes", item:"Porcelain wall tiling (supply + fit)", unit:"m²", price:42},
-  {chapter:"Coverings & finishes", item:"Porcelain floor tiling (supply + fit)", unit:"m²", price:46},
-  {chapter:"Coverings & finishes", item:"False ceiling with LED", unit:"m²", price:38},
-  {chapter:"Coverings & finishes", item:"Prep + paint walls & ceiling", unit:"m²", price:12},
+  {chapter:"Masonry & partitions", item:"New partition (brick + render)", unit:"m²", price:48},
+  {chapter:"Masonry & partitions", item:"Open new doorway", unit:"ud", price:180},
+  {chapter:"Masonry & partitions", item:"Level floor screed", unit:"m²", price:26},
+  {chapter:"Waterproofing", item:"Wet-area waterproof membrane", unit:"m²", price:24},
+  {chapter:"Waterproofing", item:"Form shower slope + drain", unit:"ud", price:140},
   {chapter:"Plumbing", item:"Relocate water point", unit:"ud", price:120},
   {chapter:"Plumbing", item:"Shower tray + mixer (supply + fit)", unit:"ud", price:640},
   {chapter:"Plumbing", item:"WC + basin (supply + fit)", unit:"ud", price:520},
-  {chapter:"Plumbing", item:"Aerothermal unit install", unit:"ud", price:1850},
+  {chapter:"Plumbing", item:"Thermostatic shower column", unit:"ud", price:380},
   {chapter:"Electrical", item:"New circuit + points", unit:"ud", price:85},
   {chapter:"Electrical", item:"Consumer unit upgrade", unit:"ud", price:420},
-  {chapter:"Carpentry", item:"Interior door (supply + fit)", unit:"ud", price:290},
-  {chapter:"Carpentry", item:"Fitted wardrobe", unit:"ml", price:340},
+  {chapter:"Electrical", item:"LED spotlight (supply + fit)", unit:"ud", price:28},
+  {chapter:"Electrical", item:"Electric heated towel rail", unit:"ud", price:210},
+  {chapter:"Heating & climate", item:"Aerothermal unit install", unit:"ud", price:1850},
+  {chapter:"Heating & climate", item:"Radiator (supply + fit)", unit:"ud", price:260},
+  {chapter:"Heating & climate", item:"Split A/C unit (supply + fit)", unit:"ud", price:980},
+  {chapter:"Coverings & finishes", item:"Porcelain wall tiling (supply + fit)", unit:"m²", price:42},
+  {chapter:"Coverings & finishes", item:"Porcelain floor tiling (supply + fit)", unit:"m²", price:46},
+  {chapter:"Coverings & finishes", item:"Microcement finish", unit:"m²", price:58},
+  {chapter:"Coverings & finishes", item:"False ceiling with LED", unit:"m²", price:38},
+  {chapter:"Carpentry & fixtures", item:"Interior door (supply + fit)", unit:"ud", price:290},
+  {chapter:"Carpentry & fixtures", item:"Fitted wardrobe", unit:"ml", price:340},
+  {chapter:"Carpentry & fixtures", item:"Vanity unit (supply + fit)", unit:"ud", price:450},
+  {chapter:"Kitchen", item:"Base + wall units", unit:"ml", price:520},
+  {chapter:"Kitchen", item:"Quartz worktop (supply + fit)", unit:"ml", price:320},
+  {chapter:"Kitchen", item:"Appliance install", unit:"ud", price:90},
+  {chapter:"Painting", item:"Prep + paint walls & ceiling", unit:"m²", price:12},
+  {chapter:"Painting", item:"Smoothing / skim coat", unit:"m²", price:9},
+  {chapter:"Windows & glazing", item:"Aluminium window (supply + fit)", unit:"ud", price:480},
+  {chapter:"Windows & glazing", item:"Tempered-glass shower screen", unit:"ud", price:480},
 ];
 const CAT_CHAPTERS = [...new Set(CATALOGUE.map(c=>c.chapter))];
 
@@ -341,7 +404,7 @@ function buildS(p){
     optional:{desc:(p.optional?.desc||"").trim()||"Optional works",
       amount:Math.round((Number(p.optional?.amount)||0)*100), included:false},
     committedPct:Math.min(1.3,(cost+2)/100), actualPct:cost/100,
-    baseline:0, revenue:0, collected:0, supplierPaid:0,
+    baseline:0, variations:0, revenue:0, collected:0, supplierPaid:0,
     vatBp:Math.round((Number(p.vatPct)||0)*100),
     quoteNo:(p.quoteNo||"").trim()||"PRE-2026-0001", invoiceNo:(p.invoiceNo||"").trim()||"FAC-2026-0001",
     termsDays:Math.max(0,Number(p.termsDays)||15),
@@ -373,7 +436,7 @@ const actual = ()=>sum(S.chapters,c=>c.actual);
 const margin = ()=>S.revenue - actual();
 const marginPct = ()=>S.revenue? Math.round(margin()/S.revenue*1000)/10 : 0;
 const cash = ()=>S.collected - S.supplierPaid;
-const forecast = ()=>{const b=S.baseline||sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0); return b - Math.max(actual(),committed());};
+const forecast = ()=>{const b=(S.baseline||sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0))+(S.variations||0); return b - Math.max(actual(),committed());};
 
 /* ---------- project folder / files ---------- */
 function art(folder,name,mime,b64){
@@ -720,6 +783,7 @@ function log(msg){ const f=$("#feed"); if(f.dataset.clean!=="1"){f.innerHTML="";
 function renderLedger(){
   const baseTotal = S.baseline || (sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0));
   $("#l-baseline").textContent = baseTotal?eur(baseTotal):"—";
+  const lv=$("#l-var"); if(lv){ lv.textContent = S.variations?(S.variations>0?"+":"")+eur(S.variations):"—"; lv.className="v "+(S.variations>0?"warn":S.variations<0?"good":""); }
   $("#l-committed").textContent = committed()?eur(committed()):"—";
   $("#l-actual").textContent = actual()?eur(actual()):"—";
   $("#l-revenue").textContent = S.revenue?eur(S.revenue):"—";
@@ -810,7 +874,7 @@ const FLOW = [
       return `<p>Work proceeds. Supplier <b>bills</b> are booked as <b>actual cost</b> (duplicates are rejected). Quoted-vs-actual per chapter updates live — the margin-leak early-warning.</p>
       <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Actual</th><th class="n">Variance</th></tr></thead><tbody>${rows}</tbody></table>`; },
     done:()=>{ textArt("08 Execution","supplier-bills.txt","Supplier bills booked:\n"+S.bills.map(b=>"  "+b.s+" ("+b.n+"): "+eurTxt(b.amt)).join("\n")+"\nTotal actual: "+eurTxt(actual())); log("Bills booked — actual "+eur(actual())+" ("+S.bills.length+" bills)"); } },
-  { cap:"billing", email:{kind:"invoice"}, body:()=>{ S.revenue=S.baseline; const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
+  { cap:"billing", email:{kind:"invoice"}, body:()=>{ S.revenue=S.baseline+(S.variations||0); const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
       return `<p>The <b>invoice</b> is issued from the accepted quote. The VAT rate is <b>decided by the rule</b> (reduced rate where the renovation conditions apply, art. 91.Uno.2.10º) — not a dropdown — and its justification is persisted. Gapless number, SHA-256 chain seal.</p>
       <table><tbody>
         <tr><td>Invoice</td><td class="n"><b>${esc(S.invoiceNo)}</b></td></tr>
@@ -894,12 +958,13 @@ function fieldEl(fld,val){
   if(fld.hint) f.append(el("span","hint",fld.hint));
   return f;
 }
-function stageDetailsText(i){
-  const sd=sdOf(i); const flds=FIELDS[i]||[];
+function saveStageDetails(i){
+  const flds=FIELDS[i]||[]; if(!flds.length) return;
+  const sd=sdOf(i);
   const rows=flds.map(fl=>{ let v=sd[fl.k]; if(v==null||v==="")return null; if(fl.type==="date")v=fmtDate(v); return "  "+fl.label+": "+v; }).filter(Boolean);
-  return STAGES[i]+" — details\n"+(rows.length?rows.join("\n"):"(none entered)");
+  if(!rows.length) return;
+  textArt(FOLDERS[i],"details.txt",STAGES[i]+" — details\n"+rows.join("\n"));
 }
-function saveStageDetails(i){ if((FIELDS[i]||[]).length) textArt(FOLDERS[i],"details.txt",stageDetailsText(i)); }
 function renderFields(wrap){
   const flds=FIELDS[step]; if(!flds) return;
   const sd=sdOf(step);
@@ -920,47 +985,55 @@ function regenInvoice(){
   art("09 Invoicing","Invoice-email.eml","message/rfc822",textToB64(buildEml(emailContent("invoice"))));
 }
 
-/* ---------- estimator (Estimate stage) ---------- */
+/* ---------- estimator (Estimate stage) — catalogue-aware, with contingency ---------- */
 function renderEstimator(wrap){
   const sd=sdOf(2);
-  if(!sd.items){ sd.items = S.chapters.length ? S.chapters.map(c=>({desc:c.chapter,qty:1,rate:(c.budget/100)})) : [{desc:"",qty:1,rate:""}]; }
+  if(!sd.items){ sd.items = (S.lines&&S.lines.length) ? S.lines.map(l=>({desc:l.item,chapter:l.chapter,unit:l.unit,qty:l.qty,rate:l.price/100}))
+    : S.chapters.length ? S.chapters.map(c=>({desc:c.chapter,chapter:c.chapter,unit:"",qty:1,rate:(c.budget/100)})) : [{desc:"",chapter:"",unit:"",qty:1,rate:""}]; }
+  if(sd.contingency==null) sd.contingency=10;
   const box=el("div","fsec"); box.style.margin="18px 0 0";
-  box.append(el("h4",null,"Estimator — build the numbers (quantity × unit rate)"));
-  const list=el("div"); list.id="estlist"; box.append(list);
-  const add=el("button","btn sm ghost","＋ Add line"); add.type="button";
+  box.append(el("h4",null,"Estimator — rough numbers (quantity × unit rate)"));
+  const addbar=el("div","attach");
+  addbar.innerHTML=`<select id="estcat" style="flex:1;min-width:0"><option value="">＋ Add from catalogue…</option>${
+    CAT_CHAPTERS.map(ch=>`<optgroup label="${esc(ch)}">${CATALOGUE.map((c,idx)=>c.chapter===ch?`<option value="${idx}">${esc(c.item)} · ${c.price} €/${esc(c.unit)}</option>`:"").join("")}</optgroup>`).join("")
+  }</select><button class="btn sm ghost" id="estadd" type="button">＋ Blank line</button>`;
+  const list=el("div"); list.id="estlist";
+  const cont=el("div","field"); cont.style.cssText="max-width:220px;margin-top:10px";
+  cont.innerHTML=`<label>Contingency (%)</label><input id="estcont" type="number" step="1" min="0" value="${sd.contingency}">`;
   const tot=el("div"); tot.id="esttot"; tot.style.cssText="margin-top:10px;font-size:13.5px";
   const apply=el("button","btn sm","→ Use as the quote"); apply.type="button"; apply.style.marginTop="12px";
-  box.append(add,tot,el("br"),apply); wrap.append(box);
+  box.append(addbar,list,cont,tot,el("br"),apply); wrap.append(box);
 
+  const sumEst=()=>sd.items.reduce((s,it)=>s+Math.round((Number(it.qty)||0)*(Number(it.rate)||0)*100),0);
+  const total=()=>{ const t=sumEst(); const c=Math.max(0,Number(sd.contingency)||0); const hi=Math.round(t*(1+c/100));
+    tot.innerHTML=`<b>Estimate:</b> ${eur(t)} – ${eur(hi)} (ex-VAT, incl. ${c}% contingency) · <span class="hint">a range to align before the detailed quote</span>`; };
   const draw=()=>{
     list.innerHTML="";
     sd.items.forEach((it,i)=>{
       const row=el("div","estrow");
       row.innerHTML=`<input data-f="desc" placeholder="Work / room" value="${esc(it.desc||"")}">
-        <input data-f="qty" type="number" step="any" placeholder="Qty" value="${it.qty??""}">
+        <input data-f="qty" type="number" step="any" placeholder="${esc(it.unit||'qty')}" value="${it.qty??""}">
         <input data-f="rate" type="number" step="any" placeholder="€/unit" value="${it.rate??""}">
         <span class="lt">${eur(Math.round((Number(it.qty)||0)*(Number(it.rate)||0)*100))}</span>
         <button class="x" data-x="${i}" type="button">×</button>`;
-      row.querySelectorAll("[data-f]").forEach(inp=>inp.oninput=()=>{ it[inp.dataset.f]=inp.value; persistSoon(); total(); });
-      row.querySelector("[data-x]").onclick=()=>{ sd.items.splice(i,1); if(!sd.items.length)sd.items.push({desc:"",qty:1,rate:""}); persistSoon(); draw(); };
+      row.querySelectorAll("[data-f]").forEach(inp=>inp.oninput=()=>{ it[inp.dataset.f]=inp.value; persistSoon(); row.querySelector(".lt").textContent=eur(Math.round((Number(it.qty)||0)*(Number(it.rate)||0)*100)); total(); });
+      row.querySelector("[data-x]").onclick=()=>{ sd.items.splice(i,1); if(!sd.items.length)sd.items.push({desc:"",chapter:"",unit:"",qty:1,rate:""}); persistSoon(); draw(); };
       list.append(row);
     });
     total();
   };
-  const sumEst=()=>sd.items.reduce((s,it)=>s+Math.round((Number(it.qty)||0)*(Number(it.rate)||0)*100),0);
-  const total=()=>{ const t=sumEst(); tot.innerHTML=`<b>Estimate:</b> ${eur(t)} – ${eur(Math.round(t*1.15))} (ex-VAT) · <span class="hint">a range to align before the detailed quote</span>`; };
-  add.onclick=()=>{ sd.items.push({desc:"",qty:1,rate:""}); persistSoon(); draw(); };
+  addbar.querySelector("#estcat").onchange=e=>{ const v=e.target.value; if(v==="")return; const c=CATALOGUE[+v];
+    sd.items.push({desc:c.item,chapter:c.chapter,unit:c.unit,qty:1,rate:c.price}); e.target.value=""; persistSoon(); draw(); };
+  addbar.querySelector("#estadd").onclick=()=>{ sd.items.push({desc:"",chapter:"",unit:"",qty:1,rate:""}); persistSoon(); draw(); };
+  cont.querySelector("#estcont").oninput=e=>{ sd.contingency=e.target.value; persistSoon(); total(); };
   apply.onclick=()=>{
     const items=sd.items.filter(it=>it.desc&&Number(it.rate)>0);
     if(!items.length){ alert("Add at least one line with a description and rate."); return; }
-    const chapters=items.map(it=>({chapter:it.desc, budget:Math.round((Number(it.qty)||1)*(Number(it.rate)||0))}));
-    if(PROJECT.profile){ PROJECT.profile.chapters=chapters; }
-    draft.chapters=chapters.map(c=>({chapter:c.chapter,budget:c.budget}));
-    S.chapters=chapters.map(c=>({chapter:c.chapter,budget:Math.round(c.budget*100),committed:0,actual:0}));
-    persistSoon(); renderLedger(); saveStageDetails(2);
-    textArt("03 Estimate","estimate.txt","Estimator for "+S.customer+"\n"+items.map(it=>"  "+it.desc+": "+it.qty+" x "+eurTxt(Math.round(it.rate*100))+" = "+eurTxt(Math.round((it.qty||1)*it.rate*100))).join("\n")+"\nEstimate total (ex-VAT): "+eurTxt(sumEst()));
-    log("Estimate applied to the quote — "+eur(sumEst())+" across "+chapters.length+" chapters.");
-    apply.textContent="✓ Sent to the quote"; setTimeout(()=>apply.textContent="→ Use as the quote",1600);
+    PROJECT.profile.lines = items.map(it=>({chapter:(it.chapter||it.desc||"Estimate"), item:it.desc, unit:it.unit||"", qty:Number(it.qty)||1, price:Number(it.rate)||0}));
+    S=buildS(PROJECT.profile); persistSoon(); renderLedger(); saveStageDetails(2);
+    textArt("03 Estimate","estimate.txt","Estimator for "+S.customer+"\n"+items.map(it=>"  "+it.desc+": "+it.qty+" "+(it.unit||"")+" x "+eurTxt(Math.round(it.rate*100))+" = "+eurTxt(Math.round((it.qty||1)*it.rate*100))).join("\n")+"\nEstimate (ex-VAT): "+eurTxt(sumEst())+" · +"+((Number(sd.contingency)||0))+"% contingency");
+    log("Estimate applied to the quote — "+eur(sumEst())+" across "+S.chapters.length+" chapter(s).");
+    apply.textContent="✓ Sent to the quote"; renderStage();
   };
   draw();
 }
@@ -1019,14 +1092,115 @@ function renderQuoteBuilder(wrap){
   draw();
 }
 
+/* ---------- scheduler (Project stage) — tasks + mini timeline ---------- */
+function renderScheduler(wrap){
+  const sd=sdOf(5);
+  const start0 = sdOf(5).startDate || todayISO();
+  if(!sd.tasks){
+    let cur=start0;
+    sd.tasks = (S.chapters.length?S.chapters:[{chapter:"Works"}]).map((c,i)=>{ const s=cur; const e=addDaysISO(s,5); cur=addDaysISO(e,1); return {name:c.chapter, start:s, end:e, progress:0}; });
+  }
+  const box=el("div","fsec"); box.style.margin="18px 0 0";
+  box.append(el("h4",null,"Schedule — tasks & timeline"));
+  const list=el("div"); list.id="schlist"; box.append(list);
+  const addb=el("button","btn sm ghost","＋ Add task"); addb.type="button"; box.append(addb);
+  const gant=el("div","gantt"); box.append(gant);
+  wrap.append(box);
+  const draw=()=>{
+    list.innerHTML="";
+    sd.tasks.forEach((t,i)=>{
+      const row=el("div","schrow");
+      row.innerHTML=`<input data-f="name" placeholder="Task" value="${esc(t.name||"")}">
+        <input data-f="start" type="date" value="${t.start||""}">
+        <input data-f="end" type="date" value="${t.end||""}">
+        <input class="pgc" data-f="progress" type="number" min="0" max="100" placeholder="%" value="${t.progress??""}">
+        <button class="x" data-x="${i}" type="button">×</button>`;
+      row.querySelectorAll("[data-f]").forEach(inp=>inp.oninput=()=>{ t[inp.dataset.f]=inp.value; persistSoon(); gantt(); });
+      row.querySelector("[data-x]").onclick=()=>{ sd.tasks.splice(i,1); persistSoon(); draw(); };
+      list.append(row);
+    });
+    gantt();
+  };
+  const gantt=()=>{
+    gant.innerHTML="";
+    const ts=sd.tasks.map(t=>({t, s:Date.parse(t.start), e:Date.parse(t.end)})).filter(x=>!isNaN(x.s)&&!isNaN(x.e)&&x.e>=x.s);
+    if(!ts.length){ gant.innerHTML='<div class="hint">Add dates to see the timeline.</div>'; return; }
+    const min=Math.min(...ts.map(x=>x.s)), max=Math.max(...ts.map(x=>x.e)); const span=Math.max(1,max-min);
+    ts.forEach(({t,s,e})=>{
+      const left=(s-min)/span*100, w=Math.max(3,(e-s)/span*100); const pg=Math.max(0,Math.min(100,Number(t.progress)||0));
+      const g=el("div","gt");
+      g.innerHTML=`<div class="gn">${esc(t.name||"—")}</div><div class="gbar"><i style="left:${left}%;width:${w}%"><span class="p" style="width:${pg}%"></span><span class="t">${pg}%</span></i></div>`;
+      gant.append(g);
+    });
+  };
+  addb.onclick=()=>{ const last=sd.tasks[sd.tasks.length-1]; const s=last?addDaysISO(last.end,1):start0; sd.tasks.push({name:"",start:s,end:addDaysISO(s,5),progress:0}); persistSoon(); draw(); };
+  draw();
+}
+
+/* ---------- change orders (Execution stage) — variations preserve the baseline ---------- */
+function recalcVariations(){ const sd=sdOf(7); S.variations=(sd.changes||[]).reduce((s,c)=>s+Math.round((Number(c.amount)||0)*100),0); }
+function renderChangeOrders(wrap){
+  const sd=sdOf(7); if(!sd.changes) sd.changes=[];
+  recalcVariations();
+  const box=el("div","fsec"); box.style.margin="18px 0 0";
+  box.append(el("h4",null,"Change orders (variations) — baseline stays frozen"));
+  const list=el("div"); list.id="colist"; box.append(list);
+  const addb=el("button","btn sm ghost","＋ Add change order"); addb.type="button"; box.append(addb);
+  const tot=el("div"); tot.id="cotot"; tot.style.cssText="margin-top:10px;font-size:13.5px"; box.append(tot);
+  wrap.append(box);
+  const total=()=>{ recalcVariations(); renderLedger();
+    const cur=(S.baseline||sum(S.chapters,c=>c.budget))+S.variations;
+    tot.innerHTML=`<b>Baseline:</b> ${eur(S.baseline||sum(S.chapters,c=>c.budget))} · <b>Variations:</b> ${S.variations>=0?"+":""}${eur(S.variations)} · <b>Current contract:</b> ${eur(cur)}`;
+    textArt("08 Execution","change-orders.txt","Change orders (variations):\n"+(sd.changes.filter(c=>c.desc).map(c=>"  "+c.desc+": "+(Number(c.amount)>=0?"+":"")+eurTxt(Math.round((Number(c.amount)||0)*100))).join("\n")||"  (none)")+"\nBaseline preserved: "+eurTxt(S.baseline||sum(S.chapters,c=>c.budget))+"\nCurrent contract: "+eurTxt(cur)); };
+  const draw=()=>{
+    list.innerHTML="";
+    sd.changes.forEach((c,i)=>{
+      const row=el("div","corow");
+      row.innerHTML=`<input data-f="desc" placeholder="Variation (e.g. add underfloor heating)" value="${esc(c.desc||"")}">
+        <input data-f="amount" type="number" step="any" placeholder="± €" value="${c.amount??""}">
+        <button class="x" data-x="${i}" type="button">×</button>`;
+      row.querySelectorAll("[data-f]").forEach(inp=>inp.oninput=()=>{ c[inp.dataset.f]=inp.value; persistSoon(); total(); });
+      row.querySelector("[data-x]").onclick=()=>{ sd.changes.splice(i,1); persistSoon(); draw(); };
+      list.append(row);
+    });
+    total();
+  };
+  addb.onclick=()=>{ sd.changes.push({desc:"",amount:""}); persistSoon(); draw(); };
+  draw();
+}
+
 /* ---------- intake (all operator inputs) ---------- */
 let draft = clone(SAMPLE);
 function intakeHtml(){
   const p=draft;
-  const chapRows=p.chapters.map((c,i)=>`<div class="chap" data-i="${i}">
-    <input data-k="chapter" placeholder="Chapter / work (e.g. Plumbing)" value="${esc(c.chapter||"")}">
-    <input data-k="budget" type="number" step="0.01" min="0" placeholder="€ budget" value="${c.budget??""}">
-    <button type="button" class="x" data-rm="${i}" title="Remove">×</button></div>`).join("");
+  const hasLines = p.lines && p.lines.length;
+  if(!hasLines && (!p.chapters || !p.chapters.length)) p.chapters=[{chapter:"",budget:""},{chapter:"",budget:""}];
+  let quoteSec;
+  if(hasLines){
+    const by={}; const ord=[]; p.lines.forEach(l=>{ if(!(l.chapter in by)){by[l.chapter]=0;ord.push(l.chapter);} by[l.chapter]+=(Number(l.qty)||0)*(Number(l.price)||0); });
+    const rows=ord.map(ch=>`<tr><td>${esc(ch)}</td><td class="n">${eur(Math.round(by[ch]*100))}</td></tr>`).join("");
+    quoteSec=`<div class="fsec"><h4>Quote — ${p.lines.length} itemised lines</h4>
+      <div class="hint" style="margin-bottom:8px">Loaded from the catalogue. Refine every line in <b>step 4 · Quotation</b>.</div>
+      <div class="tblwrap"><table><thead><tr><th>Chapter</th><th class="n">Subtotal</th></tr></thead><tbody>${rows}
+        <tr><td><b>Base total</b></td><td class="n"><b>${eur(Math.round(ord.reduce((s,ch)=>s+by[ch],0)*100))}</b></td></tr></tbody></table></div>
+      <div class="frow" style="margin-top:12px">
+        <div class="field"><label>Optional work (shown separately)</label><input data-o="desc" value="${esc(p.optional.desc)}" placeholder="e.g. Shower screen"></div>
+        <div class="field"><label>Optional amount (€)</label><input data-o="amount" type="number" step="0.01" min="0" value="${p.optional.amount??""}" placeholder="0.00"></div>
+      </div></div>`;
+  } else {
+    const chapRows=p.chapters.map((c,i)=>`<div class="chap" data-i="${i}">
+      <input data-k="chapter" placeholder="Chapter / work (e.g. Plumbing)" value="${esc(c.chapter||"")}">
+      <input data-k="budget" type="number" step="0.01" min="0" placeholder="€ budget" value="${c.budget??""}">
+      <button type="button" class="x" data-rm="${i}" title="Remove">×</button></div>`).join("");
+    quoteSec=`<div class="fsec"><h4>Quote — chapters</h4>
+      <div class="hint" style="margin-bottom:8px">Quick chapters — you'll itemise them from the catalogue in <b>step 4 · Quotation</b>.</div>
+      <div id="chaps">${chapRows}</div>
+      <button type="button" class="btn sm ghost" id="addchap">＋ Add chapter</button>
+      <div class="frow" style="margin-top:12px">
+        <div class="field"><label>Optional work (shown separately)</label><input data-o="desc" value="${esc(p.optional.desc)}" placeholder="e.g. Shower screen"></div>
+        <div class="field"><label>Optional amount (€)</label><input data-o="amount" type="number" step="0.01" min="0" value="${p.optional.amount??""}" placeholder="0.00"></div>
+      </div></div>`;
+  }
   return `<div class="eyebrow">Your project</div>
     <h2>Run the whole process with your own data</h2>
     <div class="cap">Enter a real customer and quote — or load the sample. Every step then runs automatically and files its documents into the project folder. Saved on this device.</div>
@@ -1044,14 +1218,7 @@ function intakeHtml(){
         <div class="field full"><label>Notes &amp; measurements</label><textarea data-p="visitNotes" placeholder="Rooms, sizes, what to strip / relocate, materials…">${esc(p.visitNotes)}</textarea></div>
         <div class="hint" style="margin-top:6px">Photos are taken later, at the Site-visit step, and saved to the folder.</div>
       </div>
-      <div class="fsec"><h4>Quote — chapters</h4>
-        <div id="chaps">${chapRows}</div>
-        <button type="button" class="btn sm ghost" id="addchap">＋ Add chapter</button>
-        <div class="frow" style="margin-top:12px">
-          <div class="field"><label>Optional work (shown separately)</label><input data-o="desc" value="${esc(p.optional.desc)}" placeholder="e.g. Shower screen"></div>
-          <div class="field"><label>Optional amount (€)</label><input data-o="amount" type="number" step="0.01" min="0" value="${p.optional.amount??""}" placeholder="0.00"></div>
-        </div>
-      </div>
+      ${quoteSec}
       <div class="fsec"><h4>Billing &amp; costs</h4>
         <div class="frow">
           <div class="field"><label>Quote number</label><input data-p="quoteNo" value="${esc(p.quoteNo||"")}" placeholder="PRE-2026-0001"></div>
@@ -1074,15 +1241,14 @@ function wireIntake(){
   const root=$("#stage");
   root.querySelectorAll("[data-p]").forEach(inp=>inp.oninput=()=>{ draft[inp.dataset.p]=inp.value; });
   root.querySelectorAll("[data-o]").forEach(inp=>inp.oninput=()=>{ draft.optional[inp.dataset.o]=inp.value; });
-  const bindChaps=()=>{
+  if($("#chaps")){
     root.querySelectorAll("#chaps .chap").forEach(rowEl=>{
       const i=+rowEl.dataset.i;
       rowEl.querySelectorAll("input").forEach(inp=>inp.oninput=()=>{ draft.chapters[i][inp.dataset.k]=inp.value; });
       const rm=rowEl.querySelector("[data-rm]"); rm.onclick=()=>{ draft.chapters.splice(i,1); if(!draft.chapters.length)draft.chapters.push({chapter:"",budget:""}); reIntake(); };
     });
-  };
-  bindChaps();
-  $("#addchap").onclick=()=>{ draft.chapters.push({chapter:"",budget:""}); reIntake(); };
+    $("#addchap").onclick=()=>{ draft.chapters.push({chapter:"",budget:""}); reIntake(); };
+  }
   $("#loadsample").onclick=()=>{ draft=clone(SAMPLE); reIntake(); };
   $("#clearform").onclick=()=>{ draft=clone(BLANK); reIntake(); };
   $("#startbtn").onclick=startJourney;
@@ -1090,12 +1256,14 @@ function wireIntake(){
 function reIntake(){ $("#stage").innerHTML=intakeHtml(); wireIntake(); }
 
 function startJourney(){
-  const nChap=draft.chapters.filter(c=>c.chapter&&Number(c.budget)>0).length;
-  if(!draft.customer.trim() || nChap===0){
-    const e=$("#ierr"); e.hidden=false; e.textContent=!draft.customer.trim()?"Please enter the customer name.":"Add at least one chapter with a budget.";
+  const hasQuote = (draft.lines&&draft.lines.length) || (draft.chapters||[]).filter(c=>c.chapter&&Number(c.budget)>0).length>0;
+  if(!draft.customer.trim() || !hasQuote){
+    const e=$("#ierr"); e.hidden=false; e.textContent=!draft.customer.trim()?"Please enter the customer name.":"Add at least one chapter with a budget (or load the sample).";
     return;
   }
-  PROJECT.profile=clone(draft); S=buildS(PROJECT.profile); PROJECT.stageData={}; persistSoon();
+  PROJECT.profile=clone(draft); S=buildS(PROJECT.profile);
+  PROJECT.stageData = draft._stageData ? clone(draft._stageData) : {};
+  persistSoon();
   const f=$("#feed"); f.innerHTML="<div>Project loaded — "+esc(S.customer)+".</div>"; f.dataset.clean="";
   step=-1; reached=-1; advance();   // → step 0
 }
@@ -1132,6 +1300,8 @@ function renderStage(){
 
   if(step===2) renderEstimator(wrap);
   if(step===3) renderQuoteBuilder(wrap);
+  if(step===5) renderScheduler(wrap);
+  if(step===7) renderChangeOrders(wrap);
   renderFields(wrap);
 
   if(f.email){
@@ -1177,6 +1347,7 @@ function advance(){
   step++; if(step>reached) reached=step;
   renderRail(); renderStage(); renderLedger();
   const f=FLOW[step]; f.done&&f.done();
+  saveStageDetails(step);
   window.scrollTo({top:0,behavior:"smooth"});
 }
 function editData(){ draft=clone(PROJECT.profile||SAMPLE); step=-1; renderRail(); renderStage(); }
