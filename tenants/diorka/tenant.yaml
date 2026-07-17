@@ -1,0 +1,41 @@
+# Tenant: Diorka — company #1 of the family group (Proyecto Diorka).
+# REAL intake: intake/diorka/ (BRD 2026-07-17). Legal identity fields are
+# placeholders until the BRD §11.1 validation workshop — replacing them is
+# config-only. Additional group entities become sibling tenants via
+# `factory new-tenant` when their legal names are confirmed
+# (group registry: tenants/_groups/diorka.yaml).
+tenant: diorka
+kernel: "^1"
+capabilities: [quoting, billing, sourcing, scheduling, time, procurement, docs]
+jurisdiction: es-ES@2026-07-17
+vertical: construction/reformas
+plugins: []
+
+config:
+  locale: es-ES
+  currency: EUR
+  branding:
+    legalName: "Diorka Reformas (razón social pendiente de validación)" # source: pending-validation (BRD §11.1)
+    tradeName: "Diorka"
+
+  billing:
+    seller:
+      name: "Diorka Reformas (razón social pendiente de validación)" # source: pending-validation
+      taxId: "B00000000" # source: pending-validation — real CIF at workshop
+      address: "Dirección fiscal pendiente (Cataluña)" # source: pending-validation
+      countryCode: "ES"
+    series:
+      - { id: FAC, kind: standard, pad: 4, yearly: true }
+      - { id: RECT, kind: rectificative, pad: 4, yearly: true }
+
+  jurisdiction:
+    verifactu:
+      enabled: false # gate — LEGAL_REVIEW.md #1 (2027 deadline)
+
+  vertical:
+    terminology:
+      quote: Presupuesto
+      line: Partida
+      measurement: Medición
+    materialsShareDefaultBp: 3500
+    # chapters: uses the pack default seeded from BRD Appendix A.2

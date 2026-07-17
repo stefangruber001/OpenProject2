@@ -90,3 +90,31 @@ languages: es-ES # source: synthetic
     in the kernel; in-memory adapters ship with contract-test kits that any
     durable adapter must pass unchanged (ADR-0007). Chain-head state is behind
     `KeyValueStore` (in-memory default until the durable hook lands in P2.1b).
+
+## Diorka onboarding (real intake, 2026-07-17)
+
+18. **"ERP START INPUT" baseline** = tag `erp-start-input` pinned by SHA in
+    `docs/ERP-START-INPUT.md` (git proxy hides tags; the committed SHA is the
+    durable record). New companies start via `factory new-tenant` — the
+    baseline is conceptually present in every commit (no code forks exist).
+19. **Diorka modelled as an owner GROUP over tenants** (BRD ORG-01..04): one
+    tenant per legal entity, group registry `tenants/_groups/diorka.yaml`
+    (pure data). Only entity #1 (`diorka`) exists until the BRD §11.1
+    workshop confirms legal names — adding entities is `new-tenant`, minutes.
+20. **Identity placeholders** in `tenants/diorka/tenant.yaml` are marked
+    `source: pending-validation` (the BRD itself defers legal names/CIFs to
+    its §11 workshop). Real values are a config-only overwrite.
+21. **Sourcing comparison engine** built as a GENERIC capability (kernel-only
+    vocabulary: lines/groups/bidders) — the Diorka evidence workbook is the
+    motivating instance, not a special case. Missing price ≠ zero; selection
+    explicit; prices dated + sourced (BRD SUP-03/04, Appendix A.1).
+22. **Chapter catalogue** seeded into the reformas pack as config DEFAULT
+    data (BRD Appendix A.2, Spanish wording) — tenants override freely;
+    Catalan label set queued as config addition (NFR-10).
+23. **Quote options & versions** implemented in the quoting capability
+    (QUO-07/12/13): optional totals separate, acceptance selects options,
+    revisions are new linked versions; accepted versions stay frozen.
+24. **cane.gestortectic.com** identified as a TecTic hosted "Gestor" instance
+    (Catalan vendor; anonymous access 403). No credentials exist in this
+    repo; export/import feasibility is an integration lead, not an
+    assumption of access.

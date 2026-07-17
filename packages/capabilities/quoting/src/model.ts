@@ -16,6 +16,8 @@ export interface QuoteLineInput {
    * namespaced work category). The capability never looks inside.
    */
   taxCategoryHint?: string;
+  /** Optional works are shown/totalled separately from the base scope. */
+  optional?: boolean;
   /** Structured extension data owned by vertical packs (e.g. measurements). */
   meta?: Record<string, unknown>;
 }
@@ -36,5 +38,13 @@ export interface Quote {
   createdAt: string;
   acceptedAt?: string;
   lines: QuoteLine[];
+  /** Total of non-optional lines. */
   baseCents: Cents;
+  /** Total of optional lines (kept apart from the base — never mixed in). */
+  optionalCents: Cents;
+  /** 1-based; revisions increment and link back via revisionOf. */
+  version: number;
+  revisionOf?: string;
+  /** Option line ids the customer accepted (set at acceptance). */
+  acceptedOptionIds?: string[];
 }

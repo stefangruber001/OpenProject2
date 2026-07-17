@@ -12,6 +12,33 @@ export const reformasConfigSchema = z.object({
   defaultUnits: z.array(z.string()).default(["ud", "m", "m²", "m³", "h", "PA"]),
   /** Default contractor-materials share when a project hasn't measured it yet. */
   materialsShareDefaultBp: z.number().int().min(0).max(10_000).default(3500),
+  /**
+   * Standard renovation chapter catalogue — seeded from real project
+   * evidence (tenant intake, BRD Appendix A.2). Pure data: tenants override
+   * freely; quotes/comparisons use these as grouping keys.
+   */
+  chapters: z
+    .array(z.string())
+    .default([
+      "Demoliciones y trabajos previos",
+      "Estructura",
+      "Albañilería y tabiquería",
+      "Revestimientos y acabados",
+      "Aparatos sanitarios",
+      "Carpintería interior",
+      "Carpintería exterior",
+      "Cocina",
+      "Pintura",
+      "Instalación eléctrica",
+      "Climatización",
+      "Ventilación",
+      "Fontanería",
+      "Saneamiento",
+      "Telecomunicaciones",
+      "Protección contra incendios",
+      "Varios y generales",
+      "Trabajos opcionales",
+    ]),
 });
 
 export type ReformasConfig = z.infer<typeof reformasConfigSchema>;

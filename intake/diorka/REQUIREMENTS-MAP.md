@@ -1,0 +1,62 @@
+# Diorka — requirements coverage map
+
+Source: `Proyecto_Diorka_Business_Requirements.docx` (BRD, prepared
+2026-07-17, "Draft for business validation") + evidence workbook
+`Comparatiu Joaquim Costa 2.xlsx` (referenced, not yet provided) +
+current tool `cane.gestortectic.com` (TecTic hosted "Gestor" instance,
+Catalan vendor; login-gated, 403 to anonymous access).
+
+Status legend: **✓ built** (works today) · **config** (data change only) ·
+**next** (queued P2.x slice) · **later** (P3+/on validation) ·
+**excluded** (BRD §10.2).
+
+## Coverage by BRD area
+
+| BRD area                                                                                      | Status                   | Where / plan                                                                                                                 |
+| --------------------------------------------------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| ORG multi-company, per-entity numbering/branding/tax (ORG-01..03)                             | **✓ built**              | one tenant per legal entity; spec/config per tenant; RLS isolation. Diorka group registry: `tenants/_groups/diorka.yaml`     |
+| ORG consolidated owner view (ORG-04)                                                          | **next**                 | cross-tenant owner dashboard over member runtimes (group file exists; UI queued)                                             |
+| ORG roles/permissions, audit of changes (ORG-05..07)                                          | **next / partial**       | event log ✓ (who/when on issue events); auth+roles = web shell P2.2c                                                         |
+| CRM customer register, leads, next actions (CRM-01..08)                                       | **next**                 | new `crm` capability (generic, kernel-only) — queued after quotation slices                                                  |
+| VIS site-visit capture, phone-first, photos (VIS-01..07)                                      | **later**                | mobile-first form + docs port; depends on `docs` capability build-out                                                        |
+| CAT work catalogue, chapters/items, room templates (CAT-01..08)                               | **config + next**        | chapter seed from BRD Appendix A.2 now (reformas pack default data); item catalogue entity = next slice with supplier prices |
+| SUP supplier register, dated prices w/ source, discounts (SUP-01..06)                         | **next**                 | `sourcing` capability: price records carry source + effective date (kernel effective-dating reused)                          |
+| SUP price comparison, variance, missing-price visibility (SUP-07..10, Appendix A)             | **✓ built (this cycle)** | `sourcing` comparison engine: per-item & per-chapter totals, abs/% variance vs baseline, missing ≠ zero                      |
+| QUO chapters/items/qty/price, totals, margin split (QUO-01..06,10)                            | **✓ / next**             | quoting ✓ (lines, integer money); internal-cost-vs-selling margin fields = next slice                                        |
+| QUO optional items separate from base (QUO-07, A.1)                                           | **✓ built (this cycle)** | `optional` lines; base vs optional totals; acceptance selects options                                                        |
+| QUO frozen versions + revisions (QUO-12..13)                                                  | **✓ built (this cycle)** | accepted quotes frozen ✓; `revise()` → new version linked to prior                                                           |
+| QUO professional PDF, correct company branding (QUO-15..16)                                   | **next**                 | doc-render port + Chromium PDF (renderer already exists for reports)                                                         |
+| PRJ accepted quote → project baseline w/o re-entry (PRJ-01..05)                               | **next**                 | project entity over accepted version; baseline-vs-forecast from certificaciones slice (P2.4)                                 |
+| PLN planning/labour/machinery (PLN-*)                                                         | **later**                | scheduling/time capabilities (declared, stub)                                                                                |
+| PUR purchases vs budget, returns/credits (PUR-*)                                              | **later**                | procurement capability build-out; links to sourcing selections                                                               |
+| CHG change orders preserving baseline (CHG-*)                                                 | **next (P2.4)**          | certificaciones/modificados = quoted-vs-actual per partida — also tenant #1's core pain                                      |
+| AR invoices from quote/milestones, partials, receipts (AR-01..08)                             | **✓ / next**             | issue-from-quote ✓, immutable numbering ✓, rectificativas ✓; receipts/partial allocation = AR slice next                     |
+| AP supplier bills, duplicates, due lists, partial payments (AP-*)                             | **next**                 | mirrors AR on purchase side; duplicate-number check in capability                                                            |
+| FIN margins by chapter, cash in/out view (FIN-*)                                              | **next**                 | derives from sourcing-selected cost vs quote price + AR/AP                                                                   |
+| DOC documents/photos linked everywhere (DOC-*)                                                | **later**                | `docs` capability + storage port                                                                                             |
+| DAS dashboards per owner profile + alerts (DAS-*)                                             | **next**                 | web shell views over events + AR/AP due lists                                                                                |
+| NFR usability "very non-digital user", minimal typing (NFR-01..02)                            | **design rule**          | catalogue-pick-first UI; recorded as web-shell design principle                                                              |
+| NFR mobile site capture (NFR-03), weak connectivity (NFR-04)                                  | **later**                | PWA path (P3 packaging)                                                                                                      |
+| NFR reliability/backup (NFR-06,09)                                                            | **✓ / P3**               | Postgres + migrations ✓; backup/restore drill = P4 item                                                                      |
+| NFR Spanish + Catalan documents (NFR-10)                                                      | **config later**         | doc-labels are data — a `ca-ES` label set is a config addition; queued                                                       |
+| NFR EUR + Spanish VAT (NFR-11)                                                                | **✓ built**              | es-ES pack, effective-dated, justification persisted                                                                         |
+| NFR exportability (NFR-12)                                                                    | **✓ principle**          | JSON artifacts today; CSV exports with AR/AP slice                                                                           |
+| Accounting ledger, payroll, warehouse/stock, portal auto-access, customer portal, e-signature | **excluded**             | BRD §10.2 — matches our INTEGRATIONS_PENDING gating                                                                          |
+
+## Immediate build order chosen for Diorka (this and next cycles)
+
+1. **Sourcing comparison engine** (their strongest evidence — digitizes the
+   Comparatiu workbook) — this cycle.
+2. **Quote options + versions** (QUO-07/12/13, Appendix A.1) — this cycle.
+3. **Chapter catalogue seed** (Appendix A.2, es wording) — this cycle, config.
+4. AR receipts/partial allocation + AP supplier bills — next.
+5. CRM light (customers/leads/next action) + owner dashboards — next.
+6. Certificaciones / change orders (CHG + P2.4) — next.
+
+## Identity & open validation items (BRD §11 — logged, not blocking)
+
+Legal names/CIFs of the entities, banking, numbering habits, Catalan quote
+requirement, supplier list, gestor export format, portal access rights →
+`OPEN_QUESTIONS.md` (Diorka section). Tenant `diorka` runs with
+`source: pending-validation` placeholders until the §11 workshop answers
+arrive; applying them is config-only.

@@ -19,10 +19,11 @@ is data, never a fork. Tenant #1 is a Spanish _reformas_ (renovation) company.
 
 ## Marginal cost of tenant #N+1 (the metric that decides if this worked)
 
-| Tenant            | Human/agent minutes                                                                                | Evidence                                      |
-| ----------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| #1 reformas-demo  | n/a (built the factory)                                                                            | this repo                                     |
-| #2 azulejos-lopez | **~0.02 s create+resolve, config-only, zero code** (formal timed onboarding incl. real intake: P5) | `tenants/azulejos-lopez/`, `tenants/INDEX.md` |
+| Tenant                                                             | Human/agent minutes                                                                                   | Evidence                                      |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| #1 reformas-demo                                                   | n/a (built the factory)                                                                               | this repo                                     |
+| #2 azulejos-lopez                                                  | **~0.02 s create+resolve, config-only, zero code** (formal timed onboarding incl. real intake: P5)    | `tenants/azulejos-lopez/`, `tenants/INDEX.md` |
+| #3 diorka (REAL intake — Proyecto Diorka, family renovation group) | **0.79 s validate+resolve, config-only, zero code** (BRD mapped: `intake/diorka/REQUIREMENTS-MAP.md`) | `tenants/diorka/`, `intake/diorka/`           |
 
 A flat or rising line here is a P1 defect (mandate §7).
 

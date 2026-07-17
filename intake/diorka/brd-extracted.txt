@@ -1,0 +1,1886 @@
+BUSINESSREQUIREMENTSDOCUMENT
+Integrated management needs for a family-owned renovation and construction business
+Purpose of this document
+Define what the companies need to manage and control before deciding what should be developed. This document intentionally describes business needs, processes, information and controls. It does not select a technology or prescribe a final solution.
+2+
+Primary business users
+| Multiple
+Legal entities / companies
+| 245
+Rows in the sample comparison
+| 4
+Cost / supplier alternatives compared
+Project
+| Proyecto Diorka
+Document status
+| Draft for business validation
+Prepared from
+| Project conversations, prior workbook scope and Comparatiu Joaquim Costa 2.xlsx
+Prepared on
+| 17 July 2026
+Primary audience
+| Business owners and future development team
+Contents
+1. Executive summary
+2. Business context and operating model
+3. Current-state processes and pain points
+4. Target business outcomes
+5. End-to-end process scope
+6. Detailed business and functional requirements
+7. Information and data requirements
+8. Reporting, controls and alerts
+9. Non-functional requirements
+10. Scope boundaries and assumptions
+11. Open questions for validation
+12. Requirements sign-off criteria
+Appendix A. Evidence from the sample quotation comparison
+Appendix B. Prioritised requirements register
+How to use this document
+Review each requirement with the husband and wife together. Mark each item as Confirmed, Modified, Not required or Future. Questions in Section 11 should be resolved before a solution specification or development estimate is prepared.
+1. Executive summary
+The business consists of multiple family-managed companies operating in renovation, construction and related services. The husband manages the operational side, including site work, subcontractors, materials and day-to-day decisions. The wife manages the back office, including client relationships, quotations, invoices, supplier bills, supplier price information and administrative control.
+The current operating model is highly dependent on the owners, fragmented documents and manual knowledge. A key operational process, preparing quotations, is still performed on paper by the husband. Supplier information is distributed across different portals, invoices, historical purchases and company-specific discounted price lists. This creates duplicated work, slow quotation preparation, pricing risk and limited visibility of actual project profitability and cash requirements.
+The business needs a single, simple and reliable management environment tailored to renovation work. It must cover the complete lifecycle from the first customer contact and site visit through quotation, acceptance, project execution, purchasing, invoicing, collections, supplier payments and final margin analysis. It must also recognise that these are several companies, not one business entity, while still allowing the owners to see a consolidated view.
+Core requirement
+Create one source of truth that is simple enough for a very non-digital operational user, while providing the back office with structured control over customers, suppliers, quotations, project costs, invoices, payments and margins.
+1.1 Confirmed needs
+Support more than one company or legal entity, with separate records and consolidated owner visibility.
+Support two primary user profiles with very different working styles, operational and back-office.
+Replace paper-based quotation preparation with a guided, fast and low-friction process.
+Maintain structured catalogues of work items, materials, services, labour and machinery.
+Maintain multiple supplier price lists, negotiated discounts and purchase history.
+Compare alternative prices by supplier or subcontractor at item, chapter and project level.
+Control quote versions, optional items, accepted scope and subsequent changes.
+Convert accepted quotations into projects without re-entering information.
+Track real purchasing, labour, subcontracting and other costs against the accepted budget.
+Manage customer invoices, collections, supplier bills, partial payments and cash flow.
+Provide clear management visibility of timing, pending actions, margin and cash exposure.
+1.2 Requirements principles
+Principle
+| Meaning for the business
+Ease before sophistication
+| The operational user must be able to use the core process with minimal typing, minimal screens and clear prompts.
+Capture once, reuse everywhere
+| Customer, project, scope, quantity and price information should not be re-entered in multiple files.
+Traceability
+| Every quote, price, purchase, invoice, payment and change must have a clear origin, date and responsible person.
+Real profitability
+| Commercial margin must be compared with actual cost and actual cash movement, not only estimated cost.
+Multi-company control
+| Transactions must belong to the correct company while management can view combined performance.
+Incremental adoption
+| The first usable process should solve quotation and project control pain without requiring all future functions on day one.
+2. Business context and operating model
+2.1 Organisational model
+Role
+| Typical person
+| Business responsibilities
+Owner, operations
+| Husband
+| Site visits, scope definition, technical decisions, daily execution, workers and subcontractors, material needs, issue resolution, informal pricing knowledge.
+Owner, back office
+| Wife
+| Customer communication, quotations, supplier relations, price lists, invoices, supplier bills, collections, payments, records and administrative follow-up.
+Workers / crews
+| Internal or external
+| Execute tasks, report hours, quantities, material use, incidents and completion.
+Subcontractors
+| External specialists
+| Provide quotations, execute specialist packages, issue invoices and receive payments.
+Suppliers
+| Multiple trade suppliers
+| Provide materials, negotiated prices, portal purchase history, invoices, delivery notes, returns and credit notes.
+Customers
+| Private or professional clients
+| Request quotations, approve scope, select options, pay advances and invoices, request changes and receive documentation.
+External adviser
+| Accountant / tax / legal, to confirm
+| May require exports, invoice information, VAT records, payroll or compliance documents.
+2.2 Multi-company requirement
+The owners manage several companies. The management process must therefore distinguish company-specific data from shared business data. The exact legal structure must be validated, but the following requirements apply regardless of the final technology:
+Every client, quote, project, purchase, supplier bill, customer invoice, payment and receipt must identify the relevant company.
+Each company must be able to use its own legal details, invoice numbering, bank details, tax information and document templates.
+Shared supplier, material and service information should be reusable across companies where appropriate, without losing company-specific discounts or terms.
+The owners require both individual-company reporting and a consolidated management view.
+Intercompany purchases, labour sharing, machinery use or recharges must be identifiable if they occur.
+2.3 Business characteristics affecting requirements
+Characteristic
+| Requirement implication
+Project-based work
+| Each renovation has a defined scope, location, quotation, schedule, cost profile, invoicing plan and margin.
+High variability
+| Projects combine different chapters, quantities, brands, finishes, optional works and specialist subcontractors.
+Distributed prices
+| The true purchase price may depend on supplier, negotiated discount, product brand, quantity, project and date.
+Owner-dependent knowledge
+| Technical scope and practical pricing knowledge are concentrated in the husband; administrative history is concentrated in the wife.
+Frequent exceptions
+| Changes, omissions, replacements, urgent purchases, returns and extra works are normal, not exceptional.
+Cash-intensive execution
+| Materials and subcontractors may need to be paid before customer collections are received.
+3. Current-state processes and pain points
+Process
+| Observed current state
+| Main pain / risk
+Customer enquiry
+| Customer information and follow-up may be spread across phone, messaging, email and personal knowledge.
+| Leads can be forgotten, communication history is incomplete and information is duplicated.
+Site visit and scope capture
+| The husband assesses the job and records information informally or on paper.
+| Measurements, decisions, photos and assumptions may not be consistently transferred to the quotation.
+Quotation preparation
+| The husband prepares quotations on paper. The wife performs back-office processing and document preparation.
+| Slow turnaround, repeated typing, transcription errors, limited version control and high dependency on both owners.
+Pricing
+| Prices are obtained from several suppliers, their personal portals, past invoices, past purchases and discounted price lists.
+| No single current price source, difficult comparison, expired prices and weak evidence for selected costs.
+Supplier / subcontractor comparison
+| Comparisons are built manually in spreadsheets for individual projects.
+| Useful analysis exists but is labour-intensive, project-specific and difficult to reuse.
+Project conversion
+| Accepted quotes may require information to be recreated in separate tracking files.
+| Loss of the original commercial baseline and duplicated setup work.
+Purchasing and deliveries
+| Purchases, invoices and supplier records are controlled in separate documents or portals.
+| Limited visibility of ordered, delivered, returned, invoiced and paid amounts by project.
+Execution control
+| Operational progress and issues depend heavily on the husband and informal communication.
+| No consistent progress record, difficult coordination and weak early warning of delays or cost overruns.
+Customer invoicing and collection
+| Invoices and payments are handled by the wife, potentially on an ad hoc basis.
+| Manual follow-up, unclear outstanding amounts, partial payment allocation and weak project cash visibility.
+Supplier bills and payments
+| Bills and payment dates vary by supplier and may be manually recorded.
+| Risk of missed due dates, duplicate payments, poor cash forecasting and incomplete project cost allocation.
+Profitability analysis
+| Estimated supplier alternatives may be compared, but actual project costs are not fully integrated with revenue and collections.
+| The owners may know turnover but not the final real margin, cash contribution or cause of variance.
+3.1 Pain-point summary
+ID
+| Pain point
+| Description
+P1
+| Paper and manual re-entry
+| Quotation and operational data are captured more than once.
+P2
+| Fragmented information
+| Customer, supplier, pricing, purchasing, invoicing and payment information is split across files, portals and personal knowledge.
+P3
+| Pricing uncertainty
+| There is no controlled view of latest price, discount, supplier, validity date and prior purchase evidence.
+P4
+| Weak version control
+| It is difficult to prove which scope, price and options the customer accepted.
+P5
+| Limited actual-cost control
+| Budgeted cost and real cost are not continuously reconciled by work item and chapter.
+P6
+| Owner bottlenecks
+| The business depends on the husband for operational knowledge and on the wife for administrative continuity.
+P7
+| Cash-flow opacity
+| Expected collections, supplier commitments and upcoming payments are not visible in one place.
+P8
+| No consolidated multi-company view
+| The owners need to see each entity separately and the family business as a whole.
+4. Target business outcomes
+ID
+| Outcome
+| Success statement
+BO-01
+| Reduce quotation preparation time
+| A normal quotation can be assembled from standard work items, previous projects and current prices without writing it first on paper.
+BO-02
+| Improve quotation accuracy
+| Quantities, prices, VAT, options, exclusions, totals and margins are calculated consistently.
+BO-03
+| Protect margin
+| The owners can compare selling price, selected budget cost, committed cost, actual cost and final margin.
+BO-04
+| Centralise supplier intelligence
+| Supplier-specific prices, discounts, purchase history, documents and performance are available in one controlled record.
+BO-05
+| Create project continuity
+| Accepted quote data becomes the project budget, purchasing baseline and invoicing reference.
+BO-06
+| Improve cash control
+| The owners can see expected customer collections, supplier due dates, committed spend and short-term cash requirements.
+BO-07
+| Reduce owner dependency
+| Key scope, price, project and communication information is recorded and transferable.
+BO-08
+| Improve customer service
+| Customers receive faster quotations, clear versions, documented changes and proactive updates.
+BO-09
+| Support multiple companies
+| The correct legal entity is used for each document and transaction, with consolidated owner reporting.
+BO-10
+| Enable scalable operations
+| The process can support more projects, users and suppliers without multiplying uncontrolled spreadsheets.
+4.1 Suggested success measures for later validation
+Measure
+| Definition
+Quotation turnaround
+| Average time from site visit to first customer quotation
+Rework
+| Number of corrections caused by missing quantities, wrong prices or transcription errors
+Price freshness
+| Percentage of priced items with source and last-updated date
+Budget coverage
+| Percentage of accepted quote value mapped to cost items or subcontract packages
+Actual cost coverage
+| Percentage of supplier bills, purchases and labour cost allocated to a project
+Margin visibility
+| Percentage of active projects with current forecast margin
+Collections control
+| Overdue customer amount and days overdue
+Supplier control
+| Overdue supplier bills and unallocated bills
+Adoption
+| Percentage of active projects managed through the agreed process
+5. End-to-end process scope
+1Lead
+| 2Site visit
+| 3Estimate
+| 4Quote
+| 5Acceptance
+| 6Project
+| 7Procure
+| 8Execute
+| 9Invoice
+| 10Collect
+| 11Close
+The business requires continuity across the full lifecycle. Information created in an earlier stage must remain linked to subsequent stages, particularly the accepted scope, selected supplier costs, change orders, customer invoices and final actual cost.
+Stage
+| Process
+| Required business coverage
+1
+| Lead and customer relationship
+| Capture enquiries, contacts, communication, opportunity status and next action.
+2
+| Site visit and requirements capture
+| Record address, measurements, photos, scope, assumptions, exclusions and customer preferences.
+3
+| Estimate and cost build-up
+| Build project scope from chapters, items, quantities, labour, machinery, materials and subcontract packages.
+4
+| Supplier and subcontractor sourcing
+| Request, receive, compare and select prices or packages.
+5
+| Customer quotation
+| Create customer-facing documents, options, payment terms, validity and versions.
+6
+| Acceptance and project setup
+| Capture approval and convert accepted version into an execution baseline.
+7
+| Planning and resource coordination
+| Plan dates, milestones, workers, subcontractors, machinery and key purchases.
+8
+| Procurement and delivery control
+| Track requests, orders, purchases, deliveries, returns, credits and project allocation.
+9
+| Execution and change control
+| Track progress, issues, extra works, omissions, delays and customer decisions.
+10
+| Customer billing and collections
+| Issue invoices, allocate receipts, manage partial payments and outstanding balances.
+11
+| Supplier bills and payments
+| Register bills, allocate costs, approve and track partial or full payment.
+12
+| Project close and performance analysis
+| Confirm completion, warranties, documents, final revenue, actual cost, margin and lessons learned.
+6. Detailed business and functional requirements
+Priorities use the following scale: Critical, required for the first viable operating process; High, important for reliable control; Medium, valuable after the core process is working. These priorities must be confirmed during owner review.
+6.1 Company, user and access management
+ID
+| Priority
+| Requirement
+ORG-01
+| Critical
+| The process shall support multiple companies or legal entities within the same owner environment.
+ORG-02
+| Critical
+| Each transaction and document shall be assigned to one company.
+ORG-03
+| Critical
+| Each company shall maintain its own legal name, tax ID, address, invoice numbering, bank details and document branding.
+ORG-04
+| High
+| The owners shall be able to view consolidated information across companies and filter back to an individual entity.
+ORG-05
+| Critical
+| The process shall support at least an operational owner profile and a back-office owner profile.
+ORG-06
+| High
+| Permissions shall control who can change prices, approve quotations, issue invoices, register payments and view margins.
+ORG-07
+| High
+| The process shall retain the user, date and time of material changes.
+ORG-08
+| Medium
+| Future workers, project managers, accountants or advisers shall be addable without redesigning the core data.
+6.2 Customer relationship and opportunity management
+ID
+| Priority
+| Requirement
+CRM-01
+| Critical
+| The business shall maintain one controlled customer and contact register.
+CRM-02
+| Critical
+| Customer records shall include contact details, billing details, project addresses, preferred communication method and notes.
+CRM-03
+| High
+| A customer may have multiple contacts, addresses, quotations, projects and invoices.
+CRM-04
+| Critical
+| Every new enquiry shall record source, date, requested work, responsible person, status and next action.
+CRM-05
+| High
+| Communication notes, relevant emails, calls, messages and customer decisions shall be linkable to the opportunity or project.
+CRM-06
+| High
+| The owners shall be able to identify leads awaiting visit, quotation, customer response or follow-up.
+CRM-07
+| Medium
+| The process should record lost opportunities and reasons such as price, timing, scope or no response.
+CRM-08
+| Medium
+| Customer history should show prior quotes, projects, payments, complaints and warranty matters.
+6.3 Site visit and scope capture
+ID
+| Priority
+| Requirement
+VIS-01
+| Critical
+| The operational user shall be able to create a site visit record quickly from a phone or simple device.
+VIS-02
+| Critical
+| The site visit shall capture project address, customer, requested works, measurements, units, photos and free notes.
+VIS-03
+| High
+| The site visit shall capture assumptions, exclusions, access restrictions, occupied-property conditions and customer selections.
+VIS-04
+| High
+| Photos and documents shall be linked to the correct project area or work item where practical.
+VIS-05
+| Critical
+| The operational user shall be able to select standard work items rather than typing complete descriptions repeatedly.
+VIS-06
+| High
+| A site visit may generate follow-up tasks, supplier enquiries or missing-information requests.
+VIS-07
+| High
+| The back office shall be able to review and complete the captured information without recreating it.
+6.4 Work catalogue, materials, services, labour and machinery
+ID
+| Priority
+| Requirement
+CAT-01
+| Critical
+| The business shall maintain a reusable catalogue of work chapters, subchapters and detailed items.
+CAT-02
+| Critical
+| Each item shall have a code, description, unit of measure, category and active/inactive status.
+CAT-03
+| High
+| Items shall be classifiable as material, labour, subcontracted service, machinery, professional service or other cost.
+CAT-04
+| High
+| Standard work items may contain a default resource build-up, for example labour hours, materials, machinery and waste allowance.
+CAT-05
+| High
+| The catalogue shall support alternative descriptions, brands, models, quality levels and customer-facing wording.
+CAT-06
+| High
+| Historical use of an item shall remain intact when its current master description or default price changes.
+CAT-07
+| Medium
+| Frequently used assemblies or room templates, such as bathroom, kitchen or painting packages, should be reusable.
+CAT-08
+| Medium
+| The process should support import and controlled update of catalogue information from existing spreadsheets.
+6.5 Supplier, subcontractor and price-list management
+ID
+| Priority
+| Requirement
+SUP-01
+| Critical
+| The business shall maintain one supplier and subcontractor register, with company-specific terms where required.
+SUP-02
+| Critical
+| Supplier records shall include contacts, categories, tax and billing details, portal access reference, payment terms and notes.
+SUP-03
+| Critical
+| The process shall store supplier-specific product or service prices, discounts and effective dates.
+SUP-04
+| Critical
+| Every stored price shall identify its source, such as portal, invoice, price list, supplier quote or manual confirmation.
+SUP-05
+| High
+| The process shall distinguish list price, negotiated discount, net unit price, VAT and delivery or other charges.
+SUP-06
+| High
+| The process shall retain price history and not overwrite the evidence used for an earlier quotation.
+SUP-07
+| Critical
+| The owners shall be able to compare prices from several suppliers or subcontractors for the same item or package.
+SUP-08
+| High
+| The comparison shall show quantity, unit price, total, absolute variance and percentage variance.
+SUP-09
+| High
+| The comparison shall support missing prices, alternative specifications, optional items and comments.
+SUP-10
+| High
+| The selected supplier price shall be explicitly identified and traceable to the quotation cost baseline.
+SUP-11
+| Medium
+| Supplier performance should record delivery reliability, quality issues, returns, response speed and commercial conditions.
+SUP-12
+| Medium
+| The feasibility of importing data from supplier portals, downloaded price lists or invoices should be assessed in the solution stage.
+6.6 Estimating and quotation preparation
+ID
+| Priority
+| Requirement
+QUO-01
+| Critical
+| The operational user shall be able to start a quotation from a customer, site visit, prior project or template.
+QUO-02
+| Critical
+| A quotation shall support hierarchical chapters, subchapters and work items.
+QUO-03
+| Critical
+| Each quotation item shall support code, description, unit, quantity, internal cost, selling unit price and total.
+QUO-04
+| Critical
+| The process shall calculate subtotals, taxes, discounts and total quotation value consistently.
+QUO-05
+| Critical
+| The quotation shall distinguish customer selling price from internal cost and margin information.
+QUO-06
+| Critical
+| Internal cost and margin information shall never appear on the customer-facing quotation.
+QUO-07
+| Critical
+| The user shall be able to include optional items that are shown separately from the base total.
+QUO-08
+| High
+| The user shall be able to include allowances, provisional sums, exclusions and assumptions.
+QUO-09
+| High
+| The quotation shall support different pricing methods, such as direct unit price, selected supplier cost plus markup or fixed chapter price, subject to validation.
+QUO-10
+| Critical
+| The process shall show expected gross margin by item, chapter and total before the quote is issued.
+QUO-11
+| Critical
+| A quote shall have a unique number, company, customer, project address, issue date, validity date, status and responsible person.
+QUO-12
+| Critical
+| Every issued version shall be frozen and retrievable.
+QUO-13
+| Critical
+| Revisions shall create a new version and clearly identify changes from the prior version.
+QUO-14
+| High
+| The quote shall record payment terms, planned advances, billing milestones and customer acceptance method.
+QUO-15
+| High
+| The quote document shall use the correct company details, legal text, language and branding.
+QUO-16
+| High
+| The business shall be able to produce a professional PDF or printable quotation and record when it was sent.
+QUO-17
+| Medium
+| The process should support customer signature or documented acceptance evidence.
+QUO-18
+| High
+| The business shall be able to report quotes by status, value, probability, age and expected start date.
+6.7 Quote acceptance and project creation
+ID
+| Priority
+| Requirement
+PRJ-01
+| Critical
+| Only an identified quotation version may be marked as accepted.
+PRJ-02
+| Critical
+| Acceptance shall record date, accepted options, customer evidence and any final conditions.
+PRJ-03
+| Critical
+| An accepted quotation shall create a project without re-entering customer, scope, quantities and prices.
+PRJ-04
+| Critical
+| The project shall retain the accepted commercial baseline even if master prices later change.
+PRJ-05
+| Critical
+| The project shall establish separate baselines for revenue, estimated cost and expected margin.
+PRJ-06
+| High
+| The project shall include start date, target completion date, status, responsible person, site address and key milestones.
+PRJ-07
+| High
+| The project shall identify permits, access constraints, customer dependencies and required decisions.
+PRJ-08
+| High
+| The owners shall be able to compare original baseline, approved changes, current forecast and actual result.
+6.8 Planning, labour, subcontractors and machinery
+ID
+| Priority
+| Requirement
+PLN-01
+| High
+| The business shall plan project phases, milestones and expected dates.
+PLN-02
+| High
+| Workers, crews, subcontractors and machinery shall be assignable to projects and periods.
+PLN-03
+| High
+| The process shall identify resource conflicts and upcoming requirements.
+PLN-04
+| High
+| Actual labour time or agreed subcontract progress shall be recordable against a project and, where practical, a work chapter.
+PLN-05
+| High
+| Machinery use, rental, fuel, transport and related cost shall be allocable to projects.
+PLN-06
+| High
+| The operational user shall be able to update progress with minimal data entry.
+PLN-07
+| Medium
+| The process should support daily or weekly site notes, photos, incidents and completed work.
+PLN-08
+| Medium
+| The process should retain planned versus actual start and finish dates and reasons for delay.
+6.9 Procurement, purchases, deliveries and returns
+ID
+| Priority
+| Requirement
+PUR-01
+| Critical
+| Material and subcontract requirements shall be derived from the project scope or added as project needs arise.
+PUR-02
+| High
+| The business shall be able to create supplier requests or purchase records linked to a project.
+PUR-03
+| Critical
+| Every purchase shall identify supplier, company, project, date, item or category, quantity, unit price, VAT and total.
+PUR-04
+| High
+| The process shall distinguish requested, ordered, delivered, returned, credited, invoiced and paid amounts.
+PUR-05
+| High
+| Delivery notes, receipts, supplier confirmations and photos shall be attachable.
+PUR-06
+| Critical
+| Actual purchase prices shall update the project committed or actual cost without changing the accepted quote baseline.
+PUR-07
+| High
+| A purchase may be allocated to more than one project or to general overhead, with a controlled allocation method.
+PUR-08
+| High
+| Urgent or unplanned purchases shall be recordable quickly and reconciled later.
+PUR-09
+| High
+| Returns and supplier credit notes shall reduce the relevant project cost.
+PUR-10
+| Medium
+| The process should alert when ordered value exceeds the budget for an item, chapter or supplier package.
+6.10 Change orders, extra works and scope control
+ID
+| Priority
+| Requirement
+CHG-01
+| Critical
+| Any customer-requested extra, omission or substitution after acceptance shall be recorded as a change.
+CHG-02
+| Critical
+| A change shall include description, reason, cost impact, selling price, schedule impact and approval status.
+CHG-03
+| Critical
+| Approved changes shall update current project revenue and forecast cost while preserving the original baseline.
+CHG-04
+| High
+| Unapproved work shall be clearly visible and not treated as billable until approval is recorded.
+CHG-05
+| High
+| Customer evidence and revised documents shall be attached to the change record.
+CHG-06
+| High
+| The project shall show original scope, approved changes, current scope and completed scope.
+6.11 Customer invoicing and collections
+ID
+| Priority
+| Requirement
+AR-01
+| Critical
+| The business shall create customer invoices from the accepted quote, payment plan, milestone or approved change.
+AR-02
+| Critical
+| Invoices shall use the correct company, numbering sequence, tax data, bank details and legal text.
+AR-03
+| Critical
+| The process shall support deposits, stage invoices, final invoices, partial invoices and credit notes.
+AR-04
+| Critical
+| The process shall record receipts manually and allocate them to one or more invoices.
+AR-05
+| Critical
+| Partial payments and unallocated receipts shall be supported.
+AR-06
+| High
+| The process shall show invoice status, due date, outstanding balance and days overdue.
+AR-07
+| High
+| The wife shall have a clear follow-up list of amounts due and customer contacts.
+AR-08
+| High
+| The project shall show invoiced, collected, outstanding and remaining-to-invoice amounts.
+AR-09
+| Medium
+| The process should support periodic customer contracts paid on a regular date if this remains part of the business model.
+AR-10
+| Medium
+| The business should be able to export invoice and collection data for accounting.
+6.12 Supplier bills and payments
+ID
+| Priority
+| Requirement
+AP-01
+| Critical
+| Supplier bills shall be registered with supplier, company, invoice number, date, due date, VAT, total and document attachment.
+AP-02
+| Critical
+| Supplier bills shall be allocated to project items, chapters, projects or overhead categories.
+AP-03
+| Critical
+| The process shall detect potential duplicate supplier invoice numbers.
+AP-04
+| Critical
+| The business shall support partial payments and one payment covering multiple supplier bills.
+AP-05
+| High
+| Payment terms may vary by supplier and shall be retained.
+AP-06
+| High
+| The wife shall have a due-payment list by date, supplier, company and project.
+AP-07
+| High
+| Paid, partially paid, overdue, disputed and blocked bills shall be distinguishable.
+AP-08
+| High
+| Credit notes shall be linked to the original supplier bill or purchase where practical.
+AP-09
+| Medium
+| The process should export supplier bill and payment data for accounting or banking workflows.
+6.13 Project cost, margin and cash control
+ID
+| Priority
+| Requirement
+FIN-01
+| Critical
+| Each project shall show accepted revenue, approved changes, current revenue forecast and final revenue.
+FIN-02
+| Critical
+| Each project shall show estimated cost, selected supplier or subcontract cost, committed cost, invoiced cost, paid cost and forecast final cost.
+FIN-03
+| Critical
+| Margin shall be available as amount and percentage for original budget, current forecast and final result.
+FIN-04
+| Critical
+| Cost and margin shall be visible by chapter and total project.
+FIN-05
+| High
+| The process shall identify unallocated purchases, supplier bills, labour and machinery costs.
+FIN-06
+| High
+| The process shall flag cost overruns, margin deterioration and negative-margin chapters.
+FIN-07
+| Critical
+| Cash flow shall distinguish revenue, invoicing, collections, commitments, supplier bills and payments.
+FIN-08
+| High
+| The owners shall see expected cash inflows and outflows by week and month.
+FIN-09
+| High
+| Overhead and company-level expenses shall be tracked separately from direct project cost.
+FIN-10
+| Medium
+| The business should be able to analyse profitability by customer, project type, company, supplier and period.
+6.14 Documents, communication and audit trail
+ID
+| Priority
+| Requirement
+DOC-01
+| Critical
+| Documents shall be stored or referenced against the relevant customer, supplier, quote, project, purchase, invoice or payment.
+DOC-02
+| Critical
+| The process shall support photos, PDFs, spreadsheets, invoices, delivery notes, plans and signed documents.
+DOC-03
+| High
+| Document names and categories shall be standardised enough to support retrieval.
+DOC-04
+| High
+| The latest document shall be distinguishable without deleting prior versions.
+DOC-05
+| High
+| Important customer and supplier decisions shall be recorded with date and responsible person.
+DOC-06
+| High
+| Changes to critical commercial and financial records shall be auditable.
+DOC-07
+| Medium
+| The solution stage should assess practical links with email and messaging without making informal channels the only source of truth.
+6.15 Dashboards, tasks and alerts
+ID
+| Priority
+| Requirement
+DAS-01
+| Critical
+| The owners shall have a concise management view of active leads, quotes, projects, invoices, collections, supplier payments and cash exposure.
+DAS-02
+| Critical
+| The operational owner shall see today or this week: site visits, project milestones, material needs, overdue tasks and blockers.
+DAS-03
+| Critical
+| The back-office owner shall see: quotes to prepare, follow-ups, invoices to issue, collections due, supplier bills and payments due.
+DAS-04
+| High
+| Alerts shall identify expired prices, quote validity, overdue customer balances, overdue supplier bills and missing project allocations.
+DAS-05
+| High
+| Alerts shall identify projects with cost overrun, margin deterioration or schedule delay.
+DAS-06
+| High
+| Tasks shall have an owner, due date, status, related customer or project and completion record.
+DAS-07
+| Medium
+| The business should receive periodic summary views without manually rebuilding reports.
+7. Information and data requirements
+The future process requires stable master data, transaction data and historical snapshots. The following structure is required regardless of the final tool selected.
+Core entity
+| Minimum information
+Company
+| Legal identity, tax details, addresses, numbering, bank details, branding, active status
+User / role
+| Name, role, permissions, company access, active status
+Customer / contact
+| Names, contact details, billing details, communication preferences, addresses, notes
+Lead / opportunity
+| Source, requested work, expected value, status, dates, owner, next action
+Site / property
+| Address, access, measurements, photos, constraints, occupancy, notes
+Work chapter / item
+| Code, hierarchy, description, unit, type, standard resources, active status
+Material / product
+| Supplier references, brand, model, unit, price history, discount, VAT, source
+Service / subcontract package
+| Scope, supplier, unit or lump sum, price history, assumptions, validity
+Labour resource
+| Role or trade, internal or external, cost basis, availability
+Machinery / equipment
+| Owned or rented, cost basis, availability, project use
+Quotation / version
+| Company, customer, project, status, validity, scope, items, options, costs, prices, margins, terms
+Project
+| Accepted quote baseline, dates, status, revenue, cost, resources, changes, documents
+Supplier request / purchase
+| Supplier, project, items, quantities, prices, status, delivery and documents
+Customer invoice / receipt
+| Company, customer, project, dates, tax, amount, due date, status and allocation
+Supplier bill / payment
+| Company, supplier, project allocation, dates, tax, amount, due date, status and allocation
+Change order
+| Scope, reason, approval, revenue impact, cost impact, schedule impact and evidence
+Task / alert
+| Owner, due date, status, related record, reason and resolution
+7.1 Price data requirements
+Prices must be dated and linked to a supplier or other source.
+The same item may have several simultaneous supplier prices.
+Company-specific discounts and terms must be retained.
+Historical quote and project prices must not change when a current price list is updated.
+Prices must distinguish net amount, VAT, transport, waste, minimum order or other applicable charges where relevant.
+A price should have an expiry or review date when known.
+Supplier product codes and internal catalogue codes must be mappable without requiring them to be identical.
+7.2 Quote and project hierarchy
+Required hierarchy
+Company > Customer > Site / Opportunity > Quotation > Version > Chapter > Subchapter > Work item > Resource / supplier price. After acceptance, the accepted version becomes the project baseline and is supplemented by purchases, labour, bills, invoices, payments and approved changes.
+7.3 Migration and data quality
+Existing customer, supplier, cost, quotation and project spreadsheets should be reviewed and mapped before migration.
+Duplicate customers and suppliers must be identified and resolved.
+Old prices must not be presented as current without their source date.
+Imported codes, descriptions and units should be normalised while preserving the original source reference.
+Incomplete historical projects may be imported at summary level if detailed reconstruction is not economically justified.
+The owners should agree who is responsible for approving master-data changes.
+8. Reporting, controls and alerts
+Report / view
+| Primary user
+| Minimum content
+Owner summary
+| Both owners
+| Active quotations, order book, project status, revenue, margin, collections, commitments, payments and cash outlook
+Quotation pipeline
+| Back office
+| Open quotes by status, value, age, probability, expiry and next action
+Quote margin review
+| Both owners
+| Selling value, cost alternative, selected cost, margin by chapter and low-margin items
+Supplier comparison
+| Both owners
+| Alternative quantities, unit prices, totals, missing prices, variance amount and variance percentage
+Project performance
+| Both owners
+| Original budget, approved changes, current forecast, actual cost, progress and forecast margin
+Purchasing status
+| Operations / back office
+| Requested, ordered, delivered, returned, invoiced and paid by project and supplier
+Customer receivables
+| Back office
+| Invoices, due dates, outstanding, partial payments and ageing
+Supplier payables
+| Back office
+| Bills, due dates, unpaid amount, partial payments and disputed items
+Cash forecast
+| Both owners
+| Expected collections, committed purchases, supplier due dates and net weekly / monthly movement
+Company comparison
+| Owners
+| Revenue, margin, cash, receivables, payables and active projects by legal entity
+Data exceptions
+| Back office
+| Unallocated bills, missing documents, expired prices, duplicate invoices and incomplete records
+8.1 Required alerts
+Severity
+| Alert condition
+Critical
+| Customer invoice overdue beyond agreed date
+Critical
+| Supplier payment due with insufficient planned customer collections
+Critical
+| Project forecast margin below agreed threshold or negative
+High
+| Quote awaiting completion or customer follow-up
+High
+| Supplier price expired or missing for a quoted item
+High
+| Purchase or supplier package exceeds budget
+High
+| Unapproved extra work has started or incurred cost
+High
+| Supplier bill not allocated to a project or overhead category
+High
+| Project milestone or target completion date at risk
+Medium
+| Missing delivery note, invoice, customer approval or completion document
+9. Non-functional requirements
+ID
+| Priority
+| Area
+| Requirement
+NFR-01
+| Critical
+| Usability
+| The core operational workflow must be understandable by a very rudimentary technology user without formal training.
+NFR-02
+| Critical
+| Usability
+| Common actions must require minimal typing and use predefined selections, templates and defaults.
+NFR-03
+| Critical
+| Mobile access
+| Site visit, photos, notes, progress and urgent purchase capture must work on a mobile-friendly interface.
+NFR-04
+| High
+| Connectivity
+| The solution stage must assess how essential site functions behave with weak or intermittent connectivity.
+NFR-05
+| Critical
+| Performance
+| Opening a customer, quotation or active project and saving common changes should feel immediate under normal business data volumes.
+NFR-06
+| Critical
+| Reliability
+| The business must not lose confirmed quotations, invoices, payments or project records because of a local device failure.
+NFR-07
+| Critical
+| Security
+| Access to customer, supplier, banking, invoice and margin information must be protected by user authentication and permissions.
+NFR-08
+| High
+| Auditability
+| Critical records must show who created or changed them and when.
+NFR-09
+| Critical
+| Backup and recovery
+| Data must be backed up and recoverable with a documented recovery process.
+NFR-10
+| High
+| Localisation
+| The user interface and documents should support Spanish and, where useful, Catalan terminology used in current quotations.
+NFR-11
+| Critical
+| Tax and currency
+| The process must support EUR and applicable Spanish VAT treatment, with configuration for company requirements.
+NFR-12
+| High
+| Exportability
+| The owners must be able to export their operational and financial data in common formats.
+NFR-13
+| High
+| Interoperability
+| The solution should be capable of exchanging data with accounting, email, banking or supplier sources where a justified interface is later approved.
+NFR-14
+| High
+| Scalability
+| The process must support growth in companies, users, projects, items, suppliers and years of history.
+NFR-15
+| High
+| Maintainability
+| Business users must be able to maintain catalogues, templates, taxes, price lists and basic settings without software development.
+NFR-16
+| High
+| Privacy
+| Customer and supplier information must be handled in line with applicable data-protection obligations.
+9.1 Adoption requirements
+The operational owner should not be forced to complete back-office fields while on site.
+The back office must be able to complete, correct and validate operational entries.
+Templates should reflect the language and chapter structure already used by the business.
+Initial training should use real projects and real supplier examples.
+The implementation approach should preserve business continuity during transition from paper and existing spreadsheets.
+10. Scope boundaries and assumptions
+10.1 Included in the requirements baseline
+Customer and opportunity management.
+Site visit and scope capture.
+Work catalogues, supplier prices and price comparison.
+Quotations and versions.
+Project creation, planning and execution control.
+Purchasing, real cost and supplier bill control.
+Customer invoicing, collections and supplier payments.
+Margins, cash flow, dashboards, alerts and documents.
+Multi-company operation and consolidated owner visibility.
+10.2 Not yet defined or intentionally excluded
+Choice of technology, vendor, database, hosting model or development framework.
+Detailed accounting ledger, statutory accounts and tax filing, unless later confirmed as part of scope.
+Payroll calculation, employment contracts and full HR administration, unless later confirmed.
+Full inventory warehouse management, barcode scanning or stock valuation, unless the business actually holds material stock.
+Automatic access to supplier portals, because technical and contractual feasibility has not yet been assessed.
+Customer self-service portal, online payments or electronic signatures, unless prioritised after validation.
+Detailed construction scheduling methodology beyond the level needed for this business.
+10.3 Working assumptions to validate
+ID
+| Assumption
+A-01
+| The companies operate primarily in Spain and invoice in EUR.
+A-02
+| Standard Spanish VAT is currently used for most transactions, but exceptions may exist.
+A-03
+| The husband and wife are the two essential users; additional users may be added later.
+A-04
+| Most work is project-based renovation rather than repetitive product sales.
+A-05
+| Supplier prices can be obtained from portals, invoices, price lists or direct quotations, but not all sources are electronically accessible.
+A-06
+| The business needs management control and operational support before full accounting automation.
+A-07
+| Existing spreadsheets contain useful terminology and historical data that should be reused selectively.
+11. Open questions for validation
+These questions should be answered with the husband and wife before defining a solution or estimating development effort. They are grouped to make the workshop practical.
+11.1 Companies and users
+What are the legal names of all companies and what activity does each company perform?
+Can one project involve more than one company, and how are costs or revenue divided?
+Does each company use different bank accounts, invoice numbering, VAT treatment or document branding?
+Who other than the husband and wife needs access now or within two years?
+Which information should workers or subcontractors be allowed to see or enter?
+11.2 Customers and sales
+Where do enquiries arrive today, phone, WhatsApp, email, website, referral or other?
+What information is mandatory before the husband visits a site?
+How are follow-ups currently remembered?
+Do customers usually accept the entire quote, select options or negotiate individual chapters?
+How is customer acceptance evidenced today?
+11.3 Quotation process
+Can the paper quotation format and a complete recent example be collected?
+Who decides quantities, unit costs, selling prices and markup?
+Is selling price normally calculated from cost plus margin, based on historical market price or manually set?
+Are labour and machinery included inside unit prices or shown separately?
+Which standard chapters, rooms and work packages are reused most often?
+Which legal clauses, validity periods, warranties, payment terms and exclusions must appear?
+Are quotes required in Spanish, Catalan or both?
+11.4 Suppliers and prices
+How many active material suppliers and subcontractors are used?
+Which suppliers provide downloadable price lists, and in what format?
+Which portals show negotiated net prices and historical purchases?
+Can portal access be shared technically and contractually, or must users log in manually?
+How often do prices change and who validates updates?
+Are transport, minimum order, rebates, returns or year-end discounts material?
+Does the business hold stock, or are most materials bought directly for a project?
+11.5 Project execution
+How many projects run at the same time and what is the typical duration?
+Are workers employees, self-employed, subcontractors or a mixture?
+How are labour hours, subcontract progress and machinery currently recorded?
+What are the common causes of cost overrun and delay?
+How are extra works agreed and billed?
+What completion, warranty or compliance documents are required?
+11.6 Invoicing, payments and cash
+What customer billing patterns are used: deposits, monthly progress, milestones or final payment?
+Are invoices generated before payment, after payment or both depending on the customer?
+How are partial receipts allocated today?
+What are the main supplier payment terms?
+Are supplier bills approved by the husband before payment?
+Does an external accountant need a specific export or document package?
+What cash-flow horizon is most useful, four weeks, three months or twelve months?
+11.7 Technology and adoption
+Which devices do the husband and wife use daily?
+Does the husband use messaging, photos, voice notes or any apps comfortably?
+Is reliable internet available at most sites?
+Would voice entry, photo capture or a guided checklist materially improve adoption?
+Which current Excel files are essential and must remain usable during transition?
+What is the acceptable monthly cost and implementation effort after requirements are confirmed?
+12. Requirements sign-off criteria
+The requirements phase should be considered complete when the owners can confirm the following:
+#
+| Sign-off condition
+1
+| All companies and user roles are identified.
+2
+| The current quotation process has been observed from site visit to customer issue.
+3
+| At least three representative project types and quotations have been reviewed.
+4
+| The supplier and subcontractor price sources are mapped.
+5
+| Customer invoicing, receipt allocation, supplier bills and payment processes are documented.
+6
+| The meaning of estimated cost, committed cost, actual cost, markup and margin is agreed.
+7
+| Critical requirements are confirmed and conflicting requirements are resolved.
+8
+| Scope exclusions and later-phase items are accepted.
+9
+| A measurable first release can be defined without attempting every future feature.
+12.1 Recommended next output after validation
+Once this document is validated, the next output should be a solution options and phased scope document. It should compare feasible approaches against the confirmed requirements, define the minimum viable process, identify integrations or data migration needs, and estimate cost, implementation time and business change effort. That analysis should come after, not before, agreement on the requirements.
+Appendix A. Evidence from the sample quotation comparison
+The workbook Comparatiu Joaquim Costa 2.xlsx provides concrete evidence of how the business or its advisers compare renovation estimates. The observed structure should be preserved conceptually, even if the future interface is simpler.
+Observed feature
+| Evidence / implication
+Project reference
+| Presupuesto JOAQUIM COSTA 57
+Structure
+| Hierarchical construction chapters, subchapters and detailed work items
+Item fields
+| Code, nature, unit, description, quantity, unit price and line total
+Alternatives compared
+| ESTUDI INICIAL, RESTAURI, OAK 2000 and ZEROINFINITO
+Comparison logic
+| Each alternative has quantity, unit price and total amount
+Variance logic
+| Absolute and percentage difference at chapter level
+Totals
+| Subtotals by chapter, total project, optional items and total excluding options
+Visual exceptions
+| Highlighted missing, unusual or changed prices and quantities
+Scale
+| One sheet, approximately 245 rows and 18 columns
+A.1 Business requirements derived from the workbook
+A quote or estimate must support construction-specific coding and units such as unit, square metre, linear metre and lump sum.
+The same quantity and scope must be comparable against several cost sources.
+Comparison must be available at both detailed item and summarised chapter level.
+Missing supplier prices must be visible rather than silently treated as a valid zero.
+Optional works must remain separate from the base quotation total.
+The business must be able to preserve the initial study or benchmark alongside later supplier or subcontractor offers.
+Absolute and percentage variances are useful for identifying negotiation opportunities, incomplete scopes and pricing anomalies.
+The selected cost basis must be explicit, rather than inferred from spreadsheet colour or position.
+A.2 Example construction chapters observed
+Chapter group 1
+| Chapter group 2
+| Chapter group 3
+Demolition and preliminary works
+| Structure
+| Masonry / partitions
+Finishes
+| Sanitary equipment
+| Interior joinery
+Exterior joinery
+| Kitchen
+| Painting
+General / miscellaneous
+| Electrical installation
+| Air conditioning
+Ventilation
+| Plumbing
+| Drainage
+Telecommunications
+| Fire protection
+| Optional works
+Appendix B. Prioritised requirements register
+This register consolidates the detailed requirements for review. It is not a development backlog yet. Status should be completed during the validation workshop.
+ID
+| Area
+| Priority
+| Requirement
+| Status
+ORG-01
+| Company, user and access management
+| Critical
+| The process shall support multiple companies or legal entities within the same owner environment.
+| To validate
+ORG-02
+| Company, user and access management
+| Critical
+| Each transaction and document shall be assigned to one company.
+| To validate
+ORG-03
+| Company, user and access management
+| Critical
+| Each company shall maintain its own legal name, tax ID, address, invoice numbering, bank details and document branding.
+| To validate
+ORG-04
+| Company, user and access management
+| High
+| The owners shall be able to view consolidated information across companies and filter back to an individual entity.
+| To validate
+ORG-05
+| Company, user and access management
+| Critical
+| The process shall support at least an operational owner profile and a back-office owner profile.
+| To validate
+ORG-06
+| Company, user and access management
+| High
+| Permissions shall control who can change prices, approve quotations, issue invoices, register payments and view margins.
+| To validate
+ORG-07
+| Company, user and access management
+| High
+| The process shall retain the user, date and time of material changes.
+| To validate
+ORG-08
+| Company, user and access management
+| Medium
+| Future workers, project managers, accountants or advisers shall be addable without redesigning the core data.
+| To validate
+CRM-01
+| Customer relationship and opportunity management
+| Critical
+| The business shall maintain one controlled customer and contact register.
+| To validate
+CRM-02
+| Customer relationship and opportunity management
+| Critical
+| Customer records shall include contact details, billing details, project addresses, preferred communication method and notes.
+| To validate
+CRM-03
+| Customer relationship and opportunity management
+| High
+| A customer may have multiple contacts, addresses, quotations, projects and invoices.
+| To validate
+CRM-04
+| Customer relationship and opportunity management
+| Critical
+| Every new enquiry shall record source, date, requested work, responsible person, status and next action.
+| To validate
+CRM-05
+| Customer relationship and opportunity management
+| High
+| Communication notes, relevant emails, calls, messages and customer decisions shall be linkable to the opportunity or project.
+| To validate
+CRM-06
+| Customer relationship and opportunity management
+| High
+| The owners shall be able to identify leads awaiting visit, quotation, customer response or follow-up.
+| To validate
+CRM-07
+| Customer relationship and opportunity management
+| Medium
+| The process should record lost opportunities and reasons such as price, timing, scope or no response.
+| To validate
+CRM-08
+| Customer relationship and opportunity management
+| Medium
+| Customer history should show prior quotes, projects, payments, complaints and warranty matters.
+| To validate
+VIS-01
+| Site visit and scope capture
+| Critical
+| The operational user shall be able to create a site visit record quickly from a phone or simple device.
+| To validate
+VIS-02
+| Site visit and scope capture
+| Critical
+| The site visit shall capture project address, customer, requested works, measurements, units, photos and free notes.
+| To validate
+VIS-03
+| Site visit and scope capture
+| High
+| The site visit shall capture assumptions, exclusions, access restrictions, occupied-property conditions and customer selections.
+| To validate
+VIS-04
+| Site visit and scope capture
+| High
+| Photos and documents shall be linked to the correct project area or work item where practical.
+| To validate
+VIS-05
+| Site visit and scope capture
+| Critical
+| The operational user shall be able to select standard work items rather than typing complete descriptions repeatedly.
+| To validate
+VIS-06
+| Site visit and scope capture
+| High
+| A site visit may generate follow-up tasks, supplier enquiries or missing-information requests.
+| To validate
+VIS-07
+| Site visit and scope capture
+| High
+| The back office shall be able to review and complete the captured information without recreating it.
+| To validate
+CAT-01
+| Work catalogue, materials, services, labour and machinery
+| Critical
+| The business shall maintain a reusable catalogue of work chapters, subchapters and detailed items.
+| To validate
+CAT-02
+| Work catalogue, materials, services, labour and machinery
+| Critical
+| Each item shall have a code, description, unit of measure, category and active/inactive status.
+| To validate
+CAT-03
+| Work catalogue, materials, services, labour and machinery
+| High
+| Items shall be classifiable as material, labour, subcontracted service, machinery, professional service or other cost.
+| To validate
+CAT-04
+| Work catalogue, materials, services, labour and machinery
+| High
+| Standard work items may contain a default resource build-up, for example labour hours, materials, machinery and waste allowance.
+| To validate
+CAT-05
+| Work catalogue, materials, services, labour and machinery
+| High
+| The catalogue shall support alternative descriptions, brands, models, quality levels and customer-facing wording.
+| To validate
+CAT-06
+| Work catalogue, materials, services, labour and machinery
+| High
+| Historical use of an item shall remain intact when its current master description or default price changes.
+| To validate
+CAT-07
+| Work catalogue, materials, services, labour and machinery
+| Medium
+| Frequently used assemblies or room templates, such as bathroom, kitchen or painting packages, should be reusable.
+| To validate
+CAT-08
+| Work catalogue, materials, services, labour and machinery
+| Medium
+| The process should support import and controlled update of catalogue information from existing spreadsheets.
+| To validate
+SUP-01
+| Supplier, subcontractor and price-list management
+| Critical
+| The business shall maintain one supplier and subcontractor register, with company-specific terms where required.
+| To validate
+SUP-02
+| Supplier, subcontractor and price-list management
+| Critical
+| Supplier records shall include contacts, categories, tax and billing details, portal access reference, payment terms and notes.
+| To validate
+SUP-03
+| Supplier, subcontractor and price-list management
+| Critical
+| The process shall store supplier-specific product or service prices, discounts and effective dates.
+| To validate
+SUP-04
+| Supplier, subcontractor and price-list management
+| Critical
+| Every stored price shall identify its source, such as portal, invoice, price list, supplier quote or manual confirmation.
+| To validate
+SUP-05
+| Supplier, subcontractor and price-list management
+| High
+| The process shall distinguish list price, negotiated discount, net unit price, VAT and delivery or other charges.
+| To validate
+SUP-06
+| Supplier, subcontractor and price-list management
+| High
+| The process shall retain price history and not overwrite the evidence used for an earlier quotation.
+| To validate
+SUP-07
+| Supplier, subcontractor and price-list management
+| Critical
+| The owners shall be able to compare prices from several suppliers or subcontractors for the same item or package.
+| To validate
+SUP-08
+| Supplier, subcontractor and price-list management
+| High
+| The comparison shall show quantity, unit price, total, absolute variance and percentage variance.
+| To validate
+SUP-09
+| Supplier, subcontractor and price-list management
+| High
+| The comparison shall support missing prices, alternative specifications, optional items and comments.
+| To validate
+SUP-10
+| Supplier, subcontractor and price-list management
+| High
+| The selected supplier price shall be explicitly identified and traceable to the quotation cost baseline.
+| To validate
+SUP-11
+| Supplier, subcontractor and price-list management
+| Medium
+| Supplier performance should record delivery reliability, quality issues, returns, response speed and commercial conditions.
+| To validate
+SUP-12
+| Supplier, subcontractor and price-list management
+| Medium
+| The feasibility of importing data from supplier portals, downloaded price lists or invoices should be assessed in the solution stage.
+| To validate
+QUO-01
+| Estimating and quotation preparation
+| Critical
+| The operational user shall be able to start a quotation from a customer, site visit, prior project or template.
+| To validate
+QUO-02
+| Estimating and quotation preparation
+| Critical
+| A quotation shall support hierarchical chapters, subchapters and work items.
+| To validate
+QUO-03
+| Estimating and quotation preparation
+| Critical
+| Each quotation item shall support code, description, unit, quantity, internal cost, selling unit price and total.
+| To validate
+QUO-04
+| Estimating and quotation preparation
+| Critical
+| The process shall calculate subtotals, taxes, discounts and total quotation value consistently.
+| To validate
+QUO-05
+| Estimating and quotation preparation
+| Critical
+| The quotation shall distinguish customer selling price from internal cost and margin information.
+| To validate
+QUO-06
+| Estimating and quotation preparation
+| Critical
+| Internal cost and margin information shall never appear on the customer-facing quotation.
+| To validate
+QUO-07
+| Estimating and quotation preparation
+| Critical
+| The user shall be able to include optional items that are shown separately from the base total.
+| To validate
+QUO-08
+| Estimating and quotation preparation
+| High
+| The user shall be able to include allowances, provisional sums, exclusions and assumptions.
+| To validate
+QUO-09
+| Estimating and quotation preparation
+| High
+| The quotation shall support different pricing methods, such as direct unit price, selected supplier cost plus markup or fixed chapter price, subject to validation.
+| To validate
+QUO-10
+| Estimating and quotation preparation
+| Critical
+| The process shall show expected gross margin by item, chapter and total before the quote is issued.
+| To validate
+QUO-11
+| Estimating and quotation preparation
+| Critical
+| A quote shall have a unique number, company, customer, project address, issue date, validity date, status and responsible person.
+| To validate
+QUO-12
+| Estimating and quotation preparation
+| Critical
+| Every issued version shall be frozen and retrievable.
+| To validate
+QUO-13
+| Estimating and quotation preparation
+| Critical
+| Revisions shall create a new version and clearly identify changes from the prior version.
+| To validate
+QUO-14
+| Estimating and quotation preparation
+| High
+| The quote shall record payment terms, planned advances, billing milestones and customer acceptance method.
+| To validate
+QUO-15
+| Estimating and quotation preparation
+| High
+| The quote document shall use the correct company details, legal text, language and branding.
+| To validate
+QUO-16
+| Estimating and quotation preparation
+| High
+| The business shall be able to produce a professional PDF or printable quotation and record when it was sent.
+| To validate
+QUO-17
+| Estimating and quotation preparation
+| Medium
+| The process should support customer signature or documented acceptance evidence.
+| To validate
+QUO-18
+| Estimating and quotation preparation
+| High
+| The business shall be able to report quotes by status, value, probability, age and expected start date.
+| To validate
+PRJ-01
+| Quote acceptance and project creation
+| Critical
+| Only an identified quotation version may be marked as accepted.
+| To validate
+PRJ-02
+| Quote acceptance and project creation
+| Critical
+| Acceptance shall record date, accepted options, customer evidence and any final conditions.
+| To validate
+PRJ-03
+| Quote acceptance and project creation
+| Critical
+| An accepted quotation shall create a project without re-entering customer, scope, quantities and prices.
+| To validate
+PRJ-04
+| Quote acceptance and project creation
+| Critical
+| The project shall retain the accepted commercial baseline even if master prices later change.
+| To validate
+PRJ-05
+| Quote acceptance and project creation
+| Critical
+| The project shall establish separate baselines for revenue, estimated cost and expected margin.
+| To validate
+PRJ-06
+| Quote acceptance and project creation
+| High
+| The project shall include start date, target completion date, status, responsible person, site address and key milestones.
+| To validate
+PRJ-07
+| Quote acceptance and project creation
+| High
+| The project shall identify permits, access constraints, customer dependencies and required decisions.
+| To validate
+PRJ-08
+| Quote acceptance and project creation
+| High
+| The owners shall be able to compare original baseline, approved changes, current forecast and actual result.
+| To validate
+PLN-01
+| Planning, labour, subcontractors and machinery
+| High
+| The business shall plan project phases, milestones and expected dates.
+| To validate
+PLN-02
+| Planning, labour, subcontractors and machinery
+| High
+| Workers, crews, subcontractors and machinery shall be assignable to projects and periods.
+| To validate
+PLN-03
+| Planning, labour, subcontractors and machinery
+| High
+| The process shall identify resource conflicts and upcoming requirements.
+| To validate
+PLN-04
+| Planning, labour, subcontractors and machinery
+| High
+| Actual labour time or agreed subcontract progress shall be recordable against a project and, where practical, a work chapter.
+| To validate
+PLN-05
+| Planning, labour, subcontractors and machinery
+| High
+| Machinery use, rental, fuel, transport and related cost shall be allocable to projects.
+| To validate
+PLN-06
+| Planning, labour, subcontractors and machinery
+| High
+| The operational user shall be able to update progress with minimal data entry.
+| To validate
+PLN-07
+| Planning, labour, subcontractors and machinery
+| Medium
+| The process should support daily or weekly site notes, photos, incidents and completed work.
+| To validate
+PLN-08
+| Planning, labour, subcontractors and machinery
+| Medium
+| The process should retain planned versus actual start and finish dates and reasons for delay.
+| To validate
+PUR-01
+| Procurement, purchases, deliveries and returns
+| Critical
+| Material and subcontract requirements shall be derived from the project scope or added as project needs arise.
+| To validate
+PUR-02
+| Procurement, purchases, deliveries and returns
+| High
+| The business shall be able to create supplier requests or purchase records linked to a project.
+| To validate
+PUR-03
+| Procurement, purchases, deliveries and returns
+| Critical
+| Every purchase shall identify supplier, company, project, date, item or category, quantity, unit price, VAT and total.
+| To validate
+PUR-04
+| Procurement, purchases, deliveries and returns
+| High
+| The process shall distinguish requested, ordered, delivered, returned, credited, invoiced and paid amounts.
+| To validate
+PUR-05
+| Procurement, purchases, deliveries and returns
+| High
+| Delivery notes, receipts, supplier confirmations and photos shall be attachable.
+| To validate
+PUR-06
+| Procurement, purchases, deliveries and returns
+| Critical
+| Actual purchase prices shall update the project committed or actual cost without changing the accepted quote baseline.
+| To validate
+PUR-07
+| Procurement, purchases, deliveries and returns
+| High
+| A purchase may be allocated to more than one project or to general overhead, with a controlled allocation method.
+| To validate
+PUR-08
+| Procurement, purchases, deliveries and returns
+| High
+| Urgent or unplanned purchases shall be recordable quickly and reconciled later.
+| To validate
+PUR-09
+| Procurement, purchases, deliveries and returns
+| High
+| Returns and supplier credit notes shall reduce the relevant project cost.
+| To validate
+PUR-10
+| Procurement, purchases, deliveries and returns
+| Medium
+| The process should alert when ordered value exceeds the budget for an item, chapter or supplier package.
+| To validate
+CHG-01
+| Change orders, extra works and scope control
+| Critical
+| Any customer-requested extra, omission or substitution after acceptance shall be recorded as a change.
+| To validate
+CHG-02
+| Change orders, extra works and scope control
+| Critical
+| A change shall include description, reason, cost impact, selling price, schedule impact and approval status.
+| To validate
+CHG-03
+| Change orders, extra works and scope control
+| Critical
+| Approved changes shall update current project revenue and forecast cost while preserving the original baseline.
+| To validate
+CHG-04
+| Change orders, extra works and scope control
+| High
+| Unapproved work shall be clearly visible and not treated as billable until approval is recorded.
+| To validate
+CHG-05
+| Change orders, extra works and scope control
+| High
+| Customer evidence and revised documents shall be attached to the change record.
+| To validate
+CHG-06
+| Change orders, extra works and scope control
+| High
+| The project shall show original scope, approved changes, current scope and completed scope.
+| To validate
+AR-01
+| Customer invoicing and collections
+| Critical
+| The business shall create customer invoices from the accepted quote, payment plan, milestone or approved change.
+| To validate
+AR-02
+| Customer invoicing and collections
+| Critical
+| Invoices shall use the correct company, numbering sequence, tax data, bank details and legal text.
+| To validate
+AR-03
+| Customer invoicing and collections
+| Critical
+| The process shall support deposits, stage invoices, final invoices, partial invoices and credit notes.
+| To validate
+AR-04
+| Customer invoicing and collections
+| Critical
+| The process shall record receipts manually and allocate them to one or more invoices.
+| To validate
+AR-05
+| Customer invoicing and collections
+| Critical
+| Partial payments and unallocated receipts shall be supported.
+| To validate
+AR-06
+| Customer invoicing and collections
+| High
+| The process shall show invoice status, due date, outstanding balance and days overdue.
+| To validate
+AR-07
+| Customer invoicing and collections
+| High
+| The wife shall have a clear follow-up list of amounts due and customer contacts.
+| To validate
+AR-08
+| Customer invoicing and collections
+| High
+| The project shall show invoiced, collected, outstanding and remaining-to-invoice amounts.
+| To validate
+AR-09
+| Customer invoicing and collections
+| Medium
+| The process should support periodic customer contracts paid on a regular date if this remains part of the business model.
+| To validate
+AR-10
+| Customer invoicing and collections
+| Medium
+| The business should be able to export invoice and collection data for accounting.
+| To validate
+AP-01
+| Supplier bills and payments
+| Critical
+| Supplier bills shall be registered with supplier, company, invoice number, date, due date, VAT, total and document attachment.
+| To validate
+AP-02
+| Supplier bills and payments
+| Critical
+| Supplier bills shall be allocated to project items, chapters, projects or overhead categories.
+| To validate
+AP-03
+| Supplier bills and payments
+| Critical
+| The process shall detect potential duplicate supplier invoice numbers.
+| To validate
+AP-04
+| Supplier bills and payments
+| Critical
+| The business shall support partial payments and one payment covering multiple supplier bills.
+| To validate
+AP-05
+| Supplier bills and payments
+| High
+| Payment terms may vary by supplier and shall be retained.
+| To validate
+AP-06
+| Supplier bills and payments
+| High
+| The wife shall have a due-payment list by date, supplier, company and project.
+| To validate
+AP-07
+| Supplier bills and payments
+| High
+| Paid, partially paid, overdue, disputed and blocked bills shall be distinguishable.
+| To validate
+AP-08
+| Supplier bills and payments
+| High
+| Credit notes shall be linked to the original supplier bill or purchase where practical.
+| To validate
+AP-09
+| Supplier bills and payments
+| Medium
+| The process should export supplier bill and payment data for accounting or banking workflows.
+| To validate
+FIN-01
+| Project cost, margin and cash control
+| Critical
+| Each project shall show accepted revenue, approved changes, current revenue forecast and final revenue.
+| To validate
+FIN-02
+| Project cost, margin and cash control
+| Critical
+| Each project shall show estimated cost, selected supplier or subcontract cost, committed cost, invoiced cost, paid cost and forecast final cost.
+| To validate
+FIN-03
+| Project cost, margin and cash control
+| Critical
+| Margin shall be available as amount and percentage for original budget, current forecast and final result.
+| To validate
+FIN-04
+| Project cost, margin and cash control
+| Critical
+| Cost and margin shall be visible by chapter and total project.
+| To validate
+FIN-05
+| Project cost, margin and cash control
+| High
+| The process shall identify unallocated purchases, supplier bills, labour and machinery costs.
+| To validate
+FIN-06
+| Project cost, margin and cash control
+| High
+| The process shall flag cost overruns, margin deterioration and negative-margin chapters.
+| To validate
+FIN-07
+| Project cost, margin and cash control
+| Critical
+| Cash flow shall distinguish revenue, invoicing, collections, commitments, supplier bills and payments.
+| To validate
+FIN-08
+| Project cost, margin and cash control
+| High
+| The owners shall see expected cash inflows and outflows by week and month.
+| To validate
+FIN-09
+| Project cost, margin and cash control
+| High
+| Overhead and company-level expenses shall be tracked separately from direct project cost.
+| To validate
+FIN-10
+| Project cost, margin and cash control
+| Medium
+| The business should be able to analyse profitability by customer, project type, company, supplier and period.
+| To validate
+DOC-01
+| Documents, communication and audit trail
+| Critical
+| Documents shall be stored or referenced against the relevant customer, supplier, quote, project, purchase, invoice or payment.
+| To validate
+DOC-02
+| Documents, communication and audit trail
+| Critical
+| The process shall support photos, PDFs, spreadsheets, invoices, delivery notes, plans and signed documents.
+| To validate
+DOC-03
+| Documents, communication and audit trail
+| High
+| Document names and categories shall be standardised enough to support retrieval.
+| To validate
+DOC-04
+| Documents, communication and audit trail
+| High
+| The latest document shall be distinguishable without deleting prior versions.
+| To validate
+DOC-05
+| Documents, communication and audit trail
+| High
+| Important customer and supplier decisions shall be recorded with date and responsible person.
+| To validate
+DOC-06
+| Documents, communication and audit trail
+| High
+| Changes to critical commercial and financial records shall be auditable.
+| To validate
+DOC-07
+| Documents, communication and audit trail
+| Medium
+| The solution stage should assess practical links with email and messaging without making informal channels the only source of truth.
+| To validate
+DAS-01
+| Dashboards, tasks and alerts
+| Critical
+| The owners shall have a concise management view of active leads, quotes, projects, invoices, collections, supplier payments and cash exposure.
+| To validate
+DAS-02
+| Dashboards, tasks and alerts
+| Critical
+| The operational owner shall see today or this week: site visits, project milestones, material needs, overdue tasks and blockers.
+| To validate
+DAS-03
+| Dashboards, tasks and alerts
+| Critical
+| The back-office owner shall see: quotes to prepare, follow-ups, invoices to issue, collections due, supplier bills and payments due.
+| To validate
+DAS-04
+| Dashboards, tasks and alerts
+| High
+| Alerts shall identify expired prices, quote validity, overdue customer balances, overdue supplier bills and missing project allocations.
+| To validate
+DAS-05
+| Dashboards, tasks and alerts
+| High
+| Alerts shall identify projects with cost overrun, margin deterioration or schedule delay.
+| To validate
+DAS-06
+| Dashboards, tasks and alerts
+| High
+| Tasks shall have an owner, due date, status, related customer or project and completion record.
+| To validate
+DAS-07
+| Dashboards, tasks and alerts
+| Medium
+| The business should receive periodic summary views without manually rebuilding reports.
+| To validate
+NFR-01
+| Usability
+| Critical
+| The core operational workflow must be understandable by a very rudimentary technology user without formal training.
+| To validate
+NFR-02
+| Usability
+| Critical
+| Common actions must require minimal typing and use predefined selections, templates and defaults.
+| To validate
+NFR-03
+| Mobile access
+| Critical
+| Site visit, photos, notes, progress and urgent purchase capture must work on a mobile-friendly interface.
+| To validate
+NFR-04
+| Connectivity
+| High
+| The solution stage must assess how essential site functions behave with weak or intermittent connectivity.
+| To validate
+NFR-05
+| Performance
+| Critical
+| Opening a customer, quotation or active project and saving common changes should feel immediate under normal business data volumes.
+| To validate
+NFR-06
+| Reliability
+| Critical
+| The business must not lose confirmed quotations, invoices, payments or project records because of a local device failure.
+| To validate
+NFR-07
+| Security
+| Critical
+| Access to customer, supplier, banking, invoice and margin information must be protected by user authentication and permissions.
+| To validate
+NFR-08
+| Auditability
+| High
+| Critical records must show who created or changed them and when.
+| To validate
+NFR-09
+| Backup and recovery
+| Critical
+| Data must be backed up and recoverable with a documented recovery process.
+| To validate
+NFR-10
+| Localisation
+| High
+| The user interface and documents should support Spanish and, where useful, Catalan terminology used in current quotations.
+| To validate
+NFR-11
+| Tax and currency
+| Critical
+| The process must support EUR and applicable Spanish VAT treatment, with configuration for company requirements.
+| To validate
+NFR-12
+| Exportability
+| High
+| The owners must be able to export their operational and financial data in common formats.
+| To validate
+NFR-13
+| Interoperability
+| High
+| The solution should be capable of exchanging data with accounting, email, banking or supplier sources where a justified interface is later approved.
+| To validate
+NFR-14
+| Scalability
+| High
+| The process must support growth in companies, users, projects, items, suppliers and years of history.
+| To validate
+NFR-15
+| Maintainability
+| High
+| Business users must be able to maintain catalogues, templates, taxes, price lists and basic settings without software development.
+| To validate
+NFR-16
+| Privacy
+| High
+| Customer and supplier information must be handled in line with applicable data-protection obligations.
+| To validate
+END OF REQUIREMENTS BASELINE

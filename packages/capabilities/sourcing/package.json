@@ -1,9 +1,9 @@
 {
-  "name": "@repo/factory",
+  "name": "@repo/capability-sourcing",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "The factory: pack registry, tenant resolution, CLI (new-tenant | resolve | validate | demo). Composes kernel + capabilities + packs from a tenant spec.",
+  "description": "Generic sourcing capability: multi-bidder price comparison over quantified lines — dated/sourced prices, per-group totals, variance vs baseline, missing-price visibility, explicit selection. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -13,13 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@repo/capability-billing": "workspace:*",
-    "@repo/capability-quoting": "workspace:*",
-    "@repo/capability-sourcing": "workspace:*",
     "@repo/kernel": "workspace:*",
-    "@repo/pack-jurisdiction-es-es": "workspace:*",
-    "@repo/pack-vertical-construction-reformas": "workspace:*",
-    "yaml": "^2.6.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -27,7 +21,6 @@
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.15.3",
     "eslint": "^9.39.1",
-    "tsx": "^4.19.2",
     "typescript": "5.9.2",
     "vitest": "^3.0.5"
   }

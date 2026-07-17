@@ -1,0 +1,18 @@
+# Owner group: the Diorka family business (BRD ORG-01..04).
+# A group is DATA over tenants — each legal entity is its own tenant (own
+# numbering, branding, RLS partition); the group drives the consolidated
+# owner view. Members are added config-only as legal names are validated.
+group: diorka
+displayName: "Grupo Diorka (familia — reformas y construcción)"
+owners:
+  - role: operations # "husband" per BRD §2.1 — site, subs, materials
+  - role: back-office # "wife" per BRD §2.1 — quotes, invoices, suppliers
+members:
+  - diorka # entity #1 (legal name pending validation)
+  # - <entity-2>   # pending BRD §11.1: legal names of all companies
+pendingValidation:
+  - legal names, CIFs, banking and numbering per entity (BRD §11.1)
+  - intercompany recharges handling (BRD §2.2)
+currentTools:
+  - "cane.gestortectic.com — TecTic hosted 'Gestor' instance (login-gated); export feasibility to assess"
+  - "Excel workbooks (e.g. Comparatiu Joaquim Costa 2.xlsx) + paper quotations"

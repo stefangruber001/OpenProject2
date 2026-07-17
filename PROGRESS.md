@@ -88,15 +88,32 @@ output; the factory is the product.
    issues presupuesto→factura via server action, serves the rendered factura
    at `/[tenant]/facturas/[id]`. e2e covers the full flow (3 Playwright tests
    green). Tenant links on the home page.~~
-3. **P2.2b Web shell forms**: real presupuesto creation UI (client, partidas
-   with mediciones, accept), factura issue form with eligibility attributes,
-   rectificar action; PDF via headless Chromium behind `doc-render@1`.
-4. **P2.3 es-ES filings data layer**: tag invoices/purchases so Modelo
-   303/390/347/111/115/190 extracts derive from stored decisions (no new
-   literals outside the pack); N43 fixture-based import behind
-   `bank-statements@1`; registro de jornada model in a real `time` capability.
-5. **P2.4 reformas certificaciones**: quoted-vs-actual drift per partida
-   (the tenant's biggest pain, ASSUMPTIONS intake) + bc3 import stub.
+   2b. ~~**Diorka onboarding (REAL intake)** — DONE this cycle: baseline "ERP
+   START INPUT" pinned (`docs/ERP-START-INPUT.md`, tag erp-start-input, SHA
+   539c530); intake archived (`intake/diorka/` BRD + extraction) with full
+   `REQUIREMENTS-MAP.md`; tenant `diorka` + owner-group registry
+   (`tenants/_groups/diorka.yaml`) resolve+demo green in 0.79s config-only;
+   NEW `sourcing` capability (multi-bidder comparison: dated/sourced prices,
+   group totals, abs/% variance vs baseline, missing≠zero, explicit
+   selection — digitizes their Comparatiu workbook); quoting gained optional
+   items + selective acceptance + versioned revisions (QUO-07/12/13);
+   reformas pack ships the 18-chapter catalogue (BRD Appendix A.2).
+   Current tool identified: cane.gestortectic.com = TecTic "Gestor"
+   (login-gated) → migration lead in INTEGRATIONS_PENDING.~~
+3. **P2.2b Diorka-first web forms**: presupuesto creation UI (chapter picker
+   from pack config, partidas with mediciones, options), comparison screen
+   (sourcing report), accept-with-options; PDF via `doc-render@1`
+   (Chromium renderer exists). Design rule: minimal typing, catalogue-first
+   (BRD NFR-01/02, "very non-digital user").
+4. **P2.3 AR/AP slice (Diorka Critical)**: customer receipts + partial
+   allocation, supplier bills w/ duplicate detection + due lists (AR-04/05,
+   AP-01..04); then es-ES filings tagging (Modelo 303/390/347/111/115/190),
+   N43 fixture import, registro de jornada.
+5. **P2.4 CRM light + owner dashboards + certificaciones**: customers/leads/
+   next-action (CRM-01..06), per-owner-profile views + alerts (DAS-01..03),
+   quoted-vs-actual per partida preserving baseline (CHG/PRJ; also tenant
+   #1's stated biggest pain). Consolidated group view over
+   `tenants/_groups/*` (ORG-04).
 
 ## Blockers & chosen workarounds
 
