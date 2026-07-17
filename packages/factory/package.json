@@ -17,6 +17,7 @@
     "@repo/capability-crm": "workspace:*",
     "@repo/capability-messaging": "workspace:*",
     "@repo/capability-payables": "workspace:*",
+    "@repo/capability-procurement": "workspace:*",
     "@repo/capability-projects": "workspace:*",
     "@repo/capability-quoting": "workspace:*",
     "@repo/capability-receivables": "workspace:*",

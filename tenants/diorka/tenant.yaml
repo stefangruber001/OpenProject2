@@ -18,9 +18,9 @@ capabilities:
     receivables,
     payables,
     crm,
+    procurement,
     scheduling,
     time,
-    procurement,
     docs,
   ]
 jurisdiction: es-ES@2026-07-17

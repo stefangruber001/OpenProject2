@@ -236,6 +236,34 @@ importers:
         specifier: ^3.0.5
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  packages/capabilities/procurement:
+    dependencies:
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
   packages/capabilities/projects:
     dependencies:
       '@repo/kernel':
@@ -435,6 +463,9 @@ importers:
       '@repo/capability-payables':
         specifier: workspace:*
         version: link:../capabilities/payables
+      '@repo/capability-procurement':
+        specifier: workspace:*
+        version: link:../capabilities/procurement
       '@repo/capability-projects':
         specifier: workspace:*
         version: link:../capabilities/projects

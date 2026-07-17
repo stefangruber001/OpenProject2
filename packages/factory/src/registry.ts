@@ -7,6 +7,7 @@ import { projectsManifest } from "@repo/capability-projects";
 import { receivablesManifest } from "@repo/capability-receivables";
 import { payablesManifest } from "@repo/capability-payables";
 import { crmManifest } from "@repo/capability-crm";
+import { procurementManifest } from "@repo/capability-procurement";
 import { esPack } from "@repo/pack-jurisdiction-es-es";
 import { reformasPack } from "@repo/pack-vertical-construction-reformas";
 
@@ -23,9 +24,9 @@ export const capabilityRegistry: ReadonlyMap<string, CapabilityManifest> = new M
     receivablesManifest,
     payablesManifest,
     crmManifest,
+    procurementManifest,
     stub("scheduling"),
     stub("time"),
-    stub("procurement"),
     stub("docs"),
   ].map((c) => [c.id, c] as const),
 );
