@@ -82,15 +82,21 @@ output; the factory is the product.
    jobs green incl. "Durable adapters (Postgres + RLS contract tests)"
    (postgres:17 service, migrate deploy + seed + contract kits + cross-tenant
    invisibility). The store adapters are live-database-proven.
-2. **Web ERP shell on composed services** (`apps/web`): tenant-scoped
-   presupuesto list/create/accept + factura issue/view using
-   `@repo/factory` composition; server-side only; es-ES labels from ports.
-   PDF via headless Chromium behind `doc-render@1` (env has Chromium;
-   INTEGRATIONS_PENDING #doc-render).
-3. **es-ES filings data layer**: tag invoices/purchases so Modelo
+2. ~~**P2.2a Web ERP shell, first slice** — DONE: `/[tenant]` workspace
+   resolves the spec server-side, builds composed services (Prisma+RLS stores
+   when DATABASE_URL set, in-memory otherwise), lists presupuestos/facturas,
+   issues presupuesto→factura via server action, serves the rendered factura
+   at `/[tenant]/facturas/[id]`. e2e covers the full flow (3 Playwright tests
+   green). Tenant links on the home page.~~
+3. **P2.2b Web shell forms**: real presupuesto creation UI (client, partidas
+   with mediciones, accept), factura issue form with eligibility attributes,
+   rectificar action; PDF via headless Chromium behind `doc-render@1`.
+4. **P2.3 es-ES filings data layer**: tag invoices/purchases so Modelo
    303/390/347/111/115/190 extracts derive from stored decisions (no new
    literals outside the pack); N43 fixture-based import behind
    `bank-statements@1`; registro de jornada model in a real `time` capability.
+5. **P2.4 reformas certificaciones**: quoted-vs-actual drift per partida
+   (the tenant's biggest pain, ASSUMPTIONS intake) + bc3 import stub.
 
 ## Blockers & chosen workarounds
 
