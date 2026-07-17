@@ -171,3 +171,27 @@ languages: es-ES # source: synthetic
     **editable draft** in the compose window — carrying a **dependency-free
     generated PDF** attachment. Real save-to-Drafts via Graph is logged in
     `INTEGRATIONS_PENDING.md` (`outlook-drafts@1`) pending tenant M365 creds.
+30. **More brand colour, still premium (this cycle).** "Less white, more their
+    colours." Chose the most reversible strong-brand move: deep brand-green
+    gradient headers with a white brand mark, a soft sage-green canvas (not flat
+    white), richer green/gold washes, and a bold green featured card — while
+    keeping white cards for contrast so it reads premium, not heavy. Tokens only
+    - header markup; trivially tunable.
+31. **Operator enters all data; site-visit photos; per-step project folder.**
+    The journey page became a real client-side workspace: a full intake for
+    every customer-journey input (feeds ledger/PDF/email automation), site-visit
+    camera capture (`<input capture=environment>`), and a project folder with one
+    subfolder per lifecycle step. Since the published site is static (no server),
+    the most reversible honest implementation is browser-side: IndexedDB holds
+    the project + files (photos compressed via canvas), artifacts (quote/invoice
+    PDFs, .eml emails, notes) auto-file per step, and a dependency-free
+    store-method ZIP writer (with CRC32) exports the real nested folder. Works on
+    the live link and on mobile. The production equivalent (server-side folders
+    on the docs/blob-store port) is described in the operations guide.
+32. **Operations & setup PDF.** Built a branded, print-ready HTML guide rendered
+    to a real 14-page PDF via the environment's headless Chromium (`page.pdf`):
+    visual infrastructure diagram (SVG), layered architecture, 13-step process,
+    RACI matrix, and a very detailed non-technical go-live setup (accounts → env
+    vars → deploy → config), plus runbook, backups/GDPR, roadmap, glossary.
+    Recommended hosting (Vercel + managed Postgres) is a suggestion, not a
+    commitment — the hosting decision stays R4.
