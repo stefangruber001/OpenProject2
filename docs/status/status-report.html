@@ -1,0 +1,794 @@
+<meta charset="utf-8" />
+<title>OpenProject2 — ERP Factory Build Status</title>
+<style>
+  :root {
+    --plane: #f9f9f7;
+    --surface: #fcfcfb;
+    --panel: #f2f2ef;
+    --ink: #0b0b0b;
+    --ink2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --rule: #c3c2b7;
+    --brand: #256abf;
+    --brand-soft: #cde2fb;
+    --good: #0ca30c;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+    --l1: #86b6ef;
+    --l2: #5598e7;
+    --l3: #3987e5;
+    --l4: #256abf;
+    --l5: #184f95;
+    --l6: #0d366b;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+  html {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", "Liberation Sans", sans-serif;
+    color: var(--ink);
+    background: #fff;
+    font-size: 10.5px;
+    line-height: 1.4;
+  }
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  .page {
+    position: relative;
+    width: 210mm;
+    height: 297mm;
+    padding: 15mm 15mm 13mm;
+    background: var(--plane);
+    page-break-after: always;
+    overflow: hidden;
+  }
+  .page:last-child {
+    page-break-after: auto;
+  }
+
+  /* ---- shared chrome ---- */
+  .kicker {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--brand);
+    font-weight: 700;
+  }
+  h1 {
+    font-size: 27px;
+    line-height: 1.1;
+    margin: 4px 0 6px;
+    letter-spacing: -0.01em;
+  }
+  h2.section {
+    font-size: 15px;
+    margin: 0 0 9px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid var(--ink);
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink2);
+    margin: 0 0 6px;
+  }
+  p {
+    margin: 0 0 7px;
+    color: var(--ink2);
+  }
+  .lead {
+    font-size: 12.5px;
+    color: var(--ink);
+  }
+  b,
+  strong {
+    color: var(--ink);
+  }
+  .mono {
+    font-family: "SFMono-Regular", "Liberation Mono", ui-monospace, monospace;
+    font-size: 9.2px;
+    background: #edece8;
+    padding: 0.5px 4px;
+    border-radius: 3px;
+    color: #33322f;
+  }
+  .foot {
+    position: absolute;
+    left: 15mm;
+    right: 15mm;
+    bottom: 7mm;
+    display: flex;
+    justify-content: space-between;
+    font-size: 8px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    border-top: 1px solid var(--grid);
+    padding-top: 4px;
+  }
+  .pagehead {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 11px;
+  }
+  .pagehead .brandline {
+    font-size: 8.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ---- status pills ---- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px 2px 6px;
+    border-radius: 20px;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+  .pill .dot {
+    font-size: 8px;
+  }
+  .p-done {
+    color: #06660a;
+    background: #e4f4e1;
+    border-color: #b9e2b2;
+  }
+  .p-now {
+    color: #7a4d00;
+    background: #fdf0d3;
+    border-color: #f4d79a;
+  }
+  .p-next {
+    color: #8a3d1c;
+    background: #fbe6dc;
+    border-color: #f2c3ac;
+  }
+  .p-plan {
+    color: #4b4a47;
+    background: #ecebe7;
+    border-color: #d8d7d1;
+  }
+  .p-gate {
+    color: #8f1f1f;
+    background: #f8dedd;
+    border-color: #eeb4b3;
+  }
+
+  /* ---- tiles ---- */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--grid);
+    border-left: 3px solid var(--brand);
+    border-radius: 7px;
+    padding: 9px 10px;
+  }
+  .tile .big {
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .tile .lab {
+    font-size: 8.6px;
+    color: var(--ink2);
+    margin-top: 4px;
+    line-height: 1.25;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--grid);
+    border-radius: 7px;
+    padding: 10px 12px;
+  }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+  .grid3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 9px;
+  }
+
+  ul.tight {
+    margin: 3px 0 0;
+    padding-left: 15px;
+    color: var(--ink2);
+  }
+  ul.tight li {
+    margin-bottom: 3px;
+  }
+  .rowgap > * + * {
+    margin-top: 9px;
+  }
+
+  /* ---- layer stack ---- */
+  .layers {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .layer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: #fff;
+  }
+  .layer .lname {
+    font-weight: 800;
+    font-size: 11.5px;
+    width: 132px;
+    flex-shrink: 0;
+  }
+  .layer .ldesc {
+    font-size: 9.2px;
+    opacity: 0.95;
+  }
+  .layer .tag {
+    margin-left: auto;
+    font-size: 8px;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.22);
+    padding: 2px 6px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+  .ld { color: var(--ink) !important; }
+
+  /* ---- flow ---- */
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+  }
+  .step {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    padding: 7px 8px;
+    text-align: center;
+  }
+  .step .st {
+    font-weight: 800;
+    font-size: 9.5px;
+  }
+  .step .ss {
+    font-size: 8px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .arrow {
+    align-self: center;
+    color: var(--brand);
+    font-weight: 800;
+    padding: 0 5px;
+    font-size: 12px;
+  }
+
+  /* ---- table ---- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9px;
+  }
+  th {
+    text-align: left;
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    border-bottom: 1.5px solid var(--rule);
+    padding: 5px 6px;
+    vertical-align: bottom;
+  }
+  td {
+    padding: 6px 6px;
+    border-bottom: 1px solid var(--grid);
+    color: var(--ink2);
+    vertical-align: top;
+  }
+  td b {
+    color: var(--ink);
+  }
+  tr.gaterow td {
+    background: #fdf0ef;
+  }
+
+  .legend {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 8.6px;
+    color: var(--ink2);
+    margin-top: 8px;
+  }
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .sw {
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  /* ---- roadmap timeline ---- */
+  .timeline {
+    display: flex;
+    gap: 6px;
+  }
+  .phase {
+    flex: 1;
+    border-radius: 6px;
+    padding: 8px 9px;
+    border: 1px solid var(--grid);
+    background: var(--surface);
+  }
+  .phase .pc {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 5px;
+  }
+  .phase .pn {
+    font-weight: 800;
+    font-size: 11px;
+  }
+  .phase .pt {
+    font-size: 9px;
+    color: var(--ink);
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+  .phase .pd {
+    font-size: 8.2px;
+    color: var(--ink2);
+    line-height: 1.3;
+  }
+  .phase.done {
+    background: #eef7ec;
+    border-color: #cbe6c4;
+  }
+  .phase.now {
+    background: #fdf5e3;
+    border-color: #f2dca6;
+  }
+  .phase.plan {
+    background: var(--surface);
+  }
+  .barwrap {
+    height: 6px;
+    background: var(--grid);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 10px 0 12px;
+  }
+  .barwrap > i {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--l5), var(--l3));
+  }
+
+  .callout {
+    border-left: 3px solid var(--brand);
+    background: var(--brand-soft);
+    border-radius: 0 6px 6px 0;
+    padding: 8px 11px;
+    color: #123a6e;
+    font-size: 9.4px;
+  }
+  .callout.warn {
+    border-color: var(--warning);
+    background: #fdf3d8;
+    color: #6f4a00;
+  }
+  .callout.crit {
+    border-color: var(--critical);
+    background: #f9e0df;
+    color: #7f1d1d;
+  }
+</style>
+
+<!-- ===================== PAGE 1 — COVER / STATUS ===================== -->
+<section class="page">
+  <div class="kicker">ERP Factory · Build Status Report</div>
+  <h1>OpenProject2 — an ERP factory<br />for European SMEs</h1>
+  <p class="lead" style="max-width: 165mm">
+    A machine that turns a <b>tenant specification</b> into a running, tested, compliance-gated ERP —
+    <b>spec in, ERP out</b> — repeatably for hundreds of small businesses. The ERP is the output; the
+    factory is the product. <b>Tenant #1</b> is a Spanish <i>reformas</i> (renovation) company.
+  </p>
+
+  <div style="display: flex; gap: 7px; margin: 12px 0 14px; flex-wrap: wrap">
+    <span class="pill p-done"><span class="dot">✓</span> P0 Foundation</span>
+    <span class="pill p-done"><span class="dot">✓</span> P1 Walking skeleton</span>
+    <span class="pill p-now"><span class="dot">●</span> P2 Packs &amp; UI · in progress</span>
+    <span class="pill p-plan"><span class="dot">○</span> P3 Pipeline</span>
+    <span class="pill p-plan"><span class="dot">○</span> P4 Fleet</span>
+    <span class="pill p-plan"><span class="dot">○</span> P5 Proof</span>
+  </div>
+
+  <div class="tiles" style="margin-bottom: 14px">
+    <div class="tile">
+      <div class="big">16</div>
+      <div class="lab">green commits on the branch — every one lint + type + test + build + boundary clean</div>
+    </div>
+    <div class="tile">
+      <div class="big">0.02s</div>
+      <div class="lab">to create tenant #2 — config only, <b>zero code</b>. Marginal cost near zero</div>
+    </div>
+    <div class="tile">
+      <div class="big">~70</div>
+      <div class="lab">automated tests + <b>live-Postgres</b> row-level-security contract tests in CI</div>
+    </div>
+    <div class="tile">
+      <div class="big">2027</div>
+      <div class="lab">Verifactu deadline verified &amp; gated — chaining built now, submission off until certified</div>
+    </div>
+  </div>
+
+  <h2 class="section">Where the build stands today</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="color: var(--good)">✓ Done &amp; CI-verified</h3>
+      <ul class="tight">
+        <li>Layered <b>kernel · capabilities · packs</b> architecture, boundaries enforced by the build.</li>
+        <li>Working slice: <b>presupuesto → factura</b> with effective-dated IVA, persisted legal
+          justification, and tamper-evident invoice chaining.</li>
+        <li>Durable persistence on <b>PostgreSQL with row-level security</b> per tenant.</li>
+        <li>A first <b>web workspace</b> per tenant, running the same composed services.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color: var(--warning)">● In progress / next</h3>
+      <ul class="tight">
+        <li>Real data-entry screens (presupuestos, partidas) &amp; PDF export.</li>
+        <li>Spanish <b>tax-filing data</b> (Modelo 303/347/…), bank import, working-hours log.</li>
+        <li>Renovation <b>certificaciones</b>: quoted-vs-actual per line — the tenant's biggest pain.</li>
+        <li>Deploy pipeline, fleet control plane, and the timed onboarding proof.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top: 12px">
+    <b>How to read this report.</b> Page 2 is the architecture. Page 3 is what exists and is proven.
+    Page 4 is the plan. <b>Page 5 is the one that needs you</b>: the decisions and inputs required from
+    the business — each with a safe default so nothing is blocking today.
+  </div>
+
+  <div class="foot">
+    <span>OpenProject2 · ERP Factory — Build Status</span>
+    <span>Page 1 of 5</span>
+    <span>2026-07-17 · internal</span>
+  </div>
+</section>
+
+<!-- ===================== PAGE 2 — ARCHITECTURE ===================== -->
+<section class="page">
+  <div class="pagehead">
+    <div><div class="kicker">Architecture</div><h2 class="section" style="border: none; margin: 2px 0 0; padding: 0">How the factory is built</h2></div>
+    <div class="brandline">The "solid foundation", not vibe-coding</div>
+  </div>
+
+  <p style="margin-bottom: 10px">
+    Five layers, each depending only <b>downward</b>. A country (jurisdiction) and a trade (vertical)
+    are <b>orthogonal</b> — so covering N countries × M trades costs <b>N + M</b>, never N × M. Adding
+    Germany later is a new pack, not an edit to the core.
+  </p>
+
+  <div class="layers" style="margin-bottom: 4px">
+    <div class="layer" style="background: var(--l1)"><span class="lname ld">Plugins</span><span class="ldesc ld">Sandboxed, contract-tested escape hatch for genuinely bespoke logic</span><span class="tag" style="background: rgba(11,11,11,0.1); color: #123a6e">future</span></div>
+    <div class="layer" style="background: var(--l2)"><span class="lname ld">Tenant config</span><span class="ldesc ld">Data only — branding, price lists, series, users. <b>Customisation is data, never a fork</b></span><span class="tag" style="background: rgba(11,11,11,0.12); color: #0d366b">✓ built</span></div>
+    <div class="layer" style="background: var(--l3)"><span class="lname">Vertical packs</span><span class="ldesc">Trade knowledge — <i>construction / reformas</i>: mediciones, partidas, terminology</span><span class="tag">✓ built</span></div>
+    <div class="layer" style="background: var(--l4)"><span class="lname">Jurisdiction packs</span><span class="ldesc">Country law — <i>es-ES</i>: IVA, IRPF, invoice chaining — <b>effective-dated</b></span><span class="tag">✓ built</span></div>
+    <div class="layer" style="background: var(--l5)"><span class="lname">Capabilities</span><span class="ldesc">Quoting, billing… define <b>ports</b>. Zero country / trade knowledge</span><span class="tag">✓ built</span></div>
+    <div class="layer" style="background: var(--l6)"><span class="lname">Kernel</span><span class="ldesc">Tenancy, money, effective-dating, composition, persistence, events</span><span class="tag">✓ built</span></div>
+  </div>
+  <div style="text-align: center; font-size: 8.4px; color: var(--muted); letter-spacing: 0.04em; margin-bottom: 13px">
+    ▲ depends downward only — enforced in CI · the kernel &amp; capabilities contain no <span class="mono">IVA</span>, no <span class="mono">partida</span>, no country anything
+  </div>
+
+  <div class="grid2 rowgap">
+    <div class="card">
+      <h3>Ports &amp; adapters — composition at resolve time</h3>
+      <div class="flow" style="margin: 6px 0 4px">
+        <div class="step"><div class="st">Billing</div><div class="ss">capability</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="border-color: var(--brand); border-width: 1.5px"><div class="st mono" style="background: none">tax@1</div><div class="ss">port (contract)</div></div>
+        <div class="arrow">→</div>
+        <div class="step"><div class="st">es-ES</div><div class="ss">adapter</div></div>
+      </div>
+      <p style="font-size: 9px; margin: 4px 0 0">
+        The tenant spec picks the packs; the resolver binds adapters to ports and <b>fails loudly at
+        resolve time</b> on any conflict or gap — never in front of a customer.
+      </p>
+    </div>
+    <div class="card">
+      <h3>Time is a dimension of correctness</h3>
+      <p style="font-size: 9px; margin: 0">
+        Tax rules resolve by <b>date</b>, not version: amending a March invoice in November applies
+        <b>March's</b> law. Every decision is stored <b>with its justification</b> — legal basis, inputs,
+        rule id — on the invoice, never recomputed.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top: 12px">
+    <b>Boundaries are enforced, not aspirational.</b> A build-time linter fails CI if a capability
+    imports a country pack, if one pack imports another, or if a forbidden literal (a tax name, a rate
+    like <span class="mono" style="background: #dce9fb">0.21</span>, a hardcoded locale) leaks into the
+    core. It already caught — and we fixed — a real leak on its first run.
+  </div>
+
+  <div class="callout crit" style="margin-top: 10px">
+    <b>The falsifiable test (proven, runs in CI):</b> boot the kernel + billing with <b>no country pack</b>
+    loaded and it must fail loudly — no tax rate can exist without a jurisdiction. If it ever "worked",
+    Spain would have leaked into the core. It fails, exactly as required.
+  </div>
+
+  <div class="foot">
+    <span>OpenProject2 · ERP Factory — Build Status</span>
+    <span>Page 2 of 5</span>
+    <span>2026-07-17 · internal</span>
+  </div>
+</section>
+
+<!-- ===================== PAGE 3 — WHAT WE HAVE ===================== -->
+<section class="page">
+  <div class="pagehead">
+    <div><div class="kicker">Current State</div><h2 class="section" style="border: none; margin: 2px 0 0; padding: 0">What we have — built &amp; verified</h2></div>
+    <div class="brandline">Every claim below is green in CI</div>
+  </div>
+
+  <h3>Components shipped</h3>
+  <div class="grid3" style="margin-bottom: 13px">
+    <div class="card"><b>Kernel</b><div style="font-size: 8.6px; color: var(--ink2); margin-top: 3px">Money (integer, no floats), effective-dating, port registry, spec resolver, events, stores</div></div>
+    <div class="card"><b>Quoting + Billing</b><div style="font-size: 8.6px; color: var(--ink2); margin-top: 3px">Immutable invoices, gapless numbering, rectificativas, tax via ports — zero country knowledge</div></div>
+    <div class="card"><b>es-ES pack</b><div style="font-size: 8.6px; color: var(--ink2); margin-top: 3px">Effective-dated IVA, renovation reduced-rate engine, IRPF, SHA-256 invoice chain</div></div>
+    <div class="card"><b>reformas pack</b><div style="font-size: 8.6px; color: var(--ink2); margin-top: 3px">Mediciones math, partida vocabulary, the construction↔tax data contract</div></div>
+    <div class="card"><b>Factory + CLI</b><div style="font-size: 8.6px; color: var(--ink2); margin-top: 3px"><span class="mono">resolve · validate · new-tenant · demo</span> — composes a tenant from its spec</div></div>
+    <div class="card"><b>Database + Web</b><div style="font-size: 8.6px; color: var(--ink2); margin-top: 3px">Postgres + per-tenant row-level security; a first web workspace per tenant</div></div>
+  </div>
+
+  <h3>The working slice — <span style="text-transform: none; letter-spacing: 0; color: var(--ink)">lead → presupuesto → factura → get paid</span></h3>
+  <div class="flow" style="margin-bottom: 6px">
+    <div class="step"><div class="st">Cliente</div><div class="ss">lead</div></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="st">Presupuesto</div><div class="ss">3 partidas · mediciones</div></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="st">Aceptación</div><div class="ss">frozen snapshot</div></div>
+    <div class="arrow">→</div>
+    <div class="step" style="border-color: var(--brand); border-width: 1.5px"><div class="st">Factura</div><div class="ss">tax decided by date</div></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="st">Cobro</div><div class="ss">planned</div></div>
+  </div>
+
+  <div class="grid2" style="margin-bottom: 13px">
+    <div class="card" style="border-left: 3px solid var(--good)">
+      <div style="font-size: 9px; color: var(--muted)">FAC-2026-0001 · particular, vivienda 15 años</div>
+      <div style="font-size: 15px; font-weight: 800; margin: 2px 0">IVA 10% · total 3.159,20 €</div>
+      <div style="font-size: 8.6px; color: var(--ink2)">Reduced rate — justification persisted:
+        <i>art. 91.Uno.2.10º LIVA</i>. Chained seal #1.</div>
+    </div>
+    <div class="card" style="border-left: 3px solid var(--brand)">
+      <div style="font-size: 9px; color: var(--muted)">FAC-2026-0002 · cliente empresa</div>
+      <div style="font-size: 15px; font-weight: 800; margin: 2px 0">IVA 21% · total 6.050,00 €</div>
+      <div style="font-size: 8.6px; color: var(--ink2)">Same works, general rate — <b>reasoned refusal</b>
+        of the reduced rate recorded. Chained seal #2.</div>
+    </div>
+  </div>
+
+  <div class="grid2 rowgap">
+    <div class="card">
+      <h3>Compliance encoded (researched, cited)</h3>
+      <ul class="tight" style="font-size: 8.8px">
+        <li><b>IVA 10% renovation</b> — 3 cumulative conditions (recipient, ≥2yr age, ≤40% materials); missing data ⇒ safe higher rate.</li>
+        <li><b>Verifactu</b> — deadline verified: <b>2027</b>. Chaining built; certified submission hard-gated off.</li>
+        <li><b>IRPF retention</b> — profile-based (most reformas subcontractors ⇒ none).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Verified in CI on every push</h3>
+      <ul class="tight" style="font-size: 8.8px">
+        <li>Lint · types · unit tests · build · <b>architecture boundaries</b>.</li>
+        <li><b>Postgres + RLS</b> contract tests — cross-tenant reads proven invisible.</li>
+        <li>End-to-end browser test of the tenant workspace.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout warn" style="margin-top: 12px">
+    <b>Honest caveat.</b> Tax logic is <b>defensible by design</b> (every decision carries its legal basis)
+    but marked <span class="mono" style="background: #f6e6c0">legally_verified: false</span> until a Spanish
+    <i>asesor</i> signs off. No real invoice, email, filing, or payment is ever sent — integrations run as
+    safe fakes behind ports until credentials and sign-off exist. See Page 5.
+  </div>
+
+  <div class="foot">
+    <span>OpenProject2 · ERP Factory — Build Status</span>
+    <span>Page 3 of 5</span>
+    <span>2026-07-17 · internal</span>
+  </div>
+</section>
+
+<!-- ===================== PAGE 4 — ROADMAP ===================== -->
+<section class="page">
+  <div class="pagehead">
+    <div><div class="kicker">Plan</div><h2 class="section" style="border: none; margin: 2px 0 0; padding: 0">What's planned — the road to 1,000 tenants</h2></div>
+    <div class="brandline">One core, many tenants</div>
+  </div>
+
+  <div class="barwrap"><i style="width: 42%"></i></div>
+  <div class="timeline" style="margin-bottom: 14px">
+    <div class="phase done"><div class="pc"><span class="pn">P0</span><span class="pill p-done" style="font-size: 8px"><span class="dot">✓</span></span></div><div class="pt">Foundation</div><div class="pd">Layers, boundary linter, spec composition, ADRs</div></div>
+    <div class="phase done"><div class="pc"><span class="pn">P1</span><span class="pill p-done" style="font-size: 8px"><span class="dot">✓</span></span></div><div class="pt">Walking skeleton</div><div class="pd">CLI, tenant #1, presupuesto→factura, negative test</div></div>
+    <div class="phase now"><div class="pc"><span class="pn">P2</span><span class="pill p-now" style="font-size: 8px"><span class="dot">●</span></span></div><div class="pt">Packs &amp; UI</div><div class="pd">Persistence ✓, web shell ✓ · filings, certificaciones, forms next</div></div>
+    <div class="phase plan"><div class="pc"><span class="pn">P3</span><span class="pill p-plan" style="font-size: 8px"><span class="dot">○</span></span></div><div class="pt">Pipeline</div><div class="pd">Provision → deploy → verify → rollback; PWA / desktop shells</div></div>
+    <div class="phase plan"><div class="pc"><span class="pn">P4</span><span class="pill p-plan" style="font-size: 8px"><span class="dot">○</span></span></div><div class="pt">Fleet</div><div class="pd">Control plane, wave rollout, health gates, backup drill</div></div>
+    <div class="phase plan"><div class="pc"><span class="pn">P5</span><span class="pill p-plan" style="font-size: 8px"><span class="dot">○</span></span></div><div class="pt">Proof</div><div class="pd">Timed tenant #2/#3, offboarding export, hardening</div></div>
+  </div>
+
+  <div class="grid2 rowgap">
+    <div class="card">
+      <h3 style="color: var(--warning)">Immediate next (P2 continued)</h3>
+      <ul class="tight" style="font-size: 9px">
+        <li><b>Presupuesto forms</b> + line editor with mediciones; <b>PDF export</b> of the factura.</li>
+        <li><b>es-ES filings data</b>: tag data so Modelo 303/390/347/111/115/190 derive automatically; N43 bank-statement import; working-hours register.</li>
+        <li><b>Certificaciones</b>: quoted-vs-actual per partida — where a reforma's margin is won or lost.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Definition of Done — the 5 stop conditions</h3>
+      <table style="font-size: 8.6px">
+        <tr><td style="border: none; padding: 2px 4px"><span class="pill p-now" style="font-size: 7.5px">●</span></td><td style="border: none; padding: 2px 4px"><b>make demo</b> on a clean machine → legally-defensible factura</td></tr>
+        <tr><td style="border: none; padding: 2px 4px"><span class="pill p-now" style="font-size: 7.5px">●</span></td><td style="border: none; padding: 2px 4px">Tenant #2 in <b>&lt;15 min</b>, config-only (mechanism proven at 0.02s)</td></tr>
+        <tr><td style="border: none; padding: 2px 4px"><span class="pill p-done" style="font-size: 7.5px">✓</span></td><td style="border: none; padding: 2px 4px">Negative test: no country pack ⇒ loud failure</td></tr>
+        <tr><td style="border: none; padding: 2px 4px"><span class="pill p-plan" style="font-size: 7.5px">○</span></td><td style="border: none; padding: 2px 4px">P0–P5 complete, CI green, no half-migrations</td></tr>
+        <tr><td style="border: none; padding: 2px 4px"><span class="pill p-now" style="font-size: 7.5px">●</span></td><td style="border: none; padding: 2px 4px">Governance docs honest + path to tenant #1000 &amp; country #2</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top: 13px">
+    <b>The metric that decides success</b> is the <b>marginal cost of tenant #N+1, in human minutes</b> —
+    published and tracked from tenant #1. A flat or rising line is treated as a serious defect. Today it
+    is near-zero for a same-country, same-trade tenant; the formal, timed proof (with a real intake) lands
+    in P5.
+  </div>
+
+  <div class="foot">
+    <span>OpenProject2 · ERP Factory — Build Status</span>
+    <span>Page 4 of 5</span>
+    <span>2026-07-17 · internal</span>
+  </div>
+</section>
+
+<!-- ===================== PAGE 5 — INPUTS NEEDED ===================== -->
+<section class="page">
+  <div class="pagehead">
+    <div><div class="kicker">Action for the business</div><h2 class="section" style="border: none; margin: 2px 0 0; padding: 0">What input is needed — and when</h2></div>
+    <div class="brandline">Nothing here blocks today</div>
+  </div>
+
+  <p style="margin-bottom: 9px">
+    The build runs unattended on safe defaults — synthetic company data, conservative tax choices,
+    fake integrations. Each item below <b>replaces a default</b> with reality. The <b>When</b> column is
+    the point at which it stops being optional. Red rows are <b>gates before any real production use</b>.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 22%">Input needed from you</th>
+        <th style="width: 30%">Why it matters</th>
+        <th style="width: 15%">When needed</th>
+        <th style="width: 33%">Safe default until then</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>Real tenant #1 profile</b><br />company, CIF/NIF, address, invoice-series habits, languages</td>
+        <td>Overwrites the synthetic company on every invoice &amp; document</td>
+        <td><span class="pill p-next" style="font-size: 8px">Before go-live</span></td>
+        <td>Synthetic "Reformas Iberia Demo S.L.", every field marked <span class="mono">source: synthetic</span> — overwrites config only, no code change</td>
+      </tr>
+      <tr class="gaterow">
+        <td><b>Asesor / gestor sign-off on tax logic</b><br />IVA renovation, IRPF, invoice content</td>
+        <td>Flips <span class="mono">legally_verified: false → true</span>; required before any real invoice</td>
+        <td><span class="pill p-gate" style="font-size: 8px">▲ Gate · go-live</span></td>
+        <td>Conservative by design (missing data ⇒ higher rate); decisions stored with legal basis for review</td>
+      </tr>
+      <tr class="gaterow">
+        <td><b>Verifactu decision + AEAT credentials</b></td>
+        <td>Enables certified, submitted billing (anti-fraud law)</td>
+        <td><span class="pill p-gate" style="font-size: 8px">▲ Before 2027</span></td>
+        <td>Invoice chaining + immutability already built; certified submission hard-gated <b>off</b></td>
+      </tr>
+      <tr>
+        <td><b>Gestor's accounting format</b><br />A3 / Holded / Sage / CSV</td>
+        <td>Shapes the accounting-export adapter the gestor consumes</td>
+        <td><span class="pill p-next" style="font-size: 8px">P2 (filings)</span></td>
+        <td>Generic CSV export; filing data already tagged on each invoice</td>
+      </tr>
+      <tr>
+        <td><b>Hosting &amp; EU region + provider</b></td>
+        <td>Data residency / RGPD; where the fleet runs</td>
+        <td><span class="pill p-next" style="font-size: 8px">P3 (deploy)</span></td>
+        <td>Nothing provisioned — the mandate forbids buying paid resources autonomously</td>
+      </tr>
+      <tr>
+        <td><b>Bank access for N43</b> (or manual upload)</td>
+        <td>Cash-in reconciliation — cheapest visibility win</td>
+        <td><span class="pill p-next" style="font-size: 8px">P2 (filings)</span></td>
+        <td>Fixture-based import behind the bank port</td>
+      </tr>
+      <tr>
+        <td><b>Structural <i>rehabilitación</i> projects?</b></td>
+        <td>Unlocks a distinct reduced-rate path (art. 20.Uno.22º.B)</td>
+        <td><span class="pill p-plan" style="font-size: 8px">If relevant</span></td>
+        <td>Conservative fallback to the general rate with an explanation</td>
+      </tr>
+      <tr>
+        <td><b>Real supplier profiles</b><br />autónomo empresarial vs. professional</td>
+        <td>Correct IRPF retention on subcontractor invoices</td>
+        <td><span class="pill p-next" style="font-size: 8px">Go-live</span></td>
+        <td>Default "business" ⇒ no retention (the common reformas case)</td>
+      </tr>
+      <tr>
+        <td><b>Public-sector clients?</b> (Facturae / FACe)</td>
+        <td>Legally required e-invoice format for the ~5% public mix</td>
+        <td><span class="pill p-plan" style="font-size: 8px">If serving public</span></td>
+        <td>Not built yet — flagged in the integrations register</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="legend">
+    <span><span class="sw" style="background: #fbe6dc; border: 1px solid #f2c3ac"></span> Needed soon — unblocks the next phase</span>
+    <span><span class="sw" style="background: #f8dedd; border: 1px solid #eeb4b3"></span> ▲ Legal gate — required before real production use</span>
+    <span><span class="sw" style="background: #ecebe7; border: 1px solid #d8d7d1"></span> Only if relevant to the business</span>
+  </div>
+
+  <div class="callout" style="margin-top: 13px">
+    <b>The one thing to send first:</b> the <b>real company profile for tenant #1</b> (name, CIF, address,
+    invoice-series preferences). Everything else has a working default and can follow. Legal sign-off and
+    hosting are the two <b>gates</b> that must clear before a first real customer — neither blocks
+    continued building.
+  </div>
+
+  <div class="foot">
+    <span>OpenProject2 · ERP Factory — Build Status</span>
+    <span>Page 5 of 5</span>
+    <span>2026-07-17 · internal</span>
+  </div>
+</section>
