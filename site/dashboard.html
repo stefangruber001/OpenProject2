@@ -6,36 +6,51 @@
 <title>Canei Subirats ERP — Control Tower</title>
 <style>
   :root{
-    --green:#48733c; --greenLt:#65bc7b; --greenSoft:#eef4ea; --spark:#f2c230;
-    --ink:#171911; --body:#565950; --muted:#9c9f93; --line:#efece6; --mist:#faf9f6; --paper:#fff; --card:#fff; --panel:#fcfbf9;
+    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#3a5f31; --greenSoft:#eef4ea; --spark:#f2c230;
+    --ink:#14160f; --body:#54574c; --muted:#9a9d90; --faint:#b9bcb0;
+    --line:#ecebe4; --hair:#f3f1ec; --mist:#f6f5f1; --bg:#fbfbf9; --paper:#fff; --card:#fff; --panel:#fcfcfa;
     --good:#2f7d4f; --good-bg:#eef6f0; --warn:#a56a1c; --warn-bg:#fbf3e4; --crit:#9a3b33; --crit-bg:#faedeb;
     --in:#48733c; --out:#9a3b33;
-    --shadow:0 1px 2px rgba(30,40,20,.04), 0 14px 30px -18px rgba(30,40,20,.16);
-    --shadow-sm:0 1px 2px rgba(30,40,20,.05);
+    --shadow:0 1px 2px rgba(24,32,16,.03), 0 18px 40px -24px rgba(24,32,16,.18);
+    --shadow-lg:0 2px 4px rgba(24,32,16,.04), 0 34px 70px -34px rgba(24,32,16,.26);
+    --shadow-sm:0 1px 2px rgba(24,32,16,.05);
     --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
     --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
     --mono:ui-monospace,"SF Mono",Menlo,monospace;
+    --r:20px; --r-sm:13px;
   }
   @media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){
-    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --line:#2e3327; --mist:#1e231a; --paper:#12150e; --card:#1b1f16; --panel:#171b12;
-    --greenSoft:#21301b; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }}
+    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --faint:#6c7263; --line:#2c3126; --hair:#242a1e;
+    --mist:#1c2116; --bg:#12150e; --paper:#181c12; --card:#181c12; --panel:#151910;
+    --greenSoft:#20301b; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }}
   :root[data-theme="dark"]{
-    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --line:#2e3327; --mist:#1e231a; --paper:#12150e; --card:#1b1f16; --panel:#171b12;
-    --greenSoft:#21301b; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }
+    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --faint:#6c7263; --line:#2c3126; --hair:#242a1e;
+    --mist:#1c2116; --bg:#12150e; --paper:#181c12; --card:#181c12; --panel:#151910;
+    --greenSoft:#20301b; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--mist);color:var(--body);font:14px/1.5 var(--sans)}
+  html{scroll-behavior:smooth}
+  body{margin:0;color:var(--body);font:14px/1.55 var(--sans);letter-spacing:-.005em;
+    background:
+      radial-gradient(1100px 520px at 82% -8%, rgba(72,115,60,.06), transparent 60%),
+      radial-gradient(760px 420px at 6% 2%, rgba(242,194,48,.05), transparent 55%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0}
   .mono{font-family:var(--mono)}
   button{font:inherit;cursor:pointer}
 
-  header.top{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.85);backdrop-filter:saturate(1.4) blur(10px);
-    border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:14px 26px;flex-wrap:wrap}
-  .logo{display:flex;align-items:center;gap:10px}
-  .logo .mark{width:32px;height:32px;border-radius:8px;background:var(--green);position:relative;flex:none}
-  .logo .mark::after{content:"";position:absolute;right:5px;bottom:5px;width:8px;height:8px;border-radius:2px;background:var(--spark)}
-  .logo .name{font-family:var(--serif);font-weight:600;font-size:18px;color:var(--ink);line-height:1.05}
-  .logo .name small{display:block;font-family:var(--sans);font-weight:500;font-size:10px;font-style:italic;color:var(--muted)}
-  .top .tag{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);font-weight:700}
+  header.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb, var(--paper) 82%, transparent);
+    backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);
+    border-bottom:1px solid var(--line);display:flex;align-items:center;gap:15px;padding:15px 28px;flex-wrap:wrap}
+  .logo{display:flex;align-items:center;gap:11px}
+  .logo svg{flex:none;filter:drop-shadow(0 4px 10px rgba(72,115,60,.28))}
+  .logo .name{font-family:var(--serif);font-weight:600;font-size:19px;color:var(--ink);line-height:1.02}
+  .logo .name small{display:block;font-family:var(--sans);font-weight:500;font-size:10.5px;font-style:italic;color:var(--muted)}
+  .top .tag{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:700;
+    border:1px solid color-mix(in srgb,var(--green) 30%,transparent);border-radius:999px;padding:5px 11px;background:var(--greenSoft)}
+  .top .links{font-size:12.5px;display:flex;gap:4px;align-items:center}
+  .top .links a{color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:9px;transition:.15s}
+  .top .links a:hover{color:var(--green);background:var(--greenSoft)}
   .top .today{margin-left:auto;font-size:12px;color:var(--muted)}
   .top .today b{color:var(--ink)}
 
@@ -45,7 +60,8 @@
   .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
   @media (max-width:960px){.kpis{grid-template-columns:repeat(3,1fr)}}
   @media (max-width:560px){.kpis{grid-template-columns:repeat(2,1fr)}}
-  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 15px;box-shadow:var(--shadow-sm)}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r-sm);padding:16px 17px;box-shadow:var(--shadow-sm);transition:box-shadow .2s,transform .12s}
+  .kpi:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
   .kpi .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700}
   .kpi .v{font-family:var(--serif);font-size:22px;color:var(--ink);font-weight:600;margin-top:3px;line-height:1;font-variant-numeric:tabular-nums}
   .kpi .s{font-size:10.5px;color:var(--muted);margin-top:3px}
@@ -56,7 +72,8 @@
     padding:9px 15px;border-radius:9px 9px 0 0;font-size:13.5px;font-weight:600}
   .tabs button[aria-selected="true"]{color:var(--ink);background:var(--card);border-color:var(--line);box-shadow:inset 0 3px 0 var(--green)}
 
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:var(--shadow)}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:26px;box-shadow:var(--shadow-lg);position:relative;overflow:hidden}
+  .panel::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--green),var(--greenLt) 60%,var(--spark))}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
   @media (max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
@@ -111,12 +128,13 @@
   .mailview .row b{width:64px;color:var(--muted);flex:none;font-weight:600}
   .mailview input,.mailview textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:8px 10px;width:100%}
   .mailview textarea{min-height:230px;resize:vertical;line-height:1.55;font-size:13px}
-  .btn{background:var(--green);color:#fff;border:none;border-radius:11px;padding:11px 20px;font-weight:600;font-size:13.5px;
-    box-shadow:0 1px 2px rgba(30,40,20,.12), 0 8px 18px -10px rgba(72,115,60,.5);transition:transform .08s, box-shadow .15s}
-  .btn:hover{box-shadow:0 2px 4px rgba(30,40,20,.14), 0 12px 22px -10px rgba(72,115,60,.6)}
+  .btn{background:linear-gradient(180deg,var(--greenLt),var(--green));color:#fff;border:none;border-radius:12px;padding:11px 20px;font-weight:600;font-size:13.5px;letter-spacing:-.01em;
+    box-shadow:0 1px 2px rgba(24,32,16,.14), 0 10px 22px -12px rgba(72,115,60,.6);transition:transform .08s, box-shadow .18s, filter .15s}
+  .btn:hover{filter:brightness(1.04);box-shadow:0 2px 5px rgba(24,32,16,.16), 0 16px 30px -14px rgba(72,115,60,.7)}
   .btn:active{transform:translateY(1px)}
-  .btn:disabled{opacity:.45;cursor:default;box-shadow:none}
-  .btn.ghost{background:var(--paper);border:1px solid var(--line);color:var(--body);box-shadow:var(--shadow-sm)}
+  .btn:disabled{opacity:.45;cursor:default;box-shadow:none;filter:grayscale(.2)}
+  .btn.ghost{background:var(--paper);border:1px solid var(--line);color:var(--body);box-shadow:var(--shadow-sm);font-weight:500}
+  .btn.ghost:hover{border-color:var(--green);color:var(--green);filter:none}
   .sent-tag{font-size:10.5px;color:var(--good);font-weight:700;display:inline-flex;align-items:center;gap:4px}
   .feed{font-size:11.5px;color:var(--muted);border-top:1px solid var(--line);margin-top:8px;padding-top:8px;max-height:120px;overflow:auto}
   .feed div{padding:2px 0}
@@ -137,8 +155,20 @@
 <body data-palette="#48733C,#2F6F9E,#B07A1E,#8A4FA3">
 
 <header class="top">
-  <div class="logo"><span class="mark"></span><span class="name">Canei Subirats<small>Renovations, simply complex.</small></span></div>
+  <div class="logo">
+    <svg width="34" height="34" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
+      <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c"/>
+      <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="18" y="23.5" width="4" height="5" rx="1" fill="#fff"/>
+      <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230"/>
+    </svg>
+    <span class="name">Canei Subirats<small>Renovations, simply complex.</small></span>
+  </div>
   <span class="tag">ERP · Control Tower</span>
+  <span class="links">
+    <a href="index.html">Home</a><a href="journey.html">Journey ↗</a><a href="frontend.html">Quote demo ↗</a>
+  </span>
   <span class="today">Today <b id="today">17 Jul 2026</b> · <span id="clock">demo</span></span>
 </header>
 
@@ -238,8 +268,8 @@ const days = (a,b)=>Math.round((a-b)/86400000);
 const $ = s => document.querySelector(s);
 const el = (t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
 
-/* --- 12-stage lifecycle (BRD desired process) --- */
-const STAGES = ["Lead","Site visit","Estimate","Quotation","Acceptance","Project","Purchasing","Execution","Invoicing","Collections","Supplier payments","Close · profit"];
+/* --- 13-stage lifecycle (BRD desired process, incl. review request) --- */
+const STAGES = ["Lead","Site visit","Estimate","Quotation","Acceptance","Project","Purchasing","Execution","Invoicing","Collections","Supplier payments","Close · profit","Review request"];
 
 /* --- portfolio: synthetic but realistic reforma projects --- */
 // money in cents. committed = POs raised; actual = supplier bills booked;
@@ -460,6 +490,8 @@ function tmpl(kind,p){
     body:`Dear ${p.client},\n\nWe hope everything is to your satisfaction. Our records show invoice FAC-2026-0002 for ${eur2(p.outstanding)} is now ${p.dueDays<0?`${-p.dueDays} day(s) overdue`:"due"}.\n\nIf you have already arranged payment, please disregard this note. Otherwise, a quick transfer would be greatly appreciated.\n\nThank you very much,\n${brand.sign}`};
   if(kind==="po")return{...base, to:"comercial@proveidor.example.com", event:`Purchase order`, subject:`Purchase order — ${p.name} (${p.id})`,
     body:`Hello,\n\nPlease supply the following for our project ${p.id} (“${p.name}”):\n\n  • Materials per the attached comparison (selected supplier).\n  • Committed budget for this order: ${eur2(p.committed)}.\n  • Delivery to: Sant Just Desvern site.\n\nKindly confirm price validity and delivery date.\n\nThank you,\n${brand.sign}`};
+  if(kind==="review")return{...base, event:`Review request`, subject:`How did we do? — a quick favour`,
+    body:`Dear ${p.client},\n\nIt's been a pleasure renovating your home, and we hope you're enjoying the result every day.\n\nIf you have 30 seconds, a short review means the world to a family business like ours — and helps your neighbours find a team they can trust.\n\n  ★ Leave a Google review: https://g.page/r/canei-subirats/review\n\nThank you so much,\n${brand.sign}`};
 }
 const drafts=[
   tmpl("quote-sent",P.find(p=>p.id==="P-039")),
@@ -467,6 +499,7 @@ const drafts=[
   tmpl("invoice",P.find(p=>p.id==="P-024")),
   tmpl("reminder",P.find(p=>p.id==="P-024")),
   tmpl("po",P.find(p=>p.id==="P-036")),
+  tmpl("review",P.find(p=>p.id==="P-031")),
 ].map((d,i)=>({...d,id:"M"+(i+1),status:"draft"}));
 let selMail=0;
 function renderMailList(){
@@ -497,13 +530,29 @@ function renderMail(){
       logFeed(`Sent “${m.subject}” → ${m.to} (log-only adapter — not delivered).`);
       renderMailList(); renderMail();
     };
+    const draft=el("button","btn ghost","⤓ Outlook draft (.eml)");
+    draft.onclick=()=>{
+      const to=$("#m-to").value, subj=$("#m-subj").value, body=$("#m-body").value;
+      downloadEml(to,subj,body);
+      logFeed(`Outlook draft downloaded — “${subj}” (opens editable in Outlook, not sent).`);
+    };
     const regen=el("button","btn ghost","↻ Reset draft");
     regen.onclick=()=>{Object.assign(m,tmpl(m.kind,P.find(p=>p.id===m.project)||P[0]),{id:m.id,status:"draft"});renderMail();};
-    bar.append(send, regen, el("span","sub","Auto-drafted from project data · edit freely before sending"));
+    bar.append(send, draft, regen, el("span","sub","Auto-drafted · edit freely · send or save to Outlook"));
   }
   v.append(bar);
 }
 function nowStr(){return new Intl.DateTimeFormat("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(TODAY);}
+/* Outlook draft: X-Unsent:1 makes Outlook open the .eml as a new editable message. */
+function downloadEml(to,subject,body){
+  const CRLF="\r\n";
+  const eml=[`From: ${brand.name} <${brand.from}>`,`To: ${to}`,`Subject: ${subject}`,"X-Unsent: 1",
+    "MIME-Version: 1.0",'Content-Type: text/plain; charset="utf-8"',"Content-Transfer-Encoding: 8bit","",body].join(CRLF);
+  const blob=new Blob([eml],{type:"message/rfc822"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download=`Canei-${subject.slice(0,32).replace(/[^\w]+/g,"-")}.eml`;
+  document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
 function logFeed(msg){
   const f=$("#mailfeed"); if(f.dataset.clean!=="1"){f.innerHTML="<b>Activity</b>";f.dataset.clean="1";}
   f.append(el("div",null,`${nowStr()} · ${msg}`));
