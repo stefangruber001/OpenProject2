@@ -119,12 +119,22 @@ output; the factory is the product.
     messaging, `diorka` composes **14 real, tested capabilities** — every BRD
     functional area now has a domain engine (185+ tests across the repo).
 
-## Remaining (integration + UI surfaces, not missing capabilities)
+14. **Live app on durable storage** — DONE (commit 9f9238d): `buildServices`
+    constructs all 14 capability engines when selected and exposes an
+    `aggregates` KeyValueStore (Prisma+RLS when DATABASE_URL — the same
+    adapter the CI persistence job contract-tests — in-memory otherwise).
+    `GET /api/[tenant]/control-tower` computes the live overview (crm
+    pipeline, per-project financials, AR/AP outstanding, committed, overdue
+    tasks, access checks) from the REAL services over persisted aggregates;
+    seeds on first call, reads back after. Integration test in
+    `apps/web/lib/control-tower.test.ts`. The app is the running system now,
+    not a mirror.
 
-- **Live app on durable Postgres**: wire the capability services onto the
-  Prisma+RLS stores and real Next.js routes/actions (the web shell runs
-  quoting/billing today; the new engines are proven by unit tests + the demo
-  pages).
+## Remaining (UI surfaces + packaging)
+
+- **Web pages** over the live services (the API + engines exist): branded
+  quote PDF (QUO-15/16 — Chromium renderer already in-repo), supplier/item
+  registers (CAT/SUP), owner dashboards (DAS), consolidated view (ORG-04).
 - **Web surfaces**: branded quote PDF (QUO-15/16); supplier/item registers
   (CAT/SUP UI); owner dashboards (DAS); consolidated owner view (ORG-04).
 - **PWA shell** for mobile site-visit capture (NFR-03/04) over `visits`.
