@@ -78,6 +78,23 @@ output; the factory is the product.
       to Canei brand + English (fiscal invoice stays es-ES); Chromium-verified.
       Gates green each commit.
 
+11. **Control Tower dashboard + email drafting** — DONE this cycle (commits
+    46b0bc2, 018d9be). "Execute the plan fully" (logged ASSUMPTIONS #27–28):
+    shipped the demonstrable whole-journey slice. `site/dashboard.html` — a
+    visual Customer Journey Control Tower: 12-stage lifecycle (lead→profit)
+    with drill-down, per-project financial control
+    (budget/committed/actual/revenue/margin/cash/forecast) with money
+    waterfall, and the full dashboard suite (pipeline, quote margin, AR aging,
+    AP due, purchasing-vs-budget, 6-week cash forecast in/out, company
+    performance, supplier comparison). Colours follow the dataviz skill
+    (single-hue brand green for magnitude, reserved good/warn/crit with
+    icons+labels; palette validated). Emails auto-draft per lifecycle event
+    with one-click Send routed through a **log-only** adapter (never
+    delivered). Backed by real code: NEW `@repo/capability-messaging`
+    (draft-from-data templates, `email-out@1` optional port, `LogOnlyOutbox`,
+    5 tests), registered + composed into `diorka` (8 capabilities, templates
+    as tenant data). Chromium-verified; all gates green.
+
 ## Next 3 tasks (P2 — in order)
 
 0. ~~**P2.1a Async persistence seam** — DONE: kernel store ports
