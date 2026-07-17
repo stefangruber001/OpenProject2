@@ -6,12 +6,14 @@ import {
   type ClockPort,
   type EventLogPort,
   type IdGenPort,
+  type Repository,
 } from "@repo/kernel";
 import type { Quote, QuoteLineInput } from "./model";
 
 export interface QuotingDeps {
   tenantId: string;
   currency: string;
+  store: Repository<Quote>;
   clock: ClockPort;
   idGen: IdGenPort;
   events: EventLogPort;
@@ -20,13 +22,12 @@ export interface QuotingDeps {
 /**
  * Quote lifecycle: draft → accepted. Accepted quotes are deep-frozen — the
  * accepted snapshot is what billing consumes, so it must never drift.
+ * Persistence is an injected Repository (in-memory or durable, same contract).
  */
 export class QuotingService {
-  private quotes = new Map<string, Quote>();
-
   constructor(private readonly deps: QuotingDeps) {}
 
-  create(title: string): Quote {
+  async create(title: string): Promise<Quote> {
     const quote: Quote = {
       id: this.deps.idGen.next("quote"),
       tenantId: this.deps.tenantId,
@@ -37,8 +38,8 @@ export class QuotingService {
       lines: [],
       baseCents: 0,
     };
-    this.quotes.set(quote.id, quote);
-    this.deps.events.append({
+    await this.deps.store.save(quote);
+    await this.deps.events.append({
       type: "quote.created",
       at: quote.createdAt,
       tenantId: quote.tenantId,
@@ -47,23 +48,25 @@ export class QuotingService {
     return quote;
   }
 
-  addLine(quoteId: string, input: QuoteLineInput): Quote {
-    const quote = this.mustGetDraft(quoteId);
+  async addLine(quoteId: string, input: QuoteLineInput): Promise<Quote> {
+    const quote = await this.mustGetDraft(quoteId);
     const totalCents = lineTotalCents(input.qtyMillis, input.unitCents);
     quote.lines.push({ ...input, id: this.deps.idGen.next("line"), totalCents });
     quote.baseCents = sumCents(quote.lines.map((l) => l.totalCents));
+    await this.deps.store.save(quote);
     return quote;
   }
 
-  accept(quoteId: string): Readonly<Quote> {
-    const quote = this.mustGetDraft(quoteId);
+  async accept(quoteId: string): Promise<Readonly<Quote>> {
+    const quote = await this.mustGetDraft(quoteId);
     if (quote.lines.length === 0) {
       throw new FactoryError("INVALID_STATE", `Quote ${quoteId} has no lines to accept.`);
     }
     quote.status = "accepted";
     quote.acceptedAt = this.deps.clock.nowIso();
     deepFreeze(quote);
-    this.deps.events.append({
+    await this.deps.store.save(quote);
+    await this.deps.events.append({
       type: "quote.accepted",
       at: quote.acceptedAt,
       tenantId: quote.tenantId,
@@ -72,14 +75,14 @@ export class QuotingService {
     return quote;
   }
 
-  get(quoteId: string): Readonly<Quote> {
-    const quote = this.quotes.get(quoteId);
+  async get(quoteId: string): Promise<Readonly<Quote>> {
+    const quote = await this.deps.store.get(quoteId);
     if (!quote) throw new FactoryError("NOT_FOUND", `Quote ${quoteId} not found.`);
     return quote;
   }
 
-  private mustGetDraft(quoteId: string): Quote {
-    const quote = this.quotes.get(quoteId);
+  private async mustGetDraft(quoteId: string): Promise<Quote> {
+    const quote = await this.deps.store.get(quoteId);
     if (!quote) throw new FactoryError("NOT_FOUND", `Quote ${quoteId} not found.`);
     if (quote.status !== "draft") {
       throw new FactoryError(

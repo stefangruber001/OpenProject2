@@ -10,10 +10,10 @@ const record = (n: string, total: number) => ({
 });
 
 describe("es-ES invoice chain", () => {
-  it("links each seal to the previous hash", () => {
+  it("links each seal to the previous hash", async () => {
     const chain = new EsInvoiceChainAdapter();
-    const a = chain.seal(record("FAC-2026-0001", 100));
-    const b = chain.seal(record("FAC-2026-0002", 200));
+    const a = await chain.seal(record("FAC-2026-0001", 100));
+    const b = await chain.seal(record("FAC-2026-0002", 200));
     expect(a.seq).toBe(1);
     expect(a.prevHash).toBeNull();
     expect(b.seq).toBe(2);
@@ -21,15 +21,15 @@ describe("es-ES invoice chain", () => {
     expect(b.hash).not.toBe(a.hash);
   });
 
-  it("is deterministic for identical histories", () => {
+  it("is deterministic for identical histories", async () => {
     const c1 = new EsInvoiceChainAdapter();
     const c2 = new EsInvoiceChainAdapter();
-    expect(c1.seal(record("X", 1)).hash).toBe(c2.seal(record("X", 1)).hash);
+    expect((await c1.seal(record("X", 1))).hash).toBe((await c2.seal(record("X", 1))).hash);
   });
 
-  it("any field change changes the hash (tamper evidence)", () => {
+  it("any field change changes the hash (tamper evidence)", async () => {
     const c1 = new EsInvoiceChainAdapter();
     const c2 = new EsInvoiceChainAdapter();
-    expect(c1.seal(record("X", 1)).hash).not.toBe(c2.seal(record("X", 2)).hash);
+    expect((await c1.seal(record("X", 1))).hash).not.toBe((await c2.seal(record("X", 2))).hash);
   });
 });

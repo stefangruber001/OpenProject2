@@ -74,7 +74,7 @@ try {
       const specPath = rest[0] ?? fail("usage: factory demo <tenant.yaml> [--out <dir>]");
       const outIdx = rest.indexOf("--out");
       const out = outIdx >= 0 ? rest[outIdx + 1]! : "out";
-      const result = runDemo(specPath, out);
+      const result = await runDemo(specPath, out);
       const { invoiceEligible: a, invoiceBusiness: b, resolved } = result;
       const locale = resolved.kernelConfig.locale;
       const currency = resolved.kernelConfig.currency;

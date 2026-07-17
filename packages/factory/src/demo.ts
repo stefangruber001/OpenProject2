@@ -28,7 +28,7 @@ export interface DemoResult {
 
 export const DEMO_DATE = "2026-07-16";
 
-export function runDemo(specPath: string, outBase = "out"): DemoResult {
+export async function runDemo(specPath: string, outBase = "out"): Promise<DemoResult> {
   const spec = parse(readFileSync(specPath, "utf8")) as { tenant?: string };
   const resolved = resolveTenant(spec, registries);
   const services = buildServices(resolved, {
@@ -41,7 +41,7 @@ export function runDemo(specPath: string, outBase = "out"): DemoResult {
   const t = vertical.terminology;
 
   // --- Presupuesto: reforma de baño for a private homeowner ----------------
-  const quote = quoting.create(`${t.quote} — Reforma de baño, C/ Mayor 12, Madrid`);
+  const quote = await quoting.create(`${t.quote} — Reforma de baño, C/ Mayor 12, Madrid`);
   const partidas = [
     {
       description: "Demolición de alicatado y retirada de escombros",
@@ -63,7 +63,7 @@ export function runDemo(specPath: string, outBase = "out"): DemoResult {
     },
   ];
   for (const p of partidas) {
-    quoting.addLine(quote.id, {
+    await quoting.addLine(quote.id, {
       description: p.description,
       unit: p.unit,
       qtyMillis: medicionQtyMillis(p.medicion),
@@ -72,10 +72,10 @@ export function runDemo(specPath: string, outBase = "out"): DemoResult {
       meta: { [t.measurement.toLowerCase()]: p.medicion },
     });
   }
-  const accepted = quoting.accept(quote.id);
+  const accepted = await quoting.accept(quote.id);
 
   // Factura 1 — eligible dwelling renovation (reduced rate path).
-  const invoiceEligible = billing.issueFromQuote(accepted, {
+  const invoiceEligible = await billing.issueFromQuote(accepted, {
     buyer: { name: "María García López", taxId: "00000000T", address: "C/ Mayor 12, Madrid" },
     seriesId: "FAC",
     attributes: dwellingWorksAttributes({
@@ -87,15 +87,16 @@ export function runDemo(specPath: string, outBase = "out"): DemoResult {
   });
 
   // Factura 2 — same kind of works for a business client (general rate path).
-  const office = quoting.create(`${t.quote} — Reforma de oficina, C/ Alcalá 200`);
-  quoting.addLine(office.id, {
+  const office = await quoting.create(`${t.quote} — Reforma de oficina, C/ Alcalá 200`);
+  await quoting.addLine(office.id, {
     description: "Reforma integral de oficina (partida alzada)",
     unit: "PA",
     qtyMillis: 1000,
     unitCents: 5_000_00,
     taxCategoryHint: HINT_WORKS_ON_DWELLING,
   });
-  const invoiceBusiness = billing.issueFromQuote(quoting.accept(office.id), {
+  const acceptedOffice = await quoting.accept(office.id);
+  const invoiceBusiness = await billing.issueFromQuote(acceptedOffice, {
     buyer: { name: "Alcalá Consulting S.L.", taxId: "B11111111", address: "C/ Alcalá 200, Madrid" },
     seriesId: "FAC",
     attributes: dwellingWorksAttributes({
@@ -127,7 +128,7 @@ export function runDemo(specPath: string, outBase = "out"): DemoResult {
     );
   }
   emit("chain.json", json([invoiceEligible.seal, invoiceBusiness.seal]));
-  emit("events.json", json(services.events.list()));
+  emit("events.json", json(await services.events.list()));
 
   return { outDir, resolved, quoteId: accepted.id, invoiceEligible, invoiceBusiness, files };
 }

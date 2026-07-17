@@ -61,12 +61,19 @@ output; the factory is the product.
 · build · boundaries. Every commit green and pushed to
 `claude/orin-project-status-1q50dt`.
 
-## Next 3 tasks (P2 start — in order)
+## Next 3 tasks (P2 — in order)
 
-1. **Durable persistence behind kernel ports**: Prisma schema for tenants,
-   quotes, invoices, events with `tenant_id` RLS (ADR-0007); adapter passes
-   the SAME contract tests as the in-memory ones; migration + seed; runbook
-   update. (Existing `packages/db` is the substrate.)
+0. ~~**P2.1a Async persistence seam** — DONE: kernel store ports
+   (Repository/AppendOnly/Counter/KeyValue) + in-memory adapters + exported
+   contract-test kits (`@repo/kernel` `src/testing/contracts.ts`); quoting,
+   billing, numbering, es chain and factory composition now run on injected
+   async stores. Demo output byte-identical pre/post. 58+ tests green.~~
+1. **P2.1b Durable adapters**: Prisma schema (tenant, aggregate JSONB tables,
+   counters, kv, events) with `tenant_id` RLS (ADR-0007); Prisma adapters
+   implementing the kernel store ports, passing the SAME contract kits;
+   migration SQL committed; CI job with a Postgres service runs the kits;
+   chain-head state moves to durable KV via PackRegisterContext infra hook.
+   (Existing `packages/db` is the substrate.)
 2. **Web ERP shell on composed services** (`apps/web`): tenant-scoped
    presupuesto list/create/accept + factura issue/view using
    `@repo/factory` composition; server-side only; es-ES labels from ports.

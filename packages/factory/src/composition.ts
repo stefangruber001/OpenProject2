@@ -1,20 +1,36 @@
 import {
+  InMemoryAppendOnlyStore,
+  InMemoryCounterStore,
   InMemoryEventLog,
+  InMemoryRepository,
   RandomIdGen,
   SystemClock,
+  type AppendOnlyStore,
   type ClockPort,
+  type CounterStore,
   type EventLogPort,
   type IdGenPort,
+  type Repository,
   type ResolvedTenant,
 } from "@repo/kernel";
-import { QuotingService } from "@repo/capability-quoting";
+import { QuotingService, type Quote } from "@repo/capability-quoting";
 import {
   BillingService,
   DEFAULT_LABELS,
   DOC_LABELS_PORT,
   type BillingConfig,
   type DocLabels,
+  type Invoice,
 } from "@repo/capability-billing";
+
+export interface FactoryInfra {
+  clock?: ClockPort;
+  idGen?: IdGenPort;
+  events?: EventLogPort;
+  quoteStore?: Repository<Quote>;
+  invoiceStore?: AppendOnlyStore<Invoice>;
+  counters?: CounterStore;
+}
 
 export interface FactoryServices {
   resolved: ResolvedTenant;
@@ -26,15 +42,14 @@ export interface FactoryServices {
 
 /**
  * Assemble runtime services for a resolved tenant. This is the host layer:
- * the only place capabilities, packs and kernel meet concretely.
+ * the only place capabilities, packs, kernel and INFRASTRUCTURE meet.
+ * Defaults are in-memory; durable adapters (Prisma+RLS, ADR-0007) drop in
+ * through the same store contracts without touching capabilities.
  */
-export function buildServices(
-  resolved: ResolvedTenant,
-  opts?: { clock?: ClockPort; idGen?: IdGenPort },
-): FactoryServices {
-  const clock = opts?.clock ?? new SystemClock();
-  const idGen = opts?.idGen ?? new RandomIdGen();
-  const events = new InMemoryEventLog();
+export function buildServices(resolved: ResolvedTenant, infra: FactoryInfra = {}): FactoryServices {
+  const clock = infra.clock ?? new SystemClock();
+  const idGen = infra.idGen ?? new RandomIdGen();
+  const events = infra.events ?? new InMemoryEventLog();
   const has = (id: string) => resolved.spec.capabilities.includes(id);
   const labels = resolved.ports.tryGet<DocLabels>(DOC_LABELS_PORT) ?? DEFAULT_LABELS;
 
@@ -47,13 +62,18 @@ export function buildServices(
     events,
   };
   if (has("quoting")) {
-    services.quoting = new QuotingService(common);
+    services.quoting = new QuotingService({
+      ...common,
+      store: infra.quoteStore ?? new InMemoryRepository<Quote>(),
+    });
   }
   if (has("billing")) {
     services.billing = new BillingService({
       ...common,
       config: resolved.config.billing as BillingConfig,
       ports: resolved.ports,
+      store: infra.invoiceStore ?? new InMemoryAppendOnlyStore<Invoice>(),
+      counters: infra.counters ?? new InMemoryCounterStore(),
     });
   }
   return services;

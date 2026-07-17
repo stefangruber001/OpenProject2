@@ -84,3 +84,9 @@ languages: es-ES # source: synthetic
     on _estimación directa_ (empresarial) default to **no retention** — the
     common real-world case, frequently gotten wrong. LEGAL_REVIEW.md has the
     citations; the profile field is explicit tenant data, not a guess.
+
+17. **Persistence seam (P2.1a)**: capabilities take injected async store ports
+    (`Repository`, `AppendOnlyStore`, `CounterStore`, `KeyValueStore`) defined
+    in the kernel; in-memory adapters ship with contract-test kits that any
+    durable adapter must pass unchanged (ADR-0007). Chain-head state is behind
+    `KeyValueStore` (in-memory default until the durable hook lands in P2.1b).

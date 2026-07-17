@@ -3,13 +3,15 @@ import {
   applyRateBp,
   deepFreeze,
   sumCents,
+  type AppendOnlyStore,
   type ClockPort,
+  type CounterStore,
   type EventLogPort,
   type IdGenPort,
   type PortRegistry,
 } from "@repo/kernel";
 import type { BillingConfig, Invoice, InvoiceLine, TaxSummaryRow } from "./model";
-import { SeriesCounters } from "./numbering";
+import { SeriesNumbering } from "./numbering";
 import {
   INVOICE_CHAIN_PORT,
   TAX_PORT,
@@ -23,6 +25,8 @@ export interface BillingDeps {
   currency: string;
   config: BillingConfig;
   ports: PortRegistry;
+  store: AppendOnlyStore<Invoice>;
+  counters: CounterStore;
   clock: ClockPort;
   idGen: IdGenPort;
   events: EventLogPort;
@@ -57,22 +61,22 @@ export interface BillableSource {
 }
 
 /**
- * Invoices are immutable once issued; corrections are rectificative invoices
- * in their own series referencing the original. Tax is decided by the bound
- * TaxPort at the invoice's issue date, and the decision + justification are
- * persisted on the invoice (mandate §6.3) — never recomputed on read.
+ * Invoices are immutable once issued (append-only store enforces it);
+ * corrections are rectificative invoices in their own series referencing the
+ * original. Tax is decided by the bound TaxPort at the invoice's issue date,
+ * and the decision + justification are persisted on the invoice (mandate
+ * §6.3) — never recomputed on read.
  */
 export class BillingService {
-  private invoices = new Map<string, Invoice>();
-  private counters: SeriesCounters;
+  private numbering: SeriesNumbering;
 
   constructor(private readonly deps: BillingDeps) {
-    this.counters = new SeriesCounters(deps.config.series);
+    this.numbering = new SeriesNumbering(deps.config.series, deps.counters);
     // Fail at composition time, not on first invoice: tax is required.
     deps.ports.get<TaxPort>(TAX_PORT);
   }
 
-  issueFromQuote(quote: BillableSource, opts: IssueOptions): Readonly<Invoice> {
+  async issueFromQuote(quote: BillableSource, opts: IssueOptions): Promise<Readonly<Invoice>> {
     if (quote.status !== "accepted") {
       throw new FactoryError(
         "INVALID_STATE",
@@ -98,9 +102,12 @@ export class BillingService {
   }
 
   /** Rectificative invoice: negates the original, own series, references it. */
-  rectify(invoiceId: string, opts: IssueOptions & { reason: string }): Readonly<Invoice> {
-    const original = this.get(invoiceId);
-    const def = this.counters.def(opts.seriesId);
+  async rectify(
+    invoiceId: string,
+    opts: IssueOptions & { reason: string },
+  ): Promise<Readonly<Invoice>> {
+    const original = await this.get(invoiceId);
+    const def = this.numbering.def(opts.seriesId);
     if (def.kind !== "rectificative") {
       throw new FactoryError(
         "INVALID_STATE",
@@ -118,23 +125,23 @@ export class BillingService {
     });
   }
 
-  get(invoiceId: string): Readonly<Invoice> {
-    const invoice = this.invoices.get(invoiceId);
+  async get(invoiceId: string): Promise<Readonly<Invoice>> {
+    const invoice = await this.deps.store.get(invoiceId);
     if (!invoice) throw new FactoryError("NOT_FOUND", `Invoice ${invoiceId} not found.`);
     return invoice;
   }
 
-  list(): readonly Invoice[] {
-    return [...this.invoices.values()];
+  async list(): Promise<readonly Invoice[]> {
+    return this.deps.store.list();
   }
 
-  private issue(
+  private async issue(
     lines: InvoiceLine[],
     kind: Invoice["kind"],
     opts: IssueOptions,
     extra: Partial<Pick<Invoice, "rectifies" | "rectificationReason">> & { quoteId?: string },
-  ): Readonly<Invoice> {
-    const def = this.counters.def(opts.seriesId);
+  ): Promise<Readonly<Invoice>> {
+    const def = this.numbering.def(opts.seriesId);
     if (kind === "standard" && def.kind !== "standard") {
       throw new FactoryError(
         "INVALID_STATE",
@@ -155,7 +162,7 @@ export class BillingService {
     const summary = summarize(lines, perLine);
     const baseCents = sumCents(lines.map((l) => l.totalCents));
     const taxCents = sumCents(summary.map((s) => s.taxCents));
-    const { number, displayNumber } = this.counters.next(opts.seriesId, issueDate);
+    const { number, displayNumber } = await this.numbering.next(opts.seriesId, issueDate);
 
     const invoice: Invoice = {
       id: this.deps.idGen.next("inv"),
@@ -180,7 +187,7 @@ export class BillingService {
 
     const chain = this.deps.ports.tryGet<InvoiceChainPort>(INVOICE_CHAIN_PORT);
     if (chain) {
-      invoice.seal = chain.seal({
+      invoice.seal = await chain.seal({
         tenantId: invoice.tenantId,
         series: invoice.series,
         displayNumber: invoice.displayNumber,
@@ -191,8 +198,8 @@ export class BillingService {
     }
 
     deepFreeze(invoice);
-    this.invoices.set(invoice.id, invoice);
-    this.deps.events.append({
+    await this.deps.store.append(invoice);
+    await this.deps.events.append({
       type: "invoice.issued",
       at: this.deps.clock.nowIso(),
       tenantId: invoice.tenantId,

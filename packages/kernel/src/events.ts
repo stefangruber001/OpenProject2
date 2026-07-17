@@ -2,8 +2,8 @@ import { deepFreeze } from "./canonical";
 
 /**
  * Append-only event log — the audit seam. No update, no delete, by
- * construction. Persistence is an adapter concern (in-memory here; a durable
- * adapter binds the same interface later).
+ * construction. Async so durable adapters are drop-ins; adapters must pass
+ * the same behaviour (sequential seq, frozen entries).
  */
 export interface DomainEvent {
   readonly seq: number;
@@ -14,20 +14,20 @@ export interface DomainEvent {
 }
 
 export interface EventLogPort {
-  append(evt: Omit<DomainEvent, "seq">): DomainEvent;
-  list(): readonly DomainEvent[];
+  append(evt: Omit<DomainEvent, "seq">): Promise<DomainEvent>;
+  list(): Promise<readonly DomainEvent[]>;
 }
 
 export class InMemoryEventLog implements EventLogPort {
   private events: DomainEvent[] = [];
 
-  append(evt: Omit<DomainEvent, "seq">): DomainEvent {
+  async append(evt: Omit<DomainEvent, "seq">): Promise<DomainEvent> {
     const stored = deepFreeze({ ...evt, seq: this.events.length + 1 });
     this.events.push(stored);
     return stored;
   }
 
-  list(): readonly DomainEvent[] {
+  async list(): Promise<readonly DomainEvent[]> {
     return this.events;
   }
 }

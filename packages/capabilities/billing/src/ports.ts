@@ -65,7 +65,7 @@ export interface InvoiceChainPort {
     issueDate: string;
     totalCents: Cents;
     buyerTaxId?: string;
-  }): InvoiceSeal;
+  }): Promise<InvoiceSeal>;
 }
 
 /** Human-facing document labels — language/wording is pack-supplied data. */

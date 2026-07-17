@@ -5,6 +5,7 @@ export * from "./clock";
 export * from "./ids";
 export * from "./canonical";
 export * from "./ports";
+export * from "./stores";
 export * from "./events";
 export * from "./spec";
 export * from "./resolve";

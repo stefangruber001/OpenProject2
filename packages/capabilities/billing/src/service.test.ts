@@ -1,6 +1,14 @@
-import { FixedClock, InMemoryEventLog, PortRegistry, SeqIdGen, isFactoryError } from "@repo/kernel";
+import {
+  FixedClock,
+  InMemoryAppendOnlyStore,
+  InMemoryCounterStore,
+  InMemoryEventLog,
+  PortRegistry,
+  SeqIdGen,
+  isFactoryError,
+} from "@repo/kernel";
 import { describe, expect, it } from "vitest";
-import type { BillingConfig } from "./model";
+import type { BillingConfig, Invoice } from "./model";
 import { BillingService, type BillableSource } from "./service";
 import { TAX_PORT, type TaxPort } from "./ports";
 
@@ -40,12 +48,19 @@ const config: BillingConfig = {
 function setup(withTax = true) {
   const ports = new PortRegistry();
   if (withTax) ports.bind(TAX_PORT, fakeTax, "test/fake");
-  const clock = new FixedClock("2026-07-16");
-  const idGen = new SeqIdGen();
-  const events = new InMemoryEventLog();
   const make = () =>
-    new BillingService({ tenantId: "t1", currency: "EUR", config, ports, clock, idGen, events });
-  return { ports, make, events };
+    new BillingService({
+      tenantId: "t1",
+      currency: "EUR",
+      config,
+      ports,
+      store: new InMemoryAppendOnlyStore<Invoice>(),
+      counters: new InMemoryCounterStore(),
+      clock: new FixedClock("2026-07-16"),
+      idGen: new SeqIdGen(),
+      events: new InMemoryEventLog(),
+    });
+  return { ports, make };
 }
 
 /** Structural stand-in for an accepted quote (capabilities stay decoupled). */
@@ -73,10 +88,10 @@ describe("billing", () => {
     }
   });
 
-  it("issues an immutable invoice with persisted tax decisions", () => {
+  it("issues an immutable invoice with persisted tax decisions", async () => {
     const { make } = setup();
     const billing = make();
-    const invoice = billing.issueFromQuote(acceptedQuote(), {
+    const invoice = await billing.issueFromQuote(acceptedQuote(), {
       buyer: { name: "Buyer" },
       seriesId: "INV",
     });
@@ -90,13 +105,13 @@ describe("billing", () => {
     expect(Object.isFrozen(invoice.lines[0])).toBe(true);
   });
 
-  it("numbers gapless per series and resets yearly", () => {
+  it("numbers gapless per series and resets yearly", async () => {
     const { make } = setup();
     const billing = make();
     const q = acceptedQuote();
-    const a = billing.issueFromQuote(q, { buyer: { name: "B" }, seriesId: "INV" });
-    const b = billing.issueFromQuote(q, { buyer: { name: "B" }, seriesId: "INV" });
-    const c = billing.issueFromQuote(q, {
+    const a = await billing.issueFromQuote(q, { buyer: { name: "B" }, seriesId: "INV" });
+    const b = await billing.issueFromQuote(q, { buyer: { name: "B" }, seriesId: "INV" });
+    const c = await billing.issueFromQuote(q, {
       buyer: { name: "B" },
       seriesId: "INV",
       issueDate: "2027-01-02",
@@ -106,28 +121,28 @@ describe("billing", () => {
     expect(c.displayNumber).toBe("INV-2027-0001");
   });
 
-  it("rejects draft quotes and wrong series kinds", () => {
+  it("rejects draft quotes and wrong series kinds", async () => {
     const { make } = setup();
     const billing = make();
-    expect(() =>
+    await expect(
       billing.issueFromQuote(acceptedQuote("draft"), { buyer: { name: "B" }, seriesId: "INV" }),
-    ).toThrowError(/INVALID_STATE/);
-    expect(() =>
+    ).rejects.toThrowError(/INVALID_STATE/);
+    await expect(
       billing.issueFromQuote(acceptedQuote(), { buyer: { name: "B" }, seriesId: "COR" }),
-    ).toThrowError(/INVALID_STATE/);
+    ).rejects.toThrowError(/INVALID_STATE/);
   });
 
-  it("rectifies via a negative invoice in a rectificative series", () => {
+  it("rectifies via a negative invoice in a rectificative series", async () => {
     const { make } = setup();
     const billing = make();
-    const original = billing.issueFromQuote(acceptedQuote(), {
+    const original = await billing.issueFromQuote(acceptedQuote(), {
       buyer: { name: "B" },
       seriesId: "INV",
     });
-    expect(() =>
+    await expect(
       billing.rectify(original.id, { buyer: { name: "B" }, seriesId: "INV", reason: "bad" }),
-    ).toThrowError(/rectificative/);
-    const correction = billing.rectify(original.id, {
+    ).rejects.toThrowError(/rectificative/);
+    const correction = await billing.rectify(original.id, {
       buyer: { name: "B" },
       seriesId: "COR",
       reason: "pricing error",

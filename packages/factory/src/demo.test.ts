@@ -2,15 +2,18 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
-import { runDemo } from "./demo";
+import { beforeAll, describe, expect, it } from "vitest";
+import { runDemo, type DemoResult } from "./demo";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SPEC = join(REPO_ROOT, "tenants/reformas-demo/tenant.yaml");
 
 describe("P1 walking skeleton — presupuesto → factura for tenant #1", () => {
-  const out = mkdtempSync(join(tmpdir(), "factory-demo-"));
-  const result = runDemo(SPEC, out);
+  let result: DemoResult;
+  beforeAll(async () => {
+    const out = mkdtempSync(join(tmpdir(), "factory-demo-"));
+    result = await runDemo(SPEC, out);
+  });
 
   it("composes the tenant from es-ES + construction-reformas", () => {
     expect(result.resolved.report.packs.map((p) => p.id).sort()).toEqual([
@@ -61,9 +64,9 @@ describe("P1 walking skeleton — presupuesto → factura for tenant #1", () => 
     expect(html).toContain("Base imponible");
   });
 
-  it("is deterministic: same spec ⇒ identical artifacts (principle 7)", () => {
+  it("is deterministic: same spec ⇒ identical artifacts (principle 7)", async () => {
     const out2 = mkdtempSync(join(tmpdir(), "factory-demo-"));
-    const second = runDemo(SPEC, out2);
+    const second = await runDemo(SPEC, out2);
     const read = (r: typeof result, suffix: string) =>
       readFileSync(
         r.files.find((f) => f.endsWith(suffix))!,
