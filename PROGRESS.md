@@ -130,6 +130,20 @@ output; the factory is the product.
     `apps/web/lib/control-tower.test.ts`. The app is the running system now,
     not a mirror.
 
+15. **E2E flow test + premium redesign + review-request + Outlook drafts** —
+    DONE this cycle. Headless-tested the whole lead→invoice journey (all 13
+    stages, ledger balances, zero JS errors) and built the one missing step: a
+    **review request** — added as the 13th lifecycle stage (`lead → profit →
+review`) in `site/journey.html` and `site/dashboard.html`, closing the
+    reputation loop. Applied a lighter-white, winning-website design language
+    (larger display type, generous whitespace, layered soft shadows, gradient
+    accents, brand-mark SVG everywhere) to the journey, Control Tower and
+    landing pages. Customer emails now render **full corporate identity** and
+    export as an **Outlook draft (`.eml`, `X-Unsent:1` → editable compose
+    window)** carrying a **dependency-free generated PDF** attachment. Real
+    Graph save-to-Drafts logged in `INTEGRATIONS_PENDING.md`
+    (`outlook-drafts@1`, pending tenant M365 creds). All static; nothing sent.
+
 ## Remaining (UI surfaces + packaging)
 
 - **Web pages** over the live services (the API + engines exist): branded

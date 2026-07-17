@@ -156,3 +156,18 @@ languages: es-ES # source: synthetic
     **Send**, which drives a **log-only fake adapter** (`email-out@1`). No
     real email is ever sent from dev (mandate §3); real SMTP/provider stays
     in `INTEGRATIONS_PENDING.md` until the tenant supplies credentials.
+29. **Premium redesign + review-request stage + Outlook drafts (this cycle).**
+    E2E-tested the whole lead→invoice flow (headless, all 13 stages, ledger
+    balances, no JS errors) and found the missing final step: a **review
+    request**. Added it as the 13th lifecycle stage (`lead → profit → review`)
+    across `site/journey.html` and `site/dashboard.html`, closing the
+    reputation loop. Applied a lighter-white, winning-website design language
+    (larger display type, generous whitespace, layered soft shadows, gradient
+    accents, brand-mark SVG everywhere) to journey, dashboard and landing.
+    Emails now render **full corporate identity** (logo, gradient bar, CTA,
+    PDF-attachment chip, CI footer). **Outlook link:** no Microsoft Graph
+    credentials/MCP exist here, so the most reversible honest option is a
+    downloadable **`.eml` with `X-Unsent: 1`** — Outlook opens it as an
+    **editable draft** in the compose window — carrying a **dependency-free
+    generated PDF** attachment. Real save-to-Drafts via Graph is logged in
+    `INTEGRATIONS_PENDING.md` (`outlook-drafts@1`) pending tenant M365 creds.
