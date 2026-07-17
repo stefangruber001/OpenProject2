@@ -78,8 +78,10 @@ output; the factory is the product.
    new CI `persistence` job (postgres:17 service, migrate deploy + seed +
    tests); CI now also triggers on pushes to `claude/**`; chain-head durable
    KV reachable via `resolveTenant(..., {packInfra})` hook.~~
-   **Follow-up to watch:** first CI run of the persistence job on this branch
-   — if red, fix adapters before anything else (that's the verification).
+   **Verified 2026-07-17:** CI run 29557702359 — `conclusion: success`, all
+   jobs green incl. "Durable adapters (Postgres + RLS contract tests)"
+   (postgres:17 service, migrate deploy + seed + contract kits + cross-tenant
+   invisibility). The store adapters are live-database-proven.
 2. **Web ERP shell on composed services** (`apps/web`): tenant-scoped
    presupuesto list/create/accept + factura issue/view using
    `@repo/factory` composition; server-side only; es-ES labels from ports.
