@@ -35,6 +35,8 @@ import { TimeService, type TimeConfig } from "@repo/capability-time";
 import { DocsService, type DocsConfig } from "@repo/capability-docs";
 import { VisitsService, type VisitsConfig } from "@repo/capability-visits";
 import { AccessService, type AccessConfig } from "@repo/capability-access";
+import { CatalogueService, type CatalogueConfig } from "@repo/capability-catalogue";
+import { SuppliersService, type SuppliersConfig } from "@repo/capability-suppliers";
 
 export interface FactoryInfra {
   clock?: ClockPort;
@@ -67,6 +69,8 @@ export interface FactoryServices {
   docs?: DocsService;
   visits?: VisitsService;
   access?: AccessService;
+  catalogue?: CatalogueService;
+  suppliers?: SuppliersService;
 }
 
 /**
@@ -171,6 +175,16 @@ export function buildServices(resolved: ResolvedTenant, infra: FactoryInfra = {}
   }
   if (has("access")) {
     services.access = new AccessService({ idGen, config: cfg.access as AccessConfig });
+  }
+  if (has("catalogue")) {
+    services.catalogue = new CatalogueService(cfg.catalogue as CatalogueConfig);
+  }
+  if (has("suppliers")) {
+    services.suppliers = new SuppliersService({
+      clock,
+      idGen,
+      config: cfg.suppliers as SuppliersConfig,
+    });
   }
   return services;
 }

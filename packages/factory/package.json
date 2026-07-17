@@ -15,6 +15,7 @@
   "dependencies": {
     "@repo/capability-access": "workspace:*",
     "@repo/capability-billing": "workspace:*",
+    "@repo/capability-catalogue": "workspace:*",
     "@repo/capability-crm": "workspace:*",
     "@repo/capability-docs": "workspace:*",
     "@repo/capability-messaging": "workspace:*",
@@ -25,6 +26,7 @@
     "@repo/capability-receivables": "workspace:*",
     "@repo/capability-scheduling": "workspace:*",
     "@repo/capability-sourcing": "workspace:*",
+    "@repo/capability-suppliers": "workspace:*",
     "@repo/capability-time": "workspace:*",
     "@repo/capability-visits": "workspace:*",
     "@repo/kernel": "workspace:*",

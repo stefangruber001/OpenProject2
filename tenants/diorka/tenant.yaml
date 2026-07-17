@@ -24,6 +24,8 @@ capabilities:
     docs,
     visits,
     access,
+    catalogue,
+    suppliers,
   ]
 jurisdiction: es-ES@2026-07-17
 vertical: construction/reformas
@@ -150,3 +152,58 @@ config:
         ]
       operations:
         ["visit.record", "time.log", "procurement.raise", "project.update", "schedule.manage"]
+
+  # Work/material catalogue (data). Items carry a selling price and internal
+  # cost (for margin); the room template expands into ready-made quote lines.
+  catalogue:
+    items:
+      - {
+          code: DEM-STRIP,
+          name: "Strip tiling & remove rubble",
+          chapter: "Demolition & preliminary works",
+          unit: "m²",
+          kind: labour,
+          unitPriceCents: 1840,
+          unitCostCents: 1100,
+        }
+      - {
+          code: TILE-2060,
+          name: "Ceramic wall tiling 20×60",
+          chapter: "Coverings & finishes",
+          unit: "m²",
+          kind: material,
+          unitPriceCents: 3200,
+          unitCostCents: 2000,
+        }
+      - {
+          code: FLOOR-PORC,
+          name: "Porcelain flooring",
+          chapter: "Coverings & finishes",
+          unit: "m²",
+          kind: material,
+          unitPriceCents: 2890,
+          unitCostCents: 1950,
+        }
+      - {
+          code: PLUMB-BATH,
+          name: "Full bathroom plumbing",
+          chapter: "Plumbing",
+          unit: "ud",
+          unitPriceCents: 185000,
+          unitCostCents: 140000,
+        }
+      - {
+          code: SCREEN-PREM,
+          name: "Premium tempered-glass shower screen",
+          chapter: "Coverings & finishes",
+          unit: "ud",
+          kind: material,
+          unitPriceCents: 48000,
+          unitCostCents: 33000,
+        }
+    templates:
+      - name: "Standard bathroom"
+        lines:
+          - { itemCode: DEM-STRIP, qtyMillis: 12500 }
+          - { itemCode: TILE-2060, qtyMillis: 24750 }
+          - { itemCode: PLUMB-BATH, qtyMillis: 1000 }

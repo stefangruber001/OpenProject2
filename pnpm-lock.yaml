@@ -180,6 +180,34 @@ importers:
         specifier: ^3.0.5
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  packages/capabilities/catalogue:
+    dependencies:
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
   packages/capabilities/crm:
     dependencies:
       '@repo/kernel':
@@ -460,6 +488,34 @@ importers:
         specifier: ^3.0.5
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  packages/capabilities/suppliers:
+    dependencies:
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
+
   packages/capabilities/time:
     dependencies:
       '@repo/kernel':
@@ -597,6 +653,9 @@ importers:
       '@repo/capability-billing':
         specifier: workspace:*
         version: link:../capabilities/billing
+      '@repo/capability-catalogue':
+        specifier: workspace:*
+        version: link:../capabilities/catalogue
       '@repo/capability-crm':
         specifier: workspace:*
         version: link:../capabilities/crm
@@ -627,6 +686,9 @@ importers:
       '@repo/capability-sourcing':
         specifier: workspace:*
         version: link:../capabilities/sourcing
+      '@repo/capability-suppliers':
+        specifier: workspace:*
+        version: link:../capabilities/suppliers
       '@repo/capability-time':
         specifier: workspace:*
         version: link:../capabilities/time

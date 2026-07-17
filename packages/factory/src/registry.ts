@@ -13,6 +13,8 @@ import { timeManifest } from "@repo/capability-time";
 import { docsManifest } from "@repo/capability-docs";
 import { visitsManifest } from "@repo/capability-visits";
 import { accessManifest } from "@repo/capability-access";
+import { catalogueManifest } from "@repo/capability-catalogue";
+import { suppliersManifest } from "@repo/capability-suppliers";
 import { esPack } from "@repo/pack-jurisdiction-es-es";
 import { reformasPack } from "@repo/pack-vertical-construction-reformas";
 
@@ -32,6 +34,8 @@ export const capabilityRegistry: ReadonlyMap<string, CapabilityManifest> = new M
     docsManifest,
     visitsManifest,
     accessManifest,
+    catalogueManifest,
+    suppliersManifest,
   ].map((c) => [c.id, c] as const),
 );
 
