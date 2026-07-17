@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canei Subirats ERP — End-to-End Journey</title>
+<style>
+  :root{
+    --green:#48733c; --greenLt:#65bc7b; --greenSoft:#e7efe3; --spark:#f2c230;
+    --ink:#1a1c18; --body:#333; --muted:#747474; --line:#d9dcd4; --mist:#f1f3ec; --paper:#fff; --card:#fff; --panel:#fbfcfa;
+    --good:#2f7d4f; --good-bg:#e7f2ec; --warn:#a56a1c; --warn-bg:#f7edda; --crit:#9a3b33; --crit-bg:#f6e6e4;
+    --in:#48733c; --out:#9a3b33;
+    --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
+    --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){
+    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --line:#2e3327; --mist:#1e231a; --paper:#12150e; --card:#1b1f16; --panel:#171b12;
+    --greenSoft:#21301b; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }}
+  :root[data-theme="dark"]{
+    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --line:#2e3327; --mist:#1e231a; --paper:#12150e; --card:#1b1f16; --panel:#171b12;
+    --greenSoft:#21301b; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--mist);color:var(--body);font:14px/1.55 var(--sans)}
+  h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0}
+  .mono{font-family:var(--mono)}
+  button{font:inherit;cursor:pointer}
+
+  header.top{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:3px solid var(--green);
+    display:flex;align-items:center;gap:14px;padding:12px 22px;flex-wrap:wrap}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo .mark{width:32px;height:32px;border-radius:8px;background:var(--green);position:relative;flex:none}
+  .logo .mark::after{content:"";position:absolute;right:5px;bottom:5px;width:8px;height:8px;border-radius:2px;background:var(--spark)}
+  .logo .name{font-family:var(--serif);font-weight:600;font-size:18px;color:var(--ink);line-height:1.05}
+  .logo .name small{display:block;font-family:var(--sans);font-weight:500;font-size:10px;font-style:italic;color:var(--muted)}
+  .top .tag{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);font-weight:700}
+  .top .links{margin-left:auto;font-size:12px}
+  .top .links a{color:var(--muted);text-decoration:none;margin-left:12px}
+  .top .links a:hover{color:var(--green)}
+
+  main{max-width:1180px;margin:0 auto;padding:16px 22px 70px;display:grid;grid-template-columns:1fr 320px;gap:16px}
+  @media (max-width:900px){main{grid-template-columns:1fr}}
+
+  /* stage rail */
+  .rail{grid-column:1/-1;display:flex;gap:5px;overflow-x:auto;padding-bottom:6px}
+  .rail .st{flex:1 0 auto;min-width:88px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:var(--panel);font-size:10.5px;position:relative}
+  .rail .st .n{font-size:8.5px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+  .rail .st .t{color:var(--ink);font-weight:600;font-size:11px;line-height:1.15;margin-top:2px}
+  .rail .st.done{background:var(--greenSoft);border-color:var(--greenLt)}
+  .rail .st.done .n{color:var(--green)}
+  .rail .st.cur{border-color:var(--green);box-shadow:inset 0 0 0 1px var(--green)}
+  .rail .st.done .t::before{content:"✓ ";color:var(--green)}
+
+  .stage{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
+  .stage .eyebrow{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);font-weight:700}
+  .stage h2{font-size:20px;margin:3px 0 2px}
+  .stage .cap{font-size:11px;color:var(--muted);margin-bottom:12px}
+  .stage .cap b{color:var(--green)}
+  .stage p{margin:0 0 10px}
+  .stage .did{background:var(--greenSoft);border-left:3px solid var(--green);border-radius:0 8px 8px 0;padding:10px 13px;font-size:13px;margin:10px 0}
+  .stage .did b{color:var(--ink)}
+  .stage table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
+  .stage th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:1.5px solid var(--green);padding:5px 7px}
+  .stage td{padding:5px 7px;border-bottom:1px solid var(--line)}
+  .stage td.n,.stage th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+  .btn{background:var(--green);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;font-size:14px}
+  .btn:disabled{opacity:.45;cursor:default}
+  .btn.ghost{background:none;border:1px solid var(--line);color:var(--body)}
+  .hint{font-size:11.5px;color:var(--muted)}
+
+  /* email inline */
+  .mail{border:1px solid var(--line);border-radius:9px;padding:12px;margin:10px 0;background:var(--panel)}
+  .mail .h{font-size:11px;color:var(--muted);margin-bottom:4px}
+  .mail .subj{font-weight:600;color:var(--ink);font-size:13px}
+  .mail pre{white-space:pre-wrap;font-family:var(--sans);font-size:12px;color:var(--body);margin:6px 0 8px;max-height:120px;overflow:auto}
+  .mail .safe{font-size:10.5px;color:var(--warn)}
+
+  /* ledger side panel */
+  .ledger{align-self:start;position:sticky;top:74px;display:flex;flex-direction:column;gap:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px}
+  .card h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-family:var(--sans);font-weight:700;margin-bottom:10px}
+  .row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;font-size:13px;border-bottom:1px dashed var(--line)}
+  .row:last-child{border-bottom:none}
+  .row .k{color:var(--muted)}
+  .row .v{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
+  .row.big .v{font-size:17px;font-family:var(--serif)}
+  .row .v.good{color:var(--good)} .row .v.crit{color:var(--crit)}
+  .track{height:8px;background:var(--mist);border-radius:5px;overflow:hidden;margin-top:8px}
+  .track>i{display:block;height:100%;background:var(--green);border-radius:5px;transition:width .4s}
+  .feed{font-size:11.5px;color:var(--muted);max-height:200px;overflow:auto}
+  .feed div{padding:3px 0;border-bottom:1px dashed var(--line)}
+  .feed div:last-child{border-bottom:none}
+  .chip{display:inline-block;font-size:9px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--greenSoft);color:var(--green)}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="logo"><span class="mark"></span><span class="name">Canei Subirats<small>Renovations, simply complex.</small></span></div>
+  <span class="tag">ERP · End-to-End Journey</span>
+  <span class="links">
+    <a href="dashboard.html">Control Tower ↗</a>
+    <a href="frontend.html">Quote demo ↗</a>
+    <a href="backend.html">Backend ↗</a>
+  </span>
+</header>
+
+<main>
+  <div class="rail" id="rail"></div>
+
+  <section class="stage" id="stage"></section>
+
+  <aside class="ledger">
+    <div class="card">
+      <h3>Project ledger — live</h3>
+      <div class="row big"><span class="k">Margin</span><span class="v" id="l-margin">—</span></div>
+      <div class="row"><span class="k">Quote / baseline</span><span class="v" id="l-baseline">—</span></div>
+      <div class="row"><span class="k">Committed (PO)</span><span class="v" id="l-committed">—</span></div>
+      <div class="row"><span class="k">Actual cost</span><span class="v" id="l-actual">—</span></div>
+      <div class="row"><span class="k">Revenue (ex-VAT)</span><span class="v" id="l-revenue">—</span></div>
+      <div class="row"><span class="k">Collected (cash in)</span><span class="v" id="l-collected">—</span></div>
+      <div class="row"><span class="k">Supplier paid (out)</span><span class="v" id="l-paid">—</span></div>
+      <div class="row"><span class="k">Cash position</span><span class="v" id="l-cash">—</span></div>
+      <div class="row"><span class="k">Forecast profit</span><span class="v" id="l-forecast">—</span></div>
+      <div class="track"><i id="l-bar" style="width:0%"></i></div>
+      <div class="hint" style="margin-top:6px">Progress through the 12-stage lifecycle</div>
+    </div>
+    <div class="card">
+      <h3>Activity log</h3>
+      <div class="feed" id="feed"><div>Ready — press “Start the journey”.</div></div>
+    </div>
+    <div class="card">
+      <h3>What this proves</h3>
+      <div class="hint">One customer, one clean thread: <b>lead → profit</b>. Same business logic as
+      the real system — integer-cent money, VAT decided by rule, margin = revenue − actual cost,
+      quoted-vs-actual per chapter. Emails auto-draft and send through a <b>log-only</b> adapter
+      (nothing is really delivered). All data synthetic.</div>
+    </div>
+  </aside>
+</main>
+
+<script type="module">
+/* ============================================================
+   Canei Subirats — End-to-End Journey (self-contained demo).
+   Walks ONE project through the 12 BRD lifecycle stages, wiring
+   the capability logic (crm, quoting, sourcing, projects, AR, AP,
+   billing, messaging) into one clickable flow with a live ledger.
+   ============================================================ */
+const eur = c => new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR"}).format(c/100);
+const $ = s => document.querySelector(s);
+const el = (t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+
+const STAGES = [
+  "Lead","Site visit","Estimate","Quotation","Acceptance","Project",
+  "Purchasing","Execution","Invoicing","Collections","Supplier payments","Close · profit",
+];
+
+// --- project state (cents) ---
+const S = {
+  customer:"Laura Puig", email:"laura.puig@example.com", address:"C/ Major 18, Esplugues",
+  chapters:[
+    {chapter:"Demolition & preliminary works", budget:23000, committed:0, actual:0},
+    {chapter:"Coverings & finishes", budget:79200, committed:0, actual:0},
+    {chapter:"Plumbing", budget:185000, committed:0, actual:0},
+  ],
+  optional:{desc:"Premium tempered-glass shower screen", amount:48000, included:false},
+  baseline:0, revenue:0, collected:0, supplierPaid:0,
+  vatBp:1000, invoiceNo:"FAC-2026-0007",
+  bills:[], receipts:[],
+};
+const sum = (arr,f)=>arr.reduce((s,x)=>s+f(x),0);
+const committed = ()=>sum(S.chapters,c=>c.committed);
+const actual = ()=>sum(S.chapters,c=>c.actual);
+const margin = ()=>S.revenue - actual();
+const marginPct = ()=>S.revenue? Math.round(margin()/S.revenue*1000)/10 : 0;
+const cash = ()=>S.collected - S.supplierPaid;
+const forecast = ()=>{const b=S.baseline||sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0); return b - Math.max(actual(),committed());};
+
+let step = -1;
+
+function log(msg){
+  const f=$("#feed"); if(f.dataset.clean!=="1"){f.innerHTML="";f.dataset.clean="1";}
+  f.prepend(el("div",null,msg));
+}
+function renderLedger(){
+  const baseTotal = S.baseline || (sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0));
+  $("#l-baseline").textContent = baseTotal?eur(baseTotal):"—";
+  $("#l-committed").textContent = committed()?eur(committed()):"—";
+  $("#l-actual").textContent = actual()?eur(actual()):"—";
+  $("#l-revenue").textContent = S.revenue?eur(S.revenue):"—";
+  $("#l-collected").textContent = S.collected?eur(S.collected):"—";
+  $("#l-paid").textContent = S.supplierPaid?eur(S.supplierPaid):"—";
+  const m=$("#l-margin"); m.textContent = S.revenue?`${eur(margin())} · ${marginPct()}%`:"—"; m.className="v "+(S.revenue?(marginPct()<15?"warn":"good"):"");
+  const cc=$("#l-cash"); cc.textContent = (S.collected||S.supplierPaid)?eur(cash()):"—"; cc.className="v "+(cash()<0?"crit":"good");
+  $("#l-forecast").textContent = baseTotal?eur(forecast()):"—";
+  $("#l-bar").style.width = Math.max(0,(step+1)/STAGES.length*100)+"%";
+}
+function renderRail(){
+  const r=$("#rail"); r.innerHTML="";
+  STAGES.forEach((name,i)=>{
+    const s=el("div","st"+(i<step?" done":"")+(i===step?" cur":""),
+      `<div class="n">STEP ${i+1}</div><div class="t">${name}</div>`);
+    r.append(s);
+  });
+}
+
+// each stage: title, capability tag, render(body) that performs the effect + returns html
+const FLOW = [
+  { cap:"crm", body:()=>{
+      return `<p>An enquiry comes in. We capture the customer and open a <b>lead</b> on the pipeline with a next action — no data lost on a scrap of paper.</p>
+      <div class="did"><b>Customer created:</b> ${S.customer} · ${S.email}<br><b>Lead opened:</b> “Bathroom + aerothermal — ${S.address}” · stage <span class="chip">new</span> · next action: book a site visit</div>`;
+    }, done:()=>log("CRM · lead opened for "+S.customer) },
+  { cap:"docs / mobile", body:()=>`<p>The site visit is captured on the phone: rooms, rough measurements and photos. This feeds the estimate without re-typing.</p>
+      <div class="did"><b>Visit recorded:</b> bathroom 5.0 × 2.5 m · old tiling to strip · relocate plumbing · aerothermal unit on the terrace.</div>`,
+    done:()=>log("Site visit captured (3 photos, measurements)") },
+  { cap:"quoting", body:()=>{
+      const est=sum(S.chapters,c=>c.budget);
+      return `<p>A quick <b>estimate</b> from the visit — an order-of-magnitude figure to align with the customer before the detailed quote.</p>
+      <div class="did"><b>Estimate:</b> ${eur(est)}–${eur(Math.round(est*1.15))} (ex-VAT), 3–4 weeks.</div>`;
+    }, done:()=>log("Estimate shared: ~"+eur(sum(S.chapters,c=>c.budget))) },
+  { cap:"quoting · sourcing", body:()=>{
+      const rows=S.chapters.map(c=>`<tr><td>${c.chapter}</td><td class="n">${eur(c.budget)}</td></tr>`).join("");
+      return `<p>The detailed <b>quote</b> is built catalogue-first (choose, don't type). Optional works are listed separately so they never inflate the headline price.</p>
+      <table><thead><tr><th>Chapter</th><th class="n">Amount</th></tr></thead><tbody>${rows}
+      <tr><td><b>Base total</b></td><td class="n"><b>${eur(sum(S.chapters,c=>c.budget))}</b></td></tr>
+      <tr><td>◇ Optional — ${S.optional.desc}</td><td class="n">${eur(S.optional.amount)}</td></tr></tbody></table>
+      <p class="hint">Supplier prices behind each chapter come from the comparison engine (missing price ≠ zero).</p>`;
+    }, done:()=>log("Quote built: base "+eur(sum(S.chapters,c=>c.budget))+" + optional") },
+  { cap:"quoting · messaging", email:{kind:"acceptance"}, body:()=>{
+      S.optional.included=true;
+      return `<p>The customer <b>accepts</b> and includes the optional shower screen. The accepted version is frozen; an acceptance email is auto-drafted for you.</p>
+      <div class="did"><b>Accepted:</b> base + optional = ${eur(sum(S.chapters,c=>c.budget)+S.optional.amount)} (ex-VAT). Version frozen.</div>`;
+    }, done:()=>log("Quote accepted (with optional) — version frozen") },
+  { cap:"projects", body:()=>{
+      S.baseline = sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0);
+      return `<p>The accepted quote becomes a <b>project</b> with an <b>immutable baseline</b> — no re-entry. Chapter budgets are copied once and frozen; everything from here is measured against them.</p>
+      <div class="did"><b>Project opened:</b> baseline ${eur(S.baseline)} across ${S.chapters.length} chapters (+ optional). Status: active.</div>`;
+    }, done:()=>log("Project created — baseline "+eur(S.baseline)+" frozen") },
+  { cap:"procurement · sourcing", body:()=>{
+      S.chapters[0].committed=18000; S.chapters[1].committed=60000; S.chapters[2].committed=150000;
+      const rows=S.chapters.map(c=>`<tr><td>${c.chapter}</td><td class="n">${eur(c.budget)}</td><td class="n">${eur(c.committed)}</td><td class="n">${c.committed<=c.budget?'✓ within':'⚠ over'}</td></tr>`).join("");
+      return `<p><b>Purchase orders</b> are raised to the selected suppliers — this <b>commits</b> cost against each chapter's budget, visible immediately.</p>
+      <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Committed</th><th class="n">vs budget</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }, done:()=>log("POs raised — committed "+eur(committed())) },
+  { cap:"execution · payables", body:()=>{
+      S.chapters[0].actual=17500; S.chapters[1].actual=58000; S.chapters[2].actual=148000;
+      S.bills=[{s:"S-Tiles",n:"A-1042",amt:58000},{s:"S-Plumb",n:"P-337",amt:148000},{s:"S-Demo",n:"D-88",amt:17500}];
+      const rows=S.chapters.map(c=>{const v=c.actual-c.budget;return `<tr><td>${c.chapter}</td><td class="n">${eur(c.budget)}</td><td class="n">${eur(c.actual)}</td><td class="n" style="color:${v>0?'var(--crit)':'var(--good)'}">${v>0?'+':''}${eur(v)}</td></tr>`;}).join("");
+      return `<p>Work proceeds. Supplier <b>bills</b> are booked as <b>actual cost</b> (duplicates are rejected). Quoted-vs-actual per chapter updates live — the margin-leak early-warning.</p>
+      <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Actual</th><th class="n">Variance</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }, done:()=>log("Bills booked — actual "+eur(actual())+" ("+S.bills.length+" bills, AP)") },
+  { cap:"billing", email:{kind:"invoice"}, body:()=>{
+      S.revenue = S.baseline;
+      const vat = Math.round(S.revenue*S.vatBp/10000);
+      return `<p>The <b>invoice</b> is issued from the accepted quote. The VAT rate is <b>decided by the rule</b> (reduced 10%, art. 91.Uno.2.10º) — not a dropdown — and its justification is persisted. Gapless number, SHA-256 chain seal.</p>
+      <div class="did"><b>${S.invoiceNo}</b> · base ${eur(S.revenue)} · VAT 10% ${eur(vat)} · <b>total ${eur(S.revenue+vat)}</b><br><span class="hint">legally_verified:false until the asesor's review · fiscal document renders in es-ES</span></div>`;
+    }, done:()=>log("Invoice "+S.invoiceNo+" issued — revenue "+eur(S.revenue)) },
+  { cap:"receivables", email:{kind:"reminder"}, body:()=>{
+      const vat=Math.round(S.revenue*S.vatBp/10000); const total=S.revenue+vat;
+      S.collected = total;
+      return `<p><b>Collections:</b> a receipt is recorded and allocated to the invoice (partial payments are first-class). Overdue invoices raise a reminder — auto-drafted below.</p>
+      <div class="did"><b>Receipt:</b> ${eur(total)} received and allocated to ${S.invoiceNo}. Outstanding: ${eur(0)}. <span class="chip">paid</span></div>`;
+    }, done:()=>log("Receipt allocated — collected "+eur(S.collected)+" (AR)") },
+  { cap:"payables", body:()=>{
+      S.supplierPaid = actual();
+      return `<p><b>Supplier payments:</b> the booked bills are paid on their due dates. Cash out is now visible against cash in.</p>
+      <div class="did"><b>Paid:</b> ${eur(S.supplierPaid)} across ${S.bills.length} supplier bills. Cash position: <b>${eur(cash())}</b>.</div>`;
+    }, done:()=>log("Suppliers paid — "+eur(S.supplierPaid)+" (AP)") },
+  { cap:"projects · FIN", body:()=>{
+      const rows=S.chapters.map(c=>{const v=c.actual-c.budget;return `<tr><td>${c.chapter}</td><td class="n">${eur(c.budget)}</td><td class="n">${eur(c.actual)}</td><td class="n" style="color:${v>0?'var(--crit)':'var(--good)'}">${v>0?'+':''}${eur(v)} · ${c.budget?Math.round(v/c.budget*1000)/10:0}%</td></tr>`;}).join("");
+      return `<p><b>Project close</b> with the truth the BRD asks for: not turnover — <b>profitability</b>. Revenue, actual cost, margin, and quoted-vs-actual per chapter.</p>
+      <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Actual</th><th class="n">Variance</th></tr></thead><tbody>${rows}
+        <tr><td><b>Revenue (ex-VAT)</b></td><td class="n"></td><td class="n"><b>${eur(S.revenue)}</b></td><td></td></tr>
+        <tr><td><b>Margin</b></td><td class="n"></td><td class="n"><b>${eur(margin())}</b></td><td class="n"><b>${marginPct()}%</b></td></tr></tbody></table>
+      <div class="did"><b>Closed profitably.</b> Margin ${eur(margin())} (${marginPct()}%). Cash position ${eur(cash())}. Every euro traced from the first enquiry to the final profit — one clean thread.</div>`;
+    }, done:()=>log("Project closed — margin "+eur(margin())+" ("+marginPct()+"%)") },
+];
+
+const brand={from:"hola@caneisubirats.com", sign:"Canei Subirats — Renovations, simply complex."};
+function emailFor(kind){
+  const vat=Math.round(S.revenue*S.vatBp/10000);
+  if(kind==="acceptance")return{subj:`Thank you — your project is confirmed`,
+    body:`Dear ${S.customer},\n\nWe are delighted to confirm your acceptance for “Bathroom + aerothermal — ${S.address}”. We will schedule the works and keep you updated at each milestone.\n\nKind regards,\n${brand.sign}`};
+  if(kind==="invoice")return{subj:`Invoice ${S.invoiceNo}`,
+    body:`Dear ${S.customer},\n\nPlease find attached invoice ${S.invoiceNo}. Total due: ${eur(S.revenue+vat)} (base ${eur(S.revenue)} + VAT ${eur(vat)}). Payment terms: 15 days.\n\nKind regards,\n${brand.sign}`};
+  if(kind==="reminder")return{subj:`Friendly reminder — invoice ${S.invoiceNo}`,
+    body:`Dear ${S.customer},\n\nA gentle reminder that invoice ${S.invoiceNo} is due. If you have already arranged payment, please disregard this note.\n\nThank you,\n${brand.sign}`};
+}
+
+function renderStage(){
+  const stageEl=$("#stage");
+  if(step<0){
+    stageEl.innerHTML=`<div class="eyebrow">The full lifecycle</div>
+      <h2>From first enquiry to final profit</h2>
+      <div class="cap">One project, twelve stages, every capability wired together.</div>
+      <p>This walks a real renovation — a bathroom + aerothermal in Esplugues — through the entire journey the business runs today on paper and spreadsheets. Watch the <b>ledger on the right</b> fill in as you go: committed vs actual cost, revenue, margin, cash and forecast — all from integer-cent money and the same rules as the production kernel.</p>
+      <div class="actions"><button class="btn" id="next">Start the journey ▸</button>
+      <span class="hint">Press to advance one stage at a time.</span></div>`;
+    $("#next").onclick=advance;
+    return;
+  }
+  const f=FLOW[step];
+  const wrap=el("div");
+  wrap.append(el("div","eyebrow",`Step ${step+1} of ${STAGES.length}`));
+  wrap.append(el("h2",null,STAGES[step]));
+  wrap.append(el("div","cap",`capability: <b>${f.cap}</b>`));
+  const bodyHtml=f.body();
+  wrap.append(el("div",null,bodyHtml));
+  // inline email at relevant stages
+  if(f.email){
+    const m=emailFor(f.email.kind);
+    const mail=el("div","mail",`<div class="h">Auto-drafted · To: ${S.email}</div>
+      <div class="subj">${m.subj}</div><pre>${m.body}</pre>
+      <div style="display:flex;gap:8px;align-items:center"><button class="btn" style="padding:8px 16px" id="send">✉ Send</button>
+      <span class="safe">log-only — not delivered</span></div>`);
+    wrap.append(mail);
+  }
+  const acts=el("div","actions");
+  const isLast=step===FLOW.length-1;
+  acts.append(el("button","btn",isLast?"Journey complete ✓":`Advance — ${STAGES[step+1]} ▸`));
+  if(!isLast) acts.lastChild.id="next";
+  else acts.lastChild.disabled=true;
+  const restart=el("button","btn ghost","↻ Restart"); restart.onclick=restartJourney; acts.append(restart);
+  wrap.append(acts);
+  stageEl.innerHTML=""; stageEl.append(wrap);
+  if(f.email){ $("#send").onclick=(e)=>{ e.target.textContent="✓ Sent (logged)"; e.target.disabled=true; log("Email sent → "+S.email+" (log-only, not delivered)"); }; }
+  if(!isLast) $("#next").onclick=advance;
+}
+function advance(){
+  step++;
+  renderRail();
+  renderStage();      // body() applies this stage's effect on S
+  renderLedger();     // ledger now reflects the applied effect
+  const f=FLOW[step];
+  f.done&&f.done();   // log post-effect figures
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function restartJourney(){
+  // reset mutable state
+  S.chapters.forEach(c=>{c.committed=0;c.actual=0;});
+  S.optional.included=false; S.baseline=0; S.revenue=0; S.collected=0; S.supplierPaid=0; S.bills=[]; S.receipts=[];
+  step=-1; const f=$("#feed"); f.innerHTML="<div>Restarted — press “Start the journey”.</div>"; f.dataset.clean="";
+  renderRail(); renderLedger(); renderStage();
+}
+
+renderRail(); renderLedger(); renderStage();
+</script>
+</body>
+</html>
