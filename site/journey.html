@@ -138,9 +138,13 @@
   .err{color:var(--crit);font-size:12.5px;font-weight:600;margin-top:6px}
 
   /* project folder card + photos */
+  .fcount{float:right;font-family:var(--sans);font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--green);background:var(--greenSoft);border-radius:999px;padding:2px 9px;text-transform:none}
+  .linkbtn{background:none;border:none;color:var(--muted);font:600 12px var(--sans);cursor:pointer;padding:2px 0}
+  .linkbtn:hover{color:var(--green)}
   .tree{display:flex;flex-direction:column;gap:2px;font-size:12.5px;max-height:300px;overflow:auto}
   .tree .fdr{display:flex;justify-content:space-between;align-items:center;padding:5px 7px;border-radius:8px;gap:8px}
   .tree .fdr.has{background:var(--panel)}
+  .tree .fdr.cur{outline:1.5px solid var(--green);outline-offset:-1px}
   .tree .fdr .nm{color:var(--body);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tree .fdr .ct{color:var(--faint);font-variant-numeric:tabular-nums;font-size:11px;white-space:nowrap}
   .tree .fdr .ct.on{color:var(--green);font-weight:700}
@@ -214,13 +218,14 @@
       <div class="hint" style="margin-top:8px">Progress through the 13-stage lifecycle</div>
     </div>
     <div class="card">
-      <h3>Project folder</h3>
+      <h3>Project folder <span class="fcount" id="fcount">empty</span></h3>
       <div class="tree" id="tree"></div>
-      <div class="actions" style="margin-top:12px;gap:8px">
-        <button class="btn sm" id="dlfolder">⤓ Download folder (.zip)</button>
-        <button class="btn sm ghost" id="editdata">✎ Edit data</button>
+      <button class="btn sm" id="dlfolder" style="width:100%;margin-top:14px">⤓ Download folder (.zip)</button>
+      <div style="display:flex;justify-content:space-between;margin-top:10px">
+        <button class="linkbtn" id="editdata">✎ Edit project data</button>
+        <button class="linkbtn" id="clearall">Start over</button>
       </div>
-      <div class="hint" style="margin-top:8px">Every step files its photos, documents, quote &amp; invoice PDFs and emails into its own subfolder — saved on this device.</div>
+      <div class="hint" style="margin-top:8px">Photos, documents, the quote &amp; invoice PDFs and every email are filed per step — saved on this device.</div>
     </div>
     <div class="card">
       <h3>Activity log</h3>
@@ -647,15 +652,19 @@ function ficon(m){ return m==="application/pdf"?"📄":m.startsWith("image/")?"�
 function renderTree(){
   const t=$("#tree"); if(!t)return; treeUrls.forEach(u=>URL.revokeObjectURL(u)); treeUrls=[]; t.innerHTML="";
   let total=0;
-  FOLDERS.forEach(fd=>{
+  FOLDERS.forEach((fd,i)=>{
     const files=PROJECT.folders[fd]||[]; total+=files.length;
-    t.append(el("div","fdr"+(files.length?" has":""),
-      `<span class="nm">📁 ${fd}</span><span class="ct${files.length?" on":""}">${files.length||"·"}</span>`));
+    const cur=i===step;
+    const row=el("div","fdr"+(files.length?" has":"")+(cur?" cur":""),
+      `<span class="nm">${files.length?"📂":"📁"} ${fd}</span><span class="ct${files.length?" on":""}">${files.length||""}</span>`);
+    row.style.opacity=files.length||cur?"1":".5";
+    t.append(row);
     if(files.length){ const fl=el("div","files");
       files.forEach(f=>{ const a=el("a",null,`${ficon(f.mime)} ${esc(f.name)}`); a.href=fileUrl(f); a.download=f.name; a.target="_blank"; fl.append(a); });
       t.append(fl);
     }
   });
+  const fc=$("#fcount"); if(fc) fc.textContent = total? (total+" file"+(total>1?"s":"")) : "empty";
   if(!total) t.append(el("div","hint","No files yet — advance the journey, add photos and documents."));
 }
 
@@ -872,14 +881,14 @@ function renderStage(){
     pv.append(bar); wrap.append(pv);
   }
   const gen=el("div","attach");
-  gen.innerHTML=`<label class="btn sm ghost filebtn">＋ Attach document / photo to “${FOLDERS[step]}”<input id="genin" type="file" multiple></label>`;
+  gen.innerHTML=`<label class="btn sm ghost filebtn">＋ Attach file<input id="genin" type="file" multiple></label><span class="hint">→ ${FOLDERS[step]}</span>`;
   wrap.append(gen);
 
   const acts=el("div","actions");
   const isLast=step===FLOW.length-1;
   acts.append(el("button","btn",isLast?"Journey complete ✓":`Advance — ${STAGES[step+1]} ▸`));
   if(!isLast) acts.lastChild.id="next"; else acts.lastChild.disabled=true;
-  const restart=el("button","btn ghost","✎ Edit data / restart"); restart.onclick=editData; acts.append(restart);
+  const restart=el("button","linkbtn","✎ Edit project data"); restart.style.marginLeft="4px"; restart.onclick=editData; acts.append(restart);
   wrap.append(acts);
 
   stageEl.innerHTML=""; stageEl.append(wrap);
@@ -894,9 +903,17 @@ function advance(){
 }
 function editData(){ draft=clone(PROJECT.profile||SAMPLE); step=-1; renderRail(); renderStage(); }
 
+function clearAll(){
+  if(!confirm("Start over? This clears the saved project and all its files on this device."))return;
+  PROJECT={profile:null,folders:{}}; idbDel("project").catch(()=>{});
+  draft=clone(SAMPLE); S=buildS(SAMPLE); step=-1;
+  const f=$("#feed"); f.innerHTML="<div>Cleared — enter your project to begin.</div>"; f.dataset.clean="";
+  renderRail(); renderLedger(); renderTree(); renderStage();
+}
 /* ---------- boot ---------- */
 $("#dlfolder").onclick=downloadFolder;
 $("#editdata").onclick=editData;
+$("#clearall").onclick=clearAll;
 (async()=>{
   try{ const saved=await idbGet("project"); if(saved&&saved.folders){ PROJECT=saved; if(PROJECT.profile){ draft=clone(PROJECT.profile); S=buildS(PROJECT.profile); } } }catch(e){}
   renderRail(); renderLedger(); renderTree(); renderStage();
