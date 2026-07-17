@@ -1,8 +1,10 @@
-# Tenant: Diorka — company #1 of the family group (Proyecto Diorka).
-# REAL intake: intake/diorka/ (BRD 2026-07-17). Legal identity fields are
-# placeholders until the BRD §11.1 validation workshop — replacing them is
-# config-only. Additional group entities become sibling tenants via
-# `factory new-tenant` when their legal names are confirmed
+# Tenant: Diorka — internal project/group codename. Company #1's REAL identity
+# is Canei Subirats, S.L. (confirmed from their first-party public website,
+# 2026-07-16). Corporate identity captured in docs/clients/canei-subirats/BRAND.md;
+# the branding block below is the machine-readable tokens (data, not a fork).
+# REAL intake: intake/diorka/ (BRD 2026-07-17). Only the CIF (tax ID) remains a
+# placeholder until the BRD §11.1 workshop — replacing it is config-only.
+# Additional group entities become sibling tenants via `factory new-tenant`
 # (group registry: tenants/_groups/diorka.yaml).
 tenant: diorka
 kernel: "^1"
@@ -15,14 +17,38 @@ config:
   locale: es-ES
   currency: EUR
   branding:
-    legalName: "Diorka Reformas (razón social pendiente de validación)" # source: pending-validation (BRD §11.1)
-    tradeName: "Diorka"
+    legalName: "Canei Subirats, S.L." # source: first-party (their website footer)
+    tradeName: "Canei Subirats"
+    slogan: "Renovations, simply complex." # EN working; CA handover: "Reformes senzillament complexes"
+    contact:
+      address: "Carrer de la Creu, 74, 08960 Sant Just Desvern, Barcelona"
+      phone: "659 87 67 00"
+      email: "hola@caneisubirats.com"
+      web: "https://cane.gestortectic.com"
+    # Design tokens — see docs/clients/canei-subirats/BRAND.md §5–7.
+    palette:
+      brandGreen: "#48733C" # primary
+      brandGreenLt: "#65BC7B" # secondary / success
+      brandYellow: "#F2C230" # accent (approx; refine from picto-groc SVG at handover)
+      ink: "#000000"
+      body: "#333333"
+      muted: "#747474"
+      line: "#D2D2D2"
+      mist: "#E5E4E3"
+      paper: "#FFFFFF"
+    typography:
+      display: "'Roboto Serif', Georgia, serif" # headings / document titles
+      body: "Inter, Arial, Helvetica, sans-serif" # body / UI
+    logo:
+      wordmark: "logo-Caneisubirats-2.svg" # pending handover (INTEGRATIONS_PENDING)
+      white: "logo-Caneisubirats_blanc-1.svg"
+      mark: "picto-groc.png"
 
   billing:
     seller:
-      name: "Diorka Reformas (razón social pendiente de validación)" # source: pending-validation
-      taxId: "B00000000" # source: pending-validation — real CIF at workshop
-      address: "Dirección fiscal pendiente (Cataluña)" # source: pending-validation
+      name: "Canei Subirats, S.L." # source: first-party (their website footer)
+      taxId: "B00000000" # source: pending-validation — real CIF at BRD §11.1 workshop
+      address: "Carrer de la Creu, 74, 08960 Sant Just Desvern, Barcelona" # source: first-party
       countryCode: "ES"
     series:
       - { id: FAC, kind: standard, pad: 4, yearly: true }

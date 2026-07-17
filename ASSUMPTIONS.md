@@ -114,7 +114,27 @@ languages: es-ES # source: synthetic
 23. **Quote options & versions** implemented in the quoting capability
     (QUO-07/12/13): optional totals separate, acceptance selects options,
     revisions are new linked versions; accepted versions stay frozen.
-24. **cane.gestortectic.com** identified as a TecTic hosted "Gestor" instance
-    (Catalan vendor; anonymous access 403). No credentials exist in this
-    repo; export/import feasibility is an integration lead, not an
-    assumption of access.
+24. ~~**cane.gestortectic.com** identified as a TecTic hosted "Gestor"
+    instance (Catalan vendor; anonymous access 403).~~ **CORRECTED
+    2026-07-17:** `cane.gestortectic.com` is Canei Subirats' own **public
+    marketing website** (WordPress + Avada theme), not a login-gated gestor
+    tool — the earlier 403 was transient/anti-bot, not an auth wall. The five
+    page webarchives the operator supplied are the source. `gestortectic.com`
+    is merely the hosting/staging domain their web agency uses.
+25. **Real client identity = Canei Subirats, S.L.** (Carrer de la Creu 74,
+    08960 Sant Just Desvern, Barcelona; hola@caneisubirats.com; 659 87 67
+    00). The `diorka` tenant is the internal project/group codename; Canei
+    Subirats S.L. is company #1's confirmed legal/trade identity, so the
+    `tenant.yaml` branding + billing-seller placeholders are filled with
+    these **public, first-party** values. **CIF (tax ID) stays
+    `pending-validation`** — not published on their site; confirm at the BRD
+    §11.1 workshop. Most reversible: fill known public facts now, keep the
+    one unknown gated. Corporate identity captured in
+    `docs/clients/canei-subirats/BRAND.md`.
+26. **Working language = English; handover = Spanish/Catalan.** Per operator
+    instruction we build the UI in English now and switch label sets before
+    handover. UI strings are a **data label layer** (en/es/ca), not code, so
+    the switch is config. Fiscal locale stays `es-ES` (Spanish VAT + money
+    formatting `1.234,56 €`) — display language and fiscal locale are
+    independent. Their live site (CAT default, ESP toggle) confirms
+    Catalan-first is the handover expectation (NFR-10).

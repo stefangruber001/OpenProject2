@@ -21,14 +21,43 @@ export const tenantSpecSchema = z.object({
 
 export type TenantSpec = z.infer<typeof tenantSpecSchema>;
 
+/**
+ * Kernel-neutral brand/presentation config. Deliberately generic: a palette is
+ * a token→value map, typography is font-family strings, logo is asset refs.
+ * The kernel knows nothing about which colours or fonts mean what — packs and
+ * the UI interpret it. No jurisdiction/sector knowledge lives here.
+ */
+export const brandingSchema = z.object({
+  legalName: z.string().min(1),
+  tradeName: z.string().min(1).optional(),
+  /** Short marketing line shown under the logo (never inside a fiscal block). */
+  slogan: z.string().optional(),
+  /** Public contact details for document footers / UI chrome. */
+  contact: z
+    .object({
+      address: z.string(),
+      phone: z.string(),
+      email: z.string(),
+      web: z.string(),
+    })
+    .partial()
+    .optional(),
+  /** Design tokens: token name → CSS value (e.g. hex). Interpreted by the UI. */
+  palette: z.record(z.string()).optional(),
+  /** Font-family stacks for display (headings) and body/UI text. */
+  typography: z.object({ display: z.string(), body: z.string() }).partial().optional(),
+  /** Logo asset references (filenames or URLs); resolved by the host. */
+  logo: z
+    .object({ wordmark: z.string(), white: z.string(), mark: z.string() })
+    .partial()
+    .optional(),
+});
+
 /** Kernel-owned config every tenant has, regardless of packs. */
 export const kernelConfigSchema = z.object({
   locale: z.string().min(2),
   currency: z.string().length(3),
-  branding: z.object({
-    legalName: z.string().min(1),
-    tradeName: z.string().min(1).optional(),
-  }),
+  branding: brandingSchema,
 });
 
 /** `xx-XX@2026-07-16` → { id: "xx-XX", date: "2026-07-16" } (date optional). */
