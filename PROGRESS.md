@@ -116,8 +116,10 @@ output; the factory is the product.
   capability + storage port + PWA shell (P3).
 - **PLN** planning / labour / machinery scheduling — `scheduling`/`time`
   capabilities are declared stubs; build real engines.
-- **PUR** purchase orders vs budget, returns/credits — `procurement`
-  capability build-out (links sourcing selection → projects committed cost).
+- ~~**PUR** purchase orders vs budget~~ — DONE (commit f23e959):
+  `procurement` capability — POs with draft→sent→received lifecycle,
+  committed-cost rollup by chapter, over-budget flag; replaces the stub.
+  Returns/credits remain a later extension.
 - **DOC** documents/photos linked everywhere — `docs` capability + storage.
 - **ORG-04..07** consolidated owner view, roles/permissions/audit — auth +
   cross-tenant read + event-log surfacing in the web shell.
