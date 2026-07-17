@@ -8,18 +8,7 @@
     --serif: "Roboto Serif", Georgia, "Times New Roman", serif;
     --sans: Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
     --mono: ui-monospace, "SF Mono", Menlo, monospace;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:where(:not([data-theme="light"])) {
-      --paper: #14170f; --card: #1b1f16; --ink: #f0f1e9; --ink2: #c2c8ba; --mut: #8b917f;
-      --line: #2e3327; --acc: #7fae6f; --acc-soft: #21301b; --ok: #65bc7b; --opt: #d9a45a;
-      --opt-soft: #33291a; --bad: #e07a72;
-    }
-  }
-  :root[data-theme="dark"] {
-    --paper: #14170f; --card: #1b1f16; --ink: #f0f1e9; --ink2: #c2c8ba; --mut: #8b917f;
-    --line: #2e3327; --acc: #7fae6f; --acc-soft: #21301b; --ok: #65bc7b; --opt: #d9a45a;
-    --opt-soft: #33291a; --bad: #e07a72;
+    color-scheme: light;  /* premium white theme always — never follow device dark mode */
   }
   * { box-sizing: border-box; }
   body {

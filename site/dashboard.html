@@ -18,15 +18,8 @@
     --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
     --mono:ui-monospace,"SF Mono",Menlo,monospace;
     --r:20px; --r-sm:13px;
+    color-scheme:light;  /* premium white theme always — never follow device dark mode */
   }
-  @media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){
-    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --faint:#6c7263; --line:#2c3126; --hair:#242a1e;
-    --mist:#1c2116; --bg:#12150e; --paper:#181c12; --card:#181c12; --panel:#151910;
-    --greenSoft:#20301b; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }}
-  :root[data-theme="dark"]{
-    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --faint:#6c7263; --line:#2c3126; --hair:#242a1e;
-    --mist:#1c2116; --bg:#12150e; --paper:#181c12; --card:#181c12; --panel:#151910;
-    --greenSoft:#20301b; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{margin:0;color:var(--body);font:14px/1.55 var(--sans);letter-spacing:-.005em;

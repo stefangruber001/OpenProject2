@@ -15,10 +15,8 @@
     --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
     --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
     --mono:ui-monospace,Menlo,monospace;
+    color-scheme:light;  /* premium white theme always — never follow device dark mode */
   }
-  @media (prefers-color-scheme:dark){:root{
-    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --faint:#6c7263;
-    --line:#2c3126; --hair:#242a1e; --bg:#12150e; --paper:#181c12; --greenSoft:#20301b; }}
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{margin:0;color:var(--body);font:16px/1.6 var(--sans);letter-spacing:-.005em;min-height:100vh;
