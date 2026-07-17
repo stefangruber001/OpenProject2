@@ -260,7 +260,8 @@ const FOLDERS = ["01 Lead","02 Site visit","03 Estimate","04 Quotation","05 Acce
 
 /* ---------- the DATA you enter (a profile, euros) ---------- */
 const SAMPLE = {
-  customer:"Laura Puig", email:"laura.puig@example.com", phone:"600 12 34 56", address:"C/ Major 18, Esplugues",
+  customer:"Laura Puig", email:"laura.puig@example.com", phone:"600 12 34 56",
+  buyerNif:"12345678Z", address:"C/ Major 18, 08950 Esplugues de Llobregat, Barcelona",
   visitNotes:"Bathroom 5.0 × 2.5 m · strip old tiling · relocate plumbing · aerothermal unit on the terrace.",
   chapters:[
     {chapter:"Demolition & preliminary works", budget:230},
@@ -268,12 +269,12 @@ const SAMPLE = {
     {chapter:"Plumbing", budget:1850},
   ],
   optional:{desc:"Premium tempered-glass shower screen", amount:480},
-  vatPct:10, invoiceNo:"FAC-2026-0007", costPct:78,
+  vatPct:10, quoteNo:"PRE-2026-0031", invoiceNo:"FAC-2026-0007", termsDays:15, costPct:78,
 };
 const BLANK = {
-  customer:"", email:"", phone:"", address:"", visitNotes:"",
+  customer:"", email:"", phone:"", buyerNif:"", address:"", visitNotes:"",
   chapters:[{chapter:"", budget:""},{chapter:"", budget:""}],
-  optional:{desc:"", amount:""}, vatPct:10, invoiceNo:"FAC-2026-0001", costPct:78,
+  optional:{desc:"", amount:""}, vatPct:10, quoteNo:"PRE-2026-0001", invoiceNo:"FAC-2026-0001", termsDays:15, costPct:78,
 };
 const clone = o => JSON.parse(JSON.stringify(o));
 
@@ -282,14 +283,16 @@ function buildS(p){
   return {
     customer:(p.customer||"").trim()||"Your customer",
     email:(p.email||"").trim()||"customer@example.com",
-    phone:(p.phone||"").trim(), address:(p.address||"").trim()||"—",
+    phone:(p.phone||"").trim(), buyerNif:(p.buyerNif||"").trim(), address:(p.address||"").trim()||"—",
     chapters:(p.chapters||[]).filter(c=>c.chapter&&Number(c.budget)>0)
       .map(c=>({chapter:c.chapter, budget:Math.round(Number(c.budget)*100), committed:0, actual:0})),
     optional:{desc:(p.optional?.desc||"").trim()||"Optional works",
       amount:Math.round((Number(p.optional?.amount)||0)*100), included:false},
     committedPct:Math.min(1.3,(cost+2)/100), actualPct:cost/100,
     baseline:0, revenue:0, collected:0, supplierPaid:0,
-    vatBp:Math.round((Number(p.vatPct)||0)*100), invoiceNo:(p.invoiceNo||"").trim()||"FAC-2026-0001",
+    vatBp:Math.round((Number(p.vatPct)||0)*100),
+    quoteNo:(p.quoteNo||"").trim()||"PRE-2026-0001", invoiceNo:(p.invoiceNo||"").trim()||"FAC-2026-0001",
+    termsDays:Math.max(0,Number(p.termsDays)||15),
     bills:[],
   };
 }
@@ -389,8 +392,11 @@ function readme(root){
 
 /* ---------- premium branded email + PDF (unchanged CI) ---------- */
 const BRAND = { name:"Canei Subirats", legal:"Canei Subirats, S.L.", slogan:"Renovations, simply complex.",
-  from:"hola@caneisubirats.com", address:"Sant Just Desvern, Barcelona", phone:"+34 93 000 00 00",
+  from:"hola@caneisubirats.com", address:"Carrer de la Creu 74, 08960 Sant Just Desvern, Barcelona", phone:"+34 93 000 00 00",
+  cif:"CIF: B-00000000 (pending)", iban:"ES00 0000 0000 0000 0000 0000 (pending)",
   green:"#48733c", greenLt:"#6ba85a", ink:"#14160f", body:"#54574c", soft:"#eef4ea", line:"#eceae4", spark:"#f2c230" };
+const today = ()=>new Date().toLocaleDateString("es-ES");
+const addDays = n=>{const d=new Date();d.setDate(d.getDate()+(Number(n)||0));return d.toLocaleDateString("es-ES");};
 const MARK = `<svg width="34" height="34" viewBox="0 0 40 40" fill="none">
   <rect x="1" y="1" width="38" height="38" rx="11" fill="${BRAND.green}"/>
   <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -413,17 +419,14 @@ function emailContent(kind){
     paras:[`We're delighted to confirm your acceptance of the works for your home at ${S.address}.`,
       `Your accepted quote is attached. We'll schedule the works and keep you updated at every milestone — one point of contact throughout, and a 2-year guarantee on the works.`],
     cta:{label:"View your project space"},
-    attach:{name:"Canei-quote-accepted.pdf", pdf:()=>({title:"Accepted quote", subtitle:S.address, lines:quoteLines()})} };
+    attach:{name:"Canei-presupuesto-"+S.quoteNo+".pdf", doc:()=>quoteDoc(true)} };
   if(kind==="invoice") return {
     subject:`Invoice ${S.invoiceNo} — Canei Subirats`, title:`Invoice ${S.invoiceNo}`,
     greeting:`Dear ${S.customer},`,
     paras:[`Thank you for trusting us with your renovation. Please find your invoice attached.`,
       `Total due: <b>${eur(total)}</b> (base ${eur(S.revenue)} + VAT ${eur(vat)}). Payment terms: 15 days.`],
     cta:{label:"Pay securely online"},
-    attach:{name:S.invoiceNo+".pdf", pdf:()=>({title:S.invoiceNo, subtitle:"VAT invoice · rate "+vp+"%", lines:[
-      {label:"Base (VAT excluded)",value:eurTxt(S.revenue)},
-      {label:"VAT ("+vp+"%)",value:eurTxt(vat)},
-      {label:"Total due",value:eurTxt(total)}]})} };
+    attach:{name:S.invoiceNo+".pdf", doc:()=>invoiceDoc()} };
   if(kind==="reminder") return {
     subject:`Friendly reminder — invoice ${S.invoiceNo}`, title:"A gentle reminder",
     greeting:`Dear ${S.customer},`,
@@ -497,6 +500,107 @@ function buildPdf(o){
   pdf+="trailer\n<</Size "+(objs.length+1)+"/Root 1 0 R>>\nstartxref\n"+xref+"\n%%EOF";
   return btoa(pdf);
 }
+/* ---------- full best-practice invoice / quote PDF ---------- */
+const tr = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g,"")
+  .replace(/€/g,"EUR").replace(/[·•]/g,"-").replace(/[–—]/g,"-").replace(/[’']/g,"'").replace(/[“”]/g,'"').replace(/×/g,"x").replace(/º/g,"o").replace(/ª/g,"a").replace(/[^\x20-\x7e]/g,"");
+function wrapTxt(s,maxCh){ const words=String(s).split(/\s+/); const out=[]; let cur="";
+  for(const w of words){ if((cur+" "+w).trim().length>maxCh){ if(cur)out.push(cur); cur=w; } else cur=(cur?cur+" ":"")+w; }
+  if(cur)out.push(cur); return out.length?out:[""]; }
+function buildDocPdf(d){
+  const G="0.282 0.451 0.235", INK="0.078 0.086 0.059", GREY="0.5 0.52 0.46", BODY="0.29 0.31 0.26", LN="0.85 0.88 0.82";
+  let c="";
+  const escp=s=>tr(s).replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)");
+  const T=(x,y,sz,f,col,s)=>{ c+=`${col} rg BT /${f} ${sz} Tf ${x} ${y} Td (${escp(s)}) Tj ET\n`; };
+  const TR=(rx,y,sz,f,col,s)=>{ const w=tr(s).length*sz*0.5; T(rx-w,y,sz,f,col,s); };
+  const rect=(x,y,w,h,col)=>{ c+=`${col} rg ${x} ${y} ${w} ${h} re f\n`; };
+  const hr=(x,y,w,col)=>{ c+=`${col} rg ${x} ${y} ${w} 0.8 re f\n`; };
+  // header band
+  rect(0,792,595,50,G);
+  T(42,812,19,"F2","1 1 1",BRAND.name);
+  T(42,799,9.5,"F1","0.93 0.86 0.62",BRAND.slogan);
+  TR(553,812,20,"F2","1 1 1",d.docType);
+  // seller (left) + meta (right)
+  let y=764;
+  T(42,y,9.5,"F2",INK,BRAND.legal); y-=13;
+  [BRAND.cif, BRAND.address, BRAND.from+"   "+BRAND.phone].forEach(l=>{ T(42,y,8.5,"F1",GREY,l); y-=12; });
+  let my=764;
+  [["No.",d.number],[d.dateLabel+":",d.dateIssued],[d.dueLabel+":",d.dueOrValid]].forEach(([k,v])=>{
+    TR(468,my,9,"F1",GREY,k); TR(553,my,9,"F2",INK,v); my-=15; });
+  // bill-to
+  y-=10;
+  T(42,y,8.5,"F2",G,"BILL TO / FACTURAR A"); y-=15;
+  T(42,y,11,"F2",INK,d.buyer.name); y-=14;
+  [d.buyer.nif, d.buyer.address].filter(Boolean).forEach(l=>{ T(42,y,9,"F1",BODY,l); y-=12; });
+  // lines table
+  y-=16;
+  T(42,y,8.5,"F2",GREY,"CONCEPTO / DESCRIPTION"); TR(553,y,8.5,"F2",GREY,"IMPORTE / AMOUNT");
+  y-=7; hr(42,y,511,G); y-=17;
+  d.lines.forEach(li=>{
+    const wr=wrapTxt(li.desc,64);
+    wr.forEach((w,i)=>T(42,y-i*12,10,"F1",BODY,w));
+    TR(553,y,10,"F1",INK,li.amount);
+    y -= Math.max(1,wr.length)*12 + 7; hr(42,y+5,511,LN);
+  });
+  // totals
+  y-=10;
+  d.totals.forEach((t,i)=>{ const bold=i===d.totals.length-1;
+    if(bold){ hr(330,y+14,223,G); }
+    TR(468,y,bold?11:9.5,bold?"F2":"F1",bold?INK:BODY,t[0]);
+    TR(553,y,bold?11:9.5,bold?"F2":"F1",bold?INK:BODY,t[1]); y-=17; });
+  // payment
+  if(d.payment&&d.payment.length){ y-=8; T(42,y,8.5,"F2",G,"PAGO / PAYMENT"); y-=14;
+    d.payment.forEach(l=>{ wrapTxt(l,92).forEach(w=>{ T(42,y,9,"F1",BODY,w); y-=12; }); }); }
+  // legal notes
+  if(d.notes&&d.notes.length){ y-=6; T(42,y,8.5,"F2",GREY,"NOTAS / NOTES"); y-=13;
+    d.notes.forEach(l=>{ wrapTxt("- "+l,104).forEach(w=>{ T(42,y,8,"F1",GREY,w); y-=10.5; }); }); }
+  // footer
+  hr(42,52,511,G);
+  T(42,40,8.5,"F1",GREY,BRAND.legal+"   -   "+BRAND.address);
+  T(42,29,8.5,"F1",GREY,BRAND.from+"   -   "+BRAND.phone+"   -   "+BRAND.cif);
+  // assemble
+  const objs=[
+    "<</Type/Catalog/Pages 2 0 R>>","<</Type/Pages/Kids[3 0 R]/Count 1>>",
+    "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R/F2 5 0 R>>>>/Contents 6 0 R>>",
+    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>","<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>",
+    "<</Length "+c.length+">>\nstream\n"+c+"\nendstream" ];
+  let pdf="%PDF-1.4\n"; const off=[];
+  objs.forEach((o2,i)=>{ off.push(pdf.length); pdf+=(i+1)+" 0 obj\n"+o2+"\nendobj\n"; });
+  const xref=pdf.length; pdf+="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n";
+  off.forEach(o2=>{ pdf+=String(o2).padStart(10,"0")+" 00000 n \n"; });
+  pdf+="trailer\n<</Size "+(objs.length+1)+"/Root 1 0 R>>\nstartxref\n"+xref+"\n%%EOF";
+  return btoa(pdf);
+}
+function invoiceDoc(){
+  const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
+  const lines=S.chapters.map(c=>({desc:c.chapter,amount:eurTxt(c.budget)}));
+  if(S.optional.included) lines.push({desc:"Optional — "+S.optional.desc,amount:eurTxt(S.optional.amount)});
+  return { docType:"FACTURA · INVOICE", number:S.invoiceNo, dateLabel:"Fecha", dateIssued:today(),
+    dueLabel:"Vencimiento", dueOrValid:addDays(S.termsDays),
+    buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
+    lines, totals:[["Base imponible",eurTxt(S.revenue)],["IVA "+vp+"%",eurTxt(vat)],["Total a pagar",eurTxt(S.revenue+vat)]],
+    payment:["Forma de pago: transferencia · "+S.termsDays+" dias.","IBAN: "+BRAND.iban+"   ·   Referencia: "+S.invoiceNo],
+    notes:[
+      "Tipo de IVA decidido por la regla aplicable (tipo reducido cuando concurren las condiciones de renovacion, art. 91.Uno.2.10 LIVA); justificacion almacenada en el documento.",
+      "legally_verified: false hasta revision del asesor. Verifactu (AEAT) obligatorio desde 2027.",
+      "Las correcciones se emiten como factura rectificativa; esta factura es inmutable y esta sellada (SHA-256).",
+      "Garantia de 2 anos sobre los trabajos. Un unico punto de contacto durante todo el proyecto." ] };
+}
+function quoteDoc(accepted){
+  const base=sum(S.chapters,c=>c.budget); const hasOpt=S.optional.amount>0;
+  const lines=S.chapters.map(c=>({desc:c.chapter,amount:eurTxt(c.budget)}));
+  if(hasOpt) lines.push({desc:"Opcional (aparte) — "+S.optional.desc,amount:eurTxt(S.optional.amount)});
+  const totals=[["Base (IVA no incl.)",eurTxt(base)]];
+  if(accepted&&S.optional.included) totals.push(["Aceptado (con opcional)",eurTxt(base+S.optional.amount)]);
+  return { docType:"PRESUPUESTO · QUOTE", number:S.quoteNo, dateLabel:"Fecha", dateIssued:today(),
+    dueLabel:"Valido hasta", dueOrValid:addDays(30),
+    buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
+    lines, totals,
+    payment:["Los trabajos opcionales solo se incluyen si los acepta.","El IVA se aplica en la factura final segun la regla legal aplicable."],
+    notes:[
+      "Precios validos 30 dias. Los trabajos se planifican al aceptar el presupuesto.",
+      "Este presupuesto se convierte en su proyecto con una linea base fija — sin re-introducir datos.",
+      "Garantia de 2 anos sobre los trabajos. Un unico punto de contacto durante todo el proyecto." ] };
+}
 function chunk(s){ return s.replace(/.{1,76}/g,"$&\r\n").trimEnd(); }
 function buildEml(c){
   const CRLF="\r\n"; const bnd="CANEI_"+Math.random().toString(36).slice(2,10);
@@ -507,7 +611,7 @@ function buildEml(c){
   m+="--"+bnd+"_a"+CRLF+'Content-Type: text/plain; charset="utf-8"'+CRLF+"Content-Transfer-Encoding: base64"+CRLF+CRLF+chunk(textToB64(emailText(c)))+CRLF+CRLF;
   m+="--"+bnd+"_a"+CRLF+'Content-Type: text/html; charset="utf-8"'+CRLF+"Content-Transfer-Encoding: base64"+CRLF+CRLF+chunk(textToB64(html))+CRLF+CRLF;
   m+="--"+bnd+"_a--"+CRLF+CRLF;
-  if(c.attach){ const pdf=buildPdf(c.attach.pdf());
+  if(c.attach){ const pdf=buildDocPdf(c.attach.doc());
     m+="--"+bnd+CRLF+'Content-Type: application/pdf; name="'+c.attach.name+'"'+CRLF+"Content-Transfer-Encoding: base64"+CRLF+'Content-Disposition: attachment; filename="'+c.attach.name+'"'+CRLF+CRLF+chunk(pdf)+CRLF+CRLF; }
   m+="--"+bnd+"--"+CRLF; return m;
 }
@@ -574,14 +678,14 @@ const FLOW = [
       return `<p>The detailed <b>quote</b> is built catalogue-first (choose, don't type). Optional works are listed separately so they never inflate the headline price.</p>
       <table><thead><tr><th>Chapter</th><th class="n">Amount</th></tr></thead><tbody>${rows}
       <tr><td><b>Base total</b></td><td class="n"><b>${eur(sum(S.chapters,c=>c.budget))}</b></td></tr>${optRow}</tbody></table>
-      <p class="hint">A branded quote PDF is filed into “04 Quotation”.</p>`; },
-    done:()=>{ art("04 Quotation","Quote.pdf","application/pdf",buildPdf({title:"Quote — "+S.customer,subtitle:S.address,lines:quoteLines()})); log("Quote built: base "+eur(sum(S.chapters,c=>c.budget))); } },
+      <p class="hint">A full branded quote PDF (${esc(S.quoteNo)}, valid 30 days, parties &amp; terms) is filed into “04 Quotation”.</p>`; },
+    done:()=>{ art("04 Quotation",S.quoteNo+".pdf","application/pdf",buildDocPdf(quoteDoc(false))); log("Quote "+S.quoteNo+" built: base "+eur(sum(S.chapters,c=>c.budget))); } },
   { cap:"quoting · messaging", email:{kind:"acceptance"}, body:()=>{
       const hasOpt=S.optional.amount>0; S.optional.included=hasOpt;
       const total=sum(S.chapters,c=>c.budget)+(hasOpt?S.optional.amount:0);
       return `<p>The customer <b>accepts</b>${hasOpt?` and includes the optional works (${esc(S.optional.desc)})`:""}. The accepted version is frozen; a branded acceptance email is auto-drafted with the accepted quote attached.</p>
       <div class="did"><b>Accepted:</b> ${hasOpt?"base + optional = ":""}${eur(total)} (ex-VAT). Version frozen.</div>`; },
-    done:()=>{ art("05 Acceptance","Accepted-quote.pdf","application/pdf",buildPdf({title:"Accepted quote — "+S.customer,subtitle:S.address,lines:quoteLines()}));
+    done:()=>{ art("05 Acceptance",S.quoteNo+"-accepted.pdf","application/pdf",buildDocPdf(quoteDoc(true)));
       art("05 Acceptance","Acceptance-email.eml","message/rfc822",textToB64(buildEml(emailContent("acceptance")))); log("Quote accepted — version frozen"); } },
   { cap:"projects", body:()=>{ S.baseline=sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0);
       return `<p>The accepted quote becomes a <b>project</b> with an <b>immutable baseline</b> — no re-entry. Chapter budgets are copied once and frozen; everything from here is measured against them.</p>
@@ -600,9 +704,16 @@ const FLOW = [
     done:()=>{ textArt("08 Execution","supplier-bills.txt","Supplier bills booked:\n"+S.bills.map(b=>"  "+b.s+" ("+b.n+"): "+eurTxt(b.amt)).join("\n")+"\nTotal actual: "+eurTxt(actual())); log("Bills booked — actual "+eur(actual())+" ("+S.bills.length+" bills)"); } },
   { cap:"billing", email:{kind:"invoice"}, body:()=>{ S.revenue=S.baseline; const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
       return `<p>The <b>invoice</b> is issued from the accepted quote. The VAT rate is <b>decided by the rule</b> (reduced rate where the renovation conditions apply, art. 91.Uno.2.10º) — not a dropdown — and its justification is persisted. Gapless number, SHA-256 chain seal.</p>
-      <div class="did"><b>${esc(S.invoiceNo)}</b> · base ${eur(S.revenue)} · VAT ${vp}% ${eur(vat)} · <b>total ${eur(S.revenue+vat)}</b><br><span class="hint">legally_verified:false until the asesor's review · fiscal document renders in es-ES</span></div>`; },
-    done:()=>{ const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
-      art("09 Invoicing",S.invoiceNo+".pdf","application/pdf",buildPdf({title:S.invoiceNo,subtitle:"VAT invoice · "+S.customer,lines:[{label:"Base (VAT excluded)",value:eurTxt(S.revenue)},{label:"VAT ("+vp+"%)",value:eurTxt(vat)},{label:"Total due",value:eurTxt(S.revenue+vat)}]}));
+      <table><tbody>
+        <tr><td>Invoice</td><td class="n"><b>${esc(S.invoiceNo)}</b></td></tr>
+        <tr><td>Bill to</td><td class="n">${esc(S.customer)}${S.buyerNif?" · "+esc(S.buyerNif):""}</td></tr>
+        <tr><td>Issue date · due (${S.termsDays}d)</td><td class="n">${today()} · ${addDays(S.termsDays)}</td></tr>
+        <tr><td>Base imponible</td><td class="n">${eur(S.revenue)}</td></tr>
+        <tr><td>IVA ${vp}%</td><td class="n">${eur(vat)}</td></tr>
+        <tr><td><b>Total a pagar</b></td><td class="n"><b>${eur(S.revenue+vat)}</b></td></tr>
+      </tbody></table>
+      <div class="did"><b>Full factura PDF filed into “09 Invoicing”</b> — parties (NIF/CIF), dates, line items, VAT breakdown, IBAN &amp; payment terms, and the legal notes.<br><span class="hint">legally_verified:false until the asesor's review · renders in es-ES</span></div>`; },
+    done:()=>{ art("09 Invoicing",S.invoiceNo+".pdf","application/pdf",buildDocPdf(invoiceDoc()));
       art("09 Invoicing","Invoice-email.eml","message/rfc822",textToB64(buildEml(emailContent("invoice")))); log("Invoice "+S.invoiceNo+" issued — revenue "+eur(S.revenue)); } },
   { cap:"receivables", email:{kind:"reminder"}, body:()=>{ const vat=Math.round(S.revenue*S.vatBp/10000); const total=S.revenue+vat; S.collected=total;
       return `<p><b>Collections:</b> a receipt is recorded and allocated to the invoice (partial payments are first-class). Overdue invoices raise a reminder — auto-drafted below.</p>
@@ -641,9 +752,10 @@ function intakeHtml(){
       <div class="fsec"><h4>Customer</h4>
         <div class="frow">
           <div class="field"><label>Name</label><input data-p="customer" value="${esc(p.customer)}" placeholder="e.g. Laura Puig"></div>
+          <div class="field"><label>NIF / CIF (tax ID)</label><input data-p="buyerNif" value="${esc(p.buyerNif||"")}" placeholder="12345678Z"></div>
           <div class="field"><label>Email</label><input data-p="email" type="email" value="${esc(p.email)}" placeholder="name@example.com"></div>
           <div class="field"><label>Phone</label><input data-p="phone" value="${esc(p.phone)}" placeholder="600 12 34 56"></div>
-          <div class="field"><label>Address</label><input data-p="address" value="${esc(p.address)}" placeholder="Street, town"></div>
+          <div class="field full"><label>Address</label><input data-p="address" value="${esc(p.address)}" placeholder="Street, postcode, town"></div>
         </div>
       </div>
       <div class="fsec"><h4>Site visit</h4>
@@ -660,8 +772,10 @@ function intakeHtml(){
       </div>
       <div class="fsec"><h4>Billing &amp; costs</h4>
         <div class="frow">
-          <div class="field"><label>VAT rate (%)</label><input data-p="vatPct" type="number" step="0.1" min="0" value="${p.vatPct}"></div>
+          <div class="field"><label>Quote number</label><input data-p="quoteNo" value="${esc(p.quoteNo||"")}" placeholder="PRE-2026-0001"></div>
           <div class="field"><label>Invoice number</label><input data-p="invoiceNo" value="${esc(p.invoiceNo)}"></div>
+          <div class="field"><label>VAT rate (%)</label><input data-p="vatPct" type="number" step="0.1" min="0" value="${p.vatPct}"></div>
+          <div class="field"><label>Payment terms (days)</label><input data-p="termsDays" type="number" step="1" min="0" value="${p.termsDays??15}"></div>
           <div class="field full"><label>Estimated supplier cost (% of budget) — drives committed / actual / margin</label><input data-p="costPct" type="number" step="1" min="0" max="130" value="${p.costPct}"></div>
         </div>
       </div>
