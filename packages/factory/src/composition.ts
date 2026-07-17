@@ -2,6 +2,7 @@ import {
   InMemoryAppendOnlyStore,
   InMemoryCounterStore,
   InMemoryEventLog,
+  InMemoryKeyValueStore,
   InMemoryRepository,
   RandomIdGen,
   SystemClock,
@@ -10,6 +11,7 @@ import {
   type CounterStore,
   type EventLogPort,
   type IdGenPort,
+  type KeyValueStore,
   type Repository,
   type ResolvedTenant,
 } from "@repo/kernel";
@@ -23,6 +25,16 @@ import {
   type DocLabels,
   type Invoice,
 } from "@repo/capability-billing";
+import { ProjectsService, type ProjectsConfig } from "@repo/capability-projects";
+import { ReceivablesService, type ReceivablesConfig } from "@repo/capability-receivables";
+import { PayablesService, type PayablesConfig } from "@repo/capability-payables";
+import { CrmService, type CrmConfig } from "@repo/capability-crm";
+import { ProcurementService, type ProcurementConfig } from "@repo/capability-procurement";
+import { SchedulingService, type SchedulingConfig } from "@repo/capability-scheduling";
+import { TimeService, type TimeConfig } from "@repo/capability-time";
+import { DocsService, type DocsConfig } from "@repo/capability-docs";
+import { VisitsService, type VisitsConfig } from "@repo/capability-visits";
+import { AccessService, type AccessConfig } from "@repo/capability-access";
 
 export interface FactoryInfra {
   clock?: ClockPort;
@@ -32,15 +44,29 @@ export interface FactoryInfra {
   invoiceStore?: AppendOnlyStore<Invoice>;
   comparisonStore?: Repository<Comparison>;
   counters?: CounterStore;
+  /** Durable store for the value-typed capability aggregates (crm book, etc). */
+  aggregates?: KeyValueStore;
 }
 
 export interface FactoryServices {
   resolved: ResolvedTenant;
   events: EventLogPort;
   labels: DocLabels;
+  /** Persists the value-typed capability aggregates by key (durable / in-mem). */
+  aggregates: KeyValueStore;
   quoting?: QuotingService;
   billing?: BillingService;
   sourcing?: SourcingService;
+  projects?: ProjectsService;
+  receivables?: ReceivablesService;
+  payables?: PayablesService;
+  crm?: CrmService;
+  procurement?: ProcurementService;
+  scheduling?: SchedulingService;
+  time?: TimeService;
+  docs?: DocsService;
+  visits?: VisitsService;
+  access?: AccessService;
 }
 
 /**
@@ -56,7 +82,12 @@ export function buildServices(resolved: ResolvedTenant, infra: FactoryInfra = {}
   const has = (id: string) => resolved.spec.capabilities.includes(id);
   const labels = resolved.ports.tryGet<DocLabels>(DOC_LABELS_PORT) ?? DEFAULT_LABELS;
 
-  const services: FactoryServices = { resolved, events, labels };
+  const services: FactoryServices = {
+    resolved,
+    events,
+    labels,
+    aggregates: infra.aggregates ?? new InMemoryKeyValueStore(),
+  };
   const common = {
     tenantId: resolved.spec.tenant,
     currency: resolved.kernelConfig.currency,
@@ -64,6 +95,7 @@ export function buildServices(resolved: ResolvedTenant, infra: FactoryInfra = {}
     idGen,
     events,
   };
+  const cfg = resolved.config as Record<string, unknown>;
   if (has("quoting")) {
     services.quoting = new QuotingService({
       ...common,
@@ -87,6 +119,58 @@ export function buildServices(resolved: ResolvedTenant, infra: FactoryInfra = {}
       idGen: common.idGen,
       events,
     });
+  }
+  // Value-typed capability engines: constructed here, their state persisted via
+  // `services.aggregates` (durable KV) by the host. No store needed to build.
+  if (has("projects")) {
+    services.projects = new ProjectsService({
+      clock,
+      idGen,
+      config: cfg.projects as ProjectsConfig,
+    });
+  }
+  if (has("receivables")) {
+    services.receivables = new ReceivablesService({
+      clock,
+      idGen,
+      config: cfg.receivables as ReceivablesConfig,
+    });
+  }
+  if (has("payables")) {
+    services.payables = new PayablesService({
+      clock,
+      idGen,
+      config: cfg.payables as PayablesConfig,
+    });
+  }
+  if (has("crm")) {
+    services.crm = new CrmService({ clock, idGen, config: cfg.crm as CrmConfig });
+  }
+  if (has("procurement")) {
+    services.procurement = new ProcurementService({
+      clock,
+      idGen,
+      config: cfg.procurement as ProcurementConfig,
+    });
+  }
+  if (has("scheduling")) {
+    services.scheduling = new SchedulingService({
+      clock,
+      idGen,
+      config: cfg.scheduling as SchedulingConfig,
+    });
+  }
+  if (has("time")) {
+    services.time = new TimeService({ clock, idGen, config: cfg.time as TimeConfig });
+  }
+  if (has("docs")) {
+    services.docs = new DocsService({ clock, idGen, config: cfg.docs as DocsConfig });
+  }
+  if (has("visits")) {
+    services.visits = new VisitsService({ clock, idGen, config: cfg.visits as VisitsConfig });
+  }
+  if (has("access")) {
+    services.access = new AccessService({ idGen, config: cfg.access as AccessConfig });
   }
   return services;
 }

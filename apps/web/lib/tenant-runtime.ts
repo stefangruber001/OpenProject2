@@ -74,6 +74,7 @@ async function buildRuntime(tenantId: string): Promise<FactoryServices> {
       quoteStore: new db.PrismaRepository(db.prisma, tenantId, "quote"),
       invoiceStore: new db.PrismaAppendOnlyStore(db.prisma, tenantId, "invoice"),
       counters: new db.PrismaCounterStore(db.prisma, tenantId),
+      aggregates: new db.PrismaKeyValueStore(db.prisma, tenantId, "aggregates"),
     });
   }
 
