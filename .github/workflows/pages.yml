@@ -2,7 +2,10 @@ name: Deploy preview site (GitHub Pages)
 
 on:
   push:
-    branches: [main, "claude/**"]
+    # Deploy only from the default branch — the github-pages environment's
+    # protection rules reject other branches, which would fail every push
+    # (and send a failure email). Feature branches use workflow_dispatch.
+    branches: [main]
     paths: ["site/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
