@@ -4,7 +4,6 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Canei Subirats ERP — End-to-End Journey</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
 <style>
   :root{
     --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a; --greenSoft:#e7f0e1; --greenPale:#dce8d4; --spark:#f2c230;
@@ -117,6 +116,42 @@
   .feed div:last-child{border-bottom:none}
   @keyframes fade{from{opacity:0;transform:translateY(-3px)}to{opacity:1}}
   .chip{display:inline-block;font-size:9px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--greenSoft);color:var(--green);letter-spacing:.02em;vertical-align:middle}
+
+  /* intake form */
+  .form{display:grid;gap:16px;margin-top:10px}
+  .fsec{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:var(--panel)}
+  .fsec>h4{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--green);margin-bottom:12px;font-family:var(--sans);font-weight:700}
+  .frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:600px){.frow{grid-template-columns:1fr}}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field.full{grid-column:1/-1}
+  .field label{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .field input,.field textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+  .field textarea{min-height:66px;resize:vertical;line-height:1.5}
+  .field input:focus,.field textarea:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px var(--greenSoft)}
+  .chap{display:grid;grid-template-columns:1fr 128px 36px;gap:8px;align-items:center;margin-bottom:8px}
+  .chap input{font:inherit;font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+  .chap .x{border:1px solid var(--line);background:var(--paper);border-radius:9px;height:38px;color:var(--muted);font-size:16px;line-height:1}
+  .chap .x:hover{border-color:var(--crit);color:var(--crit)}
+  .err{color:var(--crit);font-size:12.5px;font-weight:600;margin-top:6px}
+
+  /* project folder card + photos */
+  .tree{display:flex;flex-direction:column;gap:2px;font-size:12.5px;max-height:300px;overflow:auto}
+  .tree .fdr{display:flex;justify-content:space-between;align-items:center;padding:5px 7px;border-radius:8px;gap:8px}
+  .tree .fdr.has{background:var(--panel)}
+  .tree .fdr .nm{color:var(--body);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tree .fdr .ct{color:var(--faint);font-variant-numeric:tabular-nums;font-size:11px;white-space:nowrap}
+  .tree .fdr .ct.on{color:var(--green);font-weight:700}
+  .files{padding:1px 0 6px 20px;display:flex;flex-direction:column;gap:3px}
+  .files a{font-size:11.5px;color:var(--muted);text-decoration:none;display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .files a:hover{color:var(--green)}
+  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin:10px 0 2px}
+  .thumbs .t{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--panel)}
+  .thumbs .t img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumbs .t button{position:absolute;top:2px;right:2px;width:18px;height:18px;border:none;border-radius:6px;background:rgba(20,22,15,.62);color:#fff;font-size:11px;line-height:1;display:grid;place-items:center}
+  .attach{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .filebtn{position:relative;overflow:hidden;display:inline-flex;align-items:center}
+  .filebtn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:200px}
 </style>
 </head>
 <body>
@@ -161,51 +196,100 @@
       <div class="hint" style="margin-top:8px">Progress through the 13-stage lifecycle</div>
     </div>
     <div class="card">
+      <h3>Project folder</h3>
+      <div class="tree" id="tree"></div>
+      <div class="actions" style="margin-top:12px;gap:8px">
+        <button class="btn sm" id="dlfolder">⤓ Download folder (.zip)</button>
+        <button class="btn sm ghost" id="editdata">✎ Edit data</button>
+      </div>
+      <div class="hint" style="margin-top:8px">Every step files its photos, documents, quote &amp; invoice PDFs and emails into its own subfolder — saved on this device.</div>
+    </div>
+    <div class="card">
       <h3>Activity log</h3>
-      <div class="feed" id="feed"><div>Ready — press “Start the journey”.</div></div>
+      <div class="feed" id="feed"><div>Ready — enter your project to begin.</div></div>
     </div>
     <div class="card">
       <h3>What this proves</h3>
-      <div class="hint">One customer, one clean thread: <b style="color:var(--green)">lead → profit → review</b>.
-      Same business logic as the real system — integer-cent money, VAT decided by rule, margin = revenue −
-      actual cost, quoted-vs-actual per chapter. Emails auto-draft with full CI and download as an
-      <b>Outlook draft (.eml)</b> with the PDF attached. All data synthetic; nothing is really delivered.</div>
+      <div class="hint"><b style="color:var(--green)">Your data, one clean thread: lead → profit → review.</b>
+      Enter the project once; the ledger, quote &amp; invoice PDFs and every customer email are produced
+      automatically with full corporate identity. Photos &amp; documents are filed per step into a
+      downloadable project folder. Emails are log-only (nothing is really delivered).</div>
     </div>
   </aside>
 </main>
 
 <script type="module">
 /* ============================================================
-   Canei Subirats — End-to-End Journey (self-contained demo).
-   Walks ONE project through the 13 BRD lifecycle stages, wiring
-   the capability logic (crm, quoting, sourcing, projects, AR, AP,
-   billing, messaging, reputation) into one clickable flow with a
-   live ledger, premium branded emails and Outlook-draft export.
+   Canei Subirats — End-to-End Journey & Project Workspace.
+   The operator enters the project once; the 13-stage lifecycle
+   (crm, visits, quoting, sourcing, projects, procurement, AR, AP,
+   billing, messaging, reputation) then runs with a live ledger,
+   premium branded emails, generated PDFs, site-visit photo capture
+   and a per-step project folder — all saved on the device and
+   exportable as a real nested .zip. Nothing is really sent.
    ============================================================ */
 const eur = c => new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR"}).format(c/100);
 const eurTxt = c => (c/100).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" EUR";
 const $ = s => document.querySelector(s);
 const el = (t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
-
-const STAGES = [
-  "Lead","Site visit","Estimate","Quotation","Acceptance","Project","Purchasing",
-  "Execution","Invoicing","Collections","Supplier payments","Close · profit","Review request",
-];
-
-// --- project state (cents) ---
-const S = {
-  customer:"Laura Puig", email:"laura.puig@example.com", address:"C/ Major 18, Esplugues",
-  chapters:[
-    {chapter:"Demolition & preliminary works", budget:23000, committed:0, actual:0},
-    {chapter:"Coverings & finishes", budget:79200, committed:0, actual:0},
-    {chapter:"Plumbing", budget:185000, committed:0, actual:0},
-  ],
-  optional:{desc:"Premium tempered-glass shower screen", amount:48000, included:false},
-  baseline:0, revenue:0, collected:0, supplierPaid:0,
-  vatBp:1000, invoiceNo:"FAC-2026-0007",
-  bills:[], receipts:[],
-};
+const esc = s => String(s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
 const sum = (arr,f)=>arr.reduce((s,x)=>s+f(x),0);
+
+const STAGES = ["Lead","Site visit","Estimate","Quotation","Acceptance","Project","Purchasing",
+  "Execution","Invoicing","Collections","Supplier payments","Close · profit","Review request"];
+const FOLDERS = ["01 Lead","02 Site visit","03 Estimate","04 Quotation","05 Acceptance","06 Project",
+  "07 Purchasing","08 Execution","09 Invoicing","10 Collections","11 Supplier payments","12 Close","13 Review request"];
+
+/* ---------- the DATA you enter (a profile, euros) ---------- */
+const SAMPLE = {
+  customer:"Laura Puig", email:"laura.puig@example.com", phone:"600 12 34 56", address:"C/ Major 18, Esplugues",
+  visitNotes:"Bathroom 5.0 × 2.5 m · strip old tiling · relocate plumbing · aerothermal unit on the terrace.",
+  chapters:[
+    {chapter:"Demolition & preliminary works", budget:230},
+    {chapter:"Coverings & finishes", budget:792},
+    {chapter:"Plumbing", budget:1850},
+  ],
+  optional:{desc:"Premium tempered-glass shower screen", amount:480},
+  vatPct:10, invoiceNo:"FAC-2026-0007", costPct:78,
+};
+const BLANK = {
+  customer:"", email:"", phone:"", address:"", visitNotes:"",
+  chapters:[{chapter:"", budget:""},{chapter:"", budget:""}],
+  optional:{desc:"", amount:""}, vatPct:10, invoiceNo:"FAC-2026-0001", costPct:78,
+};
+const clone = o => JSON.parse(JSON.stringify(o));
+
+function buildS(p){
+  const cost=Math.max(0,Math.min(130,Number(p.costPct)||78));
+  return {
+    customer:(p.customer||"").trim()||"Your customer",
+    email:(p.email||"").trim()||"customer@example.com",
+    phone:(p.phone||"").trim(), address:(p.address||"").trim()||"—",
+    chapters:(p.chapters||[]).filter(c=>c.chapter&&Number(c.budget)>0)
+      .map(c=>({chapter:c.chapter, budget:Math.round(Number(c.budget)*100), committed:0, actual:0})),
+    optional:{desc:(p.optional?.desc||"").trim()||"Optional works",
+      amount:Math.round((Number(p.optional?.amount)||0)*100), included:false},
+    committedPct:Math.min(1.3,(cost+2)/100), actualPct:cost/100,
+    baseline:0, revenue:0, collected:0, supplierPaid:0,
+    vatBp:Math.round((Number(p.vatPct)||0)*100), invoiceNo:(p.invoiceNo||"").trim()||"FAC-2026-0001",
+    bills:[],
+  };
+}
+
+/* ---------- IndexedDB (project + files survive reloads) ---------- */
+const DB="caneiJourney", STORE="kv";
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);
+  r.onupgradeneeded=()=>r.result.createObjectStore(STORE);
+  r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);});}
+async function idbGet(k){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(STORE,"readonly").objectStore(STORE).get(k);t.onsuccess=()=>res(t.result);t.onerror=()=>rej(t.error);});}
+async function idbSet(k,v){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(STORE,"readwrite").objectStore(STORE).put(v,k);rq.onsuccess=()=>res();rq.onerror=()=>rej(rq.error);});}
+async function idbDel(k){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(STORE,"readwrite").objectStore(STORE).delete(k);rq.onsuccess=()=>res();rq.onerror=()=>rej(rq.error);});}
+
+let PROJECT = { profile:null, folders:{} };   // loaded at boot
+let S = buildS(SAMPLE);
+let step = -1;
+let saveT; function persistSoon(){clearTimeout(saveT);saveT=setTimeout(()=>idbSet("project",PROJECT).catch(()=>{}),120);}
+
 const committed = ()=>sum(S.chapters,c=>c.committed);
 const actual = ()=>sum(S.chapters,c=>c.actual);
 const margin = ()=>S.revenue - actual();
@@ -213,115 +297,82 @@ const marginPct = ()=>S.revenue? Math.round(margin()/S.revenue*1000)/10 : 0;
 const cash = ()=>S.collected - S.supplierPaid;
 const forecast = ()=>{const b=S.baseline||sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0); return b - Math.max(actual(),committed());};
 
-let step = -1;
-
-function log(msg){
-  const f=$("#feed"); if(f.dataset.clean!=="1"){f.innerHTML="";f.dataset.clean="1";}
-  f.prepend(el("div",null,msg));
+/* ---------- project folder / files ---------- */
+function art(folder,name,mime,b64){
+  const arr=PROJECT.folders[folder]||(PROJECT.folders[folder]=[]);
+  const i=arr.findIndex(f=>f.name===name); const rec={name,mime,b64};
+  if(i>=0)arr[i]=rec; else arr.push(rec);
+  persistSoon(); renderTree();
 }
-function renderLedger(){
-  const baseTotal = S.baseline || (sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0));
-  $("#l-baseline").textContent = baseTotal?eur(baseTotal):"—";
-  $("#l-committed").textContent = committed()?eur(committed()):"—";
-  $("#l-actual").textContent = actual()?eur(actual()):"—";
-  $("#l-revenue").textContent = S.revenue?eur(S.revenue):"—";
-  $("#l-collected").textContent = S.collected?eur(S.collected):"—";
-  $("#l-paid").textContent = S.supplierPaid?eur(S.supplierPaid):"—";
-  const m=$("#l-margin"); m.textContent = S.revenue?`${eur(margin())} · ${marginPct()}%`:"—"; m.className="v "+(S.revenue?(marginPct()<15?"warn":"good"):"");
-  const cc=$("#l-cash"); cc.textContent = (S.collected||S.supplierPaid)?eur(cash()):"—"; cc.className="v "+(cash()<0?"crit":"good");
-  $("#l-forecast").textContent = baseTotal?eur(forecast()):"—";
-  $("#l-bar").style.width = Math.max(0,(step+1)/STAGES.length*100)+"%";
+function textArt(folder,name,text){ art(folder,name,"text/plain",textToB64(text)); }
+function delFile(folder,name){const arr=PROJECT.folders[folder]||[];const i=arr.findIndex(f=>f.name===name);if(i>=0)arr.splice(i,1);persistSoon();renderTree();}
+function uniqueName(folder,name){
+  const arr=PROJECT.folders[folder]||[]; if(!arr.some(f=>f.name===name))return name;
+  const dot=name.lastIndexOf("."); const base=dot>0?name.slice(0,dot):name; const ext=dot>0?name.slice(dot):"";
+  let i=2; while(arr.some(f=>f.name===base+"-"+i+ext))i++; return base+"-"+i+ext;
 }
-function renderRail(){
-  const r=$("#rail"); r.innerHTML="";
-  STAGES.forEach((name,i)=>{
-    const s=el("div","st"+(i<step?" done":"")+(i===step?" cur":""),
-      `<div class="n">STEP ${i+1}</div><div class="t">${name}</div>`);
-    r.append(s);
-  });
+const textToB64 = t => btoa(unescape(encodeURIComponent(t)));
+function b64ToBytes(b64){const bin=atob(b64);const a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return a;}
+function readAny(file){return new Promise(res=>{const r=new FileReader();r.onload=()=>res({name:file.name,mime:file.type||"application/octet-stream",b64:String(r.result).split(",")[1]});r.onerror=()=>res(null);r.readAsDataURL(file);});}
+function compressImage(file){return new Promise(res=>{
+  const img=new Image(); const url=URL.createObjectURL(file);
+  img.onload=()=>{ const max=1400; const sc=Math.min(1,max/Math.max(img.width,img.height));
+    const cw=Math.max(1,Math.round(img.width*sc)), ch=Math.max(1,Math.round(img.height*sc));
+    const cv=document.createElement("canvas"); cv.width=cw; cv.height=ch;
+    cv.getContext("2d").drawImage(img,0,0,cw,ch);
+    let b64; try{ b64=cv.toDataURL("image/jpeg",0.82).split(",")[1]; }catch(e){ b64=null; }
+    URL.revokeObjectURL(url);
+    res(b64?{name:(file.name||"photo").replace(/\.\w+$/,"")+".jpg",mime:"image/jpeg",b64}:null);
+  };
+  img.onerror=()=>{ URL.revokeObjectURL(url); readAny(file).then(res); };
+  img.src=url;
+});}
+
+/* ---------- ZIP (store method) — real nested folder export ---------- */
+const crcTable=(()=>{let c,t=[];for(let n=0;n<256;n++){c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
+function crc32(bytes){let c=0xFFFFFFFF;for(let i=0;i<bytes.length;i++)c=crcTable[(c^bytes[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function u16(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255;}
+function u32(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255;a[o+2]=(v>>>16)&255;a[o+3]=(v>>>24)&255;}
+function zipStore(files){
+  const enc=new TextEncoder(); const parts=[]; const central=[]; let offset=0;
+  for(const f of files){
+    const name=enc.encode(f.path); const data=f.bytes; const crc=crc32(data);
+    const lh=new Uint8Array(30+name.length);
+    u32(lh,0,0x04034b50); u16(lh,4,20); u16(lh,6,0); u16(lh,8,0); u16(lh,10,0); u16(lh,12,0);
+    u32(lh,14,crc); u32(lh,18,data.length); u32(lh,22,data.length); u16(lh,26,name.length); u16(lh,28,0);
+    lh.set(name,30); parts.push(lh,data);
+    const ch=new Uint8Array(46+name.length);
+    u32(ch,0,0x02014b50); u16(ch,4,20); u16(ch,6,20); u16(ch,8,0); u16(ch,10,0); u16(ch,12,0); u16(ch,14,0);
+    u32(ch,16,crc); u32(ch,20,data.length); u32(ch,24,data.length); u16(ch,28,name.length);
+    u16(ch,30,0); u16(ch,32,0); u16(ch,34,0); u16(ch,36,0); u32(ch,38,0); u32(ch,42,offset);
+    ch.set(name,46); central.push(ch); offset+=lh.length+data.length;
+  }
+  let cs=0; central.forEach(c=>cs+=c.length);
+  const end=new Uint8Array(22);
+  u32(end,0,0x06054b50); u16(end,4,0); u16(end,6,0); u16(end,8,files.length); u16(end,10,files.length);
+  u32(end,12,cs); u32(end,16,offset); u16(end,20,0);
+  return new Blob([...parts,...central,end],{type:"application/zip"});
+}
+function safe(s){return String(s).replace(/[\\/:*?"<>|]+/g,"-").trim()||"Project";}
+function downloadFolder(){
+  const enc=new TextEncoder();
+  const root="Canei — "+safe(PROJECT.profile?.customer||"Project");
+  const files=[{path:root+"/README.txt",bytes:enc.encode(readme(root))}];
+  let n=0;
+  FOLDERS.forEach(fd=>{ (PROJECT.folders[fd]||[]).forEach(f=>{ files.push({path:root+"/"+fd+"/"+f.name,bytes:b64ToBytes(f.b64)}); n++; }); });
+  download(root+".zip","application/zip",zipStore(files));
+  log("Project folder downloaded — "+n+" file(s) across "+FOLDERS.length+" subfolders.");
+}
+function readme(root){
+  const p=PROJECT.profile||{};
+  const lines=FOLDERS.map(fd=>{const c=(PROJECT.folders[fd]||[]).length;return "  "+fd+"  ("+c+" file"+(c===1?"":"s")+")";});
+  return `${root}\nCanei Subirats, S.L. — project folder\n\nCustomer: ${p.customer||"—"}\nAddress:  ${p.address||"—"}\nContact:  ${p.email||"—"}  ${p.phone||""}\n\nStructure — one subfolder per lifecycle step:\n${lines.join("\n")}\n\nGenerated by the Canei Subirats ERP journey demo. Emails are log-only (not sent).`;
 }
 
-// each stage: title, capability tag, render(body) that performs the effect + returns html
-const FLOW = [
-  { cap:"crm", body:()=>{
-      return `<p>An enquiry comes in. We capture the customer and open a <b>lead</b> on the pipeline with a next action — no data lost on a scrap of paper.</p>
-      <div class="did"><b>Customer created:</b> ${S.customer} · ${S.email}<br><b>Lead opened:</b> “Bathroom + aerothermal — ${S.address}” · stage <span class="chip">new</span> · next action: book a site visit</div>`;
-    }, done:()=>log("CRM · lead opened for "+S.customer) },
-  { cap:"visits / mobile", body:()=>`<p>The site visit is captured on the phone: rooms, rough measurements and photos. This feeds the estimate without re-typing.</p>
-      <div class="did"><b>Visit recorded:</b> bathroom 5.0 × 2.5 m · old tiling to strip · relocate plumbing · aerothermal unit on the terrace.</div>`,
-    done:()=>log("Site visit captured (3 photos, measurements)") },
-  { cap:"quoting", body:()=>{
-      const est=sum(S.chapters,c=>c.budget);
-      return `<p>A quick <b>estimate</b> from the visit — an order-of-magnitude figure to align with the customer before the detailed quote.</p>
-      <div class="did"><b>Estimate:</b> ${eur(est)}–${eur(Math.round(est*1.15))} (ex-VAT), 3–4 weeks.</div>`;
-    }, done:()=>log("Estimate shared: ~"+eur(sum(S.chapters,c=>c.budget))) },
-  { cap:"quoting · sourcing", body:()=>{
-      const rows=S.chapters.map(c=>`<tr><td>${c.chapter}</td><td class="n">${eur(c.budget)}</td></tr>`).join("");
-      return `<p>The detailed <b>quote</b> is built catalogue-first (choose, don't type). Optional works are listed separately so they never inflate the headline price.</p>
-      <table><thead><tr><th>Chapter</th><th class="n">Amount</th></tr></thead><tbody>${rows}
-      <tr><td><b>Base total</b></td><td class="n"><b>${eur(sum(S.chapters,c=>c.budget))}</b></td></tr>
-      <tr><td>◇ Optional — ${S.optional.desc}</td><td class="n">${eur(S.optional.amount)}</td></tr></tbody></table>
-      <p class="hint">Supplier prices behind each chapter come from the comparison engine (missing price ≠ zero).</p>`;
-    }, done:()=>log("Quote built: base "+eur(sum(S.chapters,c=>c.budget))+" + optional") },
-  { cap:"quoting · messaging", email:{kind:"acceptance"}, body:()=>{
-      S.optional.included=true;
-      return `<p>The customer <b>accepts</b> and includes the optional shower screen. The accepted version is frozen; a branded acceptance email is auto-drafted with the accepted quote attached.</p>
-      <div class="did"><b>Accepted:</b> base + optional = ${eur(sum(S.chapters,c=>c.budget)+S.optional.amount)} (ex-VAT). Version frozen.</div>`;
-    }, done:()=>log("Quote accepted (with optional) — version frozen") },
-  { cap:"projects", body:()=>{
-      S.baseline = sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0);
-      return `<p>The accepted quote becomes a <b>project</b> with an <b>immutable baseline</b> — no re-entry. Chapter budgets are copied once and frozen; everything from here is measured against them.</p>
-      <div class="did"><b>Project opened:</b> baseline ${eur(S.baseline)} across ${S.chapters.length} chapters (+ optional). Status: active.</div>`;
-    }, done:()=>log("Project created — baseline "+eur(S.baseline)+" frozen") },
-  { cap:"procurement · sourcing", body:()=>{
-      S.chapters[0].committed=18000; S.chapters[1].committed=60000; S.chapters[2].committed=150000;
-      const rows=S.chapters.map(c=>`<tr><td>${c.chapter}</td><td class="n">${eur(c.budget)}</td><td class="n">${eur(c.committed)}</td><td class="n">${c.committed<=c.budget?'✓ within':'⚠ over'}</td></tr>`).join("");
-      return `<p><b>Purchase orders</b> are raised to the selected suppliers — this <b>commits</b> cost against each chapter's budget, visible immediately.</p>
-      <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Committed</th><th class="n">vs budget</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }, done:()=>log("POs raised — committed "+eur(committed())) },
-  { cap:"execution · payables", body:()=>{
-      S.chapters[0].actual=17500; S.chapters[1].actual=58000; S.chapters[2].actual=148000;
-      S.bills=[{s:"S-Tiles",n:"A-1042",amt:58000},{s:"S-Plumb",n:"P-337",amt:148000},{s:"S-Demo",n:"D-88",amt:17500}];
-      const rows=S.chapters.map(c=>{const v=c.actual-c.budget;return `<tr><td>${c.chapter}</td><td class="n">${eur(c.budget)}</td><td class="n">${eur(c.actual)}</td><td class="n" style="color:${v>0?'var(--crit)':'var(--good)'}">${v>0?'+':''}${eur(v)}</td></tr>`;}).join("");
-      return `<p>Work proceeds. Supplier <b>bills</b> are booked as <b>actual cost</b> (duplicates are rejected). Quoted-vs-actual per chapter updates live — the margin-leak early-warning.</p>
-      <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Actual</th><th class="n">Variance</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }, done:()=>log("Bills booked — actual "+eur(actual())+" ("+S.bills.length+" bills, AP)") },
-  { cap:"billing", email:{kind:"invoice"}, body:()=>{
-      S.revenue = S.baseline;
-      const vat = Math.round(S.revenue*S.vatBp/10000);
-      return `<p>The <b>invoice</b> is issued from the accepted quote. The VAT rate is <b>decided by the rule</b> (reduced 10%, art. 91.Uno.2.10º) — not a dropdown — and its justification is persisted. Gapless number, SHA-256 chain seal.</p>
-      <div class="did"><b>${S.invoiceNo}</b> · base ${eur(S.revenue)} · VAT 10% ${eur(vat)} · <b>total ${eur(S.revenue+vat)}</b><br><span class="hint">legally_verified:false until the asesor's review · fiscal document renders in es-ES</span></div>`;
-    }, done:()=>log("Invoice "+S.invoiceNo+" issued — revenue "+eur(S.revenue)) },
-  { cap:"receivables", email:{kind:"reminder"}, body:()=>{
-      const vat=Math.round(S.revenue*S.vatBp/10000); const total=S.revenue+vat;
-      S.collected = total;
-      return `<p><b>Collections:</b> a receipt is recorded and allocated to the invoice (partial payments are first-class). Overdue invoices raise a reminder — auto-drafted below.</p>
-      <div class="did"><b>Receipt:</b> ${eur(total)} received and allocated to ${S.invoiceNo}. Outstanding: ${eur(0)}. <span class="chip">paid</span></div>`;
-    }, done:()=>log("Receipt allocated — collected "+eur(S.collected)+" (AR)") },
-  { cap:"payables", body:()=>{
-      S.supplierPaid = actual();
-      return `<p><b>Supplier payments:</b> the booked bills are paid on their due dates. Cash out is now visible against cash in.</p>
-      <div class="did"><b>Paid:</b> ${eur(S.supplierPaid)} across ${S.bills.length} supplier bills. Cash position: <b>${eur(cash())}</b>.</div>`;
-    }, done:()=>log("Suppliers paid — "+eur(S.supplierPaid)+" (AP)") },
-  { cap:"projects · FIN", body:()=>{
-      const rows=S.chapters.map(c=>{const v=c.actual-c.budget;return `<tr><td>${c.chapter}</td><td class="n">${eur(c.budget)}</td><td class="n">${eur(c.actual)}</td><td class="n" style="color:${v>0?'var(--crit)':'var(--good)'}">${v>0?'+':''}${eur(v)} · ${c.budget?Math.round(v/c.budget*1000)/10:0}%</td></tr>`;}).join("");
-      return `<p><b>Project close</b> with the truth the BRD asks for: not turnover — <b>profitability</b>. Revenue, actual cost, margin, and quoted-vs-actual per chapter.</p>
-      <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Actual</th><th class="n">Variance</th></tr></thead><tbody>${rows}
-        <tr><td><b>Revenue (ex-VAT)</b></td><td class="n"></td><td class="n"><b>${eur(S.revenue)}</b></td><td></td></tr>
-        <tr><td><b>Margin</b></td><td class="n"></td><td class="n"><b>${eur(margin())}</b></td><td class="n"><b>${marginPct()}%</b></td></tr></tbody></table>
-      <div class="did"><b>Closed profitably.</b> Margin ${eur(margin())} (${marginPct()}%). Cash position ${eur(cash())}. Every euro traced from the first enquiry to the final profit — one clean thread.</div>`;
-    }, done:()=>log("Project closed — margin "+eur(margin())+" ("+marginPct()+"%)") },
-  { cap:"messaging · reputation", email:{kind:"review"}, body:()=>{
-      return `<p>The final, often-forgotten step: <b>ask for a review while the goodwill is fresh</b>. The moment the project closes, a branded request is auto-drafted — one click sends it, or download it as an Outlook draft. This closes the loop from first enquiry to reputation.</p>
-      <div class="did"><b>Review request drafted</b> for ${S.customer}. Google review link embedded · scheduled 3 days after handover by default · feeds the reputation loop that wins the next lead.</div>`;
-    }, done:()=>log("Review request drafted for "+S.customer+" — loop closed") },
-];
-
-/* ---------- premium branded email (full CI, email-safe inline styles) ---------- */
+/* ---------- premium branded email + PDF (unchanged CI) ---------- */
 const BRAND = { name:"Canei Subirats", legal:"Canei Subirats, S.L.", slogan:"Renovations, simply complex.",
   from:"hola@caneisubirats.com", address:"Sant Just Desvern, Barcelona", phone:"+34 93 000 00 00",
   green:"#48733c", greenLt:"#6ba85a", ink:"#14160f", body:"#54574c", soft:"#eef4ea", line:"#eceae4", spark:"#f2c230" };
-
 const MARK = `<svg width="34" height="34" viewBox="0 0 40 40" fill="none">
   <rect x="1" y="1" width="38" height="38" rx="11" fill="${BRAND.green}"/>
   <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -331,48 +382,43 @@ const MARK = `<svg width="34" height="34" viewBox="0 0 40 40" fill="none">
 
 function quoteLines(){
   const l=S.chapters.map(c=>({label:c.chapter,value:eurTxt(c.budget)}));
-  l.push({label:"Optional — "+S.optional.desc,value:eurTxt(S.optional.amount)});
-  l.push({label:"Accepted total (VAT excl.)",value:eurTxt(S.baseline||sum(S.chapters,c=>c.budget)+S.optional.amount)});
+  if(S.optional.amount>0) l.push({label:"Optional — "+S.optional.desc,value:eurTxt(S.optional.amount)});
+  const base=sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0);
+  l.push({label:"Accepted total (VAT excl.)",value:eurTxt(S.baseline||base)});
   return l;
 }
 function emailContent(kind){
-  const vat=Math.round(S.revenue*S.vatBp/10000); const total=S.revenue+vat;
+  const vat=Math.round(S.revenue*S.vatBp/10000); const total=S.revenue+vat; const vp=S.vatBp/100;
   if(kind==="acceptance") return {
     subject:"Your project is confirmed — Canei Subirats", title:"Your project is confirmed",
     greeting:`Dear ${S.customer},`,
     paras:[`We're delighted to confirm your acceptance of the works for your home at ${S.address}.`,
       `Your accepted quote is attached. We'll schedule the works and keep you updated at every milestone — one point of contact throughout, and a 2-year guarantee on the works.`],
     cta:{label:"View your project space"},
-    attach:{name:"Canei-quote-accepted.pdf", pdf:()=>({title:"Accepted quote", subtitle:S.address, lines:quoteLines()})},
-  };
+    attach:{name:"Canei-quote-accepted.pdf", pdf:()=>({title:"Accepted quote", subtitle:S.address, lines:quoteLines()})} };
   if(kind==="invoice") return {
     subject:`Invoice ${S.invoiceNo} — Canei Subirats`, title:`Invoice ${S.invoiceNo}`,
     greeting:`Dear ${S.customer},`,
     paras:[`Thank you for trusting us with your renovation. Please find your invoice attached.`,
       `Total due: <b>${eur(total)}</b> (base ${eur(S.revenue)} + VAT ${eur(vat)}). Payment terms: 15 days.`],
     cta:{label:"Pay securely online"},
-    attach:{name:S.invoiceNo+".pdf", pdf:()=>({title:S.invoiceNo, subtitle:"VAT invoice · reduced rate 10%", lines:[
+    attach:{name:S.invoiceNo+".pdf", pdf:()=>({title:S.invoiceNo, subtitle:"VAT invoice · rate "+vp+"%", lines:[
       {label:"Base (VAT excluded)",value:eurTxt(S.revenue)},
-      {label:"VAT (10%, art. 91.Uno.2.10º)",value:eurTxt(vat)},
-      {label:"Total due",value:eurTxt(total)}]})},
-  };
+      {label:"VAT ("+vp+"%)",value:eurTxt(vat)},
+      {label:"Total due",value:eurTxt(total)}]})} };
   if(kind==="reminder") return {
     subject:`Friendly reminder — invoice ${S.invoiceNo}`, title:"A gentle reminder",
     greeting:`Dear ${S.customer},`,
     paras:[`Just a friendly reminder that invoice ${S.invoiceNo} (${eur(total)}) is due.`,
       `If you've already arranged payment, please disregard this note — and thank you.`],
-    cta:{label:"Settle the invoice"},
-  };
+    cta:{label:"Settle the invoice"} };
   if(kind==="review") return {
     subject:"How did we do? — a quick favour", title:"How did we do?",
     greeting:`Dear ${S.customer},`,
     paras:[`It's been a pleasure renovating your home, and we hope you're enjoying the result every day.`,
       `If you have 30 seconds, a short review means the world to a family business like ours — and helps your neighbours find a team they can trust.`],
-    cta:{label:"★  Leave a Google review"},
-  };
+    cta:{label:"★  Leave a Google review"} };
 }
-
-/** Render a full, email-safe premium HTML email (used for the preview and the .eml). */
 function renderEmail(c){
   const B=BRAND;
   const paras=c.paras.map(p=>`<p style="margin:0 0 14px;font-size:15px;line-height:1.62;color:${B.body}">${p}</p>`).join("");
@@ -401,144 +447,327 @@ function renderEmail(c){
     </div>
   </div></div>`;
 }
-function emailDoc(c){
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${c.subject}</title></head><body style="margin:0">${renderEmail(c)}</body></html>`;
-}
-function emailText(c){
-  const strip=s=>s.replace(/<[^>]+>/g,"");
-  return `${strip(c.greeting)}\n\n${c.paras.map(strip).join("\n\n")}\n\nKind regards,\nThe ${BRAND.name} team\n\n${BRAND.legal} · ${BRAND.address}\n${BRAND.from} · ${BRAND.phone}`;
-}
+function emailDoc(c){ return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${c.subject}</title></head><body style="margin:0">${renderEmail(c)}</body></html>`; }
+function emailText(c){ const strip=s=>s.replace(/<[^>]+>/g,""); return `${strip(c.greeting)}\n\n${c.paras.map(strip).join("\n\n")}\n\nKind regards,\nThe ${BRAND.name} team\n\n${BRAND.legal} · ${BRAND.address}\n${BRAND.from} · ${BRAND.phone}`; }
 
-/* ---------- minimal, dependency-free PDF for the attachment ---------- */
 function buildPdf(o){
   const G="0.282 0.451 0.235", INK="0.078 0.086 0.059", GREY="0.55 0.56 0.5", BODY="0.33 0.34 0.29";
-  const esc=s=>String(s).replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)").replace(/[^\x20-\x7e]/g,"");
+  const e=s=>String(s).replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)").replace(/[^\x20-\x7e]/g,"");
   let c="";
-  c+=`${G} rg 0 792 595 50 re f\n`;                                        // header band
-  c+=`1 1 1 rg BT /F2 19 Tf 42 807 Td (${esc(BRAND.name)}) Tj ET\n`;
-  c+=`0.93 0.86 0.62 rg BT /F1 10 Tf 42 795 Td (${esc(BRAND.slogan)}) Tj ET\n`;
-  c+=`${INK} rg BT /F2 23 Tf 42 730 Td (${esc(o.title)}) Tj ET\n`;
-  if(o.subtitle) c+=`${GREY} rg BT /F1 12 Tf 42 710 Td (${esc(o.subtitle)}) Tj ET\n`;
+  c+=`${G} rg 0 792 595 50 re f\n`;
+  c+=`1 1 1 rg BT /F2 19 Tf 42 807 Td (${e(BRAND.name)}) Tj ET\n`;
+  c+=`0.93 0.86 0.62 rg BT /F1 10 Tf 42 795 Td (${e(BRAND.slogan)}) Tj ET\n`;
+  c+=`${INK} rg BT /F2 23 Tf 42 730 Td (${e(o.title)}) Tj ET\n`;
+  if(o.subtitle) c+=`${GREY} rg BT /F1 12 Tf 42 710 Td (${e(o.subtitle)}) Tj ET\n`;
   let y=672;
-  o.lines.forEach((l,i)=>{
-    const bold=i===o.lines.length-1;
-    if(bold){ c+=`${G} rg 42 ${y+15} 511 1.2 re f\n`; }
-    c+=`${bold?INK:BODY} rg BT /${bold?"F2":"F1"} 12 Tf 42 ${y} Td (${esc(l.label)}) Tj ET\n`;
-    c+=`${bold?INK:BODY} rg BT /${bold?"F2":"F1"} 12 Tf 430 ${y} Td (${esc(l.value)}) Tj ET\n`;
-    y-=24;
-  });
-  c+=`${GREY} rg BT /F1 9.5 Tf 42 96 Td (${esc(BRAND.legal+"  |  "+BRAND.address)}) Tj ET\n`;
-  c+=`${GREY} rg BT /F1 9.5 Tf 42 82 Td (${esc(BRAND.from+"  |  "+BRAND.phone+"  |  2-year guarantee on the works")}) Tj ET\n`;
+  o.lines.forEach((l,i)=>{ const bold=i===o.lines.length-1;
+    if(bold) c+=`${G} rg 42 ${y+15} 511 1.2 re f\n`;
+    c+=`${bold?INK:BODY} rg BT /${bold?"F2":"F1"} 12 Tf 42 ${y} Td (${e(l.label)}) Tj ET\n`;
+    c+=`${bold?INK:BODY} rg BT /${bold?"F2":"F1"} 12 Tf 430 ${y} Td (${e(l.value)}) Tj ET\n`; y-=24; });
+  c+=`${GREY} rg BT /F1 9.5 Tf 42 96 Td (${e(BRAND.legal+"  |  "+BRAND.address)}) Tj ET\n`;
+  c+=`${GREY} rg BT /F1 9.5 Tf 42 82 Td (${e(BRAND.from+"  |  "+BRAND.phone)}) Tj ET\n`;
   c+=`${G} rg 42 64 511 3 re f\n`;
   const objs=[
-    "<</Type/Catalog/Pages 2 0 R>>",
-    "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+    "<</Type/Catalog/Pages 2 0 R>>","<</Type/Pages/Kids[3 0 R]/Count 1>>",
     "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R/F2 5 0 R>>>>/Contents 6 0 R>>",
-    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
-    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>",
-    "<</Length "+c.length+">>\nstream\n"+c+"\nendstream",
-  ];
+    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>","<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>",
+    "<</Length "+c.length+">>\nstream\n"+c+"\nendstream" ];
   let pdf="%PDF-1.4\n"; const off=[];
   objs.forEach((o2,i)=>{ off.push(pdf.length); pdf+=(i+1)+" 0 obj\n"+o2+"\nendobj\n"; });
-  const xref=pdf.length;
-  pdf+="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n";
+  const xref=pdf.length; pdf+="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n";
   off.forEach(o2=>{ pdf+=String(o2).padStart(10,"0")+" 00000 n \n"; });
   pdf+="trailer\n<</Size "+(objs.length+1)+"/Root 1 0 R>>\nstartxref\n"+xref+"\n%%EOF";
   return btoa(pdf);
 }
-
-/* ---------- Outlook draft (.eml) — X-Unsent:1 opens it as an editable draft ---------- */
-function b64(str){ return btoa(unescape(encodeURIComponent(str))); }
 function chunk(s){ return s.replace(/.{1,76}/g,"$&\r\n").trimEnd(); }
 function buildEml(c){
-  const CRLF="\r\n"; const bnd="CANEI_"+Date.now().toString(36);
-  const html=emailDoc(c);
-  let m="";
-  m+="From: "+BRAND.name+" <"+BRAND.from+">"+CRLF;
-  m+="To: "+S.customer+" <"+S.email+">"+CRLF;
-  m+="Subject: "+c.subject+CRLF;
-  m+="X-Unsent: 1"+CRLF;                       // Outlook: open as a new editable draft
-  m+="MIME-Version: 1.0"+CRLF;
-  m+='Content-Type: multipart/mixed; boundary="'+bnd+'"'+CRLF+CRLF;
-  m+="--"+bnd+CRLF+'Content-Type: multipart/alternative; boundary="'+bnd+'_alt"'+CRLF+CRLF;
-  m+="--"+bnd+"_alt"+CRLF+'Content-Type: text/plain; charset="utf-8"'+CRLF+"Content-Transfer-Encoding: base64"+CRLF+CRLF+chunk(b64(emailText(c)))+CRLF+CRLF;
-  m+="--"+bnd+"_alt"+CRLF+'Content-Type: text/html; charset="utf-8"'+CRLF+"Content-Transfer-Encoding: base64"+CRLF+CRLF+chunk(b64(html))+CRLF+CRLF;
-  m+="--"+bnd+"_alt--"+CRLF+CRLF;
-  if(c.attach){
-    const pdf=buildPdf(c.attach.pdf());
-    m+="--"+bnd+CRLF+'Content-Type: application/pdf; name="'+c.attach.name+'"'+CRLF;
-    m+="Content-Transfer-Encoding: base64"+CRLF+'Content-Disposition: attachment; filename="'+c.attach.name+'"'+CRLF+CRLF+chunk(pdf)+CRLF+CRLF;
-  }
-  m+="--"+bnd+"--"+CRLF;
-  return m;
+  const CRLF="\r\n"; const bnd="CANEI_"+Math.random().toString(36).slice(2,10);
+  const html=emailDoc(c); let m="";
+  m+="From: "+BRAND.name+" <"+BRAND.from+">"+CRLF+"To: "+S.customer+" <"+S.email+">"+CRLF+"Subject: "+c.subject+CRLF;
+  m+="X-Unsent: 1"+CRLF+"MIME-Version: 1.0"+CRLF+'Content-Type: multipart/mixed; boundary="'+bnd+'"'+CRLF+CRLF;
+  m+="--"+bnd+CRLF+'Content-Type: multipart/alternative; boundary="'+bnd+'_a"'+CRLF+CRLF;
+  m+="--"+bnd+"_a"+CRLF+'Content-Type: text/plain; charset="utf-8"'+CRLF+"Content-Transfer-Encoding: base64"+CRLF+CRLF+chunk(textToB64(emailText(c)))+CRLF+CRLF;
+  m+="--"+bnd+"_a"+CRLF+'Content-Type: text/html; charset="utf-8"'+CRLF+"Content-Transfer-Encoding: base64"+CRLF+CRLF+chunk(textToB64(html))+CRLF+CRLF;
+  m+="--"+bnd+"_a--"+CRLF+CRLF;
+  if(c.attach){ const pdf=buildPdf(c.attach.pdf());
+    m+="--"+bnd+CRLF+'Content-Type: application/pdf; name="'+c.attach.name+'"'+CRLF+"Content-Transfer-Encoding: base64"+CRLF+'Content-Disposition: attachment; filename="'+c.attach.name+'"'+CRLF+CRLF+chunk(pdf)+CRLF+CRLF; }
+  m+="--"+bnd+"--"+CRLF; return m;
 }
 function download(name,mime,data){
-  const blob=new Blob([data],{type:mime});
+  const blob=data instanceof Blob?data:new Blob([data],{type:mime});
   const url=URL.createObjectURL(blob); const a=document.createElement("a");
   a.href=url; a.download=name; document.body.append(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
 }
 
-function renderStage(){
-  const stageEl=$("#stage");
-  if(step<0){
-    stageEl.innerHTML=`<div class="eyebrow">The full lifecycle</div>
-      <h2>From first enquiry to a five-star review</h2>
-      <div class="cap">One project · thirteen stages · every capability wired together.</div>
-      <p>This walks a real renovation — a bathroom + aerothermal in Esplugues — through the entire journey the business runs today on paper and spreadsheets. Watch the <b>ledger on the right</b> fill in as you go: committed vs actual cost, revenue, margin, cash and forecast — all from integer-cent money and the same rules as the production kernel.</p>
-      <p>Every customer email is <b>auto-drafted with full corporate identity</b> and downloads as an <b>Outlook draft (.eml)</b> with the PDF attached — nothing to re-type.</p>
-      <div class="actions"><button class="btn" id="next">Start the journey ▸</button>
-      <span class="hint">Advance one stage at a time.</span></div>`;
-    $("#next").onclick=advance;
+function log(msg){ const f=$("#feed"); if(f.dataset.clean!=="1"){f.innerHTML="";f.dataset.clean="1";} f.prepend(el("div",null,msg)); }
+function renderLedger(){
+  const baseTotal = S.baseline || (sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0));
+  $("#l-baseline").textContent = baseTotal?eur(baseTotal):"—";
+  $("#l-committed").textContent = committed()?eur(committed()):"—";
+  $("#l-actual").textContent = actual()?eur(actual()):"—";
+  $("#l-revenue").textContent = S.revenue?eur(S.revenue):"—";
+  $("#l-collected").textContent = S.collected?eur(S.collected):"—";
+  $("#l-paid").textContent = S.supplierPaid?eur(S.supplierPaid):"—";
+  const m=$("#l-margin"); m.textContent = S.revenue?`${eur(margin())} · ${marginPct()}%`:"—"; m.className="v "+(S.revenue?(marginPct()<15?"warn":"good"):"");
+  const cc=$("#l-cash"); cc.textContent = (S.collected||S.supplierPaid)?eur(cash()):"—"; cc.className="v "+(cash()<0?"crit":"good");
+  $("#l-forecast").textContent = baseTotal?eur(forecast()):"—";
+  $("#l-bar").style.width = Math.max(0,(step+1)/STAGES.length*100)+"%";
+}
+function renderRail(){
+  const r=$("#rail"); r.innerHTML="";
+  STAGES.forEach((name,i)=>{ r.append(el("div","st"+(i<step?" done":"")+(i===step?" cur":""),
+    `<div class="n">STEP ${i+1}</div><div class="t">${name}</div>`)); });
+}
+let treeUrls=[];
+function fileUrl(f){ const u=URL.createObjectURL(new Blob([b64ToBytes(f.b64)],{type:f.mime})); treeUrls.push(u); return u; }
+function ficon(m){ return m==="application/pdf"?"📄":m.startsWith("image/")?"🖼️":m==="message/rfc822"?"✉️":m==="text/plain"?"📝":"📎"; }
+function renderTree(){
+  const t=$("#tree"); if(!t)return; treeUrls.forEach(u=>URL.revokeObjectURL(u)); treeUrls=[]; t.innerHTML="";
+  let total=0;
+  FOLDERS.forEach(fd=>{
+    const files=PROJECT.folders[fd]||[]; total+=files.length;
+    t.append(el("div","fdr"+(files.length?" has":""),
+      `<span class="nm">📁 ${fd}</span><span class="ct${files.length?" on":""}">${files.length||"·"}</span>`));
+    if(files.length){ const fl=el("div","files");
+      files.forEach(f=>{ const a=el("a",null,`${ficon(f.mime)} ${esc(f.name)}`); a.href=fileUrl(f); a.download=f.name; a.target="_blank"; fl.append(a); });
+      t.append(fl);
+    }
+  });
+  if(!total) t.append(el("div","hint","No files yet — advance the journey, add photos and documents."));
+}
+
+/* ---------- the 13-stage flow (auto-files artifacts per step) ---------- */
+const FLOW = [
+  { cap:"crm", body:()=>`<p>An enquiry comes in. We capture the customer and open a <b>lead</b> on the pipeline with a next action — no data lost on a scrap of paper.</p>
+      <div class="did"><b>Customer:</b> ${esc(S.customer)} · ${esc(S.email)}${S.phone?" · "+esc(S.phone):""}<br><b>Lead opened:</b> “${esc(S.address)}” · stage <span class="chip">new</span> · next action: book a site visit</div>`,
+    done:()=>{ textArt("01 Lead","project-summary.txt",readme("Canei — "+safe(S.customer))); log("CRM · lead opened for "+S.customer); } },
+  { cap:"visits / mobile", body:()=>{ const n=(PROJECT.profile?.visitNotes||"").trim();
+      return `<p>The site visit is captured on the phone: notes, measurements and <b>photos</b>. Everything is filed into the <b>“02 Site visit”</b> folder and feeds the estimate without re-typing.</p>
+      <div class="did"><b>Visit notes:</b> ${n?esc(n).replace(/\n/g,"<br>"):"<span class='hint'>— add notes in your project data —</span>"}</div>`; },
+    done:()=>{ textArt("02 Site visit","visit-notes.txt",(S.customer)+" — "+S.address+"\n\n"+((PROJECT.profile?.visitNotes||"").trim()||"(no notes entered)")); log("Site visit captured"); } },
+  { cap:"quoting", body:()=>{ const est=sum(S.chapters,c=>c.budget);
+      return `<p>A quick <b>estimate</b> from the visit — an order-of-magnitude figure to align with the customer before the detailed quote.</p>
+      <div class="did"><b>Estimate:</b> ${eur(est)}–${eur(Math.round(est*1.15))} (ex-VAT), 3–4 weeks.</div>`; },
+    done:()=>{ const est=sum(S.chapters,c=>c.budget); textArt("03 Estimate","estimate.txt","Estimate for "+S.customer+"\n"+eurTxt(est)+" – "+eurTxt(Math.round(est*1.15))+" (ex-VAT)\nIndicative timeline: 3-4 weeks."); log("Estimate shared: ~"+eur(est)); } },
+  { cap:"quoting · sourcing", body:()=>{
+      const rows=S.chapters.map(c=>`<tr><td>${esc(c.chapter)}</td><td class="n">${eur(c.budget)}</td></tr>`).join("");
+      const optRow=S.optional.amount>0?`<tr><td>◇ Optional — ${esc(S.optional.desc)}</td><td class="n">${eur(S.optional.amount)}</td></tr>`:"";
+      return `<p>The detailed <b>quote</b> is built catalogue-first (choose, don't type). Optional works are listed separately so they never inflate the headline price.</p>
+      <table><thead><tr><th>Chapter</th><th class="n">Amount</th></tr></thead><tbody>${rows}
+      <tr><td><b>Base total</b></td><td class="n"><b>${eur(sum(S.chapters,c=>c.budget))}</b></td></tr>${optRow}</tbody></table>
+      <p class="hint">A branded quote PDF is filed into “04 Quotation”.</p>`; },
+    done:()=>{ art("04 Quotation","Quote.pdf","application/pdf",buildPdf({title:"Quote — "+S.customer,subtitle:S.address,lines:quoteLines()})); log("Quote built: base "+eur(sum(S.chapters,c=>c.budget))); } },
+  { cap:"quoting · messaging", email:{kind:"acceptance"}, body:()=>{
+      const hasOpt=S.optional.amount>0; S.optional.included=hasOpt;
+      const total=sum(S.chapters,c=>c.budget)+(hasOpt?S.optional.amount:0);
+      return `<p>The customer <b>accepts</b>${hasOpt?` and includes the optional works (${esc(S.optional.desc)})`:""}. The accepted version is frozen; a branded acceptance email is auto-drafted with the accepted quote attached.</p>
+      <div class="did"><b>Accepted:</b> ${hasOpt?"base + optional = ":""}${eur(total)} (ex-VAT). Version frozen.</div>`; },
+    done:()=>{ art("05 Acceptance","Accepted-quote.pdf","application/pdf",buildPdf({title:"Accepted quote — "+S.customer,subtitle:S.address,lines:quoteLines()}));
+      art("05 Acceptance","Acceptance-email.eml","message/rfc822",textToB64(buildEml(emailContent("acceptance")))); log("Quote accepted — version frozen"); } },
+  { cap:"projects", body:()=>{ S.baseline=sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0);
+      return `<p>The accepted quote becomes a <b>project</b> with an <b>immutable baseline</b> — no re-entry. Chapter budgets are copied once and frozen; everything from here is measured against them.</p>
+      <div class="did"><b>Project opened:</b> baseline ${eur(S.baseline)} across ${S.chapters.length} chapters. Status: active.</div>`; },
+    done:()=>{ textArt("06 Project","baseline.txt","Project baseline for "+S.customer+"\nFrozen baseline: "+eurTxt(S.baseline)+"\nChapters: "+S.chapters.length); log("Project created — baseline "+eur(S.baseline)+" frozen"); } },
+  { cap:"procurement · sourcing", body:()=>{ S.chapters.forEach(c=>{c.committed=Math.round(c.budget*S.committedPct);});
+      const rows=S.chapters.map(c=>`<tr><td>${esc(c.chapter)}</td><td class="n">${eur(c.budget)}</td><td class="n">${eur(c.committed)}</td><td class="n">${c.committed<=c.budget?'✓ within':'⚠ over'}</td></tr>`).join("");
+      return `<p><b>Purchase orders</b> are raised to the selected suppliers — this <b>commits</b> cost against each chapter's budget, visible immediately.</p>
+      <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Committed</th><th class="n">vs budget</th></tr></thead><tbody>${rows}</tbody></table>`; },
+    done:()=>{ textArt("07 Purchasing","purchase-orders.txt","Committed cost by chapter:\n"+S.chapters.map(c=>"  "+c.chapter+": "+eurTxt(c.committed)).join("\n")+"\nTotal committed: "+eurTxt(committed())); log("POs raised — committed "+eur(committed())); } },
+  { cap:"execution · payables", body:()=>{ S.chapters.forEach(c=>{c.actual=Math.round(c.budget*S.actualPct);});
+      S.bills=S.chapters.filter(c=>c.actual>0).map((c,i)=>({s:"Supplier "+(i+1),n:"B-"+(1040+i),amt:c.actual}));
+      const rows=S.chapters.map(c=>{const v=c.actual-c.budget;return `<tr><td>${esc(c.chapter)}</td><td class="n">${eur(c.budget)}</td><td class="n">${eur(c.actual)}</td><td class="n" style="color:${v>0?'var(--crit)':'var(--good)'}">${v>0?'+':''}${eur(v)}</td></tr>`;}).join("");
+      return `<p>Work proceeds. Supplier <b>bills</b> are booked as <b>actual cost</b> (duplicates are rejected). Quoted-vs-actual per chapter updates live — the margin-leak early-warning.</p>
+      <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Actual</th><th class="n">Variance</th></tr></thead><tbody>${rows}</tbody></table>`; },
+    done:()=>{ textArt("08 Execution","supplier-bills.txt","Supplier bills booked:\n"+S.bills.map(b=>"  "+b.s+" ("+b.n+"): "+eurTxt(b.amt)).join("\n")+"\nTotal actual: "+eurTxt(actual())); log("Bills booked — actual "+eur(actual())+" ("+S.bills.length+" bills)"); } },
+  { cap:"billing", email:{kind:"invoice"}, body:()=>{ S.revenue=S.baseline; const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
+      return `<p>The <b>invoice</b> is issued from the accepted quote. The VAT rate is <b>decided by the rule</b> (reduced rate where the renovation conditions apply, art. 91.Uno.2.10º) — not a dropdown — and its justification is persisted. Gapless number, SHA-256 chain seal.</p>
+      <div class="did"><b>${esc(S.invoiceNo)}</b> · base ${eur(S.revenue)} · VAT ${vp}% ${eur(vat)} · <b>total ${eur(S.revenue+vat)}</b><br><span class="hint">legally_verified:false until the asesor's review · fiscal document renders in es-ES</span></div>`; },
+    done:()=>{ const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
+      art("09 Invoicing",S.invoiceNo+".pdf","application/pdf",buildPdf({title:S.invoiceNo,subtitle:"VAT invoice · "+S.customer,lines:[{label:"Base (VAT excluded)",value:eurTxt(S.revenue)},{label:"VAT ("+vp+"%)",value:eurTxt(vat)},{label:"Total due",value:eurTxt(S.revenue+vat)}]}));
+      art("09 Invoicing","Invoice-email.eml","message/rfc822",textToB64(buildEml(emailContent("invoice")))); log("Invoice "+S.invoiceNo+" issued — revenue "+eur(S.revenue)); } },
+  { cap:"receivables", email:{kind:"reminder"}, body:()=>{ const vat=Math.round(S.revenue*S.vatBp/10000); const total=S.revenue+vat; S.collected=total;
+      return `<p><b>Collections:</b> a receipt is recorded and allocated to the invoice (partial payments are first-class). Overdue invoices raise a reminder — auto-drafted below.</p>
+      <div class="did"><b>Receipt:</b> ${eur(total)} received and allocated to ${esc(S.invoiceNo)}. Outstanding: ${eur(0)}. <span class="chip">paid</span></div>`; },
+    done:()=>{ const vat=Math.round(S.revenue*S.vatBp/10000); textArt("10 Collections","receipt.txt","Receipt allocated to "+S.invoiceNo+"\nAmount: "+eurTxt(S.revenue+vat)+"\nOutstanding: 0,00 EUR");
+      art("10 Collections","Reminder-email.eml","message/rfc822",textToB64(buildEml(emailContent("reminder")))); log("Receipt allocated — collected "+eur(S.collected)); } },
+  { cap:"payables", body:()=>{ S.supplierPaid=actual();
+      return `<p><b>Supplier payments:</b> the booked bills are paid on their due dates. Cash out is now visible against cash in.</p>
+      <div class="did"><b>Paid:</b> ${eur(S.supplierPaid)} across ${S.bills.length} supplier bills. Cash position: <b>${eur(cash())}</b>.</div>`; },
+    done:()=>{ textArt("11 Supplier payments","payments.txt","Supplier payments made:\n"+S.bills.map(b=>"  "+b.s+": "+eurTxt(b.amt)).join("\n")+"\nTotal paid: "+eurTxt(S.supplierPaid)+"\nCash position: "+eurTxt(cash())); log("Suppliers paid — "+eur(S.supplierPaid)); } },
+  { cap:"projects · FIN", body:()=>{
+      const rows=S.chapters.map(c=>{const v=c.actual-c.budget;return `<tr><td>${esc(c.chapter)}</td><td class="n">${eur(c.budget)}</td><td class="n">${eur(c.actual)}</td><td class="n" style="color:${v>0?'var(--crit)':'var(--good)'}">${v>0?'+':''}${eur(v)} · ${c.budget?Math.round(v/c.budget*1000)/10:0}%</td></tr>`;}).join("");
+      return `<p><b>Project close</b> with the truth the BRD asks for: not turnover — <b>profitability</b>. Revenue, actual cost, margin, and quoted-vs-actual per chapter.</p>
+      <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Actual</th><th class="n">Variance</th></tr></thead><tbody>${rows}
+        <tr><td><b>Revenue (ex-VAT)</b></td><td class="n"></td><td class="n"><b>${eur(S.revenue)}</b></td><td></td></tr>
+        <tr><td><b>Margin</b></td><td class="n"></td><td class="n"><b>${eur(margin())}</b></td><td class="n"><b>${marginPct()}%</b></td></tr></tbody></table>
+      <div class="did"><b>Closed profitably.</b> Margin ${eur(margin())} (${marginPct()}%). Cash position ${eur(cash())}. Every euro traced from the first enquiry to the final profit.</div>`; },
+    done:()=>{ textArt("12 Close","profit-summary.txt","Project close — "+S.customer+"\nRevenue (ex-VAT): "+eurTxt(S.revenue)+"\nActual cost: "+eurTxt(actual())+"\nMargin: "+eurTxt(margin())+" ("+marginPct()+"%)\nCash position: "+eurTxt(cash())); log("Project closed — margin "+eur(margin())+" ("+marginPct()+"%)"); } },
+  { cap:"messaging · reputation", email:{kind:"review"}, body:()=>`<p>The final, often-forgotten step: <b>ask for a review while the goodwill is fresh</b>. The moment the project closes, a branded request is auto-drafted — one click sends it, or download it as an Outlook draft. This closes the loop from first enquiry to reputation.</p>
+      <div class="did"><b>Review request drafted</b> for ${esc(S.customer)}. Google review link embedded · filed into “13 Review request”.</div>`,
+    done:()=>{ art("13 Review request","Review-request.eml","message/rfc822",textToB64(buildEml(emailContent("review")))); log("Review request drafted — loop closed"); } },
+];
+
+/* ---------- intake (all operator inputs) ---------- */
+let draft = clone(SAMPLE);
+function intakeHtml(){
+  const p=draft;
+  const chapRows=p.chapters.map((c,i)=>`<div class="chap" data-i="${i}">
+    <input data-k="chapter" placeholder="Chapter / work (e.g. Plumbing)" value="${esc(c.chapter||"")}">
+    <input data-k="budget" type="number" step="0.01" min="0" placeholder="€ budget" value="${c.budget??""}">
+    <button type="button" class="x" data-rm="${i}" title="Remove">×</button></div>`).join("");
+  return `<div class="eyebrow">Your project</div>
+    <h2>Run the whole process with your own data</h2>
+    <div class="cap">Enter a real customer and quote — or load the sample. Every step then runs automatically and files its documents into the project folder. Saved on this device.</div>
+    <form class="form" id="intake" autocomplete="off">
+      <div class="fsec"><h4>Customer</h4>
+        <div class="frow">
+          <div class="field"><label>Name</label><input data-p="customer" value="${esc(p.customer)}" placeholder="e.g. Laura Puig"></div>
+          <div class="field"><label>Email</label><input data-p="email" type="email" value="${esc(p.email)}" placeholder="name@example.com"></div>
+          <div class="field"><label>Phone</label><input data-p="phone" value="${esc(p.phone)}" placeholder="600 12 34 56"></div>
+          <div class="field"><label>Address</label><input data-p="address" value="${esc(p.address)}" placeholder="Street, town"></div>
+        </div>
+      </div>
+      <div class="fsec"><h4>Site visit</h4>
+        <div class="field full"><label>Notes &amp; measurements</label><textarea data-p="visitNotes" placeholder="Rooms, sizes, what to strip / relocate, materials…">${esc(p.visitNotes)}</textarea></div>
+        <div class="hint" style="margin-top:6px">Photos are taken later, at the Site-visit step, and saved to the folder.</div>
+      </div>
+      <div class="fsec"><h4>Quote — chapters</h4>
+        <div id="chaps">${chapRows}</div>
+        <button type="button" class="btn sm ghost" id="addchap">＋ Add chapter</button>
+        <div class="frow" style="margin-top:12px">
+          <div class="field"><label>Optional work (shown separately)</label><input data-o="desc" value="${esc(p.optional.desc)}" placeholder="e.g. Shower screen"></div>
+          <div class="field"><label>Optional amount (€)</label><input data-o="amount" type="number" step="0.01" min="0" value="${p.optional.amount??""}" placeholder="0.00"></div>
+        </div>
+      </div>
+      <div class="fsec"><h4>Billing &amp; costs</h4>
+        <div class="frow">
+          <div class="field"><label>VAT rate (%)</label><input data-p="vatPct" type="number" step="0.1" min="0" value="${p.vatPct}"></div>
+          <div class="field"><label>Invoice number</label><input data-p="invoiceNo" value="${esc(p.invoiceNo)}"></div>
+          <div class="field full"><label>Estimated supplier cost (% of budget) — drives committed / actual / margin</label><input data-p="costPct" type="number" step="1" min="0" max="130" value="${p.costPct}"></div>
+        </div>
+      </div>
+      <div class="err" id="ierr" hidden></div>
+      <div class="actions">
+        <button type="button" class="btn" id="startbtn">Start the journey ▸</button>
+        <button type="button" class="btn ghost" id="loadsample">Load sample data</button>
+        <button type="button" class="btn ghost" id="clearform">Clear</button>
+      </div>
+      <div class="hint" style="margin-top:4px">Your data is stored only in this browser. “Download folder (.zip)” exports everything.</div>
+    </form>`;
+}
+function wireIntake(){
+  const root=$("#stage");
+  root.querySelectorAll("[data-p]").forEach(inp=>inp.oninput=()=>{ draft[inp.dataset.p]=inp.value; });
+  root.querySelectorAll("[data-o]").forEach(inp=>inp.oninput=()=>{ draft.optional[inp.dataset.o]=inp.value; });
+  const bindChaps=()=>{
+    root.querySelectorAll("#chaps .chap").forEach(rowEl=>{
+      const i=+rowEl.dataset.i;
+      rowEl.querySelectorAll("input").forEach(inp=>inp.oninput=()=>{ draft.chapters[i][inp.dataset.k]=inp.value; });
+      const rm=rowEl.querySelector("[data-rm]"); rm.onclick=()=>{ draft.chapters.splice(i,1); if(!draft.chapters.length)draft.chapters.push({chapter:"",budget:""}); reIntake(); };
+    });
+  };
+  bindChaps();
+  $("#addchap").onclick=()=>{ draft.chapters.push({chapter:"",budget:""}); reIntake(); };
+  $("#loadsample").onclick=()=>{ draft=clone(SAMPLE); reIntake(); };
+  $("#clearform").onclick=()=>{ draft=clone(BLANK); reIntake(); };
+  $("#startbtn").onclick=startJourney;
+}
+function reIntake(){ $("#stage").innerHTML=intakeHtml(); wireIntake(); }
+
+function startJourney(){
+  const nChap=draft.chapters.filter(c=>c.chapter&&Number(c.budget)>0).length;
+  if(!draft.customer.trim() || nChap===0){
+    const e=$("#ierr"); e.hidden=false; e.textContent=!draft.customer.trim()?"Please enter the customer name.":"Add at least one chapter with a budget.";
     return;
   }
-  const f=FLOW[step];
-  const wrap=el("div");
+  PROJECT.profile=clone(draft); S=buildS(PROJECT.profile); persistSoon();
+  const f=$("#feed"); f.innerHTML="<div>Project loaded — "+esc(S.customer)+".</div>"; f.dataset.clean="";
+  step=-1; advance();   // → step 0
+}
+
+/* ---------- stage rendering ---------- */
+function renderThumbs(){
+  const box=$("#thumbs"); if(!box)return; box.innerHTML="";
+  (PROJECT.folders["02 Site visit"]||[]).filter(f=>f.mime.startsWith("image/")).forEach(f=>{
+    const t=el("div","t"); const u=fileUrl(f);
+    t.innerHTML=`<img src="${u}" alt="${esc(f.name)}"><button title="Remove" data-x="${esc(f.name)}">×</button>`;
+    t.querySelector("button").onclick=()=>{ delFile("02 Site visit",f.name); renderThumbs(); };
+    box.append(t);
+  });
+}
+async function onFiles(folder,fileList,imagesOnly){
+  const files=[...fileList]; let n=0;
+  for(const file of files){
+    let rec = (imagesOnly||file.type.startsWith("image/")) ? await compressImage(file) : await readAny(file);
+    if(rec){ rec.name=uniqueName(folder,rec.name); art(folder,rec.name,rec.mime,rec.b64); n++; }
+  }
+  if(n) log(n+" file(s) added to "+folder);
+  renderThumbs();
+}
+function renderStage(){
+  const stageEl=$("#stage");
+  if(step<0){ stageEl.innerHTML=intakeHtml(); wireIntake(); return; }
+  const f=FLOW[step]; const wrap=el("div");
   wrap.append(el("div","eyebrow",`Step ${step+1} of ${STAGES.length}`));
   wrap.append(el("h2",null,STAGES[step]));
-  wrap.append(el("div","cap",`capability: <b>${f.cap}</b>`));
+  wrap.append(el("div","cap",`capability: <b>${f.cap}</b> · folder: <b>${FOLDERS[step]}</b>`));
   wrap.append(el("div",null,f.body()));
-  // premium auto-drafted email at relevant stages
+
   if(f.email){
     const c=emailContent(f.email.kind);
     const box=el("div","maily");
-    box.append(el("div","lbl",`Auto-drafted email · full CI · to ${S.email}`));
+    box.append(el("div","lbl",`Auto-drafted email · full CI · to ${esc(S.email)}`));
     box.append(el("div","mailframe",renderEmail(c)));
     const bar=el("div","mailbar");
     const send=el("button","btn sm","✉ Send");
     const dl=el("button","btn sm ghost",(c.attach?"⤓ Outlook draft + PDF (.eml)":"⤓ Outlook draft (.eml)"));
-    const safe=el("span","safe","log-only — not delivered");
     send.onclick=()=>{ send.textContent="✓ Sent (logged)"; send.disabled=true; log("Email sent → "+S.email+" (log-only)"); };
-    dl.onclick=()=>{ download(("Canei-"+f.email.kind+".eml"),"message/rfc822",buildEml(c)); log("Outlook draft downloaded — "+f.email.kind+(c.attach?" (+PDF)":"")); };
-    bar.append(send,dl,safe); box.append(bar);
+    dl.onclick=()=>{ download("Canei-"+f.email.kind+".eml","message/rfc822",buildEml(c)); log("Outlook draft downloaded — "+f.email.kind); };
+    bar.append(send,dl,el("span","safe","log-only — not delivered")); box.append(bar);
     wrap.append(box);
   }
+
+  // photos at the site visit + a general per-step attach
+  if(step===1){
+    const pv=el("div","maily");
+    pv.append(el("div","lbl","Site-visit photos · saved to “02 Site visit”"));
+    pv.append(el("div","thumbs",'')); pv.lastChild.id="thumbs";
+    const bar=el("div","attach");
+    bar.innerHTML=`<label class="btn sm filebtn">📷 Take / add photos<input id="photoin" type="file" accept="image/*" capture="environment" multiple></label><span class="hint">Opens the camera on a phone.</span>`;
+    pv.append(bar); wrap.append(pv);
+  }
+  const gen=el("div","attach");
+  gen.innerHTML=`<label class="btn sm ghost filebtn">＋ Attach document / photo to “${FOLDERS[step]}”<input id="genin" type="file" multiple></label>`;
+  wrap.append(gen);
+
   const acts=el("div","actions");
   const isLast=step===FLOW.length-1;
   acts.append(el("button","btn",isLast?"Journey complete ✓":`Advance — ${STAGES[step+1]} ▸`));
   if(!isLast) acts.lastChild.id="next"; else acts.lastChild.disabled=true;
-  const restart=el("button","btn ghost","↻ Restart"); restart.onclick=restartJourney; acts.append(restart);
+  const restart=el("button","btn ghost","✎ Edit data / restart"); restart.onclick=editData; acts.append(restart);
   wrap.append(acts);
+
   stageEl.innerHTML=""; stageEl.append(wrap);
+  if(step===1){ renderThumbs(); const pi=$("#photoin"); if(pi) pi.onchange=e=>onFiles("02 Site visit",e.target.files,true); }
+  const gi=$("#genin"); if(gi) gi.onchange=e=>onFiles(FOLDERS[step],e.target.files,false);
   if(!isLast) $("#next").onclick=advance;
 }
 function advance(){
-  step++;
-  renderRail();
-  renderStage();      // body() applies this stage's effect on S
-  renderLedger();     // ledger now reflects the applied effect
-  const f=FLOW[step];
-  f.done&&f.done();
+  step++; renderRail(); renderStage(); renderLedger();
+  const f=FLOW[step]; f.done&&f.done();
   window.scrollTo({top:0,behavior:"smooth"});
 }
-function restartJourney(){
-  S.chapters.forEach(c=>{c.committed=0;c.actual=0;});
-  S.optional.included=false; S.baseline=0; S.revenue=0; S.collected=0; S.supplierPaid=0; S.bills=[]; S.receipts=[];
-  step=-1; const f=$("#feed"); f.innerHTML="<div>Restarted — press “Start the journey”.</div>"; f.dataset.clean="";
-  renderRail(); renderLedger(); renderStage();
-}
+function editData(){ draft=clone(PROJECT.profile||SAMPLE); step=-1; renderRail(); renderStage(); }
 
-renderRail(); renderLedger(); renderStage();
+/* ---------- boot ---------- */
+$("#dlfolder").onclick=downloadFolder;
+$("#editdata").onclick=editData;
+(async()=>{
+  try{ const saved=await idbGet("project"); if(saved&&saved.folders){ PROJECT=saved; if(PROJECT.profile){ draft=clone(PROJECT.profile); S=buildS(PROJECT.profile); } } }catch(e){}
+  renderRail(); renderLedger(); renderTree(); renderStage();
+  if(PROJECT.profile){ const f=$("#feed"); f.innerHTML="<div>Saved project loaded — press “Start the journey”.</div>"; f.dataset.clean=""; }
+})();
 </script>
 </body>
 </html>
