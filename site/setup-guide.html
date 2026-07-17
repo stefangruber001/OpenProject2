@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canei Subirats ERP — Operations & Setup Guide</title>
+<style>
+  :root{
+    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a; --greenSoft:#e7f0e1; --greenPale:#dce8d4; --spark:#f2c230;
+    --ink:#14160f; --body:#3f4339; --muted:#7c8072; --line:#d8e0d1; --hair:#e7eee1; --bg:#fff; --panel:#f4f8f1;
+    --crit:#9a3b33; --warn:#a56a1c;
+    --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
+    --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{margin:0;color:var(--body);font:13px/1.6 var(--sans);background:#e9eee6;letter-spacing:-.003em}
+  h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);margin:0;font-weight:600;letter-spacing:-.01em}
+  p{margin:0 0 10px} b{color:var(--ink)} a{color:var(--green)}
+  .mono{font-family:var(--mono);font-size:.92em}
+  code{font-family:var(--mono);font-size:.86em;background:var(--greenSoft);color:var(--greenDeep);padding:1.5px 6px;border-radius:5px;white-space:nowrap}
+
+  .page{max-width:820px;margin:22px auto;background:var(--bg);border-radius:6px;
+    box-shadow:0 22px 50px -30px rgba(20,30,15,.4);padding:46px 54px 40px;position:relative;overflow:hidden}
+  .page + .page{margin-top:26px}
+  @media print{
+    body{background:#fff}
+    .page{margin:0;border-radius:0;box-shadow:none;padding:16mm 15mm;max-width:none;min-height:auto}
+    .page + .page{page-break-before:always;margin-top:0}
+    .noprint{display:none}
+    .avoid{break-inside:avoid}
+  }
+  @page{size:A4;margin:0}
+
+  /* cover */
+  .cover{min-height:940px;display:flex;flex-direction:column;
+    background:linear-gradient(150deg,var(--greenDeep),var(--green) 62%,#5a874b);color:#fff;padding:0}
+  .cover .inner{padding:64px 60px;display:flex;flex-direction:column;height:100%;flex:1}
+  .cover .mark{display:flex;align-items:center;gap:14px}
+  .cover .mark .nm{font-family:var(--serif);font-size:22px;font-weight:600;color:#fff;line-height:1.05}
+  .cover .mark .nm small{display:block;font-size:11px;font-style:italic;color:rgba(255,255,255,.72);font-family:var(--sans)}
+  .cover h1{color:#fff;font-size:46px;line-height:1.05;margin:auto 0 8px}
+  .cover .sub{font-size:17px;color:rgba(255,255,255,.9);max-width:52ch}
+  .cover .meta{margin-top:34px;display:flex;gap:34px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.24);padding-top:22px}
+  .cover .meta div span{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.66);font-weight:700}
+  .cover .meta div b{font-size:15px;color:#fff;font-family:var(--serif)}
+  .cover .pill{align-self:flex-start;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;
+    border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:6px 13px;background:rgba(255,255,255,.14);color:#fff;margin-bottom:26px}
+
+  /* section chrome */
+  .kicker{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:700}
+  h2.sec{font-size:26px;margin:4px 0 4px;padding-bottom:12px;border-bottom:3px solid var(--green)}
+  h3{font-size:16px;margin:22px 0 8px}
+  h4{font-size:13.5px;margin:16px 0 6px;color:var(--greenDeep)}
+  .lead{font-size:14px;color:var(--body);margin-bottom:16px}
+  .pagenum{position:absolute;bottom:16px;right:20px;font-size:10px;color:var(--muted)}
+  .brandfoot{position:absolute;bottom:14px;left:20px;font-size:10px;color:var(--muted)}
+
+  ul,ol{margin:0 0 12px;padding-left:20px} li{margin:4px 0}
+  .callout{border:1px solid var(--line);border-left:3px solid var(--green);background:var(--panel);border-radius:0 10px 10px 0;padding:12px 16px;margin:14px 0;font-size:12.5px}
+  .callout.warn{border-left-color:var(--warn);background:#fbf4e6}
+  .callout b{color:var(--ink)}
+
+  table{width:100%;border-collapse:collapse;font-size:12px;margin:12px 0}
+  th{background:var(--greenSoft);color:var(--greenDeep);text-align:left;font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:8px 9px;border:1px solid var(--line)}
+  td{padding:8px 9px;border:1px solid var(--line);vertical-align:top}
+  td.c{text-align:center;font-weight:700}
+  .raci .R{color:#1f7a3f} .raci .A{color:#1f7a3f;background:var(--greenSoft)} .raci .C{color:var(--warn)} .raci .I{color:var(--muted)}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .box{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:#fff}
+  .box h4{margin:0 0 6px;color:var(--ink)}
+  .box .k{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+
+  /* step cards */
+  .step{display:flex;gap:14px;margin:0 0 14px;break-inside:avoid}
+  .step .no{flex:none;width:30px;height:30px;border-radius:9px;background:var(--green);color:#fff;font-weight:700;
+    display:grid;place-items:center;font-size:14px;box-shadow:0 6px 14px -8px rgba(72,115,60,.7)}
+  .step .bd{flex:1}
+  .step .bd>b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+  .step .why b{color:var(--ink)}
+  .step .bd .why{font-size:11.5px;color:var(--muted)}
+
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+  .chip{font-size:10.5px;font-weight:600;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;color:var(--greenDeep)}
+
+  /* toc */
+  .toc{columns:2;column-gap:34px;font-size:13px}
+  .toc a{display:flex;justify-content:space-between;gap:10px;text-decoration:none;color:var(--body);padding:5px 0;border-bottom:1px dotted var(--line)}
+  .toc a b{color:var(--ink);font-weight:600}
+  .toc a span{color:var(--muted)}
+  svg{display:block;max-width:100%}
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="page cover">
+  <div class="inner">
+    <div class="mark">
+      <svg width="46" height="46" viewBox="0 0 40 40" fill="none">
+        <rect x="1" y="1" width="38" height="38" rx="11" fill="#fff" fill-opacity="0.16" stroke="#fff" stroke-opacity="0.45"/>
+        <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="18" y="23.5" width="4" height="5" rx="1" fill="#fff"/>
+        <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230"/>
+      </svg>
+      <div class="nm">Canei Subirats<small>Renovations, simply complex.</small></div>
+    </div>
+    <div style="margin:auto 0">
+      <div class="pill">ERP · Operations &amp; setup guide</div>
+      <h1>Bringing your ERP into operation</h1>
+      <div class="sub">Infrastructure, the day-to-day process, who does what (RACI), and a step-by-step
+      setup you can follow even with no technical background — from empty account to running the whole
+      job from lead to paid invoice and a five-star review.</div>
+    </div>
+    <div class="meta">
+      <div><span>Prepared for</span><b>Canei Subirats, S.L.</b></div>
+      <div><span>Sant Just Desvern</span><b>Barcelona · Catalonia</b></div>
+      <div><span>Document</span><b>Go-live runbook v1</b></div>
+      <div><span>Read time</span><b>~20 minutes</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONTENTS ============ -->
+<section class="page">
+  <div class="kicker">Contents</div>
+  <h2 class="sec">What's in this guide</h2>
+  <p class="lead">Read it top to bottom the first time. When you set the system up, keep section 6 open —
+  it is the numbered checklist. Anything marked <span class="chip">later</span> is not needed on day one.</p>
+  <div class="toc">
+    <a href="#s1"><b>1 · The system at a glance</b><span>p.3</span></a>
+    <a href="#s2"><b>2 · Infrastructure (the moving parts)</b><span>p.4</span></a>
+    <a href="#s3"><b>3 · How it's built (architecture)</b><span>p.5</span></a>
+    <a href="#s4"><b>4 · The operating process</b><span>p.6</span></a>
+    <a href="#s5"><b>5 · Roles &amp; RACI matrix</b><span>p.7</span></a>
+    <a href="#s6"><b>6 · Go-live: step-by-step setup</b><span>p.8</span></a>
+    <a href="#s7"><b>7 · Daily operation runbook</b><span>p.11</span></a>
+    <a href="#s8"><b>8 · Backups, security &amp; data protection</b><span>p.12</span></a>
+    <a href="#s9"><b>9 · Next steps &amp; roadmap</b><span>p.13</span></a>
+    <a href="#gl"><b>Glossary of terms</b><span>p.14</span></a>
+  </div>
+
+  <div class="callout"><b>The one-sentence version.</b> Your ERP is a website (an application) that your team
+  opens in a browser on the office PC or a phone on site. It stores everything in a secure database, and it
+  turns one data entry — the customer and the quote — into the quote PDF, the project, the purchase orders,
+  the invoice, the reminders and the review request, automatically.</div>
+
+  <h3>How to use the interactive demo alongside this guide</h3>
+  <p>Everything described here can be tried today, with no installation, on the public demo:</p>
+  <ul>
+    <li><b>End-to-End Journey</b> — enter your own project and run all 13 steps; photos and documents are
+      filed into a downloadable project folder.</li>
+    <li><b>Control Tower</b> — the owner's dashboard (pipeline, money, alerts).</li>
+    <li><b>Quote demo</b> and <b>Backend</b> — the quoting screen and the API responses.</li>
+  </ul>
+  <p class="mono">stefangruber001.github.io/OpenProject2/</p>
+</section>
+
+<!-- ============ 1 · SYSTEM AT A GLANCE ============ -->
+<section class="page" id="s1">
+  <div class="kicker">Section 1</div>
+  <h2 class="sec">The system at a glance</h2>
+  <p class="lead">What you are putting into operation, in plain terms.</p>
+
+  <div class="grid2">
+    <div class="box"><div class="k">What it is</div><h4>A web application</h4>
+      <p style="margin:0;font-size:12px">A private website only your team can log in to. Nothing to install on
+      each computer — it opens in Chrome, Edge or Safari, on desktop and on the phone.</p></div>
+    <div class="box"><div class="k">What it does</div><h4>Runs the whole job</h4>
+      <p style="margin:0;font-size:12px">Lead → site visit → estimate → quote → acceptance → project →
+      purchasing → execution → invoice → collection → supplier payment → close → review. One thread.</p></div>
+    <div class="box"><div class="k">Where the data lives</div><h4>A secure database</h4>
+      <p style="margin:0;font-size:12px">A PostgreSQL database with <b>row-level security</b> — each company's
+      data is isolated. Backed up daily. You own it and can export it at any time.</p></div>
+    <div class="box"><div class="k">What makes it different</div><h4>A factory, not a fork</h4>
+      <p style="margin:0;font-size:12px">Adding a second company or changing tax rules is <b>configuration</b>
+      (data), never re-programming. Legal rules are dated and the reason is saved on each document.</p></div>
+  </div>
+
+  <h3>The promises the software keeps for you</h3>
+  <ul>
+    <li><b>Enter data once.</b> The accepted quote becomes the project, the invoice and the emails — no re-typing.</li>
+    <li><b>Money is exact.</b> All amounts are handled in whole cents; VAT is decided by the legal rule and the
+      justification is stored on the invoice (e.g. the reduced 10% renovation rate, art. 91.Uno.2.10º).</li>
+    <li><b>Invoices are immutable and gap-free.</b> Numbered in sequence and sealed in a chain (SHA-256); a
+      correction is a <i>rectificativa</i>, never an edit.</li>
+    <li><b>Profit, not just turnover.</b> Budget → committed → actual → revenue → margin → cash, per project.</li>
+    <li><b>Documents carry your identity.</b> Quotes, invoices and emails all wear the Canei logo and colours.</li>
+  </ul>
+
+  <div class="callout warn"><b>Honest limits on day one.</b> A few connections need your credentials before
+  they are switched on: real email sending, Verifactu/AEAT (legally required from 2027, not before), bank
+  statement import, and card payments. Until then the software produces the document or draft and logs it —
+  it never sends or files anything on its own. These are listed in section 9.</div>
+</section>
+
+<!-- ============ 2 · INFRASTRUCTURE ============ -->
+<section class="page avoid" id="s2">
+  <div class="kicker">Section 2</div>
+  <h2 class="sec">Infrastructure — the moving parts</h2>
+  <p class="lead">The picture below is the whole system. You rent three or four small cloud services; they talk
+  to each other over the internet. There is no server in your office to maintain.</p>
+
+  <svg viewBox="0 0 760 430" role="img" aria-label="Infrastructure diagram" style="margin:6px 0 10px">
+    <defs>
+      <marker id="ar" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#6b7264"/></marker>
+      <style>
+        .bx{fill:#fff;stroke:#c9d4c1;stroke-width:1.4;rx:12}
+        .lb{font:600 12px Inter,Arial,sans-serif;fill:#14160f}
+        .sm{font:11px Inter,Arial,sans-serif;fill:#7c8072}
+        .g{fill:#e7f0e1;stroke:#8fb27f}
+        .ln{stroke:#6b7264;stroke-width:1.5;fill:none;marker-end:url(#ar)}
+        .lnd{stroke:#b7c0ac;stroke-width:1.4;fill:none;stroke-dasharray:4 4;marker-end:url(#ar)}
+      </style>
+    </defs>
+    <!-- devices -->
+    <rect class="bx" x="18" y="30" width="150" height="66" rx="12"/>
+    <text class="lb" x="34" y="58">🖥️  Office PC</text><text class="sm" x="34" y="76">Administration &amp; owner</text>
+    <rect class="bx" x="18" y="120" width="150" height="66" rx="12"/>
+    <text class="lb" x="34" y="148">📱  Phone / tablet</text><text class="sm" x="34" y="166">On site (photos)</text>
+
+    <!-- app -->
+    <rect class="bx g" x="300" y="72" width="180" height="80" rx="12"/>
+    <text class="lb" x="318" y="100">Canei ERP app</text>
+    <text class="sm" x="318" y="118">Next.js · runs on a</text><text class="sm" x="318" y="132">host (e.g. Vercel)</text>
+
+    <!-- database -->
+    <rect class="bx" x="560" y="72" width="180" height="80" rx="12"/>
+    <text class="lb" x="578" y="100">🗄️  Database</text>
+    <text class="sm" x="578" y="118">PostgreSQL + row-level</text><text class="sm" x="578" y="132">security · daily backup</text>
+
+    <!-- internet label -->
+    <text class="sm" x="210" y="60" style="font-style:italic">internet (HTTPS)</text>
+
+    <!-- integrations row -->
+    <text class="lb" x="300" y="205" style="fill:#31532a">Connections (switched on with your credentials)</text>
+    <rect class="bx" x="300" y="220" width="132" height="58" rx="10"/><text class="lb" x="314" y="245">✉️ Email</text><text class="sm" x="314" y="263">Outlook / SMTP</text>
+    <rect class="bx" x="446" y="220" width="132" height="58" rx="10"/><text class="lb" x="460" y="245">🏛️ Verifactu</text><text class="sm" x="460" y="263">AEAT (2027)</text>
+    <rect class="bx" x="592" y="220" width="148" height="58" rx="10"/><text class="lb" x="606" y="245">🏦 Bank / 💳 Stripe</text><text class="sm" x="606" y="263">statements · payments</text>
+    <rect class="bx" x="300" y="292" width="132" height="52" rx="10"/><text class="lb" x="314" y="316">🗂️ File storage</text><text class="sm" x="314" y="332">photos · PDFs</text>
+    <rect class="bx" x="446" y="292" width="132" height="52" rx="10"/><text class="lb" x="460" y="316">📊 Gestor export</text><text class="sm" x="460" y="332">A3 / Holded CSV</text>
+    <rect class="bx" x="592" y="292" width="148" height="52" rx="10"/><text class="lb" x="606" y="316">💾 Backups</text><text class="sm" x="606" y="332">automatic, off-site</text>
+
+    <!-- arrows -->
+    <path class="ln" d="M168 63 C 240 63, 250 100, 298 108"/>
+    <path class="ln" d="M168 150 C 240 150, 250 128, 298 122"/>
+    <path class="ln" d="M480 112 L 558 112"/>
+    <path class="lnd" d="M390 152 L 366 218"/>
+    <path class="lnd" d="M470 152 L 512 218"/>
+    <path class="lnd" d="M560 140 C 640 150, 660 190, 666 218"/>
+    <path class="lnd" d="M652 152 L 700 290"/>
+  </svg>
+
+  <table class="avoid">
+    <thead><tr><th style="width:26%">Part</th><th style="width:30%">What to rent (recommended)</th><th>Why · rough cost</th></tr></thead>
+    <tbody>
+      <tr><td><b>The application host</b></td><td>Vercel (free/Pro) — or any Node host</td><td>Runs the website; deploys automatically from the code. ~€0–20/mo.</td></tr>
+      <tr><td><b>The database</b></td><td>Neon or Supabase (managed PostgreSQL)</td><td>Stores all data with backups &amp; isolation. ~€0–25/mo.</td></tr>
+      <tr><td><b>The code</b></td><td>GitHub (private repository)</td><td>Where the software lives; already set up. Free.</td></tr>
+      <tr><td><b>Domain</b> <span class="chip">optional</span></td><td>Any registrar (e.g. erp.caneisubirats.com)</td><td>A friendly web address. ~€12/yr.</td></tr>
+      <tr><td><b>Email</b> <span class="chip">later</span></td><td>Microsoft 365 (Outlook) or SMTP</td><td>To send emails &amp; save drafts to Outlook. You likely have this.</td></tr>
+      <tr><td><b>Payments</b> <span class="chip">later</span></td><td>Stripe</td><td>Card / online payment links on invoices. Pay per transaction.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><b>Plain-English takeaway.</b> You are not buying servers. You create a few online
+  accounts, paste some settings, and press deploy. Total starting cost can be under €30/month.</div>
+</section>
+
+<!-- ============ 3 · ARCHITECTURE ============ -->
+<section class="page avoid" id="s3">
+  <div class="kicker">Section 3</div>
+  <h2 class="sec">How it's built (and why that matters to you)</h2>
+  <p class="lead">You don't need this to operate the system — but it explains why changes are cheap and safe.
+  The software is built in <b>layers</b>. Knowledge about Spain and about renovations lives in the upper,
+  swappable layers; the core at the bottom knows nothing about any country or trade.</p>
+
+  <svg viewBox="0 0 760 300" role="img" aria-label="Architecture layers" style="margin:8px 0 6px">
+    <style>
+      .layer{rx:10} .lt{font:600 13px Inter,Arial,sans-serif;fill:#14160f}
+      .ld{font:11px Inter,Arial,sans-serif;fill:#5c6154}
+    </style>
+    <rect x="60" y="14" width="640" height="40" class="layer" fill="#dce8d4" stroke="#8fb27f"/>
+    <text class="lt" x="76" y="39">Plugins</text><text class="ld" x="250" y="39">optional add-ons</text>
+    <rect x="90" y="60" width="580" height="40" class="layer" fill="#e7f0e1" stroke="#9cbb8d"/>
+    <text class="lt" x="106" y="85">Tenant configuration <tspan class="ld">— your company as data (tenant.yaml)</tspan></text>
+    <rect x="120" y="106" width="520" height="40" class="layer" fill="#eef4ea" stroke="#a9c79b"/>
+    <text class="lt" x="136" y="131">Vertical packs <tspan class="ld">— renovations / construction</tspan></text>
+    <rect x="150" y="152" width="460" height="40" class="layer" fill="#f2f7ef" stroke="#b7d0aa"/>
+    <text class="lt" x="166" y="177">Jurisdiction packs <tspan class="ld">— Spain: VAT, IRPF, Verifactu rules (dated)</tspan></text>
+    <rect x="180" y="198" width="400" height="40" class="layer" fill="#f6faf4" stroke="#c4d8b9"/>
+    <text class="lt" x="196" y="223">Capabilities <tspan class="ld">— quoting, billing, projects, CRM… (ports)</tspan></text>
+    <rect x="210" y="244" width="340" height="40" class="layer" fill="#fff" stroke="#cfe0c6"/>
+    <text class="lt" x="226" y="269">Kernel <tspan class="ld">— money, dates, sealing · zero country/trade knowledge</tspan></text>
+  </svg>
+
+  <div class="grid2" style="margin-top:14px">
+    <div class="box"><h4>What this buys you</h4>
+      <ul style="margin:0;padding-left:18px;font-size:12px">
+        <li>A <b>second company</b> = a new configuration file, ready in minutes.</li>
+        <li>A <b>tax-rate change</b> = a dated rule update; old invoices keep their old rule.</li>
+        <li>Your <b>branding &amp; wording</b> are data — no code change to restyle.</li>
+      </ul></div>
+    <div class="box"><h4>How quality is protected</h4>
+      <ul style="margin:0;padding-left:18px;font-size:12px">
+        <li>Automated checks run on every change (tests, boundaries, linters).</li>
+        <li>A rule forbids Spanish/tax knowledge from leaking into the core.</li>
+        <li>Every change is versioned in GitHub and can be rolled back.</li>
+      </ul></div>
+  </div>
+</section>
+
+<!-- ============ 4 · PROCESS ============ -->
+<section class="page avoid" id="s4">
+  <div class="kicker">Section 4</div>
+  <h2 class="sec">The operating process</h2>
+  <p class="lead">The 13 steps your team runs for every job. The blue markers show where the software does the
+  work <b>automatically</b> from the data you already entered.</p>
+
+  <div class="chips" style="gap:7px;line-height:1.9">
+    <span class="chip">1 · Lead</span><span class="chip">2 · Site visit 📷</span><span class="chip">3 · Estimate</span>
+    <span class="chip">4 · Quotation ⚙️</span><span class="chip">5 · Acceptance ⚙️✉️</span><span class="chip">6 · Project ⚙️</span>
+    <span class="chip">7 · Purchasing</span><span class="chip">8 · Execution</span><span class="chip">9 · Invoicing ⚙️✉️</span>
+    <span class="chip">10 · Collections ✉️</span><span class="chip">11 · Supplier payments</span><span class="chip">12 · Close ⚙️</span>
+    <span class="chip">13 · Review request ✉️</span>
+  </div>
+  <p style="font-size:11px;color:var(--muted)">⚙️ = document generated automatically · ✉️ = email drafted for you · 📷 = photos captured on site</p>
+
+  <table class="avoid">
+    <thead><tr><th style="width:22%">Step</th><th style="width:40%">What the operator does</th><th>What the system does automatically</th></tr></thead>
+    <tbody>
+      <tr><td><b>1 Lead</b></td><td>Type the customer &amp; the enquiry.</td><td>Opens a lead with a next action; starts the project folder.</td></tr>
+      <tr><td><b>2 Site visit</b></td><td>Take photos on the phone, jot notes/measurements.</td><td>Files photos &amp; notes into the “02 Site visit” folder.</td></tr>
+      <tr><td><b>3 Estimate</b></td><td>Confirm rough scope.</td><td>Produces an order-of-magnitude figure.</td></tr>
+      <tr><td><b>4 Quotation</b></td><td>Pick chapters &amp; quantities (catalogue-first).</td><td>Totals it, keeps optionals separate, makes the <b>quote PDF</b>.</td></tr>
+      <tr><td><b>5 Acceptance</b></td><td>Mark accepted (tick any optionals taken).</td><td>Freezes the version; drafts the <b>acceptance email</b> + PDF.</td></tr>
+      <tr><td><b>6 Project</b></td><td>—</td><td>Turns the quote into a project with a frozen baseline.</td></tr>
+      <tr><td><b>7 Purchasing</b></td><td>Raise purchase orders to chosen suppliers.</td><td>Commits cost against each chapter; flags over-budget.</td></tr>
+      <tr><td><b>8 Execution</b></td><td>Book supplier bills as they arrive.</td><td>Tracks actual vs budget per chapter (margin warning).</td></tr>
+      <tr><td><b>9 Invoicing</b></td><td>Confirm the invoice.</td><td>Applies the VAT rule, seals &amp; numbers it, makes PDF + <b>email</b>.</td></tr>
+      <tr><td><b>10 Collections</b></td><td>Record the receipt when paid.</td><td>Allocates it; drafts a <b>reminder</b> if overdue.</td></tr>
+      <tr><td><b>11 Supplier payments</b></td><td>Pay bills on due dates.</td><td>Shows cash out vs cash in.</td></tr>
+      <tr><td><b>12 Close</b></td><td>—</td><td>Final margin &amp; profit summary per chapter.</td></tr>
+      <tr><td><b>13 Review request</b></td><td>Send the request.</td><td>Drafts a branded <b>review email</b> with your Google link.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><b>Lean by design.</b> Of the 13 steps, six need only a click; the rest are short data
+  entries. Everything the operator types is reused downstream — nothing is entered twice.</div>
+</section>
+
+<!-- ============ 5 · RACI ============ -->
+<section class="page avoid" id="s5">
+  <div class="kicker">Section 5</div>
+  <h2 class="sec">Roles &amp; responsibilities (RACI)</h2>
+  <p class="lead"><b>R</b> = does the work · <b>A</b> = accountable / signs off · <b>C</b> = consulted ·
+  <b>I</b> = kept informed. Roles map to the permissions already built into the system
+  (Owner, Administration, Operations), plus your external gestor and IT partner.</p>
+
+  <table class="raci avoid">
+    <thead><tr>
+      <th style="width:28%">Activity</th>
+      <th class="c">Owner</th><th class="c">Admin.</th><th class="c">Operations</th><th class="c">Gestor</th><th class="c">IT&nbsp;partner</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Lead capture &amp; qualify</td><td class="c I">I</td><td class="c R">R</td><td class="c A">A</td><td class="c">·</td><td class="c">·</td></tr>
+      <tr><td>Site visit &amp; photos</td><td class="c">·</td><td class="c I">I</td><td class="c A">A/R</td><td class="c">·</td><td class="c">·</td></tr>
+      <tr><td>Quotation &amp; pricing</td><td class="c A">A</td><td class="c R">R</td><td class="c C">C</td><td class="c">·</td><td class="c">·</td></tr>
+      <tr><td>Acceptance &amp; project open</td><td class="c A">A</td><td class="c R">R</td><td class="c I">I</td><td class="c">·</td><td class="c">·</td></tr>
+      <tr><td>Purchasing / POs</td><td class="c I">I</td><td class="c C">C</td><td class="c A">A/R</td><td class="c">·</td><td class="c">·</td></tr>
+      <tr><td>Execution &amp; supplier bills</td><td class="c I">I</td><td class="c R">R</td><td class="c A">A</td><td class="c">·</td><td class="c">·</td></tr>
+      <tr><td>Invoicing</td><td class="c A">A</td><td class="c R">R</td><td class="c">·</td><td class="c C">C</td><td class="c">·</td></tr>
+      <tr><td>Collections &amp; reminders</td><td class="c I">I</td><td class="c A">A/R</td><td class="c">·</td><td class="c">·</td><td class="c">·</td></tr>
+      <tr><td>Supplier payments</td><td class="c A">A</td><td class="c R">R</td><td class="c I">I</td><td class="c C">C</td><td class="c">·</td></tr>
+      <tr><td>Tax filing (IVA/IRPF, Verifactu)</td><td class="c A">A</td><td class="c C">C</td><td class="c">·</td><td class="c R">R</td><td class="c">·</td></tr>
+      <tr><td>User accounts &amp; permissions</td><td class="c A">A</td><td class="c R">R</td><td class="c">·</td><td class="c">·</td><td class="c C">C</td></tr>
+      <tr><td>Hosting, deploys &amp; backups</td><td class="c I">I</td><td class="c I">I</td><td class="c">·</td><td class="c">·</td><td class="c A">A/R</td></tr>
+      <tr><td>Data protection (GDPR)</td><td class="c A">A</td><td class="c R">R</td><td class="c I">I</td><td class="c C">C</td><td class="c C">C</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><b>If you are a small team,</b> one person can hold several roles — the point is that every
+  activity has a clear <b>A</b> (one person accountable). The “IT partner” can be an occasional external
+  contractor; day-to-day operation needs no IT.</div>
+</section>
+
+<!-- ============ 6 · GO-LIVE SETUP ============ -->
+<section class="page" id="s6">
+  <div class="kicker">Section 6 · the checklist</div>
+  <h2 class="sec">Go-live: step-by-step setup</h2>
+  <p class="lead">Follow these in order. Each step says <b>what to do</b> and <b>why</b>. Where you must copy a
+  setting, it looks like <code>THIS</code>. You do <b>not</b> need to understand the code — you are creating
+  accounts and pasting values. Budget about half a day. If a step feels technical, your IT partner can do
+  Part A once in ~1 hour.</p>
+
+  <h3>Part A — Stand up the system (one-time, technical)</h3>
+  <div class="step"><div class="no">1</div><div class="bd"><b>Create the accounts</b>
+    <div class="why">Go to each site and sign up (email + password): <b>GitHub</b> (github.com — you already have
+    the code here), <b>Vercel</b> (vercel.com, “Continue with GitHub”), and a database at <b>Neon</b>
+    (neon.tech) or <b>Supabase</b> (supabase.com). All have free tiers.</div></div></div>
+  <div class="step"><div class="no">2</div><div class="bd"><b>Create the database &amp; copy its address</b>
+    <div class="why">In Neon/Supabase click <i>New project</i>. When it finishes, copy the <b>connection string</b>
+    (starts with <code>postgres://…</code>). Keep it private — it is like a key to your data.</div></div></div>
+  <div class="step"><div class="no">3</div><div class="bd"><b>Connect the app to GitHub in Vercel</b>
+    <div class="why">In Vercel: <i>Add New → Project</i>, choose the <code>OpenProject2</code> repository, framework
+    “Next.js”. Don't deploy yet — first add the settings in step 4.</div></div></div>
+  <div class="step"><div class="no">4</div><div class="bd"><b>Paste the settings (environment variables)</b>
+    <div class="why">In Vercel → Project → <i>Settings → Environment Variables</i>, add:
+    <code>DATABASE_URL</code> = the address from step 2; <code>UI_LANG</code> = <code>es</code> (or <code>ca</code>
+    for Catalan, <code>en</code> for English). These tell the app where the data is and which language to show.</div></div></div>
+  <div class="step"><div class="no">5</div><div class="bd"><b>Create the tables (migrate)</b>
+    <div class="why">Once, run the database setup: <code>pnpm install</code> then <code>pnpm db:migrate</code>
+    (your IT partner runs this from the code, with the same <code>DATABASE_URL</code>). This builds the empty
+    tables. Nothing to decide — just run it.</div></div></div>
+  <div class="step"><div class="no">6</div><div class="bd"><b>Deploy</b>
+    <div class="why">Press <b>Deploy</b> in Vercel. In ~2 minutes you get a web address like
+    <code>canei-erp.vercel.app</code>. Open it — the app is live. (Optional: point
+    <code>erp.caneisubirats.com</code> to it under Vercel → Domains.)</div></div></div>
+  <div class="step"><div class="no">7</div><div class="bd"><b>Prove it works</b>
+    <div class="why">From the code, run <code>make demo</code>. It builds a sample quote and two invoices and
+    checks the seals — if it prints green, the engine is healthy. This is the “smoke test”.</div></div></div>
+
+  <h3>Part B — Make it yours (configuration, no coding)</h3>
+  <div class="step"><div class="no">8</div><div class="bd"><b>Confirm the company details</b>
+    <div class="why">Check the company file <code>tenants/diorka/tenant.yaml</code>: legal name, CIF, address,
+    logo colours, invoice numbering, IVA/IRPF profile. These are already set to Canei Subirats — verify the
+    CIF and banking once your gestor confirms them.</div></div></div>
+  <div class="step"><div class="no">9</div><div class="bd"><b>Load your catalogue &amp; suppliers</b>
+    <div class="why">Enter your usual chapters/items and prices, and your suppliers with their prices. This is
+    what makes quoting “pick, don't type”. Start with your 20 most common items; add more over time.</div></div></div>
+  <div class="step"><div class="no">10</div><div class="bd"><b>Create the user accounts &amp; roles</b>
+    <div class="why">Add each team member and give them a role: <b>Owner</b>, <b>Administration</b> or
+    <b>Operations</b> (permissions are already defined). The owner can do everything; operations can capture
+    visits and purchasing but not, say, change tax settings.</div></div></div>
+
+  <h3>Part C — Optional connections (turn on when ready) <span class="chip">later</span></h3>
+  <div class="step"><div class="no">11</div><div class="bd"><b>Email &amp; Outlook drafts</b>
+    <div class="why">Provide your Microsoft 365 / SMTP details so emails can be sent and saved to the Outlook
+    Drafts folder. Until then the app still produces the branded email and a downloadable Outlook draft.</div></div></div>
+  <div class="step"><div class="no">12</div><div class="bd"><b>Payments, bank &amp; tax</b>
+    <div class="why">Add <b>Stripe</b> for pay-online links; connect the bank for statement import; and, ahead
+    of 2027, complete the <b>Verifactu/AEAT</b> certification with your gestor. Each is a self-contained
+    switch-on and is not needed to start operating.</div></div></div>
+</section>
+
+<!-- ============ 7 · DAILY OPERATION ============ -->
+<section class="page avoid" id="s7">
+  <div class="kicker">Section 7</div>
+  <h2 class="sec">Daily operation runbook</h2>
+  <p class="lead">The rhythm once you are live.</p>
+  <div class="grid2">
+    <div class="box"><h4>Every day</h4><ul style="margin:0;padding-left:18px;font-size:12px">
+      <li>Capture new leads and book visits.</li>
+      <li>On site: photos + notes on the phone.</li>
+      <li>Turn accepted quotes into projects (one click).</li>
+      <li>Book supplier bills as they arrive.</li>
+      <li>Send drafted invoices &amp; reminders after a glance.</li>
+    </ul></div>
+    <div class="box"><h4>Every week</h4><ul style="margin:0;padding-left:18px;font-size:12px">
+      <li>Review the Control Tower: pipeline, margins, overdue.</li>
+      <li>Chase overdue invoices (reminders are pre-drafted).</li>
+      <li>Pay supplier bills due this week.</li>
+      <li>Send review requests for finished jobs.</li>
+    </ul></div>
+    <div class="box"><h4>Every month</h4><ul style="margin:0;padding-left:18px;font-size:12px">
+      <li>Export the ledger for your gestor (CSV).</li>
+      <li>Check margin-by-chapter for lessons on pricing.</li>
+      <li>Confirm the backup ran (section 8).</li>
+    </ul></div>
+    <div class="box"><h4>If something looks wrong</h4><ul style="margin:0;padding-left:18px;font-size:12px">
+      <li>Nothing is deleted — invoices are immutable; use a <i>rectificativa</i>.</li>
+      <li>The app can be re-deployed to the previous version in minutes.</li>
+      <li>Contact your IT partner; the data is safe in the database.</li>
+    </ul></div>
+  </div>
+  <div class="callout"><b>Golden rule.</b> Enter each fact once, at the step it first appears. The system carries
+  it forward. If you find yourself re-typing, there is probably a button that already has it.</div>
+</section>
+
+<!-- ============ 8 · SECURITY ============ -->
+<section class="page avoid" id="s8">
+  <div class="kicker">Section 8</div>
+  <h2 class="sec">Backups, security &amp; data protection</h2>
+  <div class="grid2">
+    <div class="box"><h4>Backups</h4><ul style="margin:0;padding-left:18px;font-size:12px">
+      <li>Managed Postgres (Neon/Supabase) takes <b>automatic daily backups</b>; keep 7–30 days.</li>
+      <li>Once a month, export a full copy (the app supports JSON/CSV export) and store it off-site
+        (e.g. company OneDrive/Drive).</li>
+      <li>Twice a year, do a <b>restore drill</b>: confirm a backup actually opens.</li>
+    </ul></div>
+    <div class="box"><h4>Access &amp; security</h4><ul style="margin:0;padding-left:18px;font-size:12px">
+      <li>Each person has their own login; roles limit what they can do.</li>
+      <li>The database has <b>row-level security</b> — data is isolated per company.</li>
+      <li>Never share the <code>DATABASE_URL</code> or passwords; store them in the host's secret settings, not in email.</li>
+      <li>Turn on 2-factor login on GitHub, Vercel and the database.</li>
+    </ul></div>
+    <div class="box"><h4>Data protection (GDPR / LOPD)</h4><ul style="margin:0;padding-left:18px;font-size:12px">
+      <li>You hold customer names, addresses, photos — treat them as personal data.</li>
+      <li>Only collect what you need; keep a simple record of processing.</li>
+      <li>Be ready to export or delete a customer's data on request.</li>
+      <li>Your hosts (EU regions available) act as processors — keep their DPAs on file.</li>
+    </ul></div>
+    <div class="box"><h4>Legal / fiscal</h4><ul style="margin:0;padding-left:18px;font-size:12px">
+      <li>Invoices are gap-free and sealed; VAT rule &amp; justification are stored on each one.</li>
+      <li>Documents render in Spanish (es-ES); a Catalan label set can be switched on.</li>
+      <li><b>Verifactu</b> is mandatory from 2027 — plan the certification with your gestor in good time.</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============ 9 · NEXT STEPS ============ -->
+<section class="page avoid" id="s9">
+  <div class="kicker">Section 9</div>
+  <h2 class="sec">Next steps &amp; roadmap</h2>
+  <p class="lead">What to do right after go-live, and what is queued.</p>
+
+  <h4>Do first (week 1–2)</h4>
+  <ol style="font-size:12.5px">
+    <li>Complete Part A &amp; B of section 6; run one real job end-to-end with a friendly customer.</li>
+    <li>Load your top catalogue items and suppliers so quoting is fast.</li>
+    <li>Confirm CIF, bank and invoice-numbering with your gestor; update the company file.</li>
+    <li>Turn on email so invoices and reminders can actually go out (or keep using Outlook drafts).</li>
+  </ol>
+
+  <h4>Queued (turn on when it pays off)</h4>
+  <table class="avoid">
+    <thead><tr><th style="width:34%">Capability</th><th>Status &amp; what it needs</th></tr></thead>
+    <tbody>
+      <tr><td>Real email / Outlook drafts</td><td>Needs Microsoft 365 or SMTP credentials. Today: branded draft + downloadable .eml.</td></tr>
+      <tr><td>Verifactu / AEAT filing</td><td>Legally required 2027; needs certificate + gestor sign-off.</td></tr>
+      <tr><td>Bank statement import (N43)</td><td>Cheapest cash-visibility win; upload file or connect aggregator.</td></tr>
+      <tr><td>Card / online payments (Stripe)</td><td>Adds “pay online” to invoices; pay-per-use.</td></tr>
+      <tr><td>Gestor export (A3 / Holded / Sage)</td><td>Confirm your gestor's preferred format; then one-click export.</td></tr>
+      <tr><td>Mobile app shell (offline site visits)</td><td>PWA packaging for weak-signal sites; the web app already works on phones.</td></tr>
+      <tr><td>Owner consolidated view (multi-company)</td><td>When a second company is added — configuration only.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout"><b>Adding a second company</b> is configuration, not a rebuild: a new company file plus its
+  catalogue, ready in well under an hour. That is the whole point of the “factory”.</div>
+</section>
+
+<!-- ============ GLOSSARY ============ -->
+<section class="page avoid" id="gl">
+  <div class="kicker">Reference</div>
+  <h2 class="sec">Glossary</h2>
+  <div class="grid2">
+    <div>
+      <h4>Application (app)</h4><p style="font-size:12px">The website your team logs into to run the business.</p>
+      <h4>Host / Vercel</h4><p style="font-size:12px">The service that runs the app on the internet.</p>
+      <h4>Database / PostgreSQL</h4><p style="font-size:12px">Where all data is stored, safely and with backups.</p>
+      <h4>Environment variable</h4><p style="font-size:12px">A private setting (like <code>DATABASE_URL</code>) pasted into the host, not into the code.</p>
+      <h4>Deploy</h4><p style="font-size:12px">Publishing a new version of the app — one button; reversible.</p>
+      <h4>Migration</h4><p style="font-size:12px">Creating/updating the database tables. Run once at setup.</p>
+    </div>
+    <div>
+      <h4>Tenant / configuration</h4><p style="font-size:12px">Your company set up as data (name, logo, tax profile) — no coding.</p>
+      <h4>Baseline</h4><p style="font-size:12px">The frozen budget copied from the accepted quote; everything is measured against it.</p>
+      <h4>Committed vs actual</h4><p style="font-size:12px">Committed = ordered (POs); actual = billed by suppliers.</p>
+      <h4>Rectificativa</h4><p style="font-size:12px">A correcting invoice — invoices are never edited or deleted.</p>
+      <h4>Verifactu</h4><p style="font-size:12px">Spain's anti-fraud invoicing regime, mandatory from 2027.</p>
+      <h4>RLS (row-level security)</h4><p style="font-size:12px">Database rule keeping each company's rows isolated.</p>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:20px"><b>Questions?</b> Keep this guide with your company file. The
+  interactive demo mirrors every step described here, so you can rehearse the whole process before go-live —
+  and after, it is the fastest way to train a new team member.</div>
+  <p style="margin-top:22px;font-size:11px;color:var(--muted)">Canei Subirats, S.L. · Sant Just Desvern ·
+  Operations &amp; setup guide v1 · Generated by the Canei ERP factory. Emails and filings are never sent
+  automatically without your credentials.</p>
+</section>
+
+<div class="noprint" style="position:fixed;right:18px;bottom:18px;z-index:50">
+  <a href="Canei-Subirats-ERP-Operations-Guide.pdf" download
+     style="display:inline-block;background:linear-gradient(180deg,#6ba85a,#48733c);color:#fff;text-decoration:none;
+     font:600 14px Inter,Arial,sans-serif;padding:12px 20px;border-radius:12px;box-shadow:0 12px 26px -12px rgba(72,115,60,.7)">⤓ Download PDF</a>
+  <button onclick="window.print()"
+     style="background:#fff;border:1px solid #d8e0d1;color:#3f4339;font:600 14px Inter,Arial,sans-serif;padding:12px 18px;border-radius:12px;margin-left:8px;cursor:pointer">🖨 Print</button>
+</div>
+</body>
+</html>
