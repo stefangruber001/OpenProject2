@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const pillars = [
   "Version control & protected main with PR review",
   "Documented architecture & decisions (ADRs)",
@@ -42,6 +44,21 @@ export default function Home() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
+          Tenant workspaces
+        </h2>
+        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+          <Link className="underline underline-offset-2" href="/reformas-demo">
+            reformas-demo
+          </Link>{" "}
+          ·{" "}
+          <Link className="underline underline-offset-2" href="/azulejos-lopez">
+            azulejos-lopez
+          </Link>
+        </p>
       </section>
 
       <footer className="mt-auto text-sm text-neutral-500">

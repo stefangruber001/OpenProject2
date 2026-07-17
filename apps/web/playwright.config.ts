@@ -20,5 +20,12 @@ export default defineConfig({
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    env: {
+      ...process.env,
+      // e2e exercises the in-memory runtime unless a database is provided
+      // explicitly via E2E_DATABASE_URL (a set-but-unreachable local .env
+      // DATABASE_URL must not leak into the app under test).
+      DATABASE_URL: process.env.E2E_DATABASE_URL ?? "",
+    },
   },
 });

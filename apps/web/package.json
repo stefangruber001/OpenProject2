@@ -14,12 +14,18 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@repo/capability-billing": "workspace:*",
+    "@repo/capability-quoting": "workspace:*",
     "@repo/db": "workspace:*",
+    "@repo/factory": "workspace:*",
+    "@repo/kernel": "workspace:*",
+    "@repo/pack-vertical-construction-reformas": "workspace:*",
     "@repo/ui": "workspace:*",
     "dotenv": "^16.4.7",
     "next": "16.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "yaml": "^2.6.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {

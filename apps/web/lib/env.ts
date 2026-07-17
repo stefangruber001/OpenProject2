@@ -16,8 +16,9 @@ const schema = z.object({
 
 export const env = schema.parse({
   NODE_ENV: process.env.NODE_ENV,
-  DATABASE_URL: process.env.DATABASE_URL,
-  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  // Empty string means "no database configured" (e.g. e2e in-memory runs).
+  DATABASE_URL: process.env.DATABASE_URL || undefined,
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || undefined,
 });
 
 export type Env = z.infer<typeof schema>;

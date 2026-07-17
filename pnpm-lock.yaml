@@ -29,9 +29,24 @@ importers:
 
   apps/web:
     dependencies:
+      '@repo/capability-billing':
+        specifier: workspace:*
+        version: link:../../packages/capabilities/billing
+      '@repo/capability-quoting':
+        specifier: workspace:*
+        version: link:../../packages/capabilities/quoting
       '@repo/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@repo/factory':
+        specifier: workspace:*
+        version: link:../../packages/factory
+      '@repo/kernel':
+        specifier: workspace:*
+        version: link:../../packages/kernel
+      '@repo/pack-vertical-construction-reformas':
+        specifier: workspace:*
+        version: link:../../packages/packs/vertical-construction-reformas
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -47,6 +62,9 @@ importers:
       react-dom:
         specifier: ^19.2.0
         version: 19.2.7(react@19.2.7)
+      yaml:
+        specifier: ^2.6.1
+        version: 2.9.0
       zod:
         specifier: ^3.24.1
         version: 3.25.76

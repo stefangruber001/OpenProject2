@@ -81,6 +81,10 @@ export class QuotingService {
     return quote;
   }
 
+  async list(): Promise<readonly Quote[]> {
+    return this.deps.store.list();
+  }
+
   private async mustGetDraft(quoteId: string): Promise<Quote> {
     const quote = await this.deps.store.get(quoteId);
     if (!quote) throw new FactoryError("NOT_FOUND", `Quote ${quoteId} not found.`);
