@@ -138,3 +138,21 @@ languages: es-ES # source: synthetic
     formatting `1.234,56 €`) — display language and fiscal locale are
     independent. Their live site (CAT default, ESP toggle) confirms
     Catalan-first is the handover expectation (NFR-10).
+27. **"Execute the plan fully" (2026-07-17)** interpreted as: build the
+    demonstrable **end-to-end customer-journey slice** now — the 12-stage
+    lifecycle (lead→…→close), per-project financial control
+    (budget/committed/actual/revenue/margin/cash/forecast), the full
+    dashboard suite (pipeline, projects, margins, suppliers, purchasing, AR,
+    AP, cash forecast, performance, alerts/tasks), and auto-drafted emails.
+    R1→R4 in full is months of work; this cycle lands the working, visual
+    whole-journey control tower + the email-drafting module so the vision is
+    usable and inspectable. Most reversible: a self-contained interactive
+    dashboard mirroring the real kernel logic (as `site/frontend.html` does)
+    - real capability code behind it, all gates green. Deeper persistence
+      wiring continues in later cycles.
+28. **Emails: auto-generated, one Send press, never really sent.** Lifecycle
+    events auto-draft an email (subject+body from templates that are DATA,
+    not kernel/capability literals); the user edits if needed and presses
+    **Send**, which drives a **log-only fake adapter** (`email-out@1`). No
+    real email is ever sent from dev (mandate §3); real SMTP/provider stays
+    in `INTEGRATIONS_PENDING.md` until the tenant supplies credentials.

@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canei Subirats ERP — Control Tower</title>
+<style>
+  :root{
+    --green:#48733c; --greenLt:#65bc7b; --greenSoft:#e7efe3; --spark:#f2c230;
+    --ink:#1a1c18; --body:#333; --muted:#747474; --line:#d9dcd4; --mist:#f1f3ec; --paper:#fff; --card:#fff; --panel:#fbfcfa;
+    --good:#2f7d4f; --good-bg:#e7f2ec; --warn:#a56a1c; --warn-bg:#f7edda; --crit:#9a3b33; --crit-bg:#f6e6e4;
+    --in:#48733c; --out:#9a3b33;
+    --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
+    --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){
+    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --line:#2e3327; --mist:#1e231a; --paper:#12150e; --card:#1b1f16; --panel:#171b12;
+    --greenSoft:#21301b; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }}
+  :root[data-theme="dark"]{
+    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --line:#2e3327; --mist:#1e231a; --paper:#12150e; --card:#1b1f16; --panel:#171b12;
+    --greenSoft:#21301b; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--mist);color:var(--body);font:14px/1.5 var(--sans)}
+  h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0}
+  .mono{font-family:var(--mono)}
+  button{font:inherit;cursor:pointer}
+
+  header.top{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:3px solid var(--green);
+    display:flex;align-items:center;gap:14px;padding:12px 22px;flex-wrap:wrap}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo .mark{width:32px;height:32px;border-radius:8px;background:var(--green);position:relative;flex:none}
+  .logo .mark::after{content:"";position:absolute;right:5px;bottom:5px;width:8px;height:8px;border-radius:2px;background:var(--spark)}
+  .logo .name{font-family:var(--serif);font-weight:600;font-size:18px;color:var(--ink);line-height:1.05}
+  .logo .name small{display:block;font-family:var(--sans);font-weight:500;font-size:10px;font-style:italic;color:var(--muted)}
+  .top .tag{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);font-weight:700}
+  .top .today{margin-left:auto;font-size:12px;color:var(--muted)}
+  .top .today b{color:var(--ink)}
+
+  main{max-width:1180px;margin:0 auto;padding:18px 22px 70px;display:flex;flex-direction:column;gap:16px}
+
+  /* KPI strip */
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+  @media (max-width:960px){.kpis{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:560px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:12px 13px}
+  .kpi .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700}
+  .kpi .v{font-family:var(--serif);font-size:22px;color:var(--ink);font-weight:600;margin-top:3px;line-height:1;font-variant-numeric:tabular-nums}
+  .kpi .s{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .kpi .s.good{color:var(--good)} .kpi .s.warn{color:var(--warn)} .kpi .s.crit{color:var(--crit)}
+
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+  .tabs button{border:1px solid transparent;border-bottom:none;background:none;color:var(--muted);
+    padding:9px 15px;border-radius:9px 9px 0 0;font-size:13.5px;font-weight:600}
+  .tabs button[aria-selected="true"]{color:var(--ink);background:var(--card);border-color:var(--line);box-shadow:inset 0 3px 0 var(--green)}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media (max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
+  h3.blk{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px;font-family:var(--sans);font-weight:700}
+  .sub{font-size:12px;color:var(--muted)}
+
+  /* journey pipeline */
+  .journey{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px}
+  .stage{flex:1 0 128px;min-width:128px;border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:var(--panel);
+    cursor:pointer;position:relative;transition:border-color .15s}
+  .stage:hover,.stage[aria-selected="true"]{border-color:var(--green)}
+  .stage .idx{font-size:9px;font-weight:700;color:var(--green);letter-spacing:.05em}
+  .stage h4{font-size:12px;margin:3px 0 6px;line-height:1.2}
+  .stage .cnt{font-family:var(--serif);font-size:20px;color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+  .stage .val{font-size:10.5px;color:var(--muted);margin-top:1px}
+  .stage .bar{height:4px;border-radius:3px;background:var(--greenSoft);margin-top:8px;overflow:hidden}
+  .stage .bar>i{display:block;height:100%;background:var(--green);border-radius:3px}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border-bottom:1.5px solid var(--green);padding:7px 8px}
+  td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--mist)}
+  .chip{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;letter-spacing:.02em;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .chip.good{color:var(--good);background:var(--good-bg)} .chip.warn{color:var(--warn);background:var(--warn-bg)} .chip.crit{color:var(--crit);background:var(--crit-bg)}
+  .chip.stage{color:var(--green);background:var(--greenSoft)}
+  .barrow{display:flex;align-items:center;gap:9px;margin:5px 0}
+  .barrow .lab{width:120px;font-size:11px;color:var(--muted);flex:none}
+  .barrow .track{flex:1;height:16px;background:var(--mist);border-radius:5px;overflow:hidden;position:relative}
+  .barrow .track>i{display:block;height:100%;border-radius:5px}
+  .barrow .amt{width:96px;text-align:right;font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--ink);flex:none;font-weight:600}
+
+  .mini{display:flex;align-items:flex-end;gap:5px;height:96px}
+  .mini .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%}
+  .mini .col .bar{width:70%;border-radius:4px 4px 0 0;min-height:2px}
+  .mini .col .cl{font-size:9px;color:var(--muted)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px;color:var(--muted);margin-top:8px}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .swatch{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+  /* emails */
+  .mailwrap{display:grid;grid-template-columns:280px 1fr;gap:14px}
+  @media (max-width:860px){.mailwrap{grid-template-columns:1fr}}
+  .maillist{display:flex;flex-direction:column;gap:6px;max-height:520px;overflow:auto}
+  .mailitem{border:1px solid var(--line);border-radius:9px;padding:9px 11px;cursor:pointer;background:var(--panel)}
+  .mailitem[aria-selected="true"]{border-color:var(--green);background:var(--greenSoft)}
+  .mailitem .subj{font-size:12.5px;color:var(--ink);font-weight:600}
+  .mailitem .meta{font-size:10.5px;color:var(--muted);margin-top:2px;display:flex;justify-content:space-between;gap:6px}
+  .mailview{border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px}
+  .mailview .row{display:flex;gap:8px;font-size:12.5px}
+  .mailview .row b{width:64px;color:var(--muted);flex:none;font-weight:600}
+  .mailview input,.mailview textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:8px 10px;width:100%}
+  .mailview textarea{min-height:230px;resize:vertical;line-height:1.55;font-size:13px}
+  .btn{background:var(--green);color:#fff;border:none;border-radius:9px;padding:10px 18px;font-weight:700;font-size:13.5px}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn.ghost{background:none;border:1px solid var(--line);color:var(--body)}
+  .sent-tag{font-size:10.5px;color:var(--good);font-weight:700;display:inline-flex;align-items:center;gap:4px}
+  .feed{font-size:11.5px;color:var(--muted);border-top:1px solid var(--line);margin-top:8px;padding-top:8px;max-height:120px;overflow:auto}
+  .feed div{padding:2px 0}
+  .warnbox{border-left:3px solid var(--warn);background:var(--warn-bg);border-radius:0 8px 8px 0;padding:8px 12px;font-size:11.5px;color:var(--ink)}
+
+  .alert{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:var(--panel)}
+  .alert .ic{width:22px;height:22px;border-radius:6px;flex:none;display:grid;place-items:center;font-size:12px;font-weight:800;color:#fff}
+  .alert.crit .ic{background:var(--crit)} .alert.warn .ic{background:var(--warn)} .alert.good .ic{background:var(--good)}
+  .alert .t{font-size:12.5px;color:var(--ink);font-weight:600}
+  .alert .d{font-size:11px;color:var(--muted)}
+  .owner{font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--mist);color:var(--muted);white-space:nowrap}
+
+  .foot{font-size:10.5px;color:var(--muted);text-align:center;padding-top:6px}
+  [hidden]{display:none!important}
+  .drill{margin-top:12px;border-top:1px dashed var(--line);padding-top:12px}
+</style>
+</head>
+<body data-palette="#48733C,#2F6F9E,#B07A1E,#8A4FA3">
+
+<header class="top">
+  <div class="logo"><span class="mark"></span><span class="name">Canei Subirats<small>Renovations, simply complex.</small></span></div>
+  <span class="tag">ERP · Control Tower</span>
+  <span class="today">Today <b id="today">17 Jul 2026</b> · <span id="clock">demo</span></span>
+</header>
+
+<main>
+  <!-- KPI STRIP -->
+  <div class="kpis" id="kpis"></div>
+
+  <div class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-tab="journey" aria-selected="true">Customer journey</button>
+    <button role="tab" data-tab="projects" aria-selected="false">Projects &amp; money</button>
+    <button role="tab" data-tab="dash" aria-selected="false">Dashboards</button>
+    <button role="tab" data-tab="emails" aria-selected="false">Emails</button>
+    <button role="tab" data-tab="alerts" aria-selected="false">Alerts &amp; tasks</button>
+  </div>
+
+  <!-- ============ JOURNEY ============ -->
+  <section class="panel" id="tab-journey">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <div><h2 style="font-size:17px">Customer journey — lead to profit</h2>
+      <div class="sub">The full lifecycle. Click a stage to see the projects in it.</div></div>
+      <div class="sub">Value = pipeline &amp; work-in-hand at each stage</div>
+    </div>
+    <div class="journey" id="journey"></div>
+    <div class="drill" id="journey-drill"></div>
+  </section>
+
+  <!-- ============ PROJECTS & MONEY ============ -->
+  <section class="panel" id="tab-projects" hidden>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div><h2 style="font-size:17px">Projects &amp; financial control</h2>
+      <div class="sub">Budget → committed → actual → revenue → margin, per project. Click a row for the money waterfall.</div></div>
+    </div>
+    <table id="proj-table"></table>
+    <div class="drill" id="proj-drill"></div>
+  </section>
+
+  <!-- ============ DASHBOARDS ============ -->
+  <section class="panel" id="tab-dash" hidden>
+    <div class="grid2">
+      <div><h3 class="blk">Sales pipeline (value by stage)</h3><div id="d-pipeline"></div></div>
+      <div><h3 class="blk">Quote margin by project</h3><div id="d-margin"></div></div>
+    </div>
+    <div class="grid3" style="margin-top:16px">
+      <div><h3 class="blk">Receivables aging</h3><div id="d-ar"></div></div>
+      <div><h3 class="blk">Payables due</h3><div id="d-ap"></div></div>
+      <div><h3 class="blk">Purchasing vs budget</h3><div id="d-pur"></div></div>
+    </div>
+    <div class="grid2" style="margin-top:16px">
+      <div><h3 class="blk">Cash forecast — next 6 weeks (in / out)</h3><div id="d-cash"></div>
+        <div class="legend"><span><i class="swatch" style="background:var(--in)"></i>Inflow (collections)</span><span><i class="swatch" style="background:var(--out)"></i>Outflow (supplier &amp; payroll)</span></div>
+      </div>
+      <div><h3 class="blk">Company performance — revenue &amp; margin</h3><div id="d-perf"></div>
+        <div class="legend"><span><i class="swatch" style="background:var(--green)"></i>Revenue</span><span><i class="swatch" style="background:var(--greenLt);outline:1px solid var(--green)"></i>Margin</span></div>
+      </div>
+    </div>
+    <div style="margin-top:16px"><h3 class="blk">Supplier comparison — bathroom chapter (missing price ≠ zero)</h3><div id="d-supp"></div></div>
+  </section>
+
+  <!-- ============ EMAILS ============ -->
+  <section class="panel" id="tab-emails" hidden>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div><h2 style="font-size:17px">Emails — auto-drafted, one click to send</h2>
+      <div class="sub">Every lifecycle event drafts the email for you. Review, tweak if needed, press <b>Send</b>.</div></div>
+    </div>
+    <div class="warnbox" style="margin-bottom:12px">🔒 <b>Demo / safe mode:</b> pressing Send routes through a log-only adapter — <b>no real email leaves the system</b>. Real delivery is enabled once the company connects its email provider.</div>
+    <div class="mailwrap">
+      <div class="maillist" id="maillist"></div>
+      <div class="mailview" id="mailview"></div>
+    </div>
+    <div class="feed" id="mailfeed"><b>Activity</b><div>— no emails sent yet.</div></div>
+  </section>
+
+  <!-- ============ ALERTS ============ -->
+  <section class="panel" id="tab-alerts" hidden>
+    <div class="grid2">
+      <div><h3 class="blk">Alerts</h3><div id="alerts" style="display:flex;flex-direction:column;gap:8px"></div></div>
+      <div><h3 class="blk">Next actions (by owner)</h3><div id="tasks" style="display:flex;flex-direction:column;gap:8px"></div></div>
+    </div>
+  </section>
+
+  <div class="foot" id="foot"></div>
+</main>
+
+<script type="module">
+/* ============================================================
+   Canei Subirats — Control Tower (self-contained demo).
+   Business logic mirrors the real kernel: integer money (cents),
+   effective-dated VAT decision, margin = revenue - actual cost.
+   All data synthetic. Emails are drafted and "sent" via a
+   log-only fake adapter — nothing leaves the system.
+   ============================================================ */
+const TODAY = new Date("2026-07-17T09:00:00");
+const eur = c => new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(c/100);
+const eur2 = c => new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR"}).format(c/100);
+const pct = (n,d) => d? Math.round(n/d*1000)/10 : 0;
+const days = (a,b)=>Math.round((a-b)/86400000);
+const $ = s => document.querySelector(s);
+const el = (t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+
+/* --- 12-stage lifecycle (BRD desired process) --- */
+const STAGES = ["Lead","Site visit","Estimate","Quotation","Acceptance","Project","Purchasing","Execution","Invoicing","Collections","Supplier payments","Close · profit"];
+
+/* --- portfolio: synthetic but realistic reforma projects --- */
+// money in cents. committed = POs raised; actual = supplier bills booked;
+// revenue = invoiced; collected = paid by customer; supplierPaid = paid to suppliers.
+const P = [
+  {id:"P-024",name:"Full bathroom — C/ Balmes 24",client:"María García López",email:"maria.garcia@example.com",stage:8,
+    budget:352_00_0*10, quote:3352_00, committed:2100_00, actual:1980_00, revenue:3687_20, collected:0, supplierPaid:1980_00, dueDays:-4, quoteAgeDays:12},
+  {id:"P-031",name:"Kitchen + living — Av. Diagonal 402",client:"Grup Ferrer SL",email:"admin@grupferrer.example.com",stage:9,
+    budget:18500_00, quote:19800_00, committed:12400_00, actual:11220_00, revenue:19800_00, collected:9900_00, supplierPaid:8600_00, dueDays:9, quoteAgeDays:34},
+  {id:"P-036",name:"Kitchen reform — Sant Just, Creu 12",client:"Joan Vidal",email:"joan.vidal@example.com",stage:6,
+    budget:9800_00, quote:10250_00, committed:4200_00, actual:1650_00, revenue:0, collected:0, supplierPaid:1650_00, dueDays:null, quoteAgeDays:6},
+  {id:"P-039",name:"Interior design — Pg. de Gràcia 88",client:"Estudi Marés",email:"hola@estudimares.example.com",stage:4,
+    budget:6400_00, quote:6900_00, committed:0, actual:0, revenue:0, collected:0, supplierPaid:0, dueDays:null, quoteAgeDays:3},
+  {id:"P-041",name:"Vertical works — façade C/ Major",client:"Comunitat Major 5",email:"presidencia@major5.example.com",stage:3,
+    budget:4200_00, quote:0, committed:0, actual:0, revenue:0, collected:0, supplierPaid:0, dueDays:null, quoteAgeDays:0, estimate:4200_00},
+  {id:"P-043",name:"Bathroom + aerothermal — Esplugues",client:"Laura Puig",email:"laura.puig@example.com",stage:1,
+    budget:0, quote:0, committed:0, actual:0, revenue:0, collected:0, supplierPaid:0, dueDays:null, quoteAgeDays:0},
+  {id:"P-046",name:"Lead — loft conversion, Cornellà",client:"Marc Roig",email:"marc.roig@example.com",stage:0,
+    budget:0, quote:0, committed:0, actual:0, revenue:0, collected:0, supplierPaid:0, dueDays:null, quoteAgeDays:0},
+];
+// derived financials
+for(const p of P){
+  p.margin = p.revenue - p.actual;
+  p.marginPct = pct(p.margin, p.revenue || p.quote || 1);
+  p.forecastProfit = (p.quote||p.estimate||0) - Math.max(p.actual, p.committed, p.budget?Math.round(p.budget*0.9):0);
+  p.cash = p.collected - p.supplierPaid;
+  p.outstanding = p.revenue - p.collected;
+  // health: margin under 12% = warn/crit; overdue receivable = crit
+  const overdue = p.dueDays!=null && p.dueDays<0 && p.outstanding>0;
+  p.health = overdue ? "crit" : (p.revenue && p.marginPct<12 ? "warn" : "good");
+}
+const active = P.filter(p=>p.stage>=5 && p.stage<11);
+const pipelineVal = P.filter(p=>p.stage<5).reduce((s,p)=>s+(p.quote||p.estimate||p.budget||0),0);
+const receivablesOverdue = P.reduce((s,p)=>s+((p.dueDays!=null&&p.dueDays<0)?p.outstanding:0),0);
+const receivablesTotal = P.reduce((s,p)=>s+Math.max(0,p.outstanding),0);
+const payablesDue = P.reduce((s,p)=>s+Math.max(0,p.actual-p.supplierPaid),0);
+const avgMargin = (()=>{const r=P.filter(p=>p.revenue);return r.length?Math.round(r.reduce((s,p)=>s+p.marginPct,0)/r.length*10)/10:0;})();
+const cash30 = 3687_20 + 9900_00 - payablesDue; // simplistic 30-day: expected collections - payables due
+
+/* -------- KPI strip -------- */
+const kpis = [
+  {k:"Pipeline value", v:eur(pipelineVal), s:P.filter(p=>p.stage<5).length+" open opportunities", cls:""},
+  {k:"Active projects", v:active.length, s:"in execution / invoicing", cls:""},
+  {k:"Avg quote margin", v:avgMargin+"%", s:avgMargin<15?"below 15% target":"healthy", cls:avgMargin<15?"warn":"good"},
+  {k:"Receivables overdue", v:eur(receivablesOverdue), s:eur(receivablesTotal)+" outstanding", cls:receivablesOverdue>0?"crit":"good"},
+  {k:"Payables due", v:eur(payablesDue), s:"supplier bills to pay", cls:payablesDue>0?"warn":"good"},
+  {k:"Cash forecast 30d", v:eur(cash30), s:cash30>=0?"net positive":"net negative", cls:cash30>=0?"good":"crit"},
+];
+$("#kpis").append(...kpis.map(x=>el("div","kpi",
+  `<div class="k">${x.k}</div><div class="v">${x.v}</div><div class="s ${x.cls}">${x.s}</div>`)));
+
+/* -------- Journey pipeline -------- */
+const jroot = $("#journey");
+const stageVal = i => P.filter(p=>p.stage===i).reduce((s,p)=>s+(p.quote||p.estimate||p.budget||p.revenue||0),0);
+const maxCnt = Math.max(1,...STAGES.map((_,i)=>P.filter(p=>p.stage===i).length));
+STAGES.forEach((name,i)=>{
+  const cnt=P.filter(p=>p.stage===i).length;
+  const s=el("div","stage",`<div class="idx">STEP ${i+1}</div><h4>${name}</h4>
+     <div class="cnt">${cnt}</div><div class="val">${stageVal(i)?eur(stageVal(i)):"—"}</div>
+     <div class="bar"><i style="width:${cnt/maxCnt*100}%"></i></div>`);
+  s.setAttribute("role","tab"); s.dataset.stage=i;
+  s.onclick=()=>selectStage(i);
+  jroot.append(s);
+});
+function selectStage(i){
+  [...jroot.children].forEach(c=>c.setAttribute("aria-selected", String(+c.dataset.stage===i)));
+  const list=P.filter(p=>p.stage===i);
+  const d=$("#journey-drill");
+  if(!list.length){d.innerHTML=`<div class="sub">No projects at “${STAGES[i]}”.</div>`;return;}
+  d.innerHTML=`<h3 class="blk">${STAGES[i]} — ${list.length} project(s)</h3>`;
+  const t=el("table"); t.innerHTML=`<thead><tr><th>Project</th><th>Client</th><th class="n">Value</th><th>Health</th><th></th></tr></thead>`;
+  const tb=el("tbody");
+  list.forEach(p=>{
+    const tr=el("tr",null,`<td><b>${p.name}</b><br><span class="sub mono">${p.id}</span></td><td>${p.client}</td>
+      <td class="n">${eur(p.quote||p.estimate||p.budget||p.revenue)||"—"}</td>
+      <td><span class="chip ${p.health}">${p.health==="crit"?"⚠ at risk":p.health==="warn"?"● watch":"✓ on track"}</span></td>
+      <td class="n"><button class="btn ghost" style="padding:5px 12px" data-goto="${p.id}">Open →</button></td>`);
+    tb.append(tr);
+  });
+  t.append(tb); d.append(t);
+  d.querySelectorAll("[data-goto]").forEach(b=>b.onclick=e=>{e.stopPropagation();openTab("projects");drillProject(b.dataset.goto);});
+}
+selectStage(8);
+
+/* -------- Projects & money -------- */
+function renderProjTable(){
+  const t=$("#proj-table");
+  t.innerHTML=`<thead><tr><th>Project</th><th>Stage</th><th class="n">Budget</th><th class="n">Committed</th>
+    <th class="n">Actual</th><th class="n">Revenue</th><th class="n">Margin</th><th class="n">Cash</th><th>Health</th></tr></thead>`;
+  const tb=el("tbody");
+  P.filter(p=>p.stage>=3).forEach(p=>{
+    const tr=el("tr",null,`<td><b>${p.name}</b><br><span class="sub mono">${p.id} · ${p.client}</span></td>
+      <td><span class="chip stage">${STAGES[p.stage]}</span></td>
+      <td class="n">${p.budget?eur(p.budget):"—"}</td><td class="n">${p.committed?eur(p.committed):"—"}</td>
+      <td class="n">${p.actual?eur(p.actual):"—"}</td><td class="n">${p.revenue?eur(p.revenue):"—"}</td>
+      <td class="n">${p.revenue?`<b>${eur(p.margin)}</b> <span class="sub">${p.marginPct}%</span>`:"—"}</td>
+      <td class="n" style="color:${p.cash<0?'var(--crit)':'var(--ink)'}">${p.cash?eur(p.cash):"—"}</td>
+      <td><span class="chip ${p.health}">${p.health==="crit"?"⚠":p.health==="warn"?"●":"✓"}</span></td>`);
+    tr.onclick=()=>drillProject(p.id);
+    tb.append(tr);
+  });
+  t.append(tb);
+}
+renderProjTable();
+function drillProject(id){
+  const p=P.find(x=>x.id===id); const d=$("#proj-drill");
+  const steps=[["Budget",p.budget,"var(--muted)"],["Committed",p.committed,"var(--greenLt)"],["Actual cost",p.actual,"var(--warn)"],["Revenue (invoiced)",p.revenue,"var(--green)"]];
+  const mx=Math.max(p.budget,p.committed,p.actual,p.revenue,1);
+  const forecast = (p.quote||p.estimate||0);
+  d.innerHTML=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:baseline">
+     <h3 style="font-size:15px">${p.name} <span class="sub mono">· ${p.id}</span></h3>
+     <span class="chip ${p.health}">${p.health==="crit"?"⚠ at risk":p.health==="warn"?"● watch margin":"✓ on track"}</span></div>
+     <div class="sub" style="margin:2px 0 12px">${p.client} · ${STAGES[p.stage]} · ${p.email}</div>`;
+  const bars=el("div"); steps.forEach(([lab,val,col])=>{
+    bars.append(el("div","barrow",`<span class="lab">${lab}</span>
+      <span class="track"><i style="width:${val/mx*100}%;background:${col}"></i></span>
+      <span class="amt">${val?eur2(val):"—"}</span>`));
+  });
+  d.append(bars);
+  const grid=el("div","grid3"); grid.style.marginTop="12px";
+  const cards=[
+    ["Gross margin", p.revenue?`${eur2(p.margin)}`:"—", p.revenue?`${p.marginPct}% of revenue`:"not invoiced yet", p.health],
+    ["Forecast profit", forecast?eur2(forecast - Math.max(p.actual,p.committed)):"—", "quote − committed/actual", forecast?(forecast-Math.max(p.actual,p.committed)>0?"good":"crit"):""],
+    ["Cash position", eur2(p.cash), `${eur2(p.collected)} in · ${eur2(p.supplierPaid)} out`, p.cash<0?"warn":"good"],
+    ["Outstanding", p.outstanding>0?eur2(p.outstanding):"—", p.dueDays!=null?(p.dueDays<0?`${-p.dueDays}d overdue`:`due in ${p.dueDays}d`):"—", (p.dueDays!=null&&p.dueDays<0&&p.outstanding>0)?"crit":"good"],
+    ["Committed vs budget", p.budget?`${pct(p.committed,p.budget)}%`:"—", "purchase commitments", p.committed>p.budget?"crit":"good"],
+    ["Quote", p.quote?eur2(p.quote):(p.estimate?eur2(p.estimate)+" (est.)":"—"), p.quoteAgeDays?`${p.quoteAgeDays}d old`:"—",""],
+  ];
+  cards.forEach(([k,v,s,cls])=>grid.append(el("div","kpi",`<div class="k">${k}</div><div class="v" style="font-size:18px">${v}</div><div class="s ${cls||''}">${s}</div>`)));
+  d.append(grid);
+  d.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+drillProject("P-031");
+
+/* -------- Dashboards (inline SVG / bar helpers) -------- */
+function barsMini(container, data, fmt=eur, color="var(--green)"){
+  const mx=Math.max(1,...data.map(d=>d.v));
+  const wrap=el("div","mini");
+  data.forEach(d=>{
+    const col=el("div","col");
+    const b=el("div","bar"); b.style.height=(d.v/mx*100)+"%"; b.style.background=d.color||color;
+    b.title=`${d.l}: ${fmt(d.v)}`;
+    col.append(el("div","sub",fmt(d.v)), b, el("div","cl",d.l));
+    wrap.append(col);
+  });
+  container.innerHTML=""; container.append(wrap);
+}
+// pipeline value by stage (single hue)
+barsMini($("#d-pipeline"), STAGES.map((n,i)=>({l:n.split(" ")[0], v:stageVal(i)})).filter(d=>d.v>0), eur);
+// quote margin by project
+barsMini($("#d-margin"), P.filter(p=>p.revenue).map(p=>({l:p.id, v:p.marginPct, color:p.marginPct<12?"var(--warn)":"var(--green)"})), v=>v+"%");
+// AR aging buckets
+const arB=[{l:"Not due",v:0},{l:"1–30d",v:0},{l:"31–60d",v:0},{l:"60d+ / overdue",v:0}];
+P.forEach(p=>{if(p.outstanding>0){const dd=p.dueDays; if(dd==null||dd>0)arB[0].v+=p.outstanding; else if(dd>=-30)arB[3].v+=p.outstanding; else arB[3].v+=p.outstanding;}});
+arB.forEach(b=>{if(b.l==="60d+ / overdue")b.color="var(--crit)";});
+barsMini($("#d-ar"), arB, eur);
+// AP due
+barsMini($("#d-ap"), P.filter(p=>p.actual-p.supplierPaid>0).map(p=>({l:p.id,v:p.actual-p.supplierPaid,color:"var(--warn)"})), eur);
+// purchasing vs budget (committed % of budget)
+barsMini($("#d-pur"), P.filter(p=>p.budget).map(p=>({l:p.id,v:pct(p.committed,p.budget),color:p.committed>p.budget?"var(--crit)":"var(--green)"})), v=>v+"%");
+// cash forecast 6 weeks in/out (diverging)
+const weeks=[["W29",4000_00,3200_00],["W30",9900_00,2600_00],["W31",1200_00,4100_00],["W32",6800_00,3000_00],["W33",2400_00,5200_00],["W34",7300_00,2800_00]];
+(function cash(){
+  const c=$("#d-cash"); const mx=Math.max(...weeks.flatMap(w=>[w[1],w[2]]));
+  const wrap=el("div","mini"); wrap.style.height="120px";
+  weeks.forEach(([l,inc,out])=>{
+    const col=el("div","col"); col.style.justifyContent="center";
+    const bin=el("div","bar"); bin.style.height=(inc/mx*46)+"%"; bin.style.background="var(--in)"; bin.title=`${l} in: ${eur(inc)}`;
+    const bout=el("div","bar"); bout.style.height=(out/mx*46)+"%"; bout.style.background="var(--out)"; bout.style.borderRadius="0 0 4px 4px"; bout.title=`${l} out: ${eur(out)}`;
+    col.append(bin,bout,el("div","cl",l)); wrap.append(col);
+  });
+  c.innerHTML=""; c.append(wrap);
+})();
+// company performance (revenue & margin over months)
+const perf=[["Mar",22,3.1],["Apr",28,4.0],["May",19,2.2],["Jun",31,4.8],["Jul",24,3.3]];
+(function perfChart(){
+  const c=$("#d-perf"); const mx=Math.max(...perf.map(p=>p[1]));
+  const wrap=el("div","mini");
+  perf.forEach(([l,rev,mar])=>{
+    const col=el("div","col");
+    const holder=el("div"); holder.style.cssText="width:70%;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:0";
+    const rb=el("div"); rb.style.cssText=`height:${rev/mx*70}%;background:var(--green);border-radius:4px 4px 0 0`; rb.title=`Revenue ${rev}k€`;
+    const mb=el("div"); mb.style.cssText=`height:${mar/mx*70}%;background:var(--greenLt);outline:1px solid var(--green)`; mb.title=`Margin ${mar}k€`;
+    holder.append(rb,mb);
+    col.append(el("div","sub",rev+"k"), holder, el("div","cl",l));
+    wrap.append(col);
+  });
+  c.innerHTML=""; c.append(wrap);
+})();
+// supplier comparison mini
+(function supp(){
+  const rows=[["Wall tiling 20×60",3200,3550,2980],["Porcelain floor",2890,null,2650],["Plumbing kit",4200,4550,null],["Demolition",1000,900,850]];
+  const t=el("table");
+  t.innerHTML=`<thead><tr><th>Line item</th><th class="n">Estimate</th><th class="n">Contractor A</th><th class="n">Contractor B</th></tr></thead>`;
+  const tb=el("tbody");
+  rows.forEach(r=>{
+    const cells=r.slice(1).map((v,i)=>{
+      if(v==null)return `<td class="n"><span class="chip crit">no price</span></td>`;
+      const base=r[1]; const cls=i>0&&v<base?"var(--good)":i>0&&v>base?"var(--crit)":"var(--ink)";
+      return `<td class="n" style="color:${cls}">${eur2(v)}</td>`;
+    }).join("");
+    tb.append(el("tr",null,`<td>${r[0]}</td>${cells}`));
+  });
+  t.append(tb); $("#d-supp").innerHTML=""; $("#d-supp").append(t);
+})();
+
+/* -------- Emails: auto-drafted templates -------- */
+const brand={name:"Canei Subirats, S.L.", from:"hola@caneisubirats.com", phone:"659 87 67 00", sign:"Canei Subirats — Renovations, simply complex."};
+function tmpl(kind,p){
+  const base={from:brand.from, to:p.email, project:p.id, kind};
+  if(kind==="quote-sent")return{...base, event:`Quotation ${STAGES[p.stage]}`, subject:`Your renovation quote — ${p.name}`,
+    body:`Dear ${p.client},\n\nThank you for trusting Canei Subirats with your project “${p.name}”.\n\nPlease find attached our detailed quotation for ${eur2(p.quote||p.estimate)}, broken down by chapter with clear measurements. Optional works are listed separately so you decide what to include.\n\nAs always, you will have a single point of contact throughout, fixed deadlines and our 2-year guarantee on the works.\n\nWe remain at your disposal for any question.\n\nKind regards,\n${brand.sign}\n${brand.phone} · ${brand.from}`};
+  if(kind==="acceptance")return{...base, event:"Customer acceptance", subject:`Thank you — your project is confirmed (${p.id})`,
+    body:`Dear ${p.client},\n\nWe are delighted to confirm the acceptance of your quotation for “${p.name}”. Your project number is ${p.id}.\n\nOur next steps: we will schedule the works, coordinate the trades and keep you updated at each milestone. You will receive the planning shortly.\n\nWelcome aboard — we look forward to building the space you have imagined.\n\nKind regards,\n${brand.sign}`};
+  if(kind==="invoice")return{...base, event:`Invoice issued`, subject:`Invoice FAC-2026-0002 — ${p.name}`,
+    body:`Dear ${p.client},\n\nPlease find attached invoice FAC-2026-0002 for the works on “${p.name}”.\n\n  Base: ${eur2(p.revenue/1.10)}\n  VAT (10% reduced, art. 91.Uno.2.10º): applied\n  Total due: ${eur2(p.revenue)}\n\nPayment terms: 15 days. Thank you for your business.\n\nKind regards,\n${brand.sign}\n${brand.from}`};
+  if(kind==="reminder")return{...base, event:`Payment reminder`, subject:`Friendly reminder — invoice for ${p.name}`,
+    body:`Dear ${p.client},\n\nWe hope everything is to your satisfaction. Our records show invoice FAC-2026-0002 for ${eur2(p.outstanding)} is now ${p.dueDays<0?`${-p.dueDays} day(s) overdue`:"due"}.\n\nIf you have already arranged payment, please disregard this note. Otherwise, a quick transfer would be greatly appreciated.\n\nThank you very much,\n${brand.sign}`};
+  if(kind==="po")return{...base, to:"comercial@proveidor.example.com", event:`Purchase order`, subject:`Purchase order — ${p.name} (${p.id})`,
+    body:`Hello,\n\nPlease supply the following for our project ${p.id} (“${p.name}”):\n\n  • Materials per the attached comparison (selected supplier).\n  • Committed budget for this order: ${eur2(p.committed)}.\n  • Delivery to: Sant Just Desvern site.\n\nKindly confirm price validity and delivery date.\n\nThank you,\n${brand.sign}`};
+}
+const drafts=[
+  tmpl("quote-sent",P.find(p=>p.id==="P-039")),
+  tmpl("acceptance",P.find(p=>p.id==="P-036")),
+  tmpl("invoice",P.find(p=>p.id==="P-024")),
+  tmpl("reminder",P.find(p=>p.id==="P-024")),
+  tmpl("po",P.find(p=>p.id==="P-036")),
+].map((d,i)=>({...d,id:"M"+(i+1),status:"draft"}));
+let selMail=0;
+function renderMailList(){
+  const l=$("#maillist"); l.innerHTML="";
+  drafts.forEach((m,i)=>{
+    const it=el("div","mailitem",`<div class="subj">${m.subject}</div>
+      <div class="meta"><span>${m.event}</span>${m.status==="sent"?'<span class="sent-tag">✓ sent</span>':'<span style="color:var(--warn)">● draft</span>'}</div>`);
+    it.setAttribute("aria-selected",String(i===selMail));
+    it.onclick=()=>{selMail=i;renderMailList();renderMail();};
+    l.append(it);
+  });
+}
+function renderMail(){
+  const m=drafts[selMail]; const v=$("#mailview");
+  v.innerHTML="";
+  v.append(el("div","row",`<b>To</b><input id="m-to" value="${m.to}">`));
+  v.append(el("div","row",`<b>Subject</b><input id="m-subj" value="${m.subject.replace(/"/g,'&quot;')}">`));
+  const ta=el("textarea"); ta.id="m-body"; ta.value=m.body; ta.disabled=m.status==="sent";
+  v.append(ta);
+  const bar=el("div"); bar.style.cssText="display:flex;gap:10px;align-items:center";
+  if(m.status==="sent"){
+    bar.append(el("span","sent-tag",`✓ Sent ${m.sentAt} · logged, not delivered (demo)`));
+  }else{
+    const send=el("button","btn","✉  Send");
+    send.onclick=()=>{
+      m.subject=$("#m-subj").value; m.body=$("#m-body").value; m.to=$("#m-to").value;
+      m.status="sent"; m.sentAt=nowStr();
+      logFeed(`Sent “${m.subject}” → ${m.to} (log-only adapter — not delivered).`);
+      renderMailList(); renderMail();
+    };
+    const regen=el("button","btn ghost","↻ Reset draft");
+    regen.onclick=()=>{Object.assign(m,tmpl(m.kind,P.find(p=>p.id===m.project)||P[0]),{id:m.id,status:"draft"});renderMail();};
+    bar.append(send, regen, el("span","sub","Auto-drafted from project data · edit freely before sending"));
+  }
+  v.append(bar);
+}
+function nowStr(){return new Intl.DateTimeFormat("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(TODAY);}
+function logFeed(msg){
+  const f=$("#mailfeed"); if(f.dataset.clean!=="1"){f.innerHTML="<b>Activity</b>";f.dataset.clean="1";}
+  f.append(el("div",null,`${nowStr()} · ${msg}`));
+}
+renderMailList(); renderMail();
+
+/* -------- Alerts & tasks -------- */
+const alerts=[];
+P.forEach(p=>{
+  if(p.dueDays!=null&&p.dueDays<0&&p.outstanding>0)alerts.push({sev:"crit",t:`Invoice overdue — ${p.name}`,d:`${eur2(p.outstanding)} · ${-p.dueDays} day(s) past due`});
+  if(p.revenue&&p.marginPct<12)alerts.push({sev:"warn",t:`Thin margin — ${p.name}`,d:`${p.marginPct}% (below 12% floor)`});
+  if(p.committed>p.budget&&p.budget)alerts.push({sev:"warn",t:`Committed over budget — ${p.name}`,d:`${pct(p.committed,p.budget)}% of budget committed`});
+});
+P.filter(p=>p.stage===4&&p.quoteAgeDays>=2).forEach(p=>alerts.push({sev:"warn",t:`Quote awaiting response — ${p.name}`,d:`sent ${p.quoteAgeDays}d ago, no acceptance`}));
+if(!alerts.length)alerts.push({sev:"good",t:"All clear",d:"No overdue invoices or margin risks."});
+$("#alerts").append(...alerts.map(a=>el("div","alert "+a.sev,
+  `<span class="ic">${a.sev==="crit"?"!":a.sev==="warn"?"●":"✓"}</span><div><div class="t">${a.t}</div><div class="d">${a.d}</div></div>`)));
+
+const tasks=[
+  {o:"Admin",t:"Send quote to Estudi Marés (P-039)",d:"draft ready in Emails"},
+  {o:"Admin",t:"Chase overdue invoice — María García (P-024)",d:"reminder drafted"},
+  {o:"Ops",t:"Site visit — loft conversion, Cornellà (P-046)",d:"new lead, book visit"},
+  {o:"Ops",t:"Raise PO for kitchen materials (P-036)",d:"selected supplier in comparison"},
+  {o:"Admin",t:"Confirm acceptance & open project (P-036)",d:"customer verbally agreed"},
+  {o:"Ops",t:"Milestone invoice — Grup Ferrer (P-031)",d:"stage 2 of 3 complete"},
+];
+$("#tasks").append(...tasks.map(t=>el("div","alert good",
+  `<span class="ic" style="background:var(--muted)">${t.o==="Ops"?"🛠":"📋"}</span>
+   <div><div class="t">${t.t} <span class="owner">${t.o==="Ops"?"Operations":"Administration"}</span></div><div class="d">${t.d}</div></div>`)));
+
+/* -------- tabs -------- */
+function openTab(name){
+  document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===name)));
+  ["journey","projects","dash","emails","alerts"].forEach(n=>$("#tab-"+n).hidden=(n!==name));
+}
+document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
+
+$("#foot").innerHTML=`Canei Subirats, S.L. · Carrer de la Creu 74, Sant Just Desvern · ${brand.phone} · ${brand.from} — internal control tower · synthetic data · emails log-only (no real delivery).`;
+</script>
+</body>
+</html>
