@@ -98,6 +98,7 @@ output; the factory is the product.
    selection — digitizes their Comparatiu workbook); quoting gained optional
    items + selective acceptance + versioned revisions (QUO-07/12/13);
    reformas pack ships the 18-chapter catalogue (BRD Appendix A.2).
+   **CI-verified: run #6 (faa77c5) success — gates + Postgres/RLS + e2e.**
    Current tool identified: cane.gestortectic.com = TecTic "Gestor"
    (login-gated) → migration lead in INTEGRATIONS_PENDING.~~
 3. **P2.2b Diorka-first web forms**: presupuesto creation UI (chapter picker
@@ -116,6 +117,15 @@ output; the factory is the product.
    `tenants/_groups/*` (ORG-04).
 
 ## Blockers & chosen workarounds
+
+- **Unattended multi-day loop**: creating a scheduled fresh-session Routine
+  (2-hourly, PROGRESS.md-driven) was attempted but the scheduler MCP requires
+  interactive approval this autonomous session cannot grant. Workaround: the
+  resume protocol operates via (a) any operator nudge, or (b) any new session
+  in this environment — CLAUDE.md routes it to this file. Operator can enable
+  the true unattended loop by approving a create_trigger call (fresh session
+  per fire, cron `0 */2 * * *`, prompt = "read CLAUDE.md + PROGRESS.md, do
+  the next unit green, push, verify CI").
 
 - **No Docker daemon in this sandbox** → P1 proven on in-memory adapters;
   P2 Prisma work runs `prisma migrate diff`-style checks + CI Postgres service
