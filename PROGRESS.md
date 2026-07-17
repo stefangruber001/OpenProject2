@@ -118,6 +118,14 @@ output; the factory is the product.
 
 ## Blockers & chosen workarounds
 
+- **GitHub Pages publish (site/)**: workflow + site committed and will
+  auto-deploy to https://stefangruber001.github.io/OpenProject2/ the moment
+  Pages is possible — run 29585500450 failed instantly because Pages is not
+  available for PRIVATE repos on the Free plan. Operator options: (a) GitHub
+  Pro upgrade (repo stays private; only site/ becomes public), (b) a separate
+  public preview repo (needs operator to authorize repo creation — outside
+  this session's repo scope), (c) keep using the claude.ai artifact links.
+  Never: making THIS repo public (intake/ contains business documents).
 - **Unattended multi-day loop**: creating a scheduled fresh-session Routine
   (2-hourly, PROGRESS.md-driven) was attempted but the scheduler MCP requires
   interactive approval this autonomous session cannot grant. Workaround: the
