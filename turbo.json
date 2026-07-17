@@ -1,7 +1,14 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
-  "globalEnv": ["CI", "NODE_ENV", "DATABASE_URL", "E2E_DATABASE_URL", "NEXT_PUBLIC_APP_URL"],
+  "globalEnv": [
+    "CI",
+    "NODE_ENV",
+    "DATABASE_URL",
+    "E2E_DATABASE_URL",
+    "NEXT_PUBLIC_APP_URL",
+    "UI_LANG"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

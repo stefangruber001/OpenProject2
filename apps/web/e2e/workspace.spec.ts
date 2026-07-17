@@ -5,7 +5,7 @@ test("tenant workspace composes, issues and serves a factura", async ({ page }) 
   await expect(page.getByRole("heading", { name: /Reformas Iberia/ })).toBeVisible();
   await expect(page.getByText("jurisdiction/es-ES + vertical/construction-reformas")).toBeVisible();
 
-  await page.getByRole("button", { name: /demo automático/i }).click();
+  await page.getByRole("button", { name: /auto demo/i }).click();
   const invoiceLink = page.getByRole("link", { name: /FAC-\d{4}-\d{4}/ }).first();
   await expect(invoiceLink).toBeVisible();
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatMoney, isFactoryError } from "@repo/kernel";
 import { getTenantRuntime } from "@/lib/tenant-runtime";
+import { ui } from "@/lib/i18n";
 import { createDemoJob } from "./actions";
 import { createPresupuesto } from "./presupuestos/actions";
 
@@ -18,6 +19,7 @@ export default async function TenantWorkspace(props: { params: Promise<{ tenant:
   }
   const { locale, currency, branding } = rt.resolved.kernelConfig;
   const money = (cents: number) => formatMoney(cents, currency, locale);
+  const t = ui();
   const quotes = await rt.quoting!.list();
   const invoices = await rt.billing!.list();
   const issueAction = createDemoJob.bind(null, tenant);
@@ -28,9 +30,12 @@ export default async function TenantWorkspace(props: { params: Promise<{ tenant:
         <span className="text-xs font-medium uppercase tracking-widest text-neutral-500">
           {tenant} · {rt.resolved.report.packs.map((p) => p.id).join(" + ")}
         </span>
-        <h1 className="text-3xl font-bold tracking-tight">{branding.legalName}</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {branding.tradeName ?? branding.legalName}
+        </h1>
+        {branding.slogan && <p className="text-sm italic text-neutral-500">{branding.slogan}</p>}
         <p className="text-sm text-neutral-500">
-          kernel {rt.resolved.kernelVersion} · puertos:{" "}
+          kernel {rt.resolved.kernelVersion} · {t.ports}:{" "}
           {rt.resolved.report.boundPorts.map((b) => b.port).join(", ")}
         </p>
       </header>
@@ -40,14 +45,14 @@ export default async function TenantWorkspace(props: { params: Promise<{ tenant:
           <input
             name="title"
             required
-            placeholder="Nuevo presupuesto — obra / dirección"
+            placeholder={t.newQuotePlaceholder}
             className="w-72 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
           />
           <button
             type="submit"
             className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900"
           >
-            Crear presupuesto
+            {t.createQuote}
           </button>
         </form>
         <form action={issueAction}>
@@ -55,14 +60,14 @@ export default async function TenantWorkspace(props: { params: Promise<{ tenant:
             type="submit"
             className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
           >
-            Demo automático
+            {t.autoDemo}
           </button>
         </form>
       </div>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-          Presupuestos ({quotes.length})
+          {t.quotesHeading(quotes.length)}
         </h2>
         <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
           {quotes.map((q) => (
@@ -82,19 +87,19 @@ export default async function TenantWorkspace(props: { params: Promise<{ tenant:
                 {money(q.baseCents)}
                 {q.optionalCents > 0 && (
                   <span className="ml-1 text-xs text-neutral-400">
-                    +{money(q.optionalCents)} opc.
+                    +{money(q.optionalCents)} {t.optionalShort}
                   </span>
                 )}
               </span>
             </li>
           ))}
-          {quotes.length === 0 && <li className="py-2 text-neutral-500">Sin presupuestos aún.</li>}
+          {quotes.length === 0 && <li className="py-2 text-neutral-500">{t.noQuotes}</li>}
         </ul>
       </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-          Facturas ({invoices.length})
+          {t.invoicesHeading(invoices.length)}
         </h2>
         <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
           {invoices.map((inv) => (
@@ -115,13 +120,12 @@ export default async function TenantWorkspace(props: { params: Promise<{ tenant:
               <span className="shrink-0 font-medium">{money(inv.totalCents)}</span>
             </li>
           ))}
-          {invoices.length === 0 && <li className="py-2 text-neutral-500">Sin facturas aún.</li>}
+          {invoices.length === 0 && <li className="py-2 text-neutral-500">{t.noInvoices}</li>}
         </ul>
       </section>
 
       <footer className="mt-auto text-xs text-neutral-500">
-        Runtime: {process.env.DATABASE_URL ? "PostgreSQL (RLS)" : "en memoria (dev)"} · Las
-        decisiones de IVA se persisten con su justificación (ADR-0008).
+        Runtime: {process.env.DATABASE_URL ? t.runtimeDb : t.runtimeMemory} · {t.footerNote}
       </footer>
     </main>
   );

@@ -15,7 +15,7 @@ const page = await browser.newPage({
 // 1. workspace → create presupuesto
 await page.goto(`${base}/diorka`);
 await page.fill('input[name="title"]', "Reforma integral baño — C/ Balmes 24, 2º1ª");
-await page.click('button:has-text("Crear presupuesto")');
+await page.click('button:has-text("Create quote")');
 await page.waitForURL(/presupuestos\//);
 
 // 2. add partidas (catalogue-first)
@@ -29,7 +29,7 @@ async function addPartida({ chapter, desc, unit, unidades, largo, ancho, precio,
   if (ancho) await page.fill('input[name="ancho"]', String(ancho));
   await page.fill('input[name="precio"]', String(precio));
   if (optional) await page.check('input[name="optional"]');
-  await page.click('button:has-text("Añadir")');
+  await page.click('button:has-text("Add")');
   // deterministic: the new row must be visible before the next add
   await page.waitForSelector(`tr:has-text("${desc.slice(0, 24)}")`, { timeout: 15000 });
 }
@@ -70,7 +70,7 @@ await page.screenshot({ path: resolve(outDir, "1-builder.png"), fullPage: true }
 
 // 3. accept including the optional
 await page.check('input[name="options"]');
-await page.click('button:has-text("Marcar como aceptado")');
+await page.click('button:has-text("Mark as accepted")');
 await page.waitForLoadState("networkidle");
 
 // 4. issue the invoice (private dwelling, 15y, 35% materials)
@@ -79,7 +79,7 @@ await page.fill('input[name="buyerTaxId"]', "00000000T");
 await page.fill('input[name="buyerAddress"]', "C/ Balmes 24, Barcelona");
 await page.fill('input[name="ageYears"]', "15");
 await page.screenshot({ path: resolve(outDir, "2-accepted-issue-form.png"), fullPage: true });
-await page.click('button:has-text("Emitir factura")');
+await page.click('button:has-text("Issue invoice")');
 await page.waitForURL(/facturas\//);
 await page.screenshot({ path: resolve(outDir, "3-factura.png"), fullPage: true });
 const facturaUrl = page.url();

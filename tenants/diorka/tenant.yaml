@@ -59,9 +59,7 @@ config:
       enabled: false # gate — LEGAL_REVIEW.md #1 (2027 deadline)
 
   vertical:
-    terminology:
-      quote: Presupuesto
-      line: Partida
-      measurement: Medición
+    # Vocabulary is language-keyed in the pack (terminologyByLang: en working,
+    # es/ca for handover); the UI picks by UI_LANG. No per-tenant override here.
     materialsShareDefaultBp: 3500
     # chapters: uses the pack default seeded from BRD Appendix A.2
