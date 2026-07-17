@@ -14,8 +14,12 @@
   },
   "dependencies": {
     "@repo/capability-billing": "workspace:*",
+    "@repo/capability-crm": "workspace:*",
     "@repo/capability-messaging": "workspace:*",
+    "@repo/capability-payables": "workspace:*",
+    "@repo/capability-projects": "workspace:*",
     "@repo/capability-quoting": "workspace:*",
+    "@repo/capability-receivables": "workspace:*",
     "@repo/capability-sourcing": "workspace:*",
     "@repo/kernel": "workspace:*",
     "@repo/pack-jurisdiction-es-es": "workspace:*",

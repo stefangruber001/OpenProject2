@@ -8,7 +8,21 @@
 # (group registry: tenants/_groups/diorka.yaml).
 tenant: diorka
 kernel: "^1"
-capabilities: [quoting, billing, sourcing, messaging, scheduling, time, procurement, docs]
+capabilities:
+  [
+    quoting,
+    billing,
+    sourcing,
+    messaging,
+    projects,
+    receivables,
+    payables,
+    crm,
+    scheduling,
+    time,
+    procurement,
+    docs,
+  ]
 jurisdiction: es-ES@2026-07-17
 vertical: construction/reformas
 plugins: []
