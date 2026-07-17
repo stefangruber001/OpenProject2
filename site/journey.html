@@ -4,107 +4,142 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Canei Subirats ERP — End-to-End Journey</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
 <style>
   :root{
-    --green:#48733c; --greenLt:#65bc7b; --greenSoft:#eef4ea; --spark:#f2c230;
-    --ink:#171911; --body:#565950; --muted:#9c9f93; --line:#efece6; --mist:#faf9f6; --paper:#fff; --card:#fff; --panel:#fcfbf9;
+    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#3a5f31; --greenSoft:#eef4ea; --spark:#f2c230;
+    --ink:#14160f; --body:#54574c; --muted:#9a9d90; --faint:#b9bcb0;
+    --line:#ecebe4; --hair:#f3f1ec; --bg:#fbfbf9; --paper:#fff; --panel:#fcfcfa;
     --good:#2f7d4f; --good-bg:#eef6f0; --warn:#a56a1c; --warn-bg:#fbf3e4; --crit:#9a3b33; --crit-bg:#faedeb;
-    --in:#48733c; --out:#9a3b33;
-    --shadow:0 1px 2px rgba(30,40,20,.04), 0 14px 30px -18px rgba(30,40,20,.16);
-    --shadow-sm:0 1px 2px rgba(30,40,20,.05);
-    --ring:0 0 0 1px var(--line);
+    --shadow:0 1px 2px rgba(24,32,16,.03), 0 18px 40px -24px rgba(24,32,16,.18);
+    --shadow-lg:0 2px 4px rgba(24,32,16,.04), 0 34px 70px -34px rgba(24,32,16,.28);
+    --shadow-sm:0 1px 2px rgba(24,32,16,.05);
     --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
     --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
     --mono:ui-monospace,"SF Mono",Menlo,monospace;
+    --r:20px; --r-sm:12px;
   }
   @media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){
-    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --line:#2e3327; --mist:#1e231a; --paper:#12150e; --card:#1b1f16; --panel:#171b12;
-    --greenSoft:#21301b; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }}
+    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --faint:#6c7263;
+    --line:#2c3126; --hair:#242a1e; --bg:#12150e; --paper:#181c12; --panel:#151910;
+    --greenSoft:#20301a; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }}
   :root[data-theme="dark"]{
-    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --line:#2e3327; --mist:#1e231a; --paper:#12150e; --card:#1b1f16; --panel:#171b12;
-    --greenSoft:#21301b; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }
+    --ink:#f0f1e9; --body:#c9ccc2; --muted:#8b917f; --faint:#6c7263;
+    --line:#2c3126; --hair:#242a1e; --bg:#12150e; --paper:#181c12; --panel:#151910;
+    --greenSoft:#20301a; --good-bg:#1c2e22; --warn-bg:#33291a; --crit-bg:#33211f; }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--mist);color:var(--body);font:14px/1.55 var(--sans)}
-  h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0}
+  html{scroll-behavior:smooth}
+  body{margin:0;color:var(--body);font:15px/1.6 var(--sans);letter-spacing:-.005em;
+    background:
+      radial-gradient(1100px 520px at 82% -8%, rgba(72,115,60,.06), transparent 60%),
+      radial-gradient(760px 420px at 6% 2%, rgba(242,194,48,.05), transparent 55%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0;letter-spacing:-.01em}
   .mono{font-family:var(--mono)}
   button{font:inherit;cursor:pointer}
+  ::selection{background:rgba(72,115,60,.16)}
 
-  header.top{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.85);backdrop-filter:saturate(1.4) blur(10px);
-    border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:14px 26px;flex-wrap:wrap}
-  .logo{display:flex;align-items:center;gap:10px}
-  .logo .mark{width:32px;height:32px;border-radius:8px;background:var(--green);position:relative;flex:none}
-  .logo .mark::after{content:"";position:absolute;right:5px;bottom:5px;width:8px;height:8px;border-radius:2px;background:var(--spark)}
-  .logo .name{font-family:var(--serif);font-weight:600;font-size:18px;color:var(--ink);line-height:1.05}
-  .logo .name small{display:block;font-family:var(--sans);font-weight:500;font-size:10px;font-style:italic;color:var(--muted)}
-  .top .tag{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);font-weight:700}
-  .top .links{margin-left:auto;font-size:12px}
-  .top .links a{color:var(--muted);text-decoration:none;margin-left:12px}
-  .top .links a:hover{color:var(--green)}
+  header.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb, var(--paper) 82%, transparent);
+    backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);
+    border-bottom:1px solid var(--line);display:flex;align-items:center;gap:15px;padding:15px 28px;flex-wrap:wrap}
+  .logo{display:flex;align-items:center;gap:11px}
+  .logo svg{flex:none;filter:drop-shadow(0 4px 10px rgba(72,115,60,.28))}
+  .logo .name{font-family:var(--serif);font-weight:600;font-size:19px;color:var(--ink);line-height:1.02}
+  .logo .name small{display:block;font-family:var(--sans);font-weight:500;font-size:10.5px;font-style:italic;color:var(--muted);letter-spacing:0}
+  .top .tag{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:700;
+    border:1px solid color-mix(in srgb,var(--green) 30%,transparent);border-radius:999px;padding:5px 11px;background:var(--greenSoft)}
+  .top .links{margin-left:auto;font-size:12.5px;display:flex;gap:6px;align-items:center}
+  .top .links a{color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:9px;transition:.15s}
+  .top .links a:hover{color:var(--green);background:var(--greenSoft)}
 
-  main{max-width:1180px;margin:0 auto;padding:16px 22px 70px;display:grid;grid-template-columns:1fr 320px;gap:16px}
-  @media (max-width:900px){main{grid-template-columns:1fr}}
+  main{max-width:1220px;margin:0 auto;padding:26px 24px 84px;display:grid;grid-template-columns:1fr 340px;gap:22px}
+  @media (max-width:940px){main{grid-template-columns:1fr}}
 
-  /* stage rail */
-  .rail{grid-column:1/-1;display:flex;gap:5px;overflow-x:auto;padding-bottom:6px}
-  .rail .st{flex:1 0 auto;min-width:90px;border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:var(--paper);font-size:10.5px;position:relative;box-shadow:var(--shadow-sm)}
-  .rail .st .n{font-size:8.5px;font-weight:700;color:var(--muted);letter-spacing:.04em}
-  .rail .st .t{color:var(--ink);font-weight:600;font-size:11px;line-height:1.15;margin-top:2px}
-  .rail .st.done{background:var(--greenSoft);border-color:var(--greenLt)}
+  /* progress rail — pill segments */
+  .rail{grid-column:1/-1;display:flex;gap:6px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:thin}
+  .rail .st{flex:1 0 auto;min-width:96px;border:1px solid var(--line);border-radius:13px;padding:10px 12px;
+    background:var(--paper);font-size:10.5px;position:relative;box-shadow:var(--shadow-sm);transition:.2s}
+  .rail .st .n{font-size:8.5px;font-weight:700;color:var(--faint);letter-spacing:.08em;text-transform:uppercase}
+  .rail .st .t{color:var(--ink);font-weight:600;font-size:11.5px;line-height:1.18;margin-top:3px}
+  .rail .st.done{background:linear-gradient(180deg,var(--greenSoft),color-mix(in srgb,var(--greenSoft) 55%,var(--paper)));border-color:color-mix(in srgb,var(--greenLt) 55%,var(--line))}
   .rail .st.done .n{color:var(--green)}
-  .rail .st.cur{border-color:var(--green);box-shadow:inset 0 0 0 1px var(--green)}
-  .rail .st.done .t::before{content:"✓ ";color:var(--green)}
+  .rail .st.done .t::before{content:"✓ ";color:var(--green);font-weight:800}
+  .rail .st.cur{border-color:var(--green);box-shadow:inset 0 0 0 1.5px var(--green),0 8px 22px -12px rgba(72,115,60,.5)}
+  .rail .st.cur .n{color:var(--green)}
 
-  .stage{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px 28px;box-shadow:var(--shadow)}
-  .stage .eyebrow{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);font-weight:700}
-  .stage h2{font-size:20px;margin:3px 0 2px}
-  .stage .cap{font-size:11px;color:var(--muted);margin-bottom:12px}
-  .stage .cap b{color:var(--green)}
-  .stage p{margin:0 0 10px}
-  .stage .did{background:var(--greenSoft);border-left:3px solid var(--green);border-radius:0 8px 8px 0;padding:10px 13px;font-size:13px;margin:10px 0}
-  .stage .did b{color:var(--ink)}
-  .stage table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
-  .stage th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:1.5px solid var(--green);padding:5px 7px}
-  .stage td{padding:5px 7px;border-bottom:1px solid var(--line)}
+  .stage{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:34px 38px;box-shadow:var(--shadow-lg);position:relative;overflow:hidden}
+  .stage::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--green),var(--greenLt) 60%,var(--spark))}
+  .stage .eyebrow{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:700}
+  .stage h2{font-size:30px;line-height:1.08;margin:8px 0 4px}
+  .stage .cap{font-size:11.5px;color:var(--muted);margin-bottom:20px}
+  .stage .cap b{color:var(--green);font-weight:600}
+  .stage p{margin:0 0 12px;font-size:15px;color:var(--body);max-width:64ch}
+  .stage p b{color:var(--ink);font-weight:600}
+  .did{background:linear-gradient(180deg,var(--greenSoft),color-mix(in srgb,var(--greenSoft) 40%,var(--paper)));
+    border:1px solid color-mix(in srgb,var(--greenLt) 32%,transparent);border-left:3px solid var(--green);
+    border-radius:6px 14px 14px 6px;padding:14px 18px;font-size:13.5px;margin:14px 0;color:var(--body)}
+  .did b{color:var(--ink);font-weight:600}
+  .stage table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0}
+  .stage th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);border-bottom:1.5px solid var(--green);padding:8px 9px}
+  .stage td{padding:8px 9px;border-bottom:1px solid var(--hair)}
   .stage td.n,.stage th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-  .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
-  .btn{background:var(--green);color:#fff;border:none;border-radius:11px;padding:12px 22px;font-weight:600;font-size:14px;
-    box-shadow:0 1px 2px rgba(30,40,20,.12), 0 8px 18px -10px rgba(72,115,60,.5);transition:transform .08s, box-shadow .15s}
-  .btn:hover{box-shadow:0 2px 4px rgba(30,40,20,.14), 0 12px 22px -10px rgba(72,115,60,.6)}
+  .actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:22px}
+  .btn{background:linear-gradient(180deg,var(--greenLt),var(--green));color:#fff;border:none;border-radius:13px;
+    padding:13px 26px;font-weight:600;font-size:14.5px;letter-spacing:-.01em;
+    box-shadow:0 1px 2px rgba(24,32,16,.14), 0 12px 26px -12px rgba(72,115,60,.62);transition:transform .08s, box-shadow .18s, filter .15s}
+  .btn:hover{filter:brightness(1.04);box-shadow:0 2px 5px rgba(24,32,16,.16), 0 18px 34px -14px rgba(72,115,60,.7)}
   .btn:active{transform:translateY(1px)}
-  .btn:disabled{opacity:.4;cursor:default;box-shadow:none}
-  .btn.ghost{background:var(--paper);border:1px solid var(--line);color:var(--body);box-shadow:var(--shadow-sm)}
-  .hint{font-size:11.5px;color:var(--muted)}
+  .btn:disabled{opacity:.42;cursor:default;box-shadow:none;filter:grayscale(.2)}
+  .btn.ghost{background:var(--paper);border:1px solid var(--line);color:var(--body);box-shadow:var(--shadow-sm);font-weight:500}
+  .btn.ghost:hover{border-color:var(--green);color:var(--green);filter:none}
+  .btn.sm{padding:9px 16px;font-size:13px;border-radius:11px}
+  .hint{font-size:12px;color:var(--muted)}
 
-  /* email inline */
-  .mail{border:1px solid var(--line);border-radius:9px;padding:12px;margin:10px 0;background:var(--panel)}
-  .mail .h{font-size:11px;color:var(--muted);margin-bottom:4px}
-  .mail .subj{font-weight:600;color:var(--ink);font-size:13px}
-  .mail pre{white-space:pre-wrap;font-family:var(--sans);font-size:12px;color:var(--body);margin:6px 0 8px;max-height:120px;overflow:auto}
-  .mail .safe{font-size:10.5px;color:var(--warn)}
+  /* premium email preview */
+  .maily{margin:16px 0 4px}
+  .maily .lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .maily .lbl::after{content:"";flex:1;height:1px;background:var(--hair)}
+  .mailframe{border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+  .mailbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .safe{font-size:11px;color:var(--warn);background:var(--warn-bg);border-radius:999px;padding:4px 11px;font-weight:600}
 
   /* ledger side panel */
-  .ledger{align-self:start;position:sticky;top:74px;display:flex;flex-direction:column;gap:12px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
-  .card h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-family:var(--sans);font-weight:700;margin-bottom:10px}
-  .row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;font-size:13px;border-bottom:1px dashed var(--line)}
+  .ledger{align-self:start;position:sticky;top:82px;display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:20px 20px;box-shadow:var(--shadow)}
+  .card h3{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-family:var(--sans);font-weight:700;margin-bottom:12px}
+  .row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;font-size:13.5px;border-bottom:1px dashed var(--hair)}
   .row:last-child{border-bottom:none}
   .row .k{color:var(--muted)}
   .row .v{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
-  .row.big .v{font-size:17px;font-family:var(--serif)}
-  .row .v.good{color:var(--good)} .row .v.crit{color:var(--crit)}
-  .track{height:8px;background:var(--mist);border-radius:5px;overflow:hidden;margin-top:8px}
-  .track>i{display:block;height:100%;background:var(--green);border-radius:5px;transition:width .4s}
-  .feed{font-size:11.5px;color:var(--muted);max-height:200px;overflow:auto}
-  .feed div{padding:3px 0;border-bottom:1px dashed var(--line)}
+  .row.big{padding:4px 0 10px;margin-bottom:4px;border-bottom:1px solid var(--line)}
+  .row.big .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--faint)}
+  .row.big .v{font-size:26px;font-family:var(--serif);letter-spacing:-.02em}
+  .row .v.good{color:var(--good)} .row .v.warn{color:var(--warn)} .row .v.crit{color:var(--crit)}
+  .track{height:9px;background:var(--hair);border-radius:6px;overflow:hidden;margin-top:12px}
+  .track>i{display:block;height:100%;background:linear-gradient(90deg,var(--greenLt),var(--green));border-radius:6px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+  .feed{font-size:11.5px;color:var(--muted);max-height:210px;overflow:auto}
+  .feed div{padding:5px 0;border-bottom:1px dashed var(--hair);animation:fade .4s}
   .feed div:last-child{border-bottom:none}
-  .chip{display:inline-block;font-size:9px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--greenSoft);color:var(--green)}
+  @keyframes fade{from{opacity:0;transform:translateY(-3px)}to{opacity:1}}
+  .chip{display:inline-block;font-size:9px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--greenSoft);color:var(--green);letter-spacing:.02em;vertical-align:middle}
 </style>
 </head>
 <body>
 <header class="top">
-  <div class="logo"><span class="mark"></span><span class="name">Canei Subirats<small>Renovations, simply complex.</small></span></div>
+  <div class="logo">
+    <svg width="34" height="34" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
+      <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c"/>
+      <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="18" y="23.5" width="4" height="5" rx="1" fill="#fff"/>
+      <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230"/>
+    </svg>
+    <span class="name">Canei Subirats<small>Renovations, simply complex.</small></span>
+  </div>
   <span class="tag">ERP · End-to-End Journey</span>
   <span class="links">
+    <a href="index.html">Home</a>
     <a href="dashboard.html">Control Tower ↗</a>
     <a href="frontend.html">Quote demo ↗</a>
     <a href="backend.html">Backend ↗</a>
@@ -129,7 +164,7 @@
       <div class="row"><span class="k">Cash position</span><span class="v" id="l-cash">—</span></div>
       <div class="row"><span class="k">Forecast profit</span><span class="v" id="l-forecast">—</span></div>
       <div class="track"><i id="l-bar" style="width:0%"></i></div>
-      <div class="hint" style="margin-top:6px">Progress through the 12-stage lifecycle</div>
+      <div class="hint" style="margin-top:8px">Progress through the 13-stage lifecycle</div>
     </div>
     <div class="card">
       <h3>Activity log</h3>
@@ -137,10 +172,10 @@
     </div>
     <div class="card">
       <h3>What this proves</h3>
-      <div class="hint">One customer, one clean thread: <b>lead → profit</b>. Same business logic as
-      the real system — integer-cent money, VAT decided by rule, margin = revenue − actual cost,
-      quoted-vs-actual per chapter. Emails auto-draft and send through a <b>log-only</b> adapter
-      (nothing is really delivered). All data synthetic.</div>
+      <div class="hint">One customer, one clean thread: <b style="color:var(--green)">lead → profit → review</b>.
+      Same business logic as the real system — integer-cent money, VAT decided by rule, margin = revenue −
+      actual cost, quoted-vs-actual per chapter. Emails auto-draft with full CI and download as an
+      <b>Outlook draft (.eml)</b> with the PDF attached. All data synthetic; nothing is really delivered.</div>
     </div>
   </aside>
 </main>
@@ -148,17 +183,19 @@
 <script type="module">
 /* ============================================================
    Canei Subirats — End-to-End Journey (self-contained demo).
-   Walks ONE project through the 12 BRD lifecycle stages, wiring
+   Walks ONE project through the 13 BRD lifecycle stages, wiring
    the capability logic (crm, quoting, sourcing, projects, AR, AP,
-   billing, messaging) into one clickable flow with a live ledger.
+   billing, messaging, reputation) into one clickable flow with a
+   live ledger, premium branded emails and Outlook-draft export.
    ============================================================ */
 const eur = c => new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR"}).format(c/100);
+const eurTxt = c => (c/100).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" EUR";
 const $ = s => document.querySelector(s);
 const el = (t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
 
 const STAGES = [
-  "Lead","Site visit","Estimate","Quotation","Acceptance","Project",
-  "Purchasing","Execution","Invoicing","Collections","Supplier payments","Close · profit",
+  "Lead","Site visit","Estimate","Quotation","Acceptance","Project","Purchasing",
+  "Execution","Invoicing","Collections","Supplier payments","Close · profit","Review request",
 ];
 
 // --- project state (cents) ---
@@ -216,7 +253,7 @@ const FLOW = [
       return `<p>An enquiry comes in. We capture the customer and open a <b>lead</b> on the pipeline with a next action — no data lost on a scrap of paper.</p>
       <div class="did"><b>Customer created:</b> ${S.customer} · ${S.email}<br><b>Lead opened:</b> “Bathroom + aerothermal — ${S.address}” · stage <span class="chip">new</span> · next action: book a site visit</div>`;
     }, done:()=>log("CRM · lead opened for "+S.customer) },
-  { cap:"docs / mobile", body:()=>`<p>The site visit is captured on the phone: rooms, rough measurements and photos. This feeds the estimate without re-typing.</p>
+  { cap:"visits / mobile", body:()=>`<p>The site visit is captured on the phone: rooms, rough measurements and photos. This feeds the estimate without re-typing.</p>
       <div class="did"><b>Visit recorded:</b> bathroom 5.0 × 2.5 m · old tiling to strip · relocate plumbing · aerothermal unit on the terrace.</div>`,
     done:()=>log("Site visit captured (3 photos, measurements)") },
   { cap:"quoting", body:()=>{
@@ -234,7 +271,7 @@ const FLOW = [
     }, done:()=>log("Quote built: base "+eur(sum(S.chapters,c=>c.budget))+" + optional") },
   { cap:"quoting · messaging", email:{kind:"acceptance"}, body:()=>{
       S.optional.included=true;
-      return `<p>The customer <b>accepts</b> and includes the optional shower screen. The accepted version is frozen; an acceptance email is auto-drafted for you.</p>
+      return `<p>The customer <b>accepts</b> and includes the optional shower screen. The accepted version is frozen; a branded acceptance email is auto-drafted with the accepted quote attached.</p>
       <div class="did"><b>Accepted:</b> base + optional = ${eur(sum(S.chapters,c=>c.budget)+S.optional.amount)} (ex-VAT). Version frozen.</div>`;
     }, done:()=>log("Quote accepted (with optional) — version frozen") },
   { cap:"projects", body:()=>{
@@ -280,28 +317,184 @@ const FLOW = [
         <tr><td><b>Margin</b></td><td class="n"></td><td class="n"><b>${eur(margin())}</b></td><td class="n"><b>${marginPct()}%</b></td></tr></tbody></table>
       <div class="did"><b>Closed profitably.</b> Margin ${eur(margin())} (${marginPct()}%). Cash position ${eur(cash())}. Every euro traced from the first enquiry to the final profit — one clean thread.</div>`;
     }, done:()=>log("Project closed — margin "+eur(margin())+" ("+marginPct()+"%)") },
+  { cap:"messaging · reputation", email:{kind:"review"}, body:()=>{
+      return `<p>The final, often-forgotten step: <b>ask for a review while the goodwill is fresh</b>. The moment the project closes, a branded request is auto-drafted — one click sends it, or download it as an Outlook draft. This closes the loop from first enquiry to reputation.</p>
+      <div class="did"><b>Review request drafted</b> for ${S.customer}. Google review link embedded · scheduled 3 days after handover by default · feeds the reputation loop that wins the next lead.</div>`;
+    }, done:()=>log("Review request drafted for "+S.customer+" — loop closed") },
 ];
 
-const brand={from:"hola@caneisubirats.com", sign:"Canei Subirats — Renovations, simply complex."};
-function emailFor(kind){
-  const vat=Math.round(S.revenue*S.vatBp/10000);
-  if(kind==="acceptance")return{subj:`Thank you — your project is confirmed`,
-    body:`Dear ${S.customer},\n\nWe are delighted to confirm your acceptance for “Bathroom + aerothermal — ${S.address}”. We will schedule the works and keep you updated at each milestone.\n\nKind regards,\n${brand.sign}`};
-  if(kind==="invoice")return{subj:`Invoice ${S.invoiceNo}`,
-    body:`Dear ${S.customer},\n\nPlease find attached invoice ${S.invoiceNo}. Total due: ${eur(S.revenue+vat)} (base ${eur(S.revenue)} + VAT ${eur(vat)}). Payment terms: 15 days.\n\nKind regards,\n${brand.sign}`};
-  if(kind==="reminder")return{subj:`Friendly reminder — invoice ${S.invoiceNo}`,
-    body:`Dear ${S.customer},\n\nA gentle reminder that invoice ${S.invoiceNo} is due. If you have already arranged payment, please disregard this note.\n\nThank you,\n${brand.sign}`};
+/* ---------- premium branded email (full CI, email-safe inline styles) ---------- */
+const BRAND = { name:"Canei Subirats", legal:"Canei Subirats, S.L.", slogan:"Renovations, simply complex.",
+  from:"hola@caneisubirats.com", address:"Sant Just Desvern, Barcelona", phone:"+34 93 000 00 00",
+  green:"#48733c", greenLt:"#6ba85a", ink:"#14160f", body:"#54574c", soft:"#eef4ea", line:"#eceae4", spark:"#f2c230" };
+
+const MARK = `<svg width="34" height="34" viewBox="0 0 40 40" fill="none">
+  <rect x="1" y="1" width="38" height="38" rx="11" fill="${BRAND.green}"/>
+  <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="18" y="23.5" width="4" height="5" rx="1" fill="#fff"/>
+  <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="${BRAND.spark}"/></svg>`;
+
+function quoteLines(){
+  const l=S.chapters.map(c=>({label:c.chapter,value:eurTxt(c.budget)}));
+  l.push({label:"Optional — "+S.optional.desc,value:eurTxt(S.optional.amount)});
+  l.push({label:"Accepted total (VAT excl.)",value:eurTxt(S.baseline||sum(S.chapters,c=>c.budget)+S.optional.amount)});
+  return l;
+}
+function emailContent(kind){
+  const vat=Math.round(S.revenue*S.vatBp/10000); const total=S.revenue+vat;
+  if(kind==="acceptance") return {
+    subject:"Your project is confirmed — Canei Subirats", title:"Your project is confirmed",
+    greeting:`Dear ${S.customer},`,
+    paras:[`We're delighted to confirm your acceptance of the works for your home at ${S.address}.`,
+      `Your accepted quote is attached. We'll schedule the works and keep you updated at every milestone — one point of contact throughout, and a 2-year guarantee on the works.`],
+    cta:{label:"View your project space"},
+    attach:{name:"Canei-quote-accepted.pdf", pdf:()=>({title:"Accepted quote", subtitle:S.address, lines:quoteLines()})},
+  };
+  if(kind==="invoice") return {
+    subject:`Invoice ${S.invoiceNo} — Canei Subirats`, title:`Invoice ${S.invoiceNo}`,
+    greeting:`Dear ${S.customer},`,
+    paras:[`Thank you for trusting us with your renovation. Please find your invoice attached.`,
+      `Total due: <b>${eur(total)}</b> (base ${eur(S.revenue)} + VAT ${eur(vat)}). Payment terms: 15 days.`],
+    cta:{label:"Pay securely online"},
+    attach:{name:S.invoiceNo+".pdf", pdf:()=>({title:S.invoiceNo, subtitle:"VAT invoice · reduced rate 10%", lines:[
+      {label:"Base (VAT excluded)",value:eurTxt(S.revenue)},
+      {label:"VAT (10%, art. 91.Uno.2.10º)",value:eurTxt(vat)},
+      {label:"Total due",value:eurTxt(total)}]})},
+  };
+  if(kind==="reminder") return {
+    subject:`Friendly reminder — invoice ${S.invoiceNo}`, title:"A gentle reminder",
+    greeting:`Dear ${S.customer},`,
+    paras:[`Just a friendly reminder that invoice ${S.invoiceNo} (${eur(total)}) is due.`,
+      `If you've already arranged payment, please disregard this note — and thank you.`],
+    cta:{label:"Settle the invoice"},
+  };
+  if(kind==="review") return {
+    subject:"How did we do? — a quick favour", title:"How did we do?",
+    greeting:`Dear ${S.customer},`,
+    paras:[`It's been a pleasure renovating your home, and we hope you're enjoying the result every day.`,
+      `If you have 30 seconds, a short review means the world to a family business like ours — and helps your neighbours find a team they can trust.`],
+    cta:{label:"★  Leave a Google review"},
+  };
+}
+
+/** Render a full, email-safe premium HTML email (used for the preview and the .eml). */
+function renderEmail(c){
+  const B=BRAND;
+  const paras=c.paras.map(p=>`<p style="margin:0 0 14px;font-size:15px;line-height:1.62;color:${B.body}">${p}</p>`).join("");
+  const cta=c.cta?`<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 6px"><tr>
+    <td style="border-radius:12px;background:${B.green};box-shadow:0 12px 22px -12px rgba(72,115,60,.6)">
+    <a href="#" style="display:inline-block;padding:13px 28px;color:#fff;font:600 14px Inter,Arial,sans-serif;text-decoration:none;letter-spacing:-.01em">${c.cta.label}</a>
+    </td></tr></table>`:"";
+  const attach=c.attach?`<div style="margin:18px 0 2px;display:flex;align-items:center;gap:11px;border:1px solid ${B.line};border-radius:12px;padding:12px 14px;background:#fafaf7">
+    <div style="width:34px;height:34px;border-radius:8px;background:${B.soft};display:flex;align-items:center;justify-content:center;font-size:15px">📄</div>
+    <div><div style="font:600 13px Inter,Arial,sans-serif;color:${B.ink}">${c.attach.name}</div>
+    <div style="font-size:11px;color:#9a9d90">PDF · attached to this email</div></div></div>`:"";
+  return `<div style="margin:0;padding:26px 14px;background:#f4f3ef;font-family:Inter,-apple-system,Segoe UI,Arial,sans-serif">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:18px;overflow:hidden;border:1px solid ${B.line};box-shadow:0 24px 60px -34px rgba(20,30,15,.5)">
+    <div style="height:5px;background:linear-gradient(90deg,${B.green},${B.greenLt} 70%,${B.spark})"></div>
+    <div style="padding:26px 32px 4px;display:flex;align-items:center;gap:12px">${MARK}
+      <div><div style="font:600 18px Georgia,serif;color:${B.ink};line-height:1.05">${B.name}</div>
+      <div style="font-size:11px;font-style:italic;color:#9a9d90">${B.slogan}</div></div></div>
+    <div style="padding:14px 32px 0"><div style="font:600 25px Georgia,serif;color:${B.ink};letter-spacing:-.01em">${c.title}</div></div>
+    <div style="padding:12px 32px 28px">
+      <p style="margin:0 0 14px;font-size:15px;color:${B.ink};font-weight:600">${c.greeting}</p>
+      ${paras}${cta}${attach}
+      <p style="margin:20px 0 0;font-size:14px;color:${B.body}">Kind regards,<br><b style="color:${B.ink}">The ${B.name} team</b></p>
+    </div>
+    <div style="padding:18px 32px;background:${B.soft};border-top:1px solid ${B.line};font-size:11.5px;color:#7c8072;line-height:1.6">
+      <b style="color:${B.ink}">${B.legal}</b> · ${B.address}<br>${B.from} · ${B.phone} · 2-year guarantee on the works
+    </div>
+  </div></div>`;
+}
+function emailDoc(c){
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${c.subject}</title></head><body style="margin:0">${renderEmail(c)}</body></html>`;
+}
+function emailText(c){
+  const strip=s=>s.replace(/<[^>]+>/g,"");
+  return `${strip(c.greeting)}\n\n${c.paras.map(strip).join("\n\n")}\n\nKind regards,\nThe ${BRAND.name} team\n\n${BRAND.legal} · ${BRAND.address}\n${BRAND.from} · ${BRAND.phone}`;
+}
+
+/* ---------- minimal, dependency-free PDF for the attachment ---------- */
+function buildPdf(o){
+  const G="0.282 0.451 0.235", INK="0.078 0.086 0.059", GREY="0.55 0.56 0.5", BODY="0.33 0.34 0.29";
+  const esc=s=>String(s).replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)").replace(/[^\x20-\x7e]/g,"");
+  let c="";
+  c+=`${G} rg 0 792 595 50 re f\n`;                                        // header band
+  c+=`1 1 1 rg BT /F2 19 Tf 42 807 Td (${esc(BRAND.name)}) Tj ET\n`;
+  c+=`0.93 0.86 0.62 rg BT /F1 10 Tf 42 795 Td (${esc(BRAND.slogan)}) Tj ET\n`;
+  c+=`${INK} rg BT /F2 23 Tf 42 730 Td (${esc(o.title)}) Tj ET\n`;
+  if(o.subtitle) c+=`${GREY} rg BT /F1 12 Tf 42 710 Td (${esc(o.subtitle)}) Tj ET\n`;
+  let y=672;
+  o.lines.forEach((l,i)=>{
+    const bold=i===o.lines.length-1;
+    if(bold){ c+=`${G} rg 42 ${y+15} 511 1.2 re f\n`; }
+    c+=`${bold?INK:BODY} rg BT /${bold?"F2":"F1"} 12 Tf 42 ${y} Td (${esc(l.label)}) Tj ET\n`;
+    c+=`${bold?INK:BODY} rg BT /${bold?"F2":"F1"} 12 Tf 430 ${y} Td (${esc(l.value)}) Tj ET\n`;
+    y-=24;
+  });
+  c+=`${GREY} rg BT /F1 9.5 Tf 42 96 Td (${esc(BRAND.legal+"  |  "+BRAND.address)}) Tj ET\n`;
+  c+=`${GREY} rg BT /F1 9.5 Tf 42 82 Td (${esc(BRAND.from+"  |  "+BRAND.phone+"  |  2-year guarantee on the works")}) Tj ET\n`;
+  c+=`${G} rg 42 64 511 3 re f\n`;
+  const objs=[
+    "<</Type/Catalog/Pages 2 0 R>>",
+    "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+    "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R/F2 5 0 R>>>>/Contents 6 0 R>>",
+    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>",
+    "<</Length "+c.length+">>\nstream\n"+c+"\nendstream",
+  ];
+  let pdf="%PDF-1.4\n"; const off=[];
+  objs.forEach((o2,i)=>{ off.push(pdf.length); pdf+=(i+1)+" 0 obj\n"+o2+"\nendobj\n"; });
+  const xref=pdf.length;
+  pdf+="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n";
+  off.forEach(o2=>{ pdf+=String(o2).padStart(10,"0")+" 00000 n \n"; });
+  pdf+="trailer\n<</Size "+(objs.length+1)+"/Root 1 0 R>>\nstartxref\n"+xref+"\n%%EOF";
+  return btoa(pdf);
+}
+
+/* ---------- Outlook draft (.eml) — X-Unsent:1 opens it as an editable draft ---------- */
+function b64(str){ return btoa(unescape(encodeURIComponent(str))); }
+function chunk(s){ return s.replace(/.{1,76}/g,"$&\r\n").trimEnd(); }
+function buildEml(c){
+  const CRLF="\r\n"; const bnd="CANEI_"+Date.now().toString(36);
+  const html=emailDoc(c);
+  let m="";
+  m+="From: "+BRAND.name+" <"+BRAND.from+">"+CRLF;
+  m+="To: "+S.customer+" <"+S.email+">"+CRLF;
+  m+="Subject: "+c.subject+CRLF;
+  m+="X-Unsent: 1"+CRLF;                       // Outlook: open as a new editable draft
+  m+="MIME-Version: 1.0"+CRLF;
+  m+='Content-Type: multipart/mixed; boundary="'+bnd+'"'+CRLF+CRLF;
+  m+="--"+bnd+CRLF+'Content-Type: multipart/alternative; boundary="'+bnd+'_alt"'+CRLF+CRLF;
+  m+="--"+bnd+"_alt"+CRLF+'Content-Type: text/plain; charset="utf-8"'+CRLF+"Content-Transfer-Encoding: base64"+CRLF+CRLF+chunk(b64(emailText(c)))+CRLF+CRLF;
+  m+="--"+bnd+"_alt"+CRLF+'Content-Type: text/html; charset="utf-8"'+CRLF+"Content-Transfer-Encoding: base64"+CRLF+CRLF+chunk(b64(html))+CRLF+CRLF;
+  m+="--"+bnd+"_alt--"+CRLF+CRLF;
+  if(c.attach){
+    const pdf=buildPdf(c.attach.pdf());
+    m+="--"+bnd+CRLF+'Content-Type: application/pdf; name="'+c.attach.name+'"'+CRLF;
+    m+="Content-Transfer-Encoding: base64"+CRLF+'Content-Disposition: attachment; filename="'+c.attach.name+'"'+CRLF+CRLF+chunk(pdf)+CRLF+CRLF;
+  }
+  m+="--"+bnd+"--"+CRLF;
+  return m;
+}
+function download(name,mime,data){
+  const blob=new Blob([data],{type:mime});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download=name; document.body.append(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 
 function renderStage(){
   const stageEl=$("#stage");
   if(step<0){
     stageEl.innerHTML=`<div class="eyebrow">The full lifecycle</div>
-      <h2>From first enquiry to final profit</h2>
-      <div class="cap">One project, twelve stages, every capability wired together.</div>
+      <h2>From first enquiry to a five-star review</h2>
+      <div class="cap">One project · thirteen stages · every capability wired together.</div>
       <p>This walks a real renovation — a bathroom + aerothermal in Esplugues — through the entire journey the business runs today on paper and spreadsheets. Watch the <b>ledger on the right</b> fill in as you go: committed vs actual cost, revenue, margin, cash and forecast — all from integer-cent money and the same rules as the production kernel.</p>
+      <p>Every customer email is <b>auto-drafted with full corporate identity</b> and downloads as an <b>Outlook draft (.eml)</b> with the PDF attached — nothing to re-type.</p>
       <div class="actions"><button class="btn" id="next">Start the journey ▸</button>
-      <span class="hint">Press to advance one stage at a time.</span></div>`;
+      <span class="hint">Advance one stage at a time.</span></div>`;
     $("#next").onclick=advance;
     return;
   }
@@ -310,26 +503,29 @@ function renderStage(){
   wrap.append(el("div","eyebrow",`Step ${step+1} of ${STAGES.length}`));
   wrap.append(el("h2",null,STAGES[step]));
   wrap.append(el("div","cap",`capability: <b>${f.cap}</b>`));
-  const bodyHtml=f.body();
-  wrap.append(el("div",null,bodyHtml));
-  // inline email at relevant stages
+  wrap.append(el("div",null,f.body()));
+  // premium auto-drafted email at relevant stages
   if(f.email){
-    const m=emailFor(f.email.kind);
-    const mail=el("div","mail",`<div class="h">Auto-drafted · To: ${S.email}</div>
-      <div class="subj">${m.subj}</div><pre>${m.body}</pre>
-      <div style="display:flex;gap:8px;align-items:center"><button class="btn" style="padding:8px 16px" id="send">✉ Send</button>
-      <span class="safe">log-only — not delivered</span></div>`);
-    wrap.append(mail);
+    const c=emailContent(f.email.kind);
+    const box=el("div","maily");
+    box.append(el("div","lbl",`Auto-drafted email · full CI · to ${S.email}`));
+    box.append(el("div","mailframe",renderEmail(c)));
+    const bar=el("div","mailbar");
+    const send=el("button","btn sm","✉ Send");
+    const dl=el("button","btn sm ghost",(c.attach?"⤓ Outlook draft + PDF (.eml)":"⤓ Outlook draft (.eml)"));
+    const safe=el("span","safe","log-only — not delivered");
+    send.onclick=()=>{ send.textContent="✓ Sent (logged)"; send.disabled=true; log("Email sent → "+S.email+" (log-only)"); };
+    dl.onclick=()=>{ download(("Canei-"+f.email.kind+".eml"),"message/rfc822",buildEml(c)); log("Outlook draft downloaded — "+f.email.kind+(c.attach?" (+PDF)":"")); };
+    bar.append(send,dl,safe); box.append(bar);
+    wrap.append(box);
   }
   const acts=el("div","actions");
   const isLast=step===FLOW.length-1;
   acts.append(el("button","btn",isLast?"Journey complete ✓":`Advance — ${STAGES[step+1]} ▸`));
-  if(!isLast) acts.lastChild.id="next";
-  else acts.lastChild.disabled=true;
+  if(!isLast) acts.lastChild.id="next"; else acts.lastChild.disabled=true;
   const restart=el("button","btn ghost","↻ Restart"); restart.onclick=restartJourney; acts.append(restart);
   wrap.append(acts);
   stageEl.innerHTML=""; stageEl.append(wrap);
-  if(f.email){ $("#send").onclick=(e)=>{ e.target.textContent="✓ Sent (logged)"; e.target.disabled=true; log("Email sent → "+S.email+" (log-only, not delivered)"); }; }
   if(!isLast) $("#next").onclick=advance;
 }
 function advance(){
@@ -338,11 +534,10 @@ function advance(){
   renderStage();      // body() applies this stage's effect on S
   renderLedger();     // ledger now reflects the applied effect
   const f=FLOW[step];
-  f.done&&f.done();   // log post-effect figures
+  f.done&&f.done();
   window.scrollTo({top:0,behavior:"smooth"});
 }
 function restartJourney(){
-  // reset mutable state
   S.chapters.forEach(c=>{c.committed=0;c.actual=0;});
   S.optional.included=false; S.baseline=0; S.revenue=0; S.collected=0; S.supplierPaid=0; S.bills=[]; S.receipts=[];
   step=-1; const f=$("#feed"); f.innerHTML="<div>Restarted — press “Start the journey”.</div>"; f.dataset.clean="";
