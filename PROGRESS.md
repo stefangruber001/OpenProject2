@@ -240,6 +240,21 @@ review`) in `site/journey.html` and `site/dashboard.html`, closing the
 - Session context finite → this file is the checkpoint; resume from "Next 3
   tasks". No force-push, no history rewrite (mandate §3).
 
+## Mobile app (iOS shell) — P3 packaging seed
+
+- **Premium native SwiftUI iOS app** shipped in `ios/` — a shell over the live
+  GitHub-Pages web app, so web changes flow to the app with no App Store update
+  (only native-shell changes need a rebuild). Animated splash, custom floating
+  tab bar (haptics + gold pill), translucent top bar with progress line,
+  pull-to-refresh, offline auto-recovery (NWPathMonitor), native share, file
+  exports via WKDownloadDelegate, JS⇄native bridge, injected `native-app` CSS to
+  collapse the web header in-shell. Ready-to-open Xcode 16 project + XcodeGen
+  fallback; fastlane `beta` lane; manual-dispatch-only TestFlight CI (no failure
+  emails). Non-technical **iOS Beta Onboarding PDF** at
+  `site/Canei-Subirats-iOS-Beta-Onboarding.pdf` (linked from the landing page).
+  See ASSUMPTIONS.md #36. Not compiled here (no Xcode on Linux) — static +
+  independent review + Chromium embed check; XcodeGen guarantees a valid project.
+
 ## Marginal cost of tenant #N+1 (minutes of human/agent time)
 
 | Tenant                 | Minutes                                                                                              | Evidence                              |

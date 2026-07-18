@@ -242,3 +242,52 @@ languages: es-ES # source: synthetic
     reviewed end-to-end (full run, rail nav, valid 30-file zip, no JS errors,
     mobile clean). Production equivalents of scheduling/change-orders exist as
     capabilities; the demo mirrors them for the shareable link.
+36. **iOS app — premium native shell over the live web app (this cycle).**
+    Mandate: "build the iOS app so web changes flow through to the app later,
+    make it very premium, best-in-class navigation, ship via TestFlight, give us
+    a one-PDF manual of what to do on our side; then review/improve/audit in a
+    loop until world-class; don't ask questions."
+    Decisions (most reversible option, logged not asked):
+    (a) **Architecture = native SwiftUI shell hosting the live GitHub-Pages web
+    app in enhanced WKWebViews.** This is the single design that satisfies "web
+    changes flow to the app automatically" — content/workflow/pricing changes
+    need no App Store update; only native-shell changes (icon, tabs, OS) require
+    a new build. Alternative (a full native rewrite of every screen) was rejected:
+    it would fork the UI and break the "one change, everywhere" property that is
+    the whole point. Files under `ios/` (kept out of the pnpm workspace and out
+    of the boundary-lint scan, which only reads packages/kernel|capabilities|packs
+    .ts — so no CI impact).
+    (b) **Premium layer, all native:** animated brand splash, custom floating tab
+    bar (material + gold matched-geometry pill + haptics), translucent top bar
+    with a live determinate progress line, native pull-to-refresh, graceful
+    offline state, native share sheet, JS⇄native bridge (haptics/share), and a
+    `native-app` class + injected CSS that collapses the site's own header inside
+    the shell so there is no duplicated chrome. Zoom already locked site-side.
+    (c) **File exports work natively:** WKDownloadDelegate captures the web app's
+    ZIP/PDF/.eml exports and routes them to the share sheet (Save to Files,
+    AirDrop). Camera/photo Info.plist permission strings included for site-visit
+    capture. Persistent WKWebsiteDataStore so the IndexedDB project workspace
+    survives launches.
+    (d) **Robustness (audit rounds):** tab bar as a bottom safe-area inset (web
+    content never hidden behind it); re-tap active tab = scroll-to-top (preserves
+    form state); NWPathMonitor auto-recovers the offline screen when signal
+    returns (field-site drops); auto-reload on web-content-process termination;
+    VoiceOver labels. Colour scheme forced light to match the locked-light web.
+    (e) **Bundle id** = honest placeholder `com.caneisubirats.erp`; DEVELOPMENT_TEAM
+    left empty for the operator to set (documented). No secrets committed;
+    `.gitignore` blocks `*.p8`/certs. No real Apple uploads performed here — the
+    operator runs them (fakes-behind-ports discipline extends to "no real
+    filings/uploads on our behalf").
+    (f) **TestFlight setup:** ready-to-open Xcode 16 project (file-system-
+    synchronized) + XcodeGen `project.yml`/`setup.sh` fallback; fastlane `beta`
+    lane; a **manual-dispatch-only** GitHub Actions workflow (never fires on
+    ordinary pushes → no failure emails). Delivered a 12-page premium
+    **iOS Beta Onboarding PDF** (`site/Canei-Subirats-iOS-Beta-Onboarding.pdf`,
+    linked from the landing page) covering every manual step for a non-technical
+    operator: Developer Program, App Store Connect app record, three build paths,
+    the API key, inviting testers, a test checklist, updates, FAQ, glossary.
+    (g) Could not compile here (no Xcode/Swift toolchain on Linux); mitigated with
+    rigorous static review + an independent adversarial Swift review pass, and the
+    guaranteed-valid XcodeGen regeneration path. The in-app web appearance was
+    verified by simulating the shell in headless Chromium (inject `native-app`
+    class + CSS at iPhone size) — headers collapse cleanly, no horizontal overflow.
