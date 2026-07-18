@@ -62,7 +62,7 @@ platform :ios do
       export_method: "app-store",
       export_options: {
         signingStyle: "automatic",
-        teamID: ENV["DEVELOPER_TEAM_ID"]
+        teamID: ENV["DEVELOPER_TEAM_ID"] || "5V62K942X6"
       },
       output_directory: "build",
       output_name: "CaneiSubirats.ipa",

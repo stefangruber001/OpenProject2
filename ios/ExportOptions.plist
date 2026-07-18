@@ -11,7 +11,7 @@
 	<key>signingStyle</key>
 	<string>automatic</string>
 	<key>teamID</key>
-	<string>REPLACE_WITH_YOUR_TEAM_ID</string>
+	<string>5V62K942X6</string>
 	<key>uploadSymbols</key>
 	<true/>
 	<key>uploadBitcode</key>

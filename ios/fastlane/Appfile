@@ -3,4 +3,4 @@
 
 app_identifier(ENV["APP_BUNDLE_ID"] || "com.caneisubirats.erp")
 apple_id(ENV["APPLE_ID"])                  # optional; API key auth doesn't need it
-team_id(ENV["DEVELOPER_TEAM_ID"])          # Apple Developer (portal) team id
+team_id(ENV["DEVELOPER_TEAM_ID"] || "5V62K942X6") # Apple Developer team id
