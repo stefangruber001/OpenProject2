@@ -316,3 +316,20 @@ languages: es-ES # source: synthetic
     screenshots. macOS-only (can't run in this Linux env) — authored + documented,
     manual-dispatch to avoid failure emails. Mirrors the article's two ideas
     (fastlane deployment automation = already built; Maestro autonomous testing).
+
+38. **Reusable, self-improving "App Producer" agent + Template repo (this cycle).**
+    Packaged the whole web→native-iOS→TestFlight→testing pipeline as a Claude Code
+    agent (`.claude/agents/app-producer.md`) so it's reusable in any project/chat,
+    and into the shared `stefangruber001/Template` repo (installer copies agents
+    into a new repo's `.claude/agents/`). Made it **self-improving**: it reads a
+    git-backed `learnings/LEARNINGS.md` ledger in the Template repo on start and
+    appends new `symptom→cause→fix` learnings on finish, so every project teaches
+    it and every call arrives updated. **Reversibility/decisions:** (a) named the
+    agent "App Producer" (per operator) and superseded the earlier
+    `ios-web-shipper.md` rather than keeping both, to avoid a stale duplicate —
+    git history preserves it. (b) Ledger lives in the Template repo (single shared
+    memory across all projects), not per-project. (c) Hard guardrail baked into
+    the agent + ledger header: **never** persist secrets, `.p8`/keys, tokens, PII
+    or client-confidential data — only generalizable technical learnings. (d) The
+    installer copies agent files only; learnings are pulled by the agent at
+    runtime so a stale local copy can't shadow newer shared knowledge.
