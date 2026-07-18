@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WebKit
 
 /// SwiftUI bridge for the store's `WKWebView`, wiring up native pull-to-refresh.
@@ -37,8 +38,10 @@ struct WebView: UIViewRepresentable {
         init(store: WebViewStore) { self.store = store }
 
         @objc func handleRefresh(_ sender: UIRefreshControl) {
+            // Fires on the main thread; assert it so the main-actor store call is
+            // synchronous and clean under strict concurrency.
             Haptics.tick()
-            store.reload()
+            MainActor.assumeIsolated { store.reload() }
         }
     }
 }

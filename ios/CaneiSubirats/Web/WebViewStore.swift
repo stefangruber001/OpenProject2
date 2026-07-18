@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WebKit
 import Combine
 import Network
@@ -124,21 +125,28 @@ final class WebViewStore: NSObject, ObservableObject {
     }
 
     private func setupObservers() {
+        // Capture only the Sendable new value (not the WKWebView) into the
+        // main-actor hop, so this is clean under strict concurrency / Swift 6.
         observers = [
-            webView.observe(\.estimatedProgress, options: [.new]) { [weak self] wv, _ in
-                Task { @MainActor in self?.estimatedProgress = wv.estimatedProgress }
+            webView.observe(\.estimatedProgress, options: [.new]) { [weak self] _, change in
+                guard let value = change.newValue else { return }
+                Task { @MainActor in self?.estimatedProgress = value }
             },
-            webView.observe(\.isLoading, options: [.new]) { [weak self] wv, _ in
-                Task { @MainActor in self?.isLoading = wv.isLoading }
+            webView.observe(\.isLoading, options: [.new]) { [weak self] _, change in
+                guard let value = change.newValue else { return }
+                Task { @MainActor in self?.isLoading = value }
             },
-            webView.observe(\.canGoBack, options: [.new]) { [weak self] wv, _ in
-                Task { @MainActor in self?.canGoBack = wv.canGoBack }
+            webView.observe(\.canGoBack, options: [.new]) { [weak self] _, change in
+                guard let value = change.newValue else { return }
+                Task { @MainActor in self?.canGoBack = value }
             },
-            webView.observe(\.canGoForward, options: [.new]) { [weak self] wv, _ in
-                Task { @MainActor in self?.canGoForward = wv.canGoForward }
+            webView.observe(\.canGoForward, options: [.new]) { [weak self] _, change in
+                guard let value = change.newValue else { return }
+                Task { @MainActor in self?.canGoForward = value }
             },
-            webView.observe(\.title, options: [.new]) { [weak self] wv, _ in
-                Task { @MainActor in self?.pageTitle = wv.title ?? "" }
+            webView.observe(\.title, options: [.new]) { [weak self] _, change in
+                let value = (change.newValue ?? nil) ?? ""
+                Task { @MainActor in self?.pageTitle = value }
             }
         ]
     }
@@ -345,6 +353,9 @@ private final class MessageProxy: NSObject, WKScriptMessageHandler {
     init(_ store: WebViewStore) { self.store = store }
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
-        Task { @MainActor in self.store?.handleBridge(message.body) }
+        // Script-message callbacks arrive on the main thread; assert that so we
+        // can touch the main-actor store synchronously without a Sendable hop.
+        let body = message.body
+        MainActor.assumeIsolated { self.store?.handleBridge(body) }
     }
 }

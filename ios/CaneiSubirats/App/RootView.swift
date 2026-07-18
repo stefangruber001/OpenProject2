@@ -45,8 +45,8 @@ struct RootView: View {
             get: { app.shareURL.map { ShareItem(url: $0) } },
             set: { app.shareURL = $0?.url }
         )) { item in
+            // UIActivityViewController manages its own presentation.
             ShareSheet(items: [item.url])
-                .presentationDetents([.medium, .large])
         }
         .preferredColorScheme(.light) // brand is a light, premium theme
     }
