@@ -1,0 +1,69 @@
+name: iOS UI tests (Maestro)
+
+# Autonomous native UI testing of the app on the iOS Simulator: builds the app
+# (no signing needed for the simulator), boots a simulator, installs the app,
+# and runs the Maestro flows in ios/maestro (launch, tab navigation, and driving
+# the customer journey through the WKWebView).
+#
+# Manual trigger only, so it never fires on ordinary pushes or emails failures.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ui:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build app for the simulator (no code signing)
+        run: |
+          xcodebuild \
+            -project CaneiSubirats.xcodeproj \
+            -scheme CaneiSubirats \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build-sim \
+            CODE_SIGNING_ALLOWED=NO build
+
+      - name: Boot an iPhone simulator
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin); devs=[x for v in d['devices'].values() for x in v if 'iPhone' in x['name']]; print(devs[0]['udid'] if devs else '')")
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+          echo "Booting $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+
+      - name: Install the app on the simulator
+        run: |
+          APP=$(find build-sim/Build/Products -name 'CaneiSubirats.app' -type d | head -1)
+          echo "Installing $APP"
+          xcrun simctl install "$SIM_UDID" "$APP"
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Run Maestro flows
+        run: maestro test maestro --format junit --output ../maestro-report.xml
+
+      - name: Upload Maestro report + screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-results
+          path: |
+            maestro-report.xml
+            ~/.maestro/tests/**/*.png
+          if-no-files-found: ignore

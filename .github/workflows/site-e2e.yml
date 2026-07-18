@@ -1,0 +1,42 @@
+name: Site E2E (autonomous journey)
+
+# Autonomously drives the live web app (the pages the iOS app loads) end-to-end
+# in a real browser: loads the sample, walks all 13 lifecycle stages, checks the
+# P&L ledger, exports the project ZIP, and asserts no console errors or mobile
+# overflow. Runs on every push/PR that touches the site or the test.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "tests/site-e2e/**"
+      - ".github/workflows/site-e2e.yml"
+  pull_request:
+    paths:
+      - "site/**"
+      - "tests/site-e2e/**"
+  workflow_dispatch:
+
+jobs:
+  journey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium (matching Playwright version)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run autonomous site E2E
+        run: node tests/site-e2e/run.mjs

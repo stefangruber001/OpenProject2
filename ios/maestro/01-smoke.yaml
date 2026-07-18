@@ -1,0 +1,45 @@
+# Native shell smoke test — launch, splash, tab navigation, web content loads.
+# Maestro reads the accessibility tree, which includes both the native chrome
+# (tab bar labels) and the WKWebView content, so we can assert both.
+#
+# Run locally:  maestro test ios/maestro/01-smoke.yaml
+appId: com.caneisubirats.erp
+---
+- launchApp:
+    clearState: true
+
+# Splash → first tab paints. The brand name is in the splash and top bar.
+- assertVisible: "Canei Subirats"
+
+# Native tab bar (VoiceOver labels set in TabBar.swift).
+- assertVisible: "Home"
+- assertVisible: "Project"
+- assertVisible: "Control Tower"
+- assertVisible: "Guide"
+
+# The Home page (web content) has loaded inside the shell.
+- assertVisible:
+    text: "enquiry|first-class|renovation"
+    optional: false
+
+# Navigate to the Project workspace and confirm its content renders.
+- tapOn: "Project"
+- assertVisible:
+    text: "project|Customer|Lead"
+    optional: false
+
+# Control Tower.
+- tapOn: "Control Tower"
+- assertVisible:
+    text: "Tower|projects|dashboard"
+    optional: false
+
+# Guide.
+- tapOn: "Guide"
+- assertVisible:
+    text: "Guide|Operations|setup"
+    optional: false
+
+# Back to Home — tabs preserve state and switch instantly.
+- tapOn: "Home"
+- assertVisible: "Canei Subirats"

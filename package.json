@@ -11,6 +11,7 @@
     "check-types": "turbo run check-types",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
+    "test:site": "node tests/site-e2e/run.mjs",
     "db:generate": "pnpm --filter @repo/db generate",
     "db:migrate": "pnpm --filter @repo/db migrate",
     "db:deploy": "pnpm --filter @repo/db deploy",

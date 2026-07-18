@@ -291,3 +291,28 @@ languages: es-ES # source: synthetic
     guaranteed-valid XcodeGen regeneration path. The in-app web appearance was
     verified by simulating the shell in headless Chromium (inject `native-app`
     class + CSS at iPhone size) — headers collapse cleanly, no horizontal overflow.
+37. **iOS build green on TestFlight + full automation & testing (this cycle).**
+    (a) The CI TestFlight pipeline went green: build #9 compiled, signed
+    (automatic cloud signing via -allowProvisioningUpdates + ASC API key on the
+    ARCHIVE only — export reuses the installed profile; passing auth to export
+    caused xcodebuild error 64), exported the .ipa, and uploaded. Sequence of
+    real fixes (all logged in git): base64 .p8 secret (invalid-curve-name),
+    empty-CI-env→default guard (env_or), apple-generic versioning for the
+    build-number bump, absolute /tmp key path, archive-only auth, and finally
+    **Xcode 26 / iOS 26 SDK** on macos-latest (Apple 409 rejects the iOS 18.5
+    SDK). Team ID 5V62K942X6 and ASC key id/issuer baked in as non-secret
+    defaults; only ASC_KEY_P8 (base64) is a required secret. I drove the runs
+    myself via workflow_dispatch and read the logs to converge.
+    (b) **Autonomous web E2E** (`tests/site-e2e/run.mjs`, `pnpm test:site`):
+    serves `site/` and drives the whole journey in headless Chromium —
+    sample→Start→advance 13 stages, asserts ledger revenue (€9,149.00), rail
+    navigation, a valid PK-zip export, no console errors, and no 390px overflow.
+    13/13 green here; CI workflow `site-e2e.yml` runs it on main/PR. It caught a
+    real bug — no favicon → `/favicon.ico` 404 — fixed by adding `site/favicon.svg`
+    (brand mark) + `<link rel=icon>` on all pages.
+    (c) **Autonomous native UI tests** via Maestro (`ios/maestro/*.yaml` +
+    `ios-ui-tests.yml`): builds the app for the simulator (no signing), boots a
+    sim, installs, runs launch/tab-nav/journey flows, uploads a JUnit report +
+    screenshots. macOS-only (can't run in this Linux env) — authored + documented,
+    manual-dispatch to avoid failure emails. Mirrors the article's two ideas
+    (fastlane deployment automation = already built; Maestro autonomous testing).

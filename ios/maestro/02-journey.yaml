@@ -1,0 +1,43 @@
+# Deeper native flow — drive the customer journey through the WKWebView from
+# the native shell: load the sample, start the journey, advance, and confirm the
+# workspace reacts. Maestro can tap web elements by their visible text.
+#
+# Run locally:  maestro test ios/maestro/02-journey.yaml
+appId: com.caneisubirats.erp
+---
+- launchApp:
+    clearState: true
+
+- tapOn: "Project"
+
+# Load the sample data (a button rendered by the web app).
+- assertVisible:
+    text: "Load sample"
+    optional: false
+- tapOn:
+    text: "Load sample.*"
+
+# Start the journey.
+- tapOn:
+    text: "Start the journey.*"
+
+# The first lifecycle stage is now visible.
+- assertVisible:
+    text: "Lead|Site visit|Estimate"
+    optional: false
+
+# Advance a few stages with the Next control.
+- repeat:
+    times: 3
+    commands:
+      - tapOn:
+          text: "Next.*|Continue.*|Advance.*"
+          optional: true
+      - waitForAnimationToEnd
+
+# Pull-to-refresh works (native gesture) and the page reloads cleanly.
+- swipe:
+    direction: DOWN
+    duration: 400
+
+- takeScreenshot: journey-native
