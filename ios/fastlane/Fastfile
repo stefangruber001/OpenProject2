@@ -16,19 +16,26 @@ SCHEME = "CaneiSubirats"
 PROJECT = "CaneiSubirats.xcodeproj"
 BUNDLE_ID = ENV["APP_BUNDLE_ID"] || "com.caneisubirats.erp"
 
+# Non-secret App Store Connect API identifiers baked in for convenience — these
+# alone cannot authenticate; the .p8 private key (below) is the secret and stays
+# local (ASC_KEY_P8_PATH) or in a CI secret (ASC_KEY_P8). Override via env if the
+# key is ever rotated.
+ASC_KEY_ID = ENV["ASC_KEY_ID"] || "TD9Q544H27"
+ASC_ISSUER_ID = ENV["ASC_ISSUER_ID"] || "10347fb1-a3c7-4894-a183-18d98a79a8d0"
+
 def asc_api_key
   path = ENV["ASC_KEY_P8_PATH"].to_s.strip
   if !path.empty?
     app_store_connect_api_key(
-      key_id: ENV["ASC_KEY_ID"],
-      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_id: ASC_KEY_ID,
+      issuer_id: ASC_ISSUER_ID,
       key_filepath: File.expand_path(path),
       in_house: false
     )
   else
     app_store_connect_api_key(
-      key_id: ENV["ASC_KEY_ID"],
-      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_id: ASC_KEY_ID,
+      issuer_id: ASC_ISSUER_ID,
       key_content: ENV["ASC_KEY_P8"], # raw .p8 contents (e.g. from a CI secret)
       is_key_content_base64: false,
       in_house: false
