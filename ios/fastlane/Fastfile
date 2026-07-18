@@ -10,6 +10,10 @@
 #
 # Ship:  cd ios && make ship   (or: bundle exec fastlane beta)
 
+require "base64"
+require "fileutils"
+require "shellwords"
+
 default_platform(:ios)
 
 SCHEME = "CaneiSubirats"
@@ -55,6 +59,21 @@ def asc_api_key
   end
 end
 
+# Materialise the .p8 as a real file so xcodebuild's -allowProvisioningUpdates
+# can authenticate with App Store Connect and create the cloud distribution
+# certificate + App Store provisioning profile on the first run (fully headless).
+# Works for both the local (path) and CI (base64 secret) inputs. Gitignored (*.p8).
+def write_asc_key_file
+  dest = File.expand_path("fastlane/.asc_api_key.p8")
+  path = ENV["ASC_KEY_P8_PATH"].to_s.strip
+  if !path.empty?
+    FileUtils.cp(File.expand_path(path), dest)
+  else
+    File.write(dest, Base64.decode64(ENV["ASC_KEY_P8"].to_s))
+  end
+  dest
+end
+
 platform :ios do
   desc "Build and upload a new beta build to TestFlight"
   lane :beta do
@@ -74,16 +93,24 @@ platform :ios do
     )
 
     # Managed signing via App Store Connect API (no manual certs needed).
-    # Passing the api_key + -allowProvisioningUpdates lets xcodebuild create the
-    # distribution certificate and provisioning profile on the first run, fully
-    # headless — no Xcode round-trip needed.
+    # Give xcodebuild the API key + -allowProvisioningUpdates so it creates the
+    # cloud distribution certificate and App Store provisioning profile on the
+    # first run — for both the archive (xcargs) and export (export_xcargs) steps.
+    key_path = write_asc_key_file
+    auth = [
+      "-allowProvisioningUpdates",
+      "-authenticationKeyID #{ASC_KEY_ID}",
+      "-authenticationKeyIssuerID #{ASC_ISSUER_ID}",
+      "-authenticationKeyPath #{key_path.shellescape}"
+    ].join(" ")
+
     build_app(
       project: PROJECT,
       scheme: SCHEME,
       configuration: "Release",
       export_method: "app-store",
-      api_key: api_key,
-      xcargs: "-allowProvisioningUpdates",
+      xcargs: auth,
+      export_xcargs: auth,
       export_options: {
         signingStyle: "automatic",
         teamID: TEAM_ID
