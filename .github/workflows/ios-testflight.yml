@@ -1,0 +1,51 @@
+name: iOS · TestFlight
+
+# Builds the app and uploads it to TestFlight.
+#
+# This runs ONLY when you trigger it by hand (Actions tab → "iOS · TestFlight"
+# → Run workflow), so it never fires on ordinary pushes and never emails a
+# failure for routine commits.
+#
+# Before the first run, add these repository secrets
+# (Settings → Secrets and variables → Actions):
+#   ASC_KEY_ID          App Store Connect API key id
+#   ASC_ISSUER_ID       App Store Connect issuer id
+#   ASC_KEY_P8          the full contents of the AuthKey_XXXX.p8 file
+#   DEVELOPER_TEAM_ID   your Apple Developer team id (10 chars)
+# See the Beta Onboarding PDF for exactly where each value comes from.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: macos-15
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select latest stable Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Set up Ruby + fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: ios
+
+      - name: Upload to TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          DEVELOPER_TEAM_ID: ${{ secrets.DEVELOPER_TEAM_ID }}
+        run: bundle exec fastlane beta

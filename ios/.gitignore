@@ -1,0 +1,26 @@
+# Xcode / build artifacts
+build/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.xcarchive
+
+# Xcode user state (keep the shared scheme, ignore per-user data)
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+fastlane/*.mobileprovision
+
+# Secrets — never commit these
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+.env
