@@ -20,7 +20,8 @@
     color-scheme:light;  /* premium white theme always — never follow device dark mode */
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth;touch-action:manipulation;-webkit-text-size-adjust:100%}
+  html{scroll-behavior:smooth;touch-action:manipulation;-webkit-text-size-adjust:100%;overflow-x:hidden}
+  body{overflow-x:hidden}
   body{margin:0;color:var(--body);font:15px/1.6 var(--sans);letter-spacing:-.005em;
     background:
       radial-gradient(1200px 560px at 84% -10%, rgba(72,115,60,.14), transparent 60%),
@@ -46,8 +47,8 @@
   .top .links a{color:rgba(255,255,255,.82);text-decoration:none;padding:6px 10px;border-radius:9px;transition:.15s}
   .top .links a:hover{color:#fff;background:rgba(255,255,255,.16)}
 
-  main{max-width:1220px;margin:0 auto;padding:26px 24px 84px;display:grid;grid-template-columns:1fr 340px;gap:22px}
-  @media (max-width:940px){main{grid-template-columns:1fr}}
+  main{max-width:1220px;margin:0 auto;padding:26px 24px 84px;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:22px}
+  @media (max-width:940px){main{grid-template-columns:minmax(0,1fr)}}
 
   /* progress rail — pill segments */
   .rail{grid-column:1/-1;display:flex;gap:6px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:thin}
@@ -103,7 +104,7 @@
     border:1px solid color-mix(in srgb,var(--greenLt) 32%,transparent);border-left:3px solid var(--green);
     border-radius:6px 14px 14px 6px;padding:14px 18px;font-size:13.5px;margin:14px 0;color:var(--body)}
   .did b{color:var(--ink);font-weight:600}
-  .tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px 0;border-radius:10px}
+  .tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px 0;border-radius:10px;min-width:0;max-width:100%}
   .stage table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0;min-width:340px}
   .tblwrap table{margin:0}
   .stage th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);border-bottom:1.5px solid var(--green);padding:8px 9px}
@@ -125,7 +126,8 @@
   .maily{margin:16px 0 4px}
   .maily .lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
   .maily .lbl::after{content:"";flex:1;height:1px;background:var(--hair)}
-  .mailframe{border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+  .mailframe{border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow);max-width:100%;min-width:0}
+  .maily{min-width:0;max-width:100%}
   .mailbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
   .safe{font-size:11px;color:var(--warn);background:var(--warn-bg);border-radius:999px;padding:4px 11px;font-weight:600}
 
@@ -150,12 +152,12 @@
   .chip{display:inline-block;font-size:9px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--greenSoft);color:var(--green);letter-spacing:.02em;vertical-align:middle}
 
   /* intake form */
-  .form{display:grid;gap:16px;margin-top:10px}
-  .fsec{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:var(--panel)}
+  .form{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:10px}
+  .fsec{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:var(--panel);min-width:0;max-width:100%;overflow:hidden}
   .fsec>h4{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--green);margin-bottom:12px;font-family:var(--sans);font-weight:700}
   .frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media (max-width:600px){.frow{grid-template-columns:1fr}}
-  .field{display:flex;flex-direction:column;gap:5px}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0}
   .field.full{grid-column:1/-1}
   .field label{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
   .field input,.field textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0}
