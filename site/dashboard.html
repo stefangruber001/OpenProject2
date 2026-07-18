@@ -21,7 +21,8 @@
     color-scheme:light;  /* premium white theme always — never follow device dark mode */
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth;touch-action:manipulation;-webkit-text-size-adjust:100%}
+  html{scroll-behavior:smooth;touch-action:manipulation;-webkit-text-size-adjust:100%;overflow-x:hidden}
+  body{overflow-x:hidden}
   body{margin:0;color:var(--body);font:14px/1.55 var(--sans);letter-spacing:-.005em;
     background:
       radial-gradient(1100px 520px at 82% -8%, rgba(72,115,60,.06), transparent 60%),
@@ -195,7 +196,7 @@
       <div><h2 style="font-size:17px">Projects &amp; financial control</h2>
       <div class="sub">Budget → committed → actual → revenue → margin, per project. Click a row for the money waterfall.</div></div>
     </div>
-    <table id="proj-table"></table>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table id="proj-table"></table></div>
     <div class="drill" id="proj-drill"></div>
   </section>
 
@@ -218,7 +219,7 @@
         <div class="legend"><span><i class="swatch" style="background:var(--green)"></i>Revenue</span><span><i class="swatch" style="background:var(--greenLt);outline:1px solid var(--green)"></i>Margin</span></div>
       </div>
     </div>
-    <div style="margin-top:16px"><h3 class="blk">Supplier comparison — bathroom chapter (missing price ≠ zero)</h3><div id="d-supp"></div></div>
+    <div style="margin-top:16px"><h3 class="blk">Supplier comparison — bathroom chapter (missing price ≠ zero)</h3><div id="d-supp" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div></div>
   </section>
 
   <!-- ============ EMAILS ============ -->

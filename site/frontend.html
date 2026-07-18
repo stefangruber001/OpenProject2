@@ -12,9 +12,10 @@
     color-scheme: light;  /* premium white theme always — never follow device dark mode */
   }
   * { box-sizing: border-box; }
+  html { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
   body {
     margin: 0; background: var(--paper); color: var(--ink);
-    font: 15px/1.5 var(--sans);
+    font: 15px/1.5 var(--sans); overflow-x: hidden;
   }
   header.top {
     display: flex; align-items: center; gap: 14px; flex-wrap: wrap;

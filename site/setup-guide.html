@@ -15,7 +15,8 @@
     color-scheme:light;
   }
   *{box-sizing:border-box}
-  html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  html{-webkit-print-color-adjust:exact;print-color-adjust:exact;overflow-x:hidden;-webkit-text-size-adjust:100%}
+  @media screen{body{overflow-x:hidden}}
   body{margin:0;color:var(--body);font:13px/1.6 var(--sans);background:#e9eee6;letter-spacing:-.003em}
   h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);margin:0;font-weight:600;letter-spacing:-.01em}
   p{margin:0 0 10px} b{color:var(--ink)} a{color:var(--green)}
