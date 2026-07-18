@@ -10,6 +10,11 @@
 #
 # Ship:  cd ios && make ship   (or: bundle exec fastlane beta)
 
+require "base64"
+require "fileutils"
+require "shellwords"
+require "tmpdir"
+
 default_platform(:ios)
 
 SCHEME = "CaneiSubirats"
@@ -55,6 +60,22 @@ def asc_api_key
   end
 end
 
+# Absolute path to the .p8 (materialised from the local file or the CI base64
+# secret) so xcodebuild's -allowProvisioningUpdates can authenticate with App
+# Store Connect during the ARCHIVE and create the cloud distribution certificate
+# + App Store provisioning profile. Absolute + /tmp: fastlane runs inside the
+# fastlane/ dir, so a relative path would nest wrong.
+def asc_key_path
+  dest = File.join(Dir.tmpdir, "canei_asc_api_key.p8")
+  path = ENV["ASC_KEY_P8_PATH"].to_s.strip
+  if !path.empty?
+    FileUtils.cp(File.expand_path(path), dest)
+  else
+    File.write(dest, Base64.decode64(ENV["ASC_KEY_P8"].to_s))
+  end
+  dest
+end
+
 platform :ios do
   desc "Build and upload a new beta build to TestFlight"
   lane :beta do
@@ -73,19 +94,27 @@ platform :ios do
       build_number: (latest + 1).to_s
     )
 
-    # Managed signing. app_store_connect_api_key (above) stored the key in the
-    # lane context; gym passes it to xcodebuild for -allowProvisioningUpdates
-    # automatically, so xcodebuild creates the cloud distribution certificate and
-    # App Store provisioning profile on the first run (archive AND export),
-    # fully headless. (Passing -authenticationKey* by hand duplicated the flags
-    # on export and made xcodebuild error 64 — let gym own the auth instead.)
+    # Managed signing. Pass the API key auth to the ARCHIVE step only, via
+    # -allowProvisioningUpdates: xcodebuild creates the cloud distribution
+    # certificate + App Store profile and installs the profile locally. The
+    # EXPORT step then reuses that installed profile with automatic signing —
+    # NO auth flags on export (adding them made xcodebuild error 64).
+    key_path = asc_key_path
+    archive_auth = [
+      "-allowProvisioningUpdates",
+      "-authenticationKeyID #{ASC_KEY_ID}",
+      "-authenticationKeyIssuerID #{ASC_ISSUER_ID}",
+      "-authenticationKeyPath #{key_path.shellescape}"
+    ].join(" ")
+
     build_app(
       project: PROJECT,
       scheme: SCHEME,
       configuration: "Release",
       export_method: "app-store",
-      xcargs: "-allowProvisioningUpdates",
+      xcargs: archive_auth,
       export_options: {
+        method: "app-store",
         signingStyle: "automatic",
         teamID: TEAM_ID
       },
