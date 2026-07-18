@@ -17,7 +17,7 @@ struct TopBar: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 if canGoBack {
-                    barButton(system: "chevron.left") { Haptics.light(); onBack() }
+                    barButton(system: "chevron.left", label: "Back") { Haptics.light(); onBack() }
                         .transition(.move(edge: .leading).combined(with: .opacity))
                 }
 
@@ -28,11 +28,13 @@ struct TopBar: View {
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
 
                 Spacer(minLength: 8)
 
-                barButton(system: "arrow.clockwise") { Haptics.light(); onReload() }
-                barButton(system: "square.and.arrow.up") { Haptics.light(); onShare() }
+                barButton(system: "arrow.clockwise", label: "Reload") { Haptics.light(); onReload() }
+                barButton(system: "square.and.arrow.up", label: "Share") { Haptics.light(); onShare() }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -64,7 +66,7 @@ struct TopBar: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: canGoBack)
     }
 
-    private func barButton(system: String, action: @escaping () -> Void) -> some View {
+    private func barButton(system: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: system)
                 .font(.system(size: 16, weight: .semibold))
@@ -73,5 +75,6 @@ struct TopBar: View {
                 .background(Circle().fill(Theme.greenSoft))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }

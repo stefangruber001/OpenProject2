@@ -1,6 +1,7 @@
 import SwiftUI
 import WebKit
 import Combine
+import Network
 
 /// Owns a single long-lived `WKWebView` for one tab and publishes its state to
 /// SwiftUI. Keeping the web view in an `ObservableObject` (created once) means
@@ -27,6 +28,9 @@ final class WebViewStore: NSObject, ObservableObject {
     /// Maps an in-flight download to the temp file it is being written to, so we
     /// can hand the finished file to the share sheet ("Save to Files", AirDrop…).
     private var downloadDestinations: [WKDownload: URL] = [:]
+    /// Watches connectivity so the offline screen recovers itself the moment
+    /// signal returns — essential on a job site that drops in and out of range.
+    private let netMonitor = NWPathMonitor()
 
     init(tab: WebTab, onShare: @escaping (URL) -> Void) {
         self.tab = tab
@@ -45,14 +49,38 @@ final class WebViewStore: NSObject, ObservableObject {
         let contentController = WKUserContentController()
         config.userContentController = contentController
 
-        // Inject a class on <html> so the web app can opt into app-specific
-        // styling (e.g. hide its own top nav) when it detects the native shell.
+        // Mark the document as running inside the native shell as early as
+        // possible (before first paint) so any `.native-app` CSS applies without
+        // a flash of the web chrome.
         let markScript = WKUserScript(
             source: "document.documentElement.classList.add('native-app');",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         )
         contentController.addUserScript(markScript)
+
+        // The app already provides a premium native top bar and tab bar, so we
+        // collapse the web page's own brand header inside the shell to avoid a
+        // duplicated header. Injected from the app so the website stays a clean,
+        // standalone product and this presentation lives in one place.
+        let chromeStyle = """
+        (function(){
+          var css = "html.native-app header.top,html.native-app .site-logo,"
+                  + "html.native-app > body > .wrap > .logo:first-child{"
+                  + "display:none !important}"
+                  + "html.native-app, html.native-app body{background:#eef3ea}";
+          var s = document.createElement('style');
+          s.setAttribute('data-native-shell','1');
+          s.textContent = css;
+          (document.head || document.documentElement).appendChild(s);
+        })();
+        """
+        let chromeScript = WKUserScript(
+            source: chromeStyle,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
+        contentController.addUserScript(chromeScript)
 
         self.webView = WKWebView(frame: .zero, configuration: config)
         super.init()
@@ -77,6 +105,22 @@ final class WebViewStore: NSObject, ObservableObject {
         }
 
         setupObservers()
+        startNetworkMonitor()
+    }
+
+    deinit {
+        netMonitor.cancel()
+    }
+
+    private func startNetworkMonitor() {
+        netMonitor.pathUpdateHandler = { [weak self] path in
+            guard path.status == .satisfied else { return }
+            Task { @MainActor in
+                guard let self, self.hasError else { return }
+                self.reload()
+            }
+        }
+        netMonitor.start(queue: DispatchQueue(label: "com.caneisubirats.erp.net"))
     }
 
     private func setupObservers() {
@@ -125,9 +169,17 @@ final class WebViewStore: NSObject, ObservableObject {
         if webView.canGoBack { webView.goBack() }
     }
 
-    /// Return to the tab's home page (used by long-press / double-tap on tab).
+    /// Return to the tab's home page.
     func goHome() {
         load(tab.url)
+    }
+
+    /// Smoothly scroll the current page to the top. Used when the already-active
+    /// tab is tapped again — the best-in-class behaviour that preserves in-page
+    /// state (never nukes a half-filled form with a reload).
+    func scrollToTop() {
+        let top = CGPoint(x: 0, y: -webView.scrollView.adjustedContentInset.top)
+        webView.scrollView.setContentOffset(top, animated: true)
     }
 
     fileprivate func handleBridge(_ body: Any) {
@@ -230,6 +282,12 @@ extension WebViewStore: WKNavigationDelegate {
         guard ns.code != NSURLErrorCancelled else { return }
         hasError = true
         Haptics.warning()
+    }
+
+    // If the web content process is jettisoned under memory pressure, reload so
+    // the user never lands on a blank white page — a hallmark of a robust shell.
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        webView.reloadFromOrigin()
     }
 }
 

@@ -50,12 +50,15 @@ struct TabBar: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(tab.title)
+                .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
             }
         }
         .padding(.horizontal, 8)
         .padding(.top, 8)
         .padding(.bottom, 2)
-        .background(.regularMaterial)
+        // Material extends under the home indicator for a seamless premium base.
+        .background(.regularMaterial, ignoresSafeAreaEdges: .bottom)
         .overlay(alignment: .top) {
             Rectangle().fill(Theme.line).frame(height: 0.5)
         }

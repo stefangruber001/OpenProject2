@@ -12,24 +12,27 @@ struct RootView: View {
 
             // Keep every tab's web view alive; show only the selected one.
             // Hidden tabs still load in the background for instant switching.
-            ForEach(Config.tabs) { tab in
-                WebContainerView(store: app.store(for: tab.id)) { url in
-                    app.shareURL = url
+            ZStack {
+                ForEach(Config.tabs) { tab in
+                    WebContainerView(store: app.store(for: tab.id)) { url in
+                        app.shareURL = url
+                    }
+                    .opacity(app.selection == tab.id ? 1 : 0)
+                    .allowsHitTesting(app.selection == tab.id)
+                    .zIndex(app.selection == tab.id ? 1 : 0)
                 }
-                .opacity(app.selection == tab.id ? 1 : 0)
-                .allowsHitTesting(app.selection == tab.id)
-                .zIndex(app.selection == tab.id ? 1 : 0)
             }
-
-            // Bottom tab bar pinned to the safe area.
-            VStack(spacing: 0) {
-                Spacer()
+            // The tab bar is a proper bottom safe-area inset, so the web content
+            // is laid out ABOVE it (never hidden behind it) — the idiomatic,
+            // best-in-class layout. It stays put when the keyboard appears.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
                 TabBar(tabs: Config.tabs, selection: $app.selection) { id in
-                    // Re-tapping the active tab returns it to its home page.
-                    app.store(for: id).goHome()
+                    // Re-tapping the active tab scrolls it back to the top,
+                    // preserving any in-progress page state.
+                    app.store(for: id).scrollToTop()
                 }
             }
-            .ignoresSafeArea(.keyboard)
+            .ignoresSafeArea(.keyboard, edges: .bottom)
 
             if app.showSplash {
                 SplashView()
