@@ -24,3 +24,7 @@ fastlane/*.mobileprovision
 *.cer
 *.mobileprovision
 .env
+# fastlane dotenv: ignore the filled-in file, keep the template
+fastlane/.env.default
+fastlane/.env.local
+!fastlane/.env.example

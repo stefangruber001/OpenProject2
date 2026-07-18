@@ -3,505 +3,157 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Canei Subirats — iOS Beta (TestFlight) Onboarding</title>
+<title>Canei Subirats — iOS Release Quickstart</title>
 <style>
   :root{
     --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a; --greenSoft:#e7f0e1; --greenPale:#dce8d4; --spark:#f2c230;
     --ink:#14160f; --body:#3f4438; --muted:#7b8070; --faint:#aab0a0;
-    --line:#dde5d6; --hair:#eef3ea; --bg:#ffffff; --paper:#fff;
+    --line:#dde5d6; --hair:#eef3ea; --bg:#ffffff;
     --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
     --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
     --mono:ui-monospace,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  body{font-family:var(--sans);color:var(--body);background:var(--bg);font-size:11pt;line-height:1.55;-webkit-font-smoothing:antialiased}
-  @page{size:A4;margin:18mm 16mm 16mm 16mm}
-  .page{page-break-after:always;position:relative;padding-bottom:6mm}
+  body{font-family:var(--sans);color:var(--body);background:var(--bg);font-size:10.4pt;line-height:1.5;-webkit-font-smoothing:antialiased}
+  @page{size:A4;margin:14mm 15mm 12mm 15mm}
+  .page{page-break-after:always;position:relative;min-height:263mm}
   .page:last-child{page-break-after:auto}
-  h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);line-height:1.2;font-weight:600}
-  h2{font-size:21pt;margin:0 0 4pt;letter-spacing:-.01em}
-  h3{font-size:14pt;margin:16pt 0 6pt;color:var(--greenDeep)}
-  h4{font-size:11.5pt;margin:11pt 0 3pt;color:var(--ink);font-family:var(--sans);font-weight:700}
-  p{margin:0 0 7pt}
+  h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);line-height:1.15;font-weight:600}
+  h1{font-size:22pt;letter-spacing:-.015em}
+  h3{font-size:12.5pt;margin:13pt 0 5pt;color:var(--greenDeep);font-family:var(--sans);font-weight:750;letter-spacing:.01em}
+  h4{font-size:10.6pt;margin:9pt 0 2pt;color:var(--ink);font-family:var(--sans);font-weight:700}
+  p{margin:0 0 5pt}
   a{color:var(--green);text-decoration:none}
   strong{color:var(--ink);font-weight:650}
-  .kicker{font-size:8.5pt;letter-spacing:.18em;text-transform:uppercase;color:var(--green);font-weight:700}
-  .lead{font-size:12pt;color:var(--body)}
+  .kicker{font-size:8pt;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:700}
   .muted{color:var(--muted)}
-  ul,ol{margin:0 0 8pt 0;padding-left:16pt}
-  li{margin:0 0 4pt}
-  code,kbd{font-family:var(--mono);font-size:9.2pt;background:var(--hair);border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--greenDeep)}
-  pre{font-family:var(--mono);font-size:8.8pt;line-height:1.5;background:#0f1a0c;color:#e7f0e1;border-radius:10px;padding:12px 14px;margin:8pt 0;overflow:auto;white-space:pre-wrap;word-break:break-word}
+  ul,ol{margin:0 0 6pt 0;padding-left:15pt}
+  li{margin:0 0 3pt}
+  code{font-family:var(--mono);font-size:8.8pt;background:var(--hair);border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--greenDeep)}
+  pre{font-family:var(--mono);font-size:8.6pt;line-height:1.5;background:#0f1a0c;color:#e7f0e1;border-radius:9px;padding:10px 13px;margin:6pt 0;white-space:pre-wrap;word-break:break-word}
   pre .c{color:#8fb98a}
-  .card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:9pt 0;background:#fff}
+  .head{display:flex;align-items:center;gap:12px;border-bottom:2px solid var(--greenPale);padding-bottom:9pt;margin-bottom:11pt}
+  .mark{width:44px;height:44px;border-radius:12px;background:linear-gradient(160deg,#31532a,#48733c);display:flex;align-items:center;justify-content:center;flex:0 0 44px}
+  .glyph{width:24px;height:24px}
+  .head .t small{display:block;font-family:var(--sans);font-size:8.5pt;letter-spacing:.14em;text-transform:uppercase;color:var(--green);font-weight:700;margin-bottom:1pt}
+  .card{border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin:7pt 0}
   .soft{background:var(--greenSoft);border-color:var(--greenPale)}
   .warn{background:#fff8e6;border-color:#f0d98a}
-  .warn h4{color:#8a6d10}
-  .tip{background:var(--greenSoft);border-color:var(--greenPale)}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .step{display:flex;gap:12px;margin:0 0 11pt;break-inside:avoid}
-  .step .n{flex:0 0 26px;height:26px;border-radius:50%;background:var(--green);color:#fff;font-family:var(--serif);font-weight:600;font-size:12pt;display:flex;align-items:center;justify-content:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .step{display:flex;gap:11px;margin:0 0 9pt;break-inside:avoid}
+  .step .n{flex:0 0 24px;height:24px;border-radius:50%;background:var(--green);color:#fff;font-family:var(--serif);font-weight:600;font-size:11pt;display:flex;align-items:center;justify-content:center}
   .step .bd{flex:1;min-width:0}
-  .step .bd h4{margin-top:2pt}
-  .pill{display:inline-block;font-size:8pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--greenDeep);background:var(--greenSoft);border:1px solid var(--greenPale);border-radius:999px;padding:2px 9px;vertical-align:middle}
-  .rule{height:1px;background:var(--line);margin:12pt 0}
-  table{width:100%;border-collapse:collapse;margin:8pt 0;font-size:9.6pt}
-  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}
-  th{background:var(--hair);color:var(--ink);font-weight:700;font-size:8.5pt;letter-spacing:.04em;text-transform:uppercase}
-  .foot{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;font-size:8pt;color:var(--faint);border-top:1px solid var(--line);padding-top:5px}
-  .toc a{display:flex;justify-content:space-between;border-bottom:1px dotted var(--line);padding:7px 0;color:var(--ink);font-weight:500}
-  .toc .s{color:var(--green);font-weight:700;font-variant-numeric:tabular-nums}
-  /* Cover */
-  .cover{background:linear-gradient(160deg,#31532a 0%,#3d6535 55%,#48733c 100%);color:#fff;min-height:262mm;border-radius:0;padding:26mm 20mm;display:flex;flex-direction:column;justify-content:space-between}
-  .cover .mark{width:74px;height:74px;border-radius:20px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center}
-  .cover h1{color:#fff;font-size:34pt;line-height:1.08;letter-spacing:-.015em;margin:18pt 0 8pt}
-  .cover .sub{color:rgba(255,255,255,.82);font-size:13pt;max-width:150mm}
-  .cover .meta{display:flex;gap:26px;margin-top:16pt;flex-wrap:wrap}
-  .cover .meta div{border-left:2px solid var(--spark);padding-left:10px}
-  .cover .meta b{display:block;color:#fff;font-size:11pt}
-  .cover .meta span{font-size:8.5pt;color:rgba(255,255,255,.7);letter-spacing:.04em;text-transform:uppercase}
-  .glyph{width:40px;height:40px}
-  .est{font-size:8.5pt;color:var(--muted);font-weight:600}
-  .chk{list-style:none;padding-left:0}
-  .chk li{padding-left:24px;position:relative;margin-bottom:6pt}
-  .chk li:before{content:"";position:absolute;left:0;top:2px;width:15px;height:15px;border:1.5px solid var(--green);border-radius:4px}
+  table{width:100%;border-collapse:collapse;margin:6pt 0;font-size:9.2pt}
+  th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--hair);color:var(--ink);font-weight:700;font-size:8pt;letter-spacing:.04em;text-transform:uppercase}
+  .foot{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;font-size:7.6pt;color:var(--faint);border-top:1px solid var(--line);padding-top:4px}
+  .pill{display:inline-block;font-size:7.6pt;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--greenDeep);background:var(--greenSoft);border:1px solid var(--greenPale);border-radius:999px;padding:1px 7px}
 </style>
 </head>
 <body>
 
-<!-- ============ COVER ============ -->
-<section class="cover">
-  <div>
+<!-- ================= PAGE 1 ================= -->
+<section class="page">
+  <div class="head">
     <div class="mark">
-      <svg class="glyph" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg class="glyph" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
         <path d="M50 6 L96 44 L82 44 L50 20 L18 44 L4 44 Z" fill="#fff"/>
         <rect x="22" y="52" width="15" height="42" fill="#fff"/>
         <rect x="63" y="52" width="15" height="42" fill="#fff"/>
         <circle cx="84" cy="20" r="10" fill="#F2C230"/>
       </svg>
     </div>
-    <div class="kicker" style="color:#cfe6c6;margin-top:22pt">Canei Subirats · Field ERP</div>
-    <h1>iOS App — Beta&nbsp;Onboarding<br/>for TestFlight</h1>
-    <p class="sub">Everything <strong style="color:#fff">you</strong> need to do, by hand, to get the Canei Subirats app onto your iPhone through Apple TestFlight — written for a non‑technical operator. Follow it top to bottom once; after that, new versions are a single tap.</p>
-  </div>
-  <div>
-    <div class="meta">
-      <div><b>~60–90 min</b><span>one‑time setup</span></div>
-      <div><b>€99 / year</b><span>Apple Developer</span></div>
-      <div><b>v1.0</b><span>app version</span></div>
-      <div><b>com.caneisubirats.erp</b><span>bundle id</span></div>
-    </div>
-    <p style="color:rgba(255,255,255,.6);font-size:8.5pt;margin-top:20pt">Confidential — prepared for Canei Subirats, S.L. · Keep API keys and passwords private.</p>
-  </div>
-</section>
-
-<!-- ============ TOC / BIG PICTURE ============ -->
-<section class="page">
-  <div class="kicker">Start here</div>
-  <h2>How this works &amp; what you'll do</h2>
-  <p class="lead">The app is a <strong>premium native shell</strong> around your existing website. The website stays the brain; the app makes it feel like a first‑class iPhone app and adds the camera, offline handling, share sheet and home‑screen icon.</p>
-
-  <div class="card soft">
-    <h4>The one idea that saves you the most time</h4>
-    <p style="margin-bottom:0">When we change the <strong>website</strong>, the <strong>app updates itself</strong> — the operator just pulls down to refresh, or reopens the app. You only need to send a <em>new TestFlight build</em> when the native shell itself changes (rare: a new icon, a new tab, an OS requirement). <strong>Day‑to‑day content, prices, catalogue and workflow changes need no new build and no App Store review.</strong></p>
-  </div>
-
-  <h3>What you will set up (once)</h3>
-  <div class="toc">
-    <a><span>Part&nbsp;1 · Before you begin — the checklist</span><span class="s">p.3</span></a>
-    <a><span>Part&nbsp;2 · Join the Apple Developer Program</span><span class="s">p.4</span></a>
-    <a><span>Part&nbsp;3 · Create the app in App Store Connect</span><span class="s">p.5</span></a>
-    <a><span>Part&nbsp;4 · Send the first build to TestFlight (3 ways)</span><span class="s">p.6</span></a>
-    <a><span>Part&nbsp;5 · The App Store Connect API key (for automation)</span><span class="s">p.8</span></a>
-    <a><span>Part&nbsp;6 · Invite testers &amp; install TestFlight</span><span class="s">p.9</span></a>
-    <a><span>Part&nbsp;7 · What to test (beta checklist)</span><span class="s">p.10</span></a>
-    <a><span>Part&nbsp;8 · Sending future updates</span><span class="s">p.11</span></a>
-    <a><span>Part&nbsp;9 · Troubleshooting &amp; FAQ</span><span class="s">p.11</span></a>
-    <a><span>Glossary</span><span class="s">p.12</span></a>
-  </div>
-
-  <div class="card warn">
-    <h4>Two roles in this guide</h4>
-    <p style="margin-bottom:0"><span class="pill">Developer Mac</span> steps happen once on a Mac with Xcode (yours, or ours). <span class="pill">Operator iPhone</span> steps are what each field user does on their phone. Most of this document is the one‑time Mac setup; the operator part is just Part&nbsp;6.</p>
-  </div>
-
-  <div class="foot"><span>Canei Subirats · iOS Beta Onboarding</span><span>2 · The big picture</span></div>
-</section>
-
-<!-- ============ PART 1 — CHECKLIST ============ -->
-<section class="page">
-  <div class="kicker">Part 1</div>
-  <h2>Before you begin</h2>
-  <p class="lead">Gather these first. If anything is missing, you can still read ahead — just come back when you have it.</p>
-
-  <div class="grid2">
-    <div class="card">
-      <h4>You need</h4>
-      <ul class="chk">
-        <li>A <strong>Mac</strong> (macOS Sonoma or newer) with <strong>Xcode 16+</strong> installed — free from the Mac App Store. <span class="est">Needed for the first build.</span></li>
-        <li>An <strong>Apple ID</strong> you control (ideally a company one, e.g. <code>it@canei…</code>) with two‑factor authentication on.</li>
-        <li>A payment card for the <strong>€99/year</strong> Apple Developer Program.</li>
-        <li>The <strong>legal company details</strong> (legal name, address, phone) — Apple verifies them.</li>
-        <li>The iPhone(s) that will run the beta, and the Apple ID email of each tester.</li>
-      </ul>
-    </div>
-    <div class="card soft">
-      <h4>Already prepared for you</h4>
-      <ul class="chk">
-        <li>The complete app project (in the <code>ios/</code> folder of the repository).</li>
-        <li>The app <strong>icon</strong>, splash, colours and navigation.</li>
-        <li>The <strong>bundle identifier</strong> <code>com.caneisubirats.erp</code>.</li>
-        <li>The upload automation (<code>fastlane</code>) and an optional one‑click GitHub workflow.</li>
-        <li>This guide + the Operations Guide PDF.</li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="card">
-    <h4>Key facts to keep handy (you'll be asked for these)</h4>
-    <table>
-      <tr><th>Item</th><th>Value</th><th>Where it's used</th></tr>
-      <tr><td>App name</td><td><strong>Canei Subirats</strong> (display name “Canei”)</td><td>App Store Connect</td></tr>
-      <tr><td>Bundle ID</td><td><code>com.caneisubirats.erp</code></td><td>Certificates, app record, signing</td></tr>
-      <tr><td>Primary language</td><td>Spanish (Spain) or English — your choice</td><td>App Store Connect</td></tr>
-      <tr><td>Category</td><td>Business (secondary: Productivity)</td><td>App Store Connect</td></tr>
-      <tr><td>Version / Build</td><td>1.0 / 1</td><td>Set automatically</td></tr>
-    </table>
-    <p class="muted" style="margin-bottom:0;font-size:9pt">If you prefer a different bundle id (for example using your own domain, like <code>com.yourcompany.canei</code>), change it in one place — see Part&nbsp;9 — before the first build. It must match everywhere.</p>
-  </div>
-
-  <div class="foot"><span>Canei Subirats · iOS Beta Onboarding</span><span>3 · Before you begin</span></div>
-</section>
-
-<!-- ============ PART 2 — DEVELOPER PROGRAM ============ -->
-<section class="page">
-  <div class="kicker">Part 2 · Developer Mac</div>
-  <h2>Join the Apple Developer Program</h2>
-  <p class="lead">TestFlight — Apple's official beta system — requires a paid Developer Program membership. This is a one‑time enrolment; renewal is yearly.</p>
-
-  <div class="step"><div class="n">1</div><div class="bd">
-    <h4>Open the enrolment page</h4>
-    <p>On the Mac, go to <a>developer.apple.com/programs/enroll</a> and sign in with your company Apple ID. If you don't have two‑factor authentication on, Apple will ask you to turn it on first.</p>
-  </div></div>
-  <div class="step"><div class="n">2</div><div class="bd">
-    <h4>Choose the entity type</h4>
-    <p>Select <strong>Company / Organization</strong> if enrolling as Canei Subirats, S.L. (recommended — the app is published under the company name and multiple people can be added). You'll need your company's legal name, address and a <strong>D‑U‑N‑S number</strong> (free; Apple links you to look it up — allow 1–5 business days if you don't have one yet). Choose <strong>Individual</strong> only if you want the fastest path and are comfortable publishing under a personal name.</p>
-  </div></div>
-  <div class="step"><div class="n">3</div><div class="bd">
-    <h4>Confirm your details &amp; pay</h4>
-    <p>Enter the company details exactly as they appear in official records, agree to the Apple Developer Agreement, and pay the <strong>€99/year</strong> fee. You'll get a confirmation email.</p>
-  </div></div>
-  <div class="step"><div class="n">4</div><div class="bd">
-    <h4>Wait for approval</h4>
-    <p>Individual enrolments are often approved within a day. Company enrolments include a verification call/email from Apple — usually 1–3 business days. You cannot use TestFlight until this is <strong>Active</strong>.</p>
-  </div></div>
-
-  <div class="card tip">
-    <h4>While you wait</h4>
-    <p style="margin-bottom:0">You can already open the project in Xcode and <strong>run the app on the iPhone Simulator</strong> (no membership needed) to see it working. You just can't send it to real devices via TestFlight until the membership is active.</p>
-  </div>
-
-  <div class="foot"><span>Canei Subirats · iOS Beta Onboarding</span><span>4 · Apple Developer Program</span></div>
-</section>
-
-<!-- ============ PART 3 — APP STORE CONNECT ============ -->
-<section class="page">
-  <div class="kicker">Part 3 · Developer Mac</div>
-  <h2>Create the app in App Store Connect</h2>
-  <p class="lead">App Store Connect is Apple's web dashboard for your apps and testers: <a>appstoreconnect.apple.com</a>. Do this once the membership is Active.</p>
-
-  <div class="step"><div class="n">1</div><div class="bd">
-    <h4>Register the bundle identifier</h4>
-    <p>Go to <strong>Certificates, Identifiers &amp; Profiles</strong> → <strong>Identifiers</strong> → <span class="pill">+</span>. Choose <strong>App IDs → App</strong>, description “Canei Subirats”, and Bundle ID <strong>Explicit</strong> = <code>com.caneisubirats.erp</code>. Leave capabilities at defaults and Register.</p>
-  </div></div>
-  <div class="step"><div class="n">2</div><div class="bd">
-    <h4>Create the app record</h4>
-    <p>In App Store Connect → <strong>Apps</strong> → <span class="pill">+ New App</span>. Fill in:</p>
-    <ul>
-      <li><strong>Platform:</strong> iOS</li>
-      <li><strong>Name:</strong> Canei Subirats <span class="muted">(this is public; “Canei” shows under the icon)</span></li>
-      <li><strong>Primary language:</strong> Spanish (Spain) or English</li>
-      <li><strong>Bundle ID:</strong> select <code>com.caneisubirats.erp</code> from the list</li>
-      <li><strong>SKU:</strong> any internal code, e.g. <code>CANEI-ERP-IOS</code></li>
-      <li><strong>User access:</strong> Full Access</li>
-    </ul>
-  </div></div>
-  <div class="step"><div class="n">3</div><div class="bd">
-    <h4>You do NOT need the full store listing yet</h4>
-    <p>TestFlight betas don't require screenshots, a description, or App Review for <strong>internal</strong> testers. You can add all that later, only when you decide to publish publicly. For now, creating the record is enough.</p>
-  </div></div>
-
-  <div class="card soft">
-    <h4>Export‑compliance: already handled</h4>
-    <p style="margin-bottom:0">The app declares it uses no non‑standard encryption (<code>ITSAppUsesNonExemptEncryption = false</code> is set in the project), so Apple won't ask you the encryption question on every upload. Nothing to do here.</p>
-  </div>
-
-  <div class="foot"><span>Canei Subirats · iOS Beta Onboarding</span><span>5 · App Store Connect</span></div>
-</section>
-
-<!-- ============ PART 4 — FIRST BUILD (3 ways) ============ -->
-<section class="page">
-  <div class="kicker">Part 4 · Developer Mac</div>
-  <h2>Send the first build to TestFlight</h2>
-  <p class="lead">Pick <strong>one</strong> of the three methods. If you've never done this before, use Method&nbsp;A — it's the most visual.</p>
-
-  <h3>Method A — Xcode (most visual, recommended first time)</h3>
-  <div class="step"><div class="n">1</div><div class="bd">
-    <h4>Open the project &amp; sign in</h4>
-    <p>Double‑click <code>ios/CaneiSubirats.xcodeproj</code>. In Xcode → <strong>Settings → Accounts</strong>, add your Apple ID (the one in the Developer Program).</p>
-  </div></div>
-  <div class="step"><div class="n">2</div><div class="bd">
-    <h4>Set the signing team</h4>
-    <p>Select the <strong>CaneiSubirats</strong> target → <strong>Signing &amp; Capabilities</strong>. Tick <strong>Automatically manage signing</strong> and pick your <strong>Team</strong> from the dropdown. Xcode creates the certificate and profile for you.</p>
-  </div></div>
-  <div class="step"><div class="n">3</div><div class="bd">
-    <h4>Choose the build destination</h4>
-    <p>At the top of the window, set the device target to <strong>Any iOS Device (arm64)</strong> (not a simulator).</p>
-  </div></div>
-  <div class="step"><div class="n">4</div><div class="bd">
-    <h4>Archive</h4>
-    <p>Menu <strong>Product → Archive</strong>. Wait for the build. When it finishes, the <strong>Organizer</strong> window opens with your archive.</p>
-  </div></div>
-  <div class="step"><div class="n">5</div><div class="bd">
-    <h4>Distribute to App Store Connect</h4>
-    <p>Click <strong>Distribute App → TestFlight &amp; App Store → Upload</strong>. Accept the defaults (automatic signing, upload symbols) and click through to <strong>Upload</strong>. Success shows a green tick.</p>
-  </div></div>
-  <div class="step"><div class="n">6</div><div class="bd">
-    <h4>Wait for processing</h4>
-    <p>In App Store Connect → your app → <strong>TestFlight</strong>, the build shows “Processing” for a few minutes, then becomes available. Continue to Part&nbsp;6 to add testers.</p>
-  </div></div>
-
-  <div class="foot"><span>Canei Subirats · iOS Beta Onboarding</span><span>6 · First build</span></div>
-</section>
-
-<section class="page">
-  <div class="kicker">Part 4 · continued</div>
-  <h2>Methods B &amp; C — one command / one click</h2>
-  <p class="lead">Once you've done Part&nbsp;5 (the API key), these let you skip Xcode entirely for every future build.</p>
-
-  <h3>Method B — fastlane (one command on the Mac)</h3>
-  <p>In Terminal:</p>
-  <pre><span class="c"># first time only — installs the automation</span>
-cd ios
-bundle install
-
-<span class="c"># set your four secrets (from Part 5)</span>
-export ASC_KEY_ID=XXXXXXXXXX
-export ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-export ASC_KEY_P8="$(cat ~/Downloads/AuthKey_XXXXXXXXXX.p8)"
-export DEVELOPER_TEAM_ID=XXXXXXXXXX
-
-<span class="c"># build + upload to TestFlight</span>
-bundle exec fastlane beta</pre>
-  <p>fastlane builds a signed release, auto‑increments the build number, and uploads it. When it prints <strong>“Uploaded to TestFlight”</strong>, go to Part&nbsp;6.</p>
-
-  <h3>Method C — GitHub (one click, no Mac needed after setup)</h3>
-  <div class="step"><div class="n">1</div><div class="bd">
-    <h4>Add four repository secrets</h4>
-    <p>In GitHub → the repository → <strong>Settings → Secrets and variables → Actions → New repository secret</strong>, add: <code>ASC_KEY_ID</code>, <code>ASC_ISSUER_ID</code>, <code>ASC_KEY_P8</code> (paste the whole <code>.p8</code> file contents), <code>DEVELOPER_TEAM_ID</code>.</p>
-  </div></div>
-  <div class="step"><div class="n">2</div><div class="bd">
-    <h4>Run the workflow</h4>
-    <p>Go to the <strong>Actions</strong> tab → <strong>“iOS · TestFlight”</strong> → <strong>Run workflow</strong>. A Mac runner builds and uploads for you. It only ever runs when you click it — it will never fire on ordinary code changes, so it won't send failure emails.</p>
-  </div></div>
-
-  <div class="card tip">
-    <h4>Which should I use?</h4>
-    <p style="margin-bottom:0">First ever build → <strong>Method A</strong>. After that, if you like Terminal → <strong>B</strong>; if you'd rather click a button in the browser → <strong>C</strong>. All three produce identical builds.</p>
-  </div>
-
-  <div class="foot"><span>Canei Subirats · iOS Beta Onboarding</span><span>7 · Automated builds</span></div>
-</section>
-
-<!-- ============ PART 5 — API KEY ============ -->
-<section class="page">
-  <div class="kicker">Part 5 · Developer Mac</div>
-  <h2>The App Store Connect API key</h2>
-  <p class="lead">Methods B and C sign in to Apple with a <strong>key file</strong> instead of your password, so there are no two‑factor prompts. Create it once. (Skip this part if you only ever use Method A.)</p>
-
-  <div class="step"><div class="n">1</div><div class="bd">
-    <h4>Open the Integrations page</h4>
-    <p>App Store Connect → <strong>Users and Access</strong> → <strong>Integrations</strong> tab → <strong>App Store Connect API</strong>.</p>
-  </div></div>
-  <div class="step"><div class="n">2</div><div class="bd">
-    <h4>Generate a key</h4>
-    <p>Click <span class="pill">+</span>, name it <code>Canei CI</code>, set access to <strong>App Manager</strong>, and Generate.</p>
-  </div></div>
-  <div class="step"><div class="n">3</div><div class="bd">
-    <h4>Copy the three values</h4>
-    <p>You'll now see:</p>
-    <table>
-      <tr><th>Value</th><th>Looks like</th><th>Secret name</th></tr>
-      <tr><td>Key ID</td><td><code>2X9ABC1DEF</code></td><td><code>ASC_KEY_ID</code></td></tr>
-      <tr><td>Issuer ID</td><td><code>69a6de70-…-1a2b3c</code></td><td><code>ASC_ISSUER_ID</code></td></tr>
-      <tr><td>The key file</td><td><code>AuthKey_2X9ABC1DEF.p8</code></td><td><code>ASC_KEY_P8</code></td></tr>
-    </table>
-    <p><strong>Download the <code>.p8</code> file now</strong> — Apple lets you download it only once. Keep it somewhere safe (a password manager). Its full text becomes the <code>ASC_KEY_P8</code> secret.</p>
-  </div></div>
-  <div class="step"><div class="n">4</div><div class="bd">
-    <h4>Find your Team ID</h4>
-    <p>developer.apple.com → <strong>Membership</strong> → <strong>Team ID</strong> (10 characters, e.g. <code>AB12CD34EF</code>). That's <code>DEVELOPER_TEAM_ID</code>.</p>
-  </div></div>
-
-  <div class="card warn">
-    <h4>Keep these private</h4>
-    <p style="margin-bottom:0">The <code>.p8</code> key and IDs can upload builds to your account. Never email them, never commit them to the repository, never paste them into a chat. Store them in GitHub Secrets or a password manager only. The project's <code>.gitignore</code> already blocks <code>*.p8</code> from being committed by accident.</p>
-  </div>
-
-  <div class="foot"><span>Canei Subirats · iOS Beta Onboarding</span><span>8 · API key</span></div>
-</section>
-
-<!-- ============ PART 6 — TESTERS ============ -->
-<section class="page">
-  <div class="kicker">Part 6 · Operator iPhone</div>
-  <h2>Invite testers &amp; install</h2>
-  <p class="lead">This is the only part your field users do. It takes about two minutes per person.</p>
-
-  <h3>You (admin) — add the testers</h3>
-  <div class="step"><div class="n">1</div><div class="bd">
-    <h4>Open TestFlight for your app</h4>
-    <p>App Store Connect → your app → <strong>TestFlight</strong>. Under <strong>Internal Testing</strong>, click <span class="pill">+</span> next to “Internal Group” (or create a group “Canei Field”). Internal testers must be added under <strong>Users and Access</strong> first (up to 100, no App Review, instant).</p>
-  </div></div>
-  <div class="step"><div class="n">2</div><div class="bd">
-    <h4>Attach the build &amp; invite</h4>
-    <p>Select the processed build, add the testers' Apple ID emails, and Save. Each person gets an email invitation from TestFlight.</p>
-  </div></div>
-
-  <div class="rule"></div>
-  <h3>Each tester — on the iPhone</h3>
-  <div class="step"><div class="n">1</div><div class="bd">
-    <h4>Install TestFlight</h4>
-    <p>Open the App Store, search <strong>TestFlight</strong> (made by Apple), install it, and sign in with the Apple ID that received the invite.</p>
-  </div></div>
-  <div class="step"><div class="n">2</div><div class="bd">
-    <h4>Accept the invitation</h4>
-    <p>Open the invitation email on the iPhone and tap <strong>View in TestFlight</strong> (or open TestFlight → <strong>Redeem</strong> and paste the code). Tap <strong>Install</strong>.</p>
-  </div></div>
-  <div class="step"><div class="n">3</div><div class="bd">
-    <h4>Launch Canei</h4>
-    <p>The Canei icon appears on the home screen. Open it — you'll see the brand splash, then the live app. On first camera use it will ask permission; tap <strong>Allow</strong> so site‑visit photos work.</p>
-  </div></div>
-
-  <div class="card tip">
-    <h4>Add to Home Screen — the no‑account alternative</h4>
-    <p style="margin-bottom:0">Testers can also just open the website in Safari and use <strong>Share → Add to Home Screen</strong> for a lightweight icon. TestFlight is the real app (camera, offline, share, updates); “Add to Home Screen” is a quick fallback if someone can't install TestFlight in time.</p>
-  </div>
-
-  <div class="foot"><span>Canei Subirats · iOS Beta Onboarding</span><span>9 · Testers</span></div>
-</section>
-
-<!-- ============ PART 7 — TEST CHECKLIST ============ -->
-<section class="page">
-  <div class="kicker">Part 7</div>
-  <h2>What to test (beta checklist)</h2>
-  <p class="lead">Run one real project end‑to‑end on the phone. Tick each item; note anything that feels slow, cut off, or confusing.</p>
-
-  <div class="grid2">
-    <div class="card">
-      <h4>Navigation &amp; feel</h4>
-      <ul class="chk">
-        <li>Splash appears, then the Home tab loads.</li>
-        <li>All four tabs switch instantly and keep their place.</li>
-        <li>Tapping the active tab returns it to the top / home.</li>
-        <li>The top progress line shows while pages load.</li>
-        <li>Pull down to refresh works on every tab.</li>
-        <li>Nothing is cut off on the left/right edges.</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h4>The real workflow</h4>
-      <ul class="chk">
-        <li>Enter your own company &amp; client data (not the sample).</li>
-        <li>Take a <strong>site‑visit photo</strong> — it saves into the project.</li>
-        <li>Build an estimate → turn it into a quote.</li>
-        <li>Generate the quote &amp; invoice PDFs.</li>
-        <li><strong>Export the project folder (ZIP)</strong> → Save to Files works.</li>
-        <li>Share a document via the share sheet.</li>
-      </ul>
+    <div class="t">
+      <h1>iOS Release — Quickstart</h1>
+      <small>Canei Subirats · for someone who has shipped to the App Store before</small>
     </div>
   </div>
 
   <div class="card soft">
-    <h4>How testers report problems (built into TestFlight)</h4>
-    <p style="margin-bottom:0">In TestFlight, a tester can <strong>take a screenshot and it is offered straight to “Share Beta Feedback”</strong>, or press‑and‑hold the app in TestFlight → <strong>Send Beta Feedback</strong>. Their note + a screenshot + device details arrive in App Store Connect → TestFlight → <strong>Feedback</strong>. Ask testers to describe: what screen, what they tapped, what they expected.</p>
+    <p style="margin:0"><strong>The model:</strong> the app is a native shell over the live web app. <strong>Website changes reach the app automatically</strong> (pull-to-refresh) — no new build, no review. You only upload a build to change the native shell (icon, tabs, permissions). Everything below is that upload path, automated to <strong>one file + one command</strong>.</p>
   </div>
 
-  <div class="card">
-    <h4>What we can fix without a new build</h4>
-    <p style="margin-bottom:0">Almost all feedback about <strong>content, layout, wording, prices, catalogue, documents and workflow</strong> is a website change — it goes live the moment we publish, and testers just pull to refresh. Only feedback about the <strong>app frame</strong> (icon, tabs, splash, permissions, crashes) needs a new TestFlight build.</p>
-  </div>
+  <h3>One-time · the app record (5 min, skip if done)</h3>
+  <div class="step"><div class="n">1</div><div class="bd">
+    <h4>Register the bundle id</h4>
+    <p>developer.apple.com → Identifiers → <span class="pill">+</span> → App → <code>com.caneisubirats.erp</code>. <span class="muted">Prefer your own prefix? Change <code>PRODUCT_BUNDLE_IDENTIFIER</code> in the Xcode target and <code>APP_BUNDLE_ID</code> in <code>fastlane/.env.default</code> to match — one place each.</span></p>
+  </div></div>
+  <div class="step"><div class="n">2</div><div class="bd">
+    <h4>Create the app in App Store Connect</h4>
+    <p>Apps → <span class="pill">+ New App</span> → iOS · name <strong>Canei Subirats</strong> · pick the bundle id · SKU <code>CANEI-ERP-IOS</code>. No screenshots/description needed for internal TestFlight. Encryption compliance is pre-declared in the project — you won't be asked.</p>
+  </div></div>
 
-  <div class="foot"><span>Canei Subirats · iOS Beta Onboarding</span><span>10 · Test checklist</span></div>
-</section>
-
-<!-- ============ PART 8/9 — UPDATES + FAQ ============ -->
-<section class="page">
-  <div class="kicker">Part 8</div>
-  <h2>Sending future updates</h2>
+  <h3>Fill once · <code>fastlane/.env.default</code></h3>
+  <p>From <strong>App Store Connect → Users and Access → Integrations → App Store Connect API</strong>, create a key with <strong>App Manager</strong> access and download the <code>.p8</code> (once-only download). Then:</p>
   <table>
-    <tr><th>What changed</th><th>What you do</th><th>Testers do</th></tr>
-    <tr><td>Website content, prices, catalogue, documents, workflow, colours</td><td><strong>Nothing</strong> — publish the website as usual</td><td>Pull to refresh / reopen</td></tr>
-    <tr><td>App icon, splash, a new tab, permissions, iOS version support</td><td>Bump the version, run Method A/B/C again</td><td>Update in TestFlight (auto‑prompted)</td></tr>
-    <tr><td>Ready to go public on the App Store</td><td>Add screenshots + description, submit for App Review</td><td>Install from the App Store</td></tr>
+    <tr><th>Key in .env.default</th><th>Value / where</th></tr>
+    <tr><td><code>ASC_KEY_ID</code></td><td>the key's <strong>Key ID</strong> (10 chars)</td></tr>
+    <tr><td><code>ASC_ISSUER_ID</code></td><td>the <strong>Issuer ID</strong> at the top of that page (uuid)</td></tr>
+    <tr><td><code>ASC_KEY_P8_PATH</code></td><td>path to your saved <code>AuthKey_XXXX.p8</code> (keep it outside the repo)</td></tr>
+    <tr><td><code>DEVELOPER_TEAM_ID</code></td><td>developer.apple.com → Membership → <strong>Team ID</strong> (10 chars)</td></tr>
+  </table>
+  <div class="card warn"><p style="margin:0"><strong>Secrets stay local.</strong> <code>fastlane/.env.default</code> and every <code>*.p8</code> are gitignored — nothing sensitive is committed. Store the <code>.p8</code> in a password manager.</p></div>
+
+  <h3>Ship · one command</h3>
+  <pre>cd ios
+make setup          <span class="c"># installs fastlane, creates .env.default (fill it), once</span>
+make ship           <span class="c"># signs, auto-bumps build no., uploads to TestFlight</span></pre>
+  <p style="margin:0">Managed signing runs through the API key — no manual certificates or 2FA prompts. On success the build appears in <strong>App Store Connect → TestFlight</strong> after a few minutes of processing.</p>
+
+  <div class="foot"><span>Canei Subirats · iOS Release Quickstart</span><span>1 / 2</span></div>
+</section>
+
+<!-- ================= PAGE 2 ================= -->
+<section class="page">
+  <div class="kicker">Page 2</div>
+
+  <h3>Testers (once per person)</h3>
+  <div class="grid2">
+    <div class="card" style="margin-top:4pt">
+      <h4>You</h4>
+      <p style="margin:0">App Store Connect → TestFlight → Internal Testing → add testers (they must be under Users and Access; up to 100, no review, instant) → attach the build.</p>
+    </div>
+    <div class="card" style="margin-top:4pt">
+      <h4>Each tester</h4>
+      <p style="margin:0">Install <strong>TestFlight</strong> from the App Store → open the invite email → <strong>Install</strong>. Allow camera on first use so site-visit photos work.</p>
+    </div>
+  </div>
+
+  <h3>Updating — what needs a build, what doesn't</h3>
+  <table>
+    <tr><th>Change</th><th>Action</th><th>Testers</th></tr>
+    <tr><td>Website content, prices, catalogue, documents, workflow, colours</td><td><strong>Nothing</strong> — publish the site as usual</td><td>Pull to refresh</td></tr>
+    <tr><td>App icon, splash, a tab, permissions, OS support</td><td><code>make ship</code> again</td><td>Update in TestFlight</td></tr>
+    <tr><td>Go public on the App Store</td><td>Add store listing → submit for review</td><td>Install from App Store</td></tr>
   </table>
 
-  <div class="kicker" style="margin-top:16pt">Part 9</div>
-  <h2>Troubleshooting &amp; FAQ</h2>
+  <h3>Hands-off alternative — GitHub</h3>
+  <p>Add the four values as repo <strong>Secrets</strong> (<code>ASC_KEY_ID</code>, <code>ASC_ISSUER_ID</code>, <code>ASC_KEY_P8</code> = the .p8 contents, <code>DEVELOPER_TEAM_ID</code>), then Actions → <strong>“iOS · TestFlight”</strong> → <strong>Run workflow</strong>. It only runs when you click it — never on ordinary pushes, so no failure emails.</p>
 
-  <h4>The build shows “Missing Compliance” in TestFlight</h4>
-  <p>Rare, because we pre‑declare it. If it appears, click the build and answer “Does your app use encryption? → None of the algorithms mentioned above / Standard only.”</p>
-
-  <h4>“No account for team” / signing errors in Xcode</h4>
-  <p>Xcode → Settings → Accounts → add your Apple ID; then on the target → Signing &amp; Capabilities pick the Team. Make sure the Developer Program membership is Active.</p>
-
-  <h4>The project won't open</h4>
-  <p>In Terminal: <code>cd ios &amp;&amp; ./setup.sh</code>. It installs a helper and regenerates the project cleanly, then opens it.</p>
-
-  <h4>I want a different bundle id / company domain</h4>
-  <p>Change <code>PRODUCT_BUNDLE_IDENTIFIER</code> in the project (and <code>app_identifier</code> in <code>ios/fastlane/Appfile</code>) to your value, register that id in Part&nbsp;3, and rebuild. Do it before the first upload.</p>
-
-  <h4>A tester didn't get the invite</h4>
-  <p>Check the exact Apple ID email, look in spam, or send them the public TestFlight redeem code. Internal testers must also be listed under Users and Access.</p>
-
-  <h4>Does the camera / photos work in the beta?</h4>
-  <p>Yes. The app asks permission on first use; the site‑visit photo capture and the project folder both work through the native app.</p>
-
-  <h4>How long can we stay in beta?</h4>
-  <p>Each TestFlight build is valid for <strong>90 days</strong>. Sending a new build resets the clock. There's no limit on how long you use TestFlight overall.</p>
-
-  <div class="foot"><span>Canei Subirats · iOS Beta Onboarding</span><span>11 · Updates &amp; FAQ</span></div>
-</section>
-
-<!-- ============ GLOSSARY ============ -->
-<section class="page">
-  <div class="kicker">Reference</div>
-  <h2>Glossary</h2>
-  <table>
-    <tr><th>Term</th><th>Plain meaning</th></tr>
-    <tr><td>TestFlight</td><td>Apple's official app for trying beta versions before they're on the App Store.</td></tr>
-    <tr><td>App Store Connect</td><td>Apple's website where you manage your app, builds and testers.</td></tr>
-    <tr><td>Apple Developer Program</td><td>The €99/year membership that unlocks TestFlight and publishing.</td></tr>
-    <tr><td>Bundle ID</td><td>The app's unique code name — <code>com.caneisubirats.erp</code>. Must match everywhere.</td></tr>
-    <tr><td>Signing / certificate</td><td>Apple's proof the app is really from you. Xcode manages it automatically.</td></tr>
-    <tr><td>Archive</td><td>A finished, uploadable build of the app.</td></tr>
-    <tr><td>Build number</td><td>A counter (1, 2, 3…) that increases every upload. Handled for you.</td></tr>
-    <tr><td>API key (.p8)</td><td>A key file that lets automation upload builds without your password.</td></tr>
-    <tr><td>Team ID</td><td>Your 10‑character Apple developer account code.</td></tr>
-    <tr><td>Internal tester</td><td>Someone on your account who can test instantly, no App Review.</td></tr>
-    <tr><td>Native shell</td><td>The iPhone app frame (splash, tabs, camera) around your website.</td></tr>
-    <tr><td>Pull to refresh</td><td>Drag the screen down to reload — fetches the latest website.</td></tr>
-  </table>
-
-  <div class="card soft" style="margin-top:14pt">
-    <h4>One‑line summary</h4>
-    <p style="margin-bottom:0">Join the Developer Program → create the app record with bundle id <code>com.caneisubirats.erp</code> → upload one build (Xcode, fastlane, or GitHub) → add testers in TestFlight. After that, website changes reach everyone automatically, and new app‑frame versions are one command away.</p>
+  <h3>Troubleshooting</h3>
+  <div class="grid2">
+    <div class="card" style="margin-top:4pt">
+      <h4>“No account for team” in Xcode</h4>
+      <p style="margin:0 0 6pt">Xcode → Settings → Accounts → add your Apple ID; target → Signing &amp; Capabilities → pick the Team.</p>
+      <h4>Project won't open</h4>
+      <p style="margin:0"><code>cd ios &amp;&amp; ./setup.sh</code> regenerates it cleanly (needs XcodeGen; the script installs it).</p>
+    </div>
+    <div class="card" style="margin-top:4pt">
+      <h4>Auth / key errors from fastlane</h4>
+      <p style="margin:0 0 6pt">Check <code>ASC_KEY_P8_PATH</code> points to the real file and the key has <strong>App Manager</strong> role. Re-download if lost (generate a new key).</p>
+      <h4>Build stuck “Processing”</h4>
+      <p style="margin:0">Normal for a few minutes; refresh TestFlight. It clears itself.</p>
+    </div>
   </div>
 
-  <div class="rule"></div>
-  <p class="muted" style="font-size:9pt">Canei Subirats, S.L. · iOS Beta Onboarding · App version 1.0 · Bundle id com.caneisubirats.erp. This document contains no passwords or keys — you generate and store those yourself. Keep it with the Operations Guide.</p>
+  <div class="card soft">
+    <p style="margin:0"><strong>In one breath:</strong> register the id + create the app record (once) → fill <code>fastlane/.env.default</code> (four values) → <code>make setup</code> then <code>make ship</code>. Future app updates = <code>make ship</code>; future content updates = just publish the website.</p>
+  </div>
 
-  <div class="foot"><span>Canei Subirats · iOS Beta Onboarding</span><span>12 · Glossary</span></div>
+  <p class="muted" style="font-size:8.5pt;margin-top:9pt">Canei Subirats, S.L. · v1.0 · bundle id com.caneisubirats.erp · No passwords or keys are contained in this document — you generate and store those yourself.</p>
+
+  <div class="foot"><span>Canei Subirats · iOS Release Quickstart</span><span>2 / 2</span></div>
 </section>
 
 </body>

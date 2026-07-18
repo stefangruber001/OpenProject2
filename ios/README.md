@@ -49,26 +49,28 @@ Everything app‑level lives in `CaneiSubirats/Support/Config.swift`:
 
 ## Ship to TestFlight
 
-Two ways — both documented step‑by‑step (with screenshots of where each value
-lives) in **`../site/Canei-Subirats-iOS-Beta-Onboarding.pdf`**.
+The full 2‑page quickstart is **`../site/Canei-Subirats-iOS-Beta-Onboarding.pdf`**.
 
-**A. From your Mac (simplest first time)**
+**A. From your Mac — fill one file, run one command**
 
 ```bash
 cd ios
-bundle install                 # once
-export ASC_KEY_ID=...          # App Store Connect API key id
-export ASC_ISSUER_ID=...       # issuer id
-export ASC_KEY_P8="$(cat AuthKey_XXXXXX.p8)"
-export DEVELOPER_TEAM_ID=...    # 10‑char team id
-bundle exec fastlane beta      # builds + uploads to TestFlight
+make setup      # installs fastlane + creates fastlane/.env.default to fill once
+#                 → paste 4 values into fastlane/.env.default (see .env.example)
+make ship       # signs, auto‑bumps the build number, uploads to TestFlight
 ```
+
+`fastlane/.env.default` (gitignored) holds `ASC_KEY_ID`, `ASC_ISSUER_ID`,
+`ASC_KEY_P8_PATH` (path to your `.p8`), `DEVELOPER_TEAM_ID`, `APP_BUNDLE_ID`.
+fastlane loads it automatically, so after the first fill every release is just
+`make ship`.
 
 **B. From GitHub (hands‑off)**
 
-Add the four values above as repository **Secrets**, then run the
-**“iOS · TestFlight”** workflow from the Actions tab. It only runs when you
-click **Run workflow** — it never fires on ordinary commits.
+Add the four values as repository **Secrets** (`ASC_KEY_ID`, `ASC_ISSUER_ID`,
+`ASC_KEY_P8` = the .p8 contents, `DEVELOPER_TEAM_ID`; optional repo **variable**
+`APP_BUNDLE_ID`), then run the **“iOS · TestFlight”** workflow from the Actions
+tab. It only runs when you click **Run workflow** — never on ordinary commits.
 
 ## Project layout
 
@@ -81,7 +83,8 @@ ios/
     UI/         Theme, BrandMark, Splash, TabBar, TopBar, Offline, Haptics, Share
     Support/    Config
     Resources/  Info.plist, Assets.xcassets (AppIcon, colors)
-  fastlane/     Appfile, Fastfile (the `beta` lane)
+  Makefile      make setup / make ship (one‑command release)
+  fastlane/     Appfile, Fastfile (the `beta` lane), .env.example (fill once)
   project.yml   XcodeGen spec (only for regenerating the project)
   setup.sh      installs XcodeGen + regenerates + opens the project
   ExportOptions.plist
