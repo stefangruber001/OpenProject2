@@ -10,7 +10,8 @@ name: iOS · TestFlight
 # (Settings → Secrets and variables → Actions):
 #   ASC_KEY_ID          App Store Connect API key id
 #   ASC_ISSUER_ID       App Store Connect issuer id
-#   ASC_KEY_P8          the full contents of the AuthKey_XXXX.p8 file
+#   ASC_KEY_P8          the BASE64 of the AuthKey_XXXX.p8 file
+#                       (create it with:  base64 -i AuthKey_XXXX.p8 | pbcopy)
 #   DEVELOPER_TEAM_ID   your Apple Developer team id (10 chars)
 # See the Beta Onboarding PDF for exactly where each value comes from.
 
