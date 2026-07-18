@@ -64,7 +64,10 @@ end
 # certificate + App Store provisioning profile on the first run (fully headless).
 # Works for both the local (path) and CI (base64 secret) inputs. Gitignored (*.p8).
 def write_asc_key_file
-  dest = File.expand_path("fastlane/.asc_api_key.p8")
+  require "tmpdir"
+  # Absolute temp path — never relative, because fastlane runs inside the
+  # fastlane/ dir and a relative path would nest as fastlane/fastlane/…
+  dest = File.join(Dir.tmpdir, "canei_asc_api_key.p8")
   path = ENV["ASC_KEY_P8_PATH"].to_s.strip
   if !path.empty?
     FileUtils.cp(File.expand_path(path), dest)
