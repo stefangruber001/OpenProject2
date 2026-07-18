@@ -14,14 +14,23 @@ default_platform(:ios)
 
 SCHEME = "CaneiSubirats"
 PROJECT = "CaneiSubirats.xcodeproj"
-BUNDLE_ID = ENV["APP_BUNDLE_ID"] || "com.caneisubirats.erp"
+
+# Treat a missing OR EMPTY env var as absent. In CI, `FOO: ${{ secrets.FOO }}`
+# sets FOO to "" when the secret isn't set — an empty string is truthy in Ruby,
+# so a plain `||` would override the baked-in default with "" and break auth.
+def env_or(name, default)
+  v = ENV[name].to_s.strip
+  v.empty? ? default : v
+end
+
+BUNDLE_ID = env_or("APP_BUNDLE_ID", "com.caneisubirats.erp")
+TEAM_ID = env_or("DEVELOPER_TEAM_ID", "5V62K942X6")
 
 # Non-secret App Store Connect API identifiers baked in for convenience — these
-# alone cannot authenticate; the .p8 private key (below) is the secret and stays
-# local (ASC_KEY_P8_PATH) or in a CI secret (ASC_KEY_P8). Override via env if the
-# key is ever rotated.
-ASC_KEY_ID = ENV["ASC_KEY_ID"] || "TD9Q544H27"
-ASC_ISSUER_ID = ENV["ASC_ISSUER_ID"] || "10347fb1-a3c7-4894-a183-18d98a79a8d0"
+# alone cannot authenticate; the .p8 private key is the secret (ASC_KEY_P8_PATH
+# locally, or the ASC_KEY_P8 base64 secret in CI). Override via env to rotate.
+ASC_KEY_ID = env_or("ASC_KEY_ID", "TD9Q544H27")
+ASC_ISSUER_ID = env_or("ASC_ISSUER_ID", "10347fb1-a3c7-4894-a183-18d98a79a8d0")
 
 def asc_api_key
   path = ENV["ASC_KEY_P8_PATH"].to_s.strip
@@ -77,7 +86,7 @@ platform :ios do
       xcargs: "-allowProvisioningUpdates",
       export_options: {
         signingStyle: "automatic",
-        teamID: ENV["DEVELOPER_TEAM_ID"] || "5V62K942X6"
+        teamID: TEAM_ID
       },
       output_directory: "build",
       output_name: "CaneiSubirats.ipa",
