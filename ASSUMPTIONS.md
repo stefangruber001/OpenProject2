@@ -317,7 +317,22 @@ languages: es-ES # source: synthetic
     manual-dispatch to avoid failure emails. Mirrors the article's two ideas
     (fastlane deployment automation = already built; Maestro autonomous testing).
 
-38. **Reusable, self-improving "App Producer" agent + Template repo (this cycle).**
+38. **Development preview site at /preview + direct-to-main (this cycle).**
+    Operator wants a separate live URL to co-develop with a collaborator on the
+    dev branch, promoting to production after alignment; also asked that changes
+    go straight to `main` from now on. (a) `pages.yml` now assembles ONE Pages
+    deployment: `main`→ site root (production), the dev branch → `/preview/`
+    (dev). Preview pages get a small fixed "Dev preview" pill. All site links are
+    relative, so the subpath works. (b) The `github-pages` environment only lets
+    `main` deploy, so a dev-branch push can't deploy directly; `preview-refresh.yml`
+    fires on dev-branch pushes and dispatches `pages.yml` on `main`, which
+    rebuilds `/preview/` from the dev branch by name — auto-refresh with **no
+    repo-settings change**. (c) Per operator instruction I now commit directly to
+    `main` (branch + main kept in sync); the collaborative flow is: iterate on the
+    dev branch → watch `/preview/` → merge to `main` to publish. Reversible: revert
+    the two workflow files to return to single-site publishing.
+
+39. **Reusable, self-improving "App Producer" agent + Template repo (this cycle).**
     Packaged the whole web→native-iOS→TestFlight→testing pipeline as a Claude Code
     agent (`.claude/agents/app-producer.md`) so it's reusable in any project/chat,
     and into the shared `stefangruber001/Template` repo (installer copies agents
