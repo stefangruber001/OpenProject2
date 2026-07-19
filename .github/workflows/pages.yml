@@ -46,23 +46,22 @@ jobs:
           path: dev
 
       - name: Assemble site (main at root, dev under /preview)
+        env:
+          # Perl reads this via %ENV; keep the Perl script single-quoted below so
+          # bash (set -u) never tries to expand $ENV itself.
+          BANNER: '<div style="position:fixed;left:10px;bottom:10px;z-index:99999;font:600 11px/1 -apple-system,Segoe UI,Roboto,sans-serif;color:#fff;background:#b4531f;padding:6px 11px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.18);letter-spacing:.06em;text-transform:uppercase;pointer-events:none">Dev preview</div>'
         run: |
           set -euo pipefail
           mkdir -p _site
           cp -R prod/site/. _site/
           mkdir -p _site/preview
           cp -R dev/site/. _site/preview/
-          # Stamp a small fixed "DEV PREVIEW" pill on every preview page so it's
+          # Stamp a small fixed "Dev preview" pill on every preview page so it's
           # never mistaken for production. Non-intrusive (fixed, high z-index).
-          banner='<div style="position:fixed;left:10px;bottom:10px;z-index:99999;font:600 11px/1 -apple-system,Segoe UI,Roboto,sans-serif;color:#fff;background:#b4531f;padding:6px 11px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.18);letter-spacing:.06em;text-transform:uppercase;pointer-events:none">Dev preview</div>'
           find _site/preview -name '*.html' -print0 | while IFS= read -r -d '' f; do
-            if grep -qi '</body>' "$f"; then
-              perl -0pi -e "s{</body>}{$ENV{BANNER}</body>}i" "$f"
-            fi
+            perl -0pi -e 's{</body>}{$ENV{BANNER}</body>}i' "$f"
           done
           echo "Assembled root=$(ls _site | wc -l) entries; preview=$(ls _site/preview | wc -l) entries."
-        env:
-          BANNER: '<div style="position:fixed;left:10px;bottom:10px;z-index:99999;font:600 11px/1 -apple-system,Segoe UI,Roboto,sans-serif;color:#fff;background:#b4531f;padding:6px 11px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.18);letter-spacing:.06em;text-transform:uppercase;pointer-events:none">Dev preview</div>'
 
       - name: Configure Pages (enable if needed)
         uses: actions/configure-pages@v5
