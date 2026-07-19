@@ -10,7 +10,11 @@ name: Deploy site + dev preview (GitHub Pages)
 
 on:
   push:
-    branches: [main, claude/orin-project-status-1q50dt]
+    # Deploy runs only from main — the github-pages environment rejects other
+    # branches. Dev-branch pushes refresh the preview via preview-refresh.yml,
+    # which dispatches THIS workflow on main; the deploy always rebuilds /preview
+    # from the dev branch by name, so it picks up the latest dev content.
+    branches: [main]
     paths: ["site/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 

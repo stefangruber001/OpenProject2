@@ -1,0 +1,33 @@
+name: Refresh dev preview on dev-branch push
+
+# The github-pages environment only lets `main` deploy Pages, so a dev-branch
+# push can't deploy directly. Instead, when the dev branch changes, this job
+# just DISPATCHES the Pages deploy on main. That deploy rebuilds the site root
+# from main and /preview from the dev branch (by name) — so /preview always
+# reflects the latest dev-branch content, with no repo-settings change needed.
+
+on:
+  push:
+    branches: [claude/orin-project-status-1q50dt]
+    paths: ["site/**", ".github/workflows/pages.yml", ".github/workflows/preview-refresh.yml"]
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+concurrency:
+  group: preview-refresh
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch the Pages deploy on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run pages.yml \
+            --repo "${{ github.repository }}" \
+            --ref main
+          echo "Dispatched pages.yml on main — /preview will rebuild from the dev branch."
