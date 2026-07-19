@@ -11,7 +11,13 @@ enum Config {
 
     /// Base URL of the deployed web app (GitHub Pages).
     /// Change this one value to point the app at staging vs production.
-    static let baseURL = URL(string: "https://stefangruber001.github.io/OpenProject2/")!
+    ///
+    /// TESTING: pointed at the **development preview** (`/preview/`), which is
+    /// served from the dev branch. This way the TestFlight build auto-updates
+    /// with whatever we push to the dev branch — no App Store update needed.
+    /// Flip to the production root for the public release:
+    ///   static let baseURL = URL(string: "https://stefangruber001.github.io/OpenProject2/")!
+    static let baseURL = URL(string: "https://stefangruber001.github.io/OpenProject2/preview/")!
 
     /// Marketing name shown in the splash and About.
     static let appName = "Canei Subirats"
