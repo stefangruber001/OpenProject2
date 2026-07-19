@@ -1,11 +1,16 @@
-name: Deploy preview site (GitHub Pages)
+name: Deploy site + dev preview (GitHub Pages)
+
+# Publishes TWO copies of the site in one Pages deployment:
+#   • main            → site root      (production)
+#   • the dev branch  → /preview/      (development preview)
+# Runs whenever EITHER branch changes, and rebuilds both from scratch each time,
+# so production and the preview are always current no matter which side pushed.
+# Both you and a collaborator can iterate on the dev branch and watch /preview/;
+# once aligned, merge the dev branch into main and the root updates.
 
 on:
   push:
-    # Deploy only from the default branch — the github-pages environment's
-    # protection rules reject other branches, which would fail every push
-    # (and send a failure email). Feature branches use workflow_dispatch.
-    branches: [main]
+    branches: [main, claude/orin-project-status-1q50dt]
     paths: ["site/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
@@ -16,7 +21,10 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
+
+env:
+  DEV_BRANCH: claude/orin-project-status-1q50dt
 
 jobs:
   deploy:
@@ -25,7 +33,36 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout production (main)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: prod
+
+      - name: Checkout development branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEV_BRANCH }}
+          path: dev
+
+      - name: Assemble site (main at root, dev under /preview)
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp -R prod/site/. _site/
+          mkdir -p _site/preview
+          cp -R dev/site/. _site/preview/
+          # Stamp a small fixed "DEV PREVIEW" pill on every preview page so it's
+          # never mistaken for production. Non-intrusive (fixed, high z-index).
+          banner='<div style="position:fixed;left:10px;bottom:10px;z-index:99999;font:600 11px/1 -apple-system,Segoe UI,Roboto,sans-serif;color:#fff;background:#b4531f;padding:6px 11px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.18);letter-spacing:.06em;text-transform:uppercase;pointer-events:none">Dev preview</div>'
+          find _site/preview -name '*.html' -print0 | while IFS= read -r -d '' f; do
+            if grep -qi '</body>' "$f"; then
+              perl -0pi -e "s{</body>}{$ENV{BANNER}</body>}i" "$f"
+            fi
+          done
+          echo "Assembled root=$(ls _site | wc -l) entries; preview=$(ls _site/preview | wc -l) entries."
+        env:
+          BANNER: '<div style="position:fixed;left:10px;bottom:10px;z-index:99999;font:600 11px/1 -apple-system,Segoe UI,Roboto,sans-serif;color:#fff;background:#b4531f;padding:6px 11px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.18);letter-spacing:.06em;text-transform:uppercase;pointer-events:none">Dev preview</div>'
 
       - name: Configure Pages (enable if needed)
         uses: actions/configure-pages@v5
@@ -35,7 +72,7 @@ jobs:
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment
