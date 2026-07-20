@@ -43,9 +43,8 @@ describe("config fragment", () => {
 
   it("ships the standard chapter catalogue seeded from real intake evidence", () => {
     const cfg = reformasConfigSchema.parse({});
-    expect(cfg.chapters).toHaveLength(18);
+    expect(cfg.chapters).toHaveLength(17);
     expect(cfg.chapters).toContain("Demoliciones y trabajos previos");
-    expect(cfg.chapters).toContain("Trabajos opcionales");
     // tenants can override with their own chapter set — it's data
     const custom = reformasConfigSchema.parse({ chapters: ["Solo un capítulo"] });
     expect(custom.chapters).toEqual(["Solo un capítulo"]);

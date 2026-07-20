@@ -39,23 +39,14 @@ export async function addPartida(
     qtyMillis: medicionQtyMillis(medicion),
     unitCents: eurosToCents(formData.get("precio")),
     taxCategoryHint: HINT_WORKS_ON_DWELLING,
-    optional: formData.get("optional") === "on",
     meta: { medicion, chapter },
   });
   revalidatePath(`/${tenantId}/presupuestos/${quoteId}`);
 }
 
-export async function acceptPresupuesto(
-  tenantId: string,
-  quoteId: string,
-  formData: FormData,
-): Promise<void> {
+export async function acceptPresupuesto(tenantId: string, quoteId: string): Promise<void> {
   const rt = await getTenantRuntime(tenantId);
-  const includeOptionIds = formData
-    .getAll("options")
-    .map(String)
-    .filter((s) => s.length > 0);
-  await rt.quoting!.accept(quoteId, { includeOptionIds });
+  await rt.quoting!.accept(quoteId);
   revalidatePath(`/${tenantId}/presupuestos/${quoteId}`);
 }
 

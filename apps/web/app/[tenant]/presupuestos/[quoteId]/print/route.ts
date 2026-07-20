@@ -19,26 +19,17 @@ export async function GET(
     const money = (c: number) => formatMoney(c, currency, locale);
     const qty = (m: number) => (m / 1000).toLocaleString(locale);
 
-    const base = quote.lines.filter((l) => !l.optional);
-    const opt = quote.lines.filter((l) => l.optional);
     const row = (l: (typeof quote.lines)[number]) =>
       `<tr><td>${esc(l.description)}</td><td class="n">${qty(l.qtyMillis)}${l.unit ? " " + esc(l.unit) : ""}</td><td class="n">${money(l.unitCents)}</td><td class="n">${money(l.totalCents)}</td></tr>`;
-
-    const optBlock = opt.length
-      ? `<h3 style="font-size:12px;margin:16px 0 6px;color:var(--muted)">Optional works (outside the base total)</h3>
-         <table><tbody>${opt.map(row).join("")}
-         <tr class="total"><td colspan="3">Optionals</td><td class="n">${money(quote.optionalCents)}</td></tr></tbody></table>`
-      : "";
 
     const bodyHtml = `
       <p style="margin:0 0 4px"><b>${esc(quote.title)}</b></p>
       <p style="margin:0 0 14px;color:var(--muted);font-size:11.5px">Quote v${quote.version} · ${quote.status === "accepted" ? "accepted" : "draft"}${quote.acceptedAt ? " (" + esc(quote.acceptedAt.slice(0, 10)) + ")" : ""}</p>
       <table>
         <thead><tr><th>Item</th><th class="n">Quantity</th><th class="n">Unit price</th><th class="n">Amount</th></tr></thead>
-        <tbody>${base.map(row).join("")}
+        <tbody>${quote.lines.map(row).join("")}
         <tr class="total"><td colspan="3">Base total (VAT excluded)</td><td class="n">${money(quote.baseCents)}</td></tr></tbody>
-      </table>
-      ${optBlock}`;
+      </table>`;
 
     const doc = brandedDocument({
       branding,
@@ -46,7 +37,7 @@ export async function GET(
       title: "Quote",
       subtitle: `v${quote.version}`,
       bodyHtml,
-      note: "Optional works are listed separately and only included when you accept them. VAT is applied on the final invoice by the applicable legal rule. A single point of contact throughout · 2-year guarantee on the works.",
+      note: "The quote is broken down by chapter with clear measurements. VAT is applied on the final invoice by the applicable legal rule. A single point of contact throughout · 2-year guarantee on the works.",
     });
     return new Response(doc, { headers: { "content-type": "text/html; charset=utf-8" } });
   } catch (e) {

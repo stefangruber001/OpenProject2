@@ -1,12 +1,12 @@
 import { test, expect } from "@playwright/test";
 
-test("R1: build presupuesto → accept with option → factura at reduced rate", async ({ page }) => {
+test("R1: build presupuesto → accept → factura at reduced rate", async ({ page }) => {
   await page.goto("/diorka");
   await page.fill('input[name="title"]', "e2e — Reforma baño");
   await page.click('button:has-text("Create quote")');
   await page.waitForURL(/presupuestos\//);
 
-  // one base partida (mediciones 1×5×2.5 = 12.5 m²) + one optional
+  // one base partida (mediciones 1×5×2.5 = 12.5 m²)
   await page.fill('input[name="description"]', "Demolición y retirada");
   await page.fill('input[name="unidades"]', "1");
   await page.fill('input[name="largo"]', "5");
@@ -14,16 +14,8 @@ test("R1: build presupuesto → accept with option → factura at reduced rate",
   await page.fill('input[name="precio"]', "18.40");
   await page.click('button:has-text("Add")');
   await page.waitForSelector('tr:has-text("Demolición y retirada")');
-
-  await page.fill('input[name="description"]', "Mampara premium");
-  await page.fill('input[name="unidades"]', "1");
-  await page.fill('input[name="precio"]', "480");
-  await page.check('input[name="optional"]');
-  await page.click('button:has-text("Add")');
-  await page.waitForSelector('tr:has-text("Mampara premium")');
   await expect(page.getByText("Base:")).toContainText("230,00");
 
-  await page.check('input[name="options"]');
   await page.click('button:has-text("Mark as accepted")');
   await page.waitForSelector("text=accepted");
 

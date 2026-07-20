@@ -96,7 +96,7 @@ config:
 
           Thank you for trusting Canei Subirats with your project “{{project}}”.
           Please find attached our detailed quote for {{amount}}, broken down by
-          chapter with clear measurements; optional works are listed separately.
+          chapter with clear measurements.
 
           You will have a single point of contact throughout, fixed deadlines and
           our 2-year guarantee on the works.
@@ -191,15 +191,6 @@ config:
           unit: "ud",
           unitPriceCents: 185000,
           unitCostCents: 140000,
-        }
-      - {
-          code: SCREEN-PREM,
-          name: "Premium tempered-glass shower screen",
-          chapter: "Coverings & finishes",
-          unit: "ud",
-          kind: material,
-          unitPriceCents: 48000,
-          unitCostCents: 33000,
         }
     templates:
       - name: "Standard bathroom"

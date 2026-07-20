@@ -24,7 +24,6 @@ export interface UiStrings {
   invoicesHeading: (n: number) => string;
   noQuotes: string;
   noInvoices: string;
-  optionalShort: string;
   ports: string;
   runtimeMemory: string;
   runtimeDb: string;
@@ -39,9 +38,7 @@ export interface UiStrings {
   colUnitPrice: string;
   colAmount: string;
   addFirstLine: (term: string) => string;
-  optionalWorks: string;
   base: string;
-  optionals: string;
   addLine: (term: string) => string;
   chapter: string;
   description: string;
@@ -51,10 +48,8 @@ export interface UiStrings {
   length: string;
   width: string;
   unitPrice: string;
-  optionalOutside: string;
   add: string;
   clientAcceptance: string;
-  includeOptional: (desc: string, price: string) => string;
   markAccepted: string;
   issueInvoice: string;
   createRevision: (v: number) => string;
@@ -79,7 +74,6 @@ const en: UiStrings = {
   invoicesHeading: (n) => `Invoices (${n})`,
   noQuotes: "No quotes yet.",
   noInvoices: "No invoices yet.",
-  optionalShort: "opt.",
   ports: "ports",
   runtimeMemory: "in-memory (dev)",
   runtimeDb: "PostgreSQL (RLS)",
@@ -93,9 +87,7 @@ const en: UiStrings = {
   colUnitPrice: "Unit price",
   colAmount: "Amount",
   addFirstLine: (term) => `Add the first ${term} below.`,
-  optionalWorks: "Optional works (outside the base total)",
   base: "Base",
-  optionals: "Optionals",
   addLine: (term) => `Add ${term} — choose, don't type`,
   chapter: "Chapter",
   description: "Description",
@@ -105,10 +97,8 @@ const en: UiStrings = {
   length: "Length (m)",
   width: "Width (m)",
   unitPrice: "Unit price (€)",
-  optionalOutside: "Optional (outside the base total)",
   add: "Add",
   clientAcceptance: "Client acceptance",
-  includeOptional: (desc, price) => `Include optional: ${desc} (${price})`,
   markAccepted: "Mark as accepted",
   issueInvoice: "Issue invoice",
   createRevision: (v) => `Create revision (v${v})`,
@@ -133,7 +123,6 @@ const es: UiStrings = {
   invoicesHeading: (n) => `Facturas (${n})`,
   noQuotes: "Sin presupuestos aún.",
   noInvoices: "Sin facturas aún.",
-  optionalShort: "opc.",
   ports: "puertos",
   runtimeMemory: "en memoria (dev)",
   runtimeDb: "PostgreSQL (RLS)",
@@ -147,9 +136,7 @@ const es: UiStrings = {
   colUnitPrice: "Precio ud.",
   colAmount: "Importe",
   addFirstLine: (term) => `Añade la primera ${term.toLowerCase()} abajo.`,
-  optionalWorks: "Trabajos opcionales (fuera del total base)",
   base: "Base",
-  optionals: "Opcionales",
   addLine: (term) => `Añadir ${term.toLowerCase()} — elegir, no teclear`,
   chapter: "Capítulo",
   description: "Descripción",
@@ -159,10 +146,8 @@ const es: UiStrings = {
   length: "Largo (m)",
   width: "Ancho (m)",
   unitPrice: "Precio unitario (€)",
-  optionalOutside: "Opcional (fuera del total base)",
   add: "Añadir",
   clientAcceptance: "Aceptación del cliente",
-  includeOptional: (desc, price) => `Incluir opcional: ${desc} (${price})`,
   markAccepted: "Marcar como aceptado",
   issueInvoice: "Emitir factura",
   createRevision: (v) => `Crear revisión (v${v})`,
@@ -187,7 +172,6 @@ const ca: UiStrings = {
   invoicesHeading: (n) => `Factures (${n})`,
   noQuotes: "Encara no hi ha pressupostos.",
   noInvoices: "Encara no hi ha factures.",
-  optionalShort: "opc.",
   ports: "ports",
   runtimeMemory: "en memòria (dev)",
   runtimeDb: "PostgreSQL (RLS)",
@@ -201,9 +185,7 @@ const ca: UiStrings = {
   colUnitPrice: "Preu u.",
   colAmount: "Import",
   addFirstLine: (term) => `Afegeix la primera ${term.toLowerCase()} a sota.`,
-  optionalWorks: "Treballs opcionals (fora del total base)",
   base: "Base",
-  optionals: "Opcionals",
   addLine: (term) => `Afegir ${term.toLowerCase()} — triar, no teclejar`,
   chapter: "Capítol",
   description: "Descripció",
@@ -213,10 +195,8 @@ const ca: UiStrings = {
   length: "Llarg (m)",
   width: "Ample (m)",
   unitPrice: "Preu unitari (€)",
-  optionalOutside: "Opcional (fora del total base)",
   add: "Afegir",
   clientAcceptance: "Acceptació del client",
-  includeOptional: (desc, price) => `Incloure opcional: ${desc} (${price})`,
   markAccepted: "Marcar com a acceptat",
   issueInvoice: "Emetre factura",
   createRevision: (v) => `Crear revisió (v${v})`,

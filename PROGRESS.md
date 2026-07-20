@@ -190,9 +190,11 @@ review`) in `site/journey.html` and `site/dashboard.html`, closing the
    (`tenants/_groups/diorka.yaml`) resolve+demo green in 0.79s config-only;
    NEW `sourcing` capability (multi-bidder comparison: dated/sourced prices,
    group totals, abs/% variance vs baseline, missing≠zero, explicit
-   selection — digitizes their Comparatiu workbook); quoting gained optional
-   items + selective acceptance + versioned revisions (QUO-07/12/13);
-   reformas pack ships the 18-chapter catalogue (BRD Appendix A.2).
+   selection — digitizes their Comparatiu workbook); quoting gained
+   selective acceptance + versioned revisions (QUO-12/13; the tenant-facing
+   optional-works surfacing QUO-07 was later removed at operator request —
+   logged in OBJECTIONS.md + ASSUMPTIONS.md); reformas pack ships the
+   17-chapter catalogue (BRD Appendix A.2).
    **CI-verified: run #6 (faa77c5) success — gates + Postgres/RLS + e2e.**
    Current tool identified: cane.gestortectic.com = TecTic "Gestor"
    (login-gated) → migration lead in INTEGRATIONS_PENDING.~~

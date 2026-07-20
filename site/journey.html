@@ -320,7 +320,6 @@ const SAMPLE = {
     {chapter:"Coverings & finishes", item:"Porcelain floor tiling (supply + fit)", unit:"m²", qty:12.5, price:46},
     {chapter:"Coverings & finishes", item:"False ceiling with LED", unit:"m²", qty:12.5, price:38},
   ],
-  optional:{desc:"Premium tempered-glass shower screen", amount:480},
   vatPct:10, quoteNo:"PRE-2026-0031", invoiceNo:"FAC-2026-0007", termsDays:15, costPct:78,
   // a fully-worked example: prefilled stage details (dates default to today)
   _stageData:{
@@ -341,7 +340,7 @@ const SAMPLE = {
 const BLANK = {
   customer:"", email:"", phone:"", buyerNif:"", address:"", visitNotes:"",
   chapters:[{chapter:"", budget:""},{chapter:"", budget:""}],
-  optional:{desc:"", amount:""}, vatPct:10, quoteNo:"PRE-2026-0001", invoiceNo:"FAC-2026-0001", termsDays:15, costPct:78,
+  vatPct:10, quoteNo:"PRE-2026-0001", invoiceNo:"FAC-2026-0001", termsDays:15, costPct:78,
 };
 const clone = o => JSON.parse(JSON.stringify(o));
 
@@ -404,8 +403,6 @@ function buildS(p){
     email:(p.email||"").trim()||"customer@example.com",
     phone:(p.phone||"").trim(), buyerNif:(p.buyerNif||"").trim(), address:(p.address||"").trim()||"—",
     lines, chapters,
-    optional:{desc:(p.optional?.desc||"").trim()||"Optional works",
-      amount:Math.round((Number(p.optional?.amount)||0)*100), included:false},
     committedPct:Math.min(1.3,(cost+2)/100), actualPct:cost/100,
     baseline:0, variations:0, revenue:0, collected:0, supplierPaid:0,
     vatBp:Math.round((Number(p.vatPct)||0)*100),
@@ -439,7 +436,7 @@ const actual = ()=>sum(S.chapters,c=>c.actual);
 const margin = ()=>S.revenue - actual();
 const marginPct = ()=>S.revenue? Math.round(margin()/S.revenue*1000)/10 : 0;
 const cash = ()=>S.collected - S.supplierPaid;
-const forecast = ()=>{const b=(S.baseline||sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0))+(S.variations||0); return b - Math.max(actual(),committed());};
+const forecast = ()=>{const b=(S.baseline||sum(S.chapters,c=>c.budget))+(S.variations||0); return b - Math.max(actual(),committed());};
 
 /* ---------- project folder / files ---------- */
 function art(folder,name,mime,b64){
@@ -529,8 +526,7 @@ const MARK = `<svg width="34" height="34" viewBox="0 0 40 40" fill="none">
 
 function quoteLines(){
   const l=S.chapters.map(c=>({label:c.chapter,value:eurTxt(c.budget)}));
-  if(S.optional.amount>0) l.push({label:"Optional — "+S.optional.desc,value:eurTxt(S.optional.amount)});
-  const base=sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0);
+  const base=sum(S.chapters,c=>c.budget);
   l.push({label:"Accepted total (VAT excl.)",value:eurTxt(S.baseline||base)});
   return l;
 }
@@ -709,15 +705,12 @@ function buildDocPdf(d){
   pdf+="trailer\n<</Size "+(objs.length+1)+"/Root 1 0 R>>\nstartxref\n"+xref+"\n%%EOF";
   return btoa(pdf);
 }
-function docGroups(includeOptional){
+function docGroups(){
   const by={}; const order=[];
   S.lines.forEach(l=>{ if(!(l.chapter in by)){ by[l.chapter]={rows:[],sub:0}; order.push(l.chapter); }
     const amt=Math.round((l.qty||0)*(l.price||0)); by[l.chapter].sub+=amt;
     by[l.chapter].rows.push({item:l.item, qtyLabel:(l.qty+" "+(l.unit||"")).trim(), priceLabel:eurTxt(l.price), amount:eurTxt(amt)}); });
-  const groups=order.map(ch=>({chapter:ch, rows:by[ch].rows, subtotal:eurTxt(by[ch].sub)}));
-  if(includeOptional && S.optional.amount>0)
-    groups.push({chapter:"Opcional (aparte)", rows:[{item:S.optional.desc, qtyLabel:"1", priceLabel:eurTxt(S.optional.amount), amount:eurTxt(S.optional.amount)}], subtotal:eurTxt(S.optional.amount)});
-  return groups;
+  return order.map(ch=>({chapter:ch, rows:by[ch].rows, subtotal:eurTxt(by[ch].sub)}));
 }
 function invoiceDoc(){
   const sd=sdOf(8);
@@ -728,14 +721,13 @@ function invoiceDoc(){
   const docType=type==="Deposit"?"FACTURA ANTICIPO · DEPOSIT":type==="Certification"?"CERTIFICACION · PROGRESS":"FACTURA · INVOICE";
   const itemized=S.lines&&S.lines.length;
   const lines=S.chapters.map(c=>({desc:c.chapter,amount:eurTxt(c.budget)}));
-  if(S.optional.included) lines.push({desc:"Optional — "+S.optional.desc,amount:eurTxt(S.optional.amount)});
   const totals=[["Base imponible",eurTxt(S.revenue)],["IVA "+vp+"%",eurTxt(vat)]];
   if(irpf>0) totals.push(["Retencion IRPF -"+irpf+"%","-"+eurTxt(irpfAmt)]);
   totals.push(["Total a pagar",eurTxt(S.revenue+vat-irpfAmt)]);
   return { docType, number:S.invoiceNo, dateLabel:"Fecha", dateIssued:fmtDate(issueISO),
     dueLabel:"Vencimiento", dueOrValid:fmtDate(addDaysISO(issueISO,S.termsDays)),
     buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
-    lines, groups: itemized?docGroups(true):undefined, totals,
+    lines, groups: itemized?docGroups():undefined, totals,
     payment:["Forma de pago: transferencia · "+S.termsDays+" dias.","IBAN: "+BRAND.iban+"   ·   Referencia: "+S.invoiceNo],
     notes:[
       "Tipo de IVA decidido por la regla aplicable (tipo reducido cuando concurren las condiciones de renovacion, art. 91.Uno.2.10 LIVA); justificacion almacenada en el documento.",
@@ -744,18 +736,16 @@ function invoiceDoc(){
       "Garantia de 2 anos sobre los trabajos. Un unico punto de contacto durante todo el proyecto." ] };
 }
 function quoteDoc(accepted){
-  const base=sum(S.chapters,c=>c.budget); const hasOpt=S.optional.amount>0;
+  const base=sum(S.chapters,c=>c.budget);
   const itemized=S.lines&&S.lines.length;
   const lines=S.chapters.map(c=>({desc:c.chapter,amount:eurTxt(c.budget)}));
-  if(hasOpt) lines.push({desc:"Opcional (aparte) — "+S.optional.desc,amount:eurTxt(S.optional.amount)});
   const totals=[["Base (IVA no incl.)",eurTxt(base)]];
-  if(accepted&&S.optional.included) totals.push(["Aceptado (con opcional)",eurTxt(base+S.optional.amount)]);
   const sd3=sdOf(3); const validity=Number(sd3.validityDays)||30;
   return { docType:"PRESUPUESTO · QUOTE", number:S.quoteNo, dateLabel:"Fecha", dateIssued:today(),
     dueLabel:"Valido hasta", dueOrValid:addDays(validity),
     buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
-    lines, groups: itemized?docGroups(hasOpt):undefined, totals,
-    payment:["Los trabajos opcionales solo se incluyen si los acepta.","El IVA se aplica en la factura final segun la regla legal aplicable."],
+    lines, groups: itemized?docGroups():undefined, totals,
+    payment:["El IVA se aplica en la factura final segun la regla legal aplicable."],
     notes:[
       "Precios validos 30 dias. Los trabajos se planifican al aceptar el presupuesto.",
       "Este presupuesto se convierte en su proyecto con una linea base fija — sin re-introducir datos.",
@@ -784,7 +774,7 @@ function download(name,mime,data){
 
 function log(msg){ const f=$("#feed"); if(f.dataset.clean!=="1"){f.innerHTML="";f.dataset.clean="1";} f.prepend(el("div",null,msg)); }
 function renderLedger(){
-  const baseTotal = S.baseline || (sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0));
+  const baseTotal = S.baseline || sum(S.chapters,c=>c.budget);
   $("#l-baseline").textContent = baseTotal?eur(baseTotal):"—";
   const lv=$("#l-var"); if(lv){ lv.textContent = S.variations?(S.variations>0?"+":"")+eur(S.variations):"—"; lv.className="v "+(S.variations>0?"warn":S.variations<0?"good":""); }
   $("#l-committed").textContent = committed()?eur(committed()):"—";
@@ -849,20 +839,18 @@ const FLOW = [
     done:()=>{ const est=sum(S.chapters,c=>c.budget); textArt("03 Estimate","estimate.txt","Estimate for "+S.customer+"\n"+eurTxt(est)+" – "+eurTxt(Math.round(est*1.15))+" (ex-VAT)\nIndicative timeline: 3-4 weeks."); log("Estimate shared: ~"+eur(est)); } },
   { cap:"quoting · sourcing", body:()=>{
       const rows=S.chapters.map(c=>`<tr><td>${esc(c.chapter)}</td><td class="n">${eur(c.budget)}</td></tr>`).join("");
-      const optRow=S.optional.amount>0?`<tr><td>◇ Optional — ${esc(S.optional.desc)}</td><td class="n">${eur(S.optional.amount)}</td></tr>`:"";
-      return `<p>The detailed <b>quote</b> is built catalogue-first (choose, don't type). Optional works are listed separately so they never inflate the headline price.</p>
+      return `<p>The detailed <b>quote</b> is built catalogue-first (choose, don't type), broken down by chapter with clear measurements.</p>
       <table><thead><tr><th>Chapter</th><th class="n">Amount</th></tr></thead><tbody>${rows}
-      <tr><td><b>Base total</b></td><td class="n"><b>${eur(sum(S.chapters,c=>c.budget))}</b></td></tr>${optRow}</tbody></table>
+      <tr><td><b>Base total</b></td><td class="n"><b>${eur(sum(S.chapters,c=>c.budget))}</b></td></tr></tbody></table>
       <p class="hint">A full branded quote PDF (${esc(S.quoteNo)}, valid 30 days, parties &amp; terms) is filed into “04 Quotation”.</p>`; },
     done:()=>{ art("04 Quotation",S.quoteNo+".pdf","application/pdf",buildDocPdf(quoteDoc(false))); log("Quote "+S.quoteNo+" built: base "+eur(sum(S.chapters,c=>c.budget))); } },
   { cap:"quoting · messaging", email:{kind:"acceptance"}, body:()=>{
-      const hasOpt=S.optional.amount>0; S.optional.included=hasOpt;
-      const total=sum(S.chapters,c=>c.budget)+(hasOpt?S.optional.amount:0);
-      return `<p>The customer <b>accepts</b>${hasOpt?` and includes the optional works (${esc(S.optional.desc)})`:""}. The accepted version is frozen; a branded acceptance email is auto-drafted with the accepted quote attached.</p>
-      <div class="did"><b>Accepted:</b> ${hasOpt?"base + optional = ":""}${eur(total)} (ex-VAT). Version frozen.</div>`; },
+      const total=sum(S.chapters,c=>c.budget);
+      return `<p>The customer <b>accepts</b>. The accepted version is frozen; a branded acceptance email is auto-drafted with the accepted quote attached.</p>
+      <div class="did"><b>Accepted:</b> ${eur(total)} (ex-VAT). Version frozen.</div>`; },
     done:()=>{ art("05 Acceptance",S.quoteNo+"-accepted.pdf","application/pdf",buildDocPdf(quoteDoc(true)));
       art("05 Acceptance","Acceptance-email.eml","message/rfc822",textToB64(buildEml(emailContent("acceptance")))); log("Quote accepted — version frozen"); } },
-  { cap:"projects", body:()=>{ S.baseline=sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0);
+  { cap:"projects", body:()=>{ S.baseline=sum(S.chapters,c=>c.budget);
       return `<p>The accepted quote becomes a <b>project</b> with an <b>immutable baseline</b> — no re-entry. Chapter budgets are copied once and frozen; everything from here is measured against them.</p>
       <div class="did"><b>Project opened:</b> baseline ${eur(S.baseline)} across ${S.chapters.length} chapters. Status: active.</div>`; },
     done:()=>{ textArt("06 Project","baseline.txt","Project baseline for "+S.customer+"\nFrozen baseline: "+eurTxt(S.baseline)+"\nChapters: "+S.chapters.length); log("Project created — baseline "+eur(S.baseline)+" frozen"); } },
@@ -1185,11 +1173,7 @@ function intakeHtml(){
     quoteSec=`<div class="fsec"><h4>Quote — ${p.lines.length} itemised lines</h4>
       <div class="hint" style="margin-bottom:8px">Loaded from the catalogue. Refine every line in <b>step 4 · Quotation</b>.</div>
       <div class="tblwrap"><table><thead><tr><th>Chapter</th><th class="n">Subtotal</th></tr></thead><tbody>${rows}
-        <tr><td><b>Base total</b></td><td class="n"><b>${eur(Math.round(ord.reduce((s,ch)=>s+by[ch],0)*100))}</b></td></tr></tbody></table></div>
-      <div class="frow" style="margin-top:12px">
-        <div class="field"><label>Optional work (shown separately)</label><input data-o="desc" value="${esc(p.optional.desc)}" placeholder="e.g. Shower screen"></div>
-        <div class="field"><label>Optional amount (€)</label><input data-o="amount" type="number" step="0.01" min="0" value="${p.optional.amount??""}" placeholder="0.00"></div>
-      </div></div>`;
+        <tr><td><b>Base total</b></td><td class="n"><b>${eur(Math.round(ord.reduce((s,ch)=>s+by[ch],0)*100))}</b></td></tr></tbody></table></div></div>`;
   } else {
     const chapRows=p.chapters.map((c,i)=>`<div class="chap" data-i="${i}">
       <input data-k="chapter" placeholder="Chapter / work (e.g. Plumbing)" value="${esc(c.chapter||"")}">
@@ -1198,11 +1182,7 @@ function intakeHtml(){
     quoteSec=`<div class="fsec"><h4>Quote — chapters</h4>
       <div class="hint" style="margin-bottom:8px">Quick chapters — you'll itemise them from the catalogue in <b>step 4 · Quotation</b>.</div>
       <div id="chaps">${chapRows}</div>
-      <button type="button" class="btn sm ghost" id="addchap">＋ Add chapter</button>
-      <div class="frow" style="margin-top:12px">
-        <div class="field"><label>Optional work (shown separately)</label><input data-o="desc" value="${esc(p.optional.desc)}" placeholder="e.g. Shower screen"></div>
-        <div class="field"><label>Optional amount (€)</label><input data-o="amount" type="number" step="0.01" min="0" value="${p.optional.amount??""}" placeholder="0.00"></div>
-      </div></div>`;
+      <button type="button" class="btn sm ghost" id="addchap">＋ Add chapter</button></div>`;
   }
   return `<div class="eyebrow">Your project</div>
     <h2>Run the whole process with your own data</h2>
@@ -1243,7 +1223,6 @@ function intakeHtml(){
 function wireIntake(){
   const root=$("#stage");
   root.querySelectorAll("[data-p]").forEach(inp=>inp.oninput=()=>{ draft[inp.dataset.p]=inp.value; });
-  root.querySelectorAll("[data-o]").forEach(inp=>inp.oninput=()=>{ draft.optional[inp.dataset.o]=inp.value; });
   if($("#chaps")){
     root.querySelectorAll("#chaps .chap").forEach(rowEl=>{
       const i=+rowEl.dataset.i;

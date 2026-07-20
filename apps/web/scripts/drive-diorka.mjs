@@ -19,7 +19,7 @@ await page.click('button:has-text("Create quote")');
 await page.waitForURL(/presupuestos\//);
 
 // 2. add partidas (catalogue-first)
-async function addPartida({ chapter, desc, unit, unidades, largo, ancho, precio, optional }) {
+async function addPartida({ chapter, desc, unit, unidades, largo, ancho, precio }) {
   await page.waitForSelector('input[name="description"]');
   await page.selectOption('select[name="chapter"]', chapter);
   await page.fill('input[name="description"]', desc);
@@ -28,7 +28,6 @@ async function addPartida({ chapter, desc, unit, unidades, largo, ancho, precio,
   if (largo) await page.fill('input[name="largo"]', String(largo));
   if (ancho) await page.fill('input[name="ancho"]', String(ancho));
   await page.fill('input[name="precio"]', String(precio));
-  if (optional) await page.check('input[name="optional"]');
   await page.click('button:has-text("Add")');
   // deterministic: the new row must be visible before the next add
   await page.waitForSelector(`tr:has-text("${desc.slice(0, 24)}")`, { timeout: 15000 });
@@ -58,18 +57,9 @@ await addPartida({
   unidades: 1,
   precio: "1850.00",
 });
-await addPartida({
-  chapter: "Trabajos opcionales",
-  desc: "Mampara de vidrio templado premium",
-  unit: "ud",
-  unidades: 1,
-  precio: "480.00",
-  optional: true,
-});
 await page.screenshot({ path: resolve(outDir, "1-builder.png"), fullPage: true });
 
-// 3. accept including the optional
-await page.check('input[name="options"]');
+// 3. accept the quote
 await page.click('button:has-text("Mark as accepted")');
 await page.waitForLoadState("networkidle");
 

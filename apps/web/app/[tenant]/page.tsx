@@ -87,14 +87,7 @@ export default async function TenantWorkspace(props: { params: Promise<{ tenant:
                   (v{q.version} · {q.status})
                 </span>
               </span>
-              <span className="shrink-0 font-medium">
-                {money(q.baseCents)}
-                {q.optionalCents > 0 && (
-                  <span className="ml-1 text-xs text-neutral-400">
-                    +{money(q.optionalCents)} {t.optionalShort}
-                  </span>
-                )}
-              </span>
+              <span className="shrink-0 font-medium">{money(q.baseCents)}</span>
             </li>
           ))}
           {quotes.length === 0 && <li className="py-2 text-neutral-500">{t.noQuotes}</li>}

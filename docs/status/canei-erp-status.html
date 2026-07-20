@@ -242,10 +242,9 @@
   <h3 style="font-size:12px; margin:2px 0 2px">A · Quote → Invoice, with the VAT decided by rule</h3>
   <div class="flow">
     <div class="step"><span class="num">1</span><h3>Build the quote</h3><p>Pick a chapter, description, unit; quantity computed from measurement (units × length × width).</p></div>
-    <div class="step"><span class="num">2</span><h3>Options apart</h3><p>Optional works are totalled separately from the base — never inflate the headline price.</p></div>
-    <div class="step"><span class="num">3</span><h3>Client accepts</h3><p>Acceptance selects which options are included; the accepted version is frozen.</p></div>
-    <div class="step"><span class="num">4</span><h3>Issue invoice</h3><p>The reduced-rate rule (art. 91.Uno.2.10º) is evaluated from the facts — not chosen from a dropdown.</p></div>
-    <div class="step"><span class="num">5</span><h3>Sealed &amp; justified</h3><p>Legal basis persisted, gapless number, SHA-256 chain seal. Renders as an es-ES fiscal document.</p></div>
+    <div class="step"><span class="num">2</span><h3>Client accepts</h3><p>The accepted version is frozen.</p></div>
+    <div class="step"><span class="num">3</span><h3>Issue invoice</h3><p>The reduced-rate rule (art. 91.Uno.2.10º) is evaluated from the facts — not chosen from a dropdown.</p></div>
+    <div class="step"><span class="num">4</span><h3>Sealed &amp; justified</h3><p>Legal basis persisted, gapless number, SHA-256 chain seal. Renders as an es-ES fiscal document.</p></div>
   </div>
   <div class="note">The rate is a <b>decision with a reason</b>: change the recipient, dwelling age or materials share
   and the engine switches between reduced (10%) and general (21%) VAT and records exactly why —
@@ -280,7 +279,7 @@
       </ul>
     </div>
   </div>
-  <div class="foot-note">Verified end-to-end in a real browser: a bathroom renovation quote → acceptance with an optional →
+  <div class="foot-note">Verified end-to-end in a real browser: a bathroom renovation quote → acceptance →
   invoice at reduced VAT with persisted justification and a chained seal.</div>
 </section>
 
@@ -309,7 +308,6 @@
       <tr><td>Supplier register, dated prices with source, discounts (SUP-01..06)</td><td><span class="chip c-next">NEXT</span></td><td>price records carry source + effective date</td></tr>
       <tr><td>Price comparison, variance, missing-price visibility (SUP-07..10)</td><td><span class="chip c-built">BUILT</span></td><td>sourcing comparison engine (this cycle)</td></tr>
       <tr><td>Quote: chapters/items/qty/price, totals, margin split (QUO-01..06,10)</td><td><span class="chip c-built">BUILT</span> <span class="chip c-next">NEXT</span></td><td>quoting built; cost-vs-selling margin fields next</td></tr>
-      <tr><td>Optional items separate from base (QUO-07)</td><td><span class="chip c-built">BUILT</span></td><td>optional lines; base vs optional totals</td></tr>
       <tr><td>Frozen versions + revisions (QUO-12..13)</td><td><span class="chip c-built">BUILT</span></td><td>accepted quotes frozen; linked revisions</td></tr>
       <tr><td>Professional PDF with correct company branding (QUO-15..16)</td><td><span class="chip c-next">NEXT</span></td><td>doc-render port + Chromium PDF (R1)</td></tr>
       <tr><td>Accepted quote → project baseline without re-entry (PRJ-01..05)</td><td><span class="chip c-next">NEXT</span></td><td>project entity over accepted version</td></tr>

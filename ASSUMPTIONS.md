@@ -348,3 +348,32 @@ languages: es-ES # source: synthetic
     or client-confidential data — only generalizable technical learnings. (d) The
     installer copies agent files only; learnings are pulled by the agent at
     runtime so a stale local copy can't shadow newer shared knowledge.
+
+40. **Optional Work removed from the tenant product; generic capability kept
+    (this cycle).** Operator asked to eliminate the "Optional Work (shown
+    separately)" feature ("no need") and to update all related code + docs. A
+    scoping question (how deep: also gut the `quoting` capability, or only the
+    tenant-facing surfaces?) could not be delivered to the operator, so per the
+    autonomy contract I chose the **most reversible** option and logged it.
+    **Decision:** remove Optional Work from every tenant-facing surface — the
+    presupuesto builder (optional checkbox + acceptance option selection), the
+    quote page optional section/totals, the branded print PDF, the dashboard
+    summary, `i18n` keys, the interactive `site/journey.html` + `site/frontend.html`
+    demos, the reformas "Trabajos opcionales"/"Optional works" catalogue chapter
+    (18→17 chapters), the diorka `SCREEN-PREM` catalogue item, and the docs —
+    while **keeping** the generic `@repo/capability-quoting` optional-line model
+    - service + tests untouched. Rationale: capabilities carry no tenant/sector
+      opinion (whether options are surfaced is tenant/UI config), and rewriting
+      ~half a generic platform capability's test suite to drop neutral vocabulary
+      is the least-reversible, highest-blast-radius move for a factory meant to
+      serve many tenants. The JSON quotes API DTO still mirrors the capability
+      shape (`optionalCents`, always 0 now) as neutral plumbing. The raw BRD
+      extract (`intake/diorka/brd-extracted.txt`) is left as the historical
+      source of record; the descope is reflected in `REQUIREMENTS-MAP.md` and
+      objected in OBJECTIONS #6. Fully reversible via git. **One deferred item:**
+      `site/backend.html` is a point-in-time "real capture" of the backend API
+      whose embedded fiscal JSON carries SHA-256 chain seals — it still shows an
+      old optional line and `optionalCents: 48000`. Hand-editing it would produce
+      invalid seals, so it must be RE-CAPTURED from a fresh live run (a new
+      capture will naturally show `optionalCents: 0` and no optional line) rather
+      than forged; left untouched until then.

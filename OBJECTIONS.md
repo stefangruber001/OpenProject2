@@ -24,3 +24,13 @@ Per mandate §2: logged, reasoned, and then implemented your way.
    feared:** the postponement to 2027 (LEGAL_REVIEW #1) means the certified
    layout can land as an es-ES adapter iteration without blocking P1. Designing
    immutability+chaining now, submission later, is the cheaper-to-reverse path.
+6. **Removing Optional Work drops the BRD's Critical QUO-07** ("the user shall
+   be able to include optional items that are shown separately from the base
+   total", BRD Appendix A.1). The operator directed removal ("no need") after
+   seeing it in the app; per §2 I log the objection and implement the mandate.
+   Blast radius contained: I removed only the tenant-facing surfacing (intake
+   forms, quote page, print PDF, i18n, demo pages, the "Optional works"
+   catalogue chapter, tenant SCREEN-PREM item, docs) and left the generic
+   `quoting` capability's neutral optional-line vocabulary intact, so the
+   requirement is reinstatable as config/UI without re-building capability
+   logic. Reversible via git; decision detail in ASSUMPTIONS #40.

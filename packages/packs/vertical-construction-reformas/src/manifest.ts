@@ -50,7 +50,6 @@ export const reformasConfigSchema = z.object({
       Telecomunicaciones: "Telecommunications",
       "Protección contra incendios": "Fire protection",
       "Varios y generales": "Miscellaneous & general",
-      "Trabajos opcionales": "Optional works",
     },
     ca: {
       "Demoliciones y trabajos previos": "Enderrocs i treballs previs",
@@ -70,7 +69,6 @@ export const reformasConfigSchema = z.object({
       Telecomunicaciones: "Telecomunicacions",
       "Protección contra incendios": "Protecció contra incendis",
       "Varios y generales": "Diversos i generals",
-      "Trabajos opcionales": "Treballs opcionals",
     },
   }),
   defaultUnits: z.array(z.string()).default(["ud", "m", "m²", "m³", "h", "PA"]),
@@ -101,7 +99,6 @@ export const reformasConfigSchema = z.object({
       "Telecomunicaciones",
       "Protección contra incendios",
       "Varios y generales",
-      "Trabajos opcionales",
     ]),
 });
 

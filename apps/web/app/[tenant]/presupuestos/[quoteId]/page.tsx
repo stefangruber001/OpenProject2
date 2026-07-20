@@ -36,8 +36,7 @@ export default async function PresupuestoPage(props: {
   const t = vertical.terminologyByLang?.[lang] ?? vertical.terminology;
   const chapterLabel = (c: string) => vertical.chapterLabels?.[lang]?.[c] ?? c;
   const isDraft = quote.status === "draft";
-  const baseLines = quote.lines.filter((l) => !l.optional);
-  const optLines = quote.lines.filter((l) => l.optional);
+  const baseLines = quote.lines;
 
   const addAction = addPartida.bind(null, tenant, quoteId);
   const acceptAction = acceptPresupuesto.bind(null, tenant, quoteId);
@@ -110,40 +109,10 @@ export default async function PresupuestoPage(props: {
           </tbody>
         </table>
 
-        {optLines.length > 0 && (
-          <>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-              {s.optionalWorks}
-            </h3>
-            <table className="w-full text-sm">
-              <tbody>
-                {optLines.map((l) => (
-                  <tr
-                    key={l.id}
-                    className="border-b border-dashed border-neutral-200 dark:border-neutral-800"
-                  >
-                    <td className="py-1.5 pr-2">{l.description}</td>
-                    <td className="py-1.5 pr-2 text-right">
-                      {(l.qtyMillis / 1000).toLocaleString(locale)} {l.unit}
-                    </td>
-                    <td className="py-1.5 pr-2 text-right">{money(l.unitCents)}</td>
-                    <td className="py-1.5 text-right font-medium">{money(l.totalCents)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
-
         <div className="flex justify-end gap-6 border-t-2 border-neutral-900 pt-2 text-sm dark:border-neutral-100">
           <span>
             {s.base}: <b>{money(quote.baseCents)}</b>
           </span>
-          {quote.optionalCents > 0 && (
-            <span className="text-neutral-500">
-              {s.optionals}: <b>{money(quote.optionalCents)}</b>
-            </span>
-          )}
         </div>
       </section>
 
@@ -204,10 +173,6 @@ export default async function PresupuestoPage(props: {
               {s.unitPrice}
               <input name="precio" type="number" step="0.01" required className={input} />
             </label>
-            <label className="col-span-2 flex items-end gap-2 pb-1 text-sm">
-              <input type="checkbox" name="optional" className="size-4" />
-              {s.optionalOutside}
-            </label>
             <div className="flex items-end">
               <button type="submit" className={button}>
                 {s.add}
@@ -223,16 +188,6 @@ export default async function PresupuestoPage(props: {
             {s.clientAcceptance}
           </h2>
           <form action={acceptAction} className="flex flex-col gap-2">
-            {optLines.length > 0 && (
-              <div className="flex flex-col gap-1 text-sm">
-                {optLines.map((l) => (
-                  <label key={l.id} className="flex items-center gap-2">
-                    <input type="checkbox" name="options" value={l.id} className="size-4" />
-                    {s.includeOptional(l.description, money(l.totalCents))}
-                  </label>
-                ))}
-              </div>
-            )}
             <button type="submit" className={button + " self-start"}>
               {s.markAccepted}
             </button>
