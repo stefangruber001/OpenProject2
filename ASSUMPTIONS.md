@@ -374,3 +374,26 @@ languages: es-ES # source: synthetic
     persists across reload + exports JSON, Financial statements compute and
     reconcile. Reversible: both are standalone static pages; revert the cards/tabs
     to remove.
+
+41. **Production-hardening cycle + 4-persona review + 5× simulation (this cycle).**
+    Operator mandate: remove developer comments/hints, make the environment
+    production-ready, run 4 real-world-trained persona agents (operator, customer,
+    supplier, owner) that walk the process and report gaps, run 5× end-to-end
+    simulation, strengthen premium/lean/mistake-proof UX, and produce a handover.
+    **Done:** (a) stripped demo/dev language across all user pages; (b) mistake-
+    proofing — locale-safe `num()` for Spanish decimals across 38 journey fields,
+    VAT picker, NIF/CIF-checksum + email required before start, Master-Data
+    duplicate guard + import confirm; (c) customer trust — Spanish emails,
+    WinAnsi PDF accents, removed internal QA text + "(pending)" from invoices,
+    term-driven (not hardcoded) email terms, unified phone; (d) Control-Tower
+    correctness — 10× budget typo, AR aging buckets, honest cash forecast
+    (incl. payroll), revenue-weighted margin. Verified: site E2E 26/26 across 5
+    stable runs. **Decisions:** where a gap was structural (single dataset across
+    pages, cross-store linking/customer-picker/auto-numbering, real itemised PO +
+    retention application, per-partida cost + change-order cost, 13-week cash
+    forecast, project/customer profitability, compliance alerts, partial billing,
+    multi-device backend, WhatsApp), I implemented the contained high-impact fixes
+    now and captured the rest as a prioritized roadmap in `HANDOVER.md` rather
+    than half-build architecture. CIF/IBAN remain placeholders (we lack the real
+    values) — the go-live checklist and invoice guard flag that the operator must
+    set them before issuing invoices. Reversible: all edits are contained per file.
