@@ -203,7 +203,7 @@ const pctf=(n,d=1)=>(n==null||isNaN(n))?'—':Number(n).toFixed(d)+'%';
 const esc=s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 const fmtDate=iso=>{if(!iso)return'';const p=String(iso).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;};
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),1900);}
-const AS_OF="2026-07-21"; // valuation date for aging (deterministic demo)
+const AS_OF=new Date().toISOString().slice(0,10); // today — valuation date for aging
 const daysBetween=(a,b)=>Math.round((new Date(a)-new Date(b))/86400000);
 
 /* ============ periods ============ */
@@ -314,7 +314,7 @@ const NAV=[
 ];
 const NAVITEM={};NAV.forEach(g=>g.items.forEach(i=>NAVITEM[i.key]=i));
 
-/* ============ seed (synthetic, fully reconciling) ============ */
+/* ============ starter data (fully reconciling; replace with your own) ============ */
 function splitYTD(total,weights){ // split a YTD total across MONTHS so the sum is exact
   const s=weights.reduce((a,b)=>a+b,0);let acc=0;const out=weights.map((w,i)=>{ if(i===weights.length-1)return total-acc; const v=Math.round(total*w/s); acc+=v; return v;});return out;}
 const W=[0.13,0.14,0.15,0.15,0.14,0.15,0.14]; // 7-month weighting
@@ -578,7 +578,7 @@ const VIEWS={
       ${ag.items.sort((a,b)=>b.days-a.days).map(i=>`<tr><td class="k">${esc(i.customer||i.supplier)}</td><td>${esc(i.doc)}</td><td class="num">${fmtDate(i.due)}</td>
         <td class="num">${i.days<=0?'<span class="pill g">current</span>':'<span class="pill '+(i.days>60?'r':'y')+'">'+i.days+'d</span>'}</td><td class="num">${euro(i.amount)}</td></tr>`).join('')}
      </tbody></table></div></div>`;};
-  v.innerHTML=`<div class="banner"><div class="bi">⏳</div><div><b>Working-capital radar.</b><span>&nbsp;Aging is computed live from open items as of 21/07/2026 — the &gt;60-day buckets are what the collections and supplier-payment automation acts on.</span></div></div>
+  v.innerHTML=`<div class="banner"><div class="bi">⏳</div><div><b>Working-capital radar.</b><span>&nbsp;Aging is computed live from open items as of ${fmtDate(AS_OF)} — the &gt;60-day buckets are what the collections and supplier-payment automation acts on.</span></div></div>
    ${block('Receivables aging (AR)',ar,'Customer')}${block('Payables aging (AP)',ap,'Supplier')}`;
  },
 };
@@ -638,7 +638,9 @@ function deleteEditor(){if(editIdx<0)return;if(!confirm('Delete this row?'))retu
 /* ============ import/export ============ */
 function exportJSON(){const payload={_meta:{app:"Canei Subirats — Financial Data",schemaVersion:1},data:DATA};
  const b=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=el('a');a.href=URL.createObjectURL(b);a.download='canei-financial-data.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);toast('Exported');}
-function importJSON(){const inp=el('input');inp.type='file';inp.accept='application/json,.json';inp.onchange=()=>{const f=inp.files[0];if(!f)return;const r=new FileReader();
+function importJSON(){const inp=el('input');inp.type='file';inp.accept='application/json,.json';inp.onchange=()=>{const f=inp.files[0];if(!f)return;
+ if(!confirm('Import replaces the current ledgers with the file’s contents. Export a backup first if unsure. Continue?'))return;
+ const r=new FileReader();
  r.onload=()=>{try{const j=JSON.parse(r.result),d=j.data||j;Object.keys(ENT).forEach(k=>{if(Array.isArray(d[k]))DATA[k]=d[k];});if(!Array.isArray(DATA.drivers))DATA.drivers=[{}];persistSoon();render();toast('Imported ✓');}catch(e){toast('Invalid JSON');}};r.readAsText(f);};inp.click();}
 
 /* ============ wire ============ */

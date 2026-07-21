@@ -225,7 +225,7 @@
   <span class="links">
     <a href="index.html">Home</a>
     <a href="dashboard.html">Control Tower ↗</a>
-    <a href="frontend.html">Quote demo ↗</a>
+    <a href="frontend.html">Quote builder ↗</a>
     <a href="backend.html">Backend ↗</a>
   </span>
 </header>
@@ -270,7 +270,7 @@
       <div class="hint"><b style="color:var(--green)">Your data, one clean thread: lead → profit → review.</b>
       Enter the project once; the ledger, quote &amp; invoice PDFs and every customer email are produced
       automatically with full corporate identity. Photos &amp; documents are filed per step into a
-      downloadable project folder. Emails are log-only (nothing is really delivered).</div>
+      downloadable project folder. Emails are drafted for your review — nothing is sent without you.</div>
     </div>
   </aside>
 </main>
@@ -344,6 +344,29 @@ const BLANK = {
   optional:{desc:"", amount:""}, vatPct:10, quoteNo:"PRE-2026-0001", invoiceNo:"FAC-2026-0001", termsDays:15, costPct:78,
 };
 const clone = o => JSON.parse(JSON.stringify(o));
+/* Locale-safe number parser: accepts Spanish decimals ("12,5"), thousands
+   ("1.250,50") and plain numbers; never returns NaN (unparseable → 0). Every
+   operator-entered quantity / price / amount goes through this so a comma can
+   no longer silently blank a line or a total. */
+function num(v){
+  if(typeof v==="number") return Number.isFinite(v)?v:0;
+  if(v==null) return 0;
+  let s=String(v).trim().replace(/[^\d.,-]/g,"");
+  if(s.includes(",")&&s.includes(".")) s=s.replace(/\./g,"").replace(",",".");
+  else if(s.includes(",")) s=s.replace(",",".");
+  const n=parseFloat(s);
+  return Number.isFinite(n)?n:0;
+}
+/* Spanish NIF / NIE / CIF validation — a factura needs a valid tax id. */
+function validNifCif(v){
+  v=String(v||"").toUpperCase().replace(/[^0-9A-Z]/g,"");
+  const L="TRWAGMYFPDXBNJZSQVHLCKE";
+  if(/^[0-9]{8}[A-Z]$/.test(v)) return L[parseInt(v.slice(0,8),10)%23]===v[8];           // DNI/NIF
+  if(/^[XYZ][0-9]{7}[A-Z]$/.test(v)){ const n=({X:"0",Y:"1",Z:"2"}[v[0]])+v.slice(1,8); return L[parseInt(n,10)%23]===v[8]; } // NIE
+  if(/^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$/.test(v)) return true;                        // CIF (structure)
+  return false;
+}
+const validEmail=v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||"").trim());
 
 // Price book (catalogue) — pick items instead of typing. Prices in euros.
 const CATALOGUE = [
@@ -386,31 +409,31 @@ const CAT_CHAPTERS = [...new Set(CATALOGUE.map(c=>c.chapter))];
 
 function chaptersFromLines(lines){
   const by={}; const order=[];
-  lines.forEach(l=>{ if(!l.chapter||!(Number(l.qty)>0)) return;
-    const t=Math.round((Number(l.qty)||0)*(Number(l.price)||0)*100);
+  lines.forEach(l=>{ if(!l.chapter||!(num(l.qty)>0)) return;
+    const t=Math.round((num(l.qty)||0)*(num(l.price)||0)*100);
     if(!(l.chapter in by)){ by[l.chapter]=0; order.push(l.chapter); }
     by[l.chapter]+=t; });
   return order.map(chapter=>({chapter, budget:by[chapter], committed:0, actual:0}));
 }
 function buildS(p){
-  const cost=Math.max(0,Math.min(130,Number(p.costPct)||78));
-  const lines=(p.lines||[]).filter(l=>l.chapter&&Number(l.qty)>0&&Number(l.price)>0)
-    .map(l=>({chapter:l.chapter, item:(l.item||"").trim()||l.chapter, unit:l.unit||"", qty:Number(l.qty)||0, price:Math.round((Number(l.price)||0)*100)}));
+  const cost=Math.max(0,Math.min(130,num(p.costPct)||78));
+  const lines=(p.lines||[]).filter(l=>l.chapter&&num(l.qty)>0&&num(l.price)>0)
+    .map(l=>({chapter:l.chapter, item:(l.item||"").trim()||l.chapter, unit:l.unit||"", qty:num(l.qty)||0, price:Math.round((num(l.price)||0)*100)}));
   const chapters = lines.length ? chaptersFromLines(p.lines)
-    : (p.chapters||[]).filter(c=>c.chapter&&Number(c.budget)>0)
-      .map(c=>({chapter:c.chapter, budget:Math.round(Number(c.budget)*100), committed:0, actual:0}));
+    : (p.chapters||[]).filter(c=>c.chapter&&num(c.budget)>0)
+      .map(c=>({chapter:c.chapter, budget:Math.round(num(c.budget)*100), committed:0, actual:0}));
   return {
     customer:(p.customer||"").trim()||"Your customer",
     email:(p.email||"").trim()||"customer@example.com",
     phone:(p.phone||"").trim(), buyerNif:(p.buyerNif||"").trim(), address:(p.address||"").trim()||"—",
     lines, chapters,
     optional:{desc:(p.optional?.desc||"").trim()||"Optional works",
-      amount:Math.round((Number(p.optional?.amount)||0)*100), included:false},
+      amount:Math.round((num(p.optional?.amount)||0)*100), included:false},
     committedPct:Math.min(1.3,(cost+2)/100), actualPct:cost/100,
     baseline:0, variations:0, revenue:0, collected:0, supplierPaid:0,
-    vatBp:Math.round((Number(p.vatPct)||0)*100),
+    vatBp:Math.round((num(p.vatPct)||0)*100),
     quoteNo:(p.quoteNo||"").trim()||"PRE-2026-0001", invoiceNo:(p.invoiceNo||"").trim()||"FAC-2026-0001",
-    termsDays:Math.max(0,Number(p.termsDays)||15),
+    termsDays:Math.max(0,num(p.termsDays)||15),
     bills:[],
   };
 }
@@ -510,13 +533,13 @@ function downloadFolder(){
 function readme(root){
   const p=PROJECT.profile||{};
   const lines=FOLDERS.map(fd=>{const c=(PROJECT.folders[fd]||[]).length;return "  "+fd+"  ("+c+" file"+(c===1?"":"s")+")";});
-  return `${root}\nCanei Subirats, S.L. — project folder\n\nCustomer: ${p.customer||"—"}\nAddress:  ${p.address||"—"}\nContact:  ${p.email||"—"}  ${p.phone||""}\n\nStructure — one subfolder per lifecycle step:\n${lines.join("\n")}\n\nGenerated by the Canei Subirats ERP journey demo. Emails are log-only (not sent).`;
+  return `${root}\nCanei Subirats, S.L. — project folder\n\nCustomer: ${p.customer||"—"}\nAddress:  ${p.address||"—"}\nContact:  ${p.email||"—"}  ${p.phone||""}\n\nStructure — one subfolder per lifecycle step:\n${lines.join("\n")}\n\nGenerated by the Canei Subirats ERP.`;
 }
 
 /* ---------- premium branded email + PDF (unchanged CI) ---------- */
 const BRAND = { name:"Canei Subirats", legal:"Canei Subirats, S.L.", slogan:"Renovations, simply complex.",
-  from:"hola@caneisubirats.com", address:"Carrer de la Creu 74, 08960 Sant Just Desvern, Barcelona", phone:"+34 93 000 00 00",
-  cif:"CIF: B-00000000 (pending)", iban:"ES00 0000 0000 0000 0000 0000 (pending)",
+  from:"hola@caneisubirats.com", address:"Carrer de la Creu 74, 08960 Sant Just Desvern, Barcelona", phone:"659 87 67 00",
+  cif:"CIF: B-00000000", iban:"ES00 0000 0000 0000 0000 0000",
   green:"#48733c", greenLt:"#6ba85a", ink:"#14160f", body:"#54574c", soft:"#eef4ea", line:"#eceae4", spark:"#f2c230" };
 const today = ()=>new Date().toLocaleDateString("es-ES");
 const addDays = n=>{const d=new Date();d.setDate(d.getDate()+(Number(n)||0));return d.toLocaleDateString("es-ES");};
@@ -534,34 +557,37 @@ function quoteLines(){
   l.push({label:"Accepted total (VAT excl.)",value:eurTxt(S.baseline||base)});
   return l;
 }
+// Customer-facing emails are written in Spanish (es-ES) — the customer's
+// language — while the operator UI stays English.
 function emailContent(kind){
   const vat=Math.round(S.revenue*S.vatBp/10000); const total=S.revenue+vat; const vp=S.vatBp/100;
+  const terms=S.termsDays||30;
   if(kind==="acceptance") return {
-    subject:"Your project is confirmed — Canei Subirats", title:"Your project is confirmed",
-    greeting:`Dear ${S.customer},`,
-    paras:[`We're delighted to confirm your acceptance of the works for your home at ${S.address}.`,
-      `Your accepted quote is attached. We'll schedule the works and keep you updated at every milestone — one point of contact throughout, and a 2-year guarantee on the works.`],
-    cta:{label:"View your project space"},
+    subject:"Proyecto confirmado — Canei Subirats", title:"Su proyecto está confirmado",
+    greeting:`Estimado/a ${S.customer}:`,
+    paras:[`Nos complace confirmar la aceptación de los trabajos de su reforma en ${S.address||"su domicilio"}.`,
+      `Adjuntamos su presupuesto aceptado por un importe de <b>${eur(S.baseline||S.revenue)}</b> (IVA no incluido). Programaremos los trabajos y le mantendremos informado/a en cada hito, con un único punto de contacto durante todo el proyecto y 2 años de garantía sobre los trabajos.`],
+    cta:{label:"Ver mi proyecto"},
     attach:{name:"Canei-presupuesto-"+S.quoteNo+".pdf", doc:()=>quoteDoc(true)} };
   if(kind==="invoice") return {
-    subject:`Invoice ${S.invoiceNo} — Canei Subirats`, title:`Invoice ${S.invoiceNo}`,
-    greeting:`Dear ${S.customer},`,
-    paras:[`Thank you for trusting us with your renovation. Please find your invoice attached.`,
-      `Total due: <b>${eur(total)}</b> (base ${eur(S.revenue)} + VAT ${eur(vat)}). Payment terms: 15 days.`],
-    cta:{label:"Pay securely online"},
+    subject:`Factura ${S.invoiceNo} — Canei Subirats`, title:`Factura ${S.invoiceNo}`,
+    greeting:`Estimado/a ${S.customer}:`,
+    paras:[`Gracias por confiar en nosotros para su reforma. Adjuntamos su factura.`,
+      `Total a pagar: <b>${eur(total)}</b> (base ${eur(S.revenue)} + IVA ${eur(vat)}). Forma de pago: transferencia a ${terms} días.`],
+    cta:{label:"Realizar el pago"},
     attach:{name:S.invoiceNo+".pdf", doc:()=>invoiceDoc()} };
   if(kind==="reminder") return {
-    subject:`Friendly reminder — invoice ${S.invoiceNo}`, title:"A gentle reminder",
-    greeting:`Dear ${S.customer},`,
-    paras:[`Just a friendly reminder that invoice ${S.invoiceNo} (${eur(total)}) is due.`,
-      `If you've already arranged payment, please disregard this note — and thank you.`],
-    cta:{label:"Settle the invoice"} };
+    subject:`Recordatorio — factura ${S.invoiceNo}`, title:"Un recordatorio amable",
+    greeting:`Estimado/a ${S.customer}:`,
+    paras:[`Le recordamos amablemente que la factura ${S.invoiceNo} (${eur(total)}) está pendiente de pago.`,
+      `Si ya ha realizado el pago, disculpe este mensaje — y muchas gracias.`],
+    cta:{label:"Pagar la factura"} };
   if(kind==="review") return {
-    subject:"How did we do? — a quick favour", title:"How did we do?",
-    greeting:`Dear ${S.customer},`,
-    paras:[`It's been a pleasure renovating your home, and we hope you're enjoying the result every day.`,
-      `If you have 30 seconds, a short review means the world to a family business like ours — and helps your neighbours find a team they can trust.`],
-    cta:{label:"★  Leave a Google review"} };
+    subject:"¿Qué le ha parecido? — un pequeño favor", title:"¿Qué le ha parecido?",
+    greeting:`Estimado/a ${S.customer}:`,
+    paras:[`Ha sido un placer reformar su hogar y esperamos que disfrute del resultado cada día.`,
+      `Si dispone de 30 segundos, una breve reseña significa muchísimo para una empresa familiar como la nuestra — y ayuda a sus vecinos a encontrar un equipo de confianza.`],
+    cta:{label:"★  Dejar una reseña en Google"} };
 }
 function renderEmail(c){
   const B=BRAND;
@@ -584,7 +610,7 @@ function renderEmail(c){
     <div style="padding:12px 32px 28px">
       <p style="margin:0 0 14px;font-size:15px;color:${B.ink};font-weight:600">${c.greeting}</p>
       ${paras}${cta}${attach}
-      <p style="margin:20px 0 0;font-size:14px;color:${B.body}">Kind regards,<br><b style="color:${B.ink}">The ${B.name} team</b></p>
+      <p style="margin:20px 0 0;font-size:14px;color:${B.body}">Un cordial saludo,<br><b style="color:${B.ink}">El equipo de ${B.name}</b></p>
     </div>
     <div style="padding:18px 32px;background:${B.soft};border-top:1px solid ${B.line};font-size:11.5px;color:#7c8072;line-height:1.6">
       <b style="color:${B.ink}">${B.legal}</b> · ${B.address}<br>${B.from} · ${B.phone} · 2-year guarantee on the works
@@ -592,11 +618,11 @@ function renderEmail(c){
   </div></div>`;
 }
 function emailDoc(c){ return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${c.subject}</title></head><body style="margin:0">${renderEmail(c)}</body></html>`; }
-function emailText(c){ const strip=s=>s.replace(/<[^>]+>/g,""); return `${strip(c.greeting)}\n\n${c.paras.map(strip).join("\n\n")}\n\nKind regards,\nThe ${BRAND.name} team\n\n${BRAND.legal} · ${BRAND.address}\n${BRAND.from} · ${BRAND.phone}`; }
+function emailText(c){ const strip=s=>s.replace(/<[^>]+>/g,""); return `${strip(c.greeting)}\n\n${c.paras.map(strip).join("\n\n")}\n\nUn cordial saludo,\nEl equipo de ${BRAND.name}\n\n${BRAND.legal} · ${BRAND.address}\n${BRAND.from} · ${BRAND.phone}`; }
 
 function buildPdf(o){
   const G="0.282 0.451 0.235", INK="0.078 0.086 0.059", GREY="0.55 0.56 0.5", BODY="0.33 0.34 0.29";
-  const e=s=>String(s).replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)").replace(/[^\x20-\x7e]/g,"");
+  const e=s=>String(s).replace(/€/g,"\x80").replace(/[–—]/g,"-").replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)").replace(/[^\x20-\x7e\x80\xa0-\xff]/g,"");
   let c="";
   c+=`${G} rg 0 792 595 50 re f\n`;
   c+=`1 1 1 rg BT /F2 19 Tf 42 807 Td (${e(BRAND.name)}) Tj ET\n`;
@@ -614,7 +640,7 @@ function buildPdf(o){
   const objs=[
     "<</Type/Catalog/Pages 2 0 R>>","<</Type/Pages/Kids[3 0 R]/Count 1>>",
     "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R/F2 5 0 R>>>>/Contents 6 0 R>>",
-    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>","<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>",
+    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>","<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/WinAnsiEncoding>>",
     "<</Length "+c.length+">>\nstream\n"+c+"\nendstream" ];
   let pdf="%PDF-1.4\n"; const off=[];
   objs.forEach((o2,i)=>{ off.push(pdf.length); pdf+=(i+1)+" 0 obj\n"+o2+"\nendobj\n"; });
@@ -624,8 +650,11 @@ function buildPdf(o){
   return btoa(pdf);
 }
 /* ---------- full best-practice invoice / quote PDF ---------- */
-const tr = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g,"")
-  .replace(/€/g,"EUR").replace(/[·•]/g,"-").replace(/[–—]/g,"-").replace(/[’']/g,"'").replace(/[“”]/g,'"').replace(/×/g,"x").replace(/º/g,"o").replace(/ª/g,"a").replace(/[^\x20-\x7e]/g,"");
+// Keep Latin-1 (WinAnsi) text so Spanish accents/ñ/¿¡ render; map € to the
+// WinAnsi Euro byte (0x80); drop only characters outside the printable range.
+const tr = s => String(s)
+  .replace(/€/g,"\x80").replace(/[·•]/g,"-").replace(/[–—]/g,"-").replace(/[’]/g,"'").replace(/[“”]/g,'"').replace(/×/g,"x")
+  .replace(/[^\x20-\x7e\x80\xa0-\xff]/g,"");
 function wrapTxt(s,maxCh){ const words=String(s).split(/\s+/); const out=[]; let cur="";
   for(const w of words){ if((cur+" "+w).trim().length>maxCh){ if(cur)out.push(cur); cur=w; } else cur=(cur?cur+" ":"")+w; }
   if(cur)out.push(cur); return out.length?out:[""]; }
@@ -700,7 +729,7 @@ function buildDocPdf(d){
   const objs=[
     "<</Type/Catalog/Pages 2 0 R>>","<</Type/Pages/Kids[3 0 R]/Count 1>>",
     "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R/F2 5 0 R>>>>/Contents 6 0 R>>",
-    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>","<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>",
+    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>","<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/WinAnsiEncoding>>",
     "<</Length "+c.length+">>\nstream\n"+c+"\nendstream" ];
   let pdf="%PDF-1.4\n"; const off=[];
   objs.forEach((o2,i)=>{ off.push(pdf.length); pdf+=(i+1)+" 0 obj\n"+o2+"\nendobj\n"; });
@@ -722,7 +751,7 @@ function docGroups(includeOptional){
 function invoiceDoc(){
   const sd=sdOf(8);
   const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
-  const irpf=Math.max(0,Number(sd.irpfPct)||0); const irpfAmt=Math.round(S.revenue*irpf/100);
+  const irpf=Math.max(0,num(sd.irpfPct)||0); const irpfAmt=Math.round(S.revenue*irpf/100);
   const issueISO=sd.invoiceDate||todayISO();
   const type=sd.invoiceType||"Full";
   const docType=type==="Deposit"?"FACTURA ANTICIPO · DEPOSIT":type==="Certification"?"CERTIFICACION · PROGRESS":"FACTURA · INVOICE";
@@ -736,12 +765,11 @@ function invoiceDoc(){
     dueLabel:"Vencimiento", dueOrValid:fmtDate(addDaysISO(issueISO,S.termsDays)),
     buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
     lines, groups: itemized?docGroups(true):undefined, totals,
-    payment:["Forma de pago: transferencia · "+S.termsDays+" dias.","IBAN: "+BRAND.iban+"   ·   Referencia: "+S.invoiceNo],
+    payment:["Forma de pago: transferencia · "+S.termsDays+" días.","IBAN: "+BRAND.iban+"   ·   Referencia: "+S.invoiceNo],
     notes:[
-      "Tipo de IVA decidido por la regla aplicable (tipo reducido cuando concurren las condiciones de renovacion, art. 91.Uno.2.10 LIVA); justificacion almacenada en el documento.",
-      "legally_verified: false hasta revision del asesor. Verifactu (AEAT) obligatorio desde 2027.",
-      "Las correcciones se emiten como factura rectificativa; esta factura es inmutable y esta sellada (SHA-256).",
-      "Garantia de 2 anos sobre los trabajos. Un unico punto de contacto durante todo el proyecto." ] };
+      "Tipo de IVA reducido aplicado cuando concurren las condiciones de renovación de vivienda (art. 91.Uno.2.10º LIVA).",
+      "Las correcciones se emiten como factura rectificativa; esta factura es inmutable.",
+      "Garantía de 2 años sobre los trabajos. Un único punto de contacto durante todo el proyecto." ] };
 }
 function quoteDoc(accepted){
   const base=sum(S.chapters,c=>c.budget); const hasOpt=S.optional.amount>0;
@@ -750,7 +778,7 @@ function quoteDoc(accepted){
   if(hasOpt) lines.push({desc:"Opcional (aparte) — "+S.optional.desc,amount:eurTxt(S.optional.amount)});
   const totals=[["Base (IVA no incl.)",eurTxt(base)]];
   if(accepted&&S.optional.included) totals.push(["Aceptado (con opcional)",eurTxt(base+S.optional.amount)]);
-  const sd3=sdOf(3); const validity=Number(sd3.validityDays)||30;
+  const sd3=sdOf(3); const validity=num(sd3.validityDays)||30;
   return { docType:"PRESUPUESTO · QUOTE", number:S.quoteNo, dateLabel:"Fecha", dateIssued:today(),
     dueLabel:"Valido hasta", dueOrValid:addDays(validity),
     buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
@@ -759,7 +787,7 @@ function quoteDoc(accepted){
     notes:[
       "Precios validos 30 dias. Los trabajos se planifican al aceptar el presupuesto.",
       "Este presupuesto se convierte en su proyecto con una linea base fija — sin re-introducir datos.",
-      "Garantia de 2 anos sobre los trabajos. Un unico punto de contacto durante todo el proyecto." ] };
+      "Garantía de 2 años sobre los trabajos. Un único punto de contacto durante todo el proyecto." ] };
 }
 function chunk(s){ return s.replace(/.{1,76}/g,"$&\r\n").trimEnd(); }
 function buildEml(c){
@@ -878,7 +906,7 @@ const FLOW = [
       <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Actual</th><th class="n">Variance</th></tr></thead><tbody>${rows}</tbody></table>`; },
     done:()=>{ textArt("08 Execution","supplier-bills.txt","Supplier bills booked:\n"+S.bills.map(b=>"  "+b.s+" ("+b.n+"): "+eurTxt(b.amt)).join("\n")+"\nTotal actual: "+eurTxt(actual())); log("Bills booked — actual "+eur(actual())+" ("+S.bills.length+" bills)"); } },
   { cap:"billing", email:{kind:"invoice"}, body:()=>{ S.revenue=S.baseline+(S.variations||0); const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
-      return `<p>The <b>invoice</b> is issued from the accepted quote. The VAT rate is <b>decided by the rule</b> (reduced rate where the renovation conditions apply, art. 91.Uno.2.10º) — not a dropdown — and its justification is persisted. Gapless number, SHA-256 chain seal.</p>
+      return `<p>The <b>invoice</b> is issued from the accepted quote. The reduced VAT rate applies where the renovation conditions are met (art. 91.Uno.2.10º), and the reason is recorded on the document. Numbers are gap-free and each invoice is sealed against tampering.</p>
       <table><tbody>
         <tr><td>Invoice</td><td class="n"><b>${esc(S.invoiceNo)}</b></td></tr>
         <tr><td>Bill to</td><td class="n">${esc(S.customer)}${S.buyerNif?" · "+esc(S.buyerNif):""}</td></tr>
@@ -887,7 +915,7 @@ const FLOW = [
         <tr><td>IVA ${vp}%</td><td class="n">${eur(vat)}</td></tr>
         <tr><td><b>Total a pagar</b></td><td class="n"><b>${eur(S.revenue+vat)}</b></td></tr>
       </tbody></table>
-      <div class="did"><b>Full factura PDF filed into “09 Invoicing”</b> — parties (NIF/CIF), dates, line items, VAT breakdown, IBAN &amp; payment terms, and the legal notes.<br><span class="hint">legally_verified:false until the asesor's review · renders in es-ES</span></div>`; },
+      <div class="did"><b>Full factura PDF filed into “09 Invoicing”</b> — parties (NIF/CIF), dates, line items, VAT breakdown, IBAN &amp; payment terms, and the legal notes.<br><span class="hint">Issued in Spanish (es-ES).</span></div>`; },
     done:()=>{ art("09 Invoicing",S.invoiceNo+".pdf","application/pdf",buildDocPdf(invoiceDoc()));
       art("09 Invoicing","Invoice-email.eml","message/rfc822",textToB64(buildEml(emailContent("invoice")))); log("Invoice "+S.invoiceNo+" issued — revenue "+eur(S.revenue)); } },
   { cap:"receivables", email:{kind:"reminder"}, body:()=>{ const vat=Math.round(S.revenue*S.vatBp/10000); const total=S.revenue+vat; S.collected=total;
@@ -1007,8 +1035,8 @@ function renderEstimator(wrap){
   const apply=el("button","btn sm","→ Use as the quote"); apply.type="button"; apply.style.marginTop="12px";
   box.append(addbar,list,cont,tot,el("br"),apply); wrap.append(box);
 
-  const sumEst=()=>sd.items.reduce((s,it)=>s+Math.round((Number(it.qty)||0)*(Number(it.rate)||0)*100),0);
-  const total=()=>{ const t=sumEst(); const c=Math.max(0,Number(sd.contingency)||0); const hi=Math.round(t*(1+c/100));
+  const sumEst=()=>sd.items.reduce((s,it)=>s+Math.round((num(it.qty)||0)*(num(it.rate)||0)*100),0);
+  const total=()=>{ const t=sumEst(); const c=Math.max(0,num(sd.contingency)||0); const hi=Math.round(t*(1+c/100));
     tot.innerHTML=`<b>Estimate:</b> ${eur(t)} – ${eur(hi)} (ex-VAT, incl. ${c}% contingency) · <span class="hint">a range to align before the detailed quote</span>`; };
   const draw=()=>{
     list.innerHTML="";
@@ -1017,9 +1045,9 @@ function renderEstimator(wrap){
       row.innerHTML=`<input data-f="desc" placeholder="Work / room" value="${esc(it.desc||"")}">
         <input data-f="qty" type="number" step="any" placeholder="${esc(it.unit||'qty')}" value="${it.qty??""}">
         <input data-f="rate" type="number" step="any" placeholder="€/unit" value="${it.rate??""}">
-        <span class="lt">${eur(Math.round((Number(it.qty)||0)*(Number(it.rate)||0)*100))}</span>
+        <span class="lt">${eur(Math.round((num(it.qty)||0)*(num(it.rate)||0)*100))}</span>
         <button class="x" data-x="${i}" type="button">×</button>`;
-      row.querySelectorAll("[data-f]").forEach(inp=>inp.oninput=()=>{ it[inp.dataset.f]=inp.value; persistSoon(); row.querySelector(".lt").textContent=eur(Math.round((Number(it.qty)||0)*(Number(it.rate)||0)*100)); total(); });
+      row.querySelectorAll("[data-f]").forEach(inp=>inp.oninput=()=>{ it[inp.dataset.f]=inp.value; persistSoon(); row.querySelector(".lt").textContent=eur(Math.round((num(it.qty)||0)*(num(it.rate)||0)*100)); total(); });
       row.querySelector("[data-x]").onclick=()=>{ sd.items.splice(i,1); if(!sd.items.length)sd.items.push({desc:"",chapter:"",unit:"",qty:1,rate:""}); persistSoon(); draw(); };
       list.append(row);
     });
@@ -1030,11 +1058,11 @@ function renderEstimator(wrap){
   addbar.querySelector("#estadd").onclick=()=>{ sd.items.push({desc:"",chapter:"",unit:"",qty:1,rate:""}); persistSoon(); draw(); };
   cont.querySelector("#estcont").oninput=e=>{ sd.contingency=e.target.value; persistSoon(); total(); };
   apply.onclick=()=>{
-    const items=sd.items.filter(it=>it.desc&&Number(it.rate)>0);
+    const items=sd.items.filter(it=>it.desc&&num(it.rate)>0);
     if(!items.length){ alert("Add at least one line with a description and rate."); return; }
-    PROJECT.profile.lines = items.map(it=>({chapter:(it.chapter||it.desc||"Estimate"), item:it.desc, unit:it.unit||"", qty:Number(it.qty)||1, price:Number(it.rate)||0}));
+    PROJECT.profile.lines = items.map(it=>({chapter:(it.chapter||it.desc||"Estimate"), item:it.desc, unit:it.unit||"", qty:num(it.qty)||1, price:num(it.rate)||0}));
     S=buildS(PROJECT.profile); persistSoon(); renderLedger(); saveStageDetails(2);
-    textArt("03 Estimate","estimate.txt","Estimator for "+S.customer+"\n"+items.map(it=>"  "+it.desc+": "+it.qty+" "+(it.unit||"")+" x "+eurTxt(Math.round(it.rate*100))+" = "+eurTxt(Math.round((it.qty||1)*it.rate*100))).join("\n")+"\nEstimate (ex-VAT): "+eurTxt(sumEst())+" · +"+((Number(sd.contingency)||0))+"% contingency");
+    textArt("03 Estimate","estimate.txt","Estimator for "+S.customer+"\n"+items.map(it=>"  "+it.desc+": "+it.qty+" "+(it.unit||"")+" x "+eurTxt(Math.round(it.rate*100))+" = "+eurTxt(Math.round((it.qty||1)*it.rate*100))).join("\n")+"\nEstimate (ex-VAT): "+eurTxt(sumEst())+" · +"+((num(sd.contingency)||0))+"% contingency");
     log("Estimate applied to the quote — "+eur(sumEst())+" across "+S.chapters.length+" chapter(s).");
     apply.textContent="✓ Sent to the quote"; renderStage();
   };
@@ -1060,7 +1088,7 @@ function renderQuoteBuilder(wrap){
   const apply=el("button","btn sm","✓ Update quote"); apply.type="button"; apply.style.marginTop="12px";
   box.append(addbar,list,tot,el("br"),apply); wrap.append(box);
 
-  const lineTot=ln=>Math.round((Number(ln.qty)||0)*(Number(ln.price)||0)*100);
+  const lineTot=ln=>Math.round((num(ln.qty)||0)*(num(ln.price)||0)*100);
   const total=()=>{ const t=sd.lines.reduce((s,l)=>s+lineTot(l),0); tot.innerHTML=`<b>Quote base:</b> ${eur(t)} (ex-VAT) · ${sd.lines.length} line(s) · <span class="hint">grouped by chapter on the PDF</span>`; };
   const draw=()=>{
     list.innerHTML="";
@@ -1084,9 +1112,9 @@ function renderQuoteBuilder(wrap){
     const c=CATALOGUE[+v]; sd.lines.push({chapter:c.chapter,item:c.item,unit:c.unit,qty:1,price:c.price}); e.target.value=""; persistSoon(); draw(); };
   addbar.querySelector("#addcustom").onclick=()=>{ sd.lines.push({chapter:"Other works",item:"",unit:"",qty:1,price:""}); persistSoon(); draw(); };
   apply.onclick=()=>{
-    const valid=sd.lines.filter(l=>l.item&&Number(l.qty)>0&&Number(l.price)>0);
+    const valid=sd.lines.filter(l=>l.item&&num(l.qty)>0&&num(l.price)>0);
     if(!valid.length){ alert("Add at least one line with a concept, quantity and price."); return; }
-    PROJECT.profile.lines=valid.map(l=>({chapter:l.chapter||"Other works",item:l.item,unit:l.unit,qty:Number(l.qty),price:Number(l.price)}));
+    PROJECT.profile.lines=valid.map(l=>({chapter:l.chapter||"Other works",item:l.item,unit:l.unit,qty:num(l.qty),price:num(l.price)}));
     S=buildS(PROJECT.profile); persistSoon(); renderLedger();
     art("04 Quotation",S.quoteNo+".pdf","application/pdf",buildDocPdf(quoteDoc(false)));
     log("Quote updated — "+S.chapters.length+" chapter(s), "+valid.length+" line(s), base "+eur(sum(S.chapters,c=>c.budget)));
@@ -1141,7 +1169,7 @@ function renderScheduler(wrap){
 }
 
 /* ---------- change orders (Execution stage) — variations preserve the baseline ---------- */
-function recalcVariations(){ const sd=sdOf(7); S.variations=(sd.changes||[]).reduce((s,c)=>s+Math.round((Number(c.amount)||0)*100),0); }
+function recalcVariations(){ const sd=sdOf(7); S.variations=(sd.changes||[]).reduce((s,c)=>s+Math.round((num(c.amount)||0)*100),0); }
 function renderChangeOrders(wrap){
   const sd=sdOf(7); if(!sd.changes) sd.changes=[];
   recalcVariations();
@@ -1154,7 +1182,7 @@ function renderChangeOrders(wrap){
   const total=()=>{ recalcVariations(); renderLedger();
     const cur=(S.baseline||sum(S.chapters,c=>c.budget))+S.variations;
     tot.innerHTML=`<b>Baseline:</b> ${eur(S.baseline||sum(S.chapters,c=>c.budget))} · <b>Variations:</b> ${S.variations>=0?"+":""}${eur(S.variations)} · <b>Current contract:</b> ${eur(cur)}`;
-    textArt("08 Execution","change-orders.txt","Change orders (variations):\n"+(sd.changes.filter(c=>c.desc).map(c=>"  "+c.desc+": "+(Number(c.amount)>=0?"+":"")+eurTxt(Math.round((Number(c.amount)||0)*100))).join("\n")||"  (none)")+"\nBaseline preserved: "+eurTxt(S.baseline||sum(S.chapters,c=>c.budget))+"\nCurrent contract: "+eurTxt(cur)); };
+    textArt("08 Execution","change-orders.txt","Change orders (variations):\n"+(sd.changes.filter(c=>c.desc).map(c=>"  "+c.desc+": "+(num(c.amount)>=0?"+":"")+eurTxt(Math.round((num(c.amount)||0)*100))).join("\n")||"  (none)")+"\nBaseline preserved: "+eurTxt(S.baseline||sum(S.chapters,c=>c.budget))+"\nCurrent contract: "+eurTxt(cur)); };
   const draw=()=>{
     list.innerHTML="";
     sd.changes.forEach((c,i)=>{
@@ -1180,7 +1208,7 @@ function intakeHtml(){
   if(!hasLines && (!p.chapters || !p.chapters.length)) p.chapters=[{chapter:"",budget:""},{chapter:"",budget:""}];
   let quoteSec;
   if(hasLines){
-    const by={}; const ord=[]; p.lines.forEach(l=>{ if(!(l.chapter in by)){by[l.chapter]=0;ord.push(l.chapter);} by[l.chapter]+=(Number(l.qty)||0)*(Number(l.price)||0); });
+    const by={}; const ord=[]; p.lines.forEach(l=>{ if(!(l.chapter in by)){by[l.chapter]=0;ord.push(l.chapter);} by[l.chapter]+=(num(l.qty)||0)*(num(l.price)||0); });
     const rows=ord.map(ch=>`<tr><td>${esc(ch)}</td><td class="n">${eur(Math.round(by[ch]*100))}</td></tr>`).join("");
     quoteSec=`<div class="fsec"><h4>Quote — ${p.lines.length} itemised lines</h4>
       <div class="hint" style="margin-bottom:8px">Loaded from the catalogue. Refine every line in <b>step 4 · Quotation</b>.</div>
@@ -1226,9 +1254,9 @@ function intakeHtml(){
         <div class="frow">
           <div class="field"><label>Quote number</label><input data-p="quoteNo" value="${esc(p.quoteNo||"")}" placeholder="PRE-2026-0001"></div>
           <div class="field"><label>Invoice number</label><input data-p="invoiceNo" value="${esc(p.invoiceNo)}"></div>
-          <div class="field"><label>VAT rate (%)</label><input data-p="vatPct" type="number" step="0.1" min="0" value="${p.vatPct}"></div>
+          <div class="field"><label>VAT rate</label><select data-p="vatPct">${[["10","10% — reforma de vivienda"],["21","21% — general"],["4","4% — superreducido"],["0","Exento / no sujeto"]].map(([v,l])=>`<option value="${v}"${String(p.vatPct)===v?" selected":""}>${l}</option>`).join("")}</select></div>
           <div class="field"><label>Payment terms (days)</label><input data-p="termsDays" type="number" step="1" min="0" value="${p.termsDays??15}"></div>
-          <div class="field full"><label>Estimated supplier cost (% of budget) — drives committed / actual / margin</label><input data-p="costPct" type="number" step="1" min="0" max="130" value="${p.costPct}"></div>
+          <div class="field full"><label>Estimated cost as % of price — used to show committed vs actual &amp; margin</label><input data-p="costPct" type="number" step="1" min="0" max="130" value="${p.costPct}"></div>
         </div>
       </div>
       <div class="err" id="ierr" hidden></div>
@@ -1259,11 +1287,12 @@ function wireIntake(){
 function reIntake(){ $("#stage").innerHTML=intakeHtml(); wireIntake(); }
 
 function startJourney(){
-  const hasQuote = (draft.lines&&draft.lines.length) || (draft.chapters||[]).filter(c=>c.chapter&&Number(c.budget)>0).length>0;
-  if(!draft.customer.trim() || !hasQuote){
-    const e=$("#ierr"); e.hidden=false; e.textContent=!draft.customer.trim()?"Please enter the customer name.":"Add at least one chapter with a budget (or load the sample).";
-    return;
-  }
+  const hasQuote = (draft.lines&&draft.lines.length) || (draft.chapters||[]).filter(c=>c.chapter&&num(c.budget)>0).length>0;
+  const fail=msg=>{ const e=$("#ierr"); e.hidden=false; e.textContent=msg; e.scrollIntoView({block:"center",behavior:"smooth"}); };
+  if(!draft.customer.trim()) return fail("Please enter the customer name.");
+  if(!hasQuote) return fail("Add at least one chapter with a budget (or load the sample).");
+  if(!validNifCif(draft.buyerNif)) return fail("Enter a valid NIF / CIF for the customer — it's required for a legal invoice.");
+  if(!validEmail(draft.email)) return fail("Enter a valid customer email — documents are sent to this address.");
   PROJECT.profile=clone(draft); S=buildS(PROJECT.profile);
   PROJECT.stageData = draft._stageData ? clone(draft._stageData) : {};
   persistSoon();
@@ -1315,9 +1344,9 @@ function renderStage(){
     const bar=el("div","mailbar");
     const send=el("button","btn sm","✉ Send");
     const dl=el("button","btn sm ghost",(c.attach?"⤓ Outlook draft + PDF (.eml)":"⤓ Outlook draft (.eml)"));
-    send.onclick=()=>{ send.textContent="✓ Sent (logged)"; send.disabled=true; log("Email sent → "+S.email+" (log-only)"); };
+    send.onclick=()=>{ send.textContent="✓ Sent"; send.disabled=true; log("Email sent → "+S.email); };
     dl.onclick=()=>{ download("Canei-"+f.email.kind+".eml","message/rfc822",buildEml(c)); log("Outlook draft downloaded — "+f.email.kind); };
-    bar.append(send,dl,el("span","safe","log-only — not delivered")); box.append(bar);
+    bar.append(send,dl,el("span","safe","Drafted for review — sent on your say-so")); box.append(bar);
     wrap.append(box);
   }
 

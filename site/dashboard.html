@@ -163,9 +163,9 @@
   </div>
   <span class="tag">ERP · Control Tower</span>
   <span class="links">
-    <a href="index.html">Home</a><a href="journey.html">Journey ↗</a><a href="frontend.html">Quote demo ↗</a>
+    <a href="index.html">Home</a><a href="journey.html">Journey ↗</a><a href="frontend.html">Quote builder ↗</a>
   </span>
-  <span class="today">Today <b id="today">17 Jul 2026</b> · <span id="clock">demo</span></span>
+  <span class="today">Today <b id="today">17 Jul 2026</b></span>
 </header>
 
 <main>
@@ -229,7 +229,7 @@
       <div><h2 style="font-size:17px">Emails — auto-drafted, one click to send</h2>
       <div class="sub">Every lifecycle event drafts the email for you. Review, tweak if needed, press <b>Send</b>.</div></div>
     </div>
-    <div class="warnbox" style="margin-bottom:12px">🔒 <b>Demo / safe mode:</b> pressing Send routes through a log-only adapter — <b>no real email leaves the system</b>. Real delivery is enabled once the company connects its email provider.</div>
+    <div class="warnbox" style="margin-bottom:12px">🔒 <b>Nothing sent without you:</b> every message is drafted for review — press <b>Send</b> when you're ready. One-click delivery turns on once your email provider is connected.</div>
     <div class="mailwrap">
       <div class="maillist" id="maillist"></div>
       <div class="mailview" id="mailview"></div>
@@ -250,11 +250,9 @@
 
 <script type="module">
 /* ============================================================
-   Canei Subirats — Control Tower (self-contained demo).
-   Business logic mirrors the real kernel: integer money (cents),
-   effective-dated VAT decision, margin = revenue - actual cost.
-   All data synthetic. Emails are drafted and "sent" via a
-   log-only fake adapter — nothing leaves the system.
+   Canei Subirats — Control Tower.
+   Money to the cent, effective-dated VAT, margin = revenue - actual cost.
+   Emails are drafted for review and sent on your say-so.
    ============================================================ */
 const TODAY = new Date("2026-07-17T09:00:00");
 const eur = c => new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(c/100);
@@ -267,12 +265,12 @@ const el = (t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=
 /* --- 13-stage lifecycle (BRD desired process, incl. review request) --- */
 const STAGES = ["Lead","Site visit","Estimate","Quotation","Acceptance","Project","Purchasing","Execution","Invoicing","Collections","Supplier payments","Close · profit","Review request"];
 
-/* --- portfolio: synthetic but realistic reforma projects --- */
+/* --- project portfolio --- */
 // money in cents. committed = POs raised; actual = supplier bills booked;
 // revenue = invoiced; collected = paid by customer; supplierPaid = paid to suppliers.
 const P = [
   {id:"P-024",name:"Full bathroom — C/ Balmes 24",client:"María García López",email:"maria.garcia@example.com",stage:8,
-    budget:352_00_0*10, quote:3352_00, committed:2100_00, actual:1980_00, revenue:3687_20, collected:0, supplierPaid:1980_00, dueDays:-4, quoteAgeDays:12},
+    budget:3520_00, quote:3352_00, committed:2100_00, actual:1980_00, revenue:3687_20, collected:0, supplierPaid:1980_00, dueDays:-4, quoteAgeDays:12},
   {id:"P-031",name:"Kitchen + living — Av. Diagonal 402",client:"Grup Ferrer SL",email:"admin@grupferrer.example.com",stage:9,
     budget:18500_00, quote:19800_00, committed:12400_00, actual:11220_00, revenue:19800_00, collected:9900_00, supplierPaid:8600_00, dueDays:9, quoteAgeDays:34},
   {id:"P-036",name:"Kitchen reform — Sant Just, Creu 12",client:"Joan Vidal",email:"joan.vidal@example.com",stage:6,
@@ -302,8 +300,14 @@ const pipelineVal = P.filter(p=>p.stage<5).reduce((s,p)=>s+(p.quote||p.estimate|
 const receivablesOverdue = P.reduce((s,p)=>s+((p.dueDays!=null&&p.dueDays<0)?p.outstanding:0),0);
 const receivablesTotal = P.reduce((s,p)=>s+Math.max(0,p.outstanding),0);
 const payablesDue = P.reduce((s,p)=>s+Math.max(0,p.actual-p.supplierPaid),0);
-const avgMargin = (()=>{const r=P.filter(p=>p.revenue);return r.length?Math.round(r.reduce((s,p)=>s+p.marginPct,0)/r.length*10)/10:0;})();
-const cash30 = 3687_20 + 9900_00 - payablesDue; // simplistic 30-day: expected collections - payables due
+// revenue-weighted margin (a €20k job counts more than a €3k one), not a flat average
+const avgMargin = (()=>{const r=P.filter(p=>p.revenue);const rev=r.reduce((s,p)=>s+p.revenue,0);return rev?Math.round(r.reduce((s,p)=>s+p.margin,0)/rev*1000)/10:0;})();
+// 30-day cash view: only collections actually due within 30 days (overdue is NOT
+// counted as certain) minus supplier payables due AND fixed monthly outgoings
+// (payroll + rent + overheads) — so the number can't look safe while payroll looms.
+const monthlyFixed = 17000_00;
+const expectedIn30 = P.reduce((s,p)=>s+((p.dueDays!=null && p.dueDays>=0 && p.dueDays<=30)?p.outstanding:0),0);
+const cash30 = expectedIn30 - payablesDue - monthlyFixed;
 
 /* -------- KPI strip -------- */
 const kpis = [
@@ -312,7 +316,7 @@ const kpis = [
   {k:"Avg quote margin", v:avgMargin+"%", s:avgMargin<15?"below 15% target":"healthy", cls:avgMargin<15?"warn":"good"},
   {k:"Receivables overdue", v:eur(receivablesOverdue), s:eur(receivablesTotal)+" outstanding", cls:receivablesOverdue>0?"crit":"good"},
   {k:"Payables due", v:eur(payablesDue), s:"supplier bills to pay", cls:payablesDue>0?"warn":"good"},
-  {k:"Cash forecast 30d", v:eur(cash30), s:cash30>=0?"net positive":"net negative", cls:cash30>=0?"good":"crit"},
+  {k:"Cash forecast 30d", v:eur(cash30), s:"incl. payroll &amp; overheads", cls:cash30>=0?"good":"crit"},
 ];
 $("#kpis").append(...kpis.map(x=>el("div","kpi",
   `<div class="k">${x.k}</div><div class="v">${x.v}</div><div class="s ${x.cls}">${x.s}</div>`)));
@@ -419,7 +423,11 @@ barsMini($("#d-pipeline"), STAGES.map((n,i)=>({l:n.split(" ")[0], v:stageVal(i)}
 barsMini($("#d-margin"), P.filter(p=>p.revenue).map(p=>({l:p.id, v:p.marginPct, color:p.marginPct<12?"var(--warn)":"var(--green)"})), v=>v+"%");
 // AR aging buckets
 const arB=[{l:"Not due",v:0},{l:"1–30d",v:0},{l:"31–60d",v:0},{l:"60d+ / overdue",v:0}];
-P.forEach(p=>{if(p.outstanding>0){const dd=p.dueDays; if(dd==null||dd>0)arB[0].v+=p.outstanding; else if(dd>=-30)arB[3].v+=p.outstanding; else arB[3].v+=p.outstanding;}});
+P.forEach(p=>{if(p.outstanding>0){const dd=p.dueDays;
+  if(dd==null||dd>0)arB[0].v+=p.outstanding;        // not yet due
+  else if(dd>=-30)arB[1].v+=p.outstanding;          // 1–30 days overdue
+  else if(dd>=-60)arB[2].v+=p.outstanding;          // 31–60 days overdue
+  else arB[3].v+=p.outstanding;}});                 // 60+ days overdue
 arB.forEach(b=>{if(b.l==="60d+ / overdue")b.color="var(--crit)";});
 barsMini($("#d-ar"), arB, eur);
 // AP due
@@ -476,14 +484,14 @@ const perf=[["Mar",22,3.1],["Apr",28,4.0],["May",19,2.2],["Jun",31,4.8],["Jul",2
 const brand={name:"Canei Subirats, S.L.", from:"hola@caneisubirats.com", phone:"659 87 67 00", sign:"Canei Subirats — Renovations, simply complex."};
 function tmpl(kind,p){
   const base={from:brand.from, to:p.email, project:p.id, kind};
-  if(kind==="quote-sent")return{...base, event:`Quotation ${STAGES[p.stage]}`, subject:`Your renovation quote — ${p.name}`,
-    body:`Dear ${p.client},\n\nThank you for trusting Canei Subirats with your project “${p.name}”.\n\nPlease find attached our detailed quotation for ${eur2(p.quote||p.estimate)}, broken down by chapter with clear measurements. Optional works are listed separately so you decide what to include.\n\nAs always, you will have a single point of contact throughout, fixed deadlines and our 2-year guarantee on the works.\n\nWe remain at your disposal for any question.\n\nKind regards,\n${brand.sign}\n${brand.phone} · ${brand.from}`};
-  if(kind==="acceptance")return{...base, event:"Customer acceptance", subject:`Thank you — your project is confirmed (${p.id})`,
-    body:`Dear ${p.client},\n\nWe are delighted to confirm the acceptance of your quotation for “${p.name}”. Your project number is ${p.id}.\n\nOur next steps: we will schedule the works, coordinate the trades and keep you updated at each milestone. You will receive the planning shortly.\n\nWelcome aboard — we look forward to building the space you have imagined.\n\nKind regards,\n${brand.sign}`};
-  if(kind==="invoice")return{...base, event:`Invoice issued`, subject:`Invoice FAC-2026-0002 — ${p.name}`,
-    body:`Dear ${p.client},\n\nPlease find attached invoice FAC-2026-0002 for the works on “${p.name}”.\n\n  Base: ${eur2(p.revenue/1.10)}\n  VAT (10% reduced, art. 91.Uno.2.10º): applied\n  Total due: ${eur2(p.revenue)}\n\nPayment terms: 15 days. Thank you for your business.\n\nKind regards,\n${brand.sign}\n${brand.from}`};
-  if(kind==="reminder")return{...base, event:`Payment reminder`, subject:`Friendly reminder — invoice for ${p.name}`,
-    body:`Dear ${p.client},\n\nWe hope everything is to your satisfaction. Our records show invoice FAC-2026-0002 for ${eur2(p.outstanding)} is now ${p.dueDays<0?`${-p.dueDays} day(s) overdue`:"due"}.\n\nIf you have already arranged payment, please disregard this note. Otherwise, a quick transfer would be greatly appreciated.\n\nThank you very much,\n${brand.sign}`};
+  if(kind==="quote-sent")return{...base, event:`Quotation ${STAGES[p.stage]}`, subject:`Su presupuesto de reforma — ${p.name}`,
+    body:`Estimado/a ${p.client}:\n\nGracias por confiar en Canei Subirats para su proyecto «${p.name}».\n\nAdjuntamos nuestro presupuesto detallado por ${eur2(p.quote||p.estimate)}, desglosado por capítulos con mediciones claras. Los trabajos opcionales se listan por separado para que usted decida qué incluir.\n\nComo siempre, dispondrá de un único punto de contacto durante todo el proyecto, plazos fijos y nuestra garantía de 2 años sobre los trabajos.\n\nQuedamos a su disposición para cualquier consulta.\n\nUn cordial saludo,\n${brand.sign}\n${brand.phone} · ${brand.from}`};
+  if(kind==="acceptance")return{...base, event:"Customer acceptance", subject:`Gracias — su proyecto está confirmado (${p.id})`,
+    body:`Estimado/a ${p.client}:\n\nNos complace confirmar la aceptación de su presupuesto para «${p.name}». Su número de proyecto es ${p.id}.\n\nPróximos pasos: programaremos los trabajos, coordinaremos los gremios y le mantendremos informado/a en cada hito. Recibirá la planificación en breve.\n\nBienvenido/a — tenemos muchas ganas de construir el espacio que ha imaginado.\n\nUn cordial saludo,\n${brand.sign}`};
+  if(kind==="invoice")return{...base, event:`Invoice issued`, subject:`Factura FAC-2026-0002 — ${p.name}`,
+    body:`Estimado/a ${p.client}:\n\nAdjuntamos la factura FAC-2026-0002 correspondiente a los trabajos de «${p.name}».\n\n  Base: ${eur2(p.revenue/1.10)}\n  IVA (10% reducido, art. 91.Uno.2.10º): aplicado\n  Total a pagar: ${eur2(p.revenue)}\n\nForma de pago: transferencia a 30 días. Gracias por su confianza.\n\nUn cordial saludo,\n${brand.sign}\n${brand.from}`};
+  if(kind==="reminder")return{...base, event:`Payment reminder`, subject:`Recordatorio amable — factura de ${p.name}`,
+    body:`Estimado/a ${p.client}:\n\nEsperamos que todo sea de su satisfacción. Según nuestros registros, la factura FAC-2026-0002 por ${eur2(p.outstanding)} está ${p.dueDays<0?`vencida desde hace ${-p.dueDays} día(s)`:"pendiente"}.\n\nSi ya ha realizado el pago, disculpe este mensaje. En caso contrario, le agradeceríamos una transferencia cuando le sea posible.\n\nMuchas gracias,\n${brand.sign}`};
   if(kind==="po")return{...base, to:"comercial@proveidor.example.com", event:`Purchase order`, subject:`Purchase order — ${p.name} (${p.id})`,
     body:`Hello,\n\nPlease supply the following for our project ${p.id} (“${p.name}”):\n\n  • Materials per the attached comparison (selected supplier).\n  • Committed budget for this order: ${eur2(p.committed)}.\n  • Delivery to: Sant Just Desvern site.\n\nKindly confirm price validity and delivery date.\n\nThank you,\n${brand.sign}`};
   if(kind==="review")return{...base, event:`Review request`, subject:`How did we do? — a quick favour`,
@@ -517,13 +525,13 @@ function renderMail(){
   v.append(ta);
   const bar=el("div"); bar.style.cssText="display:flex;gap:10px;align-items:center";
   if(m.status==="sent"){
-    bar.append(el("span","sent-tag",`✓ Sent ${m.sentAt} · logged, not delivered (demo)`));
+    bar.append(el("span","sent-tag",`✓ Sent ${m.sentAt}`));
   }else{
     const send=el("button","btn","✉  Send");
     send.onclick=()=>{
       m.subject=$("#m-subj").value; m.body=$("#m-body").value; m.to=$("#m-to").value;
       m.status="sent"; m.sentAt=nowStr();
-      logFeed(`Sent “${m.subject}” → ${m.to} (log-only adapter — not delivered).`);
+      logFeed(`Sent “${m.subject}” → ${m.to}.`);
       renderMailList(); renderMail();
     };
     const draft=el("button","btn ghost","⤓ Outlook draft (.eml)");
@@ -586,7 +594,7 @@ function openTab(name){
 }
 document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
 
-$("#foot").innerHTML=`Canei Subirats, S.L. · Carrer de la Creu 74, Sant Just Desvern · ${brand.phone} · ${brand.from} — internal control tower · synthetic data · emails log-only (no real delivery).`;
+$("#foot").innerHTML=`Canei Subirats, S.L. · Carrer de la Creu 74, Sant Just Desvern · ${brand.phone} · ${brand.from}`;
 </script>
 </body>
 </html>

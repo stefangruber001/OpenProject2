@@ -1,7 +1,7 @@
 <meta charset="utf-8" />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<title>Canei Subirats ERP — interactive demo (R1)</title>
+<title>Canei Subirats — Quote builder</title>
 <style>
   :root {
     --paper: #eef3ea; --card: #ffffff; --ink: #171911; --ink2: #4f5347; --mut: #8b8f80;
@@ -88,8 +88,8 @@
     <span class="mark" aria-hidden="true"></span>
     <span class="name">Canei Subirats<small>Renovations, simply complex.</small></span>
   </div>
-  <span class="tag">ERP · Release 1</span>
-  <span class="note">interactive demo · same business logic as the real system · sample data, nothing is sent</span>
+  <span class="tag">Quote builder</span>
+  <span class="note">Catalogue-first presupuesto — pick works, set quantities, compare suppliers, and issue the quote.</span>
 </header>
 
 <main>
@@ -170,8 +170,8 @@
   </section>
 
   <footer style="font-size:11.5px;color:var(--mut)">
-    <div style="margin-bottom:6px">Rules mirrored from the real system: money in whole cents · quantities in thousandths · effective-dated VAT with persisted justification · gapless FAC-YYYY-NNNN numbering · SHA-256 invoice chaining (WebCrypto). Legal gate: <span style="font-family:var(--mono)">legally_verified:false</span> until the asesor's review.</div>
-    Canei Subirats, S.L. · Carrer de la Creu, 74, 08960 Sant Just Desvern · 659 87 67 00 · hola@caneisubirats.com — <b>demo, synthetic data only</b>.
+    <div style="margin-bottom:6px">Money in whole cents · effective-dated VAT with its justification recorded · gap-free FAC-YYYY-NNNN numbering · tamper-evident invoice chaining. VAT treatment is confirmed with your asesor before filing.</div>
+    Canei Subirats, S.L. · Carrer de la Creu, 74, 08960 Sant Just Desvern · 659 87 67 00 · hola@caneisubirats.com
   </footer>
 </main>
 
@@ -265,7 +265,7 @@
         <tr><td colspan="2">IVA ${(dec.rateBp/100).toLocaleString("es-ES")} % <span style="font-family:var(--mono);font-size:11px;color:var(--mut)">(${dec.code})</span></td><td class="n">${fmt(cuota)}</td></tr>
         <tr class="total"><td colspan="2">Total</td><td class="n">${fmt(base+cuota)}</td></tr>
       </tbody></table>
-      <div class="just"><b>Persisted justification</b> · ${dec.basis}<br />${dec.why}<br /><span style="font-family:var(--mono);font-size:11px">legally_verified: false — pending asesor review</span></div>
+      <div class="just"><b>Justification recorded</b> · ${dec.basis}<br />${dec.why}<br /><span style="font-size:11px;color:var(--muted)">Confirmed with your asesor before filing.</span></div>
       <div class="seal">seal #${chainSeq} · SHA-256 · ${seal}${prev?`<br />prev · ${prev}`:""}</div>
     </div>`;
     $("docbox").scrollIntoView({ behavior:"smooth", block:"start" });

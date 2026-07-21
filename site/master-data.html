@@ -184,7 +184,7 @@
       <div class="toolbar">
         <label class="search"><span>🔎</span><input id="q" type="search" placeholder="Search records…" autocomplete="off"></label>
         <span class="count" id="count"></span>
-        <button class="btn sm" id="btnSeed" title="Reload sample data">↻ Sample</button>
+        <button class="btn sm" id="btnSeed" title="Load the starter data set">↻ Starter data</button>
       </div>
 
       <div class="tablewrap">
@@ -216,7 +216,7 @@
   <div class="toast" id="toast"></div>
 
 <script>
-/* =================== persistence (IndexedDB, mirrors journey.html) =================== */
+/* =================== persistence (IndexedDB) =================== */
 const DB="caneiMasterData", STORE="kv", KEY="data";
 function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);
   r.onupgradeneeded=()=>r.result.createObjectStore(STORE);
@@ -488,7 +488,7 @@ const MODEL=[
 ];
 const ENT={}; MODEL.forEach(g=>g.entities.forEach(e=>ENT[e.key]=e));
 
-/* =================== seed (synthetic — safe to overwrite) =================== */
+/* =================== starter data (replace with your own) =================== */
 function seed(){return {
  company:[{legalName:"Canei Subirats, S.L.",tradeName:"Canei Subirats",cif:"B00000000",vatId:"ESB00000000",cnae:"4332",shareCapital:3006,
    address:"Carrer de la Creu, 74",city:"Sant Just Desvern",pc:"08960",province:"Barcelona",country:"España",
@@ -682,6 +682,12 @@ function saveEditor(){
   const e=ENT[cur], rec=readForm();
   const reqMissing=e.fields.filter(f=>f.req&&(rec[f.k]===''||rec[f.k]==null)).map(f=>f.label);
   if(reqMissing.length){toast('Required: '+reqMissing.join(', '));return;}
+  // Duplicate guard: warn if another record already uses this code/SKU/NIF.
+  const keyF=(e.fields.find(f=>['code','sku'].includes(f.k))||{}).k;
+  if(keyF && rec[keyF]!=null && rec[keyF]!==''){
+    const dup=(DATA[cur]||[]).some((r,i)=>i!==editIdx && String(r[keyF]).trim().toLowerCase()===String(rec[keyF]).trim().toLowerCase());
+    if(dup && !confirm(`Another ${e.label.replace(/s$/,'').toLowerCase()} already uses ${keyF.toUpperCase()} "${rec[keyF]}". Save a duplicate anyway?`))return;
+  }
   if(e.single){DATA[cur]=[rec];}
   else if(editIdx>=0){DATA[cur][editIdx]=rec;} else {DATA[cur].push(rec);}
   persistSoon(); closeEditor(); refreshCounts(); drawRows(); toast('Saved ✓');
@@ -701,14 +707,16 @@ function exportJSON(){
 }
 function importJSON(){
   const inp=el('input');inp.type='file';inp.accept='application/json,.json';
-  inp.onchange=()=>{const f=inp.files[0];if(!f)return;const r=new FileReader();
+  inp.onchange=()=>{const f=inp.files[0];if(!f)return;
+    if(!confirm('Import replaces the current records with the file’s contents. Export a backup first if unsure. Continue?'))return;
+    const r=new FileReader();
     r.onload=()=>{try{const j=JSON.parse(r.result);const d=j.data||j;
       Object.keys(ENT).forEach(k=>{if(Array.isArray(d[k]))DATA[k]=d[k];else if(!Array.isArray(DATA[k]))DATA[k]=[];});
       persistSoon();buildNav();renderAll();toast('Imported ✓');}catch(e){toast('Invalid JSON file');}};
     r.readAsText(f);};
   inp.click();
 }
-function reseed(){ if(!confirm('Reload the sample dataset? This replaces the current data.'))return;
+function reseed(){ if(!confirm('Load the starter data set? This replaces everything currently entered.'))return;
   DATA=seed();Object.keys(ENT).forEach(k=>{if(!Array.isArray(DATA[k]))DATA[k]=[];});persistSoon();buildNav();renderAll();toast('Sample data loaded'); }
 
 /* =================== wire up =================== */
