@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+<title>Canei Subirats — Financial Data</title>
+<style>
+  :root{
+    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a; --greenSoft:#e7f0e1; --greenPale:#dce8d4; --spark:#f2c230;
+    --ink:#14160f; --body:#4f5347; --muted:#8b8f80; --faint:#aab0a0;
+    --danger:#b4402f; --dangerSoft:#f6e3df; --amber:#8a6d12; --amberSoft:#fbf0cf;
+    --line:#dde5d6; --hair:#e7eee1; --bg:#eef3ea; --paper:#fff;
+    --shadow:0 1px 2px rgba(24,32,16,.03), 0 18px 40px -24px rgba(24,32,16,.18);
+    --shadow-lg:0 2px 4px rgba(24,32,16,.04), 0 40px 80px -40px rgba(24,32,16,.3);
+    --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
+    --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    --mono:ui-monospace,Menlo,monospace;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box}
+  html{touch-action:manipulation;-webkit-text-size-adjust:100%;overflow-x:hidden}
+  body{margin:0;color:var(--body);font:15px/1.55 var(--sans);letter-spacing:-.005em;min-height:100vh;overflow-x:hidden;
+    background:
+      radial-gradient(1200px 600px at 88% -14%, rgba(72,115,60,.16), transparent 58%),
+      radial-gradient(820px 460px at -6% 2%, rgba(242,194,48,.10), transparent 55%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0;letter-spacing:-.02em}
+  a{color:var(--green);text-decoration:none}
+  .native-app .topbar{padding-top:max(14px,env(safe-area-inset-top))}
+
+  .topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:14px 20px;background:rgba(255,255,255,.82);backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .brand .nm{font-family:var(--serif);font-weight:600;font-size:16px;color:var(--ink);line-height:1;white-space:nowrap}
+  .brand .nm small{display:block;font-family:var(--sans);font-weight:600;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);margin-top:3px}
+  .tb-spacer{flex:1 1 auto}
+  .tb-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:7px;font:600 13px var(--sans);border-radius:11px;padding:9px 14px;
+    border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;transition:.15s;white-space:nowrap}
+  .btn:hover{border-color:color-mix(in srgb,var(--green) 40%,var(--line));transform:translateY(-1px);box-shadow:var(--shadow)}
+  .btn.primary{background:linear-gradient(120deg,var(--greenDeep),var(--green) 70%);color:#fff;border-color:transparent}
+  .btn.ghost{background:transparent}
+  .btn.sm{padding:6px 10px;font-size:12px;border-radius:9px}
+  .btn.danger{color:var(--danger);border-color:var(--dangerSoft)}
+  .period{display:inline-flex;align-items:center;gap:7px;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:5px 8px}
+  .period span{font:600 10.5px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .period select{border:0;outline:0;background:transparent;font:600 13px var(--sans);color:var(--ink)}
+
+  .shell{display:grid;grid-template-columns:246px 1fr;gap:0;max-width:1320px;margin:0 auto;align-items:start}
+  aside{position:sticky;top:64px;align-self:start;height:calc(100vh - 64px);overflow-y:auto;padding:18px 12px 40px;border-right:1px solid var(--line)}
+  aside .grp{font:700 10.5px var(--sans);letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin:16px 10px 6px}
+  aside .grp:first-child{margin-top:2px}
+  .navitem{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;cursor:pointer;
+    font:600 13.5px var(--sans);color:var(--body);padding:8px 10px;border-radius:10px;transition:.12s}
+  .navitem .ic{width:22px;text-align:center;font-size:15px;flex:none}
+  .navitem:hover{background:var(--greenSoft);color:var(--ink)}
+  .navitem.on{background:var(--greenSoft);color:var(--greenDeep)}
+
+  main{padding:22px 24px 80px;min-width:0}
+  .crumbs{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .head h1{font-size:clamp(22px,3.2vw,30px)}
+  .head .sub{font-size:13.5px;color:var(--body);max-width:70ch;margin-top:6px}
+  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0 12px}
+  .search{flex:1 1 220px;display:flex;align-items:center;gap:8px;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:8px 12px;min-width:0}
+  .search input{border:0;outline:0;font:14px var(--sans);color:var(--ink);width:100%;background:transparent}
+  .count{font-size:12.5px;color:var(--muted);white-space:nowrap}
+
+  .banner{display:flex;gap:12px;align-items:flex-start;background:linear-gradient(120deg,var(--greenSoft),#fff 90%);
+    border:1px solid var(--greenPale);border-left:3px solid var(--green);border-radius:0 14px 14px 0;padding:12px 16px;margin:10px 0 2px}
+  .banner .bi{font-size:18px}.banner b{color:var(--ink)}.banner span{font-size:12.5px;color:var(--body)}
+
+  /* KPI tiles */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:6px 0 18px}
+  @media(max-width:980px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:420px){.kpis{grid-template-columns:1fr}}
+  .kpi{background:var(--paper);border:1px solid var(--line);border-radius:15px;padding:14px 16px;box-shadow:var(--shadow)}
+  .kpi .lab{font:600 10.5px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  .kpi .val{font-family:var(--serif);font-size:23px;color:var(--ink);margin-top:6px;line-height:1;letter-spacing:-.02em}
+  .kpi .sub{font-size:11.5px;color:var(--muted);margin-top:5px}
+  .kpi.hi{background:linear-gradient(125deg,var(--greenDeep),var(--green) 72%);border-color:transparent}
+  .kpi.hi .lab{color:rgba(255,255,255,.75)}.kpi.hi .val{color:#fff}.kpi.hi .sub{color:rgba(255,255,255,.8)}
+  .kpi .val small{font-size:13px;color:var(--muted)}
+  .up{color:var(--green)}.down{color:var(--danger)}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
+  .card > .ch{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--hair)}
+  .card > .ch h3{font-size:16px}.card > .ch .tag{margin-left:auto;font:600 11px var(--sans);color:var(--muted)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{border-collapse:collapse;width:100%;min-width:480px;font-size:13.5px}
+  thead th{text-align:left;font:700 11px var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+    background:var(--greenSoft);padding:10px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+  tbody td{padding:10px 16px;border-bottom:1px solid var(--hair);color:var(--body);vertical-align:top}
+  tbody tr:last-child td{border-bottom:0}
+  .num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+  th.num{text-align:right}
+  tr.sub td{background:#fbfdfa;font-weight:600;color:var(--ink)}
+  tr.tot td{background:var(--greenSoft);font-weight:700;color:var(--greenDeep);border-top:1px solid var(--line)}
+  tr.grand td{background:linear-gradient(120deg,var(--greenDeep),var(--green));color:#fff;font-weight:700}
+  td.k{font-weight:600;color:var(--ink)}
+  .ind{padding-left:30px}
+  .pill{display:inline-block;font:600 11px var(--sans);border-radius:999px;padding:2px 9px;background:var(--hair);color:var(--body);white-space:nowrap}
+  .pill.g{background:var(--greenSoft);color:var(--greenDeep)}.pill.y{background:var(--amberSoft);color:var(--amber)}.pill.r{background:var(--dangerSoft);color:var(--danger)}
+  .rowedit tbody tr{cursor:pointer}.rowedit tbody tr:hover{background:var(--greenSoft)}
+  .empty{padding:40px;text-align:center;color:var(--muted)}
+
+  .bars{display:flex;flex-direction:column;gap:9px;padding:14px 18px}
+  .bar{display:grid;grid-template-columns:120px 1fr 92px;align-items:center;gap:10px;font-size:12.5px}
+  .bar .tk{height:12px;border-radius:6px;background:var(--hair);overflow:hidden}
+  .bar .tk i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--green),var(--greenLt))}
+  .bar.warn .tk i{background:linear-gradient(90deg,#d99b1a,var(--spark))}
+  .bar.bad .tk i{background:linear-gradient(90deg,var(--danger),#d9724f)}
+
+  /* drawer editor */
+  .scrim{position:fixed;inset:0;background:rgba(20,26,14,.34);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:.2s;z-index:60}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:min(520px,94vw);background:var(--bg);z-index:70;
+    box-shadow:-30px 0 80px -40px rgba(20,26,14,.5);transform:translateX(102%);transition:transform .24s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+  .drawer.on{transform:none}
+  .drawer .dh{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);background:var(--paper)}
+  .drawer .dh h3{font-size:17px}
+  .drawer .db{overflow-y:auto;padding:16px 20px 30px;flex:1}
+  .drawer .df{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--line);background:var(--paper)}
+  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0}.field.full{grid-column:1/-1}
+  .field label{font:600 11.5px var(--sans);color:var(--muted)}
+  .field input,.field select,.field textarea{font:14px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:9px 11px;outline:0;width:100%}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--greenSoft)}
+  .field .hint{font-size:11px;color:var(--faint)}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);opacity:0;pointer-events:none;transition:.2s;z-index:90;background:var(--ink);color:#fff;font:600 13px var(--sans);padding:11px 18px;border-radius:12px;box-shadow:var(--shadow-lg)}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  .note{font-size:12px;color:var(--muted);padding:12px 18px;border-top:1px solid var(--hair);background:#fbfdfa}
+
+  .mobsel{display:none}
+  @media(max-width:860px){
+    .shell{grid-template-columns:1fr}aside{display:none}main{padding:18px 16px 90px}
+    .mobsel{display:block;margin:6px 0}
+    .mobsel select{width:100%;font:600 14px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+    .fgrid{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}
+    .bar{grid-template-columns:88px 1fr 78px}
+  }
+  @media(max-width:560px){.topbar{padding:12px 14px}.tb-actions .lbl{display:none}}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
+        <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c"/>
+        <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230"/>
+      </svg>
+      <span class="nm">Canei Subirats<small>Financial Data</small></span>
+    </div>
+    <span class="tb-spacer"></span>
+    <div class="tb-actions">
+      <label class="period"><span>Period</span><select id="period"></select></label>
+      <a class="btn ghost sm" href="index.html">← Home</a>
+      <button class="btn sm" id="btnImport"><span>⇪</span><span class="lbl">Import</span></button>
+      <button class="btn sm" id="btnExport"><span>⤓</span><span class="lbl">Export</span></button>
+      <button class="btn primary sm" id="btnAdd"><span>＋</span><span class="lbl">Add</span></button>
+    </div>
+  </div>
+
+  <div class="shell">
+    <aside id="nav"></aside>
+    <main>
+      <div class="crumbs">Financial Data ›&nbsp;<span id="crumb">—</span></div>
+      <div class="head"><div><h1 id="ttl">—</h1><div class="sub" id="sub"></div></div></div>
+      <div class="mobsel"><select id="mnav"></select></div>
+      <div id="view"></div>
+    </main>
+  </div>
+
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="dh"><h3 id="dttl">Edit</h3><span style="flex:1"></span><button class="btn ghost sm" id="dClose">Close</button></div>
+    <div class="db"><div class="fgrid" id="form"></div></div>
+    <div class="df"><button class="btn danger" id="dDelete">Delete</button><span style="flex:1"></span>
+      <button class="btn" id="dCancel">Cancel</button><button class="btn primary" id="dSave">Save</button></div>
+  </aside>
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ============ persistence ============ */
+const DB="caneiFinance",STORE="kv",KEY="data";
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function idbGet(k){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(STORE,"readonly").objectStore(STORE).get(k);t.onsuccess=()=>res(t.result);t.onerror=()=>rej(t.error);});}
+async function idbSet(k,v){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(STORE,"readwrite").objectStore(STORE).put(v,k);rq.onsuccess=()=>res();rq.onerror=()=>rej(rq.error);});}
+let saveT;function persistSoon(){clearTimeout(saveT);saveT=setTimeout(()=>idbSet(KEY,DATA).catch(()=>{}),150);}
+
+/* ============ helpers ============ */
+const $=s=>document.querySelector(s),el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const euro=n=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0,useGrouping:'always'}).format(Math.round(Number(n)||0));
+const euro2=n=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',useGrouping:'always'}).format(Number(n)||0);
+const pctf=(n,d=1)=>(n==null||isNaN(n))?'—':Number(n).toFixed(d)+'%';
+const esc=s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const fmtDate=iso=>{if(!iso)return'';const p=String(iso).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;};
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),1900);}
+const AS_OF="2026-07-21"; // valuation date for aging (deterministic demo)
+const daysBetween=(a,b)=>Math.round((new Date(a)-new Date(b))/86400000);
+
+/* ============ periods ============ */
+const MONTHS=['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07'];
+const PERIODS=[
+ {id:'YTD',label:'YTD 2026 (Jan–Jul)',months:MONTHS,n:7},
+ {id:'Q1',label:'Q1 2026',months:['2026-01','2026-02','2026-03'],n:3},
+ {id:'Q2',label:'Q2 2026',months:['2026-04','2026-05','2026-06'],n:3},
+ {id:'M7',label:'July 2026',months:['2026-07'],n:1},
+ {id:'FY',label:'Full-year plan (budget)',months:MONTHS,n:12,fy:true},
+];
+let periodId='YTD';
+const P=()=>PERIODS.find(p=>p.id===periodId);
+
+/* ============ chart of accounts + ledger schema ============ */
+const PL_LINES=[
+ {key:'revenue',label:'Revenue',sign:1,sub:1},
+ {key:'cogs',label:'Cost of sales',sign:-1},
+ {key:'opex',label:'Operating expenses',sign:-1},
+ {key:'dep',label:'Depreciation & amortisation',sign:-1},
+ {key:'interest',label:'Net interest',sign:-1},
+ {key:'tax',label:'Corporate income tax',sign:-1},
+];
+const BS_LINES=[
+ {key:'asset.current',label:'Current assets',side:'A'},
+ {key:'asset.noncurrent',label:'Non-current assets',side:'A'},
+ {key:'liab.current',label:'Current liabilities',side:'L'},
+ {key:'liab.noncurrent',label:'Non-current liabilities',side:'L'},
+ {key:'equity',label:'Equity',side:'E'},
+];
+
+/* ============ entities (editable ledgers) ============ */
+const ENT={
+ accounts:{label:"Chart of accounts",icon:"📓",desc:"Every account, its statement and the line it rolls into. Budgets are annual; period budget is phased evenly.",
+  fields:[
+   {k:"code",label:"Code",type:"text",col:1,req:1},{k:"name",label:"Account name",type:"text",col:1,req:1},
+   {k:"stmt",label:"Statement",type:"select",opts:["PL","BS"],col:1,req:1},
+   {k:"line",label:"Roll-up line",type:"select",opts:["revenue","cogs","opex","dep","interest","tax","asset.current","asset.noncurrent","liab.current","liab.noncurrent","equity"],col:1,req:1},
+   {k:"budget",label:"Annual budget (PL)",type:"money",col:1},
+  ]},
+ pl:{label:"P&L ledger (monthly)",icon:"🧮",desc:"Actual income and expense by month and account. The income statement sums these across the selected period.",
+  fields:[
+   {k:"period",label:"Month",type:"select",opts:MONTHS,col:1,req:1},
+   {k:"code",label:"Account",type:"text",col:1,req:1,hint:"account code"},
+   {k:"actual",label:"Actual",type:"money",col:1,req:1},
+  ]},
+ bs:{label:"Balance sheet (snapshots)",icon:"📗",desc:"Closing balances at a date, per account. Opening (2025-12) and current (2026-07) drive the balance sheet and cash-flow deltas.",
+  fields:[
+   {k:"asOf",label:"As of",type:"select",opts:["2025-12","2026-07"],col:1,req:1},
+   {k:"code",label:"Account",type:"text",col:1,req:1,hint:"account code"},
+   {k:"balance",label:"Balance",type:"money",col:1,req:1},
+  ]},
+ arOpen:{label:"Receivables (open)",icon:"📥",desc:"Unpaid customer invoices with due dates — drives DSO and the AR aging.",
+  fields:[
+   {k:"doc",label:"Invoice",type:"text",col:1,req:1},{k:"customer",label:"Customer",type:"text",col:1,req:1},
+   {k:"issued",label:"Issued",type:"date"},{k:"due",label:"Due",type:"date",col:1,req:1},
+   {k:"amount",label:"Amount",type:"money",col:1,req:1},{k:"status",label:"Status",type:"select",opts:["Open","Part-paid","Disputed"],col:1},
+  ]},
+ apOpen:{label:"Payables (open)",icon:"📤",desc:"Unpaid supplier bills with due dates — drives DPO and the AP aging.",
+  fields:[
+   {k:"doc",label:"Bill",type:"text",col:1,req:1},{k:"supplier",label:"Supplier",type:"text",col:1,req:1},
+   {k:"issued",label:"Issued",type:"date"},{k:"due",label:"Due",type:"date",col:1,req:1},
+   {k:"amount",label:"Amount",type:"money",col:1,req:1},{k:"status",label:"Status",type:"select",opts:["Open","Part-paid","Query"],col:1},
+  ]},
+ vat:{label:"VAT & tax ledger",icon:"🧾",desc:"Output vs input VAT by period (Modelo 303) and withholdings (Modelo 111) — the net is what you settle.",
+  fields:[
+   {k:"period",label:"Period",type:"text",col:1,req:1,hint:"e.g. 2026-Q2"},
+   {k:"kind",label:"Kind",type:"select",opts:["IVA (303)","IRPF (111)"],col:1,req:1},
+   {k:"output",label:"Output / withheld",type:"money",col:1},{k:"input",label:"Input / deductible",type:"money",col:1},
+  ]},
+ loans:{label:"Loans & financing",icon:"🏦",desc:"Outstanding debt with rate and schedule — feeds interest, net debt and financing cash flow.",
+  fields:[
+   {k:"name",label:"Facility",type:"text",col:1,req:1},{k:"principal",label:"Original principal",type:"money"},
+   {k:"balance",label:"Outstanding",type:"money",col:1,req:1},{k:"rate",label:"Rate %",type:"pct",col:1},
+   {k:"monthly",label:"Monthly payment",type:"money"},{k:"maturity",label:"Maturity",type:"date"},
+  ]},
+ bank:{label:"Bank & cash accounts",icon:"💳",desc:"Live balances by account — together they are the cash line on the balance sheet.",
+  fields:[
+   {k:"code",label:"Code",type:"text",col:1,req:1},{k:"name",label:"Account",type:"text",col:1,req:1},
+   {k:"balance",label:"Balance",type:"money",col:1,req:1},
+  ]},
+ drivers:{label:"Drivers & assumptions",icon:"🎚️",single:1,desc:"Non-ledger inputs used by KPIs — headcount, order backlog and open pipeline.",
+  fields:[
+   {k:"headcount",label:"Headcount (FTE)",type:"num"},{k:"backlog",label:"Order backlog (won, not billed)",type:"money"},
+   {k:"pipeline",label:"Open pipeline value",type:"money"},{k:"targetGM",label:"Target gross margin %",type:"pct"},
+  ]},
+};
+
+/* ============ nav model ============ */
+const NAV=[
+ {grp:"Overview",items:[{key:"kpis",label:"KPI cockpit",icon:"📊",view:1}]},
+ {grp:"Statements",items:[
+   {key:"pnl",label:"Profit & Loss",icon:"📈",view:1},
+   {key:"balance",label:"Balance sheet",icon:"⚖️",view:1},
+   {key:"cashflow",label:"Cash flow",icon:"💧",view:1}]},
+ {grp:"Working capital",items:[
+   {key:"aging",label:"AR / AP aging",icon:"⏳",view:1},
+   {key:"arOpen",label:"Receivables",icon:"📥"},
+   {key:"apOpen",label:"Payables",icon:"📤"},
+   {key:"vat",label:"VAT & tax",icon:"🧾"}]},
+ {grp:"Ledgers (inputs)",items:[
+   {key:"accounts",label:"Chart of accounts",icon:"📓"},
+   {key:"pl",label:"P&L ledger",icon:"🧮"},
+   {key:"bs",label:"Balance sheet input",icon:"📗"},
+   {key:"bank",label:"Bank & cash",icon:"💳"},
+   {key:"loans",label:"Loans",icon:"🏦"},
+   {key:"drivers",label:"Drivers",icon:"🎚️"}]},
+];
+const NAVITEM={};NAV.forEach(g=>g.items.forEach(i=>NAVITEM[i.key]=i));
+
+/* ============ seed (synthetic, fully reconciling) ============ */
+function splitYTD(total,weights){ // split a YTD total across MONTHS so the sum is exact
+  const s=weights.reduce((a,b)=>a+b,0);let acc=0;const out=weights.map((w,i)=>{ if(i===weights.length-1)return total-acc; const v=Math.round(total*w/s); acc+=v; return v;});return out;}
+const W=[0.13,0.14,0.15,0.15,0.14,0.15,0.14]; // 7-month weighting
+function seed(){
+ const accounts=[
+  {code:"700",name:"Revenue — reformas",stmt:"PL",line:"revenue",budget:2000000},
+  {code:"600",name:"Materials",stmt:"PL",line:"cogs",budget:520000},
+  {code:"601",name:"Subcontractors",stmt:"PL",line:"cogs",budget:560000},
+  {code:"602",name:"Site labour",stmt:"PL",line:"cogs",budget:270000},
+  {code:"640",name:"Salaries — admin & management",stmt:"PL",line:"opex",budget:210000},
+  {code:"621",name:"Rent",stmt:"PL",line:"opex",budget:36000},
+  {code:"628",name:"Utilities",stmt:"PL",line:"opex",budget:14000},
+  {code:"625",name:"Insurance",stmt:"PL",line:"opex",budget:15000},
+  {code:"629",name:"Vehicles & fuel",stmt:"PL",line:"opex",budget:30000},
+  {code:"627",name:"Marketing",stmt:"PL",line:"opex",budget:26000},
+  {code:"623",name:"Professional fees (gestor)",stmt:"PL",line:"opex",budget:20000},
+  {code:"626",name:"Office & other",stmt:"PL",line:"opex",budget:45000},
+  {code:"681",name:"Depreciation",stmt:"PL",line:"dep",budget:34000},
+  {code:"662",name:"Net interest",stmt:"PL",line:"interest",budget:11000},
+  {code:"630",name:"Corporate income tax",stmt:"PL",line:"tax",budget:50000},
+  {code:"570",name:"Cash & banks",stmt:"BS",line:"asset.current"},
+  {code:"430",name:"Trade receivables (AR)",stmt:"BS",line:"asset.current"},
+  {code:"300",name:"Inventory / materials",stmt:"BS",line:"asset.current"},
+  {code:"330",name:"Work in progress (WIP)",stmt:"BS",line:"asset.current"},
+  {code:"210",name:"Equipment & vehicles (net)",stmt:"BS",line:"asset.noncurrent"},
+  {code:"400",name:"Trade payables (AP)",stmt:"BS",line:"liab.current"},
+  {code:"475",name:"VAT & taxes payable",stmt:"BS",line:"liab.current"},
+  {code:"170",name:"Bank loan",stmt:"BS",line:"liab.noncurrent"},
+  {code:"100",name:"Share capital",stmt:"BS",line:"equity"},
+  {code:"120",name:"Retained earnings",stmt:"BS",line:"equity"},
+ ];
+ const ytd={700:1150000,600:300000,601:330000,602:150000,640:120000,621:21000,628:8000,625:9000,629:18000,627:15000,623:12000,626:27000,681:20000,662:6000,630:28500};
+ const pl=[];
+ Object.entries(ytd).forEach(([code,total])=>{splitYTD(total,W).forEach((v,i)=>pl.push({period:MONTHS[i],code,actual:v}));});
+ const bsOpen={570:42000,430:180000,300:15000,330:25000,210:60000,400:120000,475:18000,170:90000,100:3000,120:91000};
+ const bsCur ={570:103500,430:205000,300:18000,330:30000,210:65000,400:140000,475:22000,170:80000,100:3000,120:176500};
+ const bs=[];Object.entries(bsOpen).forEach(([code,balance])=>bs.push({asOf:"2025-12",code,balance}));
+ Object.entries(bsCur).forEach(([code,balance])=>bs.push({asOf:"2026-07",code,balance}));
+ return {
+  accounts,pl,bs,
+  arOpen:[
+   {doc:"FRA-2026-050",customer:"Familia Roca Puig",issued:"2026-07-05",due:"2026-08-04",amount:45000,status:"Open"},
+   {doc:"FRA-2026-046",customer:"Comunidad Balmes 120",issued:"2026-06-20",due:"2026-07-20",amount:60000,status:"Open"},
+   {doc:"FRA-2026-041",customer:"Comunidad Balmes 120",issued:"2026-05-15",due:"2026-06-14",amount:50000,status:"Open"},
+   {doc:"FRA-2026-035",customer:"Nou Local Gràcia",issued:"2026-04-02",due:"2026-05-02",amount:30000,status:"Part-paid"},
+   {doc:"FRA-2026-028",customer:"Familia Roca Puig",issued:"2026-02-10",due:"2026-03-12",amount:20000,status:"Disputed"},
+  ],
+  apOpen:[
+   {doc:"OC-2026-081",supplier:"Materiales Vallès",issued:"2026-07-11",due:"2026-08-10",amount:55000,status:"Open"},
+   {doc:"OC-2026-076",supplier:"Materiales Vallès",issued:"2026-06-15",due:"2026-07-15",amount:40000,status:"Open"},
+   {doc:"OC-2026-068",supplier:"ElectroBaix",issued:"2026-05-10",due:"2026-06-10",amount:25000,status:"Open"},
+   {doc:"OC-2026-060",supplier:"J.M. Solé",issued:"2026-04-01",due:"2026-05-01",amount:20000,status:"Query"},
+  ],
+  vat:[
+   {period:"2026-Q1",kind:"IVA (303)",output:80500,input:52000},
+   {period:"2026-Q2",kind:"IVA (303)",output:88000,input:58000},
+   {period:"2026-Q2",kind:"IRPF (111)",output:9000,input:0},
+  ],
+  loans:[{name:"Bank loan — expansion",principal:120000,balance:80000,rate:5.5,monthly:2200,maturity:"2028-12-31"}],
+  bank:[{code:"OP",name:"Operating account",balance:88500},{code:"TAX",name:"Tax reserve",balance:15000}],
+  drivers:[{headcount:8,backlog:62000,pipeline:53000,targetGM:35}],
+ };
+}
+
+/* ============ compute engine ============ */
+const acc=code=>DATA.accounts.find(a=>a.code===code)||{};
+const accByLine=line=>DATA.accounts.filter(a=>a.line===line);
+function plActual(code,months){return DATA.pl.filter(r=>r.code===code&&months.includes(r.period)).reduce((s,r)=>s+(+r.actual||0),0);}
+function plLineActual(line,months){return accByLine(line).reduce((s,a)=>s+plActual(a.code,months),0);}
+function plLineBudget(line,n){return accByLine(line).reduce((s,a)=>s+((+a.budget||0)/12*n),0);}
+function bsBal(code,asOf){const r=DATA.bs.find(x=>x.code===code&&x.asOf===asOf);return r?(+r.balance||0):0;}
+function bsLine(line,asOf){return accByLine(line).reduce((s,a)=>s+bsBal(a.code,asOf),0);}
+function pnl(months,n,useBudget){
+ const g=(line)=>useBudget?plLineBudget(line,n):plLineActual(line,months);
+ const revenue=g('revenue'),cogs=g('cogs'),opex=g('opex'),dep=g('dep'),interest=g('interest'),tax=g('tax');
+ const gross=revenue-cogs,ebitda=gross-opex,ebit=ebitda-dep,pbt=ebit-interest,net=pbt-tax;
+ return {revenue,cogs,gross,opex,ebitda,dep,ebit,interest,pbt,tax,net};
+}
+function balance(asOf){
+ const ac=bsLine('asset.current',asOf),anc=bsLine('asset.noncurrent',asOf),
+   lc=bsLine('liab.current',asOf),lnc=bsLine('liab.noncurrent',asOf),eq=bsLine('equity',asOf);
+ const assets=ac+anc,liab=lc+lnc;return {ac,anc,lc,lnc,eq,assets,liab,le:liab+eq,check:assets-(liab+eq)};
+}
+function cashflow(){ // YTD indirect: opening 2025-12 -> current 2026-07
+ const o="2025-12",c="2026-07",p=pnl(MONTHS,7,false);
+ const dAR=bsBal('430',c)-bsBal('430',o),dInv=bsBal('300',c)-bsBal('300',o),dWIP=bsBal('330',c)-bsBal('330',o),
+   dAP=bsBal('400',c)-bsBal('400',o),dVAT=bsBal('475',c)-bsBal('475',o),
+   dEquip=bsBal('210',c)-bsBal('210',o),dLoan=bsBal('170',c)-bsBal('170',o),dCap=bsBal('100',c)-bsBal('100',o);
+ const capex=dEquip+p.dep;
+ const op=p.net+p.dep-dAR-dInv-dWIP+dAP+dVAT;
+ const inv=-capex; const fin=dLoan+dCap;
+ const net=op+inv+fin; const open=bsBal('570',o),close=bsBal('570',c);
+ return {p,dAR,dInv,dWIP,dAP,dVAT,capex,dLoan,dCap,op,inv,fin,net,open,close,recon:close-(open+net)};
+}
+function kpis(){
+ const y=pnl(MONTHS,7,false),b=balance('2026-07'),d=(DATA.drivers[0]||{});
+ const annualF=12/7; const annRev=y.revenue*annualF, annCogs=y.cogs*annualF;
+ const ar=bsBal('430','2026-07'),ap=bsBal('400','2026-07'),cash=b.ac?bsBal('570','2026-07'):0;
+ const curAssets=b.ac, curLiab=b.lc, inv=bsBal('300','2026-07'),wip=bsBal('330','2026-07');
+ const loan=DATA.loans.reduce((s,l)=>s+(+l.balance||0),0);
+ return {
+  revenue:y.revenue, gross:y.gross, gm:y.revenue?y.gross/y.revenue*100:0,
+  ebitda:y.ebitda, ebitdaPct:y.revenue?y.ebitda/y.revenue*100:0, net:y.net, nm:y.revenue?y.net/y.revenue*100:0,
+  cash, currentRatio:curLiab?curAssets/curLiab:0, quick:curLiab?(curAssets-inv-wip)/curLiab:0,
+  workingCap:curAssets-curLiab, dso:annRev?ar/annRev*365:0, dpo:annCogs?ap/annCogs*365:0,
+  netDebt:loan-cash, backlog:+d.backlog||0, pipeline:+d.pipeline||0,
+  revPerHead:d.headcount?annRev/d.headcount:0, headcount:+d.headcount||0, annRev,
+ };
+}
+function aging(rows){
+ const b={cur:0,b30:0,b60:0,b90:0,b90p:0},items=[];
+ rows.forEach(r=>{const d=daysBetween(AS_OF,r.due);let k;
+   if(d<=0)k='cur';else if(d<=30)k='b30';else if(d<=60)k='b60';else if(d<=90)k='b90';else k='b90p';
+   b[k]+=(+r.amount||0);items.push({...r,days:d,bucket:k});});
+ b.total=b.cur+b.b30+b.b60+b.b90+b.b90p;return {b,items};
+}
+
+/* ============ state ============ */
+let DATA={},cur="kpis",editIdx=-1;
+async function boot(){
+ DATA=(await idbGet(KEY))||seed();
+ Object.keys(ENT).forEach(k=>{if(!Array.isArray(DATA[k])&&k!=='drivers')DATA[k]=[];});
+ if(!Array.isArray(DATA.drivers))DATA.drivers=[{}];
+ const ps=$('#period');ps.innerHTML=PERIODS.map(p=>`<option value="${p.id}">${p.label}</option>`).join('');ps.value=periodId;
+ buildNav();render();
+}
+function buildNav(){
+ const nav=$('#nav');nav.innerHTML='';const m=$('#mnav');m.innerHTML='';
+ NAV.forEach(g=>{nav.appendChild(el('div','grp',g.grp));const og=el('optgroup');og.label=g.grp;
+  g.items.forEach(i=>{const b=el('button','navitem'+(i.key===cur?' on':''));
+   b.innerHTML=`<span class="ic">${i.icon}</span><span>${i.label}</span>`;b.dataset.k=i.key;b.onclick=()=>{cur=i.key;editIdx=-1;render();};nav.appendChild(b);
+   const o=el('option');o.value=i.key;o.textContent=`${g.grp} — ${i.label}`;if(i.key===cur)o.selected=true;og.appendChild(o);});
+  m.appendChild(og);});
+ m.onchange=()=>{cur=m.value;editIdx=-1;render();};
+}
+
+/* ============ render dispatch ============ */
+function render(){
+ const it=NAVITEM[cur];
+ document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('on',b.dataset.k===cur));
+ $('#crumb').textContent=it.label;$('#ttl').textContent=it.label;
+ $('#btnAdd').style.display=it.view?'none':'';
+ const v=$('#view');
+ if(it.view){$('#sub').textContent='';VIEWS[cur](v);}
+ else{$('#sub').textContent=ENT[cur].desc;renderEntity(v);}
+}
+
+/* ============ views ============ */
+const VIEWS={
+ kpis(v){
+  const k=kpis(),cf=cashflow(),bch=balance('2026-07').check;
+  $('#sub').textContent=`Live cockpit for ${P().label}. Everything is computed from the ledgers — edit an input and every figure moves.`;
+  const tile=(lab,val,sub,hi)=>`<div class="kpi${hi?' hi':''}"><div class="lab">${lab}</div><div class="val">${val}</div><div class="sub">${sub}</div></div>`;
+  v.innerHTML=`
+   <div class="kpis">
+    ${tile('Revenue (YTD)',euro(k.revenue),`≈ ${euro(k.annRev)} annualised`,1)}
+    ${tile('Gross margin',pctf(k.gm),`${euro(k.gross)} gross profit`)}
+    ${tile('EBITDA',euro(k.ebitda),`${pctf(k.ebitdaPct)} of revenue`)}
+    ${tile('Net profit',euro(k.net),`${pctf(k.nm)} net margin`)}
+    ${tile('Cash position',euro(k.cash),`Net ${k.netDebt<0?'cash':'debt'} ${euro(Math.abs(k.netDebt))}`,1)}
+    ${tile('Current ratio',k.currentRatio.toFixed(2),`Quick ${k.quick.toFixed(2)} · WC ${euro(k.workingCap)}`)}
+    ${tile('DSO / DPO',`${Math.round(k.dso)} / ${Math.round(k.dpo)}d`,'Collection vs payment days')}
+    ${tile('Backlog',euro(k.backlog),`${euro(k.pipeline)} open pipeline`)}
+   </div>
+   <div class="grid2">
+     <div class="card"><div class="ch"><h3>Profitability bridge</h3><span class="tag">${P().label}</span></div>
+       <div class="scroll">${miniPL()}</div></div>
+     <div class="card"><div class="ch"><h3>Health checks</h3></div>
+       <div class="scroll"><table><tbody>
+        <tr><td class="k">Balance sheet balances</td><td class="num">${bch===0?'<span class="pill g">A = L + E ✓</span>':'<span class="pill r">off by '+euro(bch)+'</span>'}</td></tr>
+        <tr><td class="k">Cash-flow reconciles</td><td class="num">${Math.abs(cf.recon)<1?'<span class="pill g">ties to cash ✓</span>':'<span class="pill r">Δ '+euro(cf.recon)+'</span>'}</td></tr>
+        <tr><td class="k">Revenue / employee</td><td class="num">${euro(k.revPerHead)}</td></tr>
+        <tr><td class="k">Gross margin vs target</td><td class="num">${pctf(k.gm)} / ${pctf((DATA.drivers[0]||{}).targetGM||0)} ${k.gm>=((DATA.drivers[0]||{}).targetGM||0)?'<span class="pill g">on</span>':'<span class="pill y">below</span>'}</td></tr>
+        <tr><td class="k">Net debt / EBITDA</td><td class="num">${k.ebitda?((k.netDebt)/(k.ebitda*12/7)).toFixed(2):'—'}×</td></tr>
+       </tbody></table></div></div>
+   </div>
+   <div class="banner"><div class="bi">🤖</div><div><b>Automation-ready.</b><span>&nbsp;These KPIs, statements and aging are derived, not typed — the same engine can push month-end alerts, covenant checks and cash-runway warnings. <b>Export</b> ships the full dataset as JSON.</span></div></div>`;
+ },
+ pnl(v){
+  const p=P(),a=pnl(p.months,p.n,false),bud=pnl(p.months,p.n,true);
+  const line=(lab,act,budg,cls,ind)=>{const varc=act-budg;return `<tr class="${cls||''}"><td class="${ind?'ind':'k'}">${lab}</td>
+    <td class="num">${euro(act)}</td><td class="num">${euro(budg)}</td>
+    <td class="num ${varc>=0?'up':'down'}">${varc>=0?'+':''}${euro(varc)}</td>
+    <td class="num">${budg?((act/budg*100).toFixed(0)+'%'):'—'}</td></tr>`;};
+  const acctRows=line=>accByLine(line).map(ac=>{
+    const act=p.fy?((+ac.budget||0)/12*p.n):plActual(ac.code,p.months);const budg=(+ac.budget||0)/12*p.n;
+    return `<tr><td class="ind">${esc(ac.code)} · ${esc(ac.name)}</td><td class="num">${euro(act)}</td><td class="num">${euro(budg)}</td><td class="num ${act-budg>=0?'up':'down'}">${act-budg>=0?'+':''}${euro(act-budg)}</td><td class="num"></td></tr>`;}).join('');
+  const A=p.fy?bud:a;
+  v.innerHTML=`<div class="card"><div class="ch"><h3>Income statement</h3><span class="tag">${p.label} · Actual vs budget</span></div>
+   <div class="scroll"><table><thead><tr><th>Line</th><th class="num">Actual</th><th class="num">Budget</th><th class="num">Variance</th><th class="num">%</th></tr></thead>
+   <tbody>
+    ${acctRows('revenue')}
+    ${line('Revenue',A.revenue,bud.revenue,'sub')}
+    ${acctRows('cogs')}
+    ${line('Cost of sales',A.cogs,bud.cogs,'sub')}
+    ${line('Gross profit',A.gross,bud.gross,'tot')}
+    ${acctRows('opex')}
+    ${line('Operating expenses',A.opex,bud.opex,'sub')}
+    ${line('EBITDA',A.ebitda,bud.ebitda,'tot')}
+    ${line('Depreciation & amortisation',A.dep,bud.dep,'',1)}
+    ${line('EBIT',A.ebit,bud.ebit,'tot')}
+    ${line('Net interest',A.interest,bud.interest,'',1)}
+    ${line('Profit before tax',A.pbt,bud.pbt,'tot')}
+    ${line('Corporate income tax',A.tax,bud.tax,'',1)}
+    ${line('Net profit',A.net,bud.net,'grand')}
+   </tbody></table></div>
+   <div class="note">Gross margin ${pctf(A.revenue?A.gross/A.revenue*100:0)} · EBITDA margin ${pctf(A.revenue?A.ebitda/A.revenue*100:0)} · Net margin ${pctf(A.revenue?A.net/A.revenue*100:0)}. Budget is the annual plan phased evenly across ${p.n} month${p.n>1?'s':''}.</div></div>`;
+ },
+ balance(v){
+  const c=balance('2026-07'),o=balance('2025-12');
+  const row=(lab,code,cls)=>{const cv=bsBal(code,'2026-07'),ov=bsBal(code,'2025-12');return `<tr class="${cls||''}"><td class="ind">${esc(lab)}</td><td class="num">${euro(cv)}</td><td class="num" style="color:var(--muted)">${euro(ov)}</td><td class="num ${cv-ov>=0?'up':'down'}">${cv-ov>=0?'+':''}${euro(cv-ov)}</td></tr>`;};
+  const grp=(lab,line)=>accByLine(line).map(a=>row(a.name,a.code)).join('');
+  const sub=(lab,cur,opn)=>`<tr class="sub"><td>${lab}</td><td class="num">${euro(cur)}</td><td class="num" style="color:var(--muted)">${euro(opn)}</td><td class="num ${cur-opn>=0?'up':'down'}">${cur-opn>=0?'+':''}${euro(cur-opn)}</td></tr>`;
+  v.innerHTML=`<div class="card"><div class="ch"><h3>Balance sheet</h3><span class="tag">as of 21/07/2026 vs opening</span></div>
+   <div class="scroll"><table><thead><tr><th>Item</th><th class="num">Current</th><th class="num">Opening</th><th class="num">Δ</th></tr></thead><tbody>
+    <tr class="tot"><td>ASSETS</td><td></td><td></td><td></td></tr>
+    ${grp('','asset.current')}${sub('Current assets',c.ac,o.ac)}
+    ${grp('','asset.noncurrent')}${sub('Non-current assets',c.anc,o.anc)}
+    <tr class="grand"><td>Total assets</td><td class="num">${euro(c.assets)}</td><td class="num">${euro(o.assets)}</td><td class="num">${c.assets-o.assets>=0?'+':''}${euro(c.assets-o.assets)}</td></tr>
+    <tr class="tot"><td>LIABILITIES &amp; EQUITY</td><td></td><td></td><td></td></tr>
+    ${grp('','liab.current')}${sub('Current liabilities',c.lc,o.lc)}
+    ${grp('','liab.noncurrent')}${sub('Non-current liabilities',c.lnc,o.lnc)}
+    ${grp('','equity')}${sub('Equity',c.eq,o.eq)}
+    <tr class="grand"><td>Total liabilities &amp; equity</td><td class="num">${euro(c.le)}</td><td class="num">${euro(o.le)}</td><td class="num">${c.le-o.le>=0?'+':''}${euro(c.le-o.le)}</td></tr>
+   </tbody></table></div>
+   <div class="note">${c.check===0?'✓ Balance check passes — Assets = Liabilities + Equity.':'⚠ Out of balance by '+euro(c.check)+'.'}</div></div>`;
+ },
+ cashflow(v){
+  const f=cashflow();
+  const r=(lab,val,cls,ind)=>`<tr class="${cls||''}"><td class="${ind?'ind':'k'}">${lab}</td><td class="num ${val<0?'down':''}">${euro(val)}</td></tr>`;
+  v.innerHTML=`<div class="card"><div class="ch"><h3>Cash flow statement</h3><span class="tag">YTD · indirect method</span></div>
+   <div class="scroll"><table><tbody>
+    <tr class="tot"><td>Operating activities</td><td></td></tr>
+    ${r('Net profit',f.p.net,'',1)}
+    ${r('Add back: depreciation',f.p.dep,'',1)}
+    ${r('Δ Receivables',-f.dAR,'',1)}
+    ${r('Δ Inventory',-f.dInv,'',1)}
+    ${r('Δ Work in progress',-f.dWIP,'',1)}
+    ${r('Δ Payables',f.dAP,'',1)}
+    ${r('Δ VAT & taxes payable',f.dVAT,'',1)}
+    ${r('Net cash from operations',f.op,'sub')}
+    <tr class="tot"><td>Investing activities</td><td></td></tr>
+    ${r('Capital expenditure',-f.capex,'',1)}
+    ${r('Net cash from investing',f.inv,'sub')}
+    <tr class="tot"><td>Financing activities</td><td></td></tr>
+    ${r('Δ Loans',f.dLoan,'',1)}
+    ${r('Δ Share capital',f.dCap,'',1)}
+    ${r('Net cash from financing',f.fin,'sub')}
+    ${r('Net change in cash',f.net,'tot')}
+    ${r('Opening cash (31/12/2025)',f.open,'',1)}
+    ${r('Closing cash (21/07/2026)',f.close,'grand')}
+   </tbody></table></div>
+   <div class="note">${Math.abs(f.recon)<1?'✓ Reconciles: opening + net change equals the balance-sheet cash line.':'⚠ Reconciliation gap '+euro(f.recon)+'.'}</div></div>`;
+ },
+ aging(v){
+  const ar=aging(DATA.arOpen),ap=aging(DATA.apOpen);
+  const block=(title,ag,who)=>{const b=ag.b;const seg=(lab,val,cls)=>{const w=b.total?Math.round(val/b.total*100):0;return `<div class="bar ${cls}"><div>${lab}</div><div class="tk"><i style="width:${w}%"></i></div><div class="num">${euro(val)}</div></div>`;};
+    return `<div class="card"><div class="ch"><h3>${title}</h3><span class="tag">${euro(b.total)} open</span></div>
+     <div class="bars">${seg('Current',b.cur,'')}${seg('1–30 days',b.b30,'')}${seg('31–60 days',b.b60,'warn')}${seg('61–90 days',b.b90,'warn')}${seg('90+ days',b.b90p,'bad')}</div>
+     <div class="scroll"><table><thead><tr><th>${who}</th><th>Doc</th><th class="num">Due</th><th class="num">Days</th><th class="num">Amount</th></tr></thead><tbody>
+      ${ag.items.sort((a,b)=>b.days-a.days).map(i=>`<tr><td class="k">${esc(i.customer||i.supplier)}</td><td>${esc(i.doc)}</td><td class="num">${fmtDate(i.due)}</td>
+        <td class="num">${i.days<=0?'<span class="pill g">current</span>':'<span class="pill '+(i.days>60?'r':'y')+'">'+i.days+'d</span>'}</td><td class="num">${euro(i.amount)}</td></tr>`).join('')}
+     </tbody></table></div></div>`;};
+  v.innerHTML=`<div class="banner"><div class="bi">⏳</div><div><b>Working-capital radar.</b><span>&nbsp;Aging is computed live from open items as of 21/07/2026 — the &gt;60-day buckets are what the collections and supplier-payment automation acts on.</span></div></div>
+   ${block('Receivables aging (AR)',ar,'Customer')}${block('Payables aging (AP)',ap,'Supplier')}`;
+ },
+};
+function miniPL(){const p=P(),a=pnl(p.months,p.n,false);
+ const rows=[['Revenue',a.revenue],['− Cost of sales',-a.cogs],['= Gross profit',a.gross],['− Operating expenses',-a.opex],['= EBITDA',a.ebitda],['− D&A',-a.dep],['− Interest',-a.interest],['− Tax',-a.tax],['= Net profit',a.net]];
+ return `<table><tbody>${rows.map(([l,v],i)=>`<tr class="${/=/.test(l)?'sub':''}${l==='= Net profit'?' grand':''}"><td class="${/=/.test(l)?'k':'ind'}">${l.replace('= ','').replace('− ','')}</td><td class="num ${v<0?'down':''}">${euro(v)}</td></tr>`).join('')}</tbody></table>`;
+}
+
+/* ============ generic editable table (ledgers) ============ */
+function cols(e){return e.fields.filter(f=>f.col);}
+function cellVal(f,v){
+ if(v==null||v==='')return'<span style="color:var(--faint)">—</span>';
+ if(f.type==='money')return `<span class="num">${euro2(v)}</span>`;
+ if(f.type==='pct')return `<span class="num">${Number(v)}%</span>`;
+ if(f.type==='num')return `<span class="num">${Number(v).toLocaleString('es-ES')}</span>`;
+ if(f.type==='date')return `<span class="num">${fmtDate(v)}</span>`;
+ if(f.type==='select'&&/status/i.test(f.k))return `<span class="pill ${/(open|paid)/i.test(v)?'g':/(query|dispute|part)/i.test(v)?'y':''}">${esc(v)}</span>`;
+ return `<span class="${['code','name','doc','legalName'].includes(f.k)?'k':''}">${esc(v)}</span>`;
+}
+function renderEntity(v){
+ const e=ENT[cur],c=cols(e);
+ v.innerHTML=`<div class="banner"><div class="bi">${e.icon}</div><div><b>${esc(e.label)}.</b><span>&nbsp;${esc(e.desc)} Editing any figure re-computes every statement and KPI instantly.</span></div></div>
+  <div class="toolbar"><label class="search"><span>🔎</span><input id="q" type="search" placeholder="Search…" autocomplete="off"></label><span class="count" id="count"></span></div>
+  <div class="card rowedit"><div class="scroll"><table><thead><tr>${c.map(f=>`<th class="${['money','pct','num','date'].includes(f.type)?'num':''}">${esc(f.label)}</th>`).join('')}<th></th></tr></thead><tbody id="tbody"></tbody></table></div></div>`;
+ $('#q').oninput=()=>drawRows();drawRows();
+}
+function matches(r,q){if(!q)return true;q=q.toLowerCase();return Object.values(r).some(x=>String(x).toLowerCase().includes(q));}
+function drawRows(){
+ const e=ENT[cur],c=cols(e),q=($('#q')?$('#q').value.trim():'');
+ const rows=(DATA[cur]||[]).map((r,i)=>({r,i})).filter(x=>matches(x.r,q));
+ const tb=$('#tbody');if(!tb)return;tb.innerHTML='';
+ if(!rows.length){tb.innerHTML=`<tr><td colspan="${c.length+1}"><div class="empty"><b>No rows.</b> Click <b>Add</b> to create one.</div></td></tr>`;}
+ rows.forEach(({r,i})=>{const tr=el('tr');tr.innerHTML=c.map(f=>`<td>${cellVal(f,r[f.k])}</td>`).join('')+'<td class="num" style="color:var(--faint)">✎</td>';tr.onclick=()=>openEditor(i);tb.appendChild(tr);});
+ if($('#count'))$('#count').textContent=`${rows.length} row${rows.length===1?'':'s'}`;
+}
+
+/* ============ drawer editor ============ */
+function fieldHTML(f,val){const id='f_'+f.k;const lab=`<label for="${id}">${esc(f.label)}${f.req?' *':''}</label>`;const hint=f.hint?`<span class="hint">${esc(f.hint)}</span>`:'';let ctrl;
+ if(f.type==='select')ctrl=`<select id="${id}"><option value=""></option>${f.opts.map(o=>`<option${String(val)===String(o)?' selected':''}>${esc(o)}</option>`).join('')}</select>`;
+ else if(f.type==='textarea')ctrl=`<textarea id="${id}">${esc(val??'')}</textarea>`;
+ else{const t=f.type==='num'||f.type==='money'||f.type==='pct'?'text':f.type==='date'?'date':'text';ctrl=`<input id="${id}" ${f.type==='money'||f.type==='num'||f.type==='pct'?'inputmode="decimal"':''} type="${t}" value="${esc(val??'')}">`;}
+ return `<div class="field ${f.type==='textarea'?'full':''}">${lab}${ctrl}${hint}</div>`;}
+function openEditor(idx){const e=ENT[cur];editIdx=idx;const row=idx>=0?(DATA[cur][idx]||{}):{};
+ $('#dttl').textContent=(idx>=0?'Edit ':'New ')+e.label;
+ $('#form').innerHTML=e.fields.map(f=>fieldHTML(f,row[f.k])).join('');
+ $('#dDelete').style.display=idx>=0&&!e.single?'':'none';
+ $('#scrim').classList.add('on');$('#drawer').classList.add('on');}
+function closeEditor(){$('#scrim').classList.remove('on');$('#drawer').classList.remove('on');}
+function readForm(){const e=ENT[cur],out={};e.fields.forEach(f=>{const n=document.getElementById('f_'+f.k);if(!n)return;let v=n.value;
+ if(['num','money','pct'].includes(f.type)){v=v===''?'':Number(String(v).replace(/[^\d.,-]/g,'').replace(',','.'));if(Number.isNaN(v))v='';}out[f.k]=v;});return out;}
+function saveEditor(){const e=ENT[cur],rec=readForm();const miss=e.fields.filter(f=>f.req&&(rec[f.k]===''||rec[f.k]==null)).map(f=>f.label);
+ if(miss.length){toast('Required: '+miss.join(', '));return;}
+ if(e.single)DATA[cur]=[rec];else if(editIdx>=0)DATA[cur][editIdx]=rec;else DATA[cur].push(rec);
+ persistSoon();closeEditor();render();toast('Saved ✓');}
+function deleteEditor(){if(editIdx<0)return;if(!confirm('Delete this row?'))return;DATA[cur].splice(editIdx,1);persistSoon();closeEditor();render();toast('Deleted');}
+
+/* ============ import/export ============ */
+function exportJSON(){const payload={_meta:{app:"Canei Subirats — Financial Data",schemaVersion:1},data:DATA};
+ const b=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=el('a');a.href=URL.createObjectURL(b);a.download='canei-financial-data.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);toast('Exported');}
+function importJSON(){const inp=el('input');inp.type='file';inp.accept='application/json,.json';inp.onchange=()=>{const f=inp.files[0];if(!f)return;const r=new FileReader();
+ r.onload=()=>{try{const j=JSON.parse(r.result),d=j.data||j;Object.keys(ENT).forEach(k=>{if(Array.isArray(d[k]))DATA[k]=d[k];});if(!Array.isArray(DATA.drivers))DATA.drivers=[{}];persistSoon();render();toast('Imported ✓');}catch(e){toast('Invalid JSON');}};r.readAsText(f);};inp.click();}
+
+/* ============ wire ============ */
+$('#period').onchange=e=>{periodId=e.target.value;render();};
+$('#btnAdd').onclick=()=>{const e=ENT[cur];openEditor(e.single&&(DATA[cur]||[]).length?0:-1);};
+$('#dClose').onclick=closeEditor;$('#dCancel').onclick=closeEditor;$('#scrim').onclick=closeEditor;$('#dSave').onclick=saveEditor;$('#dDelete').onclick=deleteEditor;
+$('#btnExport').onclick=exportJSON;$('#btnImport').onclick=importJSON;
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditor();});
+boot();
+</script>
+</body>
+</html>

@@ -348,3 +348,29 @@ languages: es-ES # source: synthetic
     or client-confidential data — only generalizable technical learnings. (d) The
     installer copies agent files only; learnings are pulled by the agent at
     runtime so a stale local copy can't shadow newer shared knowledge.
+
+40. **Master Data + Financial Data tabs (this cycle).** Operator asked for two
+    full, best-practice tabs capturing _everything_ to run the company, structured
+    for automation. (a) **`site/master-data.html`** — a schema-driven register
+    (21 entities across Organisation, Commercial, Supply, Catalogue & Pricing,
+    Operations & Resources, Governance & Automation): company/legal, branches,
+    bank accounts, numbering, customers, contacts, leads, suppliers/subcontractors
+    (with IRPF profile), payment terms, items/catalogue, chapters, price lists,
+    VAT codes, UoM, warehouses, stock, team, equipment, projects, documents,
+    automation rules. Add/edit/delete via a typed drawer, search, seed sample,
+    IndexedDB persistence, **Export/Import JSON** (the automation feed). (b)
+    **`site/financial-data.html`** — chart of accounts + monthly P&L ledger + BS
+    snapshots + AR/AP open items + VAT + loans + bank + drivers, which **compute**
+    the P&L (actual vs budget), Balance sheet (with A=L+E check), Cash flow
+    (indirect, reconciled to cash), a KPI cockpit (GM, EBITDA, DSO/DPO, ratios,
+    net debt…) and AR/AP aging. **Decisions:** seed data is synthetic and
+    deliberately **fully reconciling** (verified in the E2E: BS balances, CF ties
+    to cash, aging totals match AR/AP); money as euros for capture (kernel keeps
+    integer-cent); everything derived, not typed, so it is automation-ready.
+    Wired into `index.html` cards and as two iOS tabs (Master, Finance) in
+    `Config.swift` — the tabs need one TestFlight build, but the Home tab's new
+    cards already reach both pages in-app now. Extended `tests/site-e2e/run.mjs`
+    (now 26/26): both pages load clean, no 390px overflow, Master Data record
+    persists across reload + exports JSON, Financial statements compute and
+    reconcile. Reversible: both are standalone static pages; revert the cards/tabs
+    to remove.

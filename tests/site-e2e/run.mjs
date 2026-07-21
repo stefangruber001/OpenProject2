@@ -66,6 +66,7 @@ async function main() {
     await testJourney(browser, base);
     await testNoOverflow(browser, base);
     await testSmoke(browser, base);
+    await testDataTabs(browser, base);
   } finally {
     await browser.close();
     server.kill("SIGKILL");
@@ -203,7 +204,13 @@ async function testJourney(browser, base) {
 
 // ── Mobile: no horizontal overflow (the "cut boxes" regression) on key pages.
 async function testNoOverflow(browser, base) {
-  const pages = ["index.html", "journey.html", "dashboard.html"];
+  const pages = [
+    "index.html",
+    "journey.html",
+    "dashboard.html",
+    "master-data.html",
+    "financial-data.html",
+  ];
   const page = await browser.newPage({
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,
@@ -224,7 +231,14 @@ async function testNoOverflow(browser, base) {
 
 // ── Smoke: each app-surfaced page loads with a title and no errors.
 async function testSmoke(browser, base) {
-  const pages = ["index.html", "journey.html", "dashboard.html", "setup-guide.html"];
+  const pages = [
+    "index.html",
+    "journey.html",
+    "dashboard.html",
+    "setup-guide.html",
+    "master-data.html",
+    "financial-data.html",
+  ];
   for (const p of pages) {
     const page = await browser.newPage();
     const errors = [];
@@ -243,6 +257,109 @@ async function testSmoke(browser, base) {
     } finally {
       await page.close();
     }
+  }
+}
+
+// ── Data tabs: Master Data (capture + persist + export) and Financial Data
+//    (statements compute & reconcile). These are the automation-facing tabs.
+async function testDataTabs(browser, base) {
+  // --- Master Data: add a record, confirm it persists across reload + exports.
+  const page = await browser.newPage({
+    viewport: { width: 1200, height: 900 },
+    acceptDownloads: true,
+  });
+  const errors = [];
+  attachConsole(page, errors);
+  try {
+    await page.goto(`${base}/master-data.html`, { waitUntil: "networkidle" });
+    await page.waitForTimeout(200);
+    const navCount = await page.locator(".navitem").count();
+    if (navCount >= 15) ok(`master-data: entity nav renders (${navCount} registers)`);
+    else bad("master-data: entity nav renders", `only ${navCount}`);
+
+    const testCode = "TEST-" + String(Date.now()).slice(-6);
+    await page.locator("#btnAdd").click();
+    await page.waitForTimeout(200);
+    await page.locator("#f_code").fill(testCode);
+    await page.locator("#f_legalName").fill("Playwright Test Cliente");
+    await page.locator("#dSave").click();
+    await page.waitForTimeout(200);
+
+    // Reload → the record must come back from IndexedDB.
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForTimeout(300);
+    await page.locator("#q").fill(testCode);
+    await page.waitForTimeout(150);
+    const bodyText = await page
+      .locator("#tbody")
+      .innerText()
+      .catch(() => "");
+    if (bodyText.includes(testCode)) ok("master-data: record persists across reload (IndexedDB)");
+    else bad("master-data: record persists across reload", bodyText.slice(0, 80));
+
+    // Export must produce JSON that includes the new record (automation feed).
+    const [dl] = await Promise.all([
+      page.waitForEvent("download", { timeout: 6000 }).catch(() => null),
+      page
+        .locator("#btnExport")
+        .click()
+        .catch(() => {}),
+    ]);
+    if (dl) {
+      const p = await dl.path();
+      const nfs = await import("node:fs");
+      const txt = p ? nfs.readFileSync(p, "utf8") : "";
+      if (txt.includes("Master Data") && txt.includes(testCode))
+        ok("master-data: exports JSON including the new record");
+      else bad("master-data: exports JSON", txt.slice(0, 60));
+    } else bad("master-data: exports JSON", "no download fired");
+
+    if (errors.length === 0) ok("master-data: no console errors");
+    else bad("master-data: no console errors", errors.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("master-data tab", String(e).slice(0, 180));
+  } finally {
+    await page.close();
+  }
+
+  // --- Financial Data: KPIs render, balance sheet balances, cash flow reconciles.
+  const fp = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+  const ferr = [];
+  attachConsole(fp, ferr);
+  try {
+    await fp.goto(`${base}/financial-data.html`, { waitUntil: "networkidle" });
+    await fp.waitForTimeout(300);
+    const kpiText = await fp.locator("#view").innerText();
+    if (/Revenue/.test(kpiText) && /€/.test(kpiText)) ok("financial: KPI cockpit renders");
+    else bad("financial: KPI cockpit renders", kpiText.slice(0, 80));
+    // The self-check pill proves the seeded statements are internally consistent.
+    if (/A = L \+ E/.test(kpiText)) ok("financial: balance sheet balances (A = L + E)");
+    else bad("financial: balance sheet balances", "no pass indicator");
+
+    await fp
+      .locator(".navitem", { hasText: "Profit & Loss" })
+      .click()
+      .catch(() => {});
+    await fp.waitForTimeout(200);
+    const pl = await fp.locator("#view").innerText();
+    if (/Net profit/.test(pl) && /Gross profit/.test(pl)) ok("financial: P&L statement computes");
+    else bad("financial: P&L statement computes", pl.slice(0, 80));
+
+    await fp
+      .locator(".navitem", { hasText: "Cash flow" })
+      .click()
+      .catch(() => {});
+    await fp.waitForTimeout(200);
+    const cf = await fp.locator("#view").innerText();
+    if (/econciles/.test(cf)) ok("financial: cash flow reconciles to cash");
+    else bad("financial: cash flow reconciles", cf.slice(0, 80));
+
+    if (ferr.length === 0) ok("financial: no console errors");
+    else bad("financial: no console errors", ferr.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("financial tab", String(e).slice(0, 180));
+  } finally {
+    await fp.close();
   }
 }
 
