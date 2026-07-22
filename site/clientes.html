@@ -172,6 +172,7 @@
     <div class="tb-actions">
       <a class="btn ghost sm" href="index.html">← Home</a>
       <a class="btn ghost sm" href="master-data.html">Master data</a>
+      <button class="btn ghost sm" id="btnSeed"><span>❋</span><span class="lbl">Sample data</span></button>
       <button class="btn sm" id="btnExport"><span>⤓</span><span class="lbl">Export</span></button>
       <button class="btn primary sm" id="btnAdd"><span>＋</span><span class="lbl">Add client</span></button>
     </div>
@@ -492,6 +493,88 @@ function deleteClient(idx){
   DATA.customers.splice(idx,1); persistSoon(); closeDrawer(); render(); toast('Client deleted');
 }
 
+/* =================== sample data =================== */
+function DEMO(){return {
+ customers:[
+  {code:"C-001",legalName:"Familia Roca Puig",type:"B2C",nif:"46000000X",status:"Active",engagement:"Repeat",
+   contact:"Marta Roca",email:"marta.roca@example.com",phone:"600 111 222",lang:"ca-ES",
+   billAddress:"Av. Barcelona 10",billCity:"Sant Just Desvern",billPc:"08960",siteAddress:"Av. Barcelona 10, 3º",
+   terms:"50% up-front",method:"Transfer",priceList:"PL-RETAIL",discount:0,creditLimit:0,source:"Referral",gdpr:true,
+   tags:["reforma integral","cocina"],notes:"Segunda reforma con nosotros. Cliente muy contento.",
+   comms:[{date:"2026-05-12",channel:"Meeting",note:"Visita inicial y toma de medidas."},
+          {date:"2026-06-02",channel:"Email",note:"Enviado presupuesto integral (41.000€). Aceptado."},
+          {date:"2026-07-15",channel:"WhatsApp",note:"Fotos de avance de obra enviadas."}]},
+  {code:"C-002",legalName:"Comunidad Prop. Balmes 120",type:"B2B",nif:"H08000000",status:"Active",engagement:"VIP",
+   contact:"Admin. Finques Vives",email:"vives@fincas.example",phone:"934 000 000",lang:"es-ES",
+   billAddress:"C/ Balmes 120",billCity:"Barcelona",billPc:"08008",siteAddress:"C/ Balmes 120",
+   terms:"30 days",method:"Transfer",priceList:"PL-STD",discount:5,creditLimit:20000,source:"Architect",gdpr:true,
+   tags:["comunidad","fachada","recurrente"],notes:"Administrador con varias fincas — cuenta clave.",
+   comms:[{date:"2026-04-20",channel:"Meeting",note:"Junta de propietarios: aprobada reforma de fachada."},
+          {date:"2026-06-10",channel:"Email",note:"Contrato firmado, obra Balmes 120 (62.000€)."},
+          {date:"2026-07-18",channel:"Call",note:"Interesados en reforma de otra finca — preparar propuesta."}]},
+  {code:"C-003",legalName:"Nou Local Gràcia S.L.",type:"B2B",nif:"B66000000",status:"Prospect",engagement:"New",
+   contact:"Jordi Nadal",email:"jordi@noulocal.example",phone:"620 333 444",lang:"ca-ES",
+   billAddress:"C/ Verdi 22",billCity:"Barcelona",billPc:"08012",siteAddress:"C/ Verdi 22 bajos",
+   terms:"30/60",method:"Transfer",priceList:"PL-STD",discount:0,creditLimit:35000,source:"Web",gdpr:true,
+   tags:["local comercial"],notes:"Reforma de local para nueva tienda.",
+   comms:[{date:"2026-07-08",channel:"Email",note:"Solicita presupuesto reforma local 60 m²."},
+          {date:"2026-07-20",channel:"Call",note:"Presupuesto enviado (38.000€) — seguimiento el 24."}]},
+  {code:"C-004",legalName:"Pau Ferrer",type:"B2C",nif:"39111222Z",status:"Prospect",engagement:"New",
+   contact:"Pau Ferrer",email:"pau.ferrer@example.com",phone:"610 777 888",lang:"ca-ES",
+   billAddress:"C/ Sant Antoni 8",billCity:"Barcelona",billPc:"08221",siteAddress:"C/ Sant Antoni 8, 2º",
+   terms:"50% up-front",method:"Financing",priceList:"PL-RETAIL",discount:0,creditLimit:0,source:"Instagram",gdpr:true,
+   tags:["baño"],notes:"Reforma de baño. Vino por Instagram.",
+   comms:[{date:"2026-07-19",channel:"WhatsApp",note:"Pide cita para visita técnica."},
+          {date:"2026-07-21",channel:"Call",note:"Visita agendada para el 25/07."}]},
+  {code:"C-005",legalName:"Restaurante El Racó, S.L.",type:"B2B",nif:"B61222333",status:"Active",engagement:"Active",
+   contact:"Núria Camps",email:"nuria@elraco.example",phone:"933 222 111",lang:"ca-ES",
+   billAddress:"Pg. del Born 15",billCity:"Barcelona",billPc:"08003",siteAddress:"Pg. del Born 15",
+   terms:"30 days",method:"Transfer",priceList:"PL-STD",discount:0,creditLimit:40000,source:"Referral",gdpr:true,
+   tags:["hostelería","local"],notes:"Reforma de cocina y sala del restaurante.",
+   comms:[{date:"2026-06-15",channel:"Meeting",note:"Definido alcance: cocina industrial + sala."},
+          {date:"2026-07-01",channel:"Email",note:"Contrato firmado (78.000€), inicio en julio."}]},
+  {code:"C-006",legalName:"Marta i Jordi — Àtic Poblenou",type:"B2C",nif:"47333444W",status:"Active",engagement:"Active",
+   contact:"Jordi Serra",email:"jordi.serra@example.com",phone:"600 444 555",lang:"ca-ES",
+   billAddress:"C/ Pujades 100",billCity:"Barcelona",billPc:"08005",siteAddress:"C/ Pujades 100, àtic",
+   terms:"30/60",method:"Transfer",priceList:"PL-RETAIL",discount:0,creditLimit:0,source:"Google",gdpr:true,
+   tags:["ático","terraza"],notes:"Reforma integral de ático con terraza.",
+   comms:[{date:"2026-06-25",channel:"Email",note:"Presupuesto aceptado (53.000€)."},
+          {date:"2026-07-16",channel:"Site visit",note:"Revisión de obra en curso, todo según plan."}]},
+  {code:"C-007",legalName:"Inmobiliaria Vallès, S.L.",type:"B2B",nif:"B60111000",status:"Inactive",engagement:"Dormant",
+   contact:"Oficina Comercial",email:"info@invalles.example",phone:"937 111 000",lang:"es-ES",
+   billAddress:"C/ Major 3",billCity:"Rubí",billPc:"08191",siteAddress:"—",
+   terms:"30 days",method:"Transfer",priceList:"PL-STD",discount:0,creditLimit:15000,source:"Repeat",gdpr:true,
+   tags:["inmobiliaria"],notes:"Reformas de pisos para venta. Sin proyecto activo desde 2025.",
+   comms:[{date:"2025-11-10",channel:"Email",note:"Última reforma entregada. Sin nuevos encargos."},
+          {date:"2026-07-05",channel:"Call",note:"Llamada de reactivación — valorar campaña 2º semestre."}]},
+  {code:"C-008",legalName:"Clínica Dental Sants",type:"B2B",nif:"B62555666",status:"Active",engagement:"At risk",
+   contact:"Dra. Elena Puig",email:"admin@dentalsants.example",phone:"934 555 666",lang:"es-ES",
+   billAddress:"C/ Sants 220",billCity:"Barcelona",billPc:"08028",siteAddress:"C/ Sants 220, entlo.",
+   terms:"60 days",method:"Transfer",priceList:"PL-STD",discount:0,creditLimit:50000,source:"Architect",gdpr:true,
+   tags:["clínica","obra parada"],notes:"Obra en pausa a la espera de pago del segundo hito.",
+   comms:[{date:"2026-06-05",channel:"Email",note:"Segunda certificación emitida (48.000€)."},
+          {date:"2026-07-10",channel:"Call",note:"Pago retrasado — obra en pausa hasta regularizar."},
+          {date:"2026-07-20",channel:"Email",note:"Recordatorio de pago enviado."}]},
+ ],
+ projects:[
+  {code:"P-2026-014",name:"Reforma integral Roca",customer:"C-001",site:"Av. Barcelona 10, 3º",type:"Integral",pm:"Ignacio",status:"In progress",start:"2026-06-01",end:"2026-08-15",contract:41000},
+  {code:"P-2026-011",name:"Fachada Balmes 120",customer:"C-002",site:"C/ Balmes 120",type:"Facade",pm:"Ignacio",status:"Won",start:"2026-08-20",end:"2026-10-10",contract:62000},
+  {code:"P-2025-088",name:"Portería y accesos Balmes",customer:"C-002",site:"C/ Balmes 120",type:"Commercial",pm:"Ignacio",status:"Complete",start:"2025-09-01",end:"2025-11-15",contract:18500},
+  {code:"P-2026-020",name:"Reforma local El Racó",customer:"C-005",site:"Pg. del Born 15",type:"Commercial",pm:"Ignacio",status:"In progress",start:"2026-07-10",end:"2026-09-30",contract:78000},
+  {code:"P-2026-018",name:"Àtic Poblenou",customer:"C-006",site:"C/ Pujades 100, àtic",type:"Integral",pm:"Ignacio",status:"In progress",start:"2026-07-01",end:"2026-10-01",contract:53000},
+  {code:"P-2026-009",name:"Reforma Clínica Dental Sants",customer:"C-008",site:"C/ Sants 220",type:"Commercial",pm:"Ignacio",status:"On hold",start:"2026-05-05",end:"2026-08-30",contract:96000},
+ ],
+};}
+function seedDemo(){
+  const has=(DATA.customers||[]).length;
+  if(has && !confirm(`Load the sample customer set? This replaces the current ${has} client(s). Projects are merged (existing ones are kept).`))return;
+  const d=DEMO();
+  DATA.customers=d.customers;
+  const seen=new Set((DATA.projects||[]).map(p=>String(p.code)));
+  DATA.projects=(DATA.projects||[]).concat(d.projects.filter(p=>!seen.has(String(p.code))));
+  persistSoon(); closeDrawer(); render(); toast('Sample data loaded ✓');
+}
+
 /* =================== export =================== */
 function exportJSON(){
   const payload={_meta:{app:"Canei Subirats — Customers",exportedAt:new Date().toISOString()},customers:DATA.customers||[]};
@@ -502,6 +585,7 @@ function exportJSON(){
 
 /* =================== wire up =================== */
 $('#btnAdd').onclick=()=>openEditor(-1);
+$('#btnSeed').onclick=seedDemo;
 $('#btnExport').onclick=exportJSON;
 $('#dClose').onclick=closeDrawer; $('#scrim').onclick=closeDrawer;
 $('#q').oninput=drawRows; $('#fStatus').onchange=drawRows; $('#fEng').onchange=drawRows;
