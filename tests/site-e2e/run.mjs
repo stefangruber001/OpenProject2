@@ -434,6 +434,28 @@ async function testErp(browser, base) {
       bad("erp: BNK-02 allocation", "no unallocated movement input found");
     }
 
+    // MDM: every party field is correctable from the UI (edit drawer → updateParty)
+    await pg.evaluate(() => (location.hash = "clientes"));
+    await pg.waitForTimeout(400);
+    await pg.locator("tr.click").first().click();
+    await pg.waitForTimeout(250);
+    await pg.locator("#p_edit").click();
+    await pg.waitForTimeout(250);
+    const newContact = "E2E Contacto " + String(Date.now()).slice(-5);
+    await pg.locator("#e_contact").fill(newContact);
+    await pg.locator("#e_save").click();
+    await pg.waitForTimeout(350);
+    await pg.locator("tr.click").first().click();
+    await pg.waitForTimeout(250);
+    await pg.locator("#p_edit").click();
+    await pg.waitForTimeout(250);
+    const readBack = await pg.locator("#e_contact").inputValue();
+    if (readBack === newContact)
+      ok("erp: party edit drawer updates and persists (MDM manageability)");
+    else bad("erp: party edit drawer", `read back "${readBack}"`);
+    await pg.locator("#dClose").click();
+    await pg.waitForTimeout(200);
+
     // Gestoría: exception list + VAT summary render
     await pg.evaluate(() => (location.hash = "gestoria"));
     await pg.waitForTimeout(400);

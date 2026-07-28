@@ -578,7 +578,59 @@ function partyDrawer(id){
      <div class="it"><b>${h.budgets.length}</b> presupuestos · <b>${h.contracts.length}</b> contratos · <b>${h.projects.length}</b> proyectos</div>
      <div class="it"><b>${h.invoices.length}</b> facturas · <b>${h.receipts.length}</b> recibos · <b>${h.bills.length}</b> facturas recibidas</div>
      ${erp.state.properties.filter(x=>x.partyId===id).map(x=>`<div class="it">🏠 ${esc(x.street)} (${x.surfaceM2} m²)</div>`).join("")}
-   </div></div>`;
+   </div></div>
+   <div style="display:flex;gap:8px;margin-top:10px">
+     <button class="btn primary" id="p_edit">✏️ Editar datos</button>
+     <button class="btn" id="p_act">${p.active?"Desactivar":"Reactivar"}</button>
+   </div>`;
+  $('#p_edit').onclick=()=>editPartyDrawer(id);
+  $('#p_act').onclick=()=>mutate(()=>{
+    if(p.active) erp.deactivateParty(id,"backoffice");
+    else erp.updateParty(id,{active:true},"backoffice");
+    closeDrawer();
+  },p.active?"Tercero desactivado":"Tercero reactivado");
+}
+function editPartyDrawer(id){
+  const p=erp.party(id);
+  const db=openDrawer("Editar — "+p.name);
+  const ROLES=[["customer","Cliente"],["supplier","Proveedor"],["subcontractor","Industrial"],["selfEmployed","Autónomo"]];
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Nombre o razón social *</label><input id="e_name" value="${esc(p.name)}"></div>
+   <div class="field"><label>NIF / CIF / NIE *</label><input id="e_tax" value="${esc(p.taxId||"")}"></div>
+   <div class="field"><label>Tipo</label><select id="e_type">${[["individual","Particular"],["company","Empresa"],["community","Comunidad"],["publicBody","Ente público"]].map(([v,l])=>`<option value="${v}"${p.partyType===v?" selected":""}>${l}</option>`).join("")}</select></div>
+   <div class="field full"><label>Roles</label><div style="display:flex;gap:12px;flex-wrap:wrap;padding:6px 0">${ROLES.map(([v,l])=>`<label style="display:flex;gap:5px;align-items:center;font-size:12.5px"><input type="checkbox" data-role="${v}"${p.roles.includes(v)?" checked":""}>${l}</label>`).join("")}</div></div>
+   <div class="field full"><label>Dirección de facturación *</label><input id="e_street" value="${esc(p.billStreet||"")}"></div>
+   <div class="field"><label>C.P. *</label><input id="e_cp" value="${esc(p.billPostalCode||"")}"></div>
+   <div class="field"><label>Población *</label><input id="e_city" value="${esc(p.billCity||"")}"></div>
+   <div class="field"><label>Provincia</label><input id="e_prov" value="${esc(p.billProvince||"")}"></div>
+   <div class="field"><label>Persona de contacto</label><input id="e_contact" value="${esc(p.contactPerson||"")}"></div>
+   <div class="field"><label>Móvil *</label><input id="e_mob" value="${esc(p.mobile||"")}"></div>
+   <div class="field"><label>Fijo</label><input id="e_land" value="${esc(p.landline||"")}"></div>
+   <div class="field full"><label>Email</label><input id="e_mail" value="${esc(p.email||"")}"></div>
+   <div class="field"><label>Origen del contacto</label><select id="e_src">${ErpEngine.LISTS.leadSources.map(s=>`<option${p.leadSource===s?" selected":""}>${s}</option>`).join("")}</select></div>
+   <div class="field"><label>Línea de actividad</label><select id="e_line">${[["renovation","Reforma"],["repairs","Reparaciones"],["damp","Humedades"],["commercial","Comercial"],["other","Otra"]].map(([v,l])=>`<option value="${v}"${p.activityLine===v?" selected":""}>${l}</option>`).join("")}</select></div>
+   <div class="field"><label>Forma de pago</label><select id="e_paym">${[["transfer","Transferencia"],["card","Tarjeta"],["cash","Efectivo"],["debit","Recibo domiciliado"]].map(([v,l])=>`<option value="${v}"${p.paymentMethod===v?" selected":""}>${l}</option>`).join("")}</select></div>
+   <div class="field"><label>Plazo de pago (días)</label><input id="e_terms" type="number" min="0" value="${p.paymentTermsDays??30}"></div>
+   <div class="field"><label>IRPF</label><select id="e_irpf">${[[0,"No aplica"],[1,"Aplica"]].map(([v,l])=>`<option value="${v}"${(p.irpfApplies?1:0)===v?" selected":""}>${l}</option>`).join("")}</select></div>
+   <div class="field"><label>IRPF % (si aplica)</label><input id="e_irpfr" type="number" min="0" max="47" step="0.5" value="${(p.irpfRateBp||0)/100}"></div>
+   <div class="field full"><label>IBAN (opcional — el cambio queda registrado)</label><input id="e_iban" value="${esc((p.bank&&p.bank.iban)||"")}" placeholder="ES.."></div>
+   <div class="field full"><label>Notas</label><input id="e_notes" value="${esc(p.notes||"")}"></div>
+   <div class="field full" style="margin-top:8px"><button class="btn primary" id="e_save">Guardar cambios</button></div></div>`;
+  $('#e_save').onclick=()=>mutate(()=>{
+    const roles=[...db.querySelectorAll('input[data-role]:checked')].map(x=>x.dataset.role);
+    if(!roles.length) throw new Error("El tercero necesita al menos un rol");
+    if(!$('#e_name').value.trim()) throw new Error("El nombre es obligatorio");
+    const patch={name:$('#e_name').value.trim(),taxId:$('#e_tax').value.trim(),partyType:$('#e_type').value,roles,
+      billStreet:$('#e_street').value.trim(),billPostalCode:$('#e_cp').value.trim(),billCity:$('#e_city').value.trim(),billProvince:$('#e_prov').value.trim(),
+      contactPerson:$('#e_contact').value.trim(),mobile:$('#e_mob').value.trim(),landline:$('#e_land').value.trim(),email:$('#e_mail').value.trim(),
+      leadSource:$('#e_src').value,activityLine:$('#e_line').value,paymentMethod:$('#e_paym').value,
+      paymentTermsDays:Math.max(0,+$('#e_terms').value||0),
+      irpfApplies:$('#e_irpf').value==="1",irpfRateBp:Math.round((+$('#e_irpfr').value||0)*100),notes:$('#e_notes').value.trim()};
+    const iban=$('#e_iban').value.trim().replace(/\s+/g,"");
+    if(iban) patch.bank=Object.assign({},p.bank||{},{iban,holder:(p.bank&&p.bank.holder)||patch.name});
+    erp.updateParty(id,patch,"backoffice");
+    closeDrawer();
+  },"Datos actualizados");
 }
 function newPartyDrawer(){
   const db=openDrawer("Nuevo tercero");
