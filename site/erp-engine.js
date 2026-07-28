@@ -868,9 +868,12 @@
           "Budget fails validation: " + blocks.map((x) => x.line + " " + x.msg).join("; "),
         );
       this._requireComplete(b.partyId, "budget"); // MDM-10 (budget needs identified party)
+      const ch = channel || "email";
+      if (ch === "email" && !validEmail(this.party(b.partyId).email))
+        throw new Error("Email required to send electronically (MDM-04)");
       v.issued = true;
       v.frozen = true;
-      v.sent = { date: this.state.today, channel: channel || "email" }; // QUO-09
+      v.sent = { date: this.state.today, channel: ch }; // QUO-09 + MDM-04
       v.docRef = this._docName("presupuesto", b, v); // DOC-04
       b.status = "issued";
       const o = this.state.opportunities.find(
@@ -1966,7 +1969,7 @@
       return applicable[0].rateCentsPerHour;
     }
     recordHours(h, user) {
-      // LAB-01/02/03
+      // LAB-01/02/03 + LAB-07 (kind: normal|extra|festivo; optional extra-pay supplement)
       const rec = Object.assign(
         {
           id: this._id("lab"),
@@ -1975,11 +1978,13 @@
           chapterNum: null,
           date: this.state.today,
           hoursMilli: 0,
+          kind: "normal",
+          extraPayCents: 0,
         },
         h,
       );
       rec.rateCents = this.workerRateCents(rec.workerId, rec.date);
-      rec.costCents = mul(rec.hoursMilli, rec.rateCents);
+      rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);
       this.state.labour.push(rec);
       return rec;
     }
@@ -2552,6 +2557,420 @@
         ).length,
         docsMissing: this.state.captured.filter((c) => ["captured", "extracted"].includes(c.status))
           .length,
+      };
+    }
+
+    /* =========================== gap-closure additions (BRD v2 audit) =========================== */
+    markLegacy(kind, id, user) {
+      // ORG-03: former-entity records readable but excluded from totals
+      const coll = {
+        party: this.state.parties,
+        captured: this.state.captured,
+        project: this.state.projects,
+      }[kind];
+      const rec = coll.find((x) => x.id === id);
+      rec.legacy = true;
+      this._log(user, "markLegacy", kind + ":" + id);
+      return rec;
+    }
+    legacyItems() {
+      // ORG-03: searchable register of legacy records
+      return {
+        parties: this.state.parties.filter((p) => p.legacy),
+        captured: this.state.captured.filter((c) => c.legacy),
+        projects: this.state.projects.filter((p) => p.legacy),
+      };
+    }
+    addFeedback(projectId, f, user) {
+      // CRM-07: satisfaction, complaints, warranty claims per project
+      const p = this.project(projectId);
+      this.state.feedback = this.state.feedback || [];
+      const rec = Object.assign(
+        {
+          id: this._id("fbk"),
+          projectId: p.id,
+          partyId: p.partyId,
+          date: this.state.today,
+          kind: "satisfaction",
+          rating: null,
+          text: "",
+          status: "open",
+        },
+        f,
+      );
+      if (!["satisfaction", "complaint", "warrantyClaim"].includes(rec.kind))
+        throw new Error("Unknown feedback kind");
+      this.state.feedback.push(rec);
+      this._log(user, "addFeedback", p.code + " " + rec.kind);
+      return rec;
+    }
+    validateVisit(visitId, patch, user) {
+      // VIS-08: back office completes/corrects/validates the site capture
+      const v = this.state.visits.find((x) => x.id === visitId);
+      Object.assign(v, patch || {});
+      v.validated = { by: user || "backoffice", date: this.state.today };
+      this._log(user, "validateVisit", visitId);
+      return v;
+    }
+    visitToBudgetLines(visitId, budgetId, chapterId, user) {
+      // VIS-05/06: convert captured lines without retyping
+      const vis = this.state.visits.find((x) => x.id === visitId);
+      const out = [];
+      for (const l of vis.lines || []) {
+        const item = l.itemId ? this.state.catalogue.find((i) => i.id === l.itemId) : null;
+        out.push(
+          this.addLine(budgetId, chapterId, {
+            itemId: l.itemId || null,
+            code: item ? item.code : l.code || "",
+            desc: l.desc || (item ? item.desc : ""),
+            customerWording: item ? item.customerWording : "",
+            unit: l.unit || (item ? item.unit : "ud"),
+            qtyMilli: l.qtyMilli || 1000,
+            priceCents: l.priceCents ?? (item ? item.defaultPriceCents : 0),
+            costCents: l.costCents ?? (item ? item.defaultCostCents : 0),
+          }),
+        );
+      }
+      this._log(
+        user,
+        "visitToBudgetLines",
+        visitId + " → " + this.budget(budgetId).number + " (" + out.length + " lines)",
+      );
+      return out;
+    }
+    importCatalogue(rows, sourceRef, user) {
+      // CAT-10: controlled upsert preserving the source reference
+      const res = { added: 0, updated: 0, skipped: 0 };
+      for (const r of rows) {
+        if (!r.code || !r.desc) {
+          res.skipped++;
+          continue;
+        }
+        const existing = this.state.catalogue.find((i) => i.code === r.code);
+        if (existing) {
+          Object.assign(existing, {
+            desc: r.desc,
+            unit: r.unit || existing.unit,
+            defaultCostCents: r.defaultCostCents ?? existing.defaultCostCents,
+            importSource: sourceRef,
+          });
+          res.updated++;
+        } else {
+          this.addCatalogueItem(Object.assign({}, r, { importSource: sourceRef }), user);
+          res.added++;
+        }
+      }
+      this._log(user, "importCatalogue", sourceRef + " +" + res.added + " ~" + res.updated);
+      return res;
+    }
+    recordSupplierPerformance(supplierId, perf, user) {
+      // SUP-11: reliability, quality, returns, response
+      this.state.supplierPerf = this.state.supplierPerf || [];
+      const rec = Object.assign(
+        {
+          id: this._id("spf"),
+          supplierId,
+          date: this.state.today,
+          onTime: true,
+          qualityIssue: false,
+          returned: false,
+          responseDays: 1,
+          note: "",
+        },
+        perf,
+      );
+      this.state.supplierPerf.push(rec);
+      this._log(user, "supplierPerformance", supplierId);
+      return rec;
+    }
+    supplierRanking() {
+      // SUP-11: simple ranking
+      const perf = this.state.supplierPerf || [];
+      const by = {};
+      for (const r of perf) {
+        const g = (by[r.supplierId] = by[r.supplierId] || {
+          n: 0,
+          onTime: 0,
+          quality: 0,
+          returns: 0,
+          resp: 0,
+        });
+        g.n++;
+        g.onTime += r.onTime ? 1 : 0;
+        g.quality += r.qualityIssue ? 1 : 0;
+        g.returns += r.returned ? 1 : 0;
+        g.resp += r.responseDays;
+      }
+      return Object.entries(by)
+        .map(([supplierId, g]) => ({
+          supplierId,
+          name: this.party(supplierId).name,
+          records: g.n,
+          onTimePct: Math.round((g.onTime / g.n) * 100),
+          qualityIssues: g.quality,
+          returns: g.returns,
+          avgResponseDays: Math.round((g.resp / g.n) * 10) / 10,
+          score: Math.round(
+            (g.onTime / g.n) * 60 + (1 - g.quality / g.n) * 30 + (1 - g.returns / g.n) * 10,
+          ),
+        }))
+        .sort((a, b) => b.score - a.score);
+    }
+    saveBenchmark(budgetId, label, user) {
+      // PRE-14: preserve an initial benchmark study
+      const b = this.budget(budgetId);
+      b.benchmarks = b.benchmarks || [];
+      const t = this.budgetTotals(budgetId);
+      b.benchmarks.push({
+        label,
+        date: this.state.today,
+        chapters: clone(t.chapters),
+        costBaseCents: t.costBaseCents,
+        baseCents: t.baseCents,
+      });
+      this._log(user, "saveBenchmark", b.number + " " + label);
+    }
+    compareBudgetCosts(budgetId, supplierIds) {
+      // PRE-14: same measured scope vs several cost sources
+      const b = this.budget(budgetId);
+      const v = this.currentVersion(budgetId);
+      const lines = [];
+      for (const c of v.chapters)
+        for (const l of c.lines.filter((x) => !x.pending)) {
+          const qty = l.subLines.length ? this._aggSubLines(l.subLines) : l.qtyMilli;
+          const perSupplier = supplierIds.map((sid) => {
+            const price = l.itemId ? this.currentPriceCents(l.itemId, sid) : null;
+            return {
+              supplierId: sid,
+              totalCents: price != null ? mul(qty, price) : null,
+              missing: price == null,
+            }; // SUP-07 missing ≠ 0
+          });
+          const selected = l.lumpSum ? l.costCents : mul(qty, l.costCents);
+          const present = perSupplier.filter((x) => !x.missing);
+          const best = present.length ? Math.min(...present.map((x) => x.totalCents)) : null;
+          lines.push({
+            chapter: c.num,
+            line: l.num,
+            desc: l.desc,
+            selectedCents: selected,
+            perSupplier,
+            bestCents: best,
+            varianceAbs: best != null ? selected - best : null,
+            variancePct: best ? Math.round(((selected - best) / best) * 1000) / 10 : null,
+          });
+        }
+      const chapters = {};
+      for (const l of lines) {
+        const g = (chapters[l.chapter] = chapters[l.chapter] || { selectedCents: 0, bestCents: 0 });
+        g.selectedCents += l.selectedCents;
+        g.bestCents += l.bestCents ?? l.selectedCents;
+      }
+      return { lines, chapters, benchmarks: b.benchmarks || [] };
+    }
+    renumberChapter(budgetId, oldNum, newNum, user) {
+      // PRE-16: renumber without losing cost/progress links
+      const v = this._editableVersion(budgetId);
+      const c = v.chapters.find((x) => x.num === oldNum);
+      if (!c) throw new Error("Chapter not found");
+      if (v.chapters.some((x) => x.num === newNum))
+        throw new Error("Chapter number already in use");
+      c.num = newNum;
+      c.lines.forEach((l, i) => (l.num = newNum + "." + (i + 1)));
+      // keep every linked record pointing at the same chapter
+      const remap = (arr, key) =>
+        arr.forEach((r) => {
+          if (r[key] === oldNum) r[key] = newNum;
+        });
+      const projId = (this.state.projects.find((p) => p.budgetId === budgetId) || {}).id;
+      remap(
+        this.state.purchases.filter((p) => p.projectId === projId),
+        "chapterNum",
+      );
+      remap(
+        this.state.labour.filter((l) => l.projectId === projId),
+        "chapterNum",
+      );
+      this.state.bills.forEach((b2) =>
+        b2.allocations.forEach((a) => {
+          if (a.projectId === projId && a.chapterNum === oldNum) a.chapterNum = newNum;
+        }),
+      );
+      this._log(user, "renumberChapter", oldNum + "→" + newNum);
+      return c;
+    }
+    addProjectRequirement(projectId, req, user) {
+      // PRJ-06: permits, safety docs, access, customer decisions
+      const p = this.project(projectId);
+      const rec = Object.assign(
+        { id: this._id("req"), type: "permit", desc: "", status: "open", due: null },
+        req,
+      );
+      if (!["permit", "safetyDoc", "access", "customerDecision", "dependency"].includes(rec.type))
+        throw new Error("Unknown requirement type");
+      (rec.type === "permit" || rec.type === "safetyDoc" ? p.permits : p.dependencies).push(rec);
+      this._log(user, "addProjectRequirement", p.code + " " + rec.type);
+      return rec;
+    }
+    assignResource(projectId, a, user) {
+      // PLN-02: workers/crews/machinery to projects and periods
+      this.state.assignments = this.state.assignments || [];
+      const rec = Object.assign(
+        {
+          id: this._id("asg"),
+          projectId,
+          workerId: null,
+          machine: null,
+          from: this.state.today,
+          to: this.state.today,
+        },
+        a,
+      );
+      this.state.assignments.push(rec);
+      this._log(user, "assignResource", projectId);
+      return rec;
+    }
+    resourceConflicts() {
+      // PLN-02: overlapping assignments visible
+      const A = this.state.assignments || [];
+      const conflicts = [];
+      for (let i = 0; i < A.length; i++)
+        for (let j = i + 1; j < A.length; j++) {
+          const a = A[i],
+            b = A[j];
+          const same =
+            (a.workerId && a.workerId === b.workerId) || (a.machine && a.machine === b.machine);
+          if (same && a.projectId !== b.projectId && a.from <= b.to && b.from <= a.to)
+            conflicts.push({ a: a.id, b: b.id, resource: a.workerId || a.machine });
+        }
+      return conflicts;
+    }
+    addDiaryEntry(projectId, entry, user) {
+      // PLN-05: site diary — notes, photos, incidents, deliveries
+      const p = this.project(projectId);
+      const rec = Object.assign(
+        {
+          date: this.state.today,
+          note: "",
+          photos: [],
+          incident: false,
+          delivery: false,
+          workDone: "",
+        },
+        entry,
+      );
+      p.diary.push(rec);
+      this._log(user, "addDiaryEntry", p.code);
+      return rec;
+    }
+    upcomingNeeds(weeks = 3) {
+      // PLN-08: resource/material requirements for the coming weeks
+      const needs = [];
+      for (const p of this.state.projects.filter((x) => !x.closed && x.budgetId)) {
+        const v = this.version(p.budgetId, p.acceptedVersionId);
+        for (const c of v.chapters.filter((x) => x.section === "base" && x.progress !== "done"))
+          for (const l of c.lines.filter((x) => !x.pending && x.progress !== "done")) {
+            const qty = l.subLines.length ? this._aggSubLines(l.subLines) : l.qtyMilli;
+            needs.push({
+              project: p.code,
+              chapter: c.num,
+              desc: l.desc,
+              qty: qty / 1000,
+              unit: l.unit,
+              estCostCents: l.lumpSum ? l.costCents : mul(qty, l.costCents),
+              supplierId: l.costSupplierId,
+            });
+          }
+      }
+      return needs;
+    }
+    hoursComparison(projectId) {
+      // LAB-06: estimated vs actual hours by chapter
+      const p = this.project(projectId);
+      const est = {};
+      if (p.budgetId) {
+        const v = this.version(p.budgetId, p.acceptedVersionId);
+        for (const c of v.chapters)
+          for (const l of c.lines)
+            if (l.estHoursMilli) est[c.num] = (est[c.num] || 0) + l.estHoursMilli;
+      }
+      const act = {};
+      for (const l of this.state.labour.filter((x) => x.projectId === projectId))
+        act[l.chapterNum || "?"] = (act[l.chapterNum || "?"] || 0) + l.hoursMilli;
+      const chapters = [...new Set([...Object.keys(est), ...Object.keys(act)])].map((num) => ({
+        chapter: num,
+        estHours: (est[num] || 0) / 1000,
+        actualHours: (act[num] || 0) / 1000,
+        overrun: (act[num] || 0) > (est[num] || 0) && (est[num] || 0) > 0,
+      }));
+      return {
+        chapters,
+        estTotal: sum(Object.values(est)) / 1000,
+        actualTotal: sum(Object.values(act)) / 1000,
+      };
+    }
+    addRecurringInvoice(r, user) {
+      // AR-11: periodic invoicing (maintenance contracts)
+      this.state.recurring = this.state.recurring || [];
+      const rec = Object.assign(
+        {
+          id: this._id("rcr"),
+          partyId: null,
+          projectId: null,
+          desc: "Mantenimiento periódico",
+          baseCents: 0,
+          vatBp: 2100,
+          cadenceMonths: 1,
+          nextDate: this.state.today,
+          active: true,
+        },
+        r,
+      );
+      this.state.recurring.push(rec);
+      this._log(user, "addRecurringInvoice", rec.desc);
+      return rec;
+    }
+    runRecurring(user) {
+      // AR-11: issue every recurring invoice that is due
+      const issued = [];
+      for (const r of (this.state.recurring || []).filter(
+        (x) => x.active && x.nextDate <= this.state.today,
+      )) {
+        issued.push(
+          this.issueInvoice(
+            {
+              projectId: r.projectId,
+              kind: "progress",
+              baseCents: r.baseCents,
+              vatBp: r.vatBp,
+              desc: r.desc,
+            },
+            user,
+          ),
+        );
+        const d = new Date(r.nextDate + "T00:00:00Z");
+        d.setUTCMonth(d.getUTCMonth() + r.cadenceMonths);
+        r.nextDate = d.toISOString().slice(0, 10);
+      }
+      return issued;
+    }
+    receivablesSpecial() {
+      // FIN-09: retention, guarantee and disputed balances apart from normal AR
+      const inv = this.state.invoices.filter((i) => i.kind !== "creditNote");
+      return {
+        retentionHeldCents: sum(inv, (i) => i.retentionHeldCents || 0),
+        disputedCents: sum(
+          inv.filter((i) => i.disputed),
+          (i) => this.invoiceOutstandingCents(i.id),
+        ),
+        guaranteeCents: sum(
+          this.state.contracts.filter((c) => c.status === "completed"),
+          (c) => c.guaranteeRetainedCents || 0,
+        ),
+        normalOutstandingCents: sum(
+          inv.filter((i) => !i.disputed),
+          (i) => this.invoiceOutstandingCents(i.id),
+        ),
       };
     }
 
