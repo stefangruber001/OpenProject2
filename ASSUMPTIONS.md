@@ -397,3 +397,23 @@ languages: es-ES # source: synthetic
     than half-build architecture. CIF/IBAN remain placeholders (we lack the real
     values) — the go-live checklist and invoice guard flag that the operator must
     set them before issuing invoices. Reversible: all edits are contained per file.
+
+42. **BRD v2 (Proyecto Diorka, 28-Jul-2026) implementation cycle.** Owners'
+    updated requirements read line by line (1,382 lines) and implemented per the
+    document's own §11 phasing (Phase-1 MVP + explicitly requested Phase-2 items).
+    (a) **One integrated engine** (`site/erp-engine.js`, money in cents,
+    Node+browser) implementing MDM/CRM/VIS/CAT/SUP/PRE/QUO/CON/PRJ/PLN/LAB/PUR/
+    CHG/AR/AP/BNK/GES/VFU/PAY/FIN/DOC/DAS with gap-free numbering (ORG-04),
+    audit trail (ORG-07) and a chained invoice event log (VFU-01). (b) **Year
+    simulation** (12 months × 3 projects) — 145/145 invariants across 5 seeds.
+    (c) **Home rebuilt as an ERP launchpad** per DAS-01 with live indicators from
+    the same dataset; **`erp.html` workspace** with Torre de control (DAS-02/03),
+    day views (DAS-04/05) and all modules incl. the BNK-02 allocate-by-project-
+    number flow. **Decisions:** single entity = Canei Subirats, S.L. (ASSUMPTIONS
+    #25; BRD names roles, not names); new-page UI in Spanish per NFR-10 while
+    older analytical pages remain English (recorded as PARTIAL in the trace);
+    former-entity history handling (ORG-03) modeled via `legacy` flag; deferred
+    items follow the BRD's own Phase 2-4 list (bank feeds, portal imports, OCR at
+    scale, e-signature, certified Verifactu provider, customer portal). Merged
+    Ignacio's parallel `clientes.html` + iOS Clients tab (kept, linked from the
+    launchpad). Reversible: all new files are additive; the old home is in git.
