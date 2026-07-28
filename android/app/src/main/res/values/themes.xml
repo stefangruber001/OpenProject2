@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Premium light theme always — matches the web app (color-scheme: light). -->
+    <style name="Theme.Canei" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/canei_green</item>
+        <item name="colorOnPrimary">@color/canei_paper</item>
+        <item name="colorSecondary">@color/canei_spark</item>
+        <item name="android:windowBackground">@color/canei_bg</item>
+        <item name="android:statusBarColor">@color/canei_green_deep</item>
+        <item name="android:navigationBarColor">@color/canei_paper</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

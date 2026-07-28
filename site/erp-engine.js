@@ -240,7 +240,8 @@
 
     /* =========================== ORG — entity & series =========================== */
     configureEntity(cfg) {
-      // ORG-01: once; applied to every document
+      // ORG-01: applied to every document. Partial re-calls update only the
+      // provided fields — existing values are preserved, never reset.
       this.state.config = Object.assign(
         {
           legalName: "",
@@ -258,6 +259,7 @@
           logoRef: "canei-logo",
           marginThresholdBp: 1500,
         },
+        this.state.config || {},
         cfg,
       );
       const mk = (t, prefix) =>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="canei_green">#48733C</color>
+    <color name="canei_green_deep">#31532A</color>
+    <color name="canei_spark">#F2C230</color>
+    <color name="canei_paper">#FFFFFF</color>
+    <color name="canei_bg">#EEF3EA</color>
+    <color name="canei_muted">#8B8F80</color>
+</resources>

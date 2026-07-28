@@ -417,3 +417,16 @@ languages: es-ES # source: synthetic
     scale, e-signature, certified Verifactu provider, customer portal). Merged
     Ignacio's parallel `clientes.html` + iOS Clients tab (kept, linked from the
     launchpad). Reversible: all new files are additive; the old home is in git.
+
+- **#43 — Google Play twin app ships as a WebView shell with scrollable tab bar (2026-07-28).**
+  The Android app mirrors ios/Config.swift exactly (same 7 tabs, same /preview base URL) as a
+  classic-Views WebView shell (no Compose) to keep the first CI build low-risk. Android's bottom
+  navigation caps at 5 items, so the 7 tabs use a scrollable Material tab bar instead. Signing
+  falls back to the debug key when secrets are absent so the pipeline is testable before the
+  Play account exists (PLAY-SETUP.md). Reversible: swap to Compose/bottom-nav later without
+  touching the pipeline.
+- **#44 — Session-limit pause honoured per operator mandate (2026-07-28).** The i18n-extraction
+  and field-audit agent fleets hit the platform session limit (resets 20:30 UTC). Completed
+  results were banked (scratchpad *-partial.json), high-value fixes continued in the main loop,
+  and both workflows are scheduled to resume automatically after the reset — matching the
+  operator's standing instruction to pause on empty cloud quota and restart when it returns.
