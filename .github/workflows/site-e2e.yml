@@ -39,5 +39,10 @@ jobs:
         # playwright is declared in apps/web, so the bin lives there, not at the root
         run: pnpm --filter web exec playwright install --with-deps chromium
 
+      - name: Business simulations (1 year × 3/mo, 2 years × 2/mo)
+        run: |
+          node tests/simulation/year-sim.mjs 1
+          SIM_MONTHS=24 SIM_PPM=2 node tests/simulation/year-sim.mjs 1
+
       - name: Run autonomous site E2E
         run: node tests/site-e2e/run.mjs

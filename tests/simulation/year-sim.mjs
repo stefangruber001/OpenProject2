@@ -13,6 +13,9 @@ const E = require("../../site/erp-engine.js");
 const { ERP, addDays, quarterOf } = E;
 
 const SEED = process.argv[2] ? +process.argv[2] : 1;
+// Horizon is configurable: SIM_MONTHS=24 SIM_PPM=2 node year-sim.mjs → 2 years × 2 projects/month
+const SIM_MONTHS = +(process.env.SIM_MONTHS || 12);
+const SIM_PPM = +(process.env.SIM_PPM || 3);
 let _s = (SEED * 2654435761) % 2 ** 32;
 const rnd = () => ((_s = (1103515245 * _s + 12345) % 2 ** 31), _s / 2 ** 31);
 const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
@@ -697,20 +700,20 @@ function advanceProject(hnd) {
 }
 
 /* ---------------- run the year ---------------- */
-const MONTHS = [
-  "2026-01",
-  "2026-02",
-  "2026-03",
-  "2026-04",
-  "2026-05",
-  "2026-06",
-  "2026-07",
-  "2026-08",
-  "2026-09",
-  "2026-10",
-  "2026-11",
-  "2026-12",
-];
+const MONTHS = [];
+{
+  let y = 2026,
+    mo = 1;
+  for (let i = 0; i < SIM_MONTHS; i++) {
+    MONTHS.push(`${y}-${String(mo).padStart(2, "0")}`);
+    mo++;
+    if (mo > 12) {
+      mo = 1;
+      y++;
+    }
+  }
+}
+const END = MONTHS[MONTHS.length - 1] + (MONTHS[MONTHS.length - 1].endsWith("-12") ? "-31" : "-28");
 for (const m of MONTHS) {
   erp.setToday(m + "-05");
   // overhead each month: rent bill + salary movement (FIN-07 / BNK-03)
@@ -733,24 +736,30 @@ for (const m of MONTHS) {
     ])
     .forEach((mv, i) => erp.classifyMovement(mv.id, i === 0 ? "salary" : "internalTransfer"));
 
-  // 3 new projects/month: 1 large-or-medium with contract, 1 medium, 1 quick repair
+  // SIM_PPM new projects/month. 3 (default): large-or-medium + medium + quick repair.
+  // 2: large-or-medium + (alternating medium / quick repair) so both paths stay exercised.
   erp.setToday(m + "-08");
   const h1 = runLargeOrMedium(ri(0, 1) ? "large" : "medium");
   h1.baselineAtStart = h1.prj.baseline.revenueCents;
   openProjects.push(h1);
-  erp.setToday(m + "-14");
-  const h2 = runLargeOrMedium("medium");
-  h2.baselineAtStart = h2.prj.baseline.revenueCents;
-  openProjects.push(h2);
-  erp.setToday(m + "-20");
-  runQuickRepair();
+  const monthIdx = MONTHS.indexOf(m);
+  if (SIM_PPM >= 3 || (SIM_PPM === 2 && monthIdx % 2 === 1)) {
+    erp.setToday(m + "-14");
+    const h2 = runLargeOrMedium("medium");
+    h2.baselineAtStart = h2.prj.baseline.revenueCents;
+    openProjects.push(h2);
+  }
+  if (SIM_PPM >= 3 || (SIM_PPM === 2 && monthIdx % 2 === 0)) {
+    erp.setToday(m + "-20");
+    runQuickRepair();
+  }
 
   // advance all open projects
   erp.setToday(m + "-25");
   for (const h of openProjects.filter((x) => !x.done)) advanceProject(h);
 
   // quarterly package at quarter end (GES)
-  if (["2026-03", "2026-06", "2026-09", "2026-12"].includes(m)) {
+  if (+m.slice(5) % 3 === 0) {
     erp.setToday(m + "-30");
     const q = quarterOf(m + "-15");
     const pkg = erp.quarterlyPackage(q);
@@ -775,7 +784,7 @@ for (const m of MONTHS) {
 }
 
 /* ---------------- year-end invariants ---------------- */
-erp.setToday("2026-12-31");
+erp.setToday(END);
 const S = erp.state;
 
 // 1. Numbering series gap-free and unique (ORG-04)
@@ -945,7 +954,7 @@ assert(
 }
 // 13. VAT year total reconciles across quarters (GES-03)
 {
-  const qs = ["2026-Q1", "2026-Q2", "2026-Q3", "2026-Q4"];
+  const qs = [...new Set(MONTHS.map((m) => quarterOf(m + "-15")))];
   const sumQ = qs.reduce((s, q) => s + erp.vatSummary(q).outputVatCents, 0);
   const raw = S.invoices.reduce(
     (s, i) => s + (i.kind === "creditNote" ? -i.vatCents : i.vatCents),
@@ -989,7 +998,7 @@ assert(
 // 17. Cash discipline: undocumented cash flagged (BNK-07)
 {
   erp.recordCashMovement(till.id, {
-    accountingDate: "2026-12-31",
+    accountingDate: END,
     concept: "Pago informal prueba",
     amountCents: -5000,
   });
@@ -1044,7 +1053,12 @@ assert(
   );
 }
 // 22. Package/labour/audit sanity
-assert(S.packagesSent.length === 4, "4 quarterly packages sent", S.packagesSent.length);
+const expectedPkgs = MONTHS.filter((m) => +m.slice(5) % 3 === 0).length;
+assert(
+  S.packagesSent.length === expectedPkgs,
+  expectedPkgs + " quarterly packages sent",
+  S.packagesSent.length,
+);
 assert(
   erp.labourExport().length >= 60,
   "labour export populated (" + erp.labourExport().length + ")",

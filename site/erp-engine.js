@@ -272,23 +272,36 @@
       return this.state.config;
     }
     nextNumber(type) {
-      // ORG-04: controlled, gap-free, no manual overwriting
+      // ORG-04: controlled, gap-free, no manual overwriting.
+      // Series restart at 0001 each fiscal year (FAC-2027-0001 after FAC-2026-nnnn).
       const s = this.state.series[type];
       if (!s) throw new Error("Unknown series: " + type);
       const year = this.state.today.slice(0, 4);
-      const num = `${s.prefix}${year}-${String(s.next).padStart(4, "0")}`;
+      s.byYear = s.byYear || {};
+      if (s.byYear[year] == null)
+        s.byYear[year] = s.issued.filter((n) => n.startsWith(s.prefix + year + "-")).length + 1;
+      const num = `${s.prefix}${year}-${String(s.byYear[year]).padStart(4, "0")}`;
+      s.byYear[year]++;
       s.next++;
       s.issued.push(num);
       return num;
     }
     seriesGaps(type) {
-      // GES-07: gap check
+      // GES-07: gap check, per fiscal year
       const s = this.state.series[type];
       if (!s) return [];
-      const nums = s.issued.map((n) => +n.slice(-4)).sort((a, b) => a - b);
+      const byYear = {};
+      for (const n of s.issued) {
+        const y = n.slice(s.prefix.length, s.prefix.length + 4);
+        (byYear[y] = byYear[y] || []).push(+n.slice(-4));
+      }
       const gaps = [];
-      for (let i = 1; i < nums.length; i++)
-        if (nums[i] !== nums[i - 1] + 1) gaps.push(nums[i - 1] + 1);
+      for (const y of Object.keys(byYear).sort()) {
+        const nums = byYear[y].sort((a, b) => a - b);
+        for (let i = 1; i < nums.length; i++)
+          if (nums[i] !== nums[i - 1] + 1)
+            gaps.push(`${y}-${String(nums[i - 1] + 1).padStart(4, "0")}`);
+      }
       return gaps;
     }
 
