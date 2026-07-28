@@ -43,6 +43,7 @@ jobs:
         run: |
           node tests/simulation/year-sim.mjs 1
           SIM_MONTHS=24 SIM_PPM=2 node tests/simulation/year-sim.mjs 1
+          node tests/simulation/manageability-sim.mjs
 
       - name: Run autonomous site E2E
         run: node tests/site-e2e/run.mjs

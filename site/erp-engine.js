@@ -602,7 +602,9 @@
     }
     currentPriceCents(itemId, supplierId) {
       const cands = this.state.prices
-        .filter((p) => p.itemId === itemId && (!supplierId || p.supplierId === supplierId))
+        .filter(
+          (p) => !p.annulled && p.itemId === itemId && (!supplierId || p.supplierId === supplierId),
+        )
         .sort((a, b) => b.date.localeCompare(a.date));
       return cands.length ? cands[0].netCents : null;
     }
@@ -633,7 +635,9 @@
     priceAlerts() {
       // DAS-06: expired / stale prices
       const t = this.state.today;
-      return this.state.prices.filter((p) => p.validUntil && p.validUntil < t).map((p) => p.id);
+      return this.state.prices
+        .filter((p) => !p.annulled && p.validUntil && p.validUntil < t)
+        .map((p) => p.id);
     }
 
     /* =========================== PRE/QUO — budgets & versions =========================== */
@@ -2987,6 +2991,418 @@
           (i) => this.invoiceOutstandingCents(i.id),
         ),
       };
+    }
+
+    /* ============ manageability — correction & update paths (field audit) ============
+       Every field a company must be able to change has a method here (or in its
+       domain section). Immutable-by-design stays immutable: issued/frozen budget
+       versions, invoice numbers/series, signed contract terms, project baselines,
+       the chained invoice event log, and audit entries. Every correction is
+       audit-logged. */
+    updateCatalogueItem(id, patch, user) {
+      const it = this.state.catalogue.find((x) => x.id === id);
+      if (!it) throw new Error("Catalogue item not found");
+      delete patch.id;
+      delete patch.code;
+      Object.assign(it, patch);
+      this._log(user, "updateCatalogueItem", it.code || it.id);
+      return it;
+    }
+    updateWorkPackage(id, patch, user) {
+      const wp = this.state.packages.find((x) => x.id === id);
+      if (!wp) throw new Error("Work package not found");
+      if (patch.components) {
+        for (const c of patch.components) {
+          if (!this.state.catalogue.find((x) => x.id === c.itemId))
+            throw new Error("Component item not found: " + c.itemId);
+          if (!(c.qtyPerUnitMilli > 0)) throw new Error("Component qty must be positive");
+        }
+      }
+      delete patch.id;
+      Object.assign(wp, patch);
+      this._log(user, "updateWorkPackage", wp.name || wp.id);
+      return wp;
+    }
+    voidPrice(id, reason, user) {
+      // prices stay append-only; a wrong entry is annulled, never deleted
+      const p = this.state.prices.find((x) => x.id === id);
+      if (!p) throw new Error("Price not found");
+      p.annulled = { date: this.state.today, reason: reason || "" };
+      this._log(user, "voidPrice", id);
+      return p;
+    }
+    updateOpportunity(id, patch, user) {
+      const o = this.state.opportunities.find((x) => x.id === id);
+      if (!o) throw new Error("Opportunity not found");
+      if (patch.status === "open" && o.status === "won")
+        throw new Error("A won opportunity cannot be reopened");
+      delete patch.id;
+      Object.assign(o, patch);
+      this._log(user, "updateOpportunity", id);
+      return o;
+    }
+    resolveFeedback(id, resolution, user) {
+      const f = (this.state.feedback || []).find((x) => x.id === id);
+      if (!f) throw new Error("Feedback not found");
+      f.status = "closed";
+      f.resolution = resolution || "";
+      f.resolvedAt = this.state.today;
+      this._log(user, "resolveFeedback", id);
+      return f;
+    }
+    updateBudget(id, patch, user) {
+      // header-level corrections; frozen once a version is issued or accepted
+      const b = this.budget(id);
+      const cur = this.currentVersion(id);
+      if (b.acceptedVersionId || (cur && cur.issued))
+        throw new Error("Budget is issued/accepted — create a new version instead");
+      const allowed = ["internalRef", "propertyId", "discountCents", "vatBp", "validityDays"];
+      for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      Object.assign(b, patch);
+      this._log(user, "updateBudget", b.number);
+      return b;
+    }
+    _editableChapter(budgetId, chapterRef) {
+      // chapterRef: chapter id or its num ("1")
+      const v = this._editableVersion(budgetId);
+      const ch = v.chapters.find((c) => c.id === chapterRef || c.num === String(chapterRef));
+      if (!ch) throw new Error("Chapter not found");
+      return ch;
+    }
+    _findLine(ch, lineRef) {
+      // lineRef: line id or its num ("1.2")
+      const ln = ch.lines.find((l) => l.id === lineRef || l.num === String(lineRef));
+      if (!ln) throw new Error("Line not found");
+      return ln;
+    }
+    updateChapter(budgetId, chapterRef, patch, user) {
+      const ch = this._editableChapter(budgetId, chapterRef);
+      delete patch.num;
+      delete patch.lines;
+      Object.assign(ch, patch);
+      this._log(user, "updateChapter", this.budget(budgetId).number + " c" + ch.num);
+      return ch;
+    }
+    updateLine(budgetId, chapterRef, lineRef, patch, user) {
+      const ch = this._editableChapter(budgetId, chapterRef);
+      const ln = this._findLine(ch, lineRef);
+      delete patch.num;
+      Object.assign(ln, patch);
+      if (ln.subLines && ln.subLines.length)
+        ln.qtyMilli = ln.subLines.reduce((s, sl) => s + (sl.qtyMilli || 0), 0);
+      this._log(user, "updateLine", this.budget(budgetId).number + " " + ln.num);
+      return ln;
+    }
+    removeLine(budgetId, chapterRef, lineRef, user) {
+      const ch = this._editableChapter(budgetId, chapterRef);
+      const ln = this._findLine(ch, lineRef);
+      ch.lines.splice(ch.lines.indexOf(ln), 1);
+      ch.lines.forEach((l, idx) => (l.num = ch.num + "." + (idx + 1)));
+      this._log(user, "removeLine", this.budget(budgetId).number + " " + ln.num);
+    }
+    resolvePendingLine(budgetId, chapterRef, lineRef, { priceCents, costCents }, user) {
+      const ln = this.updateLine(
+        budgetId,
+        chapterRef,
+        lineRef,
+        { priceCents: priceCents || 0, costCents: costCents || 0, pending: false },
+        user,
+      );
+      this._log(user, "resolvePendingLine", this.budget(budgetId).number);
+      return ln;
+    }
+    markContractSent(id, user) {
+      const c = this.state.contracts.find((x) => x.id === id);
+      if (!c) throw new Error("Contract not found");
+      c.status = "sent";
+      this._log(user, "markContractSent", c.number);
+      return c;
+    }
+    cancelContract(id, reason, user) {
+      const c = this.state.contracts.find((x) => x.id === id);
+      if (!c) throw new Error("Contract not found");
+      if (c.signature && c.signature.customerSignedAt)
+        throw new Error("A signed contract cannot be cancelled here — needs a formal annex");
+      c.status = "cancelled";
+      c.cancelReason = reason || "";
+      this._log(user, "cancelContract", c.number);
+      return c;
+    }
+    updateProject(id, patch, user) {
+      // planning-level fields only; the baseline stays frozen
+      const p = this.project(id);
+      const allowed = ["targetEnd", "name", "notes", "siteAddress"];
+      const clean = {};
+      for (const k of allowed) if (k in patch) clean[k] = patch[k];
+      if ("targetEnd" in clean) {
+        p.dates = p.dates || {};
+        p.dates.targetEnd = clean.targetEnd;
+        delete clean.targetEnd;
+      }
+      Object.assign(p, clean);
+      this._log(user, "updateProject", p.code);
+      return p;
+    }
+    reopenProject(id, user) {
+      const p = this.project(id);
+      if (!p.closed) throw new Error("Project is not closed");
+      p.closed = false;
+      p.status = "inExecution";
+      this._log(user, "reopenProject", p.code);
+      return p;
+    }
+    resolveRequirement(projectId, reqId, status, user) {
+      const p = this.project(projectId);
+      const r = (p.requirements || []).find((x) => x.id === reqId);
+      if (!r) throw new Error("Requirement not found");
+      r.status = status || "resolved";
+      r.resolvedAt = this.state.today;
+      this._log(user, "resolveRequirement", p.code);
+      return r;
+    }
+    updateAssignment(id, patch, user) {
+      const a = (this.state.assignments || []).find((x) => x.id === id);
+      if (!a) throw new Error("Assignment not found");
+      delete patch.id;
+      Object.assign(a, patch);
+      this._log(user, "updateAssignment", id);
+      return a;
+    }
+    removeAssignment(id, user) {
+      const A = this.state.assignments || [];
+      const i = A.findIndex((x) => x.id === id);
+      if (i < 0) throw new Error("Assignment not found");
+      A.splice(i, 1);
+      this._log(user, "removeAssignment", id);
+    }
+    rejectChange(id, reason, user) {
+      const ch = this.state.changes.find((x) => x.id === id);
+      if (!ch) throw new Error("Change not found");
+      if (ch.invoiceId)
+        throw new Error("An invoiced extra cannot be rejected — issue a credit note");
+      ch.status = "rejected";
+      ch.rejectReason = reason || "";
+      this._log(user, "rejectChange", id);
+      return ch;
+    }
+    markChangeExecuted(id, user) {
+      const ch = this.state.changes.find((x) => x.id === id);
+      if (!ch) throw new Error("Change not found");
+      if (ch.status !== "approved")
+        throw new Error("Only an approved extra can be marked executed");
+      ch.executed = { date: this.state.today };
+      this._log(user, "markChangeExecuted", id);
+      return ch;
+    }
+    updatePurchase(id, patch, user) {
+      const pu = this.state.purchases.find((x) => x.id === id);
+      if (!pu) throw new Error("Purchase not found");
+      if (pu.status.invoicedBillId && ("qtyMilli" in patch || "unitCents" in patch))
+        throw new Error("Purchase already invoiced — correct the supplier bill instead");
+      const allowed = [
+        "projectId",
+        "chapterNum",
+        "desc",
+        "qtyMilli",
+        "unitCents",
+        "orderRef",
+        "urgent",
+      ];
+      for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      Object.assign(pu, patch);
+      pu.totalCents = mul(pu.qtyMilli, pu.unitCents);
+      this._log(user, "updatePurchase", pu.number);
+      return pu;
+    }
+    markPurchaseDelivered(id, date, user) {
+      const pu = this.state.purchases.find((x) => x.id === id);
+      if (!pu) throw new Error("Purchase not found");
+      pu.status.delivered = true;
+      pu.deliveredDate = date || this.state.today;
+      this._log(user, "markPurchaseDelivered", pu.number);
+      return pu;
+    }
+    _billLocked(b) {
+      if (b.status === "paid" || b.status === "partPaid") return "paid";
+      const q = quarterOf(b.date);
+      if ((this.state.packagesSent || []).some((p) => p.quarter === q)) return "quarter-sent";
+      return null;
+    }
+    correctBill(id, patch, user) {
+      const b = this.state.bills.find((x) => x.id === id);
+      if (!b) throw new Error("Bill not found");
+      const lock = this._billLocked(b);
+      if (lock)
+        throw new Error("Bill is locked (" + lock + ") — register a supplier credit note instead");
+      const allowed = ["baseCents", "vatBp", "number", "date", "dueDate"];
+      for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      Object.assign(b, patch);
+      b.vatCents = Math.round((b.baseCents * (b.vatBp || 0)) / 10000);
+      b.irpfCents =
+        b.irpfCents && b.irpfRateBp
+          ? Math.round((b.baseCents * b.irpfRateBp) / 10000)
+          : b.irpfCents;
+      b.totalCents = b.baseCents + b.vatCents - (b.irpfCents || 0);
+      this._log(user, "correctBill", b.number);
+      return b;
+    }
+    allocateBill(id, allocations, user) {
+      const b = this.state.bills.find((x) => x.id === id);
+      if (!b) throw new Error("Bill not found");
+      const s = sum(allocations, (a) => a.amountCents);
+      if (Math.abs(s - b.baseCents) > 1)
+        throw new Error("Allocations must equal the bill base amount");
+      b.allocations = allocations;
+      this._log(user, "allocateBill", b.number);
+      return b;
+    }
+    voidPayment(id, user) {
+      const i = this.state.payments.findIndex((p) => p.id === id);
+      if (i < 0) throw new Error("Payment not found");
+      const rec = this.state.payments[i];
+      this.state.payments.splice(i, 1);
+      for (const a of rec.billAllocations || []) {
+        const b = this.state.bills.find((x) => x.id === a.billId);
+        if (b)
+          b.status = this.billOutstandingCents(b.id) >= b.totalCents ? "registered" : "partPaid";
+      }
+      this._log(user, "voidPayment", id + " " + rec.amountCents + "c");
+      return rec;
+    }
+    allocateCollection(id, allocations, user) {
+      const c = this.state.collections.find((x) => x.id === id);
+      if (!c) throw new Error("Collection not found");
+      const s = sum(allocations, (a) => a.amountCents);
+      if (s > c.amountCents) throw new Error("Allocations exceed the amount received");
+      c.allocations = allocations;
+      c.onAccountCents = c.amountCents - s;
+      this._log(user, "allocateCollection", id);
+      return c;
+    }
+    updateRecurring(id, patch, user) {
+      const r = (this.state.recurring || []).find((x) => x.id === id);
+      if (!r) throw new Error("Recurring template not found");
+      const allowed = [
+        "baseCents",
+        "vatBp",
+        "concept",
+        "active",
+        "dayOfMonth",
+        "partyId",
+        "projectId",
+      ];
+      for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      Object.assign(r, patch);
+      this._log(user, "updateRecurring", id);
+      return r;
+    }
+    voidMovement(id, reason, user) {
+      // fixes duplicate imports; a void movement leaves balances and P&L
+      const m = this.state.movements.find((x) => x.id === id);
+      if (!m) throw new Error("Movement not found");
+      if (m.status === "void") return m;
+      m.status = "void";
+      m.voidReason = reason || "";
+      m.excludedFromPL = true;
+      m.voidedAmountCents = m.amountCents;
+      m.amountCents = 0;
+      this._log(user, "voidMovement", id);
+      return m;
+    }
+    unmatchMovement(id, user) {
+      const m = this.state.movements.find((x) => x.id === id);
+      if (!m) throw new Error("Movement not found");
+      m.matched = null;
+      this._log(user, "unmatchMovement", id);
+      return m;
+    }
+    attachMovementDoc(id, docRef, user) {
+      const m = this.state.movements.find((x) => x.id === id);
+      if (!m) throw new Error("Movement not found");
+      m.supportingDocRef = docRef;
+      m.needsDoc = false;
+      this._log(user, "attachMovementDoc", id);
+      return m;
+    }
+    addWorkerRate(workerId, { from, rateCentsPerHour }, user) {
+      // append-only: past effective rows stay; recorded hours keep their historic cost
+      const w = this.state.workers.find((x) => x.id === workerId);
+      if (!w) throw new Error("Worker not found");
+      if (!(rateCentsPerHour > 0)) throw new Error("Rate must be positive");
+      w.rateHistory.push({ from: from || this.state.today, rateCentsPerHour });
+      w.rateHistory.sort((a, b) => a.from.localeCompare(b.from));
+      this._log(user, "addWorkerRate", w.name);
+      return w;
+    }
+    correctHours(id, patch, user) {
+      const rec = this.state.labour.find((x) => x.id === id);
+      if (!rec) throw new Error("Hours entry not found");
+      const allowed = ["projectId", "chapterNum", "hoursMilli", "date", "kind", "extraPayCents"];
+      for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      Object.assign(rec, patch);
+      rec.rateCents = this.workerRateCents(rec.workerId, rec.date);
+      rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);
+      this._log(user, "correctHours", id);
+      return rec;
+    }
+    completeTask(id, user) {
+      const t = this.state.tasks.find((x) => x.id === id);
+      if (!t) throw new Error("Task not found");
+      t.status = "done";
+      t.completedAt = this.state.today;
+      t.completedBy = user || "system";
+      this._log(user, "completeTask", t.title || id);
+      return t;
+    }
+    updateTask(id, patch, user) {
+      const t = this.state.tasks.find((x) => x.id === id);
+      if (!t) throw new Error("Task not found");
+      const allowed = ["title", "due", "assignee", "projectId", "status", "notes"];
+      for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      Object.assign(t, patch);
+      this._log(user, "updateTask", id);
+      return t;
+    }
+    updateBankAccount(id, patch, user) {
+      const a = this.state.bankAccounts.find((x) => x.id === id);
+      if (!a) throw new Error("Account not found");
+      const allowed = ["name", "iban", "notes"];
+      for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      Object.assign(a, patch);
+      this._log(user, "updateBankAccount", a.name);
+      return a;
+    }
+    adminPatch(entity, id, patch, user) {
+      // Guarded escape hatch so NO editable field is ever dead-ended, even before
+      // it has a dedicated control. Refuses everything immutable-by-design and
+      // audit-logs the full patch.
+      const COLLECTIONS = {
+        party: "parties",
+        property: "properties",
+        opportunity: "opportunities",
+        visit: "visits",
+        catalogueItem: "catalogue",
+        workPackage: "packages",
+        price: "prices",
+        purchase: "purchases",
+        capture: "captures",
+        task: "tasks",
+        worker: "workers",
+        bankAccount: "bankAccounts",
+        recurring: "recurring",
+        assignment: "assignments",
+        feedback: "feedback",
+      };
+      const col = COLLECTIONS[entity];
+      if (!col)
+        throw new Error("adminPatch not allowed for '" + entity + "' — use the dedicated method");
+      const rec = (this.state[col] || []).find((x) => x.id === id);
+      if (!rec) throw new Error(entity + " not found");
+      const FORBIDDEN = ["id", "code", "number", "issued", "frozen", "baseline", "events"];
+      for (const k of FORBIDDEN) delete patch[k];
+      Object.assign(rec, patch);
+      this._log(user, "adminPatch:" + entity, id + " " + JSON.stringify(patch).slice(0, 120));
+      return rec;
     }
 
     /* ---------- DOC-04 standardized naming ---------- */
