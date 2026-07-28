@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+<title>Canei Subirats — Customer management</title>
+<style>
+  :root{
+    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a; --greenSoft:#e7f0e1; --greenPale:#dce8d4; --spark:#f2c230;
+    --ink:#14160f; --body:#4f5347; --muted:#8b8f80; --faint:#aab0a0;
+    --line:#dde5d6; --hair:#e7eee1; --bg:#eef3ea; --paper:#fff;
+    --danger:#b4402f; --dangerSoft:#f6e3df;
+    --shadow:0 1px 2px rgba(24,32,16,.03), 0 18px 40px -24px rgba(24,32,16,.18);
+    --shadow-lg:0 2px 4px rgba(24,32,16,.04), 0 40px 80px -40px rgba(24,32,16,.3);
+    --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
+    --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    --mono:ui-monospace,Menlo,monospace;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box}
+  html{touch-action:manipulation;-webkit-text-size-adjust:100%;overflow-x:hidden}
+  body{margin:0;color:var(--body);font:15px/1.55 var(--sans);letter-spacing:-.005em;min-height:100vh;overflow-x:hidden;
+    background:
+      radial-gradient(1200px 600px at 88% -14%, rgba(72,115,60,.16), transparent 58%),
+      radial-gradient(820px 460px at -6% 2%, rgba(242,194,48,.10), transparent 55%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0;letter-spacing:-.02em}
+  a{color:var(--green);text-decoration:none}
+  .native-app .topbar{padding-top:max(14px,env(safe-area-inset-top))}
+
+  /* ---- top bar ---- */
+  .topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:14px 20px;background:rgba(255,255,255,.82);backdrop-filter:saturate(1.4) blur(14px);
+    border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .brand .nm{font-family:var(--serif);font-weight:600;font-size:16px;color:var(--ink);line-height:1;white-space:nowrap}
+  .brand .nm small{display:block;font-family:var(--sans);font-weight:600;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);margin-top:3px}
+  .tb-spacer{flex:1 1 auto}
+  .tb-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:7px;font:600 13px var(--sans);border-radius:11px;padding:9px 14px;
+    border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;transition:.15s;white-space:nowrap}
+  .btn:hover{border-color:color-mix(in srgb,var(--green) 40%,var(--line));transform:translateY(-1px);box-shadow:var(--shadow)}
+  .btn.primary{background:linear-gradient(120deg,var(--greenDeep),var(--green) 70%);color:#fff;border-color:transparent}
+  .btn.ghost{background:transparent}
+  .btn.sm{padding:6px 10px;font-size:12px;border-radius:9px}
+  .btn.danger{color:var(--danger);border-color:var(--dangerSoft)}
+  .btn.danger:hover{border-color:var(--danger)}
+
+  /* ---- layout ---- */
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 22px 90px}
+  .crumbs{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .head{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+  .head h1{font-size:clamp(22px,3.2vw,30px)}
+  .head .sub{font-size:13.5px;color:var(--body);max-width:66ch;margin-top:6px}
+
+  /* ---- KPI strip ---- */
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:18px 0 4px}
+  .kpi{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:13px 15px;box-shadow:var(--shadow)}
+  .kpi b{display:block;font-family:var(--serif);font-size:23px;color:var(--ink);line-height:1;letter-spacing:-.02em}
+  .kpi span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-top:6px}
+  @media (max-width:860px){.kpis{grid-template-columns:repeat(2,1fr)}}
+
+  /* ---- toolbar ---- */
+  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:18px 0 12px}
+  .search{flex:1 1 220px;display:flex;align-items:center;gap:8px;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:8px 12px;min-width:0}
+  .search input{border:0;outline:0;font:14px var(--sans);color:var(--ink);width:100%;background:transparent}
+  .filt{font:600 13px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:9px 11px;outline:0}
+  .count{font-size:12.5px;color:var(--muted);white-space:nowrap;margin-left:auto}
+
+  /* ---- table ---- */
+  .tablewrap{background:var(--paper);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{border-collapse:collapse;width:100%;min-width:640px;font-size:13.5px}
+  thead th{position:sticky;top:0;text-align:left;font:700 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);background:var(--greenSoft);padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--hair);color:var(--body);vertical-align:middle}
+  tbody tr{cursor:pointer;transition:background .1s}
+  tbody tr:hover{background:var(--greenSoft)}
+  tbody tr:last-child td{border-bottom:0}
+  td .k{font-weight:600;color:var(--ink)}
+  td .muted2{color:var(--muted);font-size:12px}
+  .pill{display:inline-block;font:600 11px var(--sans);border-radius:999px;padding:2px 9px;background:var(--hair);color:var(--body);white-space:nowrap}
+  .pill.g{background:var(--greenSoft);color:var(--greenDeep)}
+  .pill.y{background:#fbf0cf;color:#8a6d12}
+  .pill.r{background:var(--dangerSoft);color:var(--danger)}
+  .pill.b{background:#e4edf6;color:#2c5a86}
+  .num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+  .empty{padding:46px 20px;text-align:center;color:var(--muted)}
+  .empty .bigic{font-size:34px;opacity:.6}
+
+  /* ---- drawer ---- */
+  .scrim{position:fixed;inset:0;background:rgba(20,26,14,.34);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:.2s;z-index:60}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:min(580px,96vw);background:var(--bg);z-index:70;
+    box-shadow:-30px 0 80px -40px rgba(20,26,14,.5);transform:translateX(102%);transition:transform .24s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+  .drawer.on{transform:none}
+  .drawer .dh{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);background:var(--paper)}
+  .drawer .dh h3{font-size:17px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .drawer .db{overflow-y:auto;padding:16px 20px 30px;flex:1}
+  .drawer .df{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--line);background:var(--paper)}
+
+  /* editor form */
+  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .field.full{grid-column:1/-1}
+  .field label{font:600 11.5px var(--sans);color:var(--muted);letter-spacing:.02em}
+  .field .hint{font-size:11px;color:var(--faint)}
+  .field input,.field select,.field textarea{font:14px var(--sans);color:var(--ink);background:var(--paper);
+    border:1px solid var(--line);border-radius:10px;padding:9px 11px;outline:0;width:100%;transition:.12s}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--greenSoft)}
+  .field textarea{resize:vertical;min-height:66px}
+  .field .pre{display:flex;align-items:center}
+  .field .pre span{color:var(--muted);font-size:13px;padding:0 4px 0 0}
+  .sech{font:700 10.5px var(--sans);letter-spacing:.13em;text-transform:uppercase;color:var(--green);margin:20px 0 2px;grid-column:1/-1}
+  .sech:first-child{margin-top:0}
+
+  /* detail view */
+  .dtop{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  .dtop .nmbig{font-family:var(--serif);font-weight:600;font-size:20px;color:var(--ink)}
+  .dtop .code{font:600 12px var(--mono);color:var(--muted)}
+  .pillrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);margin-top:14px}
+  .card h4{font:700 10.5px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--green);margin:0 0 10px}
+  .dl{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:13.5px}
+  .dl dt{color:var(--muted)}
+  .dl dd{margin:0;color:var(--ink);word-break:break-word}
+  .linkrow{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--hair)}
+  .linkrow:last-child{border-bottom:0}
+  .linkrow .t{color:var(--ink);font-weight:600}
+  .linkrow .m{font-size:12px;color:var(--muted)}
+  .money{font-variant-numeric:tabular-nums}
+  .comm{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--hair)}
+  .comm:last-child{border-bottom:0}
+  .comm .cd{font:600 11px var(--mono);color:var(--muted);white-space:nowrap;padding-top:2px}
+  .comm .cx{min-width:0}
+  .comm .cch{font-weight:600;color:var(--ink)}
+  .comm .cn{color:var(--body)}
+  .commadd{display:grid;grid-template-columns:130px 1fr auto;gap:8px;margin-top:12px}
+  .commadd select,.commadd input{font:13px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 10px;outline:0;width:100%}
+  @media (max-width:560px){.commadd{grid-template-columns:1fr}}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);opacity:0;pointer-events:none;transition:.2s;z-index:90;
+    background:var(--ink);color:#fff;font:600 13px var(--sans);padding:11px 18px;border-radius:12px;box-shadow:var(--shadow-lg)}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+
+  @media (max-width:560px){
+    .topbar{padding:12px 14px}
+    .brand .nm{font-size:15px}
+    .tb-actions .lbl{display:none}
+    .btn{padding:9px 11px}
+    .wrap{padding:18px 14px 90px}
+    .fgrid{grid-template-columns:1fr}
+    .dl{grid-template-columns:104px 1fr}
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
+        <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c"/>
+        <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230"/>
+      </svg>
+      <span class="nm">Canei Subirats<small>Customer management</small></span>
+    </div>
+    <span class="tb-spacer"></span>
+    <div class="tb-actions">
+      <a class="btn ghost sm" href="index.html">← Home</a>
+      <a class="btn ghost sm" href="master-data.html">Master data</a>
+      <button class="btn ghost sm" id="btnSeed"><span>❋</span><span class="lbl">Sample data</span></button>
+      <button class="btn sm" id="btnExport"><span>⤓</span><span class="lbl">Export</span></button>
+      <button class="btn primary sm" id="btnAdd"><span>＋</span><span class="lbl">Add client</span></button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="crumbs">Canei Subirats ›&nbsp;Clientes</div>
+    <div class="head">
+      <div>
+        <h1>Customer management</h1>
+        <div class="sub">The company's client register — add, edit and classify customers, and see each client's projects, payment position and communications at a glance. Shares one source of truth with Master Data.</div>
+      </div>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="toolbar">
+      <label class="search"><span>🔎</span><input id="q" type="search" placeholder="Search name, NIF, email, city, tag…" autocomplete="off"></label>
+      <select class="filt" id="fStatus"><option value="">All statuses</option></select>
+      <select class="filt" id="fEng"><option value="">All engagement</option></select>
+      <span class="count" id="count"></span>
+    </div>
+
+    <div class="tablewrap">
+      <div class="scroll">
+        <table>
+          <thead><tr>
+            <th>Client</th><th>Type</th><th>Contact</th><th>Status</th><th>Engagement</th>
+            <th style="text-align:right">Projects</th><th style="text-align:right">Contracted</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="dh">
+      <h3 id="dttl">Client</h3><span style="flex:1"></span>
+      <button class="btn ghost sm" id="dClose">Close</button>
+    </div>
+    <div class="db" id="dbody"></div>
+    <div class="df" id="dfoot"></div>
+  </aside>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+/* =================== shared persistence (same store as Master Data) =================== */
+const DB="caneiMasterData", STORE="kv", KEY="data";
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);
+  r.onupgradeneeded=()=>r.result.createObjectStore(STORE);
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function idbGet(k){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(STORE,"readonly").objectStore(STORE).get(k);t.onsuccess=()=>res(t.result);t.onerror=()=>rej(t.error);});}
+async function idbSet(k,v){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(STORE,"readwrite").objectStore(STORE).put(v,k);rq.onsuccess=()=>res();rq.onerror=()=>rej(rq.error);});}
+let saveT; function persistSoon(){clearTimeout(saveT);saveT=setTimeout(()=>idbSet(KEY,DATA).catch(()=>{}),150);}
+
+/* =================== helpers =================== */
+const $=s=>document.querySelector(s), el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const euro=n=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(Number(n)||0);
+const esc=s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const fmtDate=iso=>{if(!iso)return'';const p=String(iso).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;};
+const todayIso=()=>new Date().toISOString().slice(0,10);
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),1900);}
+
+const STATUS=["Active","Prospect","Inactive","Blocked"];
+const ENGAGEMENT=["New","Active","Repeat","VIP","At risk","Dormant"];
+function statusClass(v){const s=String(v||'').toLowerCase();
+  if(/(active)/.test(s))return'g'; if(/(prospect)/.test(s))return'y'; if(/(inactive|blocked)/.test(s))return'r'; return'';}
+function engClass(v){const s=String(v||'').toLowerCase();
+  if(/(vip)/.test(s))return'b'; if(/(repeat|active)/.test(s))return'g'; if(/(new)/.test(s))return'y'; if(/(at risk)/.test(s))return'r'; return'';}
+function pill(v,cls){return v?`<span class="pill ${cls}">${esc(v)}</span>`:'<span style="color:var(--faint)">—</span>';}
+
+/* =================== client field schema (mirrors Master Data + engagement) =================== */
+const FIELDS=[
+  {k:"code",label:"Client code",type:"text",req:1,sec:"Identity",hint:"auto-suggested, e.g. C-004"},
+  {k:"legalName",label:"Legal / full name",type:"text",req:1},
+  {k:"type",label:"Type",type:"select",opts:["B2C","B2B","Public sector"]},
+  {k:"nif",label:"NIF / CIF",type:"text"},
+  {k:"status",label:"Status",type:"select",opts:STATUS},
+  {k:"engagement",label:"Engagement",type:"select",opts:ENGAGEMENT,hint:"relationship classification"},
+  {k:"contact",label:"Primary contact",type:"text",sec:"Contact"},
+  {k:"email",label:"Email",type:"email"},{k:"phone",label:"Phone",type:"tel"},
+  {k:"lang",label:"Language",type:"select",opts:["es-ES","ca-ES","en"]},
+  {k:"billAddress",label:"Billing address",type:"text",sec:"Addresses"},
+  {k:"billCity",label:"City",type:"text"},{k:"billPc",label:"Postal code",type:"text"},
+  {k:"siteAddress",label:"Default site address",type:"text",full:1},
+  {k:"terms",label:"Payment terms",type:"select",opts:["Immediate","15 days","30 days","30/60","60 days","50% up-front"],sec:"Commercial"},
+  {k:"method",label:"Payment method",type:"select",opts:["Transfer","SEPA direct debit","Card","Cash","Financing"]},
+  {k:"iban",label:"IBAN (for SEPA)",type:"text"},
+  {k:"sepaMandate",label:"SEPA mandate ref",type:"text"},
+  {k:"priceList",label:"Price list",type:"text",hint:"code from Price lists"},
+  {k:"discount",label:"Standing discount %",type:"pct"},
+  {k:"creditLimit",label:"Credit limit",type:"money"},
+  {k:"source",label:"Lead source",type:"select",opts:["Referral","Web","Instagram","Google","Repeat","Architect","Other"],sec:"Relationship"},
+  {k:"gdpr",label:"GDPR consent",type:"bool"},
+  {k:"tags",label:"Tags",type:"tags",full:1},
+  {k:"notes",label:"Notes",type:"textarea",full:1},
+];
+const COMM_CHANNELS=["Call","Email","WhatsApp","Meeting","Site visit","Note"];
+
+/* =================== state =================== */
+let DATA={}; let editIdx=-1; let viewIdx=-1;
+
+async function boot(){
+  try{ DATA = (await idbGet(KEY)) || {}; }
+  catch(e){ DATA = {}; }   // restricted storage (e.g. some file:// contexts) — still render
+  if(!DATA||typeof DATA!=='object')DATA={};
+  if(!Array.isArray(DATA.customers))DATA.customers=[];
+  if(!Array.isArray(DATA.projects))DATA.projects=[];
+  // Fill status/engagement filters
+  const fs=$('#fStatus'); STATUS.forEach(s=>fs.appendChild(new Option(s,s)));
+  const fe=$('#fEng'); ENGAGEMENT.forEach(s=>fe.appendChild(new Option(s,s)));
+  render();
+}
+
+/* =================== derived / relationships =================== */
+function projectsOf(c){const code=String(c.code||'').toLowerCase();
+  return (DATA.projects||[]).filter(p=>String(p.customer||'').toLowerCase()===code && code!=='');}
+function contractedOf(c){return projectsOf(c).reduce((s,p)=>s+(Number(p.contract)||0),0);}
+function nextCode(){
+  let max=0; (DATA.customers||[]).forEach(c=>{const m=/^C-?0*(\d+)$/i.exec(String(c.code||''));if(m)max=Math.max(max,+m[1]);});
+  return 'C-'+String(max+1).padStart(3,'0');
+}
+
+/* =================== KPIs + table =================== */
+function render(){
+  const cs=DATA.customers||[];
+  const active=cs.filter(c=>c.status==='Active').length;
+  const prospects=cs.filter(c=>c.status==='Prospect').length;
+  const key=cs.filter(c=>c.engagement==='VIP'||c.engagement==='Repeat').length;
+  const contracted=cs.reduce((s,c)=>s+contractedOf(c),0);
+  $('#kpis').innerHTML=[
+    ['Clients',cs.length],['Active',active],['Prospects',prospects],['VIP / repeat',key],['Contracted',euro(contracted)]
+  ].map(([l,v])=>`<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join('');
+  drawRows();
+}
+function matches(c){
+  const q=$('#q').value.trim().toLowerCase();
+  const st=$('#fStatus').value, en=$('#fEng').value;
+  if(st && c.status!==st)return false;
+  if(en && c.engagement!==en)return false;
+  if(!q)return true;
+  return Object.values(c).some(v=>String(Array.isArray(v)?v.join(' '):v).toLowerCase().includes(q));
+}
+function drawRows(){
+  const cs=DATA.customers||[];
+  const rows=cs.map((c,i)=>({c,i})).filter(x=>matches(x.c));
+  const tb=$('#tbody'); tb.innerHTML='';
+  if(!rows.length){
+    tb.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="bigic">👥</div>
+      <p><b>No clients ${cs.length?'match your filters':'yet'}.</b><br>${cs.length?'Try clearing the search or filters.':'Click <b>Add client</b> to create the first one.'}</p></div></td></tr>`;
+    $('#count').textContent=`0 of ${cs.length}`; return;
+  }
+  rows.forEach(({c,i})=>{
+    const np=projectsOf(c).length, ct=contractedOf(c);
+    const tr=el('tr');
+    tr.innerHTML=
+      `<td><div class="k">${esc(c.legalName||'—')}</div><div class="muted2">${esc(c.code||'')}${c.billCity?' · '+esc(c.billCity):''}</div></td>`+
+      `<td>${pill(c.type,'')}</td>`+
+      `<td><div>${esc(c.contact||'—')}</div><div class="muted2">${esc(c.email||c.phone||'')}</div></td>`+
+      `<td>${pill(c.status,statusClass(c.status))}</td>`+
+      `<td>${pill(c.engagement,engClass(c.engagement))}</td>`+
+      `<td class="num">${np||'—'}</td>`+
+      `<td class="num">${ct?euro(ct):'—'}</td>`;
+    tr.onclick=()=>openDetail(i);
+    tb.appendChild(tr);
+  });
+  $('#count').textContent = `${rows.length} of ${cs.length} client${cs.length===1?'':'s'}`;
+}
+
+/* =================== drawer plumbing =================== */
+function openDrawer(){$('#scrim').classList.add('on');$('#drawer').classList.add('on');$('#drawer').setAttribute('aria-hidden','false');}
+function closeDrawer(){$('#scrim').classList.remove('on');$('#drawer').classList.remove('on');$('#drawer').setAttribute('aria-hidden','true');editIdx=-1;viewIdx=-1;}
+
+/* ---------- DETAIL (read-only relationships) ---------- */
+function openDetail(idx){
+  viewIdx=idx; editIdx=-1;
+  const c=DATA.customers[idx];
+  $('#dttl').textContent=c.legalName||'Client';
+  const projs=projectsOf(c), contracted=contractedOf(c);
+  const comms=Array.isArray(c.comms)?c.comms:[];
+  const info=(dt,dd)=>dd?`<dt>${dt}</dt><dd>${dd}</dd>`:'';
+  const projHtml = projs.length ? projs.map(p=>
+      `<div class="linkrow"><div><div class="t">${esc(p.name||p.code||'Project')}</div>
+        <div class="m">${esc(p.code||'')}${p.type?' · '+esc(p.type):''}${p.start?' · '+fmtDate(p.start):''}</div></div>
+        <div style="text-align:right">${pill(p.status,statusClass(p.status))}<div class="m money">${p.contract?euro(p.contract):''}</div></div></div>`
+    ).join('') : '<div class="m" style="color:var(--muted)">No projects linked to this client yet.</div>';
+  const commHtml = comms.length ? comms.slice().reverse().map(m=>
+      `<div class="comm"><div class="cd">${esc(fmtDate(m.date))}</div><div class="cx"><span class="cch">${esc(m.channel||'Note')}</span> — <span class="cn">${esc(m.note||'')}</span></div></div>`
+    ).join('') : '<div class="m" style="color:var(--muted)">No communications logged yet.</div>';
+
+  $('#dbody').innerHTML=`
+    <div class="dtop">
+      <div style="flex:1;min-width:0">
+        <div class="nmbig">${esc(c.legalName||'—')}</div>
+        <div class="code">${esc(c.code||'')}${c.nif?' · '+esc(c.nif):''}</div>
+        <div class="pillrow">${pill(c.type,'')}${pill(c.status,statusClass(c.status))}${pill(c.engagement,engClass(c.engagement))}${c.source?pill(c.source,''):''}</div>
+      </div>
+    </div>
+
+    <div class="card"><h4>Overview</h4>
+      <dl class="dl">
+        ${info('Contact',esc(c.contact))}
+        ${info('Email',c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'')}
+        ${info('Phone',c.phone?`<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>`:'')}
+        ${info('Language',esc(c.lang))}
+        ${info('Billing',[c.billAddress,c.billPc,c.billCity].filter(Boolean).map(esc).join(', '))}
+        ${info('Site',esc(c.siteAddress))}
+        ${info('Tags',(Array.isArray(c.tags)?c.tags:[]).filter(Boolean).map(t=>pill(t,'')).join(' '))}
+        ${info('Notes',esc(c.notes))}
+      </dl>
+    </div>
+
+    <div class="card"><h4>Projects (${projs.length})</h4>${projHtml}</div>
+
+    <div class="card"><h4>Payments &amp; terms</h4>
+      <dl class="dl">
+        <dt>Contracted</dt><dd class="money">${euro(contracted)} <span class="m">across ${projs.length} project${projs.length===1?'':'s'}</span></dd>
+        ${info('Terms',esc(c.terms))}
+        ${info('Method',esc(c.method))}
+        ${info('Credit limit',c.creditLimit?`<span class="money">${euro(c.creditLimit)}</span>`:'')}
+        ${info('Discount',c.discount?esc(c.discount)+'%':'')}
+      </dl>
+      <div class="m" style="color:var(--muted);margin-top:10px">Live invoices &amp; collections are tracked in <a href="financial-data.html">Financial Data</a>.</div>
+    </div>
+
+    <div class="card"><h4>Communications</h4>
+      <div id="commList">${commHtml}</div>
+      <div class="commadd">
+        <select id="commCh">${COMM_CHANNELS.map(o=>`<option>${o}</option>`).join('')}</select>
+        <input id="commNote" placeholder="Log a call, email or note…" />
+        <button class="btn sm primary" id="commAdd">Log</button>
+      </div>
+    </div>`;
+
+  $('#dfoot').innerHTML=`<button class="btn danger" id="dDelete">Delete</button><span style="flex:1"></span>
+    <button class="btn primary" id="dEdit">Edit client</button>`;
+  $('#dEdit').onclick=()=>openEditor(idx);
+  $('#dDelete').onclick=()=>deleteClient(idx);
+  $('#commAdd').onclick=()=>logComm(idx);
+  $('#commNote').addEventListener('keydown',e=>{if(e.key==='Enter')logComm(idx);});
+  openDrawer();
+}
+function logComm(idx){
+  const note=$('#commNote').value.trim(); if(!note){toast('Type a note first');return;}
+  const c=DATA.customers[idx]; if(!Array.isArray(c.comms))c.comms=[];
+  c.comms.push({date:todayIso(),channel:$('#commCh').value,note});
+  persistSoon(); openDetail(idx); toast('Logged ✓');
+}
+
+/* ---------- EDITOR (create / edit / delete) ---------- */
+function fieldHTML(f,val){
+  const id='f_'+f.k;
+  const label=`<label for="${id}">${esc(f.label)}${f.req?' *':''}</label>`;
+  const hint=f.hint?`<span class="hint">${esc(f.hint)}</span>`:'';
+  let ctrl='';
+  if(f.type==='select'){
+    ctrl=`<select id="${id}"><option value=""></option>${(f.opts||[]).map(o=>`<option${String(val)===String(o)?' selected':''}>${esc(o)}</option>`).join('')}</select>`;
+  }else if(f.type==='textarea'){
+    ctrl=`<textarea id="${id}">${esc(val??'')}</textarea>`;
+  }else if(f.type==='bool'){
+    ctrl=`<select id="${id}"><option value="false"${!val?' selected':''}>No</option><option value="true"${val?' selected':''}>Yes</option></select>`;
+  }else if(f.type==='tags'){
+    ctrl=`<input id="${id}" value="${esc(Array.isArray(val)?val.join(', '):(val??''))}" placeholder="comma, separated">`;
+  }else if(f.type==='money'){
+    ctrl=`<div class="pre"><span>€</span><input id="${id}" inputmode="decimal" value="${val??''}"></div>`;
+  }else if(f.type==='pct'){
+    ctrl=`<div class="pre"><input id="${id}" inputmode="decimal" value="${val??''}"><span>&nbsp;%</span></div>`;
+  }else{
+    const t=f.type==='num'?'number':f.type==='email'?'email':f.type==='tel'?'tel':'text';
+    ctrl=`<input id="${id}" type="${t}" value="${esc(val??'')}">`;
+  }
+  return `<div class="field ${['textarea','tags'].includes(f.type)||f.full?'full':''}">${label}${ctrl}${hint}</div>`;
+}
+function openEditor(idx){
+  editIdx=idx; viewIdx=-1;
+  const row = idx>=0 ? DATA.customers[idx] : {code:nextCode(),type:'B2C',status:'Prospect',engagement:'New',lang:'es-ES'};
+  $('#dttl').textContent = (idx>=0?'Edit ':'New ')+'client';
+  let html='<div class="fgrid">', lastSec=null;
+  FIELDS.forEach(f=>{ if(f.sec&&f.sec!==lastSec){html+=`<div class="sech">${esc(f.sec)}</div>`;lastSec=f.sec;} html+=fieldHTML(f,row[f.k]); });
+  html+='</div>';
+  $('#dbody').innerHTML=html;
+  $('#dfoot').innerHTML=`${idx>=0?'<button class="btn danger" id="dDelete">Delete</button>':''}<span style="flex:1"></span>
+    <button class="btn" id="dCancel">Cancel</button><button class="btn primary" id="dSave">Save client</button>`;
+  $('#dSave').onclick=saveEditor;
+  $('#dCancel').onclick=()=> idx>=0 ? openDetail(idx) : closeDrawer();
+  if(idx>=0)$('#dDelete').onclick=()=>deleteClient(idx);
+  openDrawer();
+}
+function readForm(){
+  const out={};
+  FIELDS.forEach(f=>{
+    const n=document.getElementById('f_'+f.k); if(!n)return; let v=n.value;
+    if(f.type==='money'||f.type==='pct'||f.type==='num'){v=v===''?'':Number(String(v).replace(',','.'));if(Number.isNaN(v))v='';}
+    else if(f.type==='bool'){v=v==='true';}
+    else if(f.type==='tags'){v=v.split(',').map(s=>s.trim()).filter(Boolean);}
+    out[f.k]=v;
+  });
+  return out;
+}
+function saveEditor(){
+  const rec=readForm();
+  const miss=FIELDS.filter(f=>f.req&&(rec[f.k]===''||rec[f.k]==null)).map(f=>f.label);
+  if(miss.length){toast('Required: '+miss.join(', '));return;}
+  const dup=(DATA.customers||[]).some((r,i)=>i!==editIdx && String(r.code||'').trim().toLowerCase()===String(rec.code).trim().toLowerCase());
+  if(dup && !confirm(`Another client already uses code "${rec.code}". Save anyway?`))return;
+  if(editIdx>=0){rec.comms=DATA.customers[editIdx].comms||[]; DATA.customers[editIdx]=rec;}
+  else {rec.comms=[]; DATA.customers.push(rec);}
+  persistSoon(); render();
+  const idx = editIdx>=0 ? editIdx : DATA.customers.length-1;
+  openDetail(idx); toast('Saved ✓');
+}
+function deleteClient(idx){
+  const c=DATA.customers[idx];
+  if(!confirm(`Delete client "${c.legalName||c.code}"? This cannot be undone.`))return;
+  DATA.customers.splice(idx,1); persistSoon(); closeDrawer(); render(); toast('Client deleted');
+}
+
+/* =================== sample data =================== */
+function DEMO(){return {
+ customers:[
+  {code:"C-001",legalName:"Familia Roca Puig",type:"B2C",nif:"46000000X",status:"Active",engagement:"Repeat",
+   contact:"Marta Roca",email:"marta.roca@example.com",phone:"600 111 222",lang:"ca-ES",
+   billAddress:"Av. Barcelona 10",billCity:"Sant Just Desvern",billPc:"08960",siteAddress:"Av. Barcelona 10, 3º",
+   terms:"50% up-front",method:"Transfer",priceList:"PL-RETAIL",discount:0,creditLimit:0,source:"Referral",gdpr:true,
+   tags:["reforma integral","cocina"],notes:"Segunda reforma con nosotros. Cliente muy contento.",
+   comms:[{date:"2026-05-12",channel:"Meeting",note:"Visita inicial y toma de medidas."},
+          {date:"2026-06-02",channel:"Email",note:"Enviado presupuesto integral (41.000€). Aceptado."},
+          {date:"2026-07-15",channel:"WhatsApp",note:"Fotos de avance de obra enviadas."}]},
+  {code:"C-002",legalName:"Comunidad Prop. Balmes 120",type:"B2B",nif:"H08000000",status:"Active",engagement:"VIP",
+   contact:"Admin. Finques Vives",email:"vives@fincas.example",phone:"934 000 000",lang:"es-ES",
+   billAddress:"C/ Balmes 120",billCity:"Barcelona",billPc:"08008",siteAddress:"C/ Balmes 120",
+   terms:"30 days",method:"Transfer",priceList:"PL-STD",discount:5,creditLimit:20000,source:"Architect",gdpr:true,
+   tags:["comunidad","fachada","recurrente"],notes:"Administrador con varias fincas — cuenta clave.",
+   comms:[{date:"2026-04-20",channel:"Meeting",note:"Junta de propietarios: aprobada reforma de fachada."},
+          {date:"2026-06-10",channel:"Email",note:"Contrato firmado, obra Balmes 120 (62.000€)."},
+          {date:"2026-07-18",channel:"Call",note:"Interesados en reforma de otra finca — preparar propuesta."}]},
+  {code:"C-003",legalName:"Nou Local Gràcia S.L.",type:"B2B",nif:"B66000000",status:"Prospect",engagement:"New",
+   contact:"Jordi Nadal",email:"jordi@noulocal.example",phone:"620 333 444",lang:"ca-ES",
+   billAddress:"C/ Verdi 22",billCity:"Barcelona",billPc:"08012",siteAddress:"C/ Verdi 22 bajos",
+   terms:"30/60",method:"Transfer",priceList:"PL-STD",discount:0,creditLimit:35000,source:"Web",gdpr:true,
+   tags:["local comercial"],notes:"Reforma de local para nueva tienda.",
+   comms:[{date:"2026-07-08",channel:"Email",note:"Solicita presupuesto reforma local 60 m²."},
+          {date:"2026-07-20",channel:"Call",note:"Presupuesto enviado (38.000€) — seguimiento el 24."}]},
+  {code:"C-004",legalName:"Pau Ferrer",type:"B2C",nif:"39111222Z",status:"Prospect",engagement:"New",
+   contact:"Pau Ferrer",email:"pau.ferrer@example.com",phone:"610 777 888",lang:"ca-ES",
+   billAddress:"C/ Sant Antoni 8",billCity:"Barcelona",billPc:"08221",siteAddress:"C/ Sant Antoni 8, 2º",
+   terms:"50% up-front",method:"Financing",priceList:"PL-RETAIL",discount:0,creditLimit:0,source:"Instagram",gdpr:true,
+   tags:["baño"],notes:"Reforma de baño. Vino por Instagram.",
+   comms:[{date:"2026-07-19",channel:"WhatsApp",note:"Pide cita para visita técnica."},
+          {date:"2026-07-21",channel:"Call",note:"Visita agendada para el 25/07."}]},
+  {code:"C-005",legalName:"Restaurante El Racó, S.L.",type:"B2B",nif:"B61222333",status:"Active",engagement:"Active",
+   contact:"Núria Camps",email:"nuria@elraco.example",phone:"933 222 111",lang:"ca-ES",
+   billAddress:"Pg. del Born 15",billCity:"Barcelona",billPc:"08003",siteAddress:"Pg. del Born 15",
+   terms:"30 days",method:"Transfer",priceList:"PL-STD",discount:0,creditLimit:40000,source:"Referral",gdpr:true,
+   tags:["hostelería","local"],notes:"Reforma de cocina y sala del restaurante.",
+   comms:[{date:"2026-06-15",channel:"Meeting",note:"Definido alcance: cocina industrial + sala."},
+          {date:"2026-07-01",channel:"Email",note:"Contrato firmado (78.000€), inicio en julio."}]},
+  {code:"C-006",legalName:"Marta i Jordi — Àtic Poblenou",type:"B2C",nif:"47333444W",status:"Active",engagement:"Active",
+   contact:"Jordi Serra",email:"jordi.serra@example.com",phone:"600 444 555",lang:"ca-ES",
+   billAddress:"C/ Pujades 100",billCity:"Barcelona",billPc:"08005",siteAddress:"C/ Pujades 100, àtic",
+   terms:"30/60",method:"Transfer",priceList:"PL-RETAIL",discount:0,creditLimit:0,source:"Google",gdpr:true,
+   tags:["ático","terraza"],notes:"Reforma integral de ático con terraza.",
+   comms:[{date:"2026-06-25",channel:"Email",note:"Presupuesto aceptado (53.000€)."},
+          {date:"2026-07-16",channel:"Site visit",note:"Revisión de obra en curso, todo según plan."}]},
+  {code:"C-007",legalName:"Inmobiliaria Vallès, S.L.",type:"B2B",nif:"B60111000",status:"Inactive",engagement:"Dormant",
+   contact:"Oficina Comercial",email:"info@invalles.example",phone:"937 111 000",lang:"es-ES",
+   billAddress:"C/ Major 3",billCity:"Rubí",billPc:"08191",siteAddress:"—",
+   terms:"30 days",method:"Transfer",priceList:"PL-STD",discount:0,creditLimit:15000,source:"Repeat",gdpr:true,
+   tags:["inmobiliaria"],notes:"Reformas de pisos para venta. Sin proyecto activo desde 2025.",
+   comms:[{date:"2025-11-10",channel:"Email",note:"Última reforma entregada. Sin nuevos encargos."},
+          {date:"2026-07-05",channel:"Call",note:"Llamada de reactivación — valorar campaña 2º semestre."}]},
+  {code:"C-008",legalName:"Clínica Dental Sants",type:"B2B",nif:"B62555666",status:"Active",engagement:"At risk",
+   contact:"Dra. Elena Puig",email:"admin@dentalsants.example",phone:"934 555 666",lang:"es-ES",
+   billAddress:"C/ Sants 220",billCity:"Barcelona",billPc:"08028",siteAddress:"C/ Sants 220, entlo.",
+   terms:"60 days",method:"Transfer",priceList:"PL-STD",discount:0,creditLimit:50000,source:"Architect",gdpr:true,
+   tags:["clínica","obra parada"],notes:"Obra en pausa a la espera de pago del segundo hito.",
+   comms:[{date:"2026-06-05",channel:"Email",note:"Segunda certificación emitida (48.000€)."},
+          {date:"2026-07-10",channel:"Call",note:"Pago retrasado — obra en pausa hasta regularizar."},
+          {date:"2026-07-20",channel:"Email",note:"Recordatorio de pago enviado."}]},
+ ],
+ projects:[
+  {code:"P-2026-014",name:"Reforma integral Roca",customer:"C-001",site:"Av. Barcelona 10, 3º",type:"Integral",pm:"Ignacio",status:"In progress",start:"2026-06-01",end:"2026-08-15",contract:41000},
+  {code:"P-2026-011",name:"Fachada Balmes 120",customer:"C-002",site:"C/ Balmes 120",type:"Facade",pm:"Ignacio",status:"Won",start:"2026-08-20",end:"2026-10-10",contract:62000},
+  {code:"P-2025-088",name:"Portería y accesos Balmes",customer:"C-002",site:"C/ Balmes 120",type:"Commercial",pm:"Ignacio",status:"Complete",start:"2025-09-01",end:"2025-11-15",contract:18500},
+  {code:"P-2026-020",name:"Reforma local El Racó",customer:"C-005",site:"Pg. del Born 15",type:"Commercial",pm:"Ignacio",status:"In progress",start:"2026-07-10",end:"2026-09-30",contract:78000},
+  {code:"P-2026-018",name:"Àtic Poblenou",customer:"C-006",site:"C/ Pujades 100, àtic",type:"Integral",pm:"Ignacio",status:"In progress",start:"2026-07-01",end:"2026-10-01",contract:53000},
+  {code:"P-2026-009",name:"Reforma Clínica Dental Sants",customer:"C-008",site:"C/ Sants 220",type:"Commercial",pm:"Ignacio",status:"On hold",start:"2026-05-05",end:"2026-08-30",contract:96000},
+ ],
+};}
+function seedDemo(){
+  const has=(DATA.customers||[]).length;
+  if(has && !confirm(`Load the sample customer set? This replaces the current ${has} client(s). Projects are merged (existing ones are kept).`))return;
+  const d=DEMO();
+  DATA.customers=d.customers;
+  const seen=new Set((DATA.projects||[]).map(p=>String(p.code)));
+  DATA.projects=(DATA.projects||[]).concat(d.projects.filter(p=>!seen.has(String(p.code))));
+  persistSoon(); closeDrawer(); render(); toast('Sample data loaded ✓');
+}
+
+/* =================== export =================== */
+function exportJSON(){
+  const payload={_meta:{app:"Canei Subirats — Customers",exportedAt:new Date().toISOString()},customers:DATA.customers||[]};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const a=el('a');a.href=URL.createObjectURL(blob);a.download='canei-customers.json';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500); toast('Exported canei-customers.json');
+}
+
+/* =================== wire up =================== */
+$('#btnAdd').onclick=()=>openEditor(-1);
+$('#btnSeed').onclick=seedDemo;
+$('#btnExport').onclick=exportJSON;
+$('#dClose').onclick=closeDrawer; $('#scrim').onclick=closeDrawer;
+$('#q').oninput=drawRows; $('#fStatus').onchange=drawRows; $('#fEng').onchange=drawRows;
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
+boot();
+</script>
+</body>
+</html>
