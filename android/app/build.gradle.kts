@@ -9,7 +9,7 @@ plugins {
 // CI passes the upload keystore via environment (decoded from the
 // ANDROID_KEYSTORE_BASE64 secret). Without it the release build falls back to
 // the debug key so the bundle still builds — the Play upload step is skipped.
-val keystorePath: String? = System.getenv("ANDROID_KEYSTORE_FILE")
+val keystorePath: String? = System.getenv("ANDROID_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
 val hasReleaseKeystore = keystorePath != null && file(keystorePath).exists()
 val ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 
