@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+<title>Canei Subirats — ERP</title>
+<style>
+  :root{
+    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a; --greenSoft:#e7f0e1; --greenPale:#dce8d4; --spark:#f2c230;
+    --ink:#14160f; --body:#4f5347; --muted:#8b8f80; --faint:#aab0a0;
+    --line:#dde5d6; --hair:#e7eee1; --bg:#eef3ea; --paper:#fff;
+    --danger:#b4402f; --dangerSoft:#f6e3df; --amber:#8a6d12; --amberSoft:#fbf0cf; --blue:#4f6b86; --blueSoft:#e6edf3;
+    --shadow:0 1px 2px rgba(24,32,16,.03), 0 18px 40px -24px rgba(24,32,16,.18);
+    --serif:"Roboto Serif",Georgia,serif; --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif; --mono:ui-monospace,Menlo,monospace;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box}
+  html{touch-action:manipulation;-webkit-text-size-adjust:100%;overflow-x:hidden}
+  body{margin:0;color:var(--body);font:14.5px/1.55 var(--sans);letter-spacing:-.004em;min-height:100vh;overflow-x:hidden;
+    background:radial-gradient(1100px 560px at 90% -14%, rgba(72,115,60,.15), transparent 58%),
+               radial-gradient(760px 430px at -6% 2%, rgba(242,194,48,.09), transparent 55%), var(--bg);
+    -webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0;letter-spacing:-.02em}
+  a{color:var(--green);text-decoration:none}
+  .native-app .topbar{padding-top:max(12px,env(safe-area-inset-top))}
+
+  .topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:12px;padding:12px 18px;
+    background:rgba(255,255,255,.85);backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .brand .nm{font-family:var(--serif);font-weight:600;font-size:15.5px;color:var(--ink);line-height:1;white-space:nowrap}
+  .brand .nm small{display:block;font:600 9.5px var(--sans);letter-spacing:.13em;text-transform:uppercase;color:var(--green);margin-top:3px}
+  .tsp{flex:1}
+  .btn{display:inline-flex;align-items:center;gap:6px;font:600 12.5px var(--sans);border-radius:10px;padding:8px 12px;
+    border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;transition:.15s;white-space:nowrap}
+  .btn:hover{border-color:color-mix(in srgb,var(--green) 40%,var(--line));transform:translateY(-1px);box-shadow:var(--shadow)}
+  .btn.primary{background:linear-gradient(120deg,var(--greenDeep),var(--green) 70%);color:#fff;border-color:transparent}
+  .btn.sm{padding:5px 9px;font-size:11.5px;border-radius:8px}
+  .btn.danger{color:var(--danger);border-color:var(--dangerSoft)}
+
+  .shell{display:grid;grid-template-columns:236px 1fr;max-width:1400px;margin:0 auto;align-items:start}
+  aside{position:sticky;top:59px;height:calc(100vh - 59px);overflow-y:auto;padding:16px 10px 40px;border-right:1px solid var(--line)}
+  aside .grp{font:700 10px var(--sans);letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin:14px 10px 5px}
+  aside .grp:first-child{margin-top:0}
+  .navitem{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border:0;background:transparent;cursor:pointer;
+    font:600 13px var(--sans);color:var(--body);padding:7px 10px;border-radius:9px;transition:.12s}
+  .navitem .ic{width:20px;text-align:center;font-size:14px;flex:none}
+  .navitem .ct{margin-left:auto;font:600 10.5px var(--sans);color:var(--faint);background:var(--hair);border-radius:999px;padding:1px 7px}
+  .navitem .ct.alert{background:var(--dangerSoft);color:var(--danger)}
+  .navitem:hover{background:var(--greenSoft);color:var(--ink)}
+  .navitem.on{background:var(--greenSoft);color:var(--greenDeep)}
+
+  main{padding:20px 22px 90px;min-width:0}
+  .crumbs{font-size:11.5px;color:var(--muted);margin-bottom:4px}
+  .head{margin-bottom:14px}
+  .head h1{font-size:clamp(20px,3vw,27px)}
+  .head .sub{font-size:13px;color:var(--body);max-width:70ch;margin-top:5px}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin:4px 0 16px}
+  @media(max-width:1080px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow);cursor:pointer;transition:.12s}
+  .kpi:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--green) 36%,var(--line))}
+  .kpi .lab{font:600 10px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .kpi .val{font-family:var(--serif);font-size:21px;color:var(--ink);margin-top:5px;line-height:1;font-variant-numeric:tabular-nums}
+  .kpi .sub{font-size:11px;color:var(--muted);margin-top:4px}
+  .kpi.hi{background:linear-gradient(125deg,var(--greenDeep),var(--green) 72%);border-color:transparent}
+  .kpi.hi .lab{color:rgba(255,255,255,.75)}.kpi.hi .val{color:#fff}.kpi.hi .sub{color:rgba(255,255,255,.8)}
+  .kpi.warn .val{color:var(--danger)}
+
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+  .card>.ch{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--hair);flex-wrap:wrap}
+  .card>.ch h3{font-size:15px}
+  .card>.ch .tag{margin-left:auto;font:600 11px var(--sans);color:var(--muted)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{border-collapse:collapse;width:100%;min-width:520px;font-size:13px}
+  thead th{text-align:left;font:700 10.5px var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+    background:var(--greenSoft);padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+  tbody td{padding:9px 14px;border-bottom:1px solid var(--hair);color:var(--body);vertical-align:top}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr.click{cursor:pointer}
+  tbody tr.click:hover{background:var(--greenSoft)}
+  .num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+  th.num{text-align:right}
+  td .k{font-weight:600;color:var(--ink)}
+  tr.tot td{background:var(--greenSoft);font-weight:700;color:var(--greenDeep)}
+  .pill{display:inline-block;font:600 10.5px var(--sans);border-radius:999px;padding:2px 8px;background:var(--hair);color:var(--body);white-space:nowrap}
+  .pill.g{background:var(--greenSoft);color:var(--greenDeep)}
+  .pill.y{background:var(--amberSoft);color:var(--amber)}
+  .pill.r{background:var(--dangerSoft);color:var(--danger)}
+  .pill.b{background:var(--blueSoft);color:var(--blue)}
+  .bar{height:7px;border-radius:5px;background:var(--hair);overflow:hidden;min-width:70px}
+  .bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,var(--green),var(--greenLt))}
+  .empty{padding:34px;text-align:center;color:var(--muted)}
+  input.inline,select.inline{font:12.5px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:5px 8px;outline:0;max-width:130px}
+  input.inline:focus{border-color:var(--green)}
+  .alerts{display:flex;flex-direction:column;gap:8px;padding:12px 16px}
+  .al{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-left-width:3px;border-radius:0 11px 11px 0;padding:9px 13px;cursor:pointer;background:var(--paper);transition:.12s}
+  .al:hover{transform:translateX(2px)}
+  .al.critical{border-left-color:var(--danger)} .al.high{border-left-color:var(--spark)} .al.medium{border-left-color:var(--blue)}
+  .al b{color:var(--ink);font-size:12.5px;font-weight:600}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:960px){.grid2{grid-template-columns:1fr}}
+  .daylist{padding:10px 16px;display:flex;flex-direction:column;gap:7px;font-size:13px}
+  .daylist .it{display:flex;gap:8px;align-items:baseline}
+  .daylist .it b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .doc{background:#fbfdf9;border:1px dashed var(--line);border-radius:12px;padding:18px 20px;font-size:12.5px}
+  .doc .dh{display:flex;justify-content:space-between;gap:14px;border-bottom:2px solid var(--green);padding-bottom:10px;margin-bottom:12px}
+  .doc .dh b{font-family:var(--serif);font-size:16px;color:var(--ink)}
+  .chapline{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+  .mobsel{display:none}
+
+  .scrim{position:fixed;inset:0;background:rgba(20,26,14,.34);opacity:0;pointer-events:none;transition:.2s;z-index:60}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:min(540px,94vw);background:var(--bg);z-index:70;
+    box-shadow:-30px 0 80px -40px rgba(20,26,14,.5);transform:translateX(102%);transition:transform .22s;display:flex;flex-direction:column}
+  .drawer.on{transform:none}
+  .drawer .dh2{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--paper)}
+  .drawer .db{overflow-y:auto;padding:14px 18px 30px;flex:1}
+  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field.full{grid-column:1/-1}
+  .field label{font:600 11px var(--sans);color:var(--muted)}
+  .field input,.field select{font:13.5px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 10px;outline:0}
+  .field input:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--greenSoft)}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;pointer-events:none;transition:.2s;z-index:90;
+    background:var(--ink);color:#fff;font:600 12.5px var(--sans);padding:10px 16px;border-radius:11px;max-width:88vw}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+
+  @media(max-width:860px){
+    .shell{grid-template-columns:1fr}
+    aside{display:none}
+    main{padding:16px 14px 90px}
+    .mobsel{display:block;margin:2px 0 12px}
+    .mobsel select{width:100%;font:600 14px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+    .fgrid{grid-template-columns:1fr}
+    .kpis{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <svg width="29" height="29" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
+        <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c"/>
+        <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230"/>
+      </svg>
+      <span class="nm">Canei Subirats<small>ERP · un único entorno</small></span>
+    </div>
+    <span class="tsp"></span>
+    <a class="btn sm" href="index.html">← Inicio</a>
+    <button class="btn sm" id="btnExport">⤓ Exportar</button>
+    <button class="btn sm" id="btnReset" title="Volver a los datos de ejemplo">↻</button>
+  </div>
+
+  <div class="shell">
+    <aside id="nav"></aside>
+    <main>
+      <div class="mobsel"><select id="mnav"></select></div>
+      <div class="crumbs" id="crumbs">ERP</div>
+      <div class="head"><h1 id="ttl">—</h1><div class="sub" id="sub"></div></div>
+      <div id="view"></div>
+    </main>
+  </div>
+
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer">
+    <div class="dh2"><h3 id="dttl">—</h3><span style="flex:1"></span><button class="btn sm" id="dClose">Cerrar</button></div>
+    <div class="db" id="dbody"></div>
+  </aside>
+  <div class="toast" id="toast"></div>
+
+<script src="erp-engine.js"></script>
+<script src="erp-seed.js"></script>
+<script>
+/* =============================== boot & persistence =============================== */
+const $=s=>document.querySelector(s), el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const esc=s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const eur=c=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',useGrouping:'always'}).format((c||0)/100);
+const eur0=c=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0,useGrouping:'always'}).format(Math.round((c||0)/100));
+const fmtD=iso=>{if(!iso)return'—';const p=String(iso).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;};
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2200);}
+
+const DB="caneiERP",STORE="kv",KEY="state";
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function idbGet(k){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(STORE,"readonly").objectStore(STORE).get(k);t.onsuccess=()=>res(t.result);t.onerror=()=>rej(t.error);});}
+async function idbSet(k,v){const db=await idb();return new Promise((res,rej)=>{const q=db.transaction(STORE,"readwrite").objectStore(STORE).put(v,k);q.onsuccess=()=>res();q.onerror=()=>rej(q.error);});}
+let saveT;function persist(){clearTimeout(saveT);saveT=setTimeout(()=>idbSet(KEY,erp.toJSON()).catch(()=>{}),140);}
+
+let erp, cur="torre";
+async function boot(){
+  try{const saved=await idbGet(KEY); erp = saved ? ErpEngine.ERP.from(saved) : ErpSeed.build();}
+  catch(e){ erp = ErpSeed.build(); }
+  if(!(await idbGet(KEY))) persist();
+  if(location.hash) cur=location.hash.slice(1)||"torre";
+  buildNav(); render();
+}
+function mutate(fn,msg){ try{ fn(); persist(); render(); if(msg)toast(msg);}catch(e){ toast("⚠ "+e.message); } }
+
+/* =============================== navigation (DAS-01) =============================== */
+const NAV=[
+ {grp:"Visión",items:[["torre","📊","Torre de control"],["hoy","☀️","Mi día"]]},
+ {grp:"Comercial",items:[["clientes","👥","Clientes y terceros"],["oportunidades","🎯","Oportunidades y visitas"],["presupuestos","📋","Presupuestos"],["contratos","📜","Contratos"]]},
+ {grp:"Obra",items:[["proyectos","🏗️","Proyectos"],["captura","📸","Captura de documentos"],["horas","⏱️","Horas de obra"]]},
+ {grp:"Economía",items:[["facturacion","🧾","Facturación y cobros"],["pagos","📤","Proveedores y pagos"],["banco","🏦","Banco y caja"],["precios","🏷️","Precios y costes"],["gestoria","📦","Gestoría"]]},
+];
+const NAVMAP={}; NAV.forEach(g=>g.items.forEach(([k,ic,lab])=>NAVMAP[k]={ic,lab,grp:g.grp}));
+function counts(k){
+  const S=erp.state;
+  try{
+    if(k==="torre")return erp.alerts().filter(a=>a.sev==="critical").length||"";
+    if(k==="clientes")return S.parties.filter(p=>p.active).length;
+    if(k==="presupuestos")return S.budgets.length;
+    if(k==="proyectos")return S.projects.filter(p=>!p.closed).length;
+    if(k==="facturacion")return S.invoices.length;
+    if(k==="banco")return S.movements.filter(m=>m.status==="unallocated").length||"";
+  }catch(e){}
+  return "";
+}
+function buildNav(){
+  const nav=$('#nav');nav.innerHTML='';const m=$('#mnav');m.innerHTML='';
+  NAV.forEach(g=>{
+    nav.appendChild(el('div','grp',g.grp));
+    const og=el('optgroup');og.label=g.grp;
+    g.items.forEach(([k,ic,lab])=>{
+      const b=el('button','navitem'+(k===cur?' on':''));
+      const c=counts(k);
+      b.innerHTML=`<span class="ic">${ic}</span><span>${lab}</span>${c!==""?`<span class="ct${k==='torre'&&c?' alert':''}">${c}</span>`:""}`;
+      b.onclick=()=>{go(k);};
+      b.dataset.k=k;nav.appendChild(b);
+      const o=el('option');o.value=k;o.textContent=`${g.grp} — ${lab}`;if(k===cur)o.selected=true;og.appendChild(o);
+    });
+    m.appendChild(og);
+  });
+  m.onchange=()=>go(m.value);
+}
+function go(k,arg){ cur=k; location.hash=k; window._arg=arg; render(); window.scrollTo(0,0); }
+
+/* =============================== render =============================== */
+function render(){
+  buildNav();
+  document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('on',b.dataset.k===cur));
+  const meta=NAVMAP[cur]||{lab:"—",grp:"ERP"};
+  $('#crumbs').textContent="ERP › "+meta.grp;
+  $('#ttl').textContent=meta.lab;
+  const v=$('#view');
+  (VIEWS[cur]||VIEWS.torre)(v);
+}
+const pillProg=s=>s==="done"?'<span class="pill g">Hecho</span>':s==="inProgress"?'<span class="pill y">En curso</span>':'<span class="pill">Sin empezar</span>';
+
+const VIEWS={
+ /* ---------- Torre de control (DAS-02/03) ---------- */
+ torre(v){
+  $('#sub').textContent="Indicadores consolidados de toda la empresa. Cada indicador y alerta abre su detalle.";
+  const ct=erp.controlTower();
+  const tiles=[
+    ["Proyectos activos",ct.activeCount,"con margen previsto "+eur0(ct.totalForecastMarginCents),"proyectos","hi"],
+    ["Facturado",eur0(ct.invoicedCents),"cobrado "+eur0(ct.collectedCents),"facturacion",""],
+    ["Pendiente de cobro",eur0(ct.outstandingCents),ct.outstandingCents>0?"reclamar según vencimientos":"al día","facturacion",ct.outstandingCents>0?"warn":""],
+    ["Pagos a proveedor",eur0(ct.supplierDueCents),"pendientes de pago","pagos",""],
+    ["Caja y bancos",eur0(ct.cash.totalCents),ct.cash.accounts.map(a=>a.name.split(" ")[0]+" "+eur0(a.balanceCents)).join(" · "),"banco","hi"],
+    ["Presupuestos en decisión",ct.budgetsAwaiting.length,eur0(ct.awaitingValueCents)+" en juego","presupuestos",""],
+    ["Extras sin aprobar",ct.unapprovedExtras,"no facturables hasta aprobación","proyectos",ct.unapprovedExtras?"warn":""],
+    ["Documentos por revisar",ct.docsAwaitingReview,"captura pendiente de validar","captura",""],
+  ];
+  v.innerHTML=`<div class="kpis">${tiles.map(([lab,val,sub,dest,cls])=>`<div class="kpi ${cls}" data-go="${dest}"><div class="lab">${lab}</div><div class="val">${val}</div><div class="sub">${sub}</div></div>`).join("")}</div>
+   <div class="grid2">
+    <div class="card"><div class="ch"><h3>Proyectos — presupuesto vs. real</h3><span class="tag">margen previsto</span></div>
+      <div class="scroll"><table><thead><tr><th>Proyecto</th><th>Avance</th><th class="num">Venta</th><th class="num">Coste real</th><th class="num">Margen prev.</th></tr></thead><tbody>
+      ${ct.activeProjects.map(p=>`<tr class="click" data-go="proyectos" data-arg="${p.code}"><td class="k">${p.code}</td>
+        <td><div class="bar"><i style="width:${p.progressPct}%"></i></div></td>
+        <td class="num">${eur0(p.currentRevenueCents)}</td><td class="num">${eur0(p.actualCents)}</td>
+        <td class="num" style="color:${p.marginForecastCents<0?'var(--danger)':'var(--greenDeep)'}">${eur0(p.marginForecastCents)} · ${p.marginForecastPct}%</td></tr>`).join("")}
+      </tbody></table></div></div>
+    <div class="card"><div class="ch"><h3>Alertas</h3><span class="tag">${ct.alertCounts.critical} críticas · ${ct.alertCounts.high} altas</span></div>
+      <div class="alerts">${ct.alerts.slice(0,14).map(a=>`<div class="al ${a.sev}" data-ref='${esc(JSON.stringify(a.ref))}'><span>${a.sev==="critical"?"🔴":a.sev==="high"?"🟡":"🔵"}</span><div><b>${esc(a.msg)}</b></div></div>`).join("")||'<div class="empty">Sin alertas. Todo en orden.</div>'}</div></div>
+   </div>`;
+  v.querySelectorAll('[data-go]').forEach(n=>n.onclick=()=>go(n.dataset.go,n.dataset.arg));
+  v.querySelectorAll('.al').forEach(n=>n.onclick=()=>{const ref=JSON.parse(n.dataset.ref);
+    if(ref.project)go("proyectos",ref.project); else if(ref.invoice)go("facturacion"); else if(ref.contract)go("contratos");
+    else if(ref.budget)go("presupuestos"); else if(ref.bill)go("pagos"); else if(ref.view==="bank"||ref.movement)go("banco");
+    else if(ref.opportunity)go("oportunidades"); else if(ref.price)go("precios"); else if(ref.change)go("proyectos"); else go("torre");});
+ },
+
+ /* ---------- Mi día (DAS-04/05) ---------- */
+ hoy(v){
+  $('#sub').textContent="La vista corta del día para cada perfil: obra y oficina.";
+  const op=erp.operationalDay(), bo=erp.backOfficeDay();
+  v.innerHTML=`<div class="grid2">
+   <div class="card"><div class="ch"><h3>🔨 Hoy en obra</h3><span class="tag">perfil operativo</span></div><div class="daylist">
+     <div class="it"><b>${op.visitsDue.length}</b> visitas pendientes ${op.visitsDue.length?("— "+op.visitsDue.map(x=>esc(x.party)).join(", ")):""}</div>
+     <div class="it"><b>${op.milestones.length}</b> hitos de obra esta semana ${op.milestones.join(", ")}</div>
+     <div class="it"><b>${op.extrasToPrice}</b> extras por valorar</div>
+     <div class="it"><b>${op.hoursToReport}</b> obras con horas por registrar</div>
+     <div class="it"><b>${op.overdueTasks}</b> tareas vencidas</div>
+   </div></div>
+   <div class="card"><div class="ch"><h3>🗂️ Hoy en oficina</h3><span class="tag">perfil administración</span></div><div class="daylist">
+     <div class="it"><b>${bo.budgetsToPrepare}</b> presupuestos por preparar</div>
+     <div class="it"><b>${bo.followUpsDue}</b> seguimientos de presupuesto</div>
+     <div class="it"><b>${bo.invoicesToIssue}</b> hitos listos para facturar</div>
+     <div class="it"><b>${bo.collectionsDue}</b> cobros por reclamar</div>
+     <div class="it"><b>${bo.billsToAllocate}</b> facturas de proveedor sin asignar</div>
+     <div class="it"><b>${bo.paymentsDue}</b> pagos que vencen esta semana</div>
+     <div class="it"><b>${bo.docsMissing}</b> documentos capturados por validar</div>
+   </div></div></div>
+   <div class="card"><div class="ch"><h3>Tareas</h3></div><div class="scroll"><table><thead><tr><th>Tarea</th><th>Responsable</th><th>Vence</th><th>Estado</th></tr></thead><tbody>
+   ${erp.state.tasks.map(t=>`<tr><td class="k">${esc(t.title)}</td><td>${t.owner==="operations"?"Obra":"Oficina"}</td><td>${fmtD(t.due)}</td><td>${t.status==="open"?(t.due<erp.today?'<span class="pill r">Vencida</span>':'<span class="pill y">Abierta</span>'):'<span class="pill g">Hecha</span>'}</td></tr>`).join("")||'<tr><td colspan="4"><div class="empty">Sin tareas.</div></td></tr>'}
+   </tbody></table></div></div>`;
+ },
+
+ /* ---------- Clientes y terceros (MDM) ---------- */
+ clientes(v){
+  $('#sub').textContent="Un único registro de terceros: clientes, proveedores, industriales y autónomos. Los datos obligatorios se validan antes de facturar o contratar.";
+  const rows=erp.state.parties.filter(p=>p.active);
+  v.innerHTML=`<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+    <button class="btn primary sm" id="bNew">＋ Nuevo tercero</button></div>
+   <div class="card"><div class="scroll"><table><thead><tr><th>Código</th><th>Nombre</th><th>Roles</th><th>NIF/CIF</th><th>Contacto</th><th>Línea</th><th>Datos</th></tr></thead><tbody>
+   ${rows.map(p=>{const c=erp.partyCompleteness(p.id);return `<tr class="click" data-id="${p.id}">
+     <td class="k">${p.code}</td><td class="k">${esc(p.name)}</td>
+     <td>${p.roles.map(r=>`<span class="pill b">${({customer:"Cliente",supplier:"Proveedor",subcontractor:"Industrial",selfEmployed:"Autónomo",employee:"Empleado",adviser:"Técnico",partner:"Socio",other:"Otro"})[r]||r}</span>`).join(" ")}</td>
+     <td>${p.taxId?esc(p.taxId):'<span class="pill r">Falta</span>'}</td>
+     <td>${esc(p.mobile||p.landline||"—")}</td><td>${esc(p.activityLine||"—")}</td>
+     <td>${c.ok?'<span class="pill g">Completo</span>':`<span class="pill r">${c.pct}% · falta ${c.missing.length}</span>`}</td></tr>`;}).join("")}
+   </tbody></table></div></div>`;
+  v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>partyDrawer(tr.dataset.id));
+  $('#bNew').onclick=()=>newPartyDrawer();
+ },
+
+ /* ---------- Oportunidades ---------- */
+ oportunidades(v){
+  $('#sub').textContent="Cada consulta crea una oportunidad con origen, estado y próxima acción. Las visitas capturan mediciones, fotos y el croquis a mano.";
+  const rows=erp.opportunityAges();
+  const done=erp.state.opportunities.filter(o=>["won","lost"].includes(o.status));
+  const ST={awaitingVisit:["Pendiente de visita","y"],awaitingBudget:["Pendiente de presupuesto","y"],awaitingResponse:["Esperando al cliente","b"],won:["Ganada","g"],lost:["Perdida","r"]};
+  v.innerHTML=`<div class="card"><div class="ch"><h3>En curso</h3><span class="tag">${rows.length} abiertas</span></div>
+   <div class="scroll"><table><thead><tr><th>Cliente</th><th>Trabajo</th><th>Origen</th><th>Estado</th><th class="num">Días</th><th>Próxima acción</th></tr></thead><tbody>
+   ${rows.map(o=>`<tr><td class="k">${esc(erp.party(o.partyId).name)}</td><td>${esc(o.requestedWork)}</td><td>${esc(o.source)}</td>
+     <td><span class="pill ${ST[o.status]?.[1]||''}">${ST[o.status]?.[0]||o.status}</span></td>
+     <td class="num">${o.ageDays}</td><td>${esc(o.nextAction||"—")}</td></tr>`).join("")||'<tr><td colspan="6"><div class="empty">Sin oportunidades abiertas.</div></td></tr>'}
+   </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Visitas de obra</h3></div><div class="scroll"><table><thead><tr><th>Fecha</th><th>Mediciones</th><th>Fotos</th><th>Croquis</th><th>Notas</th></tr></thead><tbody>
+   ${erp.state.visits.map(x=>`<tr><td>${fmtD(x.date)}</td><td>${x.measurements.map(m=>m.what+" "+m.qty+" "+m.unit).join(" · ")}</td><td>${x.photos.length} 📷</td><td>${x.handwrittenEstimateRef?"✓ adjunto":"—"}</td><td>${esc(x.notes)}</td></tr>`).join("")}
+   </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Cerradas</h3></div><div class="scroll"><table><tbody>
+   ${done.map(o=>`<tr><td class="k">${esc(erp.party(o.partyId).name)}</td><td>${esc(o.requestedWork)}</td><td><span class="pill ${o.status==="won"?"g":"r"}">${o.status==="won"?"Ganada":"Perdida"+(o.lossReason?" · "+o.lossReason:"")}</span></td></tr>`).join("")}
+   </tbody></table></div></div>`;
+ },
+
+ /* ---------- Presupuestos (PRE/QUO) ---------- */
+ presupuestos(v){
+  $('#sub').textContent="Presupuestos con capítulos, partidas y sub-mediciones, opciones y pendientes separados, y control de versiones con una única versión aceptada.";
+  const rows=erp.state.budgets;
+  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Número</th><th>Cliente</th><th>Estado</th><th>Versión</th><th class="num">Base</th><th class="num">Total</th><th class="num">Margen</th><th>Pendientes</th><th>Validez</th></tr></thead><tbody>
+   ${rows.map(b=>{const t=erp.budgetTotals(b.id,b.acceptedVersionId||b.currentVersionId);const cv=b.versions[b.versions.length-1];
+    const st=b.acceptedVersionId?'<span class="pill g">Aceptado</span>':b.status==="issued"?'<span class="pill b">Emitido</span>':'<span class="pill y">Borrador</span>';
+    return `<tr class="click" data-id="${b.id}"><td class="k">${b.number}</td><td>${esc(erp.party(b.partyId).name)}</td><td>${st}</td>
+     <td>v${cv.vNumber} · ${b.versions.length} versiones</td><td class="num">${eur0(t.baseCents)}</td><td class="num k">${eur0(t.grandCents)}</td>
+     <td class="num">${t.marginBasePct}%</td><td>${t.pendingCount?`<span class="pill y">${t.pendingCount} (${eur0(t.pendingEstCents)})</span>`:"—"}</td><td>${fmtD(b.validityDate)}</td></tr>`;}).join("")}
+   </tbody></table></div></div>`;
+  v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>budgetDrawer(tr.dataset.id));
+ },
+
+ /* ---------- Contratos (CON-13) ---------- */
+ contratos(v){
+  $('#sub').textContent="Términos clave como datos, no texto libre: hitos de pago, regla de inicio, duración, penalizaciones y garantías. Sin firma no hay obra ni primera factura.";
+  const view=erp.contractControlView();
+  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Contrato</th><th>Cliente</th><th class="num">Valor</th><th>Hitos de pago</th><th>Inicio</th><th class="num">Duración</th><th>Garantías</th><th>Firma</th><th>Estado</th></tr></thead><tbody>
+   ${view.map(c=>`<tr><td class="k">${c.number}</td><td>${esc(c.party)}</td><td class="num k">${eur0(c.valueCents)}</td>
+    <td>${c.installments.map(i=>`<span class="pill ${i.status==="invoiced"?"g":"b"}">${eur0(i.amountCents)}</span>`).join(" ")}</td>
+    <td>≤${c.startRule.startWithinDays} días${c.startRule.committedStartDate?" · "+fmtD(c.startRule.committedStartDate):""}</td>
+    <td class="num">${c.durationDays} días</td><td>${c.guarantees} categorías</td>
+    <td>${c.signed?'<span class="pill g">Firmado</span>':'<span class="pill r">Sin firmar</span>'}</td>
+    <td><span class="pill ${c.status==="completed"?"g":c.status==="inForce"?"b":"y"}">${({draft:"Borrador",sent:"Enviado",signed:"Firmado",inForce:"En vigor",completed:"Finalizado",cancelled:"Anulado"})[c.status]}</span></td></tr>`).join("")}
+   </tbody></table></div></div>`;
+ },
+
+ /* ---------- Proyectos (PRJ/FIN/CHG/PRE-11) ---------- */
+ proyectos(v){
+  $('#sub').textContent="Cada proyecto conserva su línea base aceptada y muestra venta, coste comprometido, coste real y margen por capítulo. Marca partidas hechas para certificar.";
+  const arg=window._arg; window._arg=null;
+  const rows=erp.state.projects;
+  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Código</th><th>Cliente</th><th>Línea</th><th>Avance</th><th class="num">Venta actual</th><th class="num">Comprometido</th><th class="num">Real</th><th class="num">Margen prev.</th><th>Estado</th></tr></thead><tbody>
+   ${rows.map(p=>{const e=erp.projectEconomics(p.id);return `<tr class="click" data-id="${p.id}"><td class="k">${p.code}</td><td>${esc(erp.party(p.partyId).name)}</td>
+    <td>${({renovation:"Reforma",repairs:"Reparación",damp:"Humedades",commercial:"Comercial"})[p.activityLine]||p.activityLine}</td>
+    <td><div class="bar"><i style="width:${e.progressPct}%"></i></div></td>
+    <td class="num">${eur0(e.currentRevenueCents)}</td><td class="num">${eur0(e.committedCents)}</td><td class="num">${eur0(e.actualCents)}</td>
+    <td class="num" style="color:${e.marginForecastCents<0?'var(--danger)':'var(--greenDeep)'}">${eur0(e.marginForecastCents)}</td>
+    <td>${p.closed?'<span class="pill g">Cerrado</span>':'<span class="pill b">Activo</span>'}</td></tr>`;}).join("")}
+   </tbody></table></div></div>`;
+  v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>projectDrawer(tr.dataset.id));
+  if(arg){const p=rows.find(x=>x.code===arg); if(p)projectDrawer(p.id);}
+ },
+
+ /* ---------- Captura (CAP) ---------- */
+ captura(v){
+  $('#sub').textContent="Fotografía o sube una factura, albarán o ticket y asígnalo a un proyecto o a gastos generales. Nada se valida sin confirmación humana.";
+  const ST={captured:["Capturado","y"],extracted:["Extraído","y"],validated:["Validado","b"],allocated:["Asignado","g"],sentToAccounting:["Enviado a gestoría","g"],paid:["Pagado","g"]};
+  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Documento</th><th>Tipo</th><th>Emisor</th><th class="num">Importe</th><th>Asignación</th><th>Estado</th></tr></thead><tbody>
+   ${erp.state.captured.map(c=>{const cf=c.confirmed;return `<tr>
+    <td class="k">${esc(c.stdName||c.imageRef||c.id)}</td>
+    <td>${({supplierInvoice:"Factura proveedor",selfEmployedInvoice:"Factura autónomo",deliveryNote:"Albarán",valuedDeliveryNote:"Albarán valorado",ticket:"Ticket",supplierOffer:"Oferta",orderConfirmation:"Confirmación",paymentProof:"Justificante pago",creditNote:"Abono"})[c.docType]}</td>
+    <td>${cf?esc(cf.issuerName):'<span class="pill y">Por confirmar</span>'}</td>
+    <td class="num">${cf?eur(cf.totalCents):"—"}</td>
+    <td>${c.allocations.length?c.allocations.map(a=>a.projectId?erp.project(a.projectId).code:a.overheadCategory).join(", "):"—"}</td>
+    <td><span class="pill ${ST[c.status]?.[1]}">${ST[c.status]?.[0]||c.status}</span>${c.duplicateSuspect?' <span class="pill r">¿Duplicado?</span>':''}</td></tr>`;}).join("")||'<tr><td colspan="6"><div class="empty">Sin documentos capturados.</div></td></tr>'}
+   </tbody></table></div></div>`;
+ },
+
+ /* ---------- Horas (LAB) ---------- */
+ horas(v){
+  $('#sub').textContent="Horas diarias por trabajador y proyecto, con tarifa histórica. El coste de mano de obra entra en el coste real de cada obra.";
+  const byP={};
+  erp.state.labour.forEach(l=>{const k=l.projectId?erp.project(l.projectId).code:"Sin asignar";(byP[k]=byP[k]||[]).push(l);});
+  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Fecha</th><th>Trabajador</th><th>Proyecto</th><th>Capítulo</th><th class="num">Horas</th><th class="num">Coste</th></tr></thead><tbody>
+   ${erp.state.labour.slice().reverse().map(l=>`<tr><td>${fmtD(l.date)}</td><td>${esc(erp.state.workers.find(w=>w.id===l.workerId).name)}</td>
+    <td class="k">${l.projectId?erp.project(l.projectId).code:'<span class="pill r">Sin asignar</span>'}</td><td>${l.chapterNum||"—"}</td>
+    <td class="num">${(l.hoursMilli/1000).toLocaleString('es-ES')}</td><td class="num">${eur(l.costCents)}</td></tr>`).join("")}
+   </tbody></table></div>
+   <div class="ch" style="border-top:1px solid var(--hair)"><h3 style="font-size:13px">Total por proyecto</h3><span class="tag">${Object.entries(byP).map(([k,ls])=>k+" "+eur0(ls.reduce((s,l)=>s+l.costCents,0))).join(" · ")}</span></div></div>`;
+ },
+
+ /* ---------- Facturación y cobros (AR) ---------- */
+ facturacion(v){
+  $('#sub').textContent="Facturas generadas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos; las emitidas son inmutables.";
+  const rows=erp.receivables();
+  v.innerHTML=`<div class="card"><div class="ch"><h3>Facturas</h3><span class="tag">pendiente total ${eur0(rows.reduce((s,r)=>s+r.outstandingCents,0))}</span></div>
+   <div class="scroll"><table><thead><tr><th>Número</th><th>Cliente</th><th>Proyecto</th><th class="num">Total</th><th class="num">Pendiente</th><th>Vence</th><th>Estado</th><th></th></tr></thead><tbody>
+   ${rows.map(r=>{const st=r.outstandingCents<=0?'<span class="pill g">Cobrada</span>':r.daysOverdue>0?`<span class="pill r">Vencida ${r.daysOverdue}d</span>`:'<span class="pill y">Pendiente</span>';
+    return `<tr><td class="k">${r.number}</td><td>${esc(r.party)}</td><td>${erp.project(r.projectId).code}</td>
+     <td class="num">${eur(r.totalCents)}</td><td class="num k">${r.outstandingCents>0?eur(r.outstandingCents):"—"}</td><td>${fmtD(r.dueDate)}</td><td>${st}</td>
+     <td>${r.outstandingCents>0?`<button class="btn sm" data-collect="${r.number}">Registrar cobro</button>`:""}</td></tr>`;}).join("")}
+   </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Recibos emitidos</h3></div><div class="scroll"><table><tbody>
+   ${erp.state.receipts.map(r=>`<tr><td class="k">${r.number}</td><td>${esc(erp.party(r.partyId).name)}</td><td class="num">${eur(r.amountCents)}</td><td>${r.method==="cash"?"Efectivo":"Transferencia"}</td><td>${fmtD(r.date)}</td></tr>`).join("")||'<tr><td><div class="empty">Sin recibos.</div></td></tr>'}
+   </tbody></table></div></div>`;
+  v.querySelectorAll('[data-collect]').forEach(b=>b.onclick=()=>{
+    const num=b.dataset.collect; const inv=erp.state.invoices.find(i=>i.number===num);
+    const out=erp.invoiceOutstandingCents(inv.id);
+    mutate(()=>erp.recordCollection({partyId:inv.partyId,amountCents:out,method:"transfer",allocations:[{invoiceId:inv.id,amountCents:out}]},"backoffice"),"Cobro registrado: "+eur(out));
+  });
+ },
+
+ /* ---------- Proveedores y pagos (AP) ---------- */
+ pagos(v){
+  $('#sub').textContent="Facturas de proveedor con base, IVA y retención IRPF según el perfil fiscal. Pagos parciales y un pago para varias facturas.";
+  const rows=erp.payables();
+  v.innerHTML=`<div class="card"><div class="ch"><h3>Facturas de proveedor</h3><span class="tag">pendiente ${eur0(rows.reduce((s,r)=>s+Math.max(0,r.outstandingCents),0))}</span></div>
+   <div class="scroll"><table><thead><tr><th>Proveedor</th><th>Nº factura</th><th class="num">Total</th><th class="num">Pendiente</th><th>Vence</th><th>Asignación</th><th>Estado</th><th></th></tr></thead><tbody>
+   ${rows.map(r=>{const st={paid:'<span class="pill g">Pagada</span>',partPaid:'<span class="pill y">Parcial</span>',overdue:'<span class="pill r">Vencida</span>',disputed:'<span class="pill r">En disputa</span>',registered:'<span class="pill y">Registrada</span>'}[r.status]||r.status;
+    return `<tr><td class="k">${esc(r.supplier)}</td><td>${esc(r.number)}</td><td class="num">${eur(r.totalCents)}</td>
+     <td class="num k">${r.outstandingCents>0?eur(r.outstandingCents):"—"}</td><td>${fmtD(r.dueDate)}</td>
+     <td>${r.unallocated?'<span class="pill r">Sin asignar</span>':'<span class="pill g">Asignada</span>'}</td><td>${st}</td>
+     <td>${r.outstandingCents>0?`<button class="btn sm" data-pay="${r.id}">Pagar</button>`:""}</td></tr>`;}).join("")}
+   </tbody></table></div></div>`;
+  v.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{
+    const bill=erp.state.bills.find(x=>x.id===b.dataset.pay); const out=erp.billOutstandingCents(bill.id);
+    mutate(()=>erp.payBills({amountCents:out,method:"transfer",billAllocations:[{billId:bill.id,amountCents:out}]},"backoffice"),"Pago registrado: "+eur(out));
+  });
+ },
+
+ /* ---------- Banco y caja (BNK) ---------- */
+ banco(v){
+  $('#sub').textContent="Importa los movimientos y teclea el número de proyecto sobre cualquier movimiento: el coste queda asignado a esa obra sin volver a escribir nada.";
+  const cf=erp.cashForecast(6);
+  v.innerHTML=`<div class="kpis" style="grid-template-columns:repeat(${erp.state.bankAccounts.length+1},1fr)">
+    ${erp.state.bankAccounts.map(a=>`<div class="kpi"><div class="lab">${esc(a.name)}</div><div class="val">${eur0(erp.accountBalanceCents(a.id))}</div><div class="sub">${a.kind==="till"?"caja":"banco"}</div></div>`).join("")}
+    <div class="kpi hi"><div class="lab">Total disponible</div><div class="val">${eur0(erp.cashPosition().totalCents)}</div><div class="sub">bancos + caja</div></div></div>
+   <div class="card"><div class="ch"><h3>Movimientos</h3><span class="tag">escribe el nº de proyecto para asignar (p. ej. P-2026-0001)</span></div>
+   <div class="scroll"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Clase</th><th>Asignación</th></tr></thead><tbody>
+   ${erp.state.movements.slice().reverse().map(m=>{
+     const cls={projectCost:"Coste de obra",overhead:"Gasto general",tax:"Impuestos",salary:"Nóminas",financial:"Financiero",internalTransfer:"Traspaso interno",customerReceipt:"Cobro de cliente"}[m.class]||"—";
+     const alloc=m.allocations.length?m.allocations.map(a=>(a.projectId?erp.project(a.projectId).code:a.overheadCategory)+(a.kind?` · ${a.kind}`:"")).join(", "):null;
+     return `<tr><td>${fmtD(m.accountingDate)}</td>
+      <td>${esc(m.merchantText||m.counterparty||m.concept)}${m.card?` <span class="pill b">${m.card}</span>`:""}${m.needsDoc?' <span class="pill r">Falta justificante</span>':''}</td>
+      <td class="num" style="color:${m.amountCents<0?'var(--danger)':'var(--greenDeep)'}">${eur(m.amountCents)}</td>
+      <td>${m.class?`<span class="pill ${m.class==="internalTransfer"?"b":m.class==="customerReceipt"?"g":""}">${cls}</span>`:'<span class="pill r">Sin clasificar</span>'}</td>
+      <td>${alloc?esc(alloc):(m.status==="unallocated"?`<input class="inline" placeholder="Nº proyecto" data-mov="${m.id}"> <select class="inline" data-kind="${m.id}"><option value="material">Material</option><option value="labour">Mano de obra</option><option value="subcontract">Industrial</option><option value="other">Otro</option></select>`:"—")}</td></tr>`;}).join("")}
+   </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Previsión de caja — próximas 6 semanas</h3></div><div class="scroll"><table><thead><tr><th>Semana</th><th class="num">Cobros previstos</th><th class="num">Pagos previstos</th><th class="num">Neto</th></tr></thead><tbody>
+   ${cf.map(w=>`<tr><td>${fmtD(w.from)} – ${fmtD(w.to)}</td><td class="num">${eur0(w.inflowCents)}</td><td class="num">${eur0(w.outflowCents)}</td><td class="num" style="color:${w.netCents<0?'var(--danger)':'var(--greenDeep)'}">${eur0(w.netCents)}</td></tr>`).join("")}
+   </tbody></table></div></div>`;
+  v.querySelectorAll('input[data-mov]').forEach(inp=>inp.onkeydown=(e)=>{
+    if(e.key!=="Enter")return;
+    const kind=v.querySelector(`select[data-kind="${inp.dataset.mov}"]`).value;
+    mutate(()=>erp.allocateMovementToProject(inp.dataset.mov,inp.value.trim(),kind,"backoffice"),"Movimiento asignado a "+inp.value.trim());
+  });
+ },
+
+ /* ---------- Precios y costes (SUP/CAT) ---------- */
+ precios(v){
+  $('#sub').textContent="Catálogo de partidas y precios por proveedor con fecha y documento de origen. Un precio ausente se ve ausente — nunca cuenta como cero.";
+  const sups=erp.state.parties.filter(p=>p.roles.some(r=>["supplier","subcontractor"].includes(r)));
+  const cmp=erp.comparePrices(erp.state.catalogue.map(i=>i.id),sups.map(s=>s.id));
+  v.innerHTML=`<div class="card"><div class="ch"><h3>Comparativa de precios por partida</h3><span class="tag">neto por proveedor</span></div>
+   <div class="scroll"><table><thead><tr><th>Partida</th>${sups.map(s=>`<th class="num">${esc(s.name.split(" ")[0])}</th>`).join("")}<th class="num">Mejor</th></tr></thead><tbody>
+   ${cmp.map(row=>{const it=erp.state.catalogue.find(i=>i.id===row.itemId);
+    return `<tr><td class="k">${esc(it.code)} · ${esc(it.desc)}</td>
+     ${row.perSupplier.map(ps=>`<td class="num">${ps.missing?'<span class="pill y">Sin precio</span>':eur(ps.netCents)}</td>`).join("")}
+     <td class="num k">${row.bestCents!=null?eur(row.bestCents):"—"}</td></tr>`;}).join("")}
+   </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Histórico de precios</h3><span class="tag">con origen y vigencia (nunca se sobrescribe)</span></div>
+   <div class="scroll"><table><thead><tr><th>Partida</th><th>Proveedor</th><th>Fecha</th><th class="num">Lista</th><th class="num">Dto.</th><th class="num">Neto</th><th>Origen</th><th>Vigencia</th></tr></thead><tbody>
+   ${erp.state.prices.map(p=>{const it=erp.state.catalogue.find(i=>i.id===p.itemId);const expired=p.validUntil&&p.validUntil<erp.today;
+    return `<tr><td class="k">${esc(it.code)}</td><td>${esc(erp.party(p.supplierId).name)}</td><td>${fmtD(p.date)}</td>
+     <td class="num">${eur(p.listCents)}</td><td class="num">${p.discountPct}%</td><td class="num k">${eur(p.netCents)}</td>
+     <td>${({priceList:"Tarifa",supplierPortal:"Portal",supplierOffer:"Oferta",valuedDeliveryNote:"Albarán valorado",purchaseInvoice:"Factura",manualConfirmation:"Confirmación"})[p.source]} · ${esc(p.sourceDocRef)}</td>
+     <td>${p.validUntil?(expired?`<span class="pill r">Caducado ${fmtD(p.validUntil)}</span>`:fmtD(p.validUntil)):"—"}</td></tr>`;}).join("")}
+   </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Paquetes de trabajo</h3><span class="tag">rendimiento · compra mínima · envase</span></div><div class="scroll"><table><tbody>
+   ${erp.state.packages.map(w=>`<tr><td class="k">${esc(w.code)} · ${esc(w.name)}</td><td>por ${w.unit}</td><td>merma ${w.wastePct}%</td><td>mín. ${w.minPurchaseQty||"—"}</td><td>envase ${w.containerSize||"—"}</td><td class="num">coste 10 ${w.unit}: ${eur(erp.packageCostCents(w.id,10000))}</td></tr>`).join("")}
+   </tbody></table></div></div>`;
+ },
+
+ /* ---------- Gestoría (GES) ---------- */
+ gestoria(v){
+  $('#sub').textContent="El paquete trimestral se genera desde los datos, con resúmenes de IVA e IRPF conciliados y la lista de excepciones antes de enviar.";
+  const q=window._q||"2026-Q1";
+  const pkg=(()=>{const inQ=d=>ErpEngine.quarterOf(d)===q;return {
+    invoices:erp.state.invoices.filter(i=>inQ(i.date)), bills:erp.state.bills.filter(b=>inQ(b.date)),
+    vat:erp.vatSummary(q), irpf:erp.irpfSummary(q), ex:erp.exceptionList(q)};})();
+  const exCount=Object.values(pkg.ex).flat(2).filter(x=>typeof x==="string").length;
+  v.innerHTML=`<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+    ${["2026-Q1","2026-Q2","2026-Q3","2026-Q4"].map(x=>`<button class="btn sm ${x===q?'primary':''}" data-q="${x}">${x.replace("2026-","T")}</button>`).join("")}
+    <span style="flex:1"></span><button class="btn primary sm" id="bSend">📦 Generar y registrar envío</button></div>
+   <div class="kpis">
+    <div class="kpi"><div class="lab">Facturas emitidas</div><div class="val">${pkg.invoices.length}</div><div class="sub">${eur0(pkg.invoices.reduce((s,i)=>s+(i.kind==="creditNote"?-i.totalCents:i.totalCents),0))}</div></div>
+    <div class="kpi"><div class="lab">Facturas recibidas</div><div class="val">${pkg.bills.length}</div><div class="sub">${eur0(pkg.bills.reduce((s,b)=>s+b.totalCents,0))}</div></div>
+    <div class="kpi ${pkg.vat.netCents>0?'warn':''}"><div class="lab">IVA neto (303)</div><div class="val">${eur0(pkg.vat.netCents)}</div><div class="sub">repercutido ${eur0(pkg.vat.outputVatCents)} − soportado ${eur0(pkg.vat.inputVatCents)}</div></div>
+    <div class="kpi"><div class="lab">IRPF retenido (111)</div><div class="val">${eur0(pkg.irpf.retainedCents)}</div><div class="sub">a autónomos y profesionales</div></div>
+   </div>
+   <div class="card"><div class="ch"><h3>Lista de excepciones antes de enviar</h3><span class="tag">${exCount===0?"✓ limpio":exCount+" incidencias"}</span></div><div class="daylist">
+    ${pkg.ex.partiesWithoutTaxId.length?`<div class="it">🔴 <b>${pkg.ex.partiesWithoutTaxId.length}</b> terceros sin NIF válido: ${pkg.ex.partiesWithoutTaxId.join(", ")}</div>`:""}
+    ${pkg.ex.billsWithoutDocument.length?`<div class="it">🟡 <b>${pkg.ex.billsWithoutDocument.length}</b> facturas sin documento adjunto: ${pkg.ex.billsWithoutDocument.join(", ")}</div>`:""}
+    ${pkg.ex.unallocatedMovements.length?`<div class="it">🟡 <b>${pkg.ex.unallocatedMovements.length}</b> movimientos bancarios sin asignar</div>`:""}
+    ${pkg.ex.unmatchedReceipts.length?`<div class="it">🟡 <b>${pkg.ex.unmatchedReceipts.length}</b> recibos sin casar</div>`:""}
+    ${pkg.ex.undocumentedCash.length?`<div class="it">🔵 <b>${pkg.ex.undocumentedCash.length}</b> movimientos de caja sin justificante</div>`:""}
+    ${pkg.ex.seriesGaps.invoice.length?`<div class="it">🔴 Huecos en la serie de facturas: ${pkg.ex.seriesGaps.invoice.join(", ")}</div>`:`<div class="it">✅ Serie de facturas sin huecos</div>`}
+   </div></div>
+   <div class="card"><div class="ch"><h3>IVA por tipo</h3><span class="tag">conciliado con los registros</span></div><div class="scroll"><table><thead><tr><th>Tipo</th><th class="num">Base repercutida</th><th class="num">IVA repercutido</th><th class="num">Base soportada</th><th class="num">IVA soportado</th></tr></thead><tbody>
+   ${Object.entries(pkg.vat.byRate).map(([bp,r])=>`<tr><td class="k">${bp/100}%</td><td class="num">${eur(r.outputBaseCents)}</td><td class="num">${eur(r.outputVatCents)}</td><td class="num">${eur(r.inputBaseCents)}</td><td class="num">${eur(r.inputVatCents)}</td></tr>`).join("")}
+   </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Envíos registrados</h3></div><div class="scroll"><table><tbody>
+   ${erp.state.packagesSent.map(s=>`<tr><td class="k">${s.quarter}</td><td>${fmtD(s.date)}</td><td>${s.invoices} emitidas · ${s.bills} recibidas</td><td>${s.exceptions} excepciones</td></tr>`).join("")||'<tr><td><div class="empty">Aún no se ha enviado ningún paquete.</div></td></tr>'}
+   </tbody></table></div></div>`;
+  v.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{window._q=b.dataset.q;render();});
+  $('#bSend').onclick=()=>mutate(()=>erp.quarterlyPackage(q,"backoffice"),"Paquete "+q+" generado y registrado");
+ },
+};
+
+/* =============================== drawers =============================== */
+function openDrawer(title){ $('#dttl').textContent=title; $('#scrim').classList.add('on'); $('#drawer').classList.add('on'); return $('#dbody'); }
+function closeDrawer(){ $('#scrim').classList.remove('on'); $('#drawer').classList.remove('on'); }
+$('#dClose').onclick=closeDrawer; $('#scrim').onclick=closeDrawer;
+document.addEventListener('keydown',e=>{if(e.key==="Escape")closeDrawer();});
+
+function partyDrawer(id){
+  const p=erp.party(id), c=erp.partyCompleteness(id), h=erp.partyHistory(id);
+  const db=openDrawer(p.name);
+  db.innerHTML=`
+   <div class="card"><div class="ch"><h3>Identificación</h3><span class="tag">${c.ok?'✓ completa para facturar':'incompleta — '+c.missing.join(", ")}</span></div>
+    <div class="daylist">
+     <div class="it">Código <b>${p.code}</b> · contable <b>${p.accountingCode}</b></div>
+     <div class="it">NIF/CIF: <b>${p.taxId||"—"}</b> · ${({individual:"Particular",company:"Empresa",community:"Comunidad",publicBody:"Ente público"})[p.partyType]}</div>
+     <div class="it">Dirección: ${esc([p.billStreet,p.billPostalCode,p.billCity].filter(Boolean).join(", ")||"—")}</div>
+     <div class="it">Contacto: ${esc(p.mobile||p.landline||"—")} · ${esc(p.email||"sin email")}</div>
+     <div class="it">Condiciones: ${p.paymentMethod} · ${p.paymentTermsDays} días ${p.irpfApplies?` · IRPF ${p.irpfRateBp/100}%`:""}</div>
+     <div class="it">Origen: ${p.leadSource||"—"} · Línea: ${p.activityLine||"—"}</div>
+    </div></div>
+   <div class="card"><div class="ch"><h3>Historial</h3></div><div class="daylist">
+     <div class="it"><b>${h.budgets.length}</b> presupuestos · <b>${h.contracts.length}</b> contratos · <b>${h.projects.length}</b> proyectos</div>
+     <div class="it"><b>${h.invoices.length}</b> facturas · <b>${h.receipts.length}</b> recibos · <b>${h.bills.length}</b> facturas recibidas</div>
+     ${erp.state.properties.filter(x=>x.partyId===id).map(x=>`<div class="it">🏠 ${esc(x.street)} (${x.surfaceM2} m²)</div>`).join("")}
+   </div></div>`;
+}
+function newPartyDrawer(){
+  const db=openDrawer("Nuevo tercero");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Nombre o razón social *</label><input id="f_name"></div>
+   <div class="field"><label>NIF / CIF / NIE *</label><input id="f_tax" placeholder="12345678Z"></div>
+   <div class="field"><label>Rol</label><select id="f_role"><option value="customer">Cliente</option><option value="supplier">Proveedor</option><option value="subcontractor">Industrial</option><option value="selfEmployed">Autónomo</option></select></div>
+   <div class="field full"><label>Dirección de facturación *</label><input id="f_street"></div>
+   <div class="field"><label>C.P. *</label><input id="f_cp"></div><div class="field"><label>Población *</label><input id="f_city"></div>
+   <div class="field"><label>Móvil *</label><input id="f_mob"></div><div class="field"><label>Email</label><input id="f_mail"></div>
+   <div class="field"><label>Origen del contacto *</label><select id="f_src">${ErpEngine.LISTS.leadSources.map(s=>`<option>${s}</option>`).join("")}</select></div>
+   <div class="field"><label>Línea de actividad</label><select id="f_line"><option value="renovation">Reforma</option><option value="repairs">Reparaciones</option><option value="damp">Humedades</option><option value="commercial">Comercial</option><option value="other">Otra</option></select></div>
+   <div class="field full" style="margin-top:8px"><button class="btn primary" id="f_save">Guardar tercero</button></div></div>`;
+  $('#f_save').onclick=()=>mutate(()=>{
+    erp.addParty({roles:[$('#f_role').value],name:$('#f_name').value.trim(),taxId:$('#f_tax').value.trim(),
+      billStreet:$('#f_street').value.trim(),billPostalCode:$('#f_cp').value.trim(),billCity:$('#f_city').value.trim(),billProvince:"Barcelona",
+      mobile:$('#f_mob').value.trim(),email:$('#f_mail').value.trim(),leadSource:$('#f_src').value,activityLine:$('#f_line').value},"backoffice");
+    closeDrawer();
+  },"Tercero creado");
+}
+function budgetDrawer(id){
+  const b=erp.budget(id); const vsel=b.acceptedVersionId||b.currentVersionId; const V=erp.version(id,vsel);
+  const t=erp.budgetTotals(id,vsel); const doc=erp.renderBudgetDoc(id,vsel);
+  const db=openDrawer(b.number+" · v"+V.vNumber+(b.acceptedVersionId?" (aceptada)":""));
+  const SEC={base:"",optional:" (opcional — aparte)",outOfScope:" (fuera de presupuesto)",extras:" (extras)"};
+  db.innerHTML=`
+   <div class="card"><div class="ch"><h3>Versiones</h3><span class="tag">automáticas, emitidas = congeladas</span></div><div class="daylist">
+    ${b.versions.map(x=>`<div class="it"><b>v${x.vNumber}</b> ${fmtD(x.date)} · ${esc(x.reason||"—")} ${x.id===b.acceptedVersionId?'<span class="pill g">Aceptada</span>':x.issued?'<span class="pill b">Emitida</span>':'<span class="pill y">Borrador</span>'}${x.sent?` · enviada por ${x.sent.channel}`:""}</div>`).join("")}
+    ${b.versions.length>1?(()=>{const d=erp.diffVersions(id,b.versions[0].id,b.versions[b.versions.length-1].id);return `<div class="it">Δ v${b.versions[0].vNumber}→v${b.versions[b.versions.length-1].vNumber}: <b>${eur(d.deltaCents)}</b> (${d.deltaPct}%) · ${d.changed.length} líneas modificadas</div>`;})():""}
+   </div></div>
+   <div class="doc">
+    <div class="dh"><div><b>PRESUPUESTO ${doc.number} · v${doc.version}</b><br>${esc(doc.issuer.legalName)} · ${esc(doc.issuer.taxId)}<br>${esc(doc.issuer.address)}</div>
+    <div style="text-align:right">${esc(doc.customer.name)}<br>${esc(doc.customer.taxId)}<br>${esc(doc.customer.address)}</div></div>
+    ${doc.chapters.map(c=>`<div style="margin-bottom:8px"><b style="color:var(--greenDeep)">${c.num}. ${esc(c.name)}${SEC[c.section]||""}</b>
+      ${c.lines.map(l=>`<div class="chapline"><span>${l.num} ${esc(l.desc)} — ${l.qty} ${l.unit} × ${eur(l.priceCents)}</span><b>${eur(l.totalCents)}</b></div>`).join("")}</div>`).join("")}
+    <div style="border-top:2px solid var(--green);padding-top:8px;margin-top:8px">
+      <div class="chapline"><span>Base imponible</span><b>${eur(doc.totals.taxableCents)}</b></div>
+      ${doc.totals.optionsCents?`<div class="chapline"><span>Opcionales (aparte)</span><span>${eur(doc.totals.optionsCents)}</span></div>`:""}
+      <div class="chapline"><span>IVA ${doc.totals.vatBp/100}%</span><span>${eur(doc.totals.vatCents)}</span></div>
+      <div class="chapline" style="font-size:14px"><b>TOTAL</b><b>${eur(doc.totals.grandCents)}</b></div>
+      ${doc.totals.perM2Cents?`<div class="chapline"><span>Total por m²</span><span>${eur(doc.totals.perM2Cents)}/m²</span></div>`:""}
+      ${t.pendingCount?`<div class="chapline"><span>⚠ Líneas pendientes de precio (no incluidas)</span><span>${t.pendingCount} · ~${eur(t.pendingEstCents)}</span></div>`:""}
+    </div>
+    <div style="margin-top:8px;color:var(--muted)">Validez: ${fmtD(b.validityDate)} · ${esc(b.paymentConditions)} · IBAN ${esc(doc.issuer.iban)}</div>
+   </div>
+   <div class="card" style="margin-top:12px"><div class="ch"><h3>Margen interno</h3><span class="tag">nunca aparece en el documento del cliente</span></div><div class="daylist">
+    <div class="it">Coste interno base: <b>${eur(t.costBaseCents)}</b> · Margen: <b>${eur(t.marginBaseCents)} (${t.marginBasePct}%)</b></div>
+    ${t.chapters.filter(c=>c.section==="base").map(c=>`<div class="it">${c.num} ${esc(c.name)}: venta ${eur(c.saleCents)} · coste ${eur(c.costCents)} · <b style="color:${c.marginCents<0?'var(--danger)':'inherit'}">${eur(c.marginCents)}</b></div>`).join("")}
+   </div></div>`;
+}
+function projectDrawer(id){
+  const p=erp.project(id); const e=erp.projectEconomics(id); const bill=erp.projectBilling(id); const ex=erp.extrasRegister(id);
+  const db=openDrawer(p.code+" — "+erp.party(p.partyId).name);
+  const chapters=p.budgetId?erp.version(p.budgetId,p.acceptedVersionId).chapters.filter(c=>c.section==="base"):[];
+  const chEc=p.budgetId?erp.chapterEconomics(id):[];
+  db.innerHTML=`
+   <div class="kpis" style="grid-template-columns:1fr 1fr">
+    <div class="kpi"><div class="lab">Venta actual</div><div class="val">${eur0(e.currentRevenueCents)}</div><div class="sub">base ${eur0(e.baselineRevenueCents)} + extras ${eur0(e.approvedChangesCents)}</div></div>
+    <div class="kpi ${e.marginForecastCents<0?'warn':''}"><div class="lab">Margen previsto</div><div class="val">${eur0(e.marginForecastCents)}</div><div class="sub">${e.marginForecastPct}% · real ${eur0(e.actualCents)} de ${eur0(e.forecastCostCents)}</div></div>
+   </div>
+   <div class="card"><div class="ch"><h3>Avance por capítulo</h3><span class="tag">marca lo hecho — alimenta la certificación</span></div><div class="daylist">
+    ${chapters.map(c=>`<div class="it" style="align-items:center;gap:10px">${pillProg(c.progress)} <span style="flex:1">${c.num}. ${esc(c.name)}</span>
+      ${!p.closed?`<button class="btn sm" data-prog="${c.num}" data-st="inProgress">En curso</button><button class="btn sm" data-prog="${c.num}" data-st="done">✓ Hecho</button>`:""}</div>`).join("")||`<div class="it">Avance: ${e.progressPct}%</div>`}
+   </div></div>
+   ${chEc.length?`<div class="card"><div class="ch"><h3>Coste por capítulo</h3><span class="tag">previsto vs. real</span></div><div class="scroll"><table><thead><tr><th>Capítulo</th><th class="num">Venta</th><th class="num">Coste prev.</th><th class="num">Coste real</th><th></th></tr></thead><tbody>
+    ${chEc.map(c=>`<tr><td>${c.num}. ${esc(c.name)}</td><td class="num">${eur0(c.saleCents)}</td><td class="num">${eur0(c.budgetCostCents)}</td><td class="num">${eur0(c.actualCents)}</td><td>${c.overrun?'<span class="pill r">Desvío</span>':''}</td></tr>`).join("")}
+   </tbody></table></div></div>`:""}
+   <div class="card"><div class="ch"><h3>Extras</h3><span class="tag">${ex.approved} aprobados · ${eur0(ex.unapprovedValueCents)} sin aprobar</span></div><div class="daylist">
+    ${ex.items.map(c=>`<div class="it" style="align-items:center;gap:8px"><span class="pill ${({identified:"y",priced:"y",approved:"b",executed:"b",invoiced:"g",rejected:"r"})[c.status]}">${({identified:"Detectado",priced:"Valorado",approved:"Aprobado",executed:"Ejecutado",invoiced:"Facturado",rejected:"Rechazado"})[c.status]}</span>
+      <span style="flex:1">${esc(c.desc)} — venta ${eur(c.priceCents)} · coste ${eur(c.costCents)}</span>
+      ${c.status==="priced"?`<button class="btn sm" data-approve="${c.id}">Aprobar</button>`:""}</div>`).join("")||'<div class="it">Sin extras registrados.</div>'}
+   </div></div>
+   <div class="card"><div class="ch"><h3>Facturación del proyecto</h3></div><div class="daylist">
+    <div class="it">Facturado <b>${eur(bill.invoicedCents)}</b> · Cobrado <b>${eur(bill.collectedCents)}</b> · Pendiente <b>${eur(bill.outstandingCents)}</b> · Por facturar <b>${eur(bill.remainingToInvoiceCents)}</b></div>
+   </div></div>`;
+  db.querySelectorAll('[data-prog]').forEach(b2=>b2.onclick=()=>mutate(()=>erp.markProgress(id,b2.dataset.prog,b2.dataset.st,null,"operations"),"Avance actualizado"));
+  db.querySelectorAll('[data-approve]').forEach(b2=>b2.onclick=()=>mutate(()=>erp.approveChange(b2.dataset.approve,"aprobación-cliente.png","backoffice"),"Extra aprobado — anexo generado"));
+}
+
+/* =============================== toolbar =============================== */
+$('#btnExport').onclick=()=>{
+  const blob=new Blob([JSON.stringify({_meta:{app:"Canei ERP",exportedAt:erp.today},data:erp.toJSON()},null,1)],{type:'application/json'});
+  const a=el('a');a.href=URL.createObjectURL(blob);a.download='canei-erp.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);toast("Datos exportados");
+};
+$('#btnReset').onclick=()=>{ if(!confirm("¿Restablecer el entorno con los datos de ejemplo? Se sustituye todo lo actual."))return;
+  erp=ErpSeed.build(); persist(); render(); toast("Datos de ejemplo cargados"); };
+window.addEventListener('hashchange',()=>{const k=location.hash.slice(1);if(k&&NAVMAP[k]&&k!==cur){cur=k;render();}});
+boot();
+</script>
+</body>
+</html>

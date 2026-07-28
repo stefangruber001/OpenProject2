@@ -67,6 +67,7 @@ async function main() {
     await testNoOverflow(browser, base);
     await testSmoke(browser, base);
     await testDataTabs(browser, base);
+    await testErp(browser, base);
   } finally {
     await browser.close();
     server.kill("SIGKILL");
@@ -210,6 +211,7 @@ async function testNoOverflow(browser, base) {
     "dashboard.html",
     "master-data.html",
     "financial-data.html",
+    "erp.html",
   ];
   const page = await browser.newPage({
     viewport: { width: 390, height: 844 },
@@ -238,6 +240,7 @@ async function testSmoke(browser, base) {
     "setup-guide.html",
     "master-data.html",
     "financial-data.html",
+    "erp.html",
   ];
   for (const p of pages) {
     const page = await browser.newPage();
@@ -360,6 +363,90 @@ async function testDataTabs(browser, base) {
     bad("financial tab", String(e).slice(0, 180));
   } finally {
     await fp.close();
+  }
+}
+
+// ── ERP workspace (BRD v2): launchpad live KPIs, Control Tower, and the
+//    BNK-02 flow — allocate a bank movement by typing the project number.
+async function testErp(browser, base) {
+  // Home launchpad: live indicators computed from the shared dataset.
+  const home = await browser.newPage({ viewport: { width: 1200, height: 950 } });
+  const herr = [];
+  attachConsole(home, herr);
+  try {
+    await home.goto(`${base}/index.html`, { waitUntil: "networkidle" });
+    await home.waitForTimeout(600);
+    const prj = await home.locator("#s-prj").innerText();
+    const areas = await home.locator("a.mod").count();
+    if (/^\d+$/.test(prj.trim()) && areas >= 10)
+      ok(`home: launchpad live KPIs + ${areas} management areas`);
+    else bad("home: launchpad live KPIs", `prj="${prj}" areas=${areas}`);
+    if (herr.length === 0) ok("home: no console errors");
+    else bad("home: no console errors", herr.slice(0, 2).join(" | "));
+  } catch (e) {
+    bad("home launchpad", String(e).slice(0, 160));
+  } finally {
+    await home.close();
+  }
+
+  // Workspace: Control Tower renders indicators + alerts; modules navigate.
+  const pg = await browser.newPage({ viewport: { width: 1280, height: 950 } });
+  const eerr = [];
+  attachConsole(pg, eerr);
+  try {
+    await pg.goto(`${base}/erp.html#torre`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(700);
+    const kpiText = await pg.locator("#view").innerText();
+    if (/€/.test(kpiText) && /Alertas/.test(kpiText))
+      ok("erp: Control Tower indicators + alerts render");
+    else bad("erp: Control Tower renders", kpiText.slice(0, 80));
+
+    // module navigation (DAS-01): presupuestos shows versioned budgets
+    await pg.evaluate(() => (location.hash = "presupuestos"));
+    await pg.waitForTimeout(400);
+    const preText = await pg.locator("#view").innerText();
+    if (/PRE-2026/.test(preText) && /versiones/i.test(preText))
+      ok("erp: budgets module lists versioned budgets");
+    else bad("erp: budgets module", preText.slice(0, 80));
+
+    // BNK-02: type a project number on an unallocated movement → allocated
+    await pg.evaluate(() => (location.hash = "banco"));
+    await pg.waitForTimeout(400);
+    const inp = pg.locator("input[data-mov]").first();
+    if ((await inp.count()) > 0) {
+      await inp.fill("P-2026-0001");
+      await inp.press("Enter");
+      await pg.waitForTimeout(400);
+      const after = await pg.locator("#view").innerText();
+      if (
+        /P-2026-0001 · material/.test(after) ||
+        /Movimiento asignado/.test(
+          await pg
+            .locator("#toast")
+            .innerText()
+            .catch(() => ""),
+        )
+      )
+        ok("erp: BNK-02 — movement allocated by typing the project number");
+      else bad("erp: BNK-02 allocation", "allocation not reflected");
+    } else {
+      bad("erp: BNK-02 allocation", "no unallocated movement input found");
+    }
+
+    // Gestoría: exception list + VAT summary render
+    await pg.evaluate(() => (location.hash = "gestoria"));
+    await pg.waitForTimeout(400);
+    const gesText = await pg.locator("#view").innerText();
+    if (/excepciones/i.test(gesText) && /IVA/.test(gesText))
+      ok("erp: gestoría package view (VAT + exceptions)");
+    else bad("erp: gestoría view", gesText.slice(0, 80));
+
+    if (eerr.length === 0) ok("erp: no console errors across modules");
+    else bad("erp: no console errors", eerr.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("erp workspace", String(e).slice(0, 160));
+  } finally {
+    await pg.close();
   }
 }
 
