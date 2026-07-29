@@ -334,10 +334,11 @@ async function testDataTabs(browser, base) {
     await fp.goto(`${base}/financial-data.html`, { waitUntil: "networkidle" });
     await fp.waitForTimeout(300);
     const kpiText = await fp.locator("#view").innerText();
-    if (/Revenue/.test(kpiText) && /€/.test(kpiText)) ok("financial: KPI cockpit renders");
+    if (/Revenue|Ingresos/i.test(kpiText) && /€/.test(kpiText))
+      ok("financial: KPI cockpit renders");
     else bad("financial: KPI cockpit renders", kpiText.slice(0, 80));
     // The self-check pill proves the seeded statements are internally consistent.
-    if (/A = L \+ E/.test(kpiText)) ok("financial: balance sheet balances (A = L + E)");
+    if (/A = L \+ E|A = P \+ PN/.test(kpiText)) ok("financial: balance sheet balances (A = L + E)");
     else bad("financial: balance sheet balances", "no pass indicator");
 
     await fp
@@ -346,7 +347,11 @@ async function testDataTabs(browser, base) {
       .catch(() => {});
     await fp.waitForTimeout(200);
     const pl = await fp.locator("#view").innerText();
-    if (/Net profit/.test(pl) && /Gross profit/.test(pl)) ok("financial: P&L statement computes");
+    if (
+      /Net profit|Beneficio neto/i.test(pl) &&
+      /Gross profit|Beneficio bruto|Margen bruto/i.test(pl)
+    )
+      ok("financial: P&L statement computes");
     else bad("financial: P&L statement computes", pl.slice(0, 80));
 
     await fp
@@ -355,7 +360,7 @@ async function testDataTabs(browser, base) {
       .catch(() => {});
     await fp.waitForTimeout(200);
     const cf = await fp.locator("#view").innerText();
-    if (/econciles/.test(cf)) ok("financial: cash flow reconciles to cash");
+    if (/econciles|concilia|uadra/.test(cf)) ok("financial: cash flow reconciles to cash");
     else bad("financial: cash flow reconciles", cf.slice(0, 80));
 
     if (ferr.length === 0) ok("financial: no console errors");
