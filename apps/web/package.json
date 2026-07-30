@@ -21,24 +21,24 @@
     "@repo/kernel": "workspace:*",
     "@repo/pack-vertical-construction-reformas": "workspace:*",
     "@repo/ui": "workspace:*",
-    "dotenv": "^16.4.7",
-    "next": "16.2.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "dotenv": "^17.4.2",
+    "next": "16.2.12",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "yaml": "^2.6.1",
-    "zod": "^3.24.1"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@playwright/test": "^1.50.1",
+    "@playwright/test": "^1.62.0",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@tailwindcss/postcss": "^4.0.0",
-    "@types/node": "^22.15.3",
-    "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.2",
-    "eslint": "^9.39.1",
+    "@types/node": "^26.1.2",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "eslint": "^10.8.0",
     "tailwindcss": "^4.0.0",
-    "typescript": "5.9.2",
-    "vitest": "^3.0.5"
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
   }
 }
