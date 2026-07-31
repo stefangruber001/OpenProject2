@@ -45,7 +45,14 @@ await esbuild.build({
   format: "iife",
   globalName: "ErpFactory",
   platform: "browser",
-  target: ["es2019", "safari14", "chrome90"],
+  // es2020, not something older. Every runtime that loads this bundle is a
+  // modern WebView — iOS WKWebView (the shell ships against a current SDK) and
+  // Android System WebView (updated through Play, minSdk 26) — so there is no
+  // audience for downlevelled output. Targeting es2019/safari14 additionally
+  // made esbuild try to lower destructuring inside a dependency and fail
+  // outright ("Transforming destructuring ... is not supported yet"), so the
+  // conservative target bought nothing and cost the build.
+  target: ["es2020"],
   outfile: resolve(repoRoot, "site/erp-factory.js"),
 });
 
