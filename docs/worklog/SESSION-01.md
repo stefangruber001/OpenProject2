@@ -161,11 +161,15 @@ execute the real files:
 | Both edited workflow YAML files | parsed successfully with PyYAML, jobs and trigger branches/paths confirmed by structural inspection, not just visual review |
 
 This is real execution evidence, not estimation — but it ran through a
-hand-built shim, not real Node/pnpm/turbo. **The `pnpm lint && pnpm boundaries
-&& pnpm check-types && pnpm test && pnpm build` gate (which needs real
-tooling: turbo, tsx, TypeScript, esbuild/Next) was NOT run locally.** It runs
-in CI on push; if it fails there, this is the first thing to check in the
-next session.
+hand-built shim, not real Node/pnpm/turbo.
+
+**Update after pushing:** the real gate ran in GitHub Actions on commit
+`646cbe5` (push to `claude/orin-project-status-1q50dt`) and came back green —
+`CI` (jobs: Lint·Types·Test·Build, End-to-end, **Business simulations +
+ownership guard** [new, 23s], Durable adapters/Postgres) all `success`, and
+`Site E2E` (its first-ever run on this branch — proof the new trigger works)
+also `success`. So the shim-based local verification above and the real CI
+run agree; the open-issue caveat about unverified `pnpm` tooling is closed.
 
 ## Decisions (mirrored to ASSUMPTIONS.md #45)
 
@@ -199,6 +203,7 @@ ASSUMPTIONS.md                      (#45 appended)
 
 ## Open issues for the next session
 
-- The real `pnpm` gate hasn't been run in this environment — verify in CI or
-  a Node-capable environment before building on top.
 - `site/erp-bridge.js` doesn't exist yet — session 2's first job.
+- (Resolved) The real `pnpm` gate has now run in real CI (commit `646cbe5`)
+  and passed in full, including the new `simulations` job and the first-ever
+  `Site E2E` run on this branch.
