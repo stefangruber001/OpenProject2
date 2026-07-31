@@ -276,6 +276,28 @@ review`) in `site/journey.html` and `site/dashboard.html`, closing the
 4. P0–P5 complete → P0 ✅ P1 ✅ (PDF pending) · P2–P5 open.
 5. Governance files current → ✅ (this update).
 
+## CANEI functional-spec programme (site/ + packages/ bridge)
+
+A 12-session plan turns `Requirements/20260731_REQUERMIENTOS BÁSICO CANEI.docx`
+into code: new domain logic lands in `packages/` as typed capabilities,
+bundled by esbuild into `site/erp-factory.js`, reached through a new
+`site/erp-bridge.js` seam; `site/erp-engine.js` (today's hand-written engine)
+is retired area by area, never the other way round. Full plan, session
+sequence, model/effort per session and architecture in `docs/worklog/
+WORKLOG.md`; each session's detail (and a copy-pasteable context pack for a
+fresh chat) is in `docs/worklog/SESSION-NN.md`.
+
+- **Session 1 — done (ASSUMPTIONS.md #45).** Closed a real gap: a push to the
+  dev branch could reach the iOS/Android beta apps via `/preview` with zero
+  test coverage (`site-e2e.yml` only ran on `main`). Now runs on `claude/**`
+  too; the two business simulations moved into a new `ci.yml` job
+  (`simulations`) alongside a new `tests/parity/ownership-guard.mjs` guarding
+  `site/erp-ownership.json` — the per-area migration-state record the rest of
+  the programme depends on. Captured a frozen real state-v1 fixture
+  (`tests/fixtures/state-v1-seed.json`) for the future migration ladder. No
+  product code changed.
+- **Sessions 2-12 — not started.** See `docs/worklog/WORKLOG.md`.
+
 ## Branch & discipline
 
 Work lands on `claude/orin-project-status-1q50dt` (designated). Small

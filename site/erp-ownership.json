@@ -1,0 +1,39 @@
+{
+  "$comment": "Machine-readable migration state, one entry per domain area. Read by tests/parity/ownership-guard.mjs and, from session 2 onward, by site/erp-bridge.js. Update this file in the SAME commit that changes an area's owner — never lag behind the code.",
+  "$schema": {
+    "owner": {
+      "engine": "Fully implemented in site/erp-engine.js today; erp.html reads/writes it directly or via ErpBridge pass-through.",
+      "factory": "Implemented as a packages/ capability, reached through site/erp-bridge.js. erp-engine.js may still hold a shrinking legacy copy during transition; erp.html must not call it directly once an area is 'factory'.",
+      "unbuilt": "No implementation anywhere yet (neither erp-engine.js nor packages/). Net-new capability work."
+    },
+    "specSection": "Section number in Requirements/20260731_REQUERMIENTOS BÁSICO CANEI.docx this area corresponds to.",
+    "engineSection": "The section-divider comment in site/erp-engine.js that implements this area today, or null if unbuilt.",
+    "plannedSession": "The session number (see the plan) expected to move this area to its next owner state."
+  },
+  "areas": {
+    "org-entity-numbering": { "owner": "engine", "specSection": "1", "engineSection": "ORG — entity & series", "plannedSession": null },
+    "parties-master-data": { "owner": "engine", "specSection": "3.1 / 7", "engineSection": "MDM — parties & properties", "plannedSession": null },
+    "crm-visits": { "owner": "engine", "specSection": "3.2", "engineSection": "CRM & site visits", "plannedSession": null },
+    "catalogue-packages": { "owner": "engine", "specSection": "3.3 / 5.5", "engineSection": "CAT — catalogue & packages", "plannedSession": null },
+    "supplier-prices": { "owner": "engine", "specSection": "5.5", "engineSection": "SUP — prices with source & comparison", "plannedSession": null },
+    "budgets-versions": { "owner": "engine", "specSection": "3.3", "engineSection": "PRE/QUO — budgets & versions", "plannedSession": "9" },
+    "budget-graphic-annex": { "owner": "unbuilt", "specSection": "3.3 (Improvement #1)", "engineSection": null, "plannedSession": "9" },
+    "contracts": { "owner": "engine", "specSection": "3.4", "engineSection": "CON — contracts", "plannedSession": null },
+    "projects": { "owner": "engine", "specSection": "4", "engineSection": "PRJ — projects", "plannedSession": "10a" },
+    "change-orders": { "owner": "engine", "specSection": "4.5", "engineSection": "CHG — change orders & extras", "plannedSession": "10b" },
+    "purchases": { "owner": "engine", "specSection": "4.1", "engineSection": "PUR — purchases", "plannedSession": "10b" },
+    "document-capture": { "owner": "engine", "specSection": "5.2 (Improvement #2)", "engineSection": "CAP — document capture", "plannedSession": "8" },
+    "invoices-collections": { "owner": "engine", "specSection": "5.1", "engineSection": "AR — invoices, receipts, collections", "plannedSession": null },
+    "supplier-bills-payments": { "owner": "engine", "specSection": "5.2", "engineSection": "AP — supplier bills & payments", "plannedSession": null },
+    "banking-reconciliation": { "owner": "engine", "specSection": "5.3 / 5.4", "engineSection": "BNK — bank, cash, reconciliation", "plannedSession": "11" },
+    "labour-hours": { "owner": "engine", "specSection": "4.6", "engineSection": "LAB — labour hours", "plannedSession": "10b" },
+    "project-economics": { "owner": "engine", "specSection": "4.4", "engineSection": "FIN — project economics", "plannedSession": "10a" },
+    "gestoria-package": { "owner": "engine", "specSection": "5.6", "engineSection": "GES — accounting package", "plannedSession": "11" },
+    "alerts-tasks-control-tower": { "owner": "engine", "specSection": "2.1 / 2.2", "engineSection": "DAS — alerts, tasks, control tower", "plannedSession": "12" },
+    "scheduling-gantt": { "owner": "unbuilt", "specSection": "3.3 / 4.3", "engineSection": null, "plannedSession": "5 / 6" },
+    "extraction-ocr": { "owner": "unbuilt", "specSection": "5.2 (Improvement #2)", "engineSection": null, "plannedSession": "7 / 8" },
+    "journey-project-selector": { "owner": "unbuilt", "specSection": "2.3 (Improvement #3)", "engineSection": null, "plannedSession": "12" },
+    "comunicaciones-templates": { "owner": "unbuilt", "specSection": "5.7", "engineSection": null, "plannedSession": "11" },
+    "three-panel-shell": { "owner": "unbuilt", "specSection": "1", "engineSection": null, "plannedSession": "4" }
+  }
+}

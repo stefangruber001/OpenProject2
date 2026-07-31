@@ -1,0 +1,3587 @@
+{
+  "today": "2026-05-05",
+  "config": {
+    "legalName": "Canei Subirats, S.L.",
+    "taxId": "B66666666",
+    "street": "Carrer de la Creu 74",
+    "postalCode": "08960",
+    "city": "Sant Just Desvern",
+    "province": "Barcelona",
+    "country": "España",
+    "registry": "R.M. Barcelona",
+    "phone": "659 87 67 00",
+    "email": "hola@caneisubirats.com",
+    "web": "",
+    "iban": "ES9121000418450200051332",
+    "logoRef": "canei-logo",
+    "marginThresholdBp": 1500
+  },
+  "series": {
+    "budget": {
+      "prefix": "PRE-",
+      "next": 5,
+      "issued": [
+        "PRE-2026-0001",
+        "PRE-2026-0002",
+        "PRE-2026-0003",
+        "PRE-2026-0004"
+      ],
+      "byYear": {
+        "2026": 5
+      }
+    },
+    "contract": {
+      "prefix": "CTR-",
+      "next": 4,
+      "issued": [
+        "CTR-2026-0001",
+        "CTR-2026-0002",
+        "CTR-2026-0003"
+      ],
+      "byYear": {
+        "2026": 4
+      }
+    },
+    "invoice": {
+      "prefix": "FAC-",
+      "next": 7,
+      "issued": [
+        "FAC-2026-0001",
+        "FAC-2026-0002",
+        "FAC-2026-0003",
+        "FAC-2026-0004",
+        "FAC-2026-0005",
+        "FAC-2026-0006"
+      ],
+      "byYear": {
+        "2026": 7
+      }
+    },
+    "receipt": {
+      "prefix": "REC-",
+      "next": 1,
+      "issued": []
+    },
+    "creditNote": {
+      "prefix": "ABO-",
+      "next": 1,
+      "issued": []
+    },
+    "purchaseOrder": {
+      "prefix": "OC-",
+      "next": 2,
+      "issued": [
+        "OC-2026-0001"
+      ],
+      "byYear": {
+        "2026": 2
+      }
+    }
+  },
+  "parties": [
+    {
+      "id": "pty_3",
+      "code": "T-0001",
+      "accountingCode": "430001",
+      "roles": [
+        "supplier"
+      ],
+      "partyType": "company",
+      "name": "Materiales Vallès S.A.",
+      "taxId": "A58818501",
+      "billStreet": "Pol. Ind. Can Roca 5",
+      "billPostalCode": "08191",
+      "billCity": "Rubí",
+      "billProvince": "Barcelona",
+      "billCountry": "España",
+      "contactPerson": "",
+      "landline": "",
+      "mobile": "937000001",
+      "email": "ventas@matvalles.example",
+      "preferredChannel": "mobile",
+      "leadSource": "other",
+      "activityLine": "other",
+      "paymentMethod": "transfer",
+      "paymentTermsDays": 30,
+      "vatRegime": "standard",
+      "irpfApplies": false,
+      "irpfRateBp": 0,
+      "bank": null,
+      "registry": "",
+      "active": true,
+      "legacy": false,
+      "notes": "",
+      "duplicateSuspect": null
+    },
+    {
+      "id": "pty_4",
+      "code": "T-0002",
+      "accountingCode": "430002",
+      "roles": [
+        "subcontractor"
+      ],
+      "partyType": "company",
+      "name": "ElectroBaix S.L.",
+      "taxId": "B65739207",
+      "billStreet": "C/ Indústria 12",
+      "billPostalCode": "08980",
+      "billCity": "Sant Feliu de Llobregat",
+      "billProvince": "Barcelona",
+      "billCountry": "España",
+      "contactPerson": "",
+      "landline": "",
+      "mobile": "936000002",
+      "email": "info@electrobaix.example",
+      "preferredChannel": "mobile",
+      "leadSource": "other",
+      "activityLine": "other",
+      "paymentMethod": "transfer",
+      "paymentTermsDays": 30,
+      "vatRegime": "standard",
+      "irpfApplies": false,
+      "irpfRateBp": 0,
+      "bank": null,
+      "registry": "",
+      "active": true,
+      "legacy": false,
+      "notes": "",
+      "duplicateSuspect": null
+    },
+    {
+      "id": "pty_5",
+      "code": "T-0003",
+      "accountingCode": "430003",
+      "roles": [
+        "subcontractor",
+        "selfEmployed"
+      ],
+      "partyType": "individual",
+      "name": "Josep Maria Solé (fontanería)",
+      "taxId": "46543299Q",
+      "billStreet": "C/ Major 3",
+      "billPostalCode": "08750",
+      "billCity": "Molins de Rei",
+      "billProvince": "Barcelona",
+      "billCountry": "España",
+      "contactPerson": "",
+      "landline": "",
+      "mobile": "610000003",
+      "email": "jm.sole@example.com",
+      "preferredChannel": "mobile",
+      "leadSource": "other",
+      "activityLine": "other",
+      "paymentMethod": "transfer",
+      "paymentTermsDays": 15,
+      "vatRegime": "standard",
+      "irpfApplies": false,
+      "irpfRateBp": 0,
+      "bank": null,
+      "registry": "",
+      "active": true,
+      "legacy": false,
+      "notes": "",
+      "duplicateSuspect": null
+    },
+    {
+      "id": "pty_6",
+      "code": "T-0004",
+      "accountingCode": "430004",
+      "roles": [
+        "adviser",
+        "selfEmployed"
+      ],
+      "partyType": "individual",
+      "name": "N. Camps, arquitecta técnica",
+      "taxId": "47732924N",
+      "billStreet": "Av. Diagonal 200",
+      "billPostalCode": "08018",
+      "billCity": "Barcelona",
+      "billProvince": "Barcelona",
+      "billCountry": "España",
+      "contactPerson": "",
+      "landline": "",
+      "mobile": "620000004",
+      "email": "n.camps@example.com",
+      "preferredChannel": "mobile",
+      "leadSource": "other",
+      "activityLine": "other",
+      "paymentMethod": "transfer",
+      "paymentTermsDays": 15,
+      "vatRegime": "standard",
+      "irpfApplies": true,
+      "irpfRateBp": 1500,
+      "bank": null,
+      "registry": "",
+      "active": true,
+      "legacy": false,
+      "notes": "",
+      "duplicateSuspect": null
+    },
+    {
+      "id": "pty_7",
+      "code": "T-0005",
+      "accountingCode": "430005",
+      "roles": [
+        "customer"
+      ],
+      "partyType": "individual",
+      "name": "Marta Roca Puig",
+      "taxId": "12345678Z",
+      "billStreet": "Av. Barcelona 10, 3º 2ª",
+      "billPostalCode": "08960",
+      "billCity": "Sant Just Desvern",
+      "billProvince": "Barcelona",
+      "billCountry": "España",
+      "contactPerson": "",
+      "landline": "",
+      "mobile": "600111222",
+      "email": "marta.roca@example.com",
+      "preferredChannel": "mobile",
+      "leadSource": "referrer",
+      "activityLine": "renovation",
+      "paymentMethod": "transfer",
+      "paymentTermsDays": 15,
+      "vatRegime": "standard",
+      "irpfApplies": false,
+      "irpfRateBp": 0,
+      "bank": null,
+      "registry": "",
+      "active": true,
+      "legacy": false,
+      "notes": "",
+      "duplicateSuspect": null
+    },
+    {
+      "id": "pty_8",
+      "code": "T-0006",
+      "accountingCode": "430006",
+      "roles": [
+        "customer"
+      ],
+      "partyType": "community",
+      "name": "Comunidad Prop. Balmes 120",
+      "taxId": "H08571730",
+      "billStreet": "C/ Balmes 120",
+      "billPostalCode": "08008",
+      "billCity": "Barcelona",
+      "billProvince": "Barcelona",
+      "billCountry": "España",
+      "contactPerson": "",
+      "landline": "934000000",
+      "mobile": "634000000",
+      "email": "vives@fincasvives.example",
+      "preferredChannel": "mobile",
+      "leadSource": "propertyManager",
+      "activityLine": "commercial",
+      "paymentMethod": "transfer30",
+      "paymentTermsDays": 30,
+      "vatRegime": "standard",
+      "irpfApplies": false,
+      "irpfRateBp": 0,
+      "bank": null,
+      "registry": "",
+      "active": true,
+      "legacy": false,
+      "notes": "",
+      "duplicateSuspect": null
+    },
+    {
+      "id": "pty_9",
+      "code": "T-0007",
+      "accountingCode": "430007",
+      "roles": [
+        "customer"
+      ],
+      "partyType": "company",
+      "name": "Nou Local Gràcia S.L.",
+      "taxId": "B66957286",
+      "billStreet": "C/ Verdi 22",
+      "billPostalCode": "08012",
+      "billCity": "Barcelona",
+      "billProvince": "Barcelona",
+      "billCountry": "España",
+      "contactPerson": "",
+      "landline": "",
+      "mobile": "620333444",
+      "email": "jordi@noulocal.example",
+      "preferredChannel": "mobile",
+      "leadSource": "website",
+      "activityLine": "commercial",
+      "paymentMethod": "transfer60",
+      "paymentTermsDays": 60,
+      "vatRegime": "standard",
+      "irpfApplies": false,
+      "irpfRateBp": 0,
+      "bank": null,
+      "registry": "R.M. Barcelona, T.48001, F.120",
+      "active": true,
+      "legacy": false,
+      "notes": "",
+      "duplicateSuspect": null
+    },
+    {
+      "id": "pty_10",
+      "code": "T-0008",
+      "accountingCode": "430008",
+      "roles": [
+        "customer"
+      ],
+      "partyType": "individual",
+      "name": "Pau Ferrer Vila",
+      "taxId": "46027840X",
+      "billStreet": "C/ Laurel 8",
+      "billPostalCode": "08950",
+      "billCity": "Esplugues de Llobregat",
+      "billProvince": "Barcelona",
+      "billCountry": "España",
+      "contactPerson": "",
+      "landline": "",
+      "mobile": "655001122",
+      "email": "pau.ferrer@example.com",
+      "preferredChannel": "mobile",
+      "leadSource": "leadPlatform",
+      "activityLine": "damp",
+      "paymentMethod": "transfer",
+      "paymentTermsDays": 15,
+      "vatRegime": "standard",
+      "irpfApplies": false,
+      "irpfRateBp": 0,
+      "bank": null,
+      "registry": "",
+      "active": true,
+      "legacy": false,
+      "notes": "",
+      "duplicateSuspect": null
+    },
+    {
+      "id": "pty_11",
+      "code": "T-0009",
+      "accountingCode": "430009",
+      "roles": [
+        "customer"
+      ],
+      "partyType": "individual",
+      "name": "Sra. García (pendiente de datos)",
+      "taxId": "",
+      "billStreet": "",
+      "billPostalCode": "",
+      "billCity": "",
+      "billProvince": "Barcelona",
+      "billCountry": "España",
+      "contactPerson": "",
+      "landline": "",
+      "mobile": "688777666",
+      "email": "",
+      "preferredChannel": "mobile",
+      "leadSource": "wordOfMouth",
+      "activityLine": "repairs",
+      "paymentMethod": "transfer",
+      "paymentTermsDays": 30,
+      "vatRegime": "standard",
+      "irpfApplies": false,
+      "irpfRateBp": 0,
+      "bank": null,
+      "registry": "",
+      "active": true,
+      "legacy": false,
+      "notes": "",
+      "duplicateSuspect": null
+    }
+  ],
+  "properties": [
+    {
+      "id": "prop_12",
+      "partyId": "pty_7",
+      "street": "Av. Barcelona 10, 3º 2ª",
+      "postalCode": "08960",
+      "city": "Sant Just Desvern",
+      "part": "dwelling",
+      "surfaceM2": 92,
+      "access": "",
+      "occupied": true
+    },
+    {
+      "id": "prop_13",
+      "partyId": "pty_8",
+      "street": "C/ Balmes 120",
+      "postalCode": "08008",
+      "city": "Barcelona",
+      "part": "commonArea",
+      "surfaceM2": 260,
+      "access": "",
+      "occupied": false
+    },
+    {
+      "id": "prop_14",
+      "partyId": "pty_9",
+      "street": "C/ Verdi 22, bajos",
+      "postalCode": "08012",
+      "city": "Barcelona",
+      "part": "commercialUnit",
+      "surfaceM2": 140,
+      "access": "",
+      "occupied": false
+    },
+    {
+      "id": "prop_15",
+      "partyId": "pty_10",
+      "street": "C/ Laurel 8, PB",
+      "postalCode": "08950",
+      "city": "Esplugues",
+      "part": "dwelling",
+      "surfaceM2": 78,
+      "access": "",
+      "occupied": false
+    }
+  ],
+  "opportunities": [
+    {
+      "id": "opp_32",
+      "partyId": "pty_7",
+      "propertyId": "prop_12",
+      "source": "referrer",
+      "date": "2026-03-04",
+      "requestedWork": "Reforma integral baño + cocina",
+      "owner": "operations",
+      "status": "won",
+      "nextAction": "Programar visita",
+      "expectedValue": 4100000,
+      "jobSize": "normal",
+      "lossReason": null,
+      "notes": []
+    },
+    {
+      "id": "opp_65",
+      "partyId": "pty_8",
+      "propertyId": "prop_13",
+      "source": "propertyManager",
+      "date": "2026-04-02",
+      "requestedWork": "Rehabilitación de fachada",
+      "owner": "operations",
+      "status": "won",
+      "nextAction": "Programar visita",
+      "expectedValue": 6200000,
+      "jobSize": "normal",
+      "lossReason": null,
+      "notes": []
+    },
+    {
+      "id": "opp_78",
+      "partyId": "pty_9",
+      "propertyId": "prop_14",
+      "source": "website",
+      "date": "2026-04-10",
+      "requestedWork": "Adecuación de local comercial",
+      "owner": "operations",
+      "status": "awaitingResponse",
+      "nextAction": "Programar visita",
+      "expectedValue": 3800000,
+      "jobSize": "normal",
+      "lossReason": null,
+      "notes": []
+    },
+    {
+      "id": "opp_89",
+      "partyId": "pty_10",
+      "propertyId": "prop_15",
+      "source": "leadPlatform",
+      "date": "2026-03-06",
+      "requestedWork": "Tratamiento de humedades por capilaridad",
+      "owner": "operations",
+      "status": "won",
+      "nextAction": "Programar visita",
+      "expectedValue": 480000,
+      "jobSize": "normal",
+      "lossReason": null,
+      "notes": []
+    },
+    {
+      "id": "opp_107",
+      "partyId": "pty_11",
+      "propertyId": null,
+      "source": "wordOfMouth",
+      "date": "2026-05-02",
+      "requestedWork": "Goteras en terraza",
+      "owner": "operations",
+      "status": "awaitingVisit",
+      "nextAction": "Programar visita",
+      "expectedValue": 0,
+      "jobSize": "small",
+      "lossReason": null,
+      "notes": []
+    }
+  ],
+  "visits": [
+    {
+      "id": "vis_33",
+      "opportunityId": "opp_32",
+      "date": "2026-03-04",
+      "measurements": [
+        {
+          "what": "baño",
+          "qty": 12.5,
+          "unit": "m2"
+        }
+      ],
+      "photos": [
+        "visita-roca-01.jpg"
+      ],
+      "notes": "Croquis a mano; bajante en buen estado",
+      "assumptions": [],
+      "exclusions": [],
+      "handwrittenEstimateRef": "croquis-roca.jpg",
+      "lines": []
+    },
+    {
+      "id": "vis_66",
+      "opportunityId": "opp_65",
+      "date": "2026-04-02",
+      "measurements": [
+        {
+          "what": "fachada",
+          "qty": 260,
+          "unit": "m2"
+        }
+      ],
+      "photos": [
+        "balmes-fachada.jpg"
+      ],
+      "notes": "Andamio necesario",
+      "assumptions": [],
+      "exclusions": [],
+      "handwrittenEstimateRef": null,
+      "lines": []
+    },
+    {
+      "id": "vis_79",
+      "opportunityId": "opp_78",
+      "date": "2026-04-10",
+      "measurements": [
+        {
+          "what": "local",
+          "qty": 140,
+          "unit": "m2"
+        }
+      ],
+      "photos": [
+        "verdi-local.jpg"
+      ],
+      "notes": "Licencia de actividad en trámite",
+      "assumptions": [],
+      "exclusions": [],
+      "handwrittenEstimateRef": null,
+      "lines": []
+    },
+    {
+      "id": "vis_90",
+      "opportunityId": "opp_89",
+      "date": "2026-03-06",
+      "measurements": [
+        {
+          "what": "muro afectado",
+          "qty": 18,
+          "unit": "ml"
+        }
+      ],
+      "photos": [
+        "humedad-01.jpg"
+      ],
+      "notes": "Humedad de capilaridad en PB",
+      "assumptions": [],
+      "exclusions": [],
+      "handwrittenEstimateRef": null,
+      "lines": []
+    }
+  ],
+  "catalogue": [
+    {
+      "id": "cat_16",
+      "code": "DEM-001",
+      "desc": "Demolición de tabique de ladrillo",
+      "customerWording": "",
+      "unit": "m2",
+      "type": "ownLabour",
+      "chapter": "",
+      "active": true,
+      "imageRefs": [],
+      "defaultCostCents": 950,
+      "defaultPriceCents": 1600
+    },
+    {
+      "id": "cat_17",
+      "code": "ALB-010",
+      "desc": "Tabique de cartón-yeso 15+46+15",
+      "customerWording": "",
+      "unit": "m2",
+      "type": "material",
+      "chapter": "",
+      "active": true,
+      "imageRefs": [],
+      "defaultCostCents": 1750,
+      "defaultPriceCents": 3200
+    },
+    {
+      "id": "cat_18",
+      "code": "FON-014",
+      "desc": "Punto de agua empotrado (alta/baja)",
+      "customerWording": "",
+      "unit": "ud",
+      "type": "subcontract",
+      "chapter": "",
+      "active": true,
+      "imageRefs": [],
+      "defaultCostCents": 4800,
+      "defaultPriceCents": 8200
+    },
+    {
+      "id": "cat_19",
+      "code": "ELE-020",
+      "desc": "Punto de luz / enchufe empotrado",
+      "customerWording": "",
+      "unit": "ud",
+      "type": "subcontract",
+      "chapter": "",
+      "active": true,
+      "imageRefs": [],
+      "defaultCostCents": 2600,
+      "defaultPriceCents": 4600
+    },
+    {
+      "id": "cat_20",
+      "code": "ALI-101",
+      "desc": "Alicatado gres porcelánico 60×60",
+      "customerWording": "",
+      "unit": "m2",
+      "type": "material",
+      "chapter": "",
+      "active": true,
+      "imageRefs": [],
+      "defaultCostCents": 1800,
+      "defaultPriceCents": 3400
+    },
+    {
+      "id": "cat_21",
+      "code": "PIN-001",
+      "desc": "Pintura plástica lisa dos manos",
+      "customerWording": "",
+      "unit": "m2",
+      "type": "ownLabour",
+      "chapter": "",
+      "active": true,
+      "imageRefs": [],
+      "defaultCostCents": 420,
+      "defaultPriceCents": 850
+    },
+    {
+      "id": "cat_22",
+      "code": "HUM-201",
+      "desc": "Tratamiento antihumedad por inyección",
+      "customerWording": "",
+      "unit": "l",
+      "type": "material",
+      "chapter": "",
+      "active": true,
+      "imageRefs": [],
+      "defaultCostCents": 2400,
+      "defaultPriceCents": 0
+    },
+    {
+      "id": "cat_23",
+      "code": "CAR-030",
+      "desc": "Puerta de paso lacada con manillas",
+      "customerWording": "",
+      "unit": "ud",
+      "type": "material",
+      "chapter": "",
+      "active": true,
+      "imageRefs": [],
+      "defaultCostCents": 14500,
+      "defaultPriceCents": 24500
+    }
+  ],
+  "packages": [
+    {
+      "id": "pkg_28",
+      "code": "PK-HUM",
+      "name": "Saneado antihumedad por m²",
+      "unit": "m2",
+      "components": [
+        {
+          "itemId": "cat_22",
+          "qtyPerUnitMilli": 350,
+          "kind": "material"
+        }
+      ],
+      "yieldPerUnit": 1,
+      "wastePct": 5,
+      "minPurchaseQty": 5,
+      "containerSize": 5
+    },
+    {
+      "id": "pkg_29",
+      "code": "PK-BANY",
+      "name": "Baño completo (plantilla)",
+      "unit": "ud",
+      "components": [
+        {
+          "itemId": "cat_18",
+          "qtyPerUnitMilli": 4000,
+          "kind": "subcontract"
+        },
+        {
+          "itemId": "cat_20",
+          "qtyPerUnitMilli": 32000,
+          "kind": "material"
+        }
+      ],
+      "yieldPerUnit": 1,
+      "wastePct": 10,
+      "minPurchaseQty": 0,
+      "containerSize": 0
+    }
+  ],
+  "prices": [
+    {
+      "id": "prc_24",
+      "itemId": "cat_20",
+      "supplierId": "pty_3",
+      "date": "2026-03-02",
+      "listCents": 2000,
+      "discountPct": 10,
+      "netCents": 1800,
+      "source": "priceList",
+      "sourceDocRef": "Tarifa MV 2026",
+      "transportCents": 0,
+      "validUntil": "2026-12-31",
+      "dims": null
+    },
+    {
+      "id": "prc_25",
+      "itemId": "cat_20",
+      "supplierId": "pty_4",
+      "date": "2026-03-02",
+      "listCents": 2150,
+      "discountPct": 5,
+      "netCents": 2043,
+      "source": "supplierOffer",
+      "sourceDocRef": "Oferta EB-118",
+      "transportCents": 0,
+      "validUntil": null,
+      "dims": null
+    },
+    {
+      "id": "prc_26",
+      "itemId": "cat_22",
+      "supplierId": "pty_3",
+      "date": "2026-03-02",
+      "listCents": 2600,
+      "discountPct": 8,
+      "netCents": 2392,
+      "source": "supplierOffer",
+      "sourceDocRef": "Oferta HUM-12",
+      "transportCents": 0,
+      "validUntil": "2026-02-28",
+      "dims": null
+    },
+    {
+      "id": "prc_27",
+      "itemId": "cat_23",
+      "supplierId": "pty_3",
+      "date": "2026-03-02",
+      "listCents": 15800,
+      "discountPct": 12,
+      "netCents": 13904,
+      "source": "valuedDeliveryNote",
+      "sourceDocRef": "Albarán 2026-0141",
+      "transportCents": 0,
+      "validUntil": null,
+      "dims": null
+    }
+  ],
+  "budgets": [
+    {
+      "id": "bud_34",
+      "number": "PRE-2026-0001",
+      "date": "2026-03-04",
+      "internalRef": "",
+      "partyId": "pty_7",
+      "propertyId": "prop_12",
+      "preparedBy": "backoffice",
+      "validityDate": "2026-04-03",
+      "status": "accepted",
+      "language": "es",
+      "activityLine": "renovation",
+      "surfaceM2": 92,
+      "discountCents": 0,
+      "vatBp": 1000,
+      "irpfBp": 0,
+      "paymentConditions": "40% a la firma · 40% a mitad de obra · 20% a la finalización",
+      "exclusions": [],
+      "assumptions": [],
+      "versions": [
+        {
+          "id": "ver_35",
+          "vNumber": "1.0",
+          "date": "2026-03-04",
+          "author": "backoffice",
+          "reason": "Versión inicial",
+          "frozen": true,
+          "issued": true,
+          "sent": {
+            "date": "2026-03-04",
+            "channel": "email"
+          },
+          "customerResponse": null,
+          "docRef": "presupuesto_PRE-2026-0001_v1.0_Marta-Roca-Puig_2026-03-04",
+          "superseded": true,
+          "chapters": [
+            {
+              "id": "chp_36",
+              "num": "1",
+              "name": "Demoliciones",
+              "section": "base",
+              "order": 0,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_37",
+                  "num": "1.1",
+                  "code": "D1",
+                  "itemId": "cat_16",
+                  "desc": "Demolición de tabiques y retirada",
+                  "customerWording": "",
+                  "unit": "m2",
+                  "qtyMilli": 34000,
+                  "priceCents": 1600,
+                  "costCents": 950,
+                  "costSupplierId": "pty_3",
+                  "costSourceRef": "propia",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_38",
+              "num": "2",
+              "name": "Albañilería",
+              "section": "base",
+              "order": 1,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_39",
+                  "num": "2.1",
+                  "code": "A1",
+                  "itemId": "cat_17",
+                  "desc": "Tabiquería nueva en cocina",
+                  "customerWording": "",
+                  "unit": "m2",
+                  "qtyMilli": 29700,
+                  "priceCents": 3200,
+                  "costCents": 1750,
+                  "costSupplierId": "pty_3",
+                  "costSourceRef": "Tarifa MV 2026",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [
+                    {
+                      "room": "Cocina",
+                      "qtyMilli": 18000,
+                      "wastePct": 10,
+                      "customerVisible": true
+                    },
+                    {
+                      "room": "Baño",
+                      "qtyMilli": 9000,
+                      "wastePct": 10,
+                      "customerVisible": true
+                    }
+                  ],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_40",
+              "num": "3",
+              "name": "Fontanería",
+              "section": "base",
+              "order": 2,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_41",
+                  "num": "3.1",
+                  "code": "F1",
+                  "itemId": "cat_18",
+                  "desc": "Puntos de agua baño y cocina",
+                  "customerWording": "",
+                  "unit": "ud",
+                  "qtyMilli": 8000,
+                  "priceCents": 8200,
+                  "costCents": 4800,
+                  "costSupplierId": "pty_5",
+                  "costSourceRef": "Oferta JMS-31",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_42",
+              "num": "4",
+              "name": "Electricidad",
+              "section": "base",
+              "order": 3,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_43",
+                  "num": "4.1",
+                  "code": "E1",
+                  "itemId": "cat_19",
+                  "desc": "Puntos de luz y enchufes",
+                  "customerWording": "",
+                  "unit": "ud",
+                  "qtyMilli": 22000,
+                  "priceCents": 4600,
+                  "costCents": 2600,
+                  "costSupplierId": "pty_4",
+                  "costSourceRef": "Oferta EB-119",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_44",
+              "num": "5",
+              "name": "Revestimientos",
+              "section": "base",
+              "order": 4,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_45",
+                  "num": "5.1",
+                  "code": "R1",
+                  "itemId": "cat_20",
+                  "desc": "Alicatado baño y frente cocina",
+                  "customerWording": "",
+                  "unit": "m2",
+                  "qtyMilli": 41000,
+                  "priceCents": 3400,
+                  "costCents": 1800,
+                  "costSupplierId": "pty_3",
+                  "costSourceRef": "Tarifa MV 2026",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_46",
+              "num": "6",
+              "name": "Opcional — mampara y espejo",
+              "section": "optional",
+              "order": 5,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_47",
+                  "num": "6.1",
+                  "code": "OP1",
+                  "itemId": null,
+                  "desc": "Mampara de vidrio templado",
+                  "customerWording": "",
+                  "unit": "ud",
+                  "qtyMilli": 1000,
+                  "priceCents": 68000,
+                  "costCents": 42000,
+                  "costSupplierId": null,
+                  "costSourceRef": "",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ver_48",
+          "vNumber": "1.1",
+          "date": "2026-03-12",
+          "author": "backoffice",
+          "reason": "Rebaja negociada en revestimientos",
+          "frozen": true,
+          "issued": true,
+          "sent": {
+            "date": "2026-03-12",
+            "channel": "email"
+          },
+          "customerResponse": {
+            "accepted": true,
+            "date": "2026-03-12",
+            "evidenceRef": "email-aceptacion-roca.pdf",
+            "acceptedOptions": []
+          },
+          "docRef": "presupuesto_PRE-2026-0001_v1.1_Marta-Roca-Puig_2026-03-12",
+          "superseded": false,
+          "chapters": [
+            {
+              "id": "chp_36",
+              "num": "1",
+              "name": "Demoliciones",
+              "section": "base",
+              "order": 0,
+              "progress": "done",
+              "lines": [
+                {
+                  "id": "lin_37",
+                  "num": "1.1",
+                  "code": "D1",
+                  "itemId": "cat_16",
+                  "desc": "Demolición de tabiques y retirada",
+                  "customerWording": "",
+                  "unit": "m2",
+                  "qtyMilli": 34000,
+                  "priceCents": 1600,
+                  "costCents": 950,
+                  "costSupplierId": "pty_3",
+                  "costSourceRef": "propia",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "done",
+                  "progressPct": 100,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_38",
+              "num": "2",
+              "name": "Albañilería",
+              "section": "base",
+              "order": 1,
+              "progress": "done",
+              "lines": [
+                {
+                  "id": "lin_39",
+                  "num": "2.1",
+                  "code": "A1",
+                  "itemId": "cat_17",
+                  "desc": "Tabiquería nueva en cocina",
+                  "customerWording": "",
+                  "unit": "m2",
+                  "qtyMilli": 29700,
+                  "priceCents": 3200,
+                  "costCents": 1750,
+                  "costSupplierId": "pty_3",
+                  "costSourceRef": "Tarifa MV 2026",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [
+                    {
+                      "room": "Cocina",
+                      "qtyMilli": 18000,
+                      "wastePct": 10,
+                      "customerVisible": true
+                    },
+                    {
+                      "room": "Baño",
+                      "qtyMilli": 9000,
+                      "wastePct": 10,
+                      "customerVisible": true
+                    }
+                  ],
+                  "progress": "done",
+                  "progressPct": 100,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_40",
+              "num": "3",
+              "name": "Fontanería",
+              "section": "base",
+              "order": 2,
+              "progress": "inProgress",
+              "lines": [
+                {
+                  "id": "lin_41",
+                  "num": "3.1",
+                  "code": "F1",
+                  "itemId": "cat_18",
+                  "desc": "Puntos de agua baño y cocina",
+                  "customerWording": "",
+                  "unit": "ud",
+                  "qtyMilli": 8000,
+                  "priceCents": 8200,
+                  "costCents": 4800,
+                  "costSupplierId": "pty_5",
+                  "costSourceRef": "Oferta JMS-31",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "inProgress",
+                  "progressPct": 60,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_42",
+              "num": "4",
+              "name": "Electricidad",
+              "section": "base",
+              "order": 3,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_43",
+                  "num": "4.1",
+                  "code": "E1",
+                  "itemId": "cat_19",
+                  "desc": "Puntos de luz y enchufes",
+                  "customerWording": "",
+                  "unit": "ud",
+                  "qtyMilli": 22000,
+                  "priceCents": 4600,
+                  "costCents": 2600,
+                  "costSupplierId": "pty_4",
+                  "costSourceRef": "Oferta EB-119",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_44",
+              "num": "5",
+              "name": "Revestimientos",
+              "section": "base",
+              "order": 4,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_45",
+                  "num": "5.1",
+                  "code": "R1",
+                  "itemId": "cat_20",
+                  "desc": "Alicatado baño y frente cocina",
+                  "customerWording": "",
+                  "unit": "m2",
+                  "qtyMilli": 41000,
+                  "priceCents": 3250,
+                  "costCents": 1800,
+                  "costSupplierId": "pty_3",
+                  "costSourceRef": "Tarifa MV 2026",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_46",
+              "num": "6",
+              "name": "Opcional — mampara y espejo",
+              "section": "optional",
+              "order": 5,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_47",
+                  "num": "6.1",
+                  "code": "OP1",
+                  "itemId": null,
+                  "desc": "Mampara de vidrio templado",
+                  "customerWording": "",
+                  "unit": "ud",
+                  "qtyMilli": 1000,
+                  "priceCents": 68000,
+                  "costCents": 42000,
+                  "costSupplierId": null,
+                  "costSourceRef": "",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "currentVersionId": "ver_48",
+      "acceptedVersionId": "ver_48",
+      "internalVariant": false
+    },
+    {
+      "id": "bud_67",
+      "number": "PRE-2026-0002",
+      "date": "2026-04-02",
+      "internalRef": "",
+      "partyId": "pty_8",
+      "propertyId": "prop_13",
+      "preparedBy": "backoffice",
+      "validityDate": "2026-05-02",
+      "status": "accepted",
+      "language": "es",
+      "activityLine": "commercial",
+      "surfaceM2": 260,
+      "discountCents": 0,
+      "vatBp": 1000,
+      "irpfBp": 0,
+      "paymentConditions": "40% a la firma · 40% a mitad de obra · 20% a la finalización",
+      "exclusions": [],
+      "assumptions": [],
+      "versions": [
+        {
+          "id": "ver_68",
+          "vNumber": "1.0",
+          "date": "2026-04-02",
+          "author": "backoffice",
+          "reason": "Versión inicial",
+          "frozen": true,
+          "issued": true,
+          "sent": {
+            "date": "2026-04-02",
+            "channel": "email"
+          },
+          "customerResponse": {
+            "accepted": true,
+            "date": "2026-04-20",
+            "evidenceRef": "acta-junta.pdf",
+            "acceptedOptions": []
+          },
+          "docRef": "presupuesto_PRE-2026-0002_v1.0_Comunidad-Prop.-Balmes-120_2026-04-02",
+          "superseded": false,
+          "chapters": [
+            {
+              "id": "chp_69",
+              "num": "1",
+              "name": "Medios auxiliares",
+              "section": "base",
+              "order": 0,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_70",
+                  "num": "1.1",
+                  "code": "M1",
+                  "itemId": null,
+                  "desc": "Andamio homologado, montaje y alquiler",
+                  "customerWording": "",
+                  "unit": "pa",
+                  "qtyMilli": 1000,
+                  "priceCents": 780000,
+                  "costCents": 520000,
+                  "costSupplierId": "pty_3",
+                  "costSourceRef": "Oferta AND-8",
+                  "lumpSum": true,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_71",
+              "num": "2",
+              "name": "Fachada",
+              "section": "base",
+              "order": 1,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_72",
+                  "num": "2.1",
+                  "code": "FA1",
+                  "itemId": null,
+                  "desc": "Reparación de grietas y revoco monocapa",
+                  "customerWording": "",
+                  "unit": "m2",
+                  "qtyMilli": 260000,
+                  "priceCents": 14500,
+                  "costCents": 9200,
+                  "costSupplierId": "pty_3",
+                  "costSourceRef": "Oferta MV-77",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_73",
+              "num": "3",
+              "name": "Pintura",
+              "section": "base",
+              "order": 2,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_74",
+                  "num": "3.1",
+                  "code": "P1",
+                  "itemId": "cat_21",
+                  "desc": "Pintura de fachada dos manos",
+                  "customerWording": "",
+                  "unit": "m2",
+                  "qtyMilli": 260000,
+                  "priceCents": 850,
+                  "costCents": 420,
+                  "costSupplierId": null,
+                  "costSourceRef": "",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "currentVersionId": "ver_68",
+      "acceptedVersionId": "ver_68",
+      "internalVariant": false
+    },
+    {
+      "id": "bud_80",
+      "number": "PRE-2026-0003",
+      "date": "2026-04-10",
+      "internalRef": "",
+      "partyId": "pty_9",
+      "propertyId": "prop_14",
+      "preparedBy": "backoffice",
+      "validityDate": "2026-08-15",
+      "status": "issued",
+      "language": "es",
+      "activityLine": "commercial",
+      "surfaceM2": 140,
+      "discountCents": 0,
+      "vatBp": 2100,
+      "irpfBp": 0,
+      "paymentConditions": "40% a la firma · 40% a mitad de obra · 20% a la finalización",
+      "exclusions": [],
+      "assumptions": [],
+      "versions": [
+        {
+          "id": "ver_81",
+          "vNumber": "1.0",
+          "date": "2026-04-10",
+          "author": "backoffice",
+          "reason": "Versión inicial",
+          "frozen": true,
+          "issued": true,
+          "sent": {
+            "date": "2026-04-10",
+            "channel": "email"
+          },
+          "customerResponse": null,
+          "docRef": "presupuesto_PRE-2026-0003_v1.0_Nou-Local-Gràcia-S.L._2026-04-10",
+          "superseded": false,
+          "chapters": [
+            {
+              "id": "chp_82",
+              "num": "1",
+              "name": "Demoliciones",
+              "section": "base",
+              "order": 0,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_83",
+                  "num": "1.1",
+                  "code": "D1",
+                  "itemId": "cat_16",
+                  "desc": "Demolición interior completa",
+                  "customerWording": "",
+                  "unit": "m2",
+                  "qtyMilli": 140000,
+                  "priceCents": 1600,
+                  "costCents": 950,
+                  "costSupplierId": null,
+                  "costSourceRef": "",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_84",
+              "num": "2",
+              "name": "Instalaciones",
+              "section": "base",
+              "order": 1,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_85",
+                  "num": "2.1",
+                  "code": "I1",
+                  "itemId": "cat_19",
+                  "desc": "Instalación eléctrica completa",
+                  "customerWording": "",
+                  "unit": "ud",
+                  "qtyMilli": 48000,
+                  "priceCents": 4600,
+                  "costCents": 2600,
+                  "costSupplierId": "pty_4",
+                  "costSourceRef": "Oferta EB-131",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                },
+                {
+                  "id": "lin_88",
+                  "num": "2.2",
+                  "code": "I9",
+                  "itemId": null,
+                  "desc": "Climatización — pendiente de oferta del industrial",
+                  "customerWording": "",
+                  "unit": "pa",
+                  "qtyMilli": 1000,
+                  "priceCents": 320000,
+                  "costCents": 210000,
+                  "costSupplierId": null,
+                  "costSourceRef": "",
+                  "lumpSum": true,
+                  "pending": true,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            },
+            {
+              "id": "chp_86",
+              "num": "3",
+              "name": "Carpintería",
+              "section": "base",
+              "order": 2,
+              "progress": "notStarted",
+              "lines": [
+                {
+                  "id": "lin_87",
+                  "num": "3.1",
+                  "code": "C1",
+                  "itemId": "cat_23",
+                  "desc": "Puertas y frentes lacados",
+                  "customerWording": "",
+                  "unit": "ud",
+                  "qtyMilli": 6000,
+                  "priceCents": 24500,
+                  "costCents": 13900,
+                  "costSupplierId": "pty_3",
+                  "costSourceRef": "Albarán 2026-0141",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "notStarted",
+                  "progressPct": 0,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "currentVersionId": "ver_81",
+      "acceptedVersionId": null,
+      "internalVariant": false
+    },
+    {
+      "id": "bud_91",
+      "number": "PRE-2026-0004",
+      "date": "2026-03-06",
+      "internalRef": "",
+      "partyId": "pty_10",
+      "propertyId": "prop_15",
+      "preparedBy": "backoffice",
+      "validityDate": "2026-04-05",
+      "status": "accepted",
+      "language": "es",
+      "activityLine": "damp",
+      "surfaceM2": 78,
+      "discountCents": 0,
+      "vatBp": 1000,
+      "irpfBp": 0,
+      "paymentConditions": "40% a la firma · 40% a mitad de obra · 20% a la finalización",
+      "exclusions": [],
+      "assumptions": [],
+      "versions": [
+        {
+          "id": "ver_92",
+          "vNumber": "1.0",
+          "date": "2026-03-06",
+          "author": "backoffice",
+          "reason": "Versión inicial",
+          "frozen": true,
+          "issued": true,
+          "sent": {
+            "date": "2026-03-06",
+            "channel": "whatsapp"
+          },
+          "customerResponse": {
+            "accepted": true,
+            "date": "2026-03-10",
+            "evidenceRef": "whatsapp-ok.png",
+            "acceptedOptions": []
+          },
+          "docRef": "presupuesto_PRE-2026-0004_v1.0_Pau-Ferrer-Vila_2026-03-06",
+          "superseded": false,
+          "chapters": [
+            {
+              "id": "chp_93",
+              "num": "1",
+              "name": "Tratamiento antihumedad",
+              "section": "base",
+              "order": 0,
+              "progress": "done",
+              "lines": [
+                {
+                  "id": "lin_94",
+                  "num": "1.1",
+                  "code": "H1",
+                  "itemId": "cat_22",
+                  "desc": "Inyección perimetral + saneado y pintura anti-moho",
+                  "customerWording": "",
+                  "unit": "ml",
+                  "qtyMilli": 18000,
+                  "priceCents": 24000,
+                  "costCents": 13800,
+                  "costSupplierId": "pty_3",
+                  "costSourceRef": "Oferta HUM-12",
+                  "lumpSum": false,
+                  "pending": false,
+                  "optionalLine": false,
+                  "subLines": [],
+                  "progress": "done",
+                  "progressPct": 100,
+                  "imageRefs": [],
+                  "notes": ""
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "currentVersionId": "ver_92",
+      "acceptedVersionId": "ver_92",
+      "internalVariant": false
+    }
+  ],
+  "contracts": [
+    {
+      "id": "con_49",
+      "number": "CTR-2026-0001",
+      "date": "2026-03-12",
+      "partyId": "pty_7",
+      "propertyId": "prop_12",
+      "budgetId": "bud_34",
+      "budgetNumber": "PRE-2026-0001",
+      "acceptedVersionId": "ver_48",
+      "valueCents": 449490,
+      "vatBp": 1000,
+      "vatCents": 44949,
+      "totalCents": 494439,
+      "installments": [
+        {
+          "pct": 40,
+          "trigger": "onSignature",
+          "expectedDate": "2026-03-16",
+          "idx": 0,
+          "status": "invoiced",
+          "amountCents": 197776,
+          "invoiceId": "inv_51"
+        },
+        {
+          "pct": 40,
+          "trigger": "atStage",
+          "stageRef": "50% de obra",
+          "expectedDate": "2026-04-28",
+          "idx": 1,
+          "status": "invoiced",
+          "amountCents": 197776,
+          "invoiceId": "inv_63"
+        },
+        {
+          "pct": 20,
+          "trigger": "onCompletion",
+          "expectedDate": "2026-06-05",
+          "idx": 2,
+          "status": "planned",
+          "amountCents": 98888
+        }
+      ],
+      "initiation": {
+        "scheduleWithinDays": 7,
+        "startWithinDays": 15,
+        "firstPaymentDate": "2026-03-16",
+        "committedStartDate": "2026-03-31"
+      },
+      "duration": {
+        "estimatedDays": 55,
+        "plannedStart": "2026-03-25",
+        "plannedFinish": "2026-06-01",
+        "actualStart": "2026-03-25",
+        "actualFinish": null,
+        "deviationReason": null
+      },
+      "penalties": {
+        "latePaymentInterestPctYear": 8,
+        "delayPenaltyCentsPerWeek": 15000,
+        "capCents": 49444,
+        "graceDays": 7,
+        "suspendingEvents": [
+          "retraso del cliente",
+          "fuerza mayor",
+          "cambio aprobado"
+        ]
+      },
+      "guarantees": [
+        {
+          "category": "executionAndFinishes",
+          "months": 12,
+          "startDate": null
+        },
+        {
+          "category": "installations",
+          "months": 24,
+          "startDate": null
+        },
+        {
+          "category": "structural",
+          "months": 120,
+          "startDate": null
+        }
+      ],
+      "clauseBlockVersions": [
+        "cb1"
+      ],
+      "language": "es",
+      "signature": {
+        "customerSignedAt": "2026-03-16",
+        "companySignedAt": "2026-03-16",
+        "method": "digital"
+      },
+      "status": "inForce",
+      "annexes": [
+        {
+          "number": "CTR-2026-0001-A1",
+          "changeId": "chg_62",
+          "valueCents": 186000,
+          "date": "2026-04-15"
+        }
+      ],
+      "scopeAnnexRef": "contrato-anexo_PRE-2026-0001_v1.1_Marta-Roca-Puig_2026-03-12"
+    },
+    {
+      "id": "con_75",
+      "number": "CTR-2026-0002",
+      "date": "2026-04-20",
+      "partyId": "pty_8",
+      "propertyId": "prop_13",
+      "budgetId": "bud_67",
+      "budgetNumber": "PRE-2026-0002",
+      "acceptedVersionId": "ver_68",
+      "valueCents": 4771000,
+      "vatBp": 1000,
+      "vatCents": 477100,
+      "totalCents": 5248100,
+      "installments": [
+        {
+          "pct": 30,
+          "trigger": "onSignature",
+          "expectedDate": "2026-04-25",
+          "idx": 0,
+          "status": "invoiced",
+          "amountCents": 1574430,
+          "invoiceId": "inv_77"
+        },
+        {
+          "pct": 50,
+          "trigger": "atStage",
+          "stageRef": "50% fachada",
+          "expectedDate": "2026-06-20",
+          "idx": 1,
+          "status": "planned",
+          "amountCents": 2624050
+        },
+        {
+          "pct": 20,
+          "trigger": "onCompletion",
+          "expectedDate": "2026-07-25",
+          "idx": 2,
+          "status": "planned",
+          "amountCents": 1049620
+        }
+      ],
+      "initiation": {
+        "scheduleWithinDays": 7,
+        "startWithinDays": 15,
+        "firstPaymentDate": "2026-04-25",
+        "committedStartDate": "2026-05-10"
+      },
+      "duration": {
+        "estimatedDays": 70,
+        "plannedStart": "2026-05-05",
+        "plannedFinish": "2026-07-20",
+        "actualStart": null,
+        "actualFinish": null,
+        "deviationReason": null
+      },
+      "penalties": {
+        "latePaymentInterestPctYear": 8,
+        "delayPenaltyCentsPerWeek": 0,
+        "capCents": 0,
+        "graceDays": 7,
+        "suspendingEvents": [
+          "customer delay",
+          "force majeure",
+          "approved change"
+        ]
+      },
+      "guarantees": [
+        {
+          "category": "executionAndFinishes",
+          "months": 12,
+          "startDate": null
+        },
+        {
+          "category": "installations",
+          "months": 24,
+          "startDate": null
+        },
+        {
+          "category": "structural",
+          "months": 120,
+          "startDate": null
+        }
+      ],
+      "clauseBlockVersions": [
+        "cb1"
+      ],
+      "language": "es",
+      "signature": {
+        "customerSignedAt": "2026-04-25",
+        "companySignedAt": "2026-04-25",
+        "method": "physical"
+      },
+      "status": "inForce",
+      "annexes": [],
+      "scopeAnnexRef": "contrato-anexo_PRE-2026-0002_v1.0_Comunidad-Prop.-Balmes-120_2026-04-20"
+    },
+    {
+      "id": "con_95",
+      "number": "CTR-2026-0003",
+      "date": "2026-03-10",
+      "partyId": "pty_10",
+      "propertyId": "prop_15",
+      "budgetId": "bud_91",
+      "budgetNumber": "PRE-2026-0004",
+      "acceptedVersionId": "ver_92",
+      "valueCents": 432000,
+      "vatBp": 1000,
+      "vatCents": 43200,
+      "totalCents": 475200,
+      "installments": [
+        {
+          "pct": 50,
+          "trigger": "onSignature",
+          "expectedDate": "2026-03-12",
+          "idx": 0,
+          "status": "invoiced",
+          "amountCents": 237600,
+          "invoiceId": "inv_97"
+        },
+        {
+          "pct": 50,
+          "trigger": "onCompletion",
+          "expectedDate": "2026-03-28",
+          "idx": 1,
+          "status": "invoiced",
+          "amountCents": 237600,
+          "invoiceId": "inv_102"
+        }
+      ],
+      "initiation": {
+        "scheduleWithinDays": 7,
+        "startWithinDays": 15,
+        "firstPaymentDate": "2026-03-12",
+        "committedStartDate": "2026-03-27"
+      },
+      "duration": {
+        "estimatedDays": 10,
+        "plannedStart": "2026-03-16",
+        "plannedFinish": "2026-03-27",
+        "actualStart": "2026-03-16",
+        "actualFinish": "2026-03-27",
+        "deviationReason": null
+      },
+      "penalties": {
+        "latePaymentInterestPctYear": 8,
+        "delayPenaltyCentsPerWeek": 0,
+        "capCents": 0,
+        "graceDays": 7,
+        "suspendingEvents": [
+          "customer delay",
+          "force majeure",
+          "approved change"
+        ]
+      },
+      "guarantees": [
+        {
+          "category": "executionAndFinishes",
+          "months": 24,
+          "startDate": "2026-03-27",
+          "expiryDate": "2028-03-27"
+        }
+      ],
+      "clauseBlockVersions": [
+        "cb1"
+      ],
+      "language": "es",
+      "signature": {
+        "customerSignedAt": "2026-03-12",
+        "companySignedAt": "2026-03-12",
+        "method": "digital"
+      },
+      "status": "completed",
+      "annexes": [],
+      "scopeAnnexRef": "contrato-anexo_PRE-2026-0004_v1.0_Pau-Ferrer-Vila_2026-03-10"
+    }
+  ],
+  "clauseBlocks": [
+    {
+      "id": "cb1",
+      "name": "Condiciones generales de contratación",
+      "effectiveFrom": "2026-01-01",
+      "version": 1
+    }
+  ],
+  "projects": [
+    {
+      "id": "prj_50",
+      "code": "P-2026-0001",
+      "partyId": "pty_7",
+      "propertyId": "prop_12",
+      "budgetId": "bud_34",
+      "budgetNumber": "PRE-2026-0001",
+      "acceptedVersionId": "ver_48",
+      "contractId": "con_49",
+      "activityLine": "renovation",
+      "status": "active",
+      "baseline": {
+        "revenueCents": 449490,
+        "costCents": 253675,
+        "marginCents": 195815,
+        "chapters": [
+          {
+            "num": "1",
+            "name": "Demoliciones",
+            "saleCents": 54400,
+            "costCents": 32300
+          },
+          {
+            "num": "2",
+            "name": "Albañilería",
+            "saleCents": 95040,
+            "costCents": 51975
+          },
+          {
+            "num": "3",
+            "name": "Fontanería",
+            "saleCents": 65600,
+            "costCents": 38400
+          },
+          {
+            "num": "4",
+            "name": "Electricidad",
+            "saleCents": 101200,
+            "costCents": 57200
+          },
+          {
+            "num": "5",
+            "name": "Revestimientos",
+            "saleCents": 133250,
+            "costCents": 73800
+          }
+        ]
+      },
+      "vatBp": 1000,
+      "surfaceM2": 92,
+      "dates": {
+        "start": "2026-03-25",
+        "targetEnd": "2026-06-05",
+        "actualEnd": null
+      },
+      "milestones": [],
+      "diary": [],
+      "permits": [],
+      "dependencies": [],
+      "closed": false
+    },
+    {
+      "id": "prj_76",
+      "code": "P-2026-0002",
+      "partyId": "pty_8",
+      "propertyId": "prop_13",
+      "budgetId": "bud_67",
+      "budgetNumber": "PRE-2026-0002",
+      "acceptedVersionId": "ver_68",
+      "contractId": "con_75",
+      "activityLine": "commercial",
+      "status": "active",
+      "baseline": {
+        "revenueCents": 4771000,
+        "costCents": 3021200,
+        "marginCents": 1749800,
+        "chapters": [
+          {
+            "num": "1",
+            "name": "Medios auxiliares",
+            "saleCents": 780000,
+            "costCents": 520000
+          },
+          {
+            "num": "2",
+            "name": "Fachada",
+            "saleCents": 3770000,
+            "costCents": 2392000
+          },
+          {
+            "num": "3",
+            "name": "Pintura",
+            "saleCents": 221000,
+            "costCents": 109200
+          }
+        ]
+      },
+      "vatBp": 1000,
+      "surfaceM2": 260,
+      "dates": {
+        "start": null,
+        "targetEnd": "2026-07-25",
+        "actualEnd": null
+      },
+      "milestones": [],
+      "diary": [],
+      "permits": [],
+      "dependencies": [],
+      "closed": false
+    },
+    {
+      "id": "prj_96",
+      "code": "P-2026-0004",
+      "partyId": "pty_10",
+      "propertyId": "prop_15",
+      "budgetId": "bud_91",
+      "budgetNumber": "PRE-2026-0004",
+      "acceptedVersionId": "ver_92",
+      "contractId": "con_95",
+      "activityLine": "damp",
+      "status": "closed",
+      "baseline": {
+        "revenueCents": 432000,
+        "costCents": 248400,
+        "marginCents": 183600,
+        "chapters": [
+          {
+            "num": "1",
+            "name": "Tratamiento antihumedad",
+            "saleCents": 432000,
+            "costCents": 248400
+          }
+        ]
+      },
+      "vatBp": 1000,
+      "surfaceM2": 78,
+      "dates": {
+        "start": "2026-03-16",
+        "targetEnd": null,
+        "actualEnd": "2026-03-27"
+      },
+      "milestones": [],
+      "diary": [],
+      "permits": [],
+      "dependencies": [],
+      "closed": true
+    },
+    {
+      "id": "prj_104",
+      "code": "P-R004",
+      "partyId": "pty_7",
+      "propertyId": null,
+      "budgetId": null,
+      "budgetNumber": null,
+      "contractId": null,
+      "activityLine": "repairs",
+      "status": "active",
+      "baseline": {
+        "revenueCents": 32000,
+        "costCents": 0,
+        "marginCents": 32000,
+        "chapters": [
+          {
+            "num": "1",
+            "name": "Reparación persiana y grifería",
+            "saleCents": 32000,
+            "costCents": 0
+          }
+        ]
+      },
+      "vatBp": 2100,
+      "surfaceM2": 0,
+      "dates": {
+        "start": "2026-04-03",
+        "targetEnd": null,
+        "actualEnd": null
+      },
+      "milestones": [],
+      "diary": [],
+      "permits": [],
+      "dependencies": [],
+      "closed": false
+    }
+  ],
+  "purchases": [
+    {
+      "id": "pur_54",
+      "number": "OC-2026-0001",
+      "supplierId": "pty_3",
+      "projectId": "prj_50",
+      "chapterNum": "5",
+      "date": "2026-03-25",
+      "desc": "Gres porcelánico + material obra",
+      "qtyMilli": 1000,
+      "unitCents": 310000,
+      "vatBp": 2100,
+      "totalCents": 310000,
+      "orderRef": "OR-ROCA-1",
+      "status": {
+        "ordered": true,
+        "delivered": false,
+        "returnedCents": 0,
+        "invoicedBillId": "bil_56",
+        "paid": false
+      },
+      "docRefs": [],
+      "allocations": null,
+      "urgent": false
+    }
+  ],
+  "captured": [
+    {
+      "id": "cap_55",
+      "capturedAt": "2026-04-06",
+      "capturedBy": "operations",
+      "device": "mobile",
+      "docType": "supplierInvoice",
+      "imageRef": "factura-mv-2044.jpg",
+      "machineReadable": true,
+      "extracted": {
+        "issuerName": "Materiales Valles",
+        "totalCents": 375100
+      },
+      "confirmed": {
+        "issuerName": "Materiales Vallès S.A.",
+        "issuerTaxId": "A58818501",
+        "docNumber": "MV-2044",
+        "date": "2026-04-06",
+        "totalCents": 375100
+      },
+      "status": "validated",
+      "allocations": [],
+      "billId": "bil_56",
+      "keyFields": {},
+      "extractionConfidence": 0.86,
+      "duplicateSuspect": null,
+      "stdName": "Materiales-Vallès-S.A._supplierInvoice_MV-2044_2026-04-06"
+    },
+    {
+      "id": "cap_108",
+      "capturedAt": "2026-05-02",
+      "capturedBy": "operations",
+      "device": "mobile",
+      "docType": "ticket",
+      "imageRef": "ticket-gasolinera.jpg",
+      "machineReadable": false,
+      "extracted": null,
+      "confirmed": null,
+      "status": "captured",
+      "allocations": [],
+      "billId": null,
+      "keyFields": {
+        "concepto": "Combustible furgoneta"
+      }
+    }
+  ],
+  "changes": [
+    {
+      "id": "chg_62",
+      "projectId": "prj_50",
+      "date": "2026-04-15",
+      "desc": "Suelo radiante eléctrico en baño",
+      "reason": "Petición de la clienta",
+      "priceCents": 186000,
+      "costCents": 112000,
+      "scheduleImpactDays": 0,
+      "photoRef": "extra-suelo-radiante.jpg",
+      "status": "approved",
+      "approvedAt": "2026-04-15",
+      "evidenceRef": "whatsapp-aprobacion.png",
+      "invoiceId": null,
+      "annexNumber": "CTR-2026-0001-A1"
+    }
+  ],
+  "invoices": [
+    {
+      "id": "inv_51",
+      "number": "FAC-2026-0001",
+      "kind": "deposit",
+      "date": "2026-03-16",
+      "partyId": "pty_7",
+      "projectId": "prj_50",
+      "budgetNumber": "PRE-2026-0001",
+      "worksAddress": "Av. Barcelona 10, 3º 2ª",
+      "lines": [
+        {
+          "desc": "Anticipo 40% según contrato",
+          "amountCents": 179796
+        }
+      ],
+      "baseCents": 179796,
+      "vatBp": 1000,
+      "vatCents": 17980,
+      "irpfBp": 0,
+      "irpfCents": 0,
+      "totalCents": 197776,
+      "dueDate": "2026-03-31",
+      "paymentMethod": "transfer",
+      "iban": "ES9121000418450200051332",
+      "rectifies": null,
+      "rectifyReason": null,
+      "installmentIdx": 0,
+      "changeId": null,
+      "immutable": true,
+      "docRef": "factura_FAC-2026-0001_Marta-Roca-Puig_2026-03-16"
+    },
+    {
+      "id": "inv_63",
+      "number": "FAC-2026-0002",
+      "kind": "progress",
+      "date": "2026-04-28",
+      "partyId": "pty_7",
+      "projectId": "prj_50",
+      "budgetNumber": "PRE-2026-0001",
+      "worksAddress": "Av. Barcelona 10, 3º 2ª",
+      "lines": [
+        {
+          "desc": "Certificación 50% de obra",
+          "amountCents": 179796
+        }
+      ],
+      "baseCents": 179796,
+      "vatBp": 1000,
+      "vatCents": 17980,
+      "irpfBp": 0,
+      "irpfCents": 0,
+      "totalCents": 197776,
+      "dueDate": "2026-05-13",
+      "paymentMethod": "transfer",
+      "iban": "ES9121000418450200051332",
+      "rectifies": null,
+      "rectifyReason": null,
+      "installmentIdx": 1,
+      "changeId": null,
+      "immutable": true,
+      "docRef": "factura_FAC-2026-0002_Marta-Roca-Puig_2026-04-28"
+    },
+    {
+      "id": "inv_77",
+      "number": "FAC-2026-0003",
+      "kind": "deposit",
+      "date": "2026-04-25",
+      "partyId": "pty_8",
+      "projectId": "prj_76",
+      "budgetNumber": "PRE-2026-0002",
+      "worksAddress": "C/ Balmes 120",
+      "lines": [
+        {
+          "desc": "Anticipo 30% según contrato",
+          "amountCents": 1431300
+        }
+      ],
+      "baseCents": 1431300,
+      "vatBp": 1000,
+      "vatCents": 143130,
+      "irpfBp": 0,
+      "irpfCents": 0,
+      "totalCents": 1574430,
+      "dueDate": "2026-05-25",
+      "paymentMethod": "transfer30",
+      "iban": "ES9121000418450200051332",
+      "rectifies": null,
+      "rectifyReason": null,
+      "installmentIdx": 0,
+      "changeId": null,
+      "immutable": true,
+      "docRef": "factura_FAC-2026-0003_Comunidad-Prop.-Balmes-120_2026-04-25"
+    },
+    {
+      "id": "inv_97",
+      "number": "FAC-2026-0004",
+      "kind": "deposit",
+      "date": "2026-03-12",
+      "partyId": "pty_10",
+      "projectId": "prj_96",
+      "budgetNumber": "PRE-2026-0004",
+      "worksAddress": "C/ Laurel 8, PB",
+      "lines": [
+        {
+          "desc": "Anticipo 50%",
+          "amountCents": 216000
+        }
+      ],
+      "baseCents": 216000,
+      "vatBp": 1000,
+      "vatCents": 21600,
+      "irpfBp": 0,
+      "irpfCents": 0,
+      "totalCents": 237600,
+      "dueDate": "2026-03-27",
+      "paymentMethod": "transfer",
+      "iban": "ES9121000418450200051332",
+      "rectifies": null,
+      "rectifyReason": null,
+      "installmentIdx": 0,
+      "changeId": null,
+      "immutable": true,
+      "docRef": "factura_FAC-2026-0004_Pau-Ferrer-Vila_2026-03-12"
+    },
+    {
+      "id": "inv_102",
+      "number": "FAC-2026-0005",
+      "kind": "final",
+      "date": "2026-03-27",
+      "partyId": "pty_10",
+      "projectId": "prj_96",
+      "budgetNumber": "PRE-2026-0004",
+      "worksAddress": "C/ Laurel 8, PB",
+      "lines": [
+        {
+          "desc": "Liquidación final tratamiento",
+          "amountCents": 216000
+        }
+      ],
+      "baseCents": 216000,
+      "vatBp": 1000,
+      "vatCents": 21600,
+      "irpfBp": 0,
+      "irpfCents": 0,
+      "totalCents": 237600,
+      "dueDate": "2026-04-11",
+      "paymentMethod": "transfer",
+      "iban": "ES9121000418450200051332",
+      "rectifies": null,
+      "rectifyReason": null,
+      "installmentIdx": 1,
+      "changeId": null,
+      "immutable": true,
+      "docRef": "factura_FAC-2026-0005_Pau-Ferrer-Vila_2026-03-27"
+    },
+    {
+      "id": "inv_106",
+      "number": "FAC-2026-0006",
+      "kind": "final",
+      "date": "2026-04-03",
+      "partyId": "pty_7",
+      "projectId": "prj_104",
+      "budgetNumber": null,
+      "worksAddress": "",
+      "lines": [
+        {
+          "desc": "Reparación realizada",
+          "amountCents": 32000
+        }
+      ],
+      "baseCents": 32000,
+      "vatBp": 2100,
+      "vatCents": 6720,
+      "irpfBp": 0,
+      "irpfCents": 0,
+      "totalCents": 38720,
+      "dueDate": "2026-04-18",
+      "paymentMethod": "transfer",
+      "iban": "ES9121000418450200051332",
+      "rectifies": null,
+      "rectifyReason": null,
+      "installmentIdx": null,
+      "changeId": null,
+      "immutable": true,
+      "docRef": "factura_FAC-2026-0006_Marta-Roca-Puig_2026-04-03"
+    }
+  ],
+  "receipts": [],
+  "collections": [
+    {
+      "id": "col_52",
+      "date": "2026-03-16",
+      "partyId": "pty_7",
+      "amountCents": 197776,
+      "method": "transfer",
+      "allocations": [
+        {
+          "invoiceId": "inv_51",
+          "amountCents": 197776
+        }
+      ],
+      "onAccountCents": 0,
+      "movementId": null
+    },
+    {
+      "id": "col_64",
+      "date": "2026-04-28",
+      "partyId": "pty_7",
+      "amountCents": 98888,
+      "method": "transfer",
+      "allocations": [
+        {
+          "invoiceId": "inv_63",
+          "amountCents": 98888
+        }
+      ],
+      "onAccountCents": 0,
+      "movementId": null
+    },
+    {
+      "id": "col_98",
+      "date": "2026-03-12",
+      "partyId": "pty_10",
+      "amountCents": 237600,
+      "method": "transfer",
+      "allocations": [
+        {
+          "invoiceId": "inv_97",
+          "amountCents": 237600
+        }
+      ],
+      "onAccountCents": 0,
+      "movementId": null
+    },
+    {
+      "id": "col_103",
+      "date": "2026-03-27",
+      "partyId": "pty_10",
+      "amountCents": 237600,
+      "method": "transfer",
+      "allocations": [
+        {
+          "invoiceId": "inv_102",
+          "amountCents": 237600
+        }
+      ],
+      "onAccountCents": 0,
+      "movementId": null
+    }
+  ],
+  "bills": [
+    {
+      "id": "bil_56",
+      "supplierId": "pty_3",
+      "number": "MV-2044",
+      "date": "2026-04-06",
+      "dueDate": "2026-05-06",
+      "baseCents": 310000,
+      "vatBp": 2100,
+      "vatCents": 65100,
+      "irpfBp": 0,
+      "irpfCents": 0,
+      "totalCents": 375100,
+      "allocations": [
+        {
+          "projectId": "prj_50",
+          "chapterNum": "5",
+          "kind": "material",
+          "amountCents": 310000
+        }
+      ],
+      "docRef": null,
+      "capId": "cap_55",
+      "status": "paid",
+      "disputed": false,
+      "duplicateSuspect": null,
+      "creditNoteFor": null
+    },
+    {
+      "id": "bil_99",
+      "supplierId": "pty_3",
+      "number": "MV-1990",
+      "date": "2026-03-16",
+      "dueDate": "2026-04-15",
+      "baseCents": 92000,
+      "vatBp": 2100,
+      "vatCents": 19320,
+      "irpfBp": 0,
+      "irpfCents": 0,
+      "totalCents": 111320,
+      "allocations": [
+        {
+          "projectId": "prj_96",
+          "chapterNum": "1",
+          "kind": "material",
+          "amountCents": 92000
+        }
+      ],
+      "docRef": null,
+      "capId": null,
+      "status": "paid",
+      "disputed": false,
+      "duplicateSuspect": null,
+      "creditNoteFor": null
+    },
+    {
+      "id": "bil_109",
+      "supplierId": "pty_4",
+      "number": "EB-3301",
+      "date": "2026-05-02",
+      "dueDate": "2026-06-01",
+      "baseCents": 148000,
+      "vatBp": 2100,
+      "vatCents": 31080,
+      "irpfBp": 0,
+      "irpfCents": 0,
+      "totalCents": 179080,
+      "allocations": [],
+      "docRef": null,
+      "capId": null,
+      "status": "registered",
+      "disputed": false,
+      "duplicateSuspect": null,
+      "creditNoteFor": null
+    },
+    {
+      "id": "bil_114",
+      "supplierId": "pty_6",
+      "number": "NC-88",
+      "date": "2026-05-02",
+      "dueDate": "2026-05-17",
+      "baseCents": 84000,
+      "vatBp": 2100,
+      "vatCents": 17640,
+      "irpfBp": 1500,
+      "irpfCents": 12600,
+      "totalCents": 89040,
+      "allocations": [
+        {
+          "projectId": "prj_76",
+          "chapterNum": "1",
+          "kind": "other",
+          "amountCents": 84000
+        }
+      ],
+      "docRef": null,
+      "capId": null,
+      "status": "registered",
+      "disputed": false,
+      "duplicateSuspect": null,
+      "creditNoteFor": null
+    }
+  ],
+  "payments": [
+    {
+      "id": "pay_57",
+      "date": "2026-04-06",
+      "method": "transfer",
+      "amountCents": 375100,
+      "billAllocations": [
+        {
+          "billId": "bil_56",
+          "amountCents": 375100
+        }
+      ],
+      "proofRef": null,
+      "movementId": null
+    },
+    {
+      "id": "pay_100",
+      "date": "2026-03-16",
+      "method": "transfer",
+      "amountCents": 111320,
+      "billAllocations": [
+        {
+          "billId": "bil_99",
+          "amountCents": 111320
+        }
+      ],
+      "proofRef": null,
+      "movementId": null
+    }
+  ],
+  "bankAccounts": [
+    {
+      "id": "bank_1",
+      "name": "Cuenta principal",
+      "kind": "bank",
+      "iban": "ES9121000418450200051332",
+      "openingCents": 6400000
+    },
+    {
+      "id": "bank_2",
+      "name": "Caja efectivo",
+      "kind": "till",
+      "iban": "",
+      "openingCents": 42000
+    }
+  ],
+  "movements": [
+    {
+      "id": "mov_53",
+      "accountId": "bank_1",
+      "accountingDate": "2026-03-17",
+      "valueDate": "2026-03-17",
+      "opCode": "",
+      "concept": "TRANSFERENCIA RECIBIDA",
+      "counterparty": "MARTA ROCA",
+      "merchantText": "",
+      "observations": "",
+      "reference": "",
+      "amountCents": 197776,
+      "balanceCents": null,
+      "currency": "EUR",
+      "card": null,
+      "class": "customerReceipt",
+      "allocations": [],
+      "matched": null,
+      "status": "allocated",
+      "needsDoc": false
+    },
+    {
+      "id": "mov_58",
+      "accountId": "bank_1",
+      "accountingDate": "2026-04-07",
+      "valueDate": "2026-04-07",
+      "opCode": "",
+      "concept": "PAGO PROVEEDOR",
+      "counterparty": "MATERIALES VALLES",
+      "merchantText": "",
+      "observations": "",
+      "reference": "",
+      "amountCents": -375100,
+      "balanceCents": null,
+      "currency": "EUR",
+      "card": null,
+      "class": "projectCost",
+      "allocations": [],
+      "matched": null,
+      "status": "allocated",
+      "needsDoc": false
+    },
+    {
+      "id": "mov_59",
+      "accountId": "bank_1",
+      "accountingDate": "2026-04-09",
+      "valueDate": "2026-04-09",
+      "opCode": "",
+      "concept": "COMPRA TARJETA",
+      "counterparty": "",
+      "merchantText": "BRICODEPOT ST FELIU",
+      "observations": "",
+      "reference": "",
+      "amountCents": -18650,
+      "balanceCents": null,
+      "currency": "EUR",
+      "card": "V-1234",
+      "class": "projectCost",
+      "allocations": [
+        {
+          "projectId": "prj_50",
+          "kind": "material",
+          "amountCents": 18650
+        }
+      ],
+      "matched": null,
+      "status": "allocated",
+      "needsDoc": false
+    },
+    {
+      "id": "mov_110",
+      "accountId": "bank_1",
+      "accountingDate": "2026-04-30",
+      "valueDate": "2026-04-30",
+      "opCode": "",
+      "concept": "COMPRA TARJETA",
+      "counterparty": "",
+      "merchantText": "LEROY MERLIN CORNELLA",
+      "observations": "",
+      "reference": "",
+      "amountCents": -23470,
+      "balanceCents": null,
+      "currency": "EUR",
+      "card": "V-1234",
+      "class": null,
+      "allocations": [],
+      "matched": null,
+      "status": "unallocated",
+      "needsDoc": false
+    },
+    {
+      "id": "mov_111",
+      "accountId": "bank_1",
+      "accountingDate": "2026-04-28",
+      "valueDate": "2026-04-28",
+      "opCode": "",
+      "concept": "NOMINAS",
+      "counterparty": "",
+      "merchantText": "",
+      "observations": "",
+      "reference": "",
+      "amountCents": -860000,
+      "balanceCents": null,
+      "currency": "EUR",
+      "card": null,
+      "class": "salary",
+      "allocations": [],
+      "matched": null,
+      "status": "allocated",
+      "needsDoc": false
+    },
+    {
+      "id": "mov_112",
+      "accountId": "bank_1",
+      "accountingDate": "2026-04-30",
+      "valueDate": "2026-04-30",
+      "opCode": "",
+      "concept": "TRASPASO A CAJA",
+      "counterparty": "",
+      "merchantText": "",
+      "observations": "",
+      "reference": "",
+      "amountCents": -20000,
+      "balanceCents": null,
+      "currency": "EUR",
+      "card": null,
+      "class": "internalTransfer",
+      "allocations": [],
+      "matched": null,
+      "status": "allocated",
+      "needsDoc": false,
+      "excludedFromPL": true
+    },
+    {
+      "id": "mov_113",
+      "accountId": "bank_2",
+      "accountingDate": "2026-05-02",
+      "valueDate": "2026-05-02",
+      "opCode": "CASH",
+      "concept": "Compra pequeño material",
+      "counterparty": "",
+      "merchantText": "",
+      "observations": "",
+      "reference": "",
+      "amountCents": -4200,
+      "balanceCents": null,
+      "currency": "EUR",
+      "card": null,
+      "class": null,
+      "allocations": [],
+      "matched": null,
+      "status": "unallocated",
+      "needsDoc": true
+    }
+  ],
+  "merchantRules": [
+    {
+      "match": "BRICODEPOT",
+      "supplierId": "pty_3",
+      "category": "material"
+    }
+  ],
+  "labour": [
+    {
+      "id": "lab_60",
+      "workerId": "wkr_30",
+      "projectId": "prj_50",
+      "chapterNum": "1",
+      "date": "2026-04-06",
+      "hoursMilli": 42000,
+      "kind": "normal",
+      "extraPayCents": 0,
+      "rateCents": 1900,
+      "costCents": 79800
+    },
+    {
+      "id": "lab_61",
+      "workerId": "wkr_31",
+      "projectId": "prj_50",
+      "chapterNum": "1",
+      "date": "2026-04-06",
+      "hoursMilli": 38000,
+      "kind": "normal",
+      "extraPayCents": 0,
+      "rateCents": 1400,
+      "costCents": 53200
+    },
+    {
+      "id": "lab_101",
+      "workerId": "wkr_30",
+      "projectId": "prj_96",
+      "chapterNum": "1",
+      "date": "2026-03-16",
+      "hoursMilli": 26000,
+      "kind": "normal",
+      "extraPayCents": 0,
+      "rateCents": 1900,
+      "costCents": 49400
+    },
+    {
+      "id": "lab_105",
+      "workerId": "wkr_31",
+      "projectId": "prj_104",
+      "chapterNum": "1",
+      "date": "2026-04-03",
+      "hoursMilli": 4000,
+      "kind": "normal",
+      "extraPayCents": 0,
+      "rateCents": 1400,
+      "costCents": 5600
+    }
+  ],
+  "workers": [
+    {
+      "id": "wkr_30",
+      "name": "Oficial 1ª — Álvaro",
+      "kind": "employee",
+      "rateHistory": [
+        {
+          "from": "2026-01-01",
+          "rateCentsPerHour": 1900
+        }
+      ]
+    },
+    {
+      "id": "wkr_31",
+      "name": "Peó — Ibra",
+      "kind": "employee",
+      "rateHistory": [
+        {
+          "from": "2026-01-01",
+          "rateCentsPerHour": 1400
+        }
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "tsk_115",
+      "owner": "operations",
+      "due": "2026-05-04",
+      "status": "open",
+      "relatedRef": "oportunidad",
+      "title": "Visita goteras Sra. García"
+    },
+    {
+      "id": "tsk_116",
+      "owner": "backoffice",
+      "due": "2026-05-03",
+      "status": "open",
+      "relatedRef": "factura",
+      "title": "Reclamar factura reparación Roca"
+    }
+  ],
+  "packagesSent": [],
+  "audit": [
+    {
+      "ts": "2026-03-02",
+      "user": "backoffice",
+      "action": "configureEntity",
+      "ref": "Canei Subirats, S.L."
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addBankAccount",
+      "ref": "Cuenta principal"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addBankAccount",
+      "ref": "Caja efectivo"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addParty",
+      "ref": "T-0001"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addParty",
+      "ref": "T-0002"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addParty",
+      "ref": "T-0003"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addParty",
+      "ref": "T-0004"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addParty",
+      "ref": "T-0005"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addParty",
+      "ref": "T-0006"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addParty",
+      "ref": "T-0007"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addParty",
+      "ref": "T-0008"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addParty",
+      "ref": "T-0009"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addProperty",
+      "ref": "prop_12"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addProperty",
+      "ref": "prop_13"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addProperty",
+      "ref": "prop_14"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addProperty",
+      "ref": "prop_15"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addCatalogueItem",
+      "ref": "DEM-001"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addCatalogueItem",
+      "ref": "ALB-010"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addCatalogueItem",
+      "ref": "FON-014"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addCatalogueItem",
+      "ref": "ELE-020"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addCatalogueItem",
+      "ref": "ALI-101"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addCatalogueItem",
+      "ref": "PIN-001"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addCatalogueItem",
+      "ref": "HUM-201"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addCatalogueItem",
+      "ref": "CAR-030"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addPrice",
+      "ref": "prc_24"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addPrice",
+      "ref": "prc_25"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addPrice",
+      "ref": "prc_26"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addPrice",
+      "ref": "prc_27"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addWorkPackage",
+      "ref": "PK-HUM"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addWorkPackage",
+      "ref": "PK-BANY"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addWorker",
+      "ref": "Oficial 1ª — Álvaro"
+    },
+    {
+      "ts": "2026-03-02",
+      "user": "system",
+      "action": "addWorker",
+      "ref": "Peó — Ibra"
+    },
+    {
+      "ts": "2026-03-04",
+      "user": "system",
+      "action": "addOpportunity",
+      "ref": "opp_32"
+    },
+    {
+      "ts": "2026-03-04",
+      "user": "system",
+      "action": "addVisit",
+      "ref": "vis_33"
+    },
+    {
+      "ts": "2026-03-04",
+      "user": "system",
+      "action": "newVersion",
+      "ref": "PRE-2026-0001 v1.0"
+    },
+    {
+      "ts": "2026-03-04",
+      "user": "system",
+      "action": "createBudget",
+      "ref": "PRE-2026-0001"
+    },
+    {
+      "ts": "2026-03-04",
+      "user": "system",
+      "action": "issueVersion",
+      "ref": "PRE-2026-0001 v1.0"
+    },
+    {
+      "ts": "2026-03-12",
+      "user": "backoffice",
+      "action": "newVersion",
+      "ref": "PRE-2026-0001 v1.1"
+    },
+    {
+      "ts": "2026-03-12",
+      "user": "system",
+      "action": "issueVersion",
+      "ref": "PRE-2026-0001 v1.1"
+    },
+    {
+      "ts": "2026-03-12",
+      "user": "system",
+      "action": "acceptVersion",
+      "ref": "PRE-2026-0001 v1.1"
+    },
+    {
+      "ts": "2026-03-12",
+      "user": "system",
+      "action": "createContract",
+      "ref": "CTR-2026-0001"
+    },
+    {
+      "ts": "2026-03-16",
+      "user": "system",
+      "action": "signContract",
+      "ref": "CTR-2026-0001"
+    },
+    {
+      "ts": "2026-03-16",
+      "user": "system",
+      "action": "createProject",
+      "ref": "P-2026-0001"
+    },
+    {
+      "ts": "2026-03-16",
+      "user": "system",
+      "action": "issueInvoice",
+      "ref": "FAC-2026-0001 197776"
+    },
+    {
+      "ts": "2026-03-16",
+      "user": "system",
+      "action": "recordCollection",
+      "ref": "197776c"
+    },
+    {
+      "ts": "2026-03-16",
+      "user": "system",
+      "action": "importMovements",
+      "ref": "1 movs"
+    },
+    {
+      "ts": "2026-03-16",
+      "user": "system",
+      "action": "classifyMovement",
+      "ref": "mov_53 → customerReceipt"
+    },
+    {
+      "ts": "2026-03-25",
+      "user": "system",
+      "action": "startWorks",
+      "ref": "P-2026-0001"
+    },
+    {
+      "ts": "2026-03-25",
+      "user": "system",
+      "action": "addPurchase",
+      "ref": "OC-2026-0001"
+    },
+    {
+      "ts": "2026-04-06",
+      "user": "system",
+      "action": "captureDocument",
+      "ref": "cap_55"
+    },
+    {
+      "ts": "2026-04-06",
+      "user": "system",
+      "action": "confirmCapture",
+      "ref": "cap_55"
+    },
+    {
+      "ts": "2026-04-06",
+      "user": "system",
+      "action": "registerBill",
+      "ref": "Materiales Vallès S.A. MV-2044"
+    },
+    {
+      "ts": "2026-04-06",
+      "user": "system",
+      "action": "payBills",
+      "ref": "375100c"
+    },
+    {
+      "ts": "2026-04-06",
+      "user": "system",
+      "action": "importMovements",
+      "ref": "1 movs"
+    },
+    {
+      "ts": "2026-04-06",
+      "user": "system",
+      "action": "classifyMovement",
+      "ref": "mov_58 → projectCost"
+    },
+    {
+      "ts": "2026-04-06",
+      "user": "system",
+      "action": "importMovements",
+      "ref": "1 movs"
+    },
+    {
+      "ts": "2026-04-06",
+      "user": "system",
+      "action": "allocateMovement",
+      "ref": "BRICODEPOT ST FELIU → P-2026-0001"
+    },
+    {
+      "ts": "2026-04-06",
+      "user": "system",
+      "action": "learnMerchantRule",
+      "ref": "BRICODEPOT"
+    },
+    {
+      "ts": "2026-04-06",
+      "user": "system",
+      "action": "markProgress",
+      "ref": "P-2026-0001 cap.1 → done"
+    },
+    {
+      "ts": "2026-04-06",
+      "user": "system",
+      "action": "markProgress",
+      "ref": "P-2026-0001 cap.2 → done"
+    },
+    {
+      "ts": "2026-04-06",
+      "user": "system",
+      "action": "markProgress",
+      "ref": "P-2026-0001 cap.3 → inProgress"
+    },
+    {
+      "ts": "2026-04-15",
+      "user": "system",
+      "action": "addChange",
+      "ref": "P-2026-0001 Suelo radiante eléctrico en baño"
+    },
+    {
+      "ts": "2026-04-15",
+      "user": "system",
+      "action": "priceChange",
+      "ref": "chg_62"
+    },
+    {
+      "ts": "2026-04-15",
+      "user": "system",
+      "action": "approveChange",
+      "ref": "chg_62"
+    },
+    {
+      "ts": "2026-04-28",
+      "user": "system",
+      "action": "issueInvoice",
+      "ref": "FAC-2026-0002 197776"
+    },
+    {
+      "ts": "2026-04-28",
+      "user": "system",
+      "action": "recordCollection",
+      "ref": "98888c"
+    },
+    {
+      "ts": "2026-04-02",
+      "user": "system",
+      "action": "addOpportunity",
+      "ref": "opp_65"
+    },
+    {
+      "ts": "2026-04-02",
+      "user": "system",
+      "action": "addVisit",
+      "ref": "vis_66"
+    },
+    {
+      "ts": "2026-04-02",
+      "user": "system",
+      "action": "newVersion",
+      "ref": "PRE-2026-0002 v1.0"
+    },
+    {
+      "ts": "2026-04-02",
+      "user": "system",
+      "action": "createBudget",
+      "ref": "PRE-2026-0002"
+    },
+    {
+      "ts": "2026-04-02",
+      "user": "system",
+      "action": "issueVersion",
+      "ref": "PRE-2026-0002 v1.0"
+    },
+    {
+      "ts": "2026-04-20",
+      "user": "system",
+      "action": "acceptVersion",
+      "ref": "PRE-2026-0002 v1.0"
+    },
+    {
+      "ts": "2026-04-20",
+      "user": "system",
+      "action": "createContract",
+      "ref": "CTR-2026-0002"
+    },
+    {
+      "ts": "2026-04-25",
+      "user": "system",
+      "action": "signContract",
+      "ref": "CTR-2026-0002"
+    },
+    {
+      "ts": "2026-04-25",
+      "user": "system",
+      "action": "createProject",
+      "ref": "P-2026-0002"
+    },
+    {
+      "ts": "2026-04-25",
+      "user": "system",
+      "action": "issueInvoice",
+      "ref": "FAC-2026-0003 1574430"
+    },
+    {
+      "ts": "2026-04-10",
+      "user": "system",
+      "action": "addOpportunity",
+      "ref": "opp_78"
+    },
+    {
+      "ts": "2026-04-10",
+      "user": "system",
+      "action": "addVisit",
+      "ref": "vis_79"
+    },
+    {
+      "ts": "2026-04-10",
+      "user": "system",
+      "action": "newVersion",
+      "ref": "PRE-2026-0003 v1.0"
+    },
+    {
+      "ts": "2026-04-10",
+      "user": "system",
+      "action": "createBudget",
+      "ref": "PRE-2026-0003"
+    },
+    {
+      "ts": "2026-04-10",
+      "user": "system",
+      "action": "issueVersion",
+      "ref": "PRE-2026-0003 v1.0"
+    },
+    {
+      "ts": "2026-03-06",
+      "user": "system",
+      "action": "addOpportunity",
+      "ref": "opp_89"
+    },
+    {
+      "ts": "2026-03-06",
+      "user": "system",
+      "action": "addVisit",
+      "ref": "vis_90"
+    },
+    {
+      "ts": "2026-03-06",
+      "user": "system",
+      "action": "newVersion",
+      "ref": "PRE-2026-0004 v1.0"
+    },
+    {
+      "ts": "2026-03-06",
+      "user": "system",
+      "action": "createBudget",
+      "ref": "PRE-2026-0004"
+    },
+    {
+      "ts": "2026-03-06",
+      "user": "system",
+      "action": "issueVersion",
+      "ref": "PRE-2026-0004 v1.0"
+    },
+    {
+      "ts": "2026-03-10",
+      "user": "system",
+      "action": "acceptVersion",
+      "ref": "PRE-2026-0004 v1.0"
+    },
+    {
+      "ts": "2026-03-10",
+      "user": "system",
+      "action": "createContract",
+      "ref": "CTR-2026-0003"
+    },
+    {
+      "ts": "2026-03-12",
+      "user": "system",
+      "action": "signContract",
+      "ref": "CTR-2026-0003"
+    },
+    {
+      "ts": "2026-03-12",
+      "user": "system",
+      "action": "createProject",
+      "ref": "P-2026-0004"
+    },
+    {
+      "ts": "2026-03-12",
+      "user": "system",
+      "action": "issueInvoice",
+      "ref": "FAC-2026-0004 237600"
+    },
+    {
+      "ts": "2026-03-12",
+      "user": "system",
+      "action": "recordCollection",
+      "ref": "237600c"
+    },
+    {
+      "ts": "2026-03-16",
+      "user": "system",
+      "action": "startWorks",
+      "ref": "P-2026-0004"
+    },
+    {
+      "ts": "2026-03-16",
+      "user": "system",
+      "action": "registerBill",
+      "ref": "Materiales Vallès S.A. MV-1990"
+    },
+    {
+      "ts": "2026-03-16",
+      "user": "system",
+      "action": "payBills",
+      "ref": "111320c"
+    },
+    {
+      "ts": "2026-03-27",
+      "user": "system",
+      "action": "markProgress",
+      "ref": "P-2026-0004 cap.1 → done"
+    },
+    {
+      "ts": "2026-03-27",
+      "user": "system",
+      "action": "issueInvoice",
+      "ref": "FAC-2026-0005 237600"
+    },
+    {
+      "ts": "2026-03-27",
+      "user": "system",
+      "action": "recordCollection",
+      "ref": "237600c"
+    },
+    {
+      "ts": "2026-03-27",
+      "user": "system",
+      "action": "closeProject",
+      "ref": "P-2026-0004"
+    },
+    {
+      "ts": "2026-04-03",
+      "user": "system",
+      "action": "createQuickProject",
+      "ref": "P-R004"
+    },
+    {
+      "ts": "2026-04-03",
+      "user": "system",
+      "action": "issueInvoice",
+      "ref": "FAC-2026-0006 38720"
+    },
+    {
+      "ts": "2026-05-02",
+      "user": "system",
+      "action": "addOpportunity",
+      "ref": "opp_107"
+    },
+    {
+      "ts": "2026-05-02",
+      "user": "system",
+      "action": "captureDocument",
+      "ref": "cap_108"
+    },
+    {
+      "ts": "2026-05-02",
+      "user": "system",
+      "action": "registerBill",
+      "ref": "ElectroBaix S.L. EB-3301"
+    },
+    {
+      "ts": "2026-05-02",
+      "user": "system",
+      "action": "importMovements",
+      "ref": "3 movs"
+    },
+    {
+      "ts": "2026-05-02",
+      "user": "system",
+      "action": "classifyMovement",
+      "ref": "mov_111 → salary"
+    },
+    {
+      "ts": "2026-05-02",
+      "user": "system",
+      "action": "classifyMovement",
+      "ref": "mov_112 → internalTransfer"
+    },
+    {
+      "ts": "2026-05-02",
+      "user": "system",
+      "action": "importMovements",
+      "ref": "1 movs"
+    },
+    {
+      "ts": "2026-05-02",
+      "user": "system",
+      "action": "registerBill",
+      "ref": "N. Camps, arquitecta técnica NC-88"
+    }
+  ],
+  "invoiceEvents": [
+    {
+      "number": "FAC-2026-0001",
+      "date": "2026-03-16",
+      "totalCents": 197776,
+      "prev": "GENESIS",
+      "hash": "5145edd5"
+    },
+    {
+      "number": "FAC-2026-0002",
+      "date": "2026-04-28",
+      "totalCents": 197776,
+      "prev": "5145edd5",
+      "hash": "081add5d"
+    },
+    {
+      "number": "FAC-2026-0003",
+      "date": "2026-04-25",
+      "totalCents": 1574430,
+      "prev": "081add5d",
+      "hash": "3876e848"
+    },
+    {
+      "number": "FAC-2026-0004",
+      "date": "2026-03-12",
+      "totalCents": 237600,
+      "prev": "3876e848",
+      "hash": "2627b9d4"
+    },
+    {
+      "number": "FAC-2026-0005",
+      "date": "2026-03-27",
+      "totalCents": 237600,
+      "prev": "2627b9d4",
+      "hash": "9d447f9e"
+    },
+    {
+      "number": "FAC-2026-0006",
+      "date": "2026-04-03",
+      "totalCents": 38720,
+      "prev": "9d447f9e",
+      "hash": "f5c526c8"
+    }
+  ],
+  "seq": {
+    "id": 117
+  }
+}

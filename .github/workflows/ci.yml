@@ -45,6 +45,34 @@ jobs:
           DATABASE_URL: postgresql://user:pass@localhost:5432/db
           NEXT_PUBLIC_APP_URL: http://localhost:3000
 
+  simulations:
+    name: Business simulations (erp-engine invariants + ownership guard)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Runs on every push/PR (not gated on site/** paths) so a change in
+      # packages/ that later reaches erp-engine.js/erp-bridge.js through the
+      # migration seam is checked too, not only edits under site/.
+      - name: Business simulations (1 year × 3/mo, 2 years × 2/mo)
+        run: |
+          node tests/simulation/year-sim.mjs 1
+          SIM_MONTHS=24 SIM_PPM=2 node tests/simulation/year-sim.mjs 1
+          node tests/simulation/manageability-sim.mjs
+
+      - name: Ownership file guard (strangler-fig migration state)
+        run: node tests/parity/ownership-guard.mjs
+
   persistence:
     name: Durable adapters (Postgres + RLS contract tests)
     runs-on: ubuntu-latest

@@ -4,10 +4,16 @@ name: Site E2E (autonomous journey)
 # in a real browser: loads the sample, walks all 13 lifecycle stages, checks the
 # P&L ledger, exports the project ZIP, and asserts no console errors or mobile
 # overflow. Runs on every push/PR that touches the site or the test.
+#
+# claude/** is included because that is the development branch: every push to
+# it republishes /preview via preview-refresh.yml + pages.yml, and /preview is
+# exactly what the iOS TestFlight and Android beta builds load (see
+# ios/CaneiSubirats/Support/Config.swift baseURL). Before this branch was added
+# here, code could reach beta users with zero browser-level test coverage.
 
 on:
   push:
-    branches: [main]
+    branches: [main, "claude/**"]
     paths:
       - "site/**"
       - "tests/site-e2e/**"
@@ -39,11 +45,9 @@ jobs:
         # playwright is declared in apps/web, so the bin lives there, not at the root
         run: pnpm --filter web exec playwright install --with-deps chromium
 
-      - name: Business simulations (1 year × 3/mo, 2 years × 2/mo)
-        run: |
-          node tests/simulation/year-sim.mjs 1
-          SIM_MONTHS=24 SIM_PPM=2 node tests/simulation/year-sim.mjs 1
-          node tests/simulation/manageability-sim.mjs
+      # The business simulations (erp-engine.js invariants) now run in ci.yml's
+      # "simulations" job on every push/PR — unconditionally, not just when
+      # site/** changes — so they are not duplicated here.
 
       - name: Run autonomous site E2E
         run: node tests/site-e2e/run.mjs

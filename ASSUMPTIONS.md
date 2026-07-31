@@ -430,3 +430,23 @@ languages: es-ES # source: synthetic
   results were banked (scratchpad *-partial.json), high-value fixes continued in the main loop,
   and both workflows are scheduled to resume automatically after the reset — matching the
   operator's standing instruction to pause on empty cloud quota and restart when it returns.
+- **#45 — CANEI functional-spec programme, session 1: close the CI gap before any feature work
+  (2026-07-31).** The owner's `20260731_REQUERMIENTOS BÁSICO CANEI.docx` was turned into a
+  12-session implementation plan (hybrid architecture: new domain logic as `packages/`
+  capabilities, bundled by esbuild into `site/erp-factory.js`, reached through a new
+  `site/erp-bridge.js` seam; `erp-engine.js` retired area by area; see `docs/worklog/WORKLOG.md`).
+  Session 1 found that `site-e2e.yml` triggered on `push: branches: [main]` only, while
+  `preview-refresh.yml` republishes `/preview` — the exact URL the iOS/Android beta builds load —
+  on every push to the dev branch. A direct dev-branch push could therefore reach beta users with
+  zero browser-level or business-invariant test coverage. Fixed: `site-e2e.yml` now also triggers
+  on `claude/**`; the two business simulations moved into a new `ci.yml` job (`simulations`,
+  unconditional on every push/PR, not gated on `site/**` paths) alongside a new
+  `tests/parity/ownership-guard.mjs` validating `site/erp-ownership.json` — the migration-state
+  record the whole programme's strangler-fig discipline depends on. Also captured a frozen,
+  real (not fabricated) `tests/fixtures/state-v1-seed.json` from the live seed, for session 3's
+  migration ladder to prove against. No product code changed. **Verification note:** this working
+  environment has no Node.js runtime; every script above was nonetheless actually executed (not
+  estimated) via a throwaway JavaScriptCore-based Node shim built for this session (not committed)
+  — baseline confirmed green at 145/145, 206/206 and 34/34 invariants before any edit. The real
+  `pnpm` gate was not run locally and should be the first check in the next session. Reversible:
+  all changes are additive (new files, new CI job, widened trigger); no legacy behaviour removed.
