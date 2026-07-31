@@ -13,7 +13,7 @@ resuming a fresh chat mid-programme — there was no prior equivalent.
 one-time plan-of-record for the earlier BRD, never updated after its first
 commit, now marked superseded-by-this at its top. `PROGRESS.md` and
 `ASSUMPTIONS.md` are the repo's own continuous logs (per `CLAUDE.md`) and
-still get a short entry every session — this worklog is the *detailed*
+still get a short entry every session — this worklog is the _detailed_
 companion to those, not a replacement.
 
 **Where the spec is.** `intake/diorka/20260731_REQUERMIENTOS BÁSICO CANEI.docx`
@@ -24,33 +24,37 @@ but is still where the `XXX-00` requirement ids cited throughout the code
 (MDM-03, CAP-04, GES-07 …) are defined.
 
 **Continuing from anywhere.** Everything needed is in this repository: open it
-on branch `claude/orin-project-status-1q50dt` and read `CLAUDE.md` → this file
-→ the newest `SESSION-NN.md` context pack. Nothing lives on any one machine.
+on the branch the session mandate designates (sessions 1-3 used
+`claude/orin-project-status-1q50dt`, the default named in `CLAUDE.md`; session
+4 used `claude/candi-programme-session-4-07amo8`) and read `CLAUDE.md` → this
+file → the newest `SESSION-NN.md` context pack. Nothing lives on any one
+machine.
 Check `node --version` first: sessions 1-3 ran on a host with no Node
 toolchain and their worklogs describe workarounds (a JavaScriptCore shim, a
 hand-edited lockfile) that are irrelevant wherever Node exists.
 
 **Verification is automatic — the operator does not run anything between
 sessions.** At the end of every session: commit, push to
-`claude/orin-project-status-1q50dt`, then use `gh run watch` (the `gh` CLI is
-authenticated in this environment) to wait for the real `CI` and `Site E2E`
-workflow runs and confirm they pass on GitHub's actual infrastructure — not a
-local approximation. Only report a session done once that real run is green;
+the session's branch, then wait for the real `CI` and `Site E2E` workflow runs
+and confirm they pass on GitHub's actual infrastructure — not a local
+approximation. Use whatever this environment gives you to watch them: `gh run
+watch` where the `gh` CLI is authenticated, the GitHub API/MCP tools where it
+is not (session 4 had no `gh`). Only report a session done once that real run is green;
 if it fails, fix and re-push before reporting. This applies in every future
 session too, including ones started from a fresh chat off this file.
 
-| # | Session | Status | Commit(s) |
-|---|---|---|---|
-| 1 | Close the CI gap, freeze the baseline | done | 7195335 |
-| 2 | Capability bundle pipeline + bridge facade | done | defb928, 3134b29, 4854542, 5b14d52 |
-| 3 | Data foundation: schema versions, blobs, store merge | done | 5bb2a43 |
-| 4 | Three-panel shell, global bar, retire pages | not started | — |
-| 5 | Scheduling capability: calendar + CPM + baselines | not started | — |
-| 6 | Gantt UI (SVG drag/resize/link) | not started | — |
-| 7 | Extraction capability + Spanish profile | not started | — |
-| 8 | OCR bridge + invoice capture (Improvement #2) | not started | — |
-| 9 | Budget builder + graphic annex (Improvement #1) | not started | — |
-| 10a | Projects: Gantt-from-budget, baselines, economics | not started | — |
-| 10b | Compras, subcontratos, modificaciones, horas | not started | — |
-| 11 | Administración: conciliación, gestoría, comunicaciones | not started | — |
-| 12 | Torre, Mi Día, Recorrido (Improvement #3), alerts | not started | — |
+| #   | Session                                                | Status      | Commit(s)                          |
+| --- | ------------------------------------------------------ | ----------- | ---------------------------------- |
+| 1   | Close the CI gap, freeze the baseline                  | done        | 7195335                            |
+| 2   | Capability bundle pipeline + bridge facade             | done        | defb928, 3134b29, 4854542, 5b14d52 |
+| 3   | Data foundation: schema versions, blobs, store merge   | done        | 5bb2a43                            |
+| 4   | Three-panel shell, global bar, retire pages            | done        | (see SESSION-04)                   |
+| 5   | Scheduling capability: calendar + CPM + baselines      | not started | —                                  |
+| 6   | Gantt UI (SVG drag/resize/link)                        | not started | —                                  |
+| 7   | Extraction capability + Spanish profile                | not started | —                                  |
+| 8   | OCR bridge + invoice capture (Improvement #2)          | not started | —                                  |
+| 9   | Budget builder + graphic annex (Improvement #1)        | not started | —                                  |
+| 10a | Projects: Gantt-from-budget, baselines, economics      | not started | —                                  |
+| 10b | Compras, subcontratos, modificaciones, horas           | not started | —                                  |
+| 11  | Administración: conciliación, gestoría, comunicaciones | not started | —                                  |
+| 12  | Torre, Mi Día, Recorrido (Improvement #3), alerts      | not started | —                                  |

@@ -67,6 +67,8 @@ async function main() {
     await testNoOverflow(browser, base);
     await testSmoke(browser, base);
     await testDataTabs(browser, base);
+    await testRetired(browser, base);
+    await testShell(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
   } finally {
@@ -205,14 +207,17 @@ async function testJourney(browser, base) {
 }
 
 // ── Mobile: no horizontal overflow (the "cut boxes" regression) on key pages.
+//    The ERP appears several times over: its sections are hash routes of one
+//    page, and the bottom bar the phone layout uses is shell chrome that every
+//    one of them carries.
 async function testNoOverflow(browser, base) {
   const pages = [
-    "index.html",
     "journey.html",
-    "dashboard.html",
     "master-data.html",
     "financial-data.html",
-    "erp.html",
+    "erp.html#torre",
+    "erp.html#clientes",
+    "erp.html#facturacion",
   ];
   const page = await browser.newPage({
     viewport: { width: 390, height: 844 },
@@ -235,9 +240,7 @@ async function testNoOverflow(browser, base) {
 // ── Smoke: each app-surfaced page loads with a title and no errors.
 async function testSmoke(browser, base) {
   const pages = [
-    "index.html",
     "journey.html",
-    "dashboard.html",
     "setup-guide.html",
     "master-data.html",
     "financial-data.html",
@@ -372,29 +375,154 @@ async function testDataTabs(browser, base) {
   }
 }
 
-// ── ERP workspace (BRD v2): launchpad live KPIs, Control Tower, and the
-//    BNK-02 flow — allocate a bank movement by typing the project number.
-async function testErp(browser, base) {
-  // Home launchpad: live indicators computed from the shared dataset.
-  const home = await browser.newPage({ viewport: { width: 1200, height: 950 } });
-  const herr = [];
-  attachConsole(home, herr);
-  try {
-    await home.goto(`${base}/index.html`, { waitUntil: "networkidle" });
-    await home.waitForTimeout(600);
-    const prj = await home.locator("#s-prj").innerText();
-    const areas = await home.locator("a.mod").count();
-    if (/^\d+$/.test(prj.trim()) && areas >= 10)
-      ok(`home: launchpad live KPIs + ${areas} management areas`);
-    else bad("home: launchpad live KPIs", `prj="${prj}" areas=${areas}`);
-    if (herr.length === 0) ok("home: no console errors");
-    else bad("home: no console errors", herr.slice(0, 2).join(" | "));
-  } catch (e) {
-    bad("home launchpad", String(e).slice(0, 160));
-  } finally {
-    await home.close();
+// ── Retired screens (spec §1): the old standalone pages are redirects into the
+//    single workspace. They must land on the right section, and must not sit in
+//    history — Back has to leave, not bounce.
+async function testRetired(browser, base) {
+  const cases = [
+    ["index.html", "erp.html#torre"],
+    ["dashboard.html", "erp.html#torre"],
+    ["clientes.html", "erp.html#clientes"],
+    ["frontend.html", "erp.html#presupuestos"],
+  ];
+  for (const [from, to] of cases) {
+    const page = await browser.newPage();
+    try {
+      await page.goto(`${base}/${from}`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(400);
+      const url = page.url();
+      if (url === `${base}/${to}`) ok(`retired: ${from} → ${to}`);
+      else bad(`retired: ${from} → ${to}`, `landed on ${url}`);
+    } catch (e) {
+      bad(`retired: ${from} → ${to}`, String(e).slice(0, 120));
+    } finally {
+      await page.close();
+    }
   }
+}
 
+// ── Three-panel shell + global bar (spec §1). Panel 2 stays out of the way
+//    until asked for, and the bar's four controls are real: search finds
+//    records, create opens a form, the bell counts open alerts and the period
+//    actually filters.
+async function testShell(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1280, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#torre`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(600);
+
+    const sections = await pg.locator("#p1 .secitem").count();
+    const subsOpen = await pg.locator("#p2.on").count();
+    if (sections === 7 && subsOpen === 0) ok("shell: 7 sections, subsection panel collapsed");
+    else bad("shell: sections + collapsed panel", `sections=${sections} open=${subsOpen}`);
+
+    // Press a section → panel 2 opens with that section's subsections.
+    await pg.locator('#p1 .secitem[data-sec="comercial"]').click();
+    await pg.waitForTimeout(250);
+    const subs = await pg.locator("#p2.on .navitem").count();
+    if (subs === 4) ok("shell: section opens its subsection panel");
+    else bad("shell: section opens panel", `subsections=${subs}`);
+
+    // Choosing a subsection routes and collapses the panel again.
+    await pg.locator('#p2 .navitem[data-k="contratos"]').click();
+    await pg.waitForTimeout(350);
+    const hash = await pg.evaluate(() => location.hash);
+    const stillOpen = await pg.locator("#p2.on").count();
+    const title = await pg.locator("#ttl").innerText();
+    if (hash === "#contratos" && stillOpen === 0 && /Contratos/i.test(title))
+      ok("shell: choosing a subsection routes and collapses the panel");
+    else bad("shell: subsection routes", `hash=${hash} open=${stillOpen} title=${title}`);
+
+    // Clicking outside closes it too.
+    await pg.locator('#p1 .secitem[data-sec="obra"]').click();
+    await pg.waitForTimeout(200);
+    await pg.locator("#subscrim").click();
+    await pg.waitForTimeout(250);
+    if ((await pg.locator("#p2.on").count()) === 0) ok("shell: outside click collapses the panel");
+    else bad("shell: outside click collapses", "still open");
+
+    // Unbuilt subsections say what will live there instead of rendering blank.
+    await pg.evaluate(() => (location.hash = "conciliacion"));
+    await pg.waitForTimeout(300);
+    const ph = await pg.locator("#view").innerText();
+    if (/En preparación/.test(ph)) ok("shell: unbuilt subsection explains itself");
+    else bad("shell: unbuilt subsection", ph.slice(0, 80));
+
+    // Universal search: grouped results, and picking one opens the record.
+    await pg.locator("#q").fill("Marta");
+    await pg.waitForTimeout(300);
+    const res = await pg.locator("#sres.on").innerText();
+    // Group headings are upper-cased by CSS, so innerText comes back shouting.
+    if (/clientes/i.test(res) && /Marta/.test(res))
+      ok("bar: universal search groups results by type");
+    else bad("bar: universal search", res.slice(0, 80));
+    await pg.locator("#sres .si").first().click();
+    await pg.waitForTimeout(400);
+    const drawer = await pg.locator("#drawer.on #dttl").innerText();
+    if (/Marta/.test(drawer)) ok("bar: a search hit opens the record");
+    else bad("bar: search hit opens record", drawer);
+    await pg.locator("#dClose").click();
+
+    // Alert bell: a real count, and each entry drills down.
+    const badge = await pg.locator("#bellCt").innerText();
+    await pg.locator("#btnBell").click();
+    await pg.waitForTimeout(200);
+    const bell = await pg.locator("#mBell.on").innerText();
+    if (/^\d+$/.test(badge.trim()) && bell.trim().length > 0)
+      ok(`bar: alert bell shows ${badge.trim()} open alerts`);
+    else bad("bar: alert bell", `badge=${badge} menu=${bell.slice(0, 60)}`);
+    await pg.keyboard.press("Escape");
+
+    // Contextual create: the menu follows the active section and opens a form.
+    await pg.evaluate(() => (location.hash = "proyectos"));
+    await pg.waitForTimeout(300);
+    await pg.locator("#btnCreate").click();
+    await pg.waitForTimeout(200);
+    const create = await pg.locator("#mCreate.on").innerText();
+    if (/proyecto/i.test(create)) ok("bar: create menu is contextual to the section");
+    else bad("bar: create menu contextual", create.slice(0, 60));
+    await pg.locator("#mCreate button").first().click();
+    await pg.waitForTimeout(300);
+    if ((await pg.locator("#drawer.on #n_save").count()) === 1)
+      ok("bar: create opens the new-project form");
+    else bad("bar: create opens form", "no form");
+    await pg.locator("#dClose").click();
+
+    // Period selector: switching to a month filters, and says how much it hides.
+    await pg.evaluate(() => (location.hash = "facturacion"));
+    await pg.waitForTimeout(300);
+    const beforeRows = await pg.locator("#view tbody tr").count();
+    await pg.selectOption("#periodMode", "month");
+    await pg.waitForTimeout(400);
+    const note = await pg.locator("#view .periodnote").innerText();
+    const afterRows = await pg.locator("#view tbody tr").count();
+    if (/Periodo/.test(note) && afterRows < beforeRows)
+      ok("bar: period selector filters the invoice list");
+    else bad("bar: period selector filters", `note="${note}" ${beforeRows}→${afterRows}`);
+
+    // …and the choice survives a reload (it lives in the store's meta, not the
+    // state blob, so it can never collide with an engine key).
+    await pg.reload({ waitUntil: "networkidle" });
+    await pg.waitForTimeout(700);
+    const mode = await pg.locator("#periodMode").inputValue();
+    if (mode === "month") ok("bar: period choice persists across reload");
+    else bad("bar: period persists", `mode=${mode}`);
+    await pg.selectOption("#periodMode", "year");
+
+    if (errs.length === 0) ok("shell: no console errors");
+    else bad("shell: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("three-panel shell", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── ERP workspace (BRD v2): Control Tower, and the BNK-02 flow — allocate a
+//    bank movement by typing the project number.
+async function testErp(browser, base) {
   // Workspace: Control Tower renders indicators + alerts; modules navigate.
   const pg = await browser.newPage({ viewport: { width: 1280, height: 950 } });
   const eerr = [];
@@ -483,33 +611,27 @@ async function testErp(browser, base) {
 async function testI18n(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   try {
-    await pg.goto(`${base}/index.html`, { waitUntil: "networkidle" });
-    await pg.waitForTimeout(300);
+    // The workspace is the entry screen now, so the toggle is exercised there.
+    await pg.goto(`${base}/erp.html#torre`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(600);
     const pill = await pg.locator("#canei-lang-pill button").count();
-    if (pill === 2) ok("i18n: language toggle present on home");
+    if (pill === 2) ok("i18n: language toggle present on the workspace");
     else bad("i18n: toggle present", `buttons=${pill}`);
     const esText = await pg.locator("body").innerText();
-    if (esText.includes("Áreas de gestión")) ok("i18n: home defaults to Spanish");
-    else bad("i18n: home defaults to Spanish", esText.slice(0, 60));
+    if (esText.includes("Torre de control")) ok("i18n: workspace defaults to Spanish");
+    else bad("i18n: workspace defaults to Spanish", esText.slice(0, 60));
 
     // switch to EN via the pill (reloads the page)
     await Promise.all([
       pg.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
       pg.locator("#canei-lang-pill button", { hasText: "EN" }).click(),
     ]);
-    await pg.waitForTimeout(400);
-    const enText = await pg.locator("body").innerText();
-    if (enText.includes("Management areas") && !enText.includes("Áreas de gestión"))
-      ok("i18n: EN toggle translates the home page");
-    else bad("i18n: EN toggle translates home", enText.slice(0, 100));
-
-    // dynamic content on erp.html gets translated too (MutationObserver path)
-    await pg.goto(`${base}/erp.html#torre`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(700);
+    // dynamic content gets translated too (MutationObserver path)
     const erpLang = await pg.evaluate(() => document.documentElement.lang);
     const erpText = await pg.locator("body").innerText();
-    if (erpLang === "en" && /Control tower/i.test(erpText))
-      ok("i18n: choice persists and translates the ERP workspace");
+    if (erpLang === "en" && /Control tower/i.test(erpText) && !/Torre de control/.test(erpText))
+      ok("i18n: EN toggle translates the ERP workspace");
     else bad("i18n: erp translated", `lang=${erpLang} ${erpText.slice(0, 80)}`);
 
     // English-base page flips to Spanish when ES is chosen

@@ -26,7 +26,7 @@
   a{color:var(--green);text-decoration:none}
   .native-app .topbar{padding-top:max(12px,env(safe-area-inset-top))}
 
-  .topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:12px;padding:12px 18px;
+  .topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:10px;padding:10px 16px;flex-wrap:wrap;
     background:rgba(255,255,255,.85);backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)}
   .brand{display:flex;align-items:center;gap:10px;min-width:0}
   .brand .nm{font-family:var(--serif);font-weight:600;font-size:15.5px;color:var(--ink);line-height:1;white-space:nowrap}
@@ -39,17 +39,71 @@
   .btn.sm{padding:5px 9px;font-size:11.5px;border-radius:8px}
   .btn.danger{color:var(--danger);border-color:var(--dangerSoft)}
 
-  .shell{display:grid;grid-template-columns:236px 1fr;max-width:1400px;margin:0 auto;align-items:start}
-  aside{position:sticky;top:59px;height:calc(100vh - 59px);overflow-y:auto;padding:16px 10px 40px;border-right:1px solid var(--line)}
-  aside .grp{font:700 10px var(--sans);letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin:14px 10px 5px}
-  aside .grp:first-child{margin-top:0}
+  /* ---------- global bar (spec §1: search · create · alerts · period · profile) ---------- */
+  .gsearch{position:relative;flex:1 1 210px;min-width:0;max-width:440px}
+  .gsearch input{width:100%;font:13px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);
+    border-radius:10px;padding:8px 11px;outline:0}
+  .gsearch input:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--greenSoft)}
+  .sres{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--paper);border:1px solid var(--line);
+    border-radius:12px;box-shadow:var(--shadow);max-height:min(62vh,430px);overflow-y:auto;display:none;z-index:45}
+  .sres.on{display:block}
+  .sres .sg{font:700 9.5px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);padding:9px 12px 3px}
+  .sres .si{display:block;width:100%;text-align:left;border:0;background:transparent;cursor:pointer;padding:7px 12px;
+    font:12.5px var(--sans);color:var(--muted)}
+  .sres .si b{display:block;color:var(--ink);font:600 13px var(--sans)}
+  .sres .si:hover,.sres .si.sel{background:var(--greenSoft)}
+  .gactions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .menuwrap{position:relative}
+  .menu{position:absolute;top:calc(100% + 6px);right:0;min-width:214px;background:var(--paper);border:1px solid var(--line);
+    border-radius:12px;box-shadow:var(--shadow);padding:5px;display:none;z-index:45}
+  .menu.on{display:block}
+  .menu.wide{min-width:min(340px,84vw)}
+  .menu button,.menu a{display:block;width:100%;text-align:left;border:0;background:transparent;cursor:pointer;
+    padding:8px 10px;border-radius:9px;font:600 12.5px var(--sans);color:var(--body)}
+  .menu button:hover,.menu a:hover{background:var(--greenSoft);color:var(--ink)}
+  .menu .sep{height:1px;background:var(--hair);margin:5px 2px}
+  .menu .none{padding:10px;font-size:12.5px;color:var(--muted)}
+  .menu .al{width:100%;text-align:left;margin-bottom:5px}
+  .bell{position:relative}
+  .bell .badge{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;border-radius:999px;background:var(--danger);
+    color:#fff;font:700 9.5px/16px var(--sans);text-align:center;padding:0 4px}
+  select.period{font:600 12px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);
+    border-radius:10px;padding:7px 8px;outline:0}
+  input.dt{font:12px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:6px 8px;outline:0}
+  .periodnote{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:0 0 10px}
+  .periodnote .pill{background:var(--greenSoft);color:var(--greenDeep)}
+
+  /* ---------- three panels (spec §1) ----------
+     Panel 1 (sections) is always visible; panel 2 (subsections) overlays the
+     main panel and collapses on choice or outside click; panel 3 (main) is the
+     only one whose content changes. Both live inside .rail, which is the
+     positioned ancestor panel 2 is absolute against — that keeps the overlay
+     glued to panel 1 without hard-coding the centred layout's left margin. */
+  .shell{display:grid;grid-template-columns:76px minmax(0,1fr);max-width:1400px;margin:0 auto;align-items:start}
+  .rail{position:sticky;top:var(--top,59px);height:calc(100vh - var(--top,59px));z-index:35}
+  .p1{height:100%;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:10px 6px 26px;
+    border-right:1px solid var(--line)}
+  .secitem{display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;border:0;background:transparent;
+    cursor:pointer;color:var(--body);padding:8px 2px;border-radius:11px;transition:.12s;position:relative}
+  .secitem .ic{font-size:17px;line-height:1}
+  .secitem .lb{font:600 9.5px var(--sans);line-height:1.15;text-align:center}
+  .secitem:hover{background:var(--greenSoft);color:var(--ink)}
+  .secitem.on{background:var(--greenSoft);color:var(--greenDeep)}
+  .secitem .dot{position:absolute;top:5px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--danger)}
+  .p2{position:absolute;top:0;left:76px;width:240px;height:100%;overflow-y:auto;background:var(--paper);
+    border-right:1px solid var(--line);box-shadow:22px 0 46px -34px rgba(20,26,14,.5);padding:14px 10px 26px;
+    opacity:0;visibility:hidden;transform:translateX(-10px);transition:.16s}
+  .p2.on{opacity:1;visibility:visible;transform:none}
+  .p2 .p2h{font:700 10px var(--sans);letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin:0 10px 7px}
   .navitem{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border:0;background:transparent;cursor:pointer;
-    font:600 13px var(--sans);color:var(--body);padding:7px 10px;border-radius:9px;transition:.12s}
-  .navitem .ic{width:20px;text-align:center;font-size:14px;flex:none}
+    font:600 13px var(--sans);color:var(--body);padding:8px 10px;border-radius:9px;transition:.12s}
   .navitem .ct{margin-left:auto;font:600 10.5px var(--sans);color:var(--faint);background:var(--hair);border-radius:999px;padding:1px 7px}
   .navitem .ct.alert{background:var(--dangerSoft);color:var(--danger)}
+  .navitem .ext{margin-left:auto;font-size:11px;color:var(--faint)}
   .navitem:hover{background:var(--greenSoft);color:var(--ink)}
   .navitem.on{background:var(--greenSoft);color:var(--greenDeep)}
+  .subscrim{position:fixed;inset:0;z-index:30;background:rgba(20,26,14,.10);opacity:0;pointer-events:none;transition:.16s}
+  .subscrim.on{opacity:1;pointer-events:auto}
 
   main{padding:20px 22px 90px;min-width:0}
   .crumbs{font-size:11.5px;color:var(--muted);margin-bottom:4px}
@@ -108,7 +162,6 @@
   .doc .dh{display:flex;justify-content:space-between;gap:14px;border-bottom:2px solid var(--green);padding-bottom:10px;margin-bottom:12px}
   .doc .dh b{font-family:var(--serif);font-size:16px;color:var(--ink)}
   .chapline{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
-  .mobsel{display:none}
 
   .scrim{position:fixed;inset:0;background:rgba(20,26,14,.34);opacity:0;pointer-events:none;transition:.2s;z-index:60}
   .scrim.on{opacity:1;pointer-events:auto}
@@ -127,18 +180,26 @@
     background:var(--ink);color:#fff;font:600 12.5px var(--sans);padding:10px 16px;border-radius:11px;max-width:88vw}
   .toast.on{opacity:1;transform:translate(-50%,0)}
 
+  /* Phones: panel 1 becomes a bottom bar and panel 2 a sheet above it (spec §1). */
   @media(max-width:860px){
-    .shell{grid-template-columns:1fr}
-    aside{display:none}
-    main{padding:16px 14px 90px}
-    .mobsel{display:block;margin:2px 0 12px}
-    .mobsel select{width:100%;font:600 14px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+    .shell{grid-template-columns:minmax(0,1fr)}
+    .rail{position:fixed;top:auto;left:0;right:0;bottom:0;height:auto;z-index:55}
+    .p1{flex-direction:row;height:auto;overflow-x:auto;overflow-y:hidden;border-right:0;border-top:1px solid var(--line);
+      background:rgba(255,255,255,.96);backdrop-filter:saturate(1.4) blur(12px);
+      padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+    .secitem{flex:none;min-width:66px}
+    .p2{top:auto;bottom:100%;left:0;right:0;width:auto;height:auto;max-height:58vh;border-right:0;
+      border-top:1px solid var(--line);border-radius:14px 14px 0 0;transform:translateY(12px);
+      box-shadow:0 -22px 46px -34px rgba(20,26,14,.5)}
+    .subscrim{z-index:50}
+    main{padding:16px 14px 96px}
     .fgrid{grid-template-columns:1fr}
     .kpis{grid-template-columns:repeat(2,1fr)}
   }
   @media(max-width:560px){
     .brand .nm small{display:none}
-    .topbar{padding:10px 12px}
+    .topbar{padding:9px 12px}
+    .gsearch{flex:1 1 100%;order:3;max-width:none}
   }
 </style>
 <script src="i18n-dict.js"></script>
@@ -155,21 +216,43 @@
       </svg>
       <span class="nm">Canei Subirats<small>ERP · un único entorno</small></span>
     </div>
+    <div class="gsearch">
+      <input id="q" type="search" autocomplete="off" spellcheck="false"
+             placeholder="Buscar cliente, proyecto, presupuesto, factura…" aria-label="Buscador universal" />
+      <div class="sres" id="sres"></div>
+    </div>
     <span class="tsp"></span>
-    <a class="btn sm" href="index.html">← Inicio</a>
-    <button class="btn sm" id="btnExport">⤓ Exportar</button>
-    <button class="btn sm" id="btnReset" title="Volver a los datos de ejemplo">↻</button>
+    <div class="gactions">
+      <div class="menuwrap">
+        <button class="btn primary sm" id="btnCreate" aria-haspopup="true" aria-expanded="false">＋ Crear</button>
+        <div class="menu" id="mCreate"></div>
+      </div>
+      <div class="menuwrap">
+        <button class="btn sm bell" id="btnBell" title="Alertas" aria-label="Alertas" aria-haspopup="true" aria-expanded="false">🔔<span class="badge" id="bellCt" hidden></span></button>
+        <div class="menu wide" id="mBell"></div>
+      </div>
+      <select class="period" id="periodMode" aria-label="Periodo"></select>
+      <input class="dt" type="date" id="periodFrom" aria-label="Desde" hidden />
+      <input class="dt" type="date" id="periodTo" aria-label="Hasta" hidden />
+      <div class="menuwrap">
+        <button class="btn sm" id="btnUser" title="Perfil y ayuda" aria-label="Perfil y ayuda" aria-haspopup="true" aria-expanded="false">👤</button>
+        <div class="menu" id="mUser"></div>
+      </div>
+    </div>
   </div>
 
   <div class="shell">
-    <aside id="nav"></aside>
+    <div class="rail">
+      <nav class="p1" id="p1" aria-label="Secciones"></nav>
+      <aside class="p2" id="p2" aria-label="Subsecciones"><div class="p2h" id="p2h">—</div><div id="p2list"></div></aside>
+    </div>
     <main>
-      <div class="mobsel"><select id="mnav"></select></div>
       <div class="crumbs" id="crumbs">ERP</div>
       <div class="head"><h1 id="ttl">—</h1><div class="sub" id="sub"></div></div>
       <div id="view"></div>
     </main>
   </div>
+  <div class="subscrim" id="subscrim"></div>
 
   <div class="scrim" id="scrim"></div>
   <aside class="drawer" id="drawer">
@@ -237,20 +320,99 @@ async function boot(){
   if(imported?.ran&&imported.conflicts) notes.push(`${imported.conflicts} registros necesitan revisión.`);
   bootNotice=notes.join(" ");
 
-  if(location.hash) cur=location.hash.slice(1)||"torre";
-  buildNav(); render();
+  // UI preferences (period) live in the store's `meta`, never in the state blob.
+  try{ const prefs=await ErpStore.getMeta("ui.prefs"); if(prefs&&prefs.period) PERIOD={...PERIOD,...prefs.period}; }catch(e){}
+
+  const hashKey=location.hash.slice(1);
+  if(hashKey&&SUBMAP[hashKey]&&!SUBMAP[hashKey].href) cur=hashKey;
+  measureTopbar(); buildPeriodControls(); buildUserMenu(); render();
   if(bootNotice) toast(bootNotice);
 }
+/* The sticky panels hang off the real topbar height: it wraps on narrow
+   viewports, so a hard-coded offset would leave a gap or hide a row. */
+function measureTopbar(){
+  const h=document.querySelector('.topbar').offsetHeight;
+  document.documentElement.style.setProperty('--top',h+"px");
+}
+window.addEventListener('resize',()=>{measureTopbar();closeSection();});
 function mutate(fn,msg){ try{ fn(); persist(); render(); if(msg)toast(msg);}catch(e){ toast("⚠ "+e.message); } }
 
-/* =============================== navigation (DAS-01) =============================== */
-const NAV=[
- {grp:"Visión",items:[["torre","📊","Torre de control"],["hoy","☀️","Mi día"]]},
- {grp:"Comercial",items:[["clientes","👥","Clientes y terceros"],["oportunidades","🎯","Oportunidades y visitas"],["presupuestos","📋","Presupuestos"],["contratos","📜","Contratos"]]},
- {grp:"Obra",items:[["proyectos","🏗️","Proyectos"],["captura","📸","Captura de documentos"],["horas","⏱️","Horas de obra"]]},
- {grp:"Economía",items:[["facturacion","🧾","Facturación y cobros"],["pagos","📤","Proveedores y pagos"],["banco","🏦","Banco y caja"],["precios","🏷️","Precios y costes"],["gestoria","📦","Gestoría"]]},
+/* =============================== navigation (spec §1, DAS-01) ======================
+   Three panels: sections (always visible) → subsections (open on demand) →
+   content. Routing is by SUBSECTION key and the hash keeps the same values it
+   had under the previous flat menu, so every existing deep link — including the
+   iOS and Android tab bars — still lands where it did.
+
+   Subsections carry either a `view` (rendered in panel 3), an `href` (a page
+   this shell does not own yet: the accounting and master-data screens the spec
+   keeps as they are, §6/§7), or neither, in which case PLACEHOLDERS says what
+   will live there and where the data sits today. Nothing is silently missing. */
+const SECTIONS=[
+ {k:"principal",ic:"📊",lab:"Principal",short:"Principal",subs:[
+   {k:"torre",lab:"Torre de control"},
+   {k:"hoy",lab:"Mi día"},
+   {k:"recorrido",lab:"Recorrido completo",href:"journey.html"}]},
+ {k:"comercial",ic:"🤝",lab:"Comercial",short:"Comercial",subs:[
+   {k:"clientes",lab:"Clientes"},
+   {k:"oportunidades",lab:"Oportunidades y visitas"},
+   {k:"presupuestos",lab:"Presupuestos y ofertas"},
+   {k:"contratos",lab:"Contratos"}]},
+ {k:"obra",ic:"🏗️",lab:"Proyectos",short:"Proyectos",subs:[
+   {k:"proyectos",lab:"Proyectos"},
+   {k:"compras",lab:"Compras"},
+   {k:"subcontratos",lab:"Subcontratos"},
+   {k:"seguimiento",lab:"Seguimiento técnico"},
+   {k:"economia",lab:"Seguimiento económico"},
+   {k:"modificaciones",lab:"Modificaciones contractuales"},
+   {k:"horas",lab:"Personal y horas"}]},
+ {k:"administracion",ic:"🧾",lab:"Administración",short:"Admin.",subs:[
+   {k:"facturacion",lab:"Facturas y cobros"},
+   {k:"pagos",lab:"Proveedores y pagos"},
+   {k:"captura",lab:"Captura de documentos"},
+   {k:"conciliacion",lab:"Conciliación bancaria"},
+   {k:"banco",lab:"Banco y caja"},
+   {k:"precios",lab:"Precios y costes"},
+   {k:"gestoria",lab:"Gestoría"},
+   {k:"comunicaciones",lab:"Comunicaciones"}]},
+ {k:"contabilidad",ic:"💶",lab:"Contabilidad y finanzas",short:"Contab.",subs:[
+   {k:"finanzas",lab:"Contabilidad y finanzas",href:"financial-data.html"}]},
+ {k:"maestros",ic:"🗂️",lab:"Datos maestros",short:"Maestros",subs:[
+   {k:"catalogos",lab:"Catálogos y configuración",href:"master-data.html"}]},
+ {k:"reportes",ic:"📈",lab:"Reportes",short:"Reportes",subs:[
+   {k:"reportes",lab:"Reportes"}]},
 ];
-const NAVMAP={}; NAV.forEach(g=>g.items.forEach(([k,ic,lab])=>NAVMAP[k]={ic,lab,grp:g.grp}));
+const SUBMAP={}; SECTIONS.forEach(s=>s.subs.forEach(x=>SUBMAP[x.k]={...x,sec:s}));
+
+/* Subsections the spec defines but the shell cannot render yet. Each says what
+   will live there and links to where that data is managed today, so the menu
+   never leads to a blank screen. */
+const PLACEHOLDERS={
+ compras:{sub:"Órdenes de compra, recepciones y compromiso por capítulo.",
+   body:"El registro de compras y el compromiso de coste por capítulo ya existen y se consultan hoy dentro de cada proyecto.",goto:["proyectos","Abrir Proyectos"]},
+ subcontratos:{sub:"Contratación de industriales, ofertas comparadas y documentación obligatoria.",
+   body:"Las ofertas por proveedor y su comparativa se gestionan hoy en Precios y costes; la contratación se registra en el proyecto.",goto:["precios","Abrir Precios y costes"]},
+ seguimiento:{sub:"Avance de obra por capítulo, partes de trabajo y replanificación.",
+   body:"El avance por capítulo se marca hoy en la ficha del proyecto y alimenta la certificación.",goto:["proyectos","Abrir Proyectos"]},
+ economia:{sub:"Venta, coste comprometido, coste real y desviación por capítulo.",
+   body:"La economía de cada obra se ve hoy en la ficha del proyecto, con coste previsto frente a real por capítulo.",goto:["proyectos","Abrir Proyectos"]},
+ modificaciones:{sub:"Extras y modificaciones contractuales con su aprobación.",
+   body:"Los extras se registran, valoran y aprueban hoy en la ficha del proyecto; sin aprobación no son facturables.",goto:["proyectos","Abrir Proyectos"]},
+ conciliacion:{sub:"Importación de extracto y emparejamiento asistido con los registros.",
+   body:"Los movimientos y su estado sin asignar están en Banco y caja; el emparejamiento asistido todavía no existe.",goto:["banco","Abrir Banco y caja"]},
+ comunicaciones:{sub:"Plantillas, reglas de envío y cola de comunicaciones al cliente.",
+   body:"Aún no construido. Nada se envía al cliente sin confirmación: cuando exista, seguirá esa regla.",goto:null},
+ reportes:{sub:"Espacio reservado en el menú (spec §8).",
+   body:"No se desarrolla por ahora. Los informes se construirán sobre datos ya registrados, sin pedir información nueva.",goto:null},
+};
+function placeholderView(k,v){
+  const p=PLACEHOLDERS[k]||{sub:"",body:"Sin contenido."};
+  $('#sub').textContent=p.sub;
+  v.innerHTML=`<div class="card"><div class="ch"><h3>En preparación</h3><span class="tag">${esc(SUBMAP[k]?SUBMAP[k].sec.lab:"")}</span></div>
+    <div class="daylist"><div class="it">${esc(p.body)}</div>
+    ${p.goto?`<div class="it"><button class="btn sm" id="phGo">${esc(p.goto[1])}</button></div>`:""}</div></div>`;
+  if(p.goto)$('#phGo').onclick=()=>go(p.goto[0]);
+}
+
 function counts(k){
   const S=erp.state;
   try{
@@ -263,35 +425,229 @@ function counts(k){
   }catch(e){}
   return "";
 }
-function buildNav(){
-  const nav=$('#nav');nav.innerHTML='';const m=$('#mnav');m.innerHTML='';
-  NAV.forEach(g=>{
-    nav.appendChild(el('div','grp',g.grp));
-    const og=el('optgroup');og.label=g.grp;
-    g.items.forEach(([k,ic,lab])=>{
-      const b=el('button','navitem'+(k===cur?' on':''));
-      const c=counts(k);
-      b.innerHTML=`<span class="ic">${ic}</span><span>${lab}</span>${c!==""?`<span class="ct${k==='torre'&&c?' alert':''}">${c}</span>`:""}`;
-      b.onclick=()=>{go(k);};
-      b.dataset.k=k;nav.appendChild(b);
-      const o=el('option');o.value=k;o.textContent=`${g.grp} — ${lab}`;if(k===cur)o.selected=true;og.appendChild(o);
-    });
-    m.appendChild(og);
+let openSec=null;                                     // section whose panel 2 is out
+function buildSections(){
+  const p1=$('#p1');p1.innerHTML='';
+  const curSec=SUBMAP[cur]?SUBMAP[cur].sec.k:"principal";
+  let critical=0; try{critical=erp.alerts().filter(a=>a.sev==="critical").length;}catch(e){}
+  SECTIONS.forEach(s=>{
+    const b=el('button','secitem'+(s.k===curSec?' on':''));
+    b.innerHTML=`<span class="ic">${s.ic}</span><span class="lb">${s.short}</span>${s.k==="principal"&&critical?'<span class="dot"></span>':''}`;
+    b.dataset.sec=s.k; b.setAttribute("aria-label",s.lab);
+    b.onclick=()=>toggleSection(s.k);
+    p1.appendChild(b);
   });
-  m.onchange=()=>go(m.value);
 }
-function go(k,arg){ cur=k; location.hash=k; window._arg=arg; render(); window.scrollTo(0,0); }
+function buildSubs(secKey){
+  const s=SECTIONS.find(x=>x.k===secKey); if(!s)return;
+  $('#p2h').textContent=s.lab;
+  const list=$('#p2list');list.innerHTML='';
+  s.subs.forEach(x=>{
+    const b=el('button','navitem'+(x.k===cur?' on':''));
+    const c=counts(x.k);
+    b.innerHTML=`<span>${x.lab}</span>${x.href?'<span class="ext">↗</span>':(c!==""?`<span class="ct${x.k==='torre'&&c?' alert':''}">${c}</span>`:"")}`;
+    b.dataset.k=x.k;
+    b.onclick=()=>{closeSection();go(x.k);};
+    list.appendChild(b);
+  });
+}
+function toggleSection(secKey){
+  if(openSec===secKey){closeSection();return;}
+  openSec=secKey; buildSubs(secKey);
+  $('#p2').classList.add('on'); $('#subscrim').classList.add('on');
+  document.querySelectorAll('.secitem').forEach(b=>b.classList.toggle('on',b.dataset.sec===secKey));
+}
+function closeSection(){
+  openSec=null;
+  $('#p2').classList.remove('on'); $('#subscrim').classList.remove('on');
+  const curSec=SUBMAP[cur]?SUBMAP[cur].sec.k:"principal";
+  document.querySelectorAll('.secitem').forEach(b=>b.classList.toggle('on',b.dataset.sec===curSec));
+}
+$('#subscrim').onclick=closeSection;
+document.addEventListener('keydown',e=>{if(e.key==="Escape")closeSection();});
+
+function go(k,arg){
+  const s=SUBMAP[k];
+  if(s&&s.href){ location.href=s.href; return; }        // pages this shell does not own
+  cur=k; location.hash=k; window._arg=arg; closeMenus(); render(); window.scrollTo(0,0);
+}
 
 /* =============================== render =============================== */
 function render(){
-  buildNav();
-  document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('on',b.dataset.k===cur));
-  const meta=NAVMAP[cur]||{lab:"—",grp:"ERP"};
-  $('#crumbs').textContent="ERP › "+meta.grp;
+  buildSections();
+  if(openSec) buildSubs(openSec);
+  const meta=SUBMAP[cur]||{lab:"—",sec:{lab:"ERP"}};
+  $('#crumbs').textContent="ERP › "+meta.sec.lab;
   $('#ttl').textContent=meta.lab;
+  $('#sub').textContent="";
+  renderBell(); renderCreateMenu();
   const v=$('#view');
-  (VIEWS[cur]||VIEWS.torre)(v);
+  if(VIEWS[cur]) VIEWS[cur](v); else placeholderView(cur,v);
 }
+
+/* =============================== global bar (spec §1) ==============================
+   Universal search · contextual create · alert bell · period selector · profile
+   and help. The period is a preference, not business data: it lives in the
+   store's `meta` object store, never in the state blob, so it can never collide
+   with an engine key or need a schema migration to change. */
+const MONTHS=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const PERIOD_MODES=[["year","Año"],["quarter","Trimestre"],["month","Mes"],["range","Rango"]];
+let PERIOD={mode:"year",from:null,to:null};
+const pad2=n=>String(n).padStart(2,"0");
+const lastDay=(y,m)=>`${y}-${pad2(m)}-${new Date(Date.UTC(y,m,0)).getUTCDate()}`;
+/* The reference date is the dataset's today, not the wall clock: this dataset
+   lives in its own exercise year and a wall-clock period would empty every
+   table for reasons the user cannot see. */
+function periodRange(){
+  const t=(erp&&erp.today)||new Date().toISOString().slice(0,10);
+  const Y=+t.slice(0,4), M=+t.slice(5,7);
+  if(PERIOD.mode==="month")   return {from:`${Y}-${pad2(M)}-01`,to:lastDay(Y,M),label:`${MONTHS[M-1]} ${Y}`};
+  if(PERIOD.mode==="quarter"){const q=Math.floor((M-1)/3);return {from:`${Y}-${pad2(q*3+1)}-01`,to:lastDay(Y,q*3+3),label:`T${q+1} ${Y}`};}
+  if(PERIOD.mode==="range"&&PERIOD.from&&PERIOD.to) return {from:PERIOD.from,to:PERIOD.to,label:`${fmtD(PERIOD.from)} – ${fmtD(PERIOD.to)}`};
+  return {from:`${Y}-01-01`,to:`${Y}-12-31`,label:String(Y)};
+}
+const inPeriod=iso=>{const r=periodRange();return !!iso&&iso>=r.from&&iso<=r.to;};
+/* Every filtered table says so, with how much it is hiding — a table that
+   quietly drops rows is indistinguishable from a table with no data. */
+function periodNote(shown,total){
+  const r=periodRange();
+  return `<div class="periodnote"><span class="pill">Periodo · ${esc(r.label)}</span>
+    <span>${shown} de ${total} registros${shown<total?` · ${total-shown} fuera del periodo`:""}</span></div>`;
+}
+function savePrefs(){ try{ ErpStore.setMeta("ui.prefs",{period:PERIOD}); }catch(e){} }
+function buildPeriodControls(){
+  const sel=$('#periodMode');
+  sel.innerHTML=PERIOD_MODES.map(([v,l])=>`<option value="${v}"${PERIOD.mode===v?" selected":""}>${l}</option>`).join("");
+  const range=PERIOD.mode==="range";
+  $('#periodFrom').hidden=!range; $('#periodTo').hidden=!range;
+  const r=periodRange();
+  $('#periodFrom').value=PERIOD.from||r.from; $('#periodTo').value=PERIOD.to||r.to;
+  sel.title="Periodo aplicado: "+r.label;
+}
+$('#periodMode').onchange=e=>{
+  PERIOD={...PERIOD,mode:e.target.value};
+  if(PERIOD.mode==="range"&&(!PERIOD.from||!PERIOD.to)){const r=periodRange();PERIOD.from=r.from;PERIOD.to=r.to;}
+  savePrefs(); buildPeriodControls(); render();
+};
+['#periodFrom','#periodTo'].forEach(id=>{ $(id).onchange=()=>{
+  PERIOD={mode:"range",from:$('#periodFrom').value||null,to:$('#periodTo').value||null};
+  savePrefs(); buildPeriodControls(); render();
+};});
+
+/* ---------- menus ---------- */
+function closeMenus(){ document.querySelectorAll('.menu.on').forEach(m=>m.classList.remove('on'));
+  document.querySelectorAll('[aria-haspopup]').forEach(b=>b.setAttribute('aria-expanded','false'));
+  $('#sres').classList.remove('on'); }
+function toggleMenu(btnSel,menuSel){
+  const m=$(menuSel), was=m.classList.contains('on');
+  closeMenus(); if(was)return;
+  m.classList.add('on'); $(btnSel).setAttribute('aria-expanded','true');
+}
+document.addEventListener('click',e=>{ if(!e.target.closest('.menuwrap')&&!e.target.closest('.gsearch')) closeMenus(); });
+
+/* ---------- universal search ---------- */
+function searchAll(term){
+  const s=term.trim().toLowerCase(); if(s.length<2)return [];
+  const S=erp.state, hit=(...vals)=>vals.some(x=>String(x||"").toLowerCase().includes(s));
+  const groups=[], add=(type,items)=>{ if(items.length)groups.push({type,items:items.slice(0,6),more:Math.max(0,items.length-6)}); };
+  const partyName=id=>{try{return erp.party(id).name;}catch(e){return "—";}};
+  add("Clientes",S.parties.filter(p=>p.roles.includes("customer")&&hit(p.name,p.code,p.taxId,p.billCity))
+    .map(p=>({lab:p.name,sub:`${p.code}${p.taxId?" · "+p.taxId:""}${p.billCity?" · "+p.billCity:""}`,k:"clientes",open:()=>partyDrawer(p.id)})));
+  add("Proveedores",S.parties.filter(p=>p.roles.some(r=>["supplier","subcontractor","selfEmployed"].includes(r))&&hit(p.name,p.code,p.taxId))
+    .map(p=>({lab:p.name,sub:`${p.code}${p.activityLine?" · "+p.activityLine:""}`,k:"clientes",open:()=>partyDrawer(p.id)})));
+  add("Proyectos",S.projects.filter(p=>hit(p.code,partyName(p.partyId),p.activityLine))
+    .map(p=>({lab:`${p.code} — ${partyName(p.partyId)}`,sub:p.closed?"cerrado":"activo",k:"proyectos",open:()=>projectDrawer(p.id)})));
+  add("Presupuestos",S.budgets.filter(b=>hit(b.number,partyName(b.partyId)))
+    .map(b=>({lab:`${b.number} — ${partyName(b.partyId)}`,sub:b.acceptedVersionId?"aceptado":b.status,k:"presupuestos",open:()=>budgetDrawer(b.id)})));
+  add("Facturas",S.invoices.filter(i=>hit(i.number,partyName(i.partyId)))
+    .map(i=>({lab:`${i.number} — ${partyName(i.partyId)}`,sub:`${fmtD(i.date)} · ${eur(i.totalCents)}`,k:"facturacion",open:null})));
+  add("Documentos",(S.captured||[]).filter(c=>hit(c.stdName,c.imageRef,c.confirmed&&c.confirmed.issuerName))
+    .map(c=>({lab:c.stdName||c.imageRef||c.id,sub:c.status,k:"captura",open:null})));
+  return groups;
+}
+let searchHits=[];
+function renderSearch(term){
+  const box=$('#sres'); const groups=searchAll(term);
+  searchHits=[];
+  if(!groups.length){
+    box.innerHTML=term.trim().length>=2?'<div class="sg">Sin resultados</div>':'';
+    box.classList.toggle('on',term.trim().length>=2);
+    return;
+  }
+  box.innerHTML=groups.map(g=>`<div class="sg">${g.type}</div>`+g.items.map(it=>{
+    const idx=searchHits.push(it)-1;
+    return `<button class="si" data-hit="${idx}"><b>${esc(it.lab)}</b>${esc(it.sub||"")}</button>`;
+  }).join("")+(g.more?`<div class="sg" style="text-transform:none;letter-spacing:0">+${g.more} más</div>`:"")).join("");
+  box.classList.add('on');
+  box.querySelectorAll('[data-hit]').forEach(b=>b.onclick=()=>pickHit(searchHits[+b.dataset.hit]));
+}
+function pickHit(it){
+  if(!it)return;
+  $('#sres').classList.remove('on'); $('#q').value="";
+  go(it.k);
+  if(it.open) setTimeout(it.open,0);          // after the view has rendered
+}
+$('#q').oninput=e=>renderSearch(e.target.value);
+$('#q').onkeydown=e=>{
+  if(e.key==="Escape"){ $('#sres').classList.remove('on'); e.target.blur(); }
+  if(e.key==="Enter"){ e.preventDefault(); pickHit(searchHits[0]); }
+};
+$('#q').onfocus=e=>{ if(e.target.value.trim().length>=2) renderSearch(e.target.value); };
+
+/* ---------- contextual create ---------- */
+const CREATE={
+ principal:[["🗒️ Nueva tarea",()=>newTaskDrawer()]],
+ comercial:[["🎯 Nueva oportunidad",()=>newOpportunityDrawer()],["👤 Nuevo cliente",()=>newPartyDrawer("customer")],["🗒️ Nueva tarea",()=>newTaskDrawer()]],
+ obra:[["🏗️ Nuevo proyecto",()=>newQuickProjectDrawer()],["🗒️ Nueva tarea",()=>newTaskDrawer()]],
+ administracion:[["🚚 Nuevo proveedor",()=>newPartyDrawer("supplier")],["🗒️ Nueva tarea",()=>newTaskDrawer()]],
+ contabilidad:[["🗒️ Nueva tarea",()=>newTaskDrawer()]],
+ maestros:[["👥 Nuevo tercero",()=>newPartyDrawer()]],
+ reportes:[],
+};
+function renderCreateMenu(){
+  const secKey=SUBMAP[cur]?SUBMAP[cur].sec.k:"principal";
+  const items=CREATE[secKey]||[];
+  $('#btnCreate').hidden=!items.length;
+  const m=$('#mCreate'); m.innerHTML='';
+  items.forEach(([lab,fn])=>{ const b=el('button',null,lab); b.onclick=()=>{closeMenus();fn();}; m.appendChild(b); });
+}
+$('#btnCreate').onclick=()=>toggleMenu('#btnCreate','#mCreate');
+
+/* ---------- alert bell ---------- */
+function gotoAlert(ref){
+  if(!ref)return go("torre");
+  if(ref.project)go("proyectos",ref.project); else if(ref.invoice)go("facturacion"); else if(ref.contract)go("contratos");
+  else if(ref.budget)go("presupuestos"); else if(ref.bill)go("pagos"); else if(ref.view==="bank"||ref.movement)go("banco");
+  else if(ref.opportunity)go("oportunidades"); else if(ref.price)go("precios"); else if(ref.change)go("proyectos"); else go("torre");
+}
+function renderBell(){
+  let list=[]; try{list=erp.alerts();}catch(e){}
+  const urgent=list.filter(a=>a.sev==="critical"||a.sev==="high").length;
+  const badge=$('#bellCt'); badge.textContent=urgent>99?"99+":String(urgent); badge.hidden=!urgent;
+  const m=$('#mBell'); m.innerHTML='';
+  if(!list.length){ m.innerHTML='<div class="none">Sin alertas abiertas.</div>'; return; }
+  list.slice(0,10).forEach(a=>{
+    const b=el('button','al '+a.sev,`<span>${a.sev==="critical"?"🔴":a.sev==="high"?"🟡":"🔵"}</span><div><b>${esc(a.msg)}</b></div>`);
+    b.onclick=()=>{closeMenus();gotoAlert(a.ref);};
+    m.appendChild(b);
+  });
+  if(list.length>10){ const b=el('button',null,`Ver las ${list.length} alertas en la torre`); b.onclick=()=>{closeMenus();go("torre");}; m.appendChild(b); }
+}
+$('#btnBell').onclick=()=>toggleMenu('#btnBell','#mBell');
+
+/* ---------- profile & help ---------- */
+function buildUserMenu(){
+  const m=$('#mUser');
+  m.innerHTML=`<a href="setup-guide.html">📘 Guía de operaciones</a>
+    <a href="ios-beta-guide.html">📱 Guía de la beta</a>
+    <a href="journey.html">▶️ Recorrido completo</a>
+    <div class="sep"></div>
+    <button id="uExport">⤓ Exportar datos</button>
+    <button id="uReset">↻ Datos de ejemplo</button>`;
+  $('#uExport').onclick=()=>{closeMenus();exportData();};
+  $('#uReset').onclick=()=>{closeMenus();resetData();};
+}
+$('#btnUser').onclick=()=>toggleMenu('#btnUser','#mUser');
 /* Task counts by status, computed by @repo/capability-scheduling through
    ErpBridge — the first read that crosses into the typed capability layer.
    Renders nothing at all if the bundle is unavailable, so the page is never
@@ -351,10 +707,7 @@ const VIEWS={
       <div class="alerts">${ct.alerts.slice(0,14).map(a=>`<div class="al ${a.sev}" data-ref='${esc(JSON.stringify(a.ref))}'><span>${a.sev==="critical"?"🔴":a.sev==="high"?"🟡":"🔵"}</span><div><b>${esc(a.msg)}</b></div></div>`).join("")||'<div class="empty">Sin alertas. Todo en orden.</div>'}</div></div>
    </div>`;
   v.querySelectorAll('[data-go]').forEach(n=>n.onclick=()=>go(n.dataset.go,n.dataset.arg));
-  v.querySelectorAll('.al').forEach(n=>n.onclick=()=>{const ref=JSON.parse(n.dataset.ref);
-    if(ref.project)go("proyectos",ref.project); else if(ref.invoice)go("facturacion"); else if(ref.contract)go("contratos");
-    else if(ref.budget)go("presupuestos"); else if(ref.bill)go("pagos"); else if(ref.view==="bank"||ref.movement)go("banco");
-    else if(ref.opportunity)go("oportunidades"); else if(ref.price)go("precios"); else if(ref.change)go("proyectos"); else go("torre");});
+  v.querySelectorAll('.al').forEach(n=>n.onclick=()=>gotoAlert(JSON.parse(n.dataset.ref)));
  },
 
  /* ---------- Mi día (DAS-04/05) ---------- */
@@ -485,9 +838,10 @@ const VIEWS={
  horas(v){
   $('#sub').textContent="Horas diarias por trabajador y proyecto, con tarifa histórica. El coste de mano de obra entra en el coste real de cada obra.";
   const byP={};
-  erp.state.labour.forEach(l=>{const k=l.projectId?erp.project(l.projectId).code:"Sin asignar";(byP[k]=byP[k]||[]).push(l);});
-  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Fecha</th><th>Trabajador</th><th>Proyecto</th><th>Capítulo</th><th class="num">Horas</th><th class="num">Coste</th></tr></thead><tbody>
-   ${erp.state.labour.slice().reverse().map(l=>`<tr><td>${fmtD(l.date)}</td><td>${esc(erp.state.workers.find(w=>w.id===l.workerId).name)}</td>
+  const lab=erp.state.labour.filter(l=>inPeriod(l.date));
+  lab.forEach(l=>{const k=l.projectId?erp.project(l.projectId).code:"Sin asignar";(byP[k]=byP[k]||[]).push(l);});
+  v.innerHTML=`${periodNote(lab.length,erp.state.labour.length)}<div class="card"><div class="scroll"><table><thead><tr><th>Fecha</th><th>Trabajador</th><th>Proyecto</th><th>Capítulo</th><th class="num">Horas</th><th class="num">Coste</th></tr></thead><tbody>
+   ${lab.slice().reverse().map(l=>`<tr><td>${fmtD(l.date)}</td><td>${esc(erp.state.workers.find(w=>w.id===l.workerId).name)}</td>
     <td class="k">${l.projectId?erp.project(l.projectId).code:'<span class="pill r">Sin asignar</span>'}</td><td>${l.chapterNum||"—"}</td>
     <td class="num">${(l.hoursMilli/1000).toLocaleString('es-ES')}</td><td class="num">${eur(l.costCents)}</td></tr>`).join("")}
    </tbody></table></div>
@@ -497,8 +851,10 @@ const VIEWS={
  /* ---------- Facturación y cobros (AR) ---------- */
  facturacion(v){
   $('#sub').textContent="Facturas generadas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos; las emitidas son inmutables.";
-  const rows=erp.receivables();
-  v.innerHTML=`<div class="card"><div class="ch"><h3>Facturas</h3><span class="tag">pendiente total ${eur0(rows.reduce((s,r)=>s+r.outstandingCents,0))}</span></div>
+  const all=erp.receivables();
+  const issued={}; erp.state.invoices.forEach(i=>{issued[i.number]=i.date;});
+  const rows=all.filter(r=>inPeriod(issued[r.number]));
+  v.innerHTML=`${periodNote(rows.length,all.length)}<div class="card"><div class="ch"><h3>Facturas</h3><span class="tag">pendiente total ${eur0(rows.reduce((s,r)=>s+r.outstandingCents,0))}</span></div>
    <div class="scroll"><table><thead><tr><th>Número</th><th>Cliente</th><th>Proyecto</th><th class="num">Total</th><th class="num">Pendiente</th><th>Vence</th><th>Estado</th><th></th></tr></thead><tbody>
    ${rows.map(r=>{const st=r.outstandingCents<=0?'<span class="pill g">Cobrada</span>':r.daysOverdue>0?`<span class="pill r">Vencida ${r.daysOverdue}d</span>`:'<span class="pill y">Pendiente</span>';
     return `<tr><td class="k">${r.number}</td><td>${esc(r.party)}</td><td>${erp.project(r.projectId).code}</td>
@@ -537,12 +893,14 @@ const VIEWS={
  banco(v){
   $('#sub').textContent="Importa los movimientos y teclea el número de proyecto sobre cualquier movimiento: el coste queda asignado a esa obra sin volver a escribir nada.";
   const cf=erp.cashForecast(6);
+  const movAll=erp.state.movements, movs=movAll.filter(m=>inPeriod(m.accountingDate));
   v.innerHTML=`<div class="kpis" style="grid-template-columns:repeat(${erp.state.bankAccounts.length+1},1fr)">
     ${erp.state.bankAccounts.map(a=>`<div class="kpi"><div class="lab">${esc(a.name)}</div><div class="val">${eur0(erp.accountBalanceCents(a.id))}</div><div class="sub">${a.kind==="till"?"caja":"banco"}</div></div>`).join("")}
     <div class="kpi hi"><div class="lab">Total disponible</div><div class="val">${eur0(erp.cashPosition().totalCents)}</div><div class="sub">bancos + caja</div></div></div>
+   ${periodNote(movs.length,movAll.length)}
    <div class="card"><div class="ch"><h3>Movimientos</h3><span class="tag">escribe el nº de proyecto para asignar (p. ej. P-2026-0001)</span></div>
    <div class="scroll"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Clase</th><th>Asignación</th></tr></thead><tbody>
-   ${erp.state.movements.slice().reverse().map(m=>{
+   ${movs.slice().reverse().map(m=>{
      const cls={projectCost:"Coste de obra",overhead:"Gasto general",tax:"Impuestos",salary:"Nóminas",financial:"Financiero",internalTransfer:"Traspaso interno",customerReceipt:"Cobro de cliente"}[m.class]||"—";
      const alloc=m.allocations.length?m.allocations.map(a=>(a.projectId?erp.project(a.projectId).code:a.overheadCategory)+(a.kind?` · ${a.kind}`:"")).join(", "):null;
      return `<tr><td>${fmtD(m.accountingDate)}</td>
@@ -589,7 +947,9 @@ const VIEWS={
  /* ---------- Gestoría (GES) ---------- */
  gestoria(v){
   $('#sub').textContent="El paquete trimestral se genera desde los datos, con resúmenes de IVA e IRPF conciliados y la lista de excepciones antes de enviar.";
-  const q=window._q||"2026-Q1";
+  // The quarter buttons stay; the default follows the global period selector
+  // whenever that is expressed in quarters, so the two never contradict.
+  const q=window._q||(PERIOD.mode==="quarter"?ErpEngine.quarterOf(periodRange().from):"2026-Q1");
   const pkg=(()=>{const inQ=d=>ErpEngine.quarterOf(d)===q;return {
     invoices:erp.state.invoices.filter(i=>inQ(i.date)), bills:erp.state.bills.filter(b=>inQ(b.date)),
     vat:erp.vatSummary(q), irpf:erp.irpfSummary(q), ex:erp.exceptionList(q)};})();
@@ -699,12 +1059,13 @@ function editPartyDrawer(id){
     closeDrawer();
   },"Datos actualizados");
 }
-function newPartyDrawer(){
-  const db=openDrawer("Nuevo tercero");
+function newPartyDrawer(role){
+  const db=openDrawer(role==="supplier"?"Nuevo proveedor":role==="customer"?"Nuevo cliente":"Nuevo tercero");
+  const ROLE=[["customer","Cliente"],["supplier","Proveedor"],["subcontractor","Industrial"],["selfEmployed","Autónomo"]];
   db.innerHTML=`<div class="fgrid">
    <div class="field full"><label>Nombre o razón social *</label><input id="f_name"></div>
    <div class="field"><label>NIF / CIF / NIE *</label><input id="f_tax" placeholder="12345678Z"></div>
-   <div class="field"><label>Rol</label><select id="f_role"><option value="customer">Cliente</option><option value="supplier">Proveedor</option><option value="subcontractor">Industrial</option><option value="selfEmployed">Autónomo</option></select></div>
+   <div class="field"><label>Rol</label><select id="f_role">${ROLE.map(([v,l])=>`<option value="${v}"${role===v?" selected":""}>${l}</option>`).join("")}</select></div>
    <div class="field full"><label>Dirección de facturación *</label><input id="f_street"></div>
    <div class="field"><label>C.P. *</label><input id="f_cp"></div><div class="field"><label>Población *</label><input id="f_city"></div>
    <div class="field"><label>Móvil *</label><input id="f_mob"></div><div class="field"><label>Email</label><input id="f_mail"></div>
@@ -717,6 +1078,63 @@ function newPartyDrawer(){
       mobile:$('#f_mob').value.trim(),email:$('#f_mail').value.trim(),leadSource:$('#f_src').value,activityLine:$('#f_line').value},"backoffice");
     closeDrawer();
   },"Tercero creado");
+}
+/* The three creations the global "+ Crear" offers. They call the engine's own
+   entry points, so every validation (complete tax data before a project, a
+   party that exists, the audit log entry) applies exactly as it does anywhere
+   else — the bar is a shortcut to existing rules, never a way around them. */
+function partyOptions(filter){
+  return erp.state.parties.filter(p=>p.active&&filter(p)).map(p=>`<option value="${p.id}">${esc(p.name)} (${p.code})</option>`).join("");
+}
+function newOpportunityDrawer(){
+  const db=openDrawer("Nueva oportunidad");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Cliente *</label><select id="o_party">${partyOptions(p=>p.roles.includes("customer"))}</select></div>
+   <div class="field full"><label>Trabajo solicitado *</label><input id="o_work" placeholder="Reforma integral de baño"></div>
+   <div class="field"><label>Origen *</label><select id="o_src">${ErpEngine.LISTS.leadSources.map(s=>`<option>${s}</option>`).join("")}</select></div>
+   <div class="field"><label>Valor estimado (€)</label><input id="o_val" type="number" min="0" step="100" value="0"></div>
+   <div class="field full"><label>Próxima acción</label><input id="o_next" value="Programar visita"></div>
+   <div class="field full" style="margin-top:8px"><button class="btn primary" id="o_save">Crear oportunidad</button></div></div>`;
+  $('#o_save').onclick=()=>mutate(()=>{
+    const work=$('#o_work').value.trim();
+    if(!$('#o_party').value) throw new Error("Hace falta un cliente");
+    if(!work) throw new Error("Describe el trabajo solicitado");
+    erp.addOpportunity({partyId:$('#o_party').value,requestedWork:work,source:$('#o_src').value,
+      expectedValue:Math.round((+$('#o_val').value||0)*100),nextAction:$('#o_next').value.trim()||"Programar visita"},"backoffice");
+    closeDrawer(); go("oportunidades");
+  },"Oportunidad creada");
+}
+function newQuickProjectDrawer(){
+  const db=openDrawer("Nuevo proyecto");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Cliente *</label><select id="n_party">${partyOptions(p=>p.roles.includes("customer"))}</select></div>
+   <div class="field full"><label>Descripción del trabajo *</label><input id="n_desc" placeholder="Reparación de humedades"></div>
+   <div class="field"><label>Línea de actividad</label><select id="n_line">${[["repairs","Reparaciones"],["renovation","Reforma"],["damp","Humedades"],["commercial","Comercial"]].map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select></div>
+   <div class="field"><label>Valor de venta (€) *</label><input id="n_val" type="number" min="0" step="100" value="0"></div>
+   <div class="field full" style="font-size:12px;color:var(--muted)">Para una obra con presupuesto formal, créala desde el presupuesto aceptado: así conserva su línea base.</div>
+   <div class="field full" style="margin-top:8px"><button class="btn primary" id="n_save">Crear proyecto</button></div></div>`;
+  $('#n_save').onclick=()=>mutate(()=>{
+    const desc=$('#n_desc').value.trim(), val=Math.round((+$('#n_val').value||0)*100);
+    if(!$('#n_party').value) throw new Error("Hace falta un cliente");
+    if(!desc) throw new Error("Describe el trabajo");
+    if(val<=0) throw new Error("El valor de venta debe ser mayor que cero");
+    erp.createQuickProject({partyId:$('#n_party').value,desc,activityLine:$('#n_line').value,valueCents:val},"backoffice");
+    closeDrawer(); go("proyectos");
+  },"Proyecto creado");
+}
+function newTaskDrawer(){
+  const db=openDrawer("Nueva tarea");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Tarea *</label><input id="t_title" placeholder="Llamar al cliente con la valoración"></div>
+   <div class="field"><label>Responsable</label><select id="t_owner"><option value="backoffice">Oficina</option><option value="operations">Obra</option></select></div>
+   <div class="field"><label>Vence</label><input id="t_due" type="date" value="${erp.today}"></div>
+   <div class="field full" style="margin-top:8px"><button class="btn primary" id="t_save">Crear tarea</button></div></div>`;
+  $('#t_save').onclick=()=>mutate(()=>{
+    const title=$('#t_title').value.trim();
+    if(!title) throw new Error("La tarea necesita un título");
+    erp.addTask({title,owner:$('#t_owner').value,due:$('#t_due').value||erp.today},"backoffice");
+    closeDrawer(); go("hoy");
+  },"Tarea creada");
 }
 function budgetDrawer(id){
   const b=erp.budget(id); const vsel=b.acceptedVersionId||b.currentVersionId; const V=erp.version(id,vsel);
@@ -777,14 +1195,14 @@ function projectDrawer(id){
   db.querySelectorAll('[data-approve]').forEach(b2=>b2.onclick=()=>mutate(()=>erp.approveChange(b2.dataset.approve,"aprobación-cliente.png","backoffice"),"Extra aprobado — anexo generado"));
 }
 
-/* =============================== toolbar =============================== */
-$('#btnExport').onclick=()=>{
+/* =============================== data actions (profile menu) =============================== */
+function exportData(){
   const blob=new Blob([JSON.stringify({_meta:{app:"Canei ERP",exportedAt:erp.today},data:erp.toJSON()},null,1)],{type:'application/json'});
   const a=el('a');a.href=URL.createObjectURL(blob);a.download='canei-erp.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);toast("Datos exportados");
-};
-$('#btnReset').onclick=()=>{ if(!confirm("¿Restablecer el entorno con los datos de ejemplo? Se sustituye todo lo actual."))return;
-  erp=ErpSeed.build(); persist(); render(); toast("Datos de ejemplo cargados"); };
-window.addEventListener('hashchange',()=>{const k=location.hash.slice(1);if(k&&NAVMAP[k]&&k!==cur){cur=k;render();}});
+}
+function resetData(){ if(!confirm("¿Restablecer el entorno con los datos de ejemplo? Se sustituye todo lo actual."))return;
+  erp=ErpSeed.build(); persist(); render(); toast("Datos de ejemplo cargados"); }
+window.addEventListener('hashchange',()=>{const k=location.hash.slice(1);if(k&&SUBMAP[k]&&!SUBMAP[k].href&&k!==cur){cur=k;render();}});
 boot();
 </script>
 </body>

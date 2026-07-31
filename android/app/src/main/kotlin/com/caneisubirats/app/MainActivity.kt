@@ -29,14 +29,21 @@ class MainActivity : AppCompatActivity() {
     private val internalHosts = setOf("stefangruber001.github.io")
     private val userAgentMarker = "CaneiApp/1.0 (Android; native-shell)"
 
-    /** The tabs of the app — same pages as the iOS shell. */
+    /**
+     * The tabs of the app — same destinations as the iOS shell.
+     *
+     * They follow the web app's own sections (spec §1): the ERP workspace is a
+     * single page with a three-panel shell, so a tab deep-links into a section
+     * instead of loading a separate screen. index.html, clientes.html and
+     * dashboard.html are retired redirects now and are deliberately not used.
+     */
     private data class Tab(val title: String, val path: String)
     private val tabs = listOf(
-        Tab("Inicio", "index.html"),
-        Tab("Proyecto", "journey.html"),
-        Tab("Clientes", "clientes.html"),
-        Tab("Torre", "dashboard.html"),
-        Tab("Maestros", "master-data.html"),
+        Tab("Torre", "erp.html#torre"),
+        Tab("Comercial", "erp.html#clientes"),
+        Tab("Proyectos", "erp.html#proyectos"),
+        Tab("Administración", "erp.html#facturacion"),
+        Tab("Recorrido", "journey.html"),
         Tab("Finanzas", "financial-data.html"),
         Tab("Guía", "setup-guide.html"),
     )

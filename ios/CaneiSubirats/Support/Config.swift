@@ -30,27 +30,33 @@ enum Config {
 
     /// The tabs of the app. Each maps to a page of the web app.
     /// Reordering / renaming here restyles the whole app without touching views.
+    ///
+    /// The tabs follow the web app's own sections (spec §1): the ERP workspace
+    /// is one page with a three-panel shell, so a tab is a deep link into a
+    /// section rather than a separate screen. `index.html`, `clientes.html` and
+    /// `dashboard.html` are retired redirects now — pointing a tab at one would
+    /// cost every launch an extra navigation.
     static let tabs: [WebTab] = [
-        WebTab(id: "home",
-               title: "Home",
-               systemImage: "house.fill",
-               path: "index.html"),
-        WebTab(id: "project",
-               title: "Project",
-               systemImage: "square.stack.3d.up.fill",
-               path: "journey.html"),
-        WebTab(id: "clients",
-               title: "Clients",
-               systemImage: "person.2.fill",
-               path: "clientes.html"),
         WebTab(id: "tower",
                title: "Control Tower",
                systemImage: "chart.bar.xaxis.ascending",
-               path: "dashboard.html"),
-        WebTab(id: "master",
-               title: "Master",
-               systemImage: "square.grid.2x2.fill",
-               path: "master-data.html"),
+               path: "erp.html#torre"),
+        WebTab(id: "sales",
+               title: "Sales",
+               systemImage: "person.2.fill",
+               path: "erp.html#clientes"),
+        WebTab(id: "projects",
+               title: "Projects",
+               systemImage: "hammer.fill",
+               path: "erp.html#proyectos"),
+        WebTab(id: "admin",
+               title: "Admin",
+               systemImage: "doc.text.fill",
+               path: "erp.html#facturacion"),
+        WebTab(id: "journey",
+               title: "Journey",
+               systemImage: "square.stack.3d.up.fill",
+               path: "journey.html"),
         WebTab(id: "finance",
                title: "Finance",
                systemImage: "eurosign.circle.fill",

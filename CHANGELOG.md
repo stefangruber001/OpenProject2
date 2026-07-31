@@ -5,6 +5,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The ERP workspace (`site/erp.html`) is the whole web app: three-panel
+  navigation (sections → subsections → content, bottom bar + sheet on phones)
+  and a global bar with universal search, a section-contextual "+ Crear" menu,
+  an alert bell and a period selector shared by every list that filters by
+  date. The iOS and Android shells' tabs now deep-link into its sections.
+
+### Removed
+
+- Retired the standalone screens the workspace supersedes: the home launchpad
+  (`site/index.html`), the classic control tower (`site/dashboard.html`), the
+  customer zone (`site/clientes.html`) and the quote builder
+  (`site/frontend.html`). Each file remains as a redirect into the
+  corresponding section, so existing links and bookmarks keep working.
+
 ### Added
 
 - Customer management zone (`site/clientes.html`): a back-office CRUD app to

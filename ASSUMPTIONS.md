@@ -466,8 +466,8 @@ languages: es-ES # source: synthetic
   tree-shakes out (verified: 5.7 KB bundle, no zod; CI fails if `ZodError` reappears).
   (d) `BrowserIdGen` overrides the kernel's `RandomIdGen`, which calls
   `globalThis.crypto.randomUUID()` — undefined in a non-secure context and older WKWebViews,
-  where it would throw on first id and blank the page. (e) The first bridge call is a *derived
-  read* (task counts by status in Mi día), not an ownership move: doing both at once would have
+  where it would throw on first id and blank the page. (e) The first bridge call is a _derived
+  read_ (task counts by status in Mi día), not an ownership move: doing both at once would have
   confounded "is the pipeline correct?" with "is the migration correct?". **Constraint worth
   recording:** this environment has no Node/pnpm/esbuild, so `pnpm-lock.yaml` could not be
   regenerated — the new package's importer entry was hand-written and passed `--frozen-lockfile`
@@ -486,7 +486,7 @@ languages: es-ES # source: synthetic
   (b) A blob newer than the build **throws** rather than being downgraded, and `erp.html` shows a
   dedicated screen instead of reseeding over it — the case is real, because the web ships
   continuously to `/preview` while the shells ship through store review. (c) Import conflicts
-  surface as a Torre *view banner*, not through the engine's `alerts()`, which `year-sim.mjs`
+  surface as a Torre _view banner_, not through the engine's `alerts()`, which `year-sim.mjs`
   asserts on. (d) `caneiMasterData` is imported one-way but **not deleted** (most reversible);
   `caneiFinance`/`caneiJourney` are deliberately untouched per spec §6 and session 12.
   **Also fixed a live bug:** `index.html` hardcoded `indexedDB.open("caneiERP", 1)`, which would
@@ -494,3 +494,31 @@ languages: es-ES # source: synthetic
   it now reads through `ErpStore` like every other page. Two new simulations (`migrations-sim`,
   `import-sim`) run in CI; the import test asserts what the import must REFUSE as hard as what it
   does. Reversible: `kv`/`"state"` coordinates unchanged, backups written, legacy stores intact.
+- **#48 — CANEI session 4: one workspace, three panels, and four screens retired (2026-07-31).**
+  Spec §1 replaces the flat side menu with sections → subsections → content, adds a global bar
+  (universal search, contextual create, alert bell, period selector, profile/help) and states that
+  the old home page "ceases to exist as an intermediate screen". **Decisions:** (a) the hash stays
+  the _subsection_ key, unchanged from the flat menu, so every deep link — including both native
+  shells' tabs, the e2e suite and printed links — still lands where it did; the section is derived
+  from the subsection, never routed to. (b) `index.html`, `dashboard.html`, `clientes.html` and
+  `frontend.html` become redirect stubs rather than deletions: the site root, GitHub Pages and the
+  shells' cached tabs all resolve to files that must keep existing, and a stub is the most
+  reversible retirement. They use `location.replace`, so a retired screen never sits in history.
+  `index.html` is retired too even though the session brief only listed the other three — §1 is
+  explicit that the system opens straight on the control tower. (c) Subsections the spec defines
+  but the code cannot serve yet (compras, subcontratos, seguimiento técnico/económico,
+  modificaciones, conciliación, comunicaciones, reportes) render a short "en preparación" card
+  saying what will live there and linking to where that data is managed today. A menu entry that
+  opens a blank panel is worse than one that explains itself. (d) The period selector defaults to
+  **year**, and its reference date is the dataset's `today`, not the wall clock: this dataset lives
+  in its own exercise year, so a wall-clock period would empty every table for reasons the user
+  cannot see. Every filtered table prints how many rows it is hiding. (e) The period lives in the
+  store's `meta` object store, **never in the state blob** — it is a preference, not business data,
+  so it needs no schema migration and can never collide with an engine key. (f) "+ Crear" calls the
+  engine's own `addOpportunity` / `createQuickProject` / `addTask` / `addParty`, so every validation
+  and audit-log entry applies exactly as it does elsewhere: the bar is a shortcut to existing rules,
+  never a way around them. (g) The spec says "eight sections" but enumerates seven (chapters 2-8);
+  seven are implemented, and the eighth is not invented here. **Ownership:** `three-panel-shell`
+  moves `unbuilt` → `engine` with `engineSection: null` — it is view-layer only, and the schema has
+  no "view" owner value. Reversible: the retired pages' previous content is one `git revert` away
+  and no engine code changed.

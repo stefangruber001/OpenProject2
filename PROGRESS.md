@@ -316,9 +316,25 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   once the schema upgraded. Legacy `caneiMasterData` customers now fold in
   one-way and non-destructively, with anything ambiguous surfaced for review
   instead of auto-merged. Two new simulations in CI (23/23, 25/25).
-- **Sessions 4-12 — not started.** See `docs/worklog/WORKLOG.md`.
+- **Session 4 — done (ASSUMPTIONS.md #48).** The ERP is now one workspace with
+  the spec's three-panel shell: sections (always visible) → subsections (open
+  on demand, collapse on choice or outside click) → content, with a bottom bar
+  and sheet on phones. A global bar landed with it: universal search across
+  clients, suppliers, projects, budgets, invoices and documents (grouped by
+  type, a hit opens the record); a "+ Crear" menu contextual to the active
+  section, calling the engine's own entry points so every validation still
+  applies; an alert bell with a live count and drill-down; and a period
+  selector (year/quarter/month/range) that filters the invoice, movement and
+  hours lists and always says how many rows it is hiding. `index.html`,
+  `dashboard.html`, `clientes.html` and `frontend.html` are retired to
+  redirect stubs, and both native shells' tabs now deep-link into the
+  workspace's sections. Spec'd-but-unbuilt subsections say what will live
+  there instead of opening blank. Site E2E: 53/53.
+- **Sessions 5-12 — not started.** See `docs/worklog/WORKLOG.md`.
 
 ## Branch & discipline
 
-Work lands on `claude/orin-project-status-1q50dt` (designated). Small
-conventional commits, every commit green, no force-push, no history rewrite.
+Work lands on the branch designated for the session — `claude/orin-project-
+status-1q50dt` for sessions 1-3, `claude/candi-programme-session-4-07amo8` for
+session 4. Small conventional commits, every commit green, no force-push, no
+history rewrite.
