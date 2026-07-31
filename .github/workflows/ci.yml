@@ -80,8 +80,14 @@ jobs:
       # The artifacts are committed (pages.yml publishes site/** from a bare
       # checkout with no Node). This proves the committed copies still match
       # the capability sources they were generated from.
-      - name: Committed bundle must match its source
-        run: git diff --exit-code -- site/erp-factory.js site/erp-factory.cjs
+      #
+      # The tracked check is not redundant: `git diff` ignores untracked files,
+      # so if the artifacts were ever deleted from the index the diff would
+      # pass silently while the deployed site served nothing.
+      - name: Committed bundle must be tracked and match its source
+        run: |
+          git ls-files --error-unmatch site/erp-factory.js site/erp-factory.cjs >/dev/null
+          git diff --exit-code -- site/erp-factory.js site/erp-factory.cjs
 
       # Lets a machine without a Node toolchain obtain a freshly built bundle:
       # download this artifact and commit it.

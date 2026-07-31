@@ -34,6 +34,13 @@
     "extraction-ocr": { "owner": "unbuilt", "specSection": "5.2 (Improvement #2)", "engineSection": null, "plannedSession": "7 / 8" },
     "journey-project-selector": { "owner": "unbuilt", "specSection": "2.3 (Improvement #3)", "engineSection": null, "plannedSession": "12" },
     "comunicaciones-templates": { "owner": "unbuilt", "specSection": "5.7", "engineSection": null, "plannedSession": "11" },
-    "three-panel-shell": { "owner": "unbuilt", "specSection": "1", "engineSection": null, "plannedSession": "4" }
+    "three-panel-shell": { "owner": "unbuilt", "specSection": "1", "engineSection": null, "plannedSession": "4" },
+    "task-status-summary": {
+      "owner": "factory",
+      "specSection": "2.2",
+      "engineSection": null,
+      "plannedSession": "2",
+      "note": "First area served by the capability layer. Task counts by status are computed by @repo/capability-scheduling via site/erp-bridge.js, not by ad-hoc filtering in the view. The underlying task records are still owned by erp-engine.js (see alerts-tasks-control-tower) — only this derivation moved, which is what made it safe to land first."
+    }
   }
 }

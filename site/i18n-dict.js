@@ -174,6 +174,9 @@ window.CANEI_DICT = {
     ["ERP › Economía", "ERP › Finance"],
     ["Hecho", "Done"],
     ["En curso", "In progress"],
+    ["Planificadas", "Planned"],
+    ["Hechas", "Done"],
+    ["Bloqueadas", "Blocked"],
     ["Sin empezar", "Not started"],
     [
       "Indicadores consolidados de toda la empresa. Cada indicador y alerta abre su detalle.",

@@ -180,6 +180,11 @@
 
 <script src="erp-engine.js"></script>
 <script src="erp-seed.js"></script>
+<!-- Typed capability layer: erp-factory.js is GENERATED from packages/erp-browser
+     (do not edit by hand); erp-bridge.js is the seam erp.html calls through.
+     Both degrade silently if unavailable, so the ERP still runs without them. -->
+<script src="erp-factory.js"></script>
+<script src="erp-bridge.js"></script>
 <script>
 /* =============================== boot & persistence =============================== */
 const $=s=>document.querySelector(s), el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
@@ -254,6 +259,19 @@ function render(){
   const v=$('#view');
   (VIEWS[cur]||VIEWS.torre)(v);
 }
+/* Task counts by status, computed by @repo/capability-scheduling through
+   ErpBridge — the first read that crosses into the typed capability layer.
+   Renders nothing at all if the bundle is unavailable, so the page is never
+   worse off than before it existed. Labels sit in their own text nodes so the
+   runtime i18n layer can translate them without a regex rule. */
+const TASK_STATUS_ES={planned:"Planificadas",in_progress:"En curso",done:"Hechas",blocked:"Bloqueadas"};
+function taskStatusTags(){
+  if(typeof ErpBridge==="undefined"||!ErpBridge.available)return"";
+  return ErpBridge.scheduling.taskSummary(erp.state)
+    .filter(s=>s.count>0)
+    .map(s=>`<span class="tag"><b>${s.count}</b> ${TASK_STATUS_ES[s.status]||s.status}</span>`)
+    .join("");
+}
 const pillProg=s=>s==="done"?'<span class="pill g">Hecho</span>':s==="inProgress"?'<span class="pill y">En curso</span>':'<span class="pill">Sin empezar</span>';
 
 const VIEWS={
@@ -311,7 +329,7 @@ const VIEWS={
      <div class="it"><b>${bo.paymentsDue}</b> pagos que vencen esta semana</div>
      <div class="it"><b>${bo.docsMissing}</b> documentos capturados por validar</div>
    </div></div></div>
-   <div class="card"><div class="ch"><h3>Tareas</h3></div><div class="scroll"><table><thead><tr><th>Tarea</th><th>Responsable</th><th>Vence</th><th>Estado</th></tr></thead><tbody>
+   <div class="card"><div class="ch"><h3>Tareas</h3>${taskStatusTags()}</div><div class="scroll"><table><thead><tr><th>Tarea</th><th>Responsable</th><th>Vence</th><th>Estado</th></tr></thead><tbody>
    ${erp.state.tasks.map(t=>`<tr><td class="k">${esc(t.title)}</td><td>${t.owner==="operations"?"Obra":"Oficina"}</td><td>${fmtD(t.due)}</td><td>${t.status==="open"?(t.due<erp.today?'<span class="pill r">Vencida</span>':'<span class="pill y">Abierta</span>'):'<span class="pill g">Hecha</span>'}</td></tr>`).join("")||'<tr><td colspan="4"><div class="empty">Sin tareas.</div></td></tr>'}
    </tbody></table></div></div>`;
  },
