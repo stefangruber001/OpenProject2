@@ -306,7 +306,17 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   `@repo/capability-scheduling`. zod tree-shakes out (5.7 KB bundle); CI
   builds, asserts browser-safety, and fails on drift or an untracked artifact.
   `CLAUDE.md` gained the neutral glossary the literal linter demands.
-- **Sessions 3-12 — not started.** See `docs/worklog/WORKLOG.md`.
+- **Session 3 — done (ASSUMPTIONS.md #47).** The persisted state now has a
+  version and a single owner. `site/erp-migrations.js` is a pure, idempotent
+  ladder (v1→v2 additive; a newer-than-build blob throws rather than being
+  downgraded); `site/erp-store.js` is the only module touching IndexedDB
+  (`caneiERP` v2 adds `blobs` + `meta`, `kv`/"state" unchanged, pre-migration
+  backup written). Fixed a live bug: `index.html` opened the database at a
+  hardcoded version and would have blanked the launchpad with `VersionError`
+  once the schema upgraded. Legacy `caneiMasterData` customers now fold in
+  one-way and non-destructively, with anything ambiguous surfaced for review
+  instead of auto-merged. Two new simulations in CI (23/23, 25/25).
+- **Sessions 4-12 — not started.** See `docs/worklog/WORKLOG.md`.
 
 ## Branch & discipline
 

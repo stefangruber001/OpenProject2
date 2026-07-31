@@ -29,7 +29,7 @@ session too, including ones started from a fresh chat off this file.
 |---|---|---|---|
 | 1 | Close the CI gap, freeze the baseline | done | 7195335 |
 | 2 | Capability bundle pipeline + bridge facade | done | defb928, 3134b29, 4854542, 5b14d52 |
-| 3 | Data foundation: schema versions, blobs, store merge | not started | — |
+| 3 | Data foundation: schema versions, blobs, store merge | done | 5bb2a43 |
 | 4 | Three-panel shell, global bar, retire pages | not started | — |
 | 5 | Scheduling capability: calendar + CPM + baselines | not started | — |
 | 6 | Gantt UI (SVG drag/resize/link) | not started | — |

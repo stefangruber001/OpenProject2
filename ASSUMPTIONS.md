@@ -473,3 +473,24 @@ languages: es-ES # source: synthetic
   regenerated — the new package's importer entry was hand-written and passed `--frozen-lockfile`
   in CI (shape recorded in `docs/worklog/SESSION-02.md`). Reversible: `erp.html` degrades to its
   previous behaviour if the bundle is absent, and nothing was removed from `erp-engine.js`.
+- **#47 — CANEI session 3: the persisted state gets a version, and one owner (2026-07-31).**
+  `ERP.from(json)` assigned the stored blob straight onto `this.state`, which is fine until the
+  shape changes and a live data-loss hazard the moment it does. Added `site/erp-migrations.js`
+  (pure, idempotent ladder; v1→v2 purely additive, declaring the four collections the engine
+  creates lazily plus `importConflicts`/`imports`) and `site/erp-store.js` (the only module that
+  touches IndexedDB; `caneiERP` v2 adds `blobs` + `meta` while leaving `kv`/`"state"` at exactly
+  the same coordinates so existing data is untouched; writes a one-shot `state.backup.v<n>` before
+  migrating). **Decisions:** (a) migration runs in the host, NOT inside `ERP.from` — putting it in
+  the engine would make `erp-engine.js` depend on the new persistence layer, the old→new direction
+  the strangler rule forbids, and would risk the two Node simulations that `require()` it.
+  (b) A blob newer than the build **throws** rather than being downgraded, and `erp.html` shows a
+  dedicated screen instead of reseeding over it — the case is real, because the web ships
+  continuously to `/preview` while the shells ship through store review. (c) Import conflicts
+  surface as a Torre *view banner*, not through the engine's `alerts()`, which `year-sim.mjs`
+  asserts on. (d) `caneiMasterData` is imported one-way but **not deleted** (most reversible);
+  `caneiFinance`/`caneiJourney` are deliberately untouched per spec §6 and session 12.
+  **Also fixed a live bug:** `index.html` hardcoded `indexedDB.open("caneiERP", 1)`, which would
+  have thrown `VersionError` and blanked the launchpad the moment `erp.html` upgraded the schema;
+  it now reads through `ErpStore` like every other page. Two new simulations (`migrations-sim`,
+  `import-sim`) run in CI; the import test asserts what the import must REFUSE as hard as what it
+  does. Reversible: `kv`/`"state"` coordinates unchanged, backups written, legacy stores intact.
