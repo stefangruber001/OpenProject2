@@ -9,7 +9,7 @@ in the operator's local plan file; the same content is restated at the top of
 
 | # | Session | Status | Commit(s) |
 |---|---|---|---|
-| 1 | Close the CI gap, freeze the baseline | done | see SESSION-01.md |
+| 1 | Close the CI gap, freeze the baseline | done | 7195335 |
 | 2 | Capability bundle pipeline + bridge facade | not started | — |
 | 3 | Data foundation: schema versions, blobs, store merge | not started | — |
 | 4 | Three-panel shell, global bar, retire pages | not started | — |
