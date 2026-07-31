@@ -126,6 +126,14 @@ jobs:
           SIM_MONTHS=24 SIM_PPM=2 node tests/simulation/year-sim.mjs 1
           node tests/simulation/manageability-sim.mjs
 
+      # Data foundation: replays the frozen real v1 blob through the schema
+      # ladder, and drives the one-way legacy import's decision logic — the two
+      # paths that can silently damage a live dataset.
+      - name: Schema migration + legacy import simulations
+        run: |
+          node tests/simulation/migrations-sim.mjs
+          node tests/simulation/import-sim.mjs
+
       - name: Ownership file guard (strangler-fig migration state)
         run: node tests/parity/ownership-guard.mjs
 

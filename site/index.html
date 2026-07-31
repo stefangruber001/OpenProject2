@@ -178,6 +178,8 @@
 
 <script src="erp-engine.js"></script>
 <script src="erp-seed.js"></script>
+<script src="erp-migrations.js"></script>
+<script src="erp-store.js"></script>
 <script>
 /* Live indicators from the SAME dataset the workspace uses (IndexedDB "caneiERP"). */
 (async function(){
@@ -186,9 +188,12 @@
   $('#today').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
   let erp;
   try{
-    const db=await new Promise((res,rej)=>{const r=indexedDB.open("caneiERP",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
-    const saved=await new Promise((res)=>{const t=db.transaction("kv","readonly").objectStore("kv").get("state");t.onsuccess=()=>res(t.result);t.onerror=()=>res(null);});
-    erp = saved ? ErpEngine.ERP.from(saved) : ErpSeed.build();
+    // Read through ErpStore, never by opening IndexedDB here: the database
+    // version is per-database, so a hardcoded version on this page would throw
+    // VersionError the moment erp.html upgraded the schema. Read-only — the
+    // launchpad shows indicators, it does not own the data.
+    const loaded=await ErpStore.loadState();
+    erp = loaded.state ? ErpEngine.ERP.from(loaded.state) : ErpSeed.build();
   }catch(e){ try{ erp=ErpSeed.build(); }catch(e2){ return; } }
   try{
     const ct=erp.controlTower(), op=erp.operationalDay(), bo=erp.backOfficeDay(), S=erp.state;

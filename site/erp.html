@@ -180,6 +180,9 @@
 
 <script src="erp-engine.js"></script>
 <script src="erp-seed.js"></script>
+<!-- Persistence: one module owns the IndexedDB version for every page. -->
+<script src="erp-migrations.js"></script>
+<script src="erp-store.js"></script>
 <!-- Typed capability layer: erp-factory.js is GENERATED from packages/erp-browser
      (do not edit by hand); erp-bridge.js is the seam erp.html calls through.
      Both degrade silently if unavailable, so the ERP still runs without them. -->
@@ -194,19 +197,49 @@ const eur0=c=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',max
 const fmtD=iso=>{if(!iso)return'—';const p=String(iso).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;};
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2200);}
 
-const DB="caneiERP",STORE="kv",KEY="state";
-function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
-async function idbGet(k){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(STORE,"readonly").objectStore(STORE).get(k);t.onsuccess=()=>res(t.result);t.onerror=()=>rej(t.error);});}
-async function idbSet(k,v){const db=await idb();return new Promise((res,rej)=>{const q=db.transaction(STORE,"readwrite").objectStore(STORE).put(v,k);q.onsuccess=()=>res();q.onerror=()=>rej(q.error);});}
-let saveT;function persist(){clearTimeout(saveT);saveT=setTimeout(()=>idbSet(KEY,erp.toJSON()).catch(()=>{}),140);}
+/* Persistence lives in erp-store.js — one module owns the IndexedDB version,
+   because a second page opening "caneiERP" at a different version would throw
+   VersionError and render nothing. */
+let saveT;function persist(){clearTimeout(saveT);saveT=setTimeout(()=>ErpStore.saveState(erp.toJSON()).catch(()=>{}),140);}
 
-let erp, cur="torre";
+let erp, cur="torre", bootNotice="";
 async function boot(){
-  try{const saved=await idbGet(KEY); erp = saved ? ErpEngine.ERP.from(saved) : ErpSeed.build();}
-  catch(e){ erp = ErpSeed.build(); }
-  if(!(await idbGet(KEY))) persist();
+  let migration=null, fresh=false;
+  try{
+    const loaded=await ErpStore.loadState();      // migrates + backs up if needed
+    migration=loaded.migration;
+    if(loaded.state){ erp=ErpEngine.ERP.from(loaded.state); }
+    else { erp=ErpSeed.build(); fresh=true; }
+  }catch(e){
+    // A blob newer than this build lands here. Never silently reseed over it:
+    // that would destroy the user's data to make the page render.
+    if(/schema v/i.test(String(e&&e.message))){
+      document.body.innerHTML='<div style="max-width:36rem;margin:18vh auto;padding:0 24px;font:15px/1.6 var(--sans,system-ui);color:#14160f">'
+        +'<h1 style="font-size:19px;margin:0 0 10px">Datos más recientes que la aplicación</h1>'
+        +'<p style="color:#4f5347">'+esc(e.message)+'</p>'
+        +'<p style="color:#8b8f80;font-size:13px">No se ha modificado nada. Actualiza la aplicación para volver a abrir estos datos.</p></div>';
+      return;
+    }
+    erp=ErpSeed.build(); fresh=true;
+  }
+
+  // One-way, non-destructive fold-in of the legacy master-data store. Runs at
+  // most once (recorded in state.imports); anything ambiguous becomes a
+  // reviewable conflict rather than an automatic overwrite.
+  let imported=null;
+  try{ imported=await ErpStore.importLegacyMasterData(erp); }catch(e){ /* never block boot */ }
+
+  if(fresh||migration?.applied.length||imported?.ran) persist();
+
+  const notes=[];
+  if(migration?.applied.length) notes.push(`Datos actualizados al formato v${migration.to} (copia de seguridad guardada).`);
+  if(imported?.ran&&imported.imported) notes.push(`${imported.imported} clientes importados de Datos Maestros.`);
+  if(imported?.ran&&imported.conflicts) notes.push(`${imported.conflicts} registros necesitan revisión.`);
+  bootNotice=notes.join(" ");
+
   if(location.hash) cur=location.hash.slice(1)||"torre";
   buildNav(); render();
+  if(bootNotice) toast(bootNotice);
 }
 function mutate(fn,msg){ try{ fn(); persist(); render(); if(msg)toast(msg);}catch(e){ toast("⚠ "+e.message); } }
 
@@ -264,6 +297,22 @@ function render(){
    Renders nothing at all if the bundle is unavailable, so the page is never
    worse off than before it existed. Labels sit in their own text nodes so the
    runtime i18n layer can translate them without a regex rule. */
+/* Rows the one-way legacy import refused to merge automatically. Surfaced
+   rather than silently dropped: an import that quietly discards records is
+   indistinguishable, to the operator, from one that never ran. */
+const IMPORT_CONFLICT_ES={yaExiste:"ya existe en el sistema",rechazado:"datos no válidos",sinNombre:"sin nombre"};
+function importConflictsBanner(){
+  const cs=(erp.state.importConflicts)||[];
+  if(!cs.length)return"";
+  const byReason={};cs.forEach(c=>{byReason[c.reason]=(byReason[c.reason]||0)+1;});
+  const detail=Object.keys(byReason).map(r=>`${byReason[r]} ${IMPORT_CONFLICT_ES[r]||r}`).join(" · ");
+  return `<div class="card" style="border-left:3px solid var(--spark);margin-bottom:14px"><div class="ch">
+    <h3>Registros importados que necesitan revisión</h3><span class="tag">${cs.length}</span></div>
+    <div style="font-size:13px;color:var(--body)">${esc(detail)}. No se ha sobrescrito ningún dato existente.</div>
+    <div class="scroll" style="margin-top:8px"><table><thead><tr><th>Registro</th><th>Origen</th><th>Motivo</th></tr></thead><tbody>
+    ${cs.slice(0,20).map(c=>`<tr><td class="k">${esc(c.label||c.ref||"—")}</td><td>${esc(c.source||"")}</td><td>${esc(IMPORT_CONFLICT_ES[c.reason]||c.reason)}${c.existingCode?" ("+esc(c.existingCode)+")":""}</td></tr>`).join("")}
+    </tbody></table></div></div>`;
+}
 const TASK_STATUS_ES={planned:"Planificadas",in_progress:"En curso",done:"Hechas",blocked:"Bloqueadas"};
 function taskStatusTags(){
   if(typeof ErpBridge==="undefined"||!ErpBridge.available)return"";
@@ -289,7 +338,7 @@ const VIEWS={
     ["Extras sin aprobar",ct.unapprovedExtras,"no facturables hasta aprobación","proyectos",ct.unapprovedExtras?"warn":""],
     ["Documentos por revisar",ct.docsAwaitingReview,"captura pendiente de validar","captura",""],
   ];
-  v.innerHTML=`<div class="kpis">${tiles.map(([lab,val,sub,dest,cls])=>`<div class="kpi ${cls}" data-go="${dest}"><div class="lab">${lab}</div><div class="val">${val}</div><div class="sub">${sub}</div></div>`).join("")}</div>
+  v.innerHTML=`${importConflictsBanner()}<div class="kpis">${tiles.map(([lab,val,sub,dest,cls])=>`<div class="kpi ${cls}" data-go="${dest}"><div class="lab">${lab}</div><div class="val">${val}</div><div class="sub">${sub}</div></div>`).join("")}</div>
    <div class="grid2">
     <div class="card"><div class="ch"><h3>Proyectos — presupuesto vs. real</h3><span class="tag">margen previsto</span></div>
       <div class="scroll"><table><thead><tr><th>Proyecto</th><th>Avance</th><th class="num">Venta</th><th class="num">Coste real</th><th class="num">Margen prev.</th></tr></thead><tbody>
