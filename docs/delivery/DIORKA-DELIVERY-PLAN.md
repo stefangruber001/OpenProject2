@@ -5,6 +5,17 @@ BRD's incremental-adoption principle and uses BRD §12 sign-off + §4.1
 measures as the acceptance contract. Requirement IDs refer to
 `intake/diorka/REQUIREMENTS-MAP.md` / the BRD.
 
+> **Superseded as the active plan-of-record (2026-07-31).** The owner's
+> `Requirements/20260731_REQUERMIENTOS BÁSICO CANEI.docx` functional spec is
+> broader than the BRD this plan was scoped against, and the current
+> implementation plan is the 12-session programme in `docs/worklog/
+> WORKLOG.md` (hybrid architecture: new domain logic as `packages/`
+> capabilities bundled into `site/erp-factory.js`, reached through
+> `site/erp-bridge.js`, `site/erp-engine.js` retired area by area). This R0-R4
+> release plan is kept as the historical record of what R0 actually shipped
+> and why — its acceptance-contract discipline (BRD §12 sign-off, real-data
+> UAT, gates green before "shipped") still applies to the new plan's sessions.
+
 ## Releases
 
 - **R0 Foundation — DONE, CI-verified**: multi-entity (ORG-01..03), es-ES VAT
