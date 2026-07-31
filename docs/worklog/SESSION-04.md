@@ -150,6 +150,12 @@ Everything below was executed for real on this machine (Node 22.22.2):
 | `ownership-guard.mjs`                                             | 25 areas valid — 19 engine · 1 factory · 5 unbuilt |
 | `pnpm --filter @repo/erp-browser build`                           | no drift (committed bundle byte-identical)         |
 
+Confirmed on GitHub's own infrastructure for commit `0ed8513`, not only
+locally: `CI` run 171 — all five jobs green (Lint · Types · Test · Build;
+End-to-end; Business simulations + ownership guard; Capability bundle drift;
+Durable adapters on Postgres) — and `Site E2E (autonomous journey)` run 19
+green.
+
 New e2e assertions worth knowing about, because they pin the spec's wording:
 seven sections with panel 2 collapsed at rest; a section press opens exactly
 its subsections; choosing one routes _and_ collapses; an outside click
@@ -196,6 +202,12 @@ period survives a reload (which is what proves it is in `meta`, not the blob).
   Torre, Mi Día and the project screens, each new list must consume
   `inPeriod()` / `periodNote()` or the spec's "affects all indicators" will
   quietly stay half-true.
+- The iOS shell keeps one web view per tab, so four of them now hold the same
+  page at different sections. They share the IndexedDB dataset but not their
+  in-memory copy of it, so a write in one tab is not reflected in another until
+  that tab reloads. This is not new — the tabs were always separate pages over
+  the same store — but it is more visible now that they are the same app. A
+  cheap fix when it starts to bite: re-read on `pageshow`/visibility change.
 - `master-data.html` still owns registers the engine has no home for
   (warehouses, stock, equipment, documents/compliance, automation rules); it is
   reachable as the Datos Maestros section and is deliberately unchanged (§7).
