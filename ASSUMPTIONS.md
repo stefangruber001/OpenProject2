@@ -450,3 +450,26 @@ languages: es-ES # source: synthetic
   — baseline confirmed green at 145/145, 206/206 and 34/34 invariants before any edit. The real
   `pnpm` gate was not run locally and should be the first check in the next session. Reversible:
   all changes are additive (new files, new CI job, widened trigger); no legacy behaviour removed.
+- **#46 — CANEI session 2: the capability seam, and how it is built without a local toolchain
+  (2026-07-31).** `packages/erp-browser` (a HOST package, outside the boundary linter's layer
+  matrix like `packages/factory`) bundles typed capabilities with esbuild into two committed
+  artifacts, `site/erp-factory.js` (IIFE) + `.cjs`, which `site/erp-bridge.js` calls on behalf of
+  `erp.html`. Committed rather than built at deploy time because `pages.yml` publishes `site/**`
+  from a bare checkout with no Node; CI rebuilds and diffs them, and also asserts they stay
+  tracked (`git diff` ignores untracked files, so a deleted artifact would pass silently).
+  **Decisions:** (a) the bundle build lives in `ci.yml`, not a `workflow_dispatch` workflow —
+  dispatch only registers from the default branch and this work never pushes to `main`; the job
+  uploads the artifact so a machine with no Node can still obtain a built bundle. (b) Browser
+  target `es2020`, not `es2019`/`safari14`: the conservative target made esbuild fail trying to
+  downlevel a dependency's destructuring, and had no audience — every runtime loading this bundle
+  is a modern WebView. (c) `"sideEffects": false` on all 16 capabilities + kernel so zod
+  tree-shakes out (verified: 5.7 KB bundle, no zod; CI fails if `ZodError` reappears).
+  (d) `BrowserIdGen` overrides the kernel's `RandomIdGen`, which calls
+  `globalThis.crypto.randomUUID()` — undefined in a non-secure context and older WKWebViews,
+  where it would throw on first id and blank the page. (e) The first bridge call is a *derived
+  read* (task counts by status in Mi día), not an ownership move: doing both at once would have
+  confounded "is the pipeline correct?" with "is the migration correct?". **Constraint worth
+  recording:** this environment has no Node/pnpm/esbuild, so `pnpm-lock.yaml` could not be
+  regenerated — the new package's importer entry was hand-written and passed `--frozen-lockfile`
+  in CI (shape recorded in `docs/worklog/SESSION-02.md`). Reversible: `erp.html` degrades to its
+  previous behaviour if the bundle is absent, and nothing was removed from `erp-engine.js`.

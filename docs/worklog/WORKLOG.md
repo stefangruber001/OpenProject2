@@ -28,7 +28,7 @@ session too, including ones started from a fresh chat off this file.
 | # | Session | Status | Commit(s) |
 |---|---|---|---|
 | 1 | Close the CI gap, freeze the baseline | done | 7195335 |
-| 2 | Capability bundle pipeline + bridge facade | not started | — |
+| 2 | Capability bundle pipeline + bridge facade | done | defb928, 3134b29, 4854542, 5b14d52 |
 | 3 | Data foundation: schema versions, blobs, store merge | not started | — |
 | 4 | Three-panel shell, global bar, retire pages | not started | — |
 | 5 | Scheduling capability: calendar + CPM + baselines | not started | — |

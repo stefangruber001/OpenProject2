@@ -296,7 +296,17 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   the programme depends on. Captured a frozen real state-v1 fixture
   (`tests/fixtures/state-v1-seed.json`) for the future migration ladder. No
   product code changed.
-- **Sessions 2-12 — not started.** See `docs/worklog/WORKLOG.md`.
+- **Session 2 — done (ASSUMPTIONS.md #46).** The seam exists.
+  `packages/erp-browser` (host layer) bundles typed capabilities with esbuild
+  into committed artifacts `site/erp-factory.{js,cjs}`, which
+  `site/erp-bridge.js` calls on behalf of `erp.html` — enforcing the rule the
+  whole migration rests on: delegation flows new→old, never back, so the Node
+  simulations against `erp-engine.js` keep passing untouched. First real call
+  across the seam: task counts by status in Mi día, computed by
+  `@repo/capability-scheduling`. zod tree-shakes out (5.7 KB bundle); CI
+  builds, asserts browser-safety, and fails on drift or an untracked artifact.
+  `CLAUDE.md` gained the neutral glossary the literal linter demands.
+- **Sessions 3-12 — not started.** See `docs/worklog/WORKLOG.md`.
 
 ## Branch & discipline
 
