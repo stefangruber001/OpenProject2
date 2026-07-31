@@ -45,6 +45,56 @@ jobs:
           DATABASE_URL: postgresql://user:pass@localhost:5432/db
           NEXT_PUBLIC_APP_URL: http://localhost:3000
 
+  bundle:
+    name: Capability bundle (build, browser-safety, drift)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build capability bundle
+        run: pnpm --filter @repo/erp-browser build
+
+      - name: Assert the bundle is browser-safe
+        run: |
+          test -s site/erp-factory.js  || { echo "erp-factory.js missing/empty";  exit 1; }
+          test -s site/erp-factory.cjs || { echo "erp-factory.cjs missing/empty"; exit 1; }
+          # The IIFE must expose the global site/erp-bridge.js reaches for.
+          grep -q "ErpFactory" site/erp-factory.js || { echo "global ErpFactory not found"; exit 1; }
+          # zod is a resolve-time concern and must tree-shake out of the browser
+          # bundle ("sideEffects": false on every capability enables that).
+          if grep -q "ZodError" site/erp-factory.js; then
+            echo "zod leaked into the browser bundle — check tree-shaking"; exit 1
+          fi
+          ls -l site/erp-factory.js site/erp-factory.cjs
+
+      # The artifacts are committed (pages.yml publishes site/** from a bare
+      # checkout with no Node). This proves the committed copies still match
+      # the capability sources they were generated from.
+      - name: Committed bundle must match its source
+        run: git diff --exit-code -- site/erp-factory.js site/erp-factory.cjs
+
+      # Lets a machine without a Node toolchain obtain a freshly built bundle:
+      # download this artifact and commit it.
+      - name: Upload bundle artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capability-bundle
+          path: |
+            site/erp-factory.js
+            site/erp-factory.cjs
+          retention-days: 7
+
   simulations:
     name: Business simulations (erp-engine invariants + ownership guard)
     runs-on: ubuntu-latest
