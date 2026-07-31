@@ -49,7 +49,7 @@ session too, including ones started from a fresh chat off this file.
 | 2   | Capability bundle pipeline + bridge facade             | done        | defb928, 3134b29, 4854542, 5b14d52 |
 | 3   | Data foundation: schema versions, blobs, store merge   | done        | 5bb2a43                            |
 | 4   | Three-panel shell, global bar, retire pages            | done        | 0ed8513                            |
-| 5   | Scheduling capability: calendar + CPM + baselines      | done        | (see SESSION-05)                   |
+| 5   | Scheduling capability: calendar + CPM + baselines      | done        | 6e18112                            |
 | 6   | Gantt UI (SVG drag/resize/link)                        | not started | —                                  |
 | 7   | Extraction capability + Spanish profile                | not started | —                                  |
 | 8   | OCR bridge + invoice capture (Improvement #2)          | not started | —                                  |

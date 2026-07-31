@@ -140,6 +140,10 @@ All executed here, on Node 22.22.2:
 | `node tests/site-e2e/run.mjs` (against the new 21.7 KB bundle) | **53/53**                                          |
 | Bundle browser-safety                                          | `ErpFactory` present, `ZodError` absent            |
 
+Confirmed on GitHub's own infrastructure for commit `6e18112`: `CI` run 173
+(all five jobs, including the new scheduling simulation) and `Site E2E`
+run 20 both green.
+
 The scheduling assertions worth knowing, because they pin the spec's wording:
 a two-day task starting Monday finishes Tuesday; its finish-to-start successor
 steps over both a closed day and the weekend; a milestone is a zero-duration
