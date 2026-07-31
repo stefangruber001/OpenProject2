@@ -129,7 +129,8 @@
       "owner": "unbuilt",
       "specSection": "3.3 / 4.3",
       "engineSection": null,
-      "plannedSession": "5 / 6"
+      "plannedSession": "6",
+      "note": "Session 5 built the domain half in @repo/capability-scheduling — working calendar, FS/SS/FF dependencies with lead/lag, forward/backward CPM pass with float and critical path, and append-only baselines — and it ships in the committed bundle (surface v2). Still 'unbuilt' on purpose: no screen reaches it yet, and an area is only 'factory' once erp.html genuinely goes through site/erp-bridge.js for it. Session 6 builds that chart and flips this."
     },
     "extraction-ocr": {
       "owner": "unbuilt",

@@ -522,3 +522,31 @@ languages: es-ES # source: synthetic
   moves `unbuilt` → `engine` with `engineSection: null` — it is view-layer only, and the schema has
   no "view" owner value. Reversible: the retired pages' previous content is one `git revert` away
   and no engine code changed.
+- **#49 — CANEI session 5: the planning engine, and where a calendar is allowed to live (2026-07-31).**
+  Spec §3.3 wants a Gantt with FS/SS/FF dependencies, positive and negative lag, a working calendar
+  with closures, automatic movement of the finish date, a critical path and a baseline frozen at
+  approval. Session 5 built all of that as domain code in `@repo/capability-scheduling`; the chart
+  itself is session 6. **Decisions:** (a) the working calendar is **data**, not knowledge —
+  `workingWeekdays` + `nonWorkingDates` arrive from the host, and the fallback for a plan with no
+  calendar is a **seven-day** week. Defaulting to Monday-Friday would have put a jurisdiction
+  assumption inside a capability, which the architecture forbids and the forbidden-literal linter
+  cannot catch. (b) Float and baseline drift are counted in **working days**: a plan crossing a
+  two-week closure has not slipped two weeks, and saying it has sends someone to a site meeting
+  with the wrong number. (c) Dragging a task sets a **start-no-earlier-than pin**, not a fixed
+  date — it holds the position a human chose but still moves when a predecessor pushes it later,
+  because the alternative is a chart that silently produces impossible plans. (d) **FS, SS and FF
+  only.** The spec names those three; start-to-finish is left unimplemented rather than
+  half-implemented. (e) Every new `Task`/`Plan` field is **optional**, so the hand-built plans
+  `site/erp-bridge.js` produces (no calendar, no durations, no links) still schedule — durations
+  are read back off the dates — and no persisted data needed migrating. There is a test pinned to
+  exactly that legacy shape. (f) The calendar walkers are **bounded** (3660 days): a config with no
+  working weekday is one typo away and would otherwise hang the scheduler instead of failing it.
+  (g) `scheduling-gantt` stays **`unbuilt`** in `site/erp-ownership.json` even though the domain now
+  exists and ships in the bundle — an area becomes `factory` when `erp.html` genuinely goes through
+  the bridge for it, and anything else makes that file describe intentions instead of code.
+  (h) `SURFACE_VERSION` 1 → 2, and the engine is reached as `service` rather than through named
+  passthroughs: wrapping an API before its caller exists is how a surface collects methods nobody
+  calls. **New guard:** `tests/simulation/scheduling-sim.mjs` drives the engine through the
+  **committed** `site/erp-factory.cjs`, keeping "the capability is correct" and "the artifact the
+  phones load is correct" as two separately-proven claims. Reversible: the capability's previous
+  API is untouched and nothing in `site/` calls the new code yet.

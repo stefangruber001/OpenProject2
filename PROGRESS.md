@@ -330,7 +330,22 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   redirect stubs, and both native shells' tabs now deep-link into the
   workspace's sections. Spec'd-but-unbuilt subsections say what will live
   there instead of opening blank. Site E2E: 53/53.
-- **Sessions 5-12 — not started.** See `docs/worklog/WORKLOG.md`.
+- **Session 5 — done (ASSUMPTIONS.md #49).** `@repo/capability-scheduling`
+  grew from a task list into a planning engine: a working calendar supplied as
+  data (no weekend, closure or country hardcoded — a five-day week is a local
+  convention, so the neutral fallback works every day), finish-to-start,
+  start-to-start and finish-to-finish dependencies with positive and negative
+  lag, a forward/backward CPM pass yielding total float and the critical path,
+  cycles refused by name, and append-only baselines whose drift is reported in
+  working days. Dragging a task sets a start-no-earlier-than pin, so it holds
+  a human's date while its successors still follow. Every new field is
+  optional, so the plans `site/erp-bridge.js` builds by hand keep scheduling
+  unmigrated. 30 vitest tests, plus a new simulation that drives the whole
+  engine through the **committed browser bundle** (16 checks, in CI) — the
+  artifact the phones load is a separate claim from the source being right.
+  No UI: the chart is session 6, and `scheduling-gantt` stays `unbuilt` until
+  a screen actually reaches it.
+- **Sessions 6-12 — not started.** See `docs/worklog/WORKLOG.md`.
 
 ## Branch & discipline
 

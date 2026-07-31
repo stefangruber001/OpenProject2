@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Planning engine in `@repo/capability-scheduling`: a working calendar
+  supplied as data (working weekdays + closed dates), finish-to-start,
+  start-to-start and finish-to-finish dependencies with positive and negative
+  lag, a critical-path pass giving each task its total float, automatic
+  movement of the plan's finish date, and append-only baselines whose drift is
+  reported in working days. It ships in the committed browser bundle
+  (`site/erp-factory.{js,cjs}`, surface version 2); no screen consumes it yet.
+
 ### Changed
 
 - The ERP workspace (`site/erp.html`) is the whole web app: three-panel

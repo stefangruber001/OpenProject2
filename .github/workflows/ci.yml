@@ -134,6 +134,12 @@ jobs:
           node tests/simulation/migrations-sim.mjs
           node tests/simulation/import-sim.mjs
 
+      # Drives the calendar/CPM/baseline engine through the COMMITTED bundle,
+      # so "the capability is correct" and "the artifact the phones load is
+      # correct" stay two separate, separately-proven claims.
+      - name: Scheduling engine simulation (committed bundle)
+        run: node tests/simulation/scheduling-sim.mjs
+
       - name: Ownership file guard (strangler-fig migration state)
         run: node tests/parity/ownership-guard.mjs
 

@@ -15,7 +15,19 @@
    ========================================================================== */
 
 import { SchedulingService } from "@repo/capability-scheduling";
-import type { Plan, StatusSummary, Task, TaskStatus } from "@repo/capability-scheduling";
+import type {
+  Baseline,
+  BaselineComparison,
+  Dependency,
+  DependencyType,
+  Plan,
+  Schedule,
+  ScheduledTask,
+  StatusSummary,
+  Task,
+  TaskStatus,
+  WorkCalendar,
+} from "@repo/capability-scheduling";
 import { SystemClock, type ClockPort, type IdGenPort } from "@repo/kernel";
 
 /**
@@ -56,10 +68,12 @@ export function defaultPorts(): FactoryPorts {
 /**
  * Scheduling surface.
  *
- * Today this exposes only read-side derivations, because the areas it could
- * own are still owned by site/erp-engine.js (see site/erp-ownership.json).
- * Session 5 of the programme grows this capability into the calendar/CPM
- * engine behind the Gantt; this surface is where that arrives.
+ * The named methods here are the read-side derivations the ERP calls today;
+ * the areas they touch are still owned by site/erp-engine.js (see
+ * site/erp-ownership.json). The calendar/CPM/baseline engine that landed in
+ * the capability is reached through `service`, deliberately un-wrapped: the
+ * chart that consumes it does not exist yet, and wrapping an API before its
+ * caller exists is how a surface acquires methods nobody ever calls.
  */
 export function createScheduling(ports: FactoryPorts = defaultPorts()) {
   const svc = new SchedulingService({
@@ -85,11 +99,27 @@ export function createScheduling(ports: FactoryPorts = defaultPorts()) {
   };
 }
 
-export type { Plan, StatusSummary, Task, TaskStatus };
+export type {
+  Baseline,
+  BaselineComparison,
+  Dependency,
+  DependencyType,
+  Plan,
+  Schedule,
+  ScheduledTask,
+  StatusSummary,
+  Task,
+  TaskStatus,
+  WorkCalendar,
+};
 
 /**
  * Bumped by hand when the shape of this surface changes in a way
  * site/erp-bridge.js must notice. Not a build stamp — a build stamp would
  * churn the committed bundle on every commit and defeat the CI drift check.
+ *
+ * 2 — `service` gained the calendar/CPM/baseline engine. A caller reaching
+ *     for `service.schedule` against a version-1 artifact would find nothing
+ *     there, which is exactly the staleness this number exists to catch.
  */
-export const SURFACE_VERSION = 1;
+export const SURFACE_VERSION = 2;
