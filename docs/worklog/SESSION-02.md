@@ -4,8 +4,14 @@
 
 ```
 Repo stefangruber001/OpenProject2 · branch claude/orin-project-status-1q50dt
-Spec: Requirements/20260731_REQUERMIENTOS BÁSICO CANEI.docx
+Spec: "20260731_REQUERMIENTOS BÁSICO CANEI.docx" (see NOTE below)
 Plan + session index: docs/worklog/WORKLOG.md  (12 sessions; this was #2)
+
+NOTE ON THE SPEC FILE: it is NOT in this repository. It is held by the
+operator (OneDrive: Nacho Consulting/Diorca/Requirements/). The repo contains
+only the older, superseded BRD at intake/diorka/. If you cannot open the spec
+from where you are running, work from this worklog + PROGRESS.md and ask the
+operator rather than guessing at section content.
 
 THE SEAM NOW EXISTS. Architecture, concretely:
 
