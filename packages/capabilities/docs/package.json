@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic document capability: a metadata register attaching documents to any entity, with tags and versions, over an injected blob-store port (fake in dev). No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

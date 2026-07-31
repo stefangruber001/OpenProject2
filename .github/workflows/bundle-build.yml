@@ -1,0 +1,73 @@
+name: Build capability bundle (artifact)
+
+# Manual utility: builds site/erp-factory.js + site/erp-factory.cjs from
+# packages/erp-browser and uploads them, together with the resulting
+# pnpm-lock.yaml, as a downloadable artifact.
+#
+# Why this exists: the committed bundle must be regenerated whenever the
+# capabilities it composes change, but neither the operator's machine nor the
+# Pages deploy job has a Node toolchain. This workflow is the build machine —
+# dispatch it, download the artifact, commit the files.
+#
+#   gh workflow run bundle-build.yml --ref claude/orin-project-status-1q50dt
+#   gh run download <run-id> -n capability-bundle -D /tmp/bundle
+#
+# It installs with --no-frozen-lockfile on purpose, so it also works as the
+# authority on what pnpm-lock.yaml *should* contain after a dependency change.
+# CI (ci.yml) is what enforces that the committed bundle matches its source.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bundle:
+    name: Build and upload
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies (lockfile may be updated)
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Report lockfile drift
+        run: |
+          if git diff --quiet pnpm-lock.yaml; then
+            echo "pnpm-lock.yaml unchanged — the committed lockfile is correct."
+          else
+            echo "::warning::pnpm-lock.yaml changed during install — commit the copy from this artifact."
+            git --no-pager diff --stat pnpm-lock.yaml
+          fi
+
+      - name: Build capability bundle
+        run: pnpm --filter @repo/erp-browser build
+
+      - name: Assert the bundle is browser-safe
+        run: |
+          test -s site/erp-factory.js  || { echo "erp-factory.js missing/empty";  exit 1; }
+          test -s site/erp-factory.cjs || { echo "erp-factory.cjs missing/empty"; exit 1; }
+          # The IIFE must expose the global erp-bridge.js expects.
+          grep -q "ErpFactory" site/erp-factory.js || { echo "global ErpFactory not found"; exit 1; }
+          # zod is a resolve-time concern; it must tree-shake out of the browser
+          # bundle (every capability sets "sideEffects": false to allow that).
+          if grep -q "ZodError" site/erp-factory.js; then
+            echo "zod leaked into the browser bundle — check tree-shaking"; exit 1
+          fi
+          ls -l site/erp-factory.js site/erp-factory.cjs
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: capability-bundle
+          path: |
+            site/erp-factory.js
+            site/erp-factory.cjs
+            pnpm-lock.yaml
+          retention-days: 7

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic CRM capability: customer register, leads with a configurable pipeline, next-action tracking and overdue detection. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

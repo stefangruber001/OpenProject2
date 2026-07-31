@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic planning capability: tasks and milestones with planned dates, assignee and status, overdue detection and by-assignee/status summaries. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic access capability: roles carrying permissions, member assignments and a permission-check engine (wildcard supported). No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

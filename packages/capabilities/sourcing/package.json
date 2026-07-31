@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic sourcing capability: multi-bidder price comparison over quantified lines — dated/sourced prices, per-group totals, variance vs baseline, missing-price visibility, explicit selection. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

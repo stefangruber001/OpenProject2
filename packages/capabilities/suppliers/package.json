@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic supplier capability: a supplier register with effective-dated purchase prices per item (source + optional discount) and net-price resolution at a date. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

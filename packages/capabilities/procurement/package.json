@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic procurement capability: purchase orders with lines per chapter/project, a draft→sent→received lifecycle, committed-cost rollup by chapter and over-budget detection. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

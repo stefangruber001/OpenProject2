@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic accounts-payable capability: supplier bills with duplicate-number detection, partial payments, outstanding balances and due lists. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

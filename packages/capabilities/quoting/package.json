@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic quoting capability: quotes, sections, lines, totals, acceptance. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

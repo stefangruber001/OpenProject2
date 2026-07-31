@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic project-control capability: a project created from an accepted quote as an immutable baseline; committed/actual cost tracking; change orders that preserve the baseline; margin and quoted-vs-actual variance by chapter; forecast profit. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

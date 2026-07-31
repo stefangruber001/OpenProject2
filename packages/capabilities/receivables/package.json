@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic accounts-receivable capability: register customer invoices, record receipts with partial allocation across invoices, outstanding balances and aging/due lists. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

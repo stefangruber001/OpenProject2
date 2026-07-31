@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic site-visit capability: capture a visit with notes, room measurements and photo references, linked to a customer/lead, with area roll-up. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

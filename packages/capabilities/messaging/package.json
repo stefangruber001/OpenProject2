@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic messaging capability: auto-draft outgoing email from lifecycle events + data-supplied templates, send through an injected outbox port. Ships a log-only dev adapter that never touches the network. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

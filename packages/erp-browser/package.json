@@ -1,0 +1,20 @@
+{
+  "name": "@repo/erp-browser",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Host layer: bundles selected capabilities into a browser-loadable module (site/erp-factory.js) and a Node twin (site/erp-factory.cjs) so the static ERP can consume the same typed domain code the factory composes. Not a capability — it is a host, like packages/factory and apps/web, and is therefore outside the boundary linter's layer matrix.",
+  "scripts": {
+    "build": "node build.mjs",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/capability-scheduling": "workspace:*",
+    "@repo/kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "esbuild": "^0.28.1",
+    "typescript": "5.9.2"
+  }
+}

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic catalogue capability: a register of work/material items (code, chapter, unit, cost/price) and room templates that expand into quote lines. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"

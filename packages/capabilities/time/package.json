@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Generic time-tracking capability: labour time entries against a project/chapter/person, hours and labour-cost roll-ups. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"
