@@ -11,11 +11,16 @@ Spec: "20260731_REQUERMIENTOS BÁSICO CANEI.docx" — a Spanish
 functional spec (8 sections + 3 improvements + Anexo A code-contrast) for the
 Canei Subirats ERP. Read docs/worklog/WORKLOG.md for the full 12-session plan
 
-NOTE ON THE SPEC FILE: it is NOT in this repository. It is held by the
-operator (OneDrive: Nacho Consulting/Diorca/Requirements/). The repo contains
-only the older, superseded BRD at intake/diorka/. If you cannot open the spec
-from where you are running, work from this worklog + PROGRESS.md and ask the
-operator rather than guessing at section content.
+THE SPEC IS IN THE REPO:
+  intake/diorka/20260731_REQUERMIENTOS BÁSICO CANEI.docx   (source of truth)
+  intake/diorka/canei-spec-extracted.txt                   (plain text — read
+      this one; it is greppable and needs no Word). Section numbering matches
+      the docx: 1 navigation · 2 Principal · 3 Comercial · 4 Proyectos ·
+      5 Administración · 6 Contabilidad · 7 Datos Maestros · 8 Reportes ·
+      Anexo A = the code-vs-spec gap table.
+  intake/diorka/Proyecto_Diorka_Business_Requirements.docx is the OLDER,
+      superseded BRD — useful for the XXX-00 requirement ids the code cites
+      (MDM-03, CAP-04, GES-07 …), not for current scope.
 and where this session sits in it (#1 of 12, no dependencies).
 
 Programme architecture (do not re-derive, do not revisit):

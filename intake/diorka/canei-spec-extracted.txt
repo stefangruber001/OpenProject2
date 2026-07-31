@@ -1,0 +1,412 @@
+CANEI — Especificación funcional del sistema de gestión
+Diseño, operación y flujo de trabajo · versión para planificación técnica
+Este documento define cómo debe operar el sistema: qué muestra cada área, qué puede hacerse en ella y cómo se encadenan las acciones. Es la base sobre la que se planificará después la reestructuración del código; no contiene todavía dicho plan.
+Cómo está organizado. Cada sección y subsección se abre con el propósito del área y continúa con su especificación funcional: disposición de pantalla, acciones de gestión disponibles, flujo operativo, reglas y alertas, enlaces con el resto del sistema y trazabilidad.
+Principio rector. Todas las áreas son de gestión, no de consulta: en cada una debe poderse crear, modificar, eliminar, aprobar, enviar y generar. La visualización existe para soportar la decisión, nunca como fin en sí misma.
+Trazabilidad. Las referencias entre corchetes —por ejemplo [MDM-03] o [GES-07]— remiten a los requisitos del documento «Proyecto Diorka — Business Requirements v2», de modo que cada decisión de diseño pueda seguirse hasta su origen.
+Estado del código. El anexo A recoge el contraste de esta especificación con el código existente hoy en la rama de desarrollo del repositorio, indicando para cada área qué está construido, qué está parcialmente construido y qué no existe.
+1.  Modelo de navegación y fundamentos de diseño
+Al iniciar sesión, el sistema abre directamente Principal → Torre de Control. La página de inicio actual se elimina y deja de existir como pantalla intermedia.
+La navegación se organiza en tres paneles. El panel de Secciones permanece siempre visible en el lado izquierdo. Al pulsar una sección se despliega a su derecha un segundo panel con las Subsecciones, que en estado normal permanece oculto. Al elegir una subsección cambia el contenido del panel principal y el panel de subsecciones se repliega.
+Ejemplo de referencia:
+	•	Estado basal:
+Panel principal
+Panel principal
+Secciones
+Secciones
+
+
+
+	•	Estado con sección seleccionada:
+Panel principal
+Panel principal
+Subsecciones
+Subsecciones
+Secciones
+Secciones
+ 
+
+
+Fundamentos de diseño y patrones comunes
+— Estructura de tres paneles. Panel 1 (Secciones), fijo a la izquierda, ancho ~72 px, sólo icono + etiqueta corta, siempre visible. Panel 2 (Subsecciones), ~240 px, oculto por defecto; se despliega al pulsar una sección y se repliega al elegir subsección o al pulsar fuera. Panel 3 (principal), ocupa el resto y es el único que cambia de contenido. En móvil los paneles 1 y 2 se convierten en un menú inferior + hoja desplegable.
+— Barra superior global. Buscador universal (clientes, proyectos, presupuestos, facturas, proveedores, documentos) con resultados agrupados por tipo; botón «+ Crear» contextual (crea lo que corresponda a la sección activa); campana de alertas con contador; selector de periodo (mes, trimestre, año, rango) que afecta a todos los indicadores; acceso al perfil y a la ayuda.
+— Patrón de trabajo único en todas las áreas. Toda área de gestión se comporta igual: (1) Lista/tabla con búsqueda, filtros combinables, orden y columnas configurables; (2) ficha de detalle que se abre en panel lateral (drawer) sin perder la lista; (3) edición en línea y formulario completo en la ficha; (4) acciones masivas por selección múltiple. Aprender un área es aprenderlas todas.
+— Ficha estándar por pestañas. Toda ficha (cliente, proyecto, proveedor, contrato, factura) usa las mismas pestañas: Datos, Relaciones (enlaces a otros objetos), Documentos, Comunicaciones, Historial/Auditoría. Cabecera fija con nombre, código, estado y las 3-4 cifras clave del objeto.
+— Acciones, no sólo consulta. Cada pantalla debe declarar explícitamente qué se puede crear, modificar, eliminar, aprobar, enviar y generar desde ella. Toda tabla ofrece Importar, Exportar y Crear; toda ficha ofrece Editar, Duplicar, Cambiar estado, Generar documento y Enviar.
+— Estados y semáforo consistentes. Códigos de color únicos en todo el sistema: verde = correcto/al día, ámbar = requiere atención/próximo a vencer, rojo = riesgo/vencido/bloqueado, gris = inactivo o borrador. Los estados se muestran siempre como etiqueta (pill) con el mismo vocabulario.
+— Todo indicador es navegable. Cualquier número, barra o gráfico permite pulsar y descender al detalle que lo compone, y desde ahí al objeto de origen (cliente, proyecto, factura, movimiento). Sin excepción [DAS-03].
+— Trazabilidad y seguridad de la operación. Registro de auditoría (quién, qué, cuándo, valor anterior y nuevo) en toda creación, modificación y eliminación. Confirmación explícita en acciones irreversibles. Borrado lógico con papelera y restauración durante 30 días. Documentos y numeraciones nunca se borran: se anulan o rectifican.
+— Movilidad. Las acciones de obra (visita, avance, foto de factura, horas, incidencia) deben poder completarse desde el móvil en menos de un minuto y con conectividad intermitente [NFR-03, NFR-04].
+— Idioma y marca. Interfaz en español; documentos al cliente en español y catalán. Todo documento emitido lleva logotipo y datos fiscales completos [DOC-01].
+El sistema se organiza en las ocho secciones siguientes.
+2.  Principal
+2.1  Torre de Control
+Pantalla de entrada del sistema y cuadro de mando del negocio. Reúne los indicadores de dirección, el estado de los proyectos y las alertas abiertas.
+Sustituir el bloque de indicadores actual, presentado todo en el mismo color blanco, por el conjunto siguiente:
+
+	•	Proyectos activos: número (grande) monto contratado (pequeño)
+	•	Resultado operativo del mes en curso: monto (grande) y Ingresos – Gastos (pequeño)
+	•	Resultado operativo del trimestre en curso: monto (grande) y Ingresos – Gastos (pequeño)
+	•	Saldo bancos: actual (grande) y Cierre mes anterior (pequeño)
+	•	Proyección de caja: 7 días (grande) y 14 días y 30 días (pequeño)
+	•	Pagos a proveedores: semana actual (grande) y próxima semana (pequeño)
+	•	Oportunidades abiertas: número (grande) y Contratadas/Perdidas últimos 12 meses (Pequeño)
+	•	Visitas: nºpendientes (grande) y nºrealizadas últimos 30 días (pequeño)
+Proyectos (cuadro existente). Columnas: proyecto, avance en barra y porcentaje, venta acumulada real, coste acumulado real y margen acumulado real.
+
+Alertas (cuadro existente).
+
+Diseño, operación y flujo
+— Disposición de la pantalla. Tres franjas: (1) rejilla de 8 tarjetas de indicador (4 columnas en escritorio, 2 en tablet, 1 en móvil); (2) tabla de Proyectos; (3) panel de Alertas. El orden y la visibilidad de cada bloque son configurables por usuario y se guardan.
+— Anatomía de la tarjeta de indicador. Cada tarjeta: título breve arriba; cifra principal grande; cifra o comparativa secundaria pequeña debajo; micro-gráfico de tendencia (sparkline) de los últimos 12 periodos; variación frente al periodo anterior con flecha y color; punto de color si supera umbral. Fondo blanco, una sola tinta de color por tarjeta, sin degradados.
+— Destino del descenso a detalle (por tarjeta). Proyectos activos → lista de proyectos filtrada. Resultado del mes/trimestre → Contabilidad y Finanzas con el periodo aplicado. Saldo bancos → Banco & Caja. Proyección de caja → detalle de cobros y pagos previstos. Pagos a proveedores → Proveedores & pagos filtrado por vencimiento. Oportunidades abiertas → embudo comercial. Visitas → calendario de visitas.
+— Acciones de gestión desde la Torre. Definir el umbral de cada indicador que dispara alerta; fijar, ocultar y reordenar tarjetas; cambiar el periodo global; exportar la vista a PDF/Excel; crear directamente desde aquí una visita, un presupuesto, una factura o una tarea; marcar un proyecto como prioritario.
+— Tabla de Proyectos. Columnas: proyecto, cliente, avance (barra + %), venta acumulada real, coste acumulado real, margen acumulado (importe y %), desviación frente a presupuesto y próxima fecha crítica. Orden por cualquier columna, filtro por estado y responsable. Pulsar la fila abre el proyecto; el avance puede actualizarse en línea sin salir de la Torre.
+— Panel de Alertas como gestor, no como aviso. Cada alerta debe poder asignarse a un responsable, ponerle fecha límite, posponerse (snooze), convertirse en tarea, resolverse con nota y adjuntar evidencia. Agrupación por tipo (económica, técnica, documental, fiscal) y por proyecto. Editor de reglas: el propietario define condición, umbral, destinatario y canal de aviso.
+— Actualización y periodo. Cifras recalculadas al abrir y refresco manual visible; fecha y hora del último cálculo siempre a la vista, para que el usuario sepa a qué momento corresponde el dato.
+— Trazabilidad. DAS-01 a DAS-16; FIN-01 a FIN-04.
+2.2  Mi Día
+Se mantienen los cuadros existentes y se añade un calendario de hitos importantes: hitos de proyecto, envío de reportes contables a la gestoría, presentación y pago de impuestos, vencimientos de contrato y de garantía, y entregas de material comprometidas.
+
+Diseño, operación y flujo
+— Disposición. Dos columnas: izquierda, lista «Hoy» y «Esta semana» (visitas, tareas, vencimientos, entregas de material); derecha, calendario mensual con los hitos importantes. En móvil, sólo la lista con acceso al calendario.
+— Contenido del calendario de hitos. Hitos de proyecto (inicio, fases, entrega), hitos de cobro y de pago, entregas de material comprometidas, vencimientos de contrato y de garantía, envío de documentación a la gestoría, presentación y pago de impuestos, caducidad de seguros y documentación obligatoria de subcontratas. Cada tipo con color e icono propios y filtro de visibilidad.
+— Acciones de gestión. Crear visita, tarea, hito o recordatorio desde el propio calendario; arrastrar para reprogramar (con aviso si afecta a dependencias de obra); asignar responsable; marcar completado; adjuntar nota o foto; convertir una tarea en oportunidad, parte de obra o incidencia.
+— Reglas y automatismos. Los hitos fiscales y de gestoría se generan solos a partir del calendario del ejercicio. Los hitos de obra y de cobro se heredan del contrato y de la carta Gantt, y se mueven cuando la planificación cambia. Aviso configurable con antelación por tipo de hito.
+— Trazabilidad. DAS-04; PLN-01; GES-01.
+2.3  Recorrido completo
+Se mantiene el recorrido de trece etapas tal como está hoy, con una única incorporación: la selección del proyecto sobre el que se trabaja.
+Diseño, operación y flujo
+— Alcance. Se mantienen la estructura de trece etapas y su funcionamiento actual. La única incorporación es la selección del proyecto sobre el que se trabaja, que se detalla a continuación.
+— Doble función. Con un proyecto nuevo se comporta como hoy: recorrido guiado, demostración del sistema y guía de aprendizaje para usuarios nuevos. Con un proyecto existente pasa a ser además el espacio de trabajo de ese proyecto.
+— Enlace con el resto del sistema. En cada etapa, acceso directo a la pantalla real correspondiente (cliente, presupuesto, contrato, obra, facturación), de modo que el recorrido sirva también como lista de puesta en marcha del proyecto.
+Selección de proyecto en el recorrido
+— Comportamiento por defecto. Al abrir el Recorrido completo, la opción activa es «Crear nuevo proyecto», que inicia el recorrido en blanco. Es el comportamiento predeterminado y no requiere ninguna selección previa.
+— Filtro de proyectos existentes. Junto a la opción anterior se ofrece «Proyecto existente», con una lista desplegable de los proyectos ya registrados, buscable y filtrable por estado, cliente y fecha. Al elegir uno, el recorrido carga toda la información real de ese proyecto en cada una de las trece etapas, de modo que puedan consultarse y continuarse desde el punto en que se encuentre.
+— Estado por etapa. Cada etapa muestra si está completa, en curso o pendiente para el proyecto cargado, con sus datos, documentos y fotografías reales. El recorrido deja de ser una demostración para convertirse también en el espacio de trabajo del proyecto.
+— Acciones de gestión. Cambiar de proyecto sin perder lo introducido; continuar un proyecto en la etapa en que se quedó; duplicar un proyecto existente como punto de partida de uno nuevo; y descargar la carpeta completa del proyecto.
+— Reglas. El cambio de proyecto pide confirmación si hay cambios sin guardar. El proyecto cargado queda indicado de forma visible durante todo el recorrido, para evitar trabajar sobre el proyecto equivocado.
+3.  Comercial
+Diseño, operación y flujo
+— Propósito. Cubre todo lo anterior a la firma: quién es el cliente, qué pide, cuánto cuesta, qué se le ofrece y con qué condiciones se contrata. Su salida (contrato firmado + presupuesto aceptado + carta Gantt) es la entrada de la sección Proyectos.
+— Panel de entrada de la sección. Al entrar en Comercial, antes de elegir subsección, se muestra un embudo: oportunidades abiertas → visitas pendientes → presupuestos enviados → aceptados → contratos firmados, con importe y número en cada etapa, y tasa de conversión de los últimos 12 meses.
+— Continuidad del dato. Un mismo hilo recorre las cuatro subsecciones sin reintroducir información: Cliente → Oportunidad → Visita → Presupuesto (versiones) → Contrato → Proyecto. Cada paso hereda del anterior y conserva el enlace de vuelta.
+3.1  Clientes
+Área de gestión de la cartera de clientes: creación, modificación y eliminación, con todas las entradas identificadas como necesarias. Sustituye a lo que hoy es «Customer Management».
+Se elimina de esta pantalla el acceso a Datos Maestros y a Sample Data. La barra de herramientas conserva únicamente cuatro acciones: Inicio, Importar, Exportar y Crear Cliente.
+En el detalle que se despliega al pulsar un cliente, si éste tiene proyectos activos debe existir un enlace directo a cada uno de ellos.
+
+Diseño, operación y flujo
+— Barra de herramientas (según lo indicado). Sólo cuatro acciones: Inicio, Importar, Exportar y Crear Cliente. Se elimina el acceso a Datos Maestros y a Sample Data desde esta pantalla.
+— Disposición. Cabecera con 5 indicadores de cartera (total clientes, activos, prospectos, clientes con proyecto en curso, importe contratado vivo). Debajo, buscador + filtros (estado, segmento, tipo B2C/B2B, origen, población, etiqueta) y tabla. Al pulsar una fila se abre la ficha en panel lateral.
+— Columnas de la tabla. Cliente (nombre + código + población), tipo, contacto (persona + email/teléfono), estado, segmento de relación, nº de proyectos, importe contratado, saldo pendiente de cobro y última interacción. Columnas configurables y vistas guardadas.
+— Ficha de cliente por pestañas. (1) Identificación y fiscal: nombre legal y comercial, NIF/CIF, tipo, dirección fiscal, idioma, código contable. (2) Contactos: varias personas con cargo, canal preferente y contacto principal. (3) Direcciones: fiscal, de obra y de envío, con posibilidad de varias propiedades. (4) Condiciones comerciales: forma y plazo de pago, IBAN y mandato SEPA, tarifa aplicable, descuento, límite de crédito, retención. (5) Proyectos. (6) Oportunidades y presupuestos. (7) Facturación y cobros. (8) Comunicaciones. (9) Documentos. (10) Historial/auditoría.
+— Enlace a proyectos activos (requerido). En la ficha, si el cliente tiene proyectos, se muestra la lista con nombre, estado, avance %, importe contratado y saldo pendiente; cada uno es un enlace directo que abre el proyecto en la sección Proyectos con el contexto ya seleccionado. Si no tiene, se ofrece «Crear oportunidad» o «Crear presupuesto».
+— Acciones de gestión. Crear, modificar y eliminar cliente; activar/desactivar; fusionar duplicados conservando el histórico; validar NIF/CIF; cambiar segmento de relación; registrar consentimiento RGPD; crear desde el cliente una oportunidad, una visita, un presupuesto o una factura; enviar email con plantilla; añadir nota de comunicación; adjuntar documento; exportar ficha completa en PDF; importar y exportar cartera en Excel/CSV con plantilla y validación previa.
+— Reglas y validaciones. NIF/CIF validado en formato y dígito de control, con detección de duplicados [MDM-03]. Datos fiscales obligatorios completos antes de poder emitir presupuesto, contrato o factura [MDM-02]. No se permite eliminar un cliente con documentos económicos asociados: se desactiva y se conserva el histórico. Aviso al modificar datos fiscales si existen documentos ya emitidos.
+— Segmentación y relación. Segmento editable (nuevo, activo, recurrente, VIP, en riesgo, inactivo) calculable además de forma automática por facturación de los últimos 12 meses, número de proyectos y antigüedad; el usuario puede fijarlo manualmente y el sistema indica cuándo el valor calculado difiere.
+— Trazabilidad. MDM-01 a MDM-26; CRM-02, CRM-03; DOC-02.
+3.2  Oportunidades y Visitas
+Se mantiene el enfoque actual, desarrollado según el diseño siguiente.
+Diseño, operación y flujo
+— Disposición. Dos vistas conmutables: (1) Embudo Kanban con una columna por etapa (nueva, cualificada, visita agendada, visita realizada, presupuesto enviado, negociación, ganada, perdida), tarjetas arrastrables con cliente, importe estimado, responsable y próxima acción; (2) Calendario de visitas por semana y responsable. Vista de mapa opcional para agrupar visitas por zona.
+— Acciones de gestión. Crear oportunidad (manual o desde cliente); mover de etapa arrastrando; agendar visita con responsable, fecha y duración; registrar la visita desde el móvil; convertir la oportunidad en presupuesto heredando cliente, dirección, alcance y mediciones; marcar ganada o perdida con motivo tipificado; reasignar responsable; fijar próxima acción con fecha.
+— Ficha de visita (captura en obra). Dirección y cliente; trabajos solicitados; mediciones con unidad por estancia o zona; fotografías asociadas a la estancia o partida; condicionantes de acceso y de vivienda ocupada; supuestos y exclusiones; notas de voz transcritas. Todo ello viaja después al presupuesto sin volver a teclearse [VIS-01 a VIS-16].
+— Reglas y alertas. Alerta de oportunidad sin actividad durante X días (configurable); aviso de visita realizada sin presupuesto pasados Y días; motivo obligatorio al marcar perdida, con informe posterior de motivos de pérdida.
+— Trazabilidad. CRM-01 a CRM-14; VIS-01 a VIS-16.
+3.3  Presupuestos y Ofertas
+Constructor de presupuestos, registro de versiones de las ofertas realizadas, carga de ofertas de subcontratas y materiales con sus versiones —enlazadas con Proyectos y con Administración—, visualización de márgenes operativos, envío automático y registro de aceptación.
+Incorpora además la generación de la carta Gantt a partir del presupuesto enviado y aprobado. Esta zona es la entrada del seguimiento técnico y económico de obra, por lo que su diseño debe ser simple y a la vez completo: con dependencias, desfases hacia atrás y hacia adelante, y desplazamiento automático de la fecha de cierre según las dependencias previas.
+Diseño, operación y flujo
+— Disposición del constructor. Tres zonas simultáneas: izquierda, árbol de capítulos y partidas con totales por capítulo; centro, rejilla editable tipo hoja de cálculo (código, descripción, unidad, cantidad, precio coste, precio venta, importe, margen, estado de la línea); derecha, panel fijo de totales en vivo (base, IVA, retención, total, margen en importe y %, e importe de líneas pendientes). El panel derecho recalcula con cada tecla.
+— Alta de líneas. Desde catálogo de partidas, desde un presupuesto anterior, desde una plantilla por tipo de obra, por duplicado de línea o manualmente. Mediciones por estancia con subtotales y porcentaje de merma. Líneas marcables como «pendiente de precio» que no suman al total pero quedan visibles [PRE-04].
+— Gestión de versiones. Numeración automática de versión; cada versión emitida se congela y queda consultable con fecha, autor y motivo de la revisión; comparador visual de dos versiones que muestra líneas añadidas, eliminadas, cambios de cantidad y de precio, con el efecto sobre el total; una sola versión «actual» y como máximo una «aceptada» [QUO-01 a QUO-24].
+— Ofertas de subcontratas y materiales. Solicitud de oferta a varios proveedores desde las partidas del presupuesto; carga de la oferta recibida (PDF/Excel/foto) con extracción de importes; versiones de cada oferta; comparador de ofertas por capítulo y por partida frente al precio presupuestado, con selección del proveedor adjudicado. La selección alimenta el coste comprometido del proyecto y queda enlazada con Compras/Subcontratos y con Administración.
+— Márgenes operativos. Visualización simultánea de margen por línea, por capítulo y total, en importe y porcentaje, con alerta cuando una línea o capítulo baja del mínimo definido. Posibilidad de fijar el margen objetivo y que el sistema calcule el precio de venta, o al revés.
+— Envío, aceptación y acciones. Generar PDF con marca e datos fiscales; enviar por email con plantilla y seguimiento de apertura; registrar aceptación (fecha, persona, medio, documento firmado); rechazar con motivo; duplicar como nueva versión; convertir en contrato; convertir en proyecto una vez firmado.
+— Carta Gantt del presupuesto. Generación automática de la planificación a partir de los capítulos y partidas del presupuesto aceptado. Requisitos: dependencias fin-inicio, inicio-inicio y fin-fin; desfases positivos y negativos (lead/lag) sobre cada dependencia; recálculo automático de la fecha de cierre al mover cualquier tarea o cambiar una duración; calendario laboral con festivos; ruta crítica destacada; hitos de pago del contrato representados sobre la misma línea temporal; línea base congelada al aprobar. Interacción simple: arrastrar para mover, tirar del borde para alargar, y unir tareas con el ratón para crear dependencia.
+— Salida hacia Proyectos. Esta carta Gantt es la línea base del seguimiento técnico y económico de obra; al firmar el contrato se copia al proyecto y queda congelada como referencia, permitiendo después comparar planificado frente a real.
+— Trazabilidad. PRE-01 a PRE-32; QUO-01 a QUO-24; CAT-01 a CAT-20; SUP-01 a SUP-24; PLN-01.
+Anexo gráfico del presupuesto
+— Objetivo. Poder acompañar el presupuesto con imágenes de referencia sin alterar la lectura de la tabla de partidas. Las imágenes se asocian a una partida, pero no se imprimen en su fila: se reúnen en un anexo gráfico al final del documento, y cada imagen indica a qué partida corresponde.
+— El anexo gráfico. Página o páginas añadidas al final del presupuesto, después de los totales y antes de las condiciones. Reúnen las imágenes de las partidas que las tengan, agrupadas y ordenadas por capítulo y número de línea. Se activa o desactiva por presupuesto, y permite elegir el número de imágenes por página.
+— Referencia a la partida. Cada imagen del anexo se identifica con el número de capítulo, el número de la partida y su descripción breve, de modo que el cliente pueda localizar sin ambigüedad la partida a la que corresponde. Si una partida tiene varias imágenes, se numeran de forma correlativa bajo la misma referencia.
+— Presentación de la tabla de partidas. Las filas del documento del cliente no cambian: siguen mostrando concepto, unidad, cantidad, precio e importe. Cuando existe anexo, la partida que tiene imágenes puede llevar una marca discreta de remisión al anexo, sin ocupar espacio adicional en la fila.
+— Origen de las imágenes. Del catálogo de partidas cuando el artículo ya tiene imagen de referencia [CAT-08]; de las fotografías tomadas en la visita de obra; de una carga manual desde el ordenador; o de la cámara del móvil.
+— Acciones de gestión. Asociar, sustituir, eliminar y reordenar las imágenes de una partida; marcar cuáles se incluyen en el anexo y cuáles quedan como uso interno; editar el pie de imagen; activar o desactivar el anexo para el presupuesto; fijar el orden y el número de imágenes por página; previsualizar el documento del cliente antes de emitir.
+— Vista interna del constructor. En el constructor, la fila de la partida muestra únicamente un indicador con el número de imágenes asociadas; al pulsarlo se abre la galería para gestionarlas. Ese indicador es de uso interno y no forma parte del documento emitido.
+— Reglas. La imagen es informativa y nunca altera cantidades, precios ni totales. Al congelar una versión del presupuesto se congela también su anexo, de modo que una versión emitida siempre puede reproducirse tal cual se envió. Las imágenes se comprimen al guardarse para no penalizar el tamaño del documento ni el uso desde el móvil. Si una imagen procede del catálogo y éste cambia después, la versión emitida conserva la original.
+— Trazabilidad. PRE-10; CAT-08; DOC-02; DOC-03; QUO-02.
+3.4  Contratos
+Listado de contratos —activos, en negociación y cerrados— y su administración: creación, modificación y eliminación. Formatos base de contrato construidos a partir de la información del cliente, del presupuesto aprobado y de la carta Gantt del presupuesto, con registro de aceptación.
+Diseño, operación y flujo
+— Disposición. Lista con pestañas por estado (en negociación, activos, cerrados, vencidos) e indicadores de cabecera: importe contratado vivo, pendiente de firma, próximo vencimiento de garantía. Ficha de contrato con cabecera fija (cliente, obra, importe, estado, fechas) y pestañas.
+— Generación automática. Crear contrato desde el presupuesto aceptado y su carta Gantt: se vuelcan cliente y datos fiscales, dirección de obra, alcance por capítulos, importe, plazos, hitos de pago y calendario, sin reescribir nada [CON-01].
+— Términos como datos estructurados, no como texto libre. Importe y forma de revisión; plazo de ejecución e inicio; hitos de pago (porcentaje o importe contra evento); retención de garantía y plazo de liberación; penalización por retraso; garantías y seguros; condiciones de recepción; causas de suspensión. Al ser datos, alimentan directamente facturación, calendario y alertas [CON-03, CON-04].
+— Gestión de plantillas. Biblioteca de formatos base por tipo de obra; editor con campos variables del sistema; carga de un formato nuevo y mapeo de sus campos; versión de plantilla registrada en cada contrato emitido.
+— Acciones de gestión. Crear, modificar, duplicar y eliminar (sólo en borrador); generar PDF; enviar a firma; registrar aceptación y firma con fecha, persona y documento; versionar el contrato; suspender, reactivar, cerrar y archivar; liberar retención; crear el proyecto a partir del contrato firmado.
+— Reglas y alertas. Numeración controlada y correlativa; un contrato firmado no se edita, se modifica mediante adenda; aviso de contrato en negociación sin movimiento; aviso de vencimiento de garantía y de seguros; bloqueo de creación si faltan datos fiscales del cliente.
+— Trazabilidad. CON-01 a CON-28; PRJ-01, PRJ-02.
+4.  Proyectos
+Lo primero de esta sección es la selección del proyecto, de modo que todo lo que aparece debajo quede asociado a un proyecto concreto.
+Al firmarse el contrato, el proyecto hereda la información de la sección anterior sin volver a introducirla: fechas, hitos de pago, materiales, subcontratos, precios y márgenes.
+Diseño, operación y flujo
+— Selector de proyecto persistente. Primer elemento de la sección: un selector fijo en la parte superior con buscador, proyectos recientes, favoritos y filtro por estado. El proyecto elegido queda como contexto activo y todas las subsecciones (Compras, Subcontratos, Seguimiento, Modificaciones, Personal) muestran únicamente su información. El contexto se mantiene al cambiar de subsección y se indica siempre de forma visible.
+— Cabecera de proyecto siempre visible. Bajo el selector, una franja fija con: cliente (enlace a su ficha), dirección de obra, estado, responsable, avance % con barra, venta contratada, coste real, margen actual, y las dos próximas fechas críticas. Es el marco de referencia de todo lo que se haga debajo.
+— Herencia al firmar el contrato. Al firmar, el proyecto se crea heredando sin reintroducción: fechas y calendario, carta Gantt como línea base, hitos de pago, capítulos y partidas con cantidades y precios, materiales y subcontratas previstas, proveedores seleccionados en las ofertas, márgenes objetivo y condiciones comerciales del cliente [PRJ-02].
+— Líneas base congeladas. El proyecto guarda tres líneas base independientes: venta, coste estimado y margen esperado, más el calendario base. No cambian aunque cambien las tarifas o el catálogo; sólo se modifican mediante modificaciones contractuales aprobadas, y siempre conservando el original para comparar [PRJ-03, PRJ-04].
+— Acciones a nivel de proyecto. Cambiar estado; asignar responsable; abrir, suspender, reanudar y cerrar; recalcular proyección; exportar dossier completo del proyecto (presupuesto, contrato, órdenes, facturas, fotos, partes) en un único archivo; duplicar como plantilla para un proyecto similar.
+— Trazabilidad. PRJ-01 a PRJ-16; CON-01; FIN-01 a FIN-18.
+4.1  Compras
+Generador de órdenes de compra, manejo de versiones, registro de aceptación y envío automático al proveedor. Administración de fechas de llegada de materiales y de condiciones de pago, y visualización del historial de facturación y pagos, enlazado con la sección de Administración.
+Diseño, operación y flujo
+— Disposición. Tres bloques: (1) necesidades de material derivadas del presupuesto del proyecto, con lo ya pedido y lo pendiente; (2) lista de órdenes de compra con estado (borrador, enviada, aceptada, recibida parcial, recibida, facturada, pagada); (3) calendario de llegadas previstas. Ficha de OC con líneas, condiciones y documentos.
+— Generador de órdenes de compra. Crear OC desde las necesidades del proyecto (seleccionando partidas y cantidades), desde una oferta adjudicada o manualmente. Agrupación por proveedor. Precios propuestos desde la base de Precios & Costos, con aviso si difieren del precio presupuestado.
+— Acciones de gestión. Crear, editar y anular OC; versionar con historial de cambios; enviar automáticamente al proveedor por email con PDF y plantilla; registrar aceptación del proveedor; confirmar y modificar fecha de llegada; registrar recepción total o parcial con albarán y foto; registrar devoluciones y abonos; duplicar OC; cerrar OC.
+— Condiciones y seguimiento económico. Condiciones de pago por proveedor y por orden; visualización del historial de facturación y pagos de esa orden, con enlace directo a Administración → Proveedores & pagos; control de comprometido frente a presupuestado por capítulo.
+— Reglas y alertas. Alerta de retraso sobre la fecha comprometida y aviso a la planificación si afecta a una tarea de obra; alerta de sobrecoste al superar el importe presupuestado del capítulo; conciliación a tres bandas (orden ↔ albarán ↔ factura) con marca de diferencias; detección de material recibido sin orden.
+— Trazabilidad. PUR-01 a PUR-20; SUP-02; FIN-02.
+4.2  Subcontratos
+Generador de órdenes de compra o de contratos de subcontrata, manejo de versiones, registro de aceptación y envío automático al proveedor. Administración de fechas de ejecución, manejo de garantías y condiciones de pago, y visualización del historial de facturación y pagos, enlazado con la sección de Administración.
+Diseño, operación y flujo
+— Disposición. Lista de subcontratas del proyecto por oficio, con importe adjudicado, ejecutado, certificado, facturado y pendiente; estado documental (seguro, PRL, alta) con semáforo; y calendario de ejecución por oficio superpuesto a la obra.
+— Generador de orden o contrato de subcontrata. Crear desde la oferta adjudicada o desde las partidas del presupuesto; elegir entre formato de orden de trabajo o contrato de subcontrata; versiones con historial; envío automático al proveedor; registro de aceptación con fecha y persona.
+— Gestión de la ejecución. Fechas de ejecución previstas y reales por oficio; valoración o certificación parcial del trabajo ejecutado (base de la factura del subcontratista); registro de trabajos rechazados o repasos; enlace directo a las tareas de la carta Gantt que ejecuta ese oficio.
+— Garantías, retenciones y documentación. Retención de garantía por subcontrata con porcentaje, plazo y fecha prevista de liberación; registro de garantías de los trabajos con fecha de fin; control de documentación obligatoria (seguro de responsabilidad civil, PRL, alta en la Seguridad Social) con fecha de caducidad y bloqueo o aviso si está vencida.
+— Acciones de gestión. Adjudicar, modificar, ampliar y rescindir; registrar certificación de avance; aprobar factura del subcontratista; programar pago; liberar retención; renovar documentación; ver historial de facturación y pagos con enlace a Administración.
+— Reglas y alertas. Aviso de documentación caducada antes de permitir su entrada en obra; alerta de desviación entre importe adjudicado y certificado; alerta de subcontrata sin factura pasado el plazo; retención no liberada tras vencimiento del plazo de garantía.
+— Trazabilidad. PUR-01 a PUR-20; SUP-01 a SUP-24; AP-01 a AP-20; CON-04.
+4.3  Seguimiento Técnico de Obra
+Parte de la carta Gantt inicial de obra, construida según el presupuesto aceptado y el contrato. Permite editar la planificación —añadir, modificar o eliminar partidas—, gestionar el avance de obra y recalcular la fecha de entrega según avance y dependencias.
+Debe recoger las buenas prácticas de gestión de proyectos manteniendo la operación simple. Incluye la visualización del avance presupuestado frente al real y al proyectado, la visualización de retrasos y la generación de alertas.
+Diseño, operación y flujo
+— Disposición. Pantalla dividida: arriba, carta Gantt editable con línea base en gris y avance real superpuesto; abajo, tabla de partidas con % de avance, responsable, fechas previstas y reales; a la derecha, panel de desviaciones. Conmutable a vista de curva S (avance planificado frente a real y proyectado).
+— Edición de la planificación. Añadir, modificar, reordenar y eliminar partidas y tareas; cambiar duraciones y fechas arrastrando; crear y editar dependencias con desfases positivos y negativos; asignar responsable, equipo o subcontrata; agrupar por capítulo; congelar nueva línea base sólo mediante modificación contractual aprobada.
+— Registro de avance. Actualización del % por partida desde escritorio o móvil; marcado de líneas del presupuesto como hechas, en curso o no iniciadas [PLN-03]; avance por cantidad ejecutada además de por porcentaje; registro con foto y fecha; parte de obra diario que consolida avance, personal presente e incidencias.
+— Recálculo y consecuencias. Al registrar avance o retraso, el sistema recalcula automáticamente las fechas de las tareas dependientes y la fecha de entrega, respetando desfases y calendario laboral, y muestra el impacto antes de confirmar. La ruta crítica se destaca permanentemente.
+— Visualización de desviaciones y alertas. Comparativa avance presupuestado frente a real y proyectado, global y por capítulo; días de retraso acumulado; tareas críticas en riesgo; generación automática de alerta cuando el retraso supera el umbral definido o cuando una tarea crítica no ha comenzado en su fecha.
+— Acciones de gestión. Replanificar; solicitar ampliación de plazo (genera modificación contractual); crear incidencia con foto y responsable; convertir un trabajo extra detectado en obra en una modificación contractual; emitir informe de avance para el cliente.
+— Trazabilidad. PLN-01 a PLN-16; CHG-01 a CHG-04; PRJ-03.
+4.4  Seguimiento Económico de Obra
+Equivalente al seguimiento técnico en el plano económico. Debe recoger las buenas prácticas de gestión de proyectos manteniendo la operación simple, y presentar el margen presupuestado frente al real y al proyectado, la visualización de desviaciones y la generación de alertas.
+Diseño, operación y flujo
+— Disposición. Tabla principal por capítulo con las columnas: presupuestado, comprometido (órdenes y subcontratos adjudicados), real (facturas recibidas y horas imputadas), proyectado a fin de obra, desviación en importe y en %, y margen. Arriba, cuatro cifras del proyecto: venta actual, coste real, margen actual y margen proyectado. A la derecha, curva S de coste y caja del proyecto.
+— Composición del coste. Cada capítulo permite desplegar su detalle: materiales (órdenes de compra), subcontratas, mano de obra propia (horas × coste), maquinaria y otros. Cada importe es navegable hasta el documento de origen.
+— Proyección. Cálculo del coste estimado hasta terminar a partir del avance real y del coste unitario observado, con posibilidad de que el usuario ajuste manualmente la proyección de un capítulo justificando el motivo. El sistema muestra ambas cifras: proyección calculada y proyección ajustada.
+— Acciones de gestión. Reclasificar un coste de capítulo o de proyecto; imputar gastos pendientes de asignación; aprobar o rechazar un sobrecoste; ajustar la proyección; generar certificación de avance y, desde ella, la factura al cliente; exportar el informe económico del proyecto.
+— Alertas. Desviación de capítulo superior al umbral; margen por debajo del mínimo definido; coste sin asignar a capítulo; coste comprometido superior al presupuestado; consumo de material muy por encima del avance registrado; cobro vencido del proyecto.
+— Trazabilidad. FIN-01 a FIN-18; AP-02; PUR-03; LAB-01.
+4.5  Modificaciones Contractuales
+Gestor de adendas de contrato: generación automática a partir de la información del contrato, envío al cliente y registro de aceptación. Incluye el manejo de formatos tipo, la carga de un formato nuevo y la programación de su automatización.
+Diseño, operación y flujo
+— Disposición. Lista de modificaciones del proyecto con: número, descripción, origen, estado (detectada, valorada, enviada, aceptada, rechazada), efecto en venta, efecto en coste, efecto en plazo y fecha. Cabecera con el acumulado: contrato original, modificaciones aprobadas, contrato vigente.
+— Captura desde obra. El responsable de obra registra el extra en el momento con fotografía, descripción breve y ubicación; queda como «detectada» y pendiente de valorar por administración [CHG-02].
+— Valoración y generación de la adenda. Valoración con las mismas partidas y precios del presupuesto (o nuevas partidas); cálculo del efecto en venta, coste, margen y plazo; generación automática del documento de adenda a partir del contrato original y de la plantilla, con numeración correlativa.
+— Gestión de plantillas y automatización. Biblioteca de formatos de adenda; carga de un formato nuevo con mapeo de campos variables; regla de automatización que define qué plantilla se usa según el tipo de modificación y qué envío se dispara al aprobarse.
+— Acciones de gestión. Crear, valorar, editar y anular; enviar al cliente; registrar aceptación o rechazo con fecha y documento; aplicar la modificación aprobada al proyecto (actualiza venta, coste previsto, hitos de facturación y carta Gantt conservando la línea base original); revertir si se anula.
+— Reglas. El trabajo no aprobado se muestra siempre marcado como no aprobado y no es facturable [CHG-04]. Ninguna modificación altera la línea base original: se acumula sobre ella y ambas quedan visibles.
+— Trazabilidad. CHG-01 a CHG-14; CON-01; PLN-01; FIN-01.
+4.6  Personal y Horas
+Asignación de horas a proyecto, enlazada con Administración y con Datos Maestros.
+Diseño, operación y flujo
+— Disposición. Rejilla semanal trabajador × día, con celdas editables de horas y desplegable de proyecto y capítulo; totales por trabajador, por proyecto y por día. Vista alternativa de parte diario para el móvil, con los trabajadores asignados ya precargados.
+— Registro con esfuerzo mínimo. Un solo paso desde el móvil: seleccionar proyecto, marcar los presentes de una lista predefinida y confirmar la jornada; sólo se detallan las excepciones. Posibilidad de repetir el parte del día anterior [LAB-01, LAB-04].
+— Acciones de gestión. Asignar trabajadores y equipos a proyectos y fechas; registrar, corregir y eliminar horas; aprobar o rechazar partes semanales; reimputar horas de un proyecto a otro; bloquear el periodo aprobado; exportar a Administración y a la gestoría.
+— Costes. Coste horario tomado de Datos Maestros, distinguiendo empleados, autónomos y personal de subcontrata, ya que su tratamiento contable es distinto. Las horas aprobadas se imputan automáticamente al coste real del capítulo correspondiente en el Seguimiento Económico.
+— Alertas. Jornadas sin registrar; horas imputadas a un proyecto cerrado; exceso sobre las horas previstas del capítulo; trabajador sin documentación válida.
+— Trazabilidad. LAB-01 a LAB-18; FIN-02; MDM-01.
+5.  Administración
+Diseño, operación y flujo
+— Propósito. Convierte la actividad de obra en dinero y en información fiscal: facturar y cobrar, recibir y pagar, conciliar el banco, mantener precios y entregar a la gestoría un paquete completo y sin excepciones.
+— Panel de entrada de la sección. Antes de elegir subsección: pendiente de cobro y de pago con antigüedad, saldo de bancos y caja, movimientos sin conciliar, documentos sin respaldo y estado del periodo fiscal en curso (semáforo de completitud para la gestoría).
+— Principio de trabajo. Ningún importe debe teclearse dos veces: la factura nace del presupuesto, el contrato o el avance; el pago nace de la factura; el movimiento bancario se enlaza con el documento; y el paquete de la gestoría se genera de lo ya registrado.
+5.1  Facturas y Cobros
+Gestor de facturación con asociación a proyectos y a hitos de pago, y registro del cobro con fecha, medio de pago y referencia.
+Diseño, operación y flujo
+— Disposición. Cabecera con pendiente de cobro total y antigüedad por tramos (al día, 1-30, 31-60, +60). Lista de facturas con número, fecha, cliente, proyecto, base, IVA, retención, total, estado de cobro y vencimiento. Panel lateral con la ficha y la previsualización del PDF.
+— Creación de la factura. Desde el presupuesto aceptado, desde un hito de pago del contrato, desde una certificación de avance de obra, desde modificaciones aprobadas o manualmente. Siempre referida a un proyecto, de modo que el ingreso sea siempre atribuible [AR-01, AR-03].
+— Tipos soportados. Anticipo, factura de avance, factura final, factura de extras, rectificativa y abono. Numeración correlativa controlada por serie.
+— Acciones de gestión. Crear, editar (sólo en borrador), emitir, enviar por email con plantilla, descargar PDF, duplicar, anular mediante rectificativa; registrar cobro (fecha, importe, medio de pago, banco o caja, referencia) admitiendo cobros parciales y un cobro que salda varias facturas; emitir recibo al cliente; enviar recordatorio de cobro manual o automático; reclamar por tramos de antigüedad.
+— Reglas de cumplimiento. Una factura emitida no se edita: se corrige con rectificativa [VFU-02]. Numeración sin huecos, verificada. Logotipo y datos fiscales completos del emisor y del receptor. Preparada para el régimen antifraude (Verifactu): registro secuencial e inalterable y exportación de los registros de facturación [VFU-01 a VFU-10].
+— Enlaces. Con el proyecto (ingreso y margen), con Conciliación Bancaria (cobro real), con la ficha del cliente y con el paquete de la gestoría.
+— Trazabilidad. AR-01 a AR-22; VFU-01 a VFU-10; PAY-01 a PAY-10; CON-04.
+5.2  Proveedores y Pagos
+Registro de las facturas recibidas de proveedores y subcontratas, y control de su pago.
+Diseño, operación y flujo
+— Alcance ampliado. Además del registro de subcontratos, esta subsección debe ser el gestor completo de las facturas recibidas y de su pago: captura, validación, asignación, aprobación y pago.
+— Disposición. Cabecera con pendiente de pago y antigüedad, y con el importe a pagar esta semana y la próxima. Lista de facturas recibidas con proveedor, número, fecha, proyecto, base, IVA, IRPF, total, estado y vencimiento. Bandeja de entrada de documentos capturados pendientes de procesar.
+— Captura del documento. Fotografía o carga desde el móvil en pocos pasos; lectura automática de emisor, NIF, número, fecha, base, IVA e importe, con revisión y corrección por el usuario; admite factura de proveedor, factura de autónomo o subcontrata, albarán valorado, tique, combustible, renting y honorarios profesionales [CAP-01 a CAP-22].
+— Asignación. A un proyecto y capítulo, a varios proyectos con reparto controlado, o a una categoría de gasto general. Las facturas sin asignar quedan en una cola visible y bloquean el cierre del periodo.
+— Acciones de gestión. Registrar, editar y eliminar facturas recibidas; aprobar o rechazar para pago; programar pago y agrupar en remesa; generar el fichero de transferencia; registrar pago total o parcial y pagos que cubren varias facturas; aplicar retención de IRPF y de garantía; conciliar con la orden de compra o el subcontrato; marcar duplicados.
+— Reglas y alertas. Detección de duplicados por proveedor, número e importe [AP-03]; aviso de factura sin documento adjunto; aviso de factura sin proyecto; alerta de vencimiento próximo y de vencido; control de que el importe facturado no supere lo adjudicado sin modificación aprobada.
+— Trazabilidad. AP-01 a AP-20; CAP-01 a CAP-22; SUP-01; FIN-02.
+Captura de factura de proveedor por fotografía
+— Objetivo. Que el usuario fotografíe con el móvil una factura de proveedor o de subcontrata, el sistema lea su contenido y precargue con él un nuevo registro de factura recibida, el usuario valide los datos y, al confirmarlos, quede creado el registro con la imagen archivada y enlazada.
+— Flujo completo. (1) Captura: fotografía desde el móvil o carga de un archivo PDF o de imagen, con posibilidad de varias páginas en un mismo documento. (2) Lectura automática del contenido. (3) Pantalla de validación. (4) Confirmación por el usuario. (5) Alta del registro de factura recibida. (6) Archivo de la imagen original enlazada de forma permanente al registro.
+— Campos que se extraen y precargan. Emisor y su NIF/CIF, número de documento, fecha de emisión y de vencimiento, base imponible, tipo y cuota de IVA —admitiendo varios tipos en un mismo documento—, retención de IRPF, importe total, forma de pago e IBAN, y referencia de pedido u obra si aparece.
+— Pantalla de validación. La imagen se muestra a un lado y los campos extraídos al otro. Cada campo indica su nivel de confianza; los de confianza baja aparecen resaltados y con el foco de entrada, de modo que el usuario revise primero lo dudoso. Al pulsar un campo se destaca la zona de la imagen de la que se obtuvo. Ningún dato se da por bueno sin confirmación explícita del usuario [CAP-04].
+— Acciones de gestión. Corregir cualquier campo; reintentar la lectura; girar o recortar la imagen; añadir páginas; rechazar la captura; marcarla como duplicada; dar de alta el proveedor si no existe; asignar el gasto a un proyecto y capítulo, repartirlo entre varios proyectos o imputarlo a una categoría general; aprobar la factura para pago; y programar el pago.
+— Casos no ideales. Si el documento no contiene texto legible, el sistema lo indica y ofrece el alta manual con la fotografía ya adjunta y los campos mínimos obligatorios [CAP-10]. Si no hay conectividad, la captura queda en una cola local y se procesa al recuperarla. Si el importe o el número coinciden con un documento ya registrado, se avisa de posible duplicado antes de confirmar [CAP-05].
+— Archivo y trazabilidad de la imagen. La imagen original se conserva siempre, sin recomprimir de forma destructiva, con nombre normalizado a partir del emisor, tipo de documento, número y fecha, y queda enlazada al registro contable y disponible para el paquete de la gestoría [CAP-08, DOC-04]. Se registra quién capturó, quién validó y cuándo.
+— Trazabilidad. CAP-01 a CAP-10; AP-01, AP-02, AP-03; GES-01; DOC-03.
+5.3  Conciliación Bancaria
+Carga de estados de cuenta en PDF y Excel, lectura de los movimientos y asignación a proyecto a partir de la lista de proyectos activos. Cuando el movimiento no corresponde a un proyecto, se clasifica según el plan de cuentas o equivalente. Incluye la asignación a factura —de ingreso o de gasto— y la marca de movimiento sin respaldo. Debe recoger las mejores prácticas en esta materia.
+Diseño, operación y flujo
+— Disposición de dos columnas. Izquierda: movimientos del extracto (fecha, concepto, importe, saldo). Derecha: documentos candidatos (facturas emitidas, facturas recibidas, recibos). En el centro, sugerencias de emparejamiento con grado de confianza. Abajo, cola de movimientos sin conciliar, que es el indicador de salud del periodo.
+— Carga del extracto. Importación desde PDF, Excel/CSV y norma bancaria N43; lectura y normalización de los movimientos conservando fecha contable, fecha valor, concepto, importe y saldo; detección de duplicados y de solapamiento de periodos ya cargados.
+— Emparejamiento asistido. Propuesta automática por importe, fecha y referencia, con tolerancia configurable de días e importe; aceptación en un clic; conciliación parcial (un movimiento contra varias facturas y varias facturas contra un movimiento); identificación de transferencias internas para que no inflen ingresos ni gastos.
+— Asignación (el punto clave). En cualquier movimiento se puede escribir el número de proyecto o de presupuesto y el importe queda imputado a ese proyecto [BNK-02]. Si no corresponde a un proyecto, se clasifica según el plan de cuentas o la lista de categorías de gasto (impuestos, nóminas, gastos generales, financieros, activo fijo).
+— Acciones de gestión. Asignar y reasignar a proyecto o categoría; enlazar a factura de ingreso o de gasto; dividir un movimiento en varias imputaciones; marcar «sin respaldo» y generar la tarea de reclamar el documento; crear reglas de auto-clasificación por concepto o emisor que se apliquen en las próximas cargas; deshacer una conciliación; cerrar y bloquear el periodo conciliado.
+— Buenas prácticas incorporadas. Reglas aprendidas de las decisiones anteriores; conciliación por lotes; trazabilidad completa de quién concilió qué y cuándo; imposibilidad de modificar un periodo cerrado sin reapertura registrada; panel de excepciones que debe quedar a cero antes de enviar a la gestoría.
+— Trazabilidad. BNK-01 a BNK-20; GES-07; FIN-04.
+5.4  Banco y Caja
+Se mantiene lo existente, retirando la parte de asignación, que pasa a realizarse íntegramente en Conciliación Bancaria.
+
+Diseño, operación y flujo
+— Alcance. Se mantiene como está, retirando la asignación de movimientos, que pasa a realizarse íntegramente en Conciliación Bancaria.
+— Disposición. Tarjetas de saldo por cuenta bancaria y por caja, con saldo actual y cierre del periodo anterior; debajo, listado de movimientos consultable y filtrable; y evolución del saldo en el tiempo.
+— Acciones de gestión que sí permanecen aquí. Alta y baja de cuentas bancarias y de cajas; registro de movimientos de caja (entradas, salidas y gastos menores) con justificante adjunto; arqueo de caja con diferencia registrada; traspasos entre cuentas y entre caja y banco, marcados como movimiento interno; ajuste de saldo inicial.
+— Reglas. Todo movimiento de caja exige justificante o queda marcado como pendiente de respaldo; los traspasos internos nunca computan como ingreso ni como gasto; el saldo mostrado indica siempre si incluye movimientos aún no conciliados.
+— Trazabilidad. BNK-05 a BNK-20; PAY-01.
+5.5  Precios y Costos
+Carga de los presupuestos recibidos, registro de precios de materiales y de trabajos de subcontrata según sus unidades de medida, y visualización de la evolución de precios.
+Diseño, operación y flujo
+— Disposición. Buscador y catálogo de materiales y trabajos con: descripción, unidad de medida, último precio, precio medio, mejor precio, proveedor y fecha. Al abrir un artículo, gráfico de evolución del precio en el tiempo con los puntos de cada oferta o factura que lo originó.
+— Carga de presupuestos recibidos. Subida de la oferta del proveedor (PDF/Excel/foto), extracción de líneas con unidad, cantidad y precio, y alta o actualización de los precios en la base, dejando registrada la fuente y su fecha de validez [SUP-03].
+— Acciones de gestión. Crear, editar y desactivar artículos y trabajos; unificar duplicados; fijar unidad de medida canónica; registrar precio por proveedor con descuento, portes y cargos; marcar precio preferente; versionar tarifas con fechas de vigencia; comparar el precio actual con el histórico y con el usado en un presupuesto; enviar el artículo al catálogo de partidas.
+— Uso en el resto del sistema. Es la fuente de precios del constructor de presupuestos y la referencia para detectar sobrecostes en compras. Cuando un precio de compra se aparta del registrado, el sistema lo señala y ofrece actualizar la base.
+— Visualización de evolución. Variación porcentual por artículo y por familia en 3, 6 y 12 meses; ranking de artículos con mayor subida; comparativa entre proveedores para el mismo artículo.
+— Trazabilidad. SUP-02 a SUP-24; CAT-01 a CAT-20; PUR-02.
+5.6  Gestoría
+El sistema debe aprovechar toda la información que ya se carga para construir el paquete que se envía a la gestoría como un único descargable. El contenido de esta sección se ha definido cruzando los requerimientos anteriores de la gestoría con la última versión del documento de requisitos y con la estructura real de las carpetas que hoy se remiten.
+
+Diseño, operación y flujo
+— Origen de este diseño. Cruce de los requerimientos anteriores (sección 6.19 y apéndice D del documento de requisitos, GES-01 a GES-10) con la estructura real de las carpetas que hoy se envían a la gestoría: FACTURAS EMITIDAS por trimestre, FACTURAS SOPORTADAS por trimestre, BANCO (histórico de movimientos) y una carpeta de documentos extemporáneos.
+— Disposición. Selector de periodo (trimestre y ejercicio) y, debajo, un semáforo de completitud con el estado de cada bloque del paquete: emitidas, soportadas, banco, caja, extemporáneas y resúmenes fiscales. Cada bloque muestra número de documentos, importe y número de incidencias. A la derecha, historial de envíos anteriores.
+— Contenido del paquete generado. (1) Registro de facturas emitidas del periodo, con su PDF, numeración verificada sin huecos y cada factura enlazada a un proyecto. (2) Registro de facturas recibidas y soportadas con su documento. (3) Movimientos bancarios del periodo. (4) Registro de caja. (5) Documentos extemporáneos identificados como tales. (6) Resumen de IVA repercutido y soportado por tipo. (7) Resumen de retenciones de IRPF. (8) Relación de activos fijos, vehículos y renting separados del coste directo de obra.
+— Lista de excepciones antes de enviar (bloqueante). Facturas sin documento adjunto; documentos sin número de factura; terceros sin NIF válido; movimientos bancarios sin asignar; cobros y pagos sin emparejar; huecos en la serie de numeración; documentos con más de un tipo de IVA sin desglosar; gastos sin categoría. El envío se permite sólo cuando la lista está a cero o cuando el usuario justifica y acepta expresamente cada excepción [GES-07].
+— Acciones de gestión. Generar el paquete descargable en un único archivo comprimido, con los datos en Excel/CSV y los documentos en PDF, con nomenclatura normalizada y carpetas por bloque; previsualizar antes de generar; marcar el periodo como enviado con fecha y destinatario; registrar las consultas y correcciones recibidas de la gestoría y su resolución; reabrir un periodo enviado dejando constancia; mantener la lista de categorías de gasto y su equivalencia con las que usa la gestoría [GES-05].
+— Tratamiento de documentos extemporáneos. Regla explícita de corte: los documentos que llegan después del cierre se registran contra el periodo correcto y se marcan como extemporáneos, apareciendo en el siguiente envío en un bloque propio, con detección de duplicados respecto de lo ya enviado. El objetivo es que la carpeta de extras deje de ser la norma y pase a ser la excepción.
+— Evolución. Perfil de acceso restringido de sólo lectura y exportación para la gestoría, sin visibilidad de márgenes ni de precios comerciales, e integración directa con su software, a valorar en la fase de solución [GES-10].
+— Trazabilidad. GES-01 a GES-20; apéndice D del documento de requisitos; BNK-04; AR-02; CAP-08.
+5.7  Comunicaciones
+Editor de los distintos correos tipo y de las reglas que determinan cuándo se envían.
+Diseño, operación y flujo
+— Disposición. Dos paneles: biblioteca de plantillas a la izquierda (agrupadas por familia: comercial, contractual, obra, cobros, proveedores, posventa) y editor con previsualización a la derecha. Pestaña adicional de Reglas y otra de Historial de envíos.
+— Editor de plantillas. Edición por bloques (cabecera con logotipo, cuerpo, llamada a la acción, pie con datos fiscales); inserción de variables del sistema (cliente, proyecto, número de documento, importe, fecha, enlace al documento); versión en español y catalán; adjuntos automáticos según el tipo (presupuesto, factura, contrato); previsualización con datos reales de un registro concreto antes de guardar.
+— Editor de reglas. Cada regla se define como evento → condición → plantilla → destinatario → momento de envío → canal. Ejemplos: presupuesto enviado sin respuesta a los 7 días, factura vencida a 3, 10 y 20 días, contrato firmado, obra finalizada, garantía por vencer, documentación de subcontrata caducada.
+— Acciones de gestión. Crear, duplicar, editar, versionar, activar y desactivar plantillas y reglas; probar una regla en modo simulación; ver la cola de envíos programados y cancelar o adelantar uno; reenviar; consultar el historial completo por cliente y por documento.
+— Principio de control. Configurable por regla si el envío es automático o queda como borrador para aprobación; por defecto, nada se envía al cliente sin confirmación. Todo envío queda registrado en la ficha del cliente y del documento.
+— Trazabilidad. DOC-01; CRM-03; AR-08; GES-08.
+6.  Contabilidad y Finanzas
+Corresponde a lo que actualmente es «Datos Financieros» y se mantiene exactamente como está.
+Diseño, operación y flujo
+— Alcance. Se mantiene exactamente como está hoy en «Datos Financieros». Los complementos siguientes son de gestión y no alteran su contenido actual.
+— Gestión sobre lo existente. Selector de periodo compartido con el resto del sistema; comparativa presupuesto frente a real por periodo; cierre de periodo con bloqueo y reapertura registrada; exportación de cada estado a Excel y PDF; anotaciones del propietario sobre una cifra concreta.
+— Navegabilidad. Toda cifra debe permitir descender hasta los documentos que la componen y desde ahí al proyecto, cliente o proveedor de origen.
+— Trazabilidad. FIN-05 a FIN-18; DAS-03.
+7.  Datos Maestros
+Se mantiene como está actualmente, con la condición de permanecer siempre actualizado en función de las ediciones que se realicen en cualquier área del sistema.
+Diseño, operación y flujo
+— Alcance. Se mantiene como está, con la condición de permanecer siempre sincronizado con las ediciones realizadas en cualquier área: un cliente creado en Comercial o un proveedor creado en Compras aparecen aquí de inmediato, y a la inversa.
+— Gobierno del dato. Un único registro de terceros con etiquetas de rol (cliente, proveedor, subcontrata, profesional) en lugar de listas separadas; responsable de cada catálogo; validación en la entrada; fusión de duplicados conservando el histórico; baja lógica en lugar de borrado.
+— Acciones de gestión. Importar y exportar cada catálogo con plantilla y validación previa con informe de errores; edición masiva por selección; versionado de catálogos y tarifas con fecha de vigencia; auditoría de cambios; informe de calidad de datos (registros sin NIF, sin dirección, sin condiciones de pago).
+— Trazabilidad. MDM-01 a MDM-26; CAT-01 a CAT-20; ORG-02.
+8.  Reportes
+Se reserva el espacio en el menú. No se desarrolla contenido por el momento.
+Diseño, operación y flujo
+— Situación. No se desarrolla por ahora. Se reserva la sección en el menú y se deja definido el rumbo para no condicionar decisiones posteriores.
+— Rumbo previsto. Generador de informes sobre los mismos datos ya existentes: selección de origen (proyectos, clientes, facturación, costes, horas, precios), filtros, agrupaciones y totales; guardado de informes propios; programación de envío periódico por email; exportación a Excel y PDF.
+— Informes candidatos. Rentabilidad por proyecto y por tipo de obra; desviación presupuestado frente a real por capítulo; conversión comercial y motivos de pérdida; antigüedad de cobros y de pagos; evolución de precios de materiales; productividad de horas por proyecto; comparativa de proveedores.
+— Condición de diseño. Ningún informe debe requerir introducir datos nuevos: todos se construyen sobre lo ya registrado en el sistema.
+Anexo A.  Estado actual del código y brechas
+Contraste de esta especificación con el código existente en la rama de desarrollo del repositorio (rama claude/orin-project-status-1q50dt), revisado en la fecha de esta versión. Su finalidad es que la planificación posterior distinga con claridad lo que hay que construir, lo que hay que completar y lo que sólo hay que conectar.
+Conviene señalar dos hallazgos que condicionan el plan. El primero: la página erp.html ya implementa un armazón de navegación por secciones y subsecciones muy próximo al modelo descrito en el capítulo 1, junto a un motor de negocio (erp-engine.js) que cubre buena parte de las reglas de este documento. El segundo: el ciclo de captura de documentos ya está modelado de extremo a extremo —capturar, extraer, validar, asignar y registrar la factura—, de modo que la incorporación de la cámara y de la lectura real es una extensión de algo existente y no una construcción desde cero.
+Área
+Qué existe hoy en el código
+Estado
+Navegación de tres paneles
+erp.html: navegación lateral por grupos y elementos; sin segundo panel desplegable independiente
+Parcial
+Torre de Control
+dashboard.html y vista «torre» de erp.html; motor de alertas en erp-engine.js
+Parcial
+Mi Día
+vista «hoy» en erp.html; sin calendario de hitos
+Parcial
+Recorrido completo
+journey.html con las 13 etapas y persistencia local, para un único proyecto
+Existe, sin selector
+Clientes
+clientes.html con alta, edición, baja, filtros y ficha; registro de terceros en el motor
+Existe
+Oportunidades y Visitas
+capacidades crm y visits; vista «oportunidades» en erp.html
+Parcial
+Presupuestos: constructor y versiones
+capacidad quoting; frontend.html; versiones congeladas y documento generado en erp-engine.js
+Existe (base)
+Imágenes de partida
+campo imageRefs presente en las líneas de presupuesto y trasladado al documento; sin interfaz de carga ni anexo gráfico
+Parcial
+Carta Gantt y dependencias
+capacidad scheduling con tareas, fechas y avance; sin dependencias, desfases ni ruta crítica
+No existe
+Contratos
+estados, disparadores de hitos y garantías en el motor; bloqueo de primera factura sin firma
+Parcial
+Proyectos: selector y herencia
+capacidad projects con líneas base, costes y desviación por capítulo
+Parcial
+Compras
+capacidad procurement con órdenes y compromiso por capítulo
+Parcial
+Subcontratos
+capacidades suppliers y sourcing; comparativa de ofertas
+Parcial
+Seguimiento técnico
+avance por tarea en scheduling; sin replanificación por dependencias
+Parcial
+Seguimiento económico
+presupuesto, coste y desviación por capítulo en projects
+Existe (base)
+Modificaciones contractuales
+entidad de cambio con estados en la capacidad projects
+Parcial
+Personal y horas
+capacidad time; vista «horas» en erp.html
+Parcial
+Facturas y cobros
+capacidades receivables y billing; numeración por serie y reglas de cumplimiento
+Existe
+Proveedores y pagos
+capacidad payables con facturas recibidas y pagos
+Existe
+Captura por fotografía
+ciclo capturar → extraer → validar → asignar → registrar factura, con duplicados y nombre normalizado; sin cámara ni lectura real
+Parcial
+Conciliación bancaria
+movimientos con estado sin asignar en el motor; sin importación de extracto ni emparejamiento asistido
+Parcial
+Banco y caja
+vista «banco» en erp.html
+Parcial
+Precios y costos
+capacidad sourcing con precios y comparativas; sin evolución histórica
+Parcial
+Gestoría
+vista «gestoria»; estado «enviado a contabilidad» y control de documentos faltantes
+Parcial
+Comunicaciones
+capacidad messaging; sin editor de plantillas ni de reglas
+Parcial
+Contabilidad y Finanzas
+financial-data.html
+Existe
+Datos Maestros
+master-data.html y registro único de terceros
+Existe
+Reportes
+no iniciado
+No existe
+

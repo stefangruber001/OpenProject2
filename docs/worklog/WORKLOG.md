@@ -16,6 +16,20 @@ commit, now marked superseded-by-this at its top. `PROGRESS.md` and
 still get a short entry every session — this worklog is the *detailed*
 companion to those, not a replacement.
 
+**Where the spec is.** `intake/diorka/20260731_REQUERMIENTOS BÁSICO CANEI.docx`
+is the source of truth; `intake/diorka/canei-spec-extracted.txt` is the same
+content as greppable plain text — read that one. The older
+`Proyecto_Diorka_Business_Requirements.docx` in the same folder is superseded,
+but is still where the `XXX-00` requirement ids cited throughout the code
+(MDM-03, CAP-04, GES-07 …) are defined.
+
+**Continuing from anywhere.** Everything needed is in this repository: open it
+on branch `claude/orin-project-status-1q50dt` and read `CLAUDE.md` → this file
+→ the newest `SESSION-NN.md` context pack. Nothing lives on any one machine.
+Check `node --version` first: sessions 1-3 ran on a host with no Node
+toolchain and their worklogs describe workarounds (a JavaScriptCore shim, a
+hand-edited lockfile) that are irrelevant wherever Node exists.
+
 **Verification is automatic — the operator does not run anything between
 sessions.** At the end of every session: commit, push to
 `claude/orin-project-status-1q50dt`, then use `gh run watch` (the `gh` CLI is
