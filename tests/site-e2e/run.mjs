@@ -87,12 +87,33 @@ async function main() {
   if (failed.length) process.exit(1);
 }
 
-async function waitForServer(base, tries = 50) {
+/**
+ * Readiness probe: a raw TCP connect, deliberately NOT fetch().
+ *
+ * This used to poll with fetch() and never read the response body. undici
+ * keeps an HTTP parser alive per un-consumed response, and probing a socket
+ * that is still coming up crashed the entire run from inside that parser —
+ * `AssertionError: assert(!this.paused)` at Parser.finish, 0.7s in, before a
+ * single test had executed (CI run 21, Node 22.23.1; the same code passed on
+ * 22.22.2 locally, which is exactly how this kind of bug hides).
+ *
+ * A "is the port listening yet" check has no business owning an HTTP client.
+ */
+async function waitForServer(base, tries = 60) {
+  const { hostname, port } = new URL(base);
   for (let i = 0; i < tries; i++) {
-    try {
-      const r = await fetch(`${base}/journey.html`);
-      if (r.ok) return;
-    } catch {}
+    const listening = await new Promise((res) => {
+      const socket = net.connect({ host: hostname, port: Number(port) }, () => {
+        socket.end();
+        res(true);
+      });
+      socket.setTimeout(500, () => {
+        socket.destroy();
+        res(false);
+      });
+      socket.on("error", () => res(false));
+    });
+    if (listening) return;
     await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error("static server did not start");
