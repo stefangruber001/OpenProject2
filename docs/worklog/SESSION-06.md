@@ -132,6 +132,20 @@ creates a dependency; freezing draws the reference bars; **closing the finish
 day pushes the finish out** (2026-05-04 → 2026-05-05, the proof that the
 calendar reaches the engine); and the plan survives a reload.
 
+Confirmed on GitHub for `a83c49c`: `CI` run 176 (all five jobs) and `Site E2E`
+run 22 green.
+
+**The first push was not green, and the reason is worth keeping.** Site E2E run
+21 (`d9e43a2`) died 0.7 s in, before a single test executed:
+`AssertionError: assert(!this.paused)` from inside undici's HTTP parser. The
+harness's `waitForServer()` had been polling with `fetch()` since session 1 and
+never consuming the response body; undici keeps a parser alive per
+un-consumed response, and probing a socket that is still coming up can end it
+mid-parse and assert out of the whole process. It passed on Node 22.22.2
+locally and failed on the runner's 22.23.1 — exactly how this class of bug
+hides. The probe is now a raw `net.connect` with a timeout (`a83c49c`): a
+readiness check has no business owning an HTTP client.
+
 ## Two bugs this caught
 
 1. **CSS geometry applies to SVG.** `class="bar"` on the chart's rects
