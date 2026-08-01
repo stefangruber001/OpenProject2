@@ -7,13 +7,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Gantt chart in the ERP workspace (Proyectos → Seguimiento técnico): bars
+  with the critical path, float, milestones, dependency arrows, frozen-baseline
+  ghosts and the contract's payment milestones on one timeline, with an
+  editable working calendar. Drag to move, pull the right edge to lengthen,
+  drag between bars to link — mouse, pen and touch alike. Plans are stored per
+  project (schema v3) and every date on screen is computed by the scheduling
+  capability, never by the view.
 - Planning engine in `@repo/capability-scheduling`: a working calendar
   supplied as data (working weekdays + closed dates), finish-to-start,
   start-to-start and finish-to-finish dependencies with positive and negative
   lag, a critical-path pass giving each task its total float, automatic
   movement of the plan's finish date, and append-only baselines whose drift is
   reported in working days. It ships in the committed browser bundle
-  (`site/erp-factory.{js,cjs}`, surface version 2); no screen consumes it yet.
+  (`site/erp-factory.{js,cjs}`, surface version 3) and is what the Gantt above
+  draws.
 
 ### Changed
 

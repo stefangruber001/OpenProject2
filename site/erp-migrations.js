@@ -57,6 +57,26 @@
         return s;
       },
     },
+    {
+      to: 3,
+      name: "per-project schedules",
+      /*
+       * `plans` holds one capability-owned Plan value per project, keyed by
+       * project id: tasks with durations, the dependency network, the working
+       * calendar and any frozen baselines.
+       *
+       * It lives in the same blob but is NOT engine state. erp-engine.js
+       * neither writes it nor knows it exists; site/erp-bridge.js puts it
+       * there and @repo/capability-scheduling owns its shape. That is the
+       * strangler seam working as intended — the engine keeps serialising the
+       * whole object, so a new area can persist alongside it without the old
+       * code learning anything about the new.
+       */
+      up: function (s) {
+        if (!s.plans || typeof s.plans !== "object" || Array.isArray(s.plans)) s.plans = {};
+        return s;
+      },
+    },
   ];
 
   var CURRENT_VERSION = MIGRATIONS.reduce(function (max, m) {

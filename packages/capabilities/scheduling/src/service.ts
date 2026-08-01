@@ -65,6 +65,31 @@ export class SchedulingService {
     return { ...plan, tasks: [...plan.tasks, task] };
   }
 
+  /**
+   * Remove a task and every dependency that touched it. The cleanup is the
+   * point: a dependency left pointing at a deleted task makes the next
+   * schedule throw, so deletion has to be a single operation the engine owns
+   * rather than two the caller must remember to pair.
+   */
+  removeTask(plan: Plan, taskId: string): Plan {
+    if (!plan.tasks.some((t) => t.id === taskId)) {
+      throw new FactoryError("NOT_FOUND", `Task ${taskId} not found.`);
+    }
+    return {
+      ...plan,
+      tasks: plan.tasks.filter((t) => t.id !== taskId),
+      dependencies: (plan.dependencies ?? []).filter(
+        (d) => d.predecessorId !== taskId && d.successorId !== taskId,
+      ),
+    };
+  }
+
+  renameTask(plan: Plan, taskId: string, title: string): Plan {
+    const clean = title.trim();
+    if (!clean) throw new FactoryError("INVALID_STATE", "A task needs a title.");
+    return this.mutate(plan, taskId, (t) => ({ ...t, title: clean }));
+  }
+
   setStatus(plan: Plan, taskId: string, status: TaskStatus): Plan {
     return this.mutate(plan, taskId, (t) => ({
       ...t,

@@ -550,3 +550,34 @@ languages: es-ES # source: synthetic
   **committed** `site/erp-factory.cjs`, keeping "the capability is correct" and "the artifact the
   phones load is correct" as two separately-proven claims. Reversible: the capability's previous
   API is untouched and nothing in `site/` calls the new code yet.
+- **#50 — CANEI session 6: the chart, and keeping the arithmetic out of it (2026-07-31).**
+  Spec §3.3 asks for a Gantt with FS/SS/FF dependencies, lead/lag, a working calendar with
+  closures, a finish date that moves by itself, a visible critical path, the contract's payment
+  milestones on the same timeline, a baseline frozen at approval, and "interacción simple:
+  arrastrar para mover, tirar del borde para alargar, y unir tareas con el ratón". Session 6
+  built exactly that in `erp.html` (Proyectos → Seguimiento técnico) over session 5's engine.
+  **Decisions:** (a) **the view computes no dates.** Bar positions, floats, the critical path, the
+  finish and baseline drift are all asked of `@repo/capability-scheduling` through
+  `ErpBridge.scheduling.plans`; the only arithmetic in the chart is pixels ↔ _calendar_ days for
+  the axis and for turning a drag into a date, and working-day questions go back to the engine's
+  own calendar helpers (newly exposed on the browser surface, `SURFACE_VERSION` 2 → 3). A second
+  implementation of working-day maths in the view would disagree with the engine the first time
+  someone added a closure. (b) **Plans persist in `state.plans` (schema v3)**, one per project:
+  a capability-owned value riding inside the engine's blob, which `erp-engine.js` neither writes
+  nor knows about. Cheaper and more reversible than a second IndexedDB store, and it is the
+  strangler seam working as designed. (c) **Dragging sets the engine's start-no-earlier-than pin**
+  rather than a fixed date, so successors still follow and the plan stays possible. (d) **Payment
+  milestones are drawn, never scheduled** — they belong to the contract, and letting the planner
+  move them would let a chart edit a contract. (e) **`seedFromChapters` is explicitly a seed**;
+  session 10a owns the real budget→plan derivation. It exists so a chart opened on a real project
+  is not an empty grid, and only runs when the user asks. (f) **The default five-day calendar
+  lives in `erp-bridge.js`**, a host file allowed to hold local convention; the capability keeps
+  its seven-day neutrality and tenant config will replace that one constant. (g) **Gestures use
+  Pointer Events**, one path for mouse, pen and touch — the ERP runs in two WebViews and a
+  mouse-only chart would be useless on the site visit it is for. (h) `scheduling-gantt` →
+  **`factory`**: the first area the capability layer owns end to end.
+  **A trap worth recording:** SVG geometry attributes are overridable by CSS in Chromium, so the
+  chart's `class="bar"` inherited the table progress-bar rule `.bar{height:7px}` and silently
+  flattened every bar. All chart classes are now `g`-prefixed and the e2e asserts bar height, so
+  it cannot come back. Reversible: no engine code changed, and the migration only adds an empty
+  object.

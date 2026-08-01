@@ -14,7 +14,14 @@
    If you find yourself writing a domain rule here, it belongs one layer down.
    ========================================================================== */
 
-import { SchedulingService } from "@repo/capability-scheduling";
+import {
+  SchedulingService,
+  addWorkingDays,
+  everyDayCalendar,
+  isWorkingDay,
+  workingDayOffset,
+  workingDaysInclusive,
+} from "@repo/capability-scheduling";
 import type {
   Baseline,
   BaselineComparison,
@@ -95,6 +102,20 @@ export function createScheduling(ports: FactoryPorts = defaultPorts()) {
     overdue(plan: Plan, asOf?: string): Task[] {
       return svc.overdue(plan, asOf);
     },
+    /**
+     * Calendar arithmetic, exposed because a chart genuinely needs it: to
+     * shade the closed days on its axis and to convert a pixel drag into a
+     * date. Without this the view would reimplement working-day maths beside
+     * the engine that owns it, and the two would drift apart on the first
+     * closure someone adds.
+     */
+    calendar: {
+      everyDay: everyDayCalendar,
+      isWorkingDay,
+      addWorkingDays,
+      workingDaysInclusive,
+      workingDayOffset,
+    },
     service: svc,
   };
 }
@@ -121,5 +142,6 @@ export type {
  * 2 — `service` gained the calendar/CPM/baseline engine. A caller reaching
  *     for `service.schedule` against a version-1 artifact would find nothing
  *     there, which is exactly the staleness this number exists to catch.
+ * 3 — `calendar` namespace added for the chart's axis and drag arithmetic.
  */
-export const SURFACE_VERSION = 2;
+export const SURFACE_VERSION = 3;

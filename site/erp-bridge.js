@@ -70,6 +70,90 @@
     };
   }
 
+  /**
+   * The working calendar a new schedule starts from.
+   *
+   * This is a HOST default, and it is allowed to be one: erp.html is outside
+   * the boundary matrix, so it may hold local convention. The capability
+   * itself knows no weekend and no closure — it falls back to a seven-day
+   * week — which is why the value has to be supplied from here. When tenant
+   * config grows a calendar (working days + the closures that apply to that
+   * tenant), this constant is the single line that reads it instead.
+   */
+  var DEFAULT_CALENDAR = { workingWeekdays: [1, 2, 3, 4, 5], nonWorkingDates: [] };
+
+  /**
+   * Per-project schedules live in state.plans (schema v3), keyed by project
+   * id. The engine does not know they are there: it serialises the whole
+   * state object, so a capability-owned value can persist beside engine data
+   * without the old code learning anything about the new.
+   */
+  function planFor(state, projectId) {
+    var stored = state && state.plans && state.plans[projectId];
+    if (stored && Array.isArray(stored.tasks)) return stored;
+    return { tasks: [], dependencies: [], calendar: DEFAULT_CALENDAR, baselines: [] };
+  }
+
+  function storePlan(state, projectId, plan) {
+    if (!state.plans || typeof state.plans !== "object") state.plans = {};
+    state.plans[projectId] = plan;
+    return plan;
+  }
+
+  /**
+   * A starting schedule from the project's accepted budget chapters: one task
+   * per chapter, in order, each finish-to-start behind the previous one.
+   *
+   * Deliberately a SEED, not the real generation. Session 10a builds the true
+   * budget→plan derivation (quantities, line-level durations, the baseline
+   * that the contract freezes). This exists so a chart opened on a real
+   * project has something to show other than an empty grid, and it is only
+   * ever run when the user asks for it.
+   */
+  function seedFromChapters(erp, projectId, opts) {
+    if (!scheduling) return null;
+    var svc = scheduling.service;
+    var project = erp.project(projectId);
+    var chapters = [];
+    try {
+      if (project.budgetId) {
+        chapters = erp
+          .version(project.budgetId, project.acceptedVersionId)
+          .chapters.filter(function (c) {
+            return c.section === "base";
+          });
+      }
+    } catch (e) {
+      chapters = [];
+    }
+    if (!chapters.length && project.baseline && project.baseline.chapters) {
+      chapters = project.baseline.chapters;
+    }
+    if (!chapters.length) return null;
+
+    var start = (opts && opts.from) || (project.dates && project.dates.start) || erp.today;
+    var days = (opts && opts.durationDays) || 5;
+    var plan = svc.setCalendar(
+      { tasks: [], dependencies: [], baselines: [] },
+      (opts && opts.calendar) || DEFAULT_CALENDAR,
+    );
+    var previousId = null;
+    chapters.forEach(function (c) {
+      plan = svc.addTask(plan, {
+        title: c.num + ". " + c.name,
+        plannedStart: start,
+        plannedEnd: start,
+        durationDays: days,
+        projectRef: projectId,
+        sourceRef: "chapter:" + c.num,
+      });
+      var added = plan.tasks[plan.tasks.length - 1];
+      if (previousId) plan = svc.link(plan, { predecessorId: previousId, successorId: added.id });
+      previousId = added.id;
+    });
+    return svc.recalculate(plan, start);
+  }
+
   /* ------------------------------------------------------------------ *
    * Call surface
    * ------------------------------------------------------------------ */
@@ -101,6 +185,121 @@
       overdueTasks: function (state, asOf) {
         if (!scheduling) return [];
         return scheduling.overdue(tasksToPlan(state), asOf || (state && state.today));
+      },
+
+      /**
+       * The contract's payment milestones for a project, as points on the
+       * same timeline as the plan (spec §3.3). A pure projection of engine
+       * data: the chart draws them, nothing schedules them, and the plan
+       * never contains them — they belong to the contract, not the planner.
+       */
+      paymentMilestones: function (erp, projectId) {
+        try {
+          var project = erp.project(projectId);
+          if (!project.contractId) return [];
+          var contract = erp.state.contracts.find(function (c) {
+            return c.id === project.contractId;
+          });
+          if (!contract) return [];
+          return contract.installments
+            .filter(function (i) {
+              return !!i.expectedDate;
+            })
+            .map(function (i, idx) {
+              return {
+                label: contract.number + " · hito " + (idx + 1),
+                date: i.expectedDate,
+                amountCents: i.amountCents,
+                invoiced: i.status === "invoiced",
+              };
+            });
+        } catch (e) {
+          return [];
+        }
+      },
+
+      /* ---------------------------------------------------------------- *
+       * Project schedules (the chart in Proyectos → Seguimiento técnico).
+       *
+       * Every method here is a pass-through to @repo/capability-scheduling
+       * plus the one thing the capability cannot do, being pure: put the
+       * result back in the state blob. No arithmetic happens in this file and
+       * none may happen in the view — dates, floats, the critical path and
+       * baseline drift all come from the engine, so there is exactly one
+       * implementation of each to be wrong.
+       * ---------------------------------------------------------------- */
+      plans: {
+        defaultCalendar: function () {
+          return { workingWeekdays: DEFAULT_CALENDAR.workingWeekdays.slice(), nonWorkingDates: [] };
+        },
+
+        /** The stored plan for a project, or an empty one on the host calendar. */
+        get: function (state, projectId) {
+          return planFor(state, projectId);
+        },
+
+        /** Write a plan back into the blob. The caller still owns persistence. */
+        save: function (state, projectId, plan) {
+          return storePlan(state, projectId, plan);
+        },
+
+        /** Dates, floats and the critical path. Null when the bundle is absent. */
+        schedule: function (plan, from) {
+          if (!scheduling) return null;
+          return scheduling.service.schedule(plan, from);
+        },
+
+        /** Apply the schedule to the plan's own dates. */
+        recalculate: function (plan, from) {
+          if (!scheduling) return plan;
+          return scheduling.service.recalculate(plan, from);
+        },
+
+        addTask: function (plan, input) {
+          return scheduling.service.addTask(plan, input);
+        },
+        removeTask: function (plan, taskId) {
+          return scheduling.service.removeTask(plan, taskId);
+        },
+        rename: function (plan, taskId, title) {
+          return scheduling.service.renameTask(plan, taskId, title);
+        },
+        link: function (plan, input) {
+          return scheduling.service.link(plan, input);
+        },
+        unlink: function (plan, dependencyId) {
+          return scheduling.service.unlink(plan, dependencyId);
+        },
+        move: function (plan, taskId, start) {
+          return scheduling.service.moveTask(plan, taskId, start);
+        },
+        unpin: function (plan, taskId) {
+          return scheduling.service.unpin(plan, taskId);
+        },
+        setDuration: function (plan, taskId, days) {
+          return scheduling.service.setDuration(plan, taskId, days);
+        },
+        setProgress: function (plan, taskId, pct) {
+          return scheduling.service.setProgress(plan, taskId, pct);
+        },
+        setCalendar: function (plan, calendar) {
+          return scheduling.service.setCalendar(plan, calendar);
+        },
+        freezeBaseline: function (plan, label, asOf) {
+          return scheduling.service.freezeBaseline(plan, label, asOf);
+        },
+        compareToBaseline: function (plan, baselineId) {
+          if (!scheduling || !(plan.baselines || []).length) return null;
+          return scheduling.service.compareToBaseline(plan, baselineId);
+        },
+
+        /** One task per accepted-budget chapter, chained. See seedFromChapters. */
+        seedFromChapters: function (erp, projectId, opts) {
+          return seedFromChapters(erp, projectId, opts);
+        },
+
+        /** Calendar arithmetic for the chart's axis and its drag maths. */
+        calendar: scheduling ? scheduling.calendar : null,
       },
     },
 

@@ -163,6 +163,47 @@
   .doc .dh b{font-family:var(--serif);font-size:16px;color:var(--ink)}
   .chapline{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
 
+  /* ---------- Gantt (spec §3.3 · §4.3) ---------- */
+  .gwrap{display:flex;align-items:flex-start;border-top:1px solid var(--hair)}
+  .gnames{flex:none;width:190px;border-right:1px solid var(--line);background:var(--paper)}
+  .gnames .gh{height:34px;border-bottom:1px solid var(--line);background:var(--greenSoft)}
+  .gnames .gn{height:30px;display:flex;align-items:center;gap:6px;padding:0 10px;border-bottom:1px solid var(--hair);
+    font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .gnames .gn:hover{background:var(--greenSoft)}
+  .gnames .gn.on{background:var(--greenSoft);color:var(--greenDeep);font-weight:600}
+  .gnames .gn.pay{color:var(--blue);cursor:default}
+  .gnames .gn .dot{width:6px;height:6px;border-radius:50%;background:var(--danger);flex:none}
+  .gscroll{overflow-x:auto;overflow-y:hidden;flex:1;-webkit-overflow-scrolling:touch}
+  .gsvg{display:block}
+  /* The bars own their gestures; everything else on the chart scrolls normally. */
+  .gsvg .gbar,.gsvg .ggrip,.gsvg .gknob,.gsvg .gms{touch-action:none}
+  .gsvg text{font:11px var(--sans);fill:var(--muted)}
+  .gsvg text.mon{font:600 10px var(--sans);fill:var(--body)}
+  .gsvg .gbar{fill:var(--green);cursor:grab}
+  .gsvg .gbar.crit{fill:var(--danger)}
+  .gsvg .gbar.sel{stroke:var(--ink);stroke-width:1.5}
+  .gsvg .gprog{fill:rgba(255,255,255,.45);pointer-events:none}
+  .gsvg .gghost{fill:none;stroke:var(--faint);stroke-width:1;stroke-dasharray:3 2}
+  .gsvg .ggrip{fill:rgba(255,255,255,.55);cursor:ew-resize}
+  .gsvg .gknob{fill:var(--paper);stroke:var(--green);stroke-width:1.5;cursor:crosshair}
+  .gsvg .gdep{stroke:var(--muted);stroke-width:1.2;fill:none}
+  .gsvg .gnonwork{fill:var(--hair)}
+  .gsvg .gtoday{stroke:var(--spark);stroke-width:1.5}
+  .gsvg .growline{stroke:var(--hair);stroke-width:1}
+  .gsvg .gfloat{stroke:var(--faint);stroke-width:1;stroke-dasharray:2 2}
+  .gsvg .gms{fill:var(--greenDeep);cursor:grab}
+  .gsvg .gms.crit{fill:var(--danger)}
+  .gsvg .gpay{fill:var(--blue)}
+  .gsvg .grubber{stroke:var(--green);stroke-width:1.6;stroke-dasharray:4 3;fill:none;pointer-events:none}
+  .gbarwrap{position:relative}
+  .gtools{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:10px 14px}
+  .gtools .chip{display:inline-flex;align-items:center;gap:5px;font:600 11px var(--sans);color:var(--body);
+    background:var(--hair);border-radius:999px;padding:3px 9px}
+  .gtools .chip b{color:var(--ink)}
+  .gtools .chip button{border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:12px;padding:0 1px}
+  .glegend{display:flex;gap:12px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid var(--hair);font-size:11.5px;color:var(--muted)}
+  .glegend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+
   .scrim{position:fixed;inset:0;background:rgba(20,26,14,.34);opacity:0;pointer-events:none;transition:.2s;z-index:60}
   .scrim.on{opacity:1;pointer-events:auto}
   .drawer{position:fixed;top:0;right:0;height:100%;width:min(540px,94vw);background:var(--bg);z-index:70;
@@ -391,8 +432,6 @@ const PLACEHOLDERS={
    body:"El registro de compras y el compromiso de coste por capítulo ya existen y se consultan hoy dentro de cada proyecto.",goto:["proyectos","Abrir Proyectos"]},
  subcontratos:{sub:"Contratación de industriales, ofertas comparadas y documentación obligatoria.",
    body:"Las ofertas por proveedor y su comparativa se gestionan hoy en Precios y costes; la contratación se registra en el proyecto.",goto:["precios","Abrir Precios y costes"]},
- seguimiento:{sub:"Avance de obra por capítulo, partes de trabajo y replanificación.",
-   body:"El avance por capítulo se marca hoy en la ficha del proyecto y alimenta la certificación.",goto:["proyectos","Abrir Proyectos"]},
  economia:{sub:"Venta, coste comprometido, coste real y desviación por capítulo.",
    body:"La economía de cada obra se ve hoy en la ficha del proyecto, con coste previsto frente a real por capítulo.",goto:["proyectos","Abrir Proyectos"]},
  modificaciones:{sub:"Extras y modificaciones contractuales con su aprobación.",
@@ -679,6 +718,271 @@ function taskStatusTags(){
 }
 const pillProg=s=>s==="done"?'<span class="pill g">Hecho</span>':s==="inProgress"?'<span class="pill y">En curso</span>':'<span class="pill">Sin empezar</span>';
 
+/* =============================== Gantt (spec §3.3 · §4.3) ==========================
+   THE CHART IS A VIEW AND NOTHING MORE. Every date, duration, float,
+   critical-path flag and baseline drift it draws is asked of
+   @repo/capability-scheduling through ErpBridge. The only arithmetic in this
+   block is pixels ↔ calendar days: where to put a bar, and what date a drag
+   of N pixels landed on. Working-day questions — is this day closed, how long
+   is this task really, where does the plan now finish — are the engine's, and
+   the first time one of them gets recomputed here the chart and the engine
+   will start disagreeing about the same plan. */
+let gProject=null, gSel=null, gZoom=24, gBaseline=true, gDrag=null;
+const G_ROW=30, G_HEAD=34;
+const isoAdd=(iso,d)=>{const t=new Date(iso+"T00:00:00Z");t.setUTCDate(t.getUTCDate()+d);return t.toISOString().slice(0,10);};
+const isoDiff=(a,b)=>Math.round((Date.parse(b+"T00:00:00Z")-Date.parse(a+"T00:00:00Z"))/86400000);
+function ganttApi(){ return (typeof ErpBridge!=="undefined"&&ErpBridge.available)?ErpBridge.scheduling.plans:null; }
+/* Every change goes through one door: recalculate, store, persist, re-render.
+   mutate() turns an engine refusal (a cycle, a bad duration) into a toast. */
+function ganttCommit(pid,plan,msg){
+  const B=ganttApi();
+  mutate(()=>{ B.save(erp.state,pid,B.recalculate(plan)); },msg);
+}
+
+function ganttChart(plan,sch,cmp,pays){
+  const B=ganttApi(), cal=plan.calendar||B.defaultCalendar(), C=B.calendar;
+  const S={}; if(sch) sch.tasks.forEach(t=>{S[t.taskId]=t;});
+  const base={};
+  if(cmp){ const b=(plan.baselines||[]).find(x=>x.id===cmp.baselineId); (b?b.tasks:[]).forEach(t=>{base[t.taskId]=t;}); }
+  const pos=t=>S[t.id]||{start:t.plannedStart,finish:t.plannedEnd,critical:false,lateFinish:t.plannedEnd,totalFloatDays:0};
+
+  let from=null,to=null;
+  const touch=d=>{ if(!d)return; if(!from||d<from)from=d; if(!to||d>to)to=d; };
+  plan.tasks.forEach(t=>{const p=pos(t);touch(p.start);touch(p.finish);const b=base[t.id];if(b){touch(b.start);touch(b.finish);}});
+  pays.forEach(p=>touch(p.date));
+  touch(erp.today);
+  from=isoAdd(from,-3); to=isoAdd(to,4);
+
+  const nDays=isoDiff(from,to)+1, W=Math.max(nDays*gZoom,360);
+  const rows=plan.tasks.length+(pays.length?1:0), H=G_HEAD+rows*G_ROW;
+  const x=iso=>isoDiff(from,iso)*gZoom;
+  const barW=(a,b)=>Math.max(gZoom*0.7,(isoDiff(a,b)+1)*gZoom-3);
+
+  /* --- axis: closed days shaded, day numbers, month labels, today --- */
+  let axis="";
+  for(let i=0;i<nDays;i++){
+    const d=isoAdd(from,i), X=i*gZoom;
+    if(!C.isWorkingDay(cal,d)) axis+=`<rect class="gnonwork" x="${X}" y="${G_HEAD}" width="${gZoom}" height="${H-G_HEAD}"/>`;
+    if(gZoom>=24||d.slice(8)==="01"||i===0)
+      axis+=`<text x="${X+gZoom/2}" y="${G_HEAD-6}" text-anchor="middle">${+d.slice(8)}</text>`;
+    if(d.slice(8)==="01"||i===0)
+      axis+=`<text class="mon" x="${X+2}" y="13">${MONTHS[+d.slice(5,7)-1]} ${d.slice(0,4)}</text>`;
+  }
+  axis+=`<line class="gtoday" x1="${x(erp.today)+gZoom/2}" y1="${G_HEAD}" x2="${x(erp.today)+gZoom/2}" y2="${H}"/>`;
+
+  /* --- bars --- */
+  let bars="", names="";
+  plan.tasks.forEach((t,i)=>{
+    const p=pos(t), y=G_HEAD+i*G_ROW, top=y+5, mid=y+G_ROW/2;
+    const b=base[t.id];
+    if(b) bars+=`<rect class="gghost" x="${x(b.start)}" y="${y+2}" width="${barW(b.start,b.finish)}" height="${G_ROW-4}" rx="4"/>`;
+    if(t.milestone){
+      const cx=x(p.start)+gZoom/2;
+      bars+=`<polygon class="gms${p.critical?" crit":""}" data-task="${t.id}" data-role="move" points="${cx},${mid-9} ${cx+9},${mid} ${cx},${mid+9} ${cx-9},${mid}"><title>${esc(t.title)} · ${fmtD(p.start)}</title></polygon>`;
+    }else{
+      const w=barW(p.start,p.finish), X=x(p.start);
+      if(p.totalFloatDays>0&&p.lateFinish>p.finish)
+        bars+=`<line class="gfloat" x1="${X+w}" y1="${mid}" x2="${x(p.lateFinish)+gZoom-3}" y2="${mid}"/>`;
+      bars+=`<g><rect class="gbar${p.critical?" crit":""}${gSel===t.id?" sel":""}" data-task="${t.id}" data-role="move" x="${X}" y="${top}" width="${w}" height="20" rx="5"><title>${esc(t.title)} · ${fmtD(p.start)} → ${fmtD(p.finish)} · ${p.durationDays} d${p.critical?" · crítica":` · holgura ${p.totalFloatDays} d`}</title></rect>
+        ${t.progressPct?`<rect class="gprog" x="${X}" y="${top+14}" width="${Math.max(2,w*t.progressPct/100)}" height="4" rx="2"/>`:""}
+        <rect class="ggrip" data-task="${t.id}" data-role="resize" x="${X+w-6}" y="${top}" width="6" height="20" rx="2"/>
+        <circle class="gknob" data-task="${t.id}" data-role="link" cx="${X+w+7}" cy="${mid}" r="4.5"/></g>`;
+    }
+    names+=`<div class="gn${gSel===t.id?" on":""}" data-task="${t.id}" title="${esc(t.title)}">${p.critical?'<span class="dot"></span>':""}${t.milestone?"◆ ":""}${esc(t.title)}</div>`;
+  });
+
+  /* --- dependency arrows --- */
+  let deps="";
+  const rowOf={}; plan.tasks.forEach((t,i)=>{rowOf[t.id]=i;});
+  (plan.dependencies||[]).forEach(d=>{
+    const a=plan.tasks.find(t=>t.id===d.predecessorId), z=plan.tasks.find(t=>t.id===d.successorId);
+    if(!a||!z)return;
+    const pa=pos(a), pz=pos(z);
+    const ya=G_HEAD+rowOf[a.id]*G_ROW+G_ROW/2, yz=G_HEAD+rowOf[z.id]*G_ROW+G_ROW/2;
+    const xa=d.type==="SS"?x(pa.start):x(pa.finish)+barW(pa.start,pa.finish);
+    const xz=d.type==="FF"?x(pz.finish)+barW(pz.start,pz.finish):x(pz.start);
+    const midX=Math.max(xa+8,xz-8);
+    deps+=`<path class="gdep" d="M ${xa} ${ya} H ${midX} V ${yz} H ${xz}"/>
+      <polygon class="gdep" style="fill:var(--muted)" points="${xz},${yz} ${xz-5},${yz-3.5} ${xz-5},${yz+3.5}"/>`;
+  });
+
+  /* --- contract payment milestones: drawn, never scheduled --- */
+  if(pays.length){
+    const y=G_HEAD+plan.tasks.length*G_ROW, mid=y+G_ROW/2;
+    pays.forEach(p=>{
+      const cx=x(p.date)+gZoom/2;
+      bars+=`<polygon class="gpay" points="${cx},${mid-8} ${cx+8},${mid} ${cx},${mid+8} ${cx-8},${mid}" opacity="${p.invoiced?1:.55}"><title>${esc(p.label)} · ${eur0(p.amountCents)} · ${fmtD(p.date)}${p.invoiced?" · facturado":""}</title></polygon>`;
+    });
+    names+=`<div class="gn pay">◆ Hitos de cobro</div>`;
+  }
+
+  let grid="";
+  for(let r=0;r<=rows;r++) grid+=`<line class="growline" x1="0" y1="${G_HEAD+r*G_ROW}" x2="${W}" y2="${G_HEAD+r*G_ROW}"/>`;
+
+  return `<div class="gwrap">
+    <div class="gnames"><div class="gh"></div>${names}</div>
+    <div class="gscroll"><svg class="gsvg" id="gSvg" width="${W}" height="${H}" data-from="${from}">
+      ${axis}${grid}${deps}${bars}</svg></div>
+  </div>`;
+}
+
+/* Pointer gestures. One handler set for mouse, pen and touch — the ERP runs
+   inside two WebViews and a desktop browser, and a mouse-only chart would be
+   unusable on the site visit it is meant for. */
+function ganttWire(v,pid,plan,sch){
+  const svg=v.querySelector('#gSvg'); if(!svg)return;
+  const B=ganttApi(), cal=plan.calendar||B.defaultCalendar(), C=B.calendar;
+  const S={}; if(sch) sch.tasks.forEach(t=>{S[t.taskId]=t;});
+
+  v.querySelectorAll('.gn[data-task]').forEach(n=>{ n.onclick=()=>{ gSel=n.dataset.task; ganttTaskDrawer(pid,n.dataset.task); }; });
+
+  const end=()=>{ if(gDrag&&gDrag.rubber)gDrag.rubber.remove(); gDrag=null; };
+
+  svg.addEventListener('pointerdown',e=>{
+    const el=e.target.closest('[data-task]'); if(!el)return;
+    gDrag={id:el.dataset.task,role:el.dataset.role||"move",x0:e.clientX,y0:e.clientY,moved:false,el,rubber:null};
+    if(gDrag.role==="link"){
+      const r=document.createElementNS("http://www.w3.org/2000/svg","path");
+      r.setAttribute("class","grubber"); svg.appendChild(r); gDrag.rubber=r;
+      gDrag.cx=+el.getAttribute("cx"); gDrag.cy=+el.getAttribute("cy");
+    }
+    try{ svg.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+  });
+
+  svg.addEventListener('pointermove',e=>{
+    if(!gDrag)return;
+    const dx=e.clientX-gDrag.x0;
+    if(Math.abs(dx)>3||Math.abs(e.clientY-gDrag.y0)>3) gDrag.moved=true;
+    if(gDrag.role==="link"){
+      const pt=svgPoint(svg,e);
+      gDrag.rubber.setAttribute("d",`M ${gDrag.cx} ${gDrag.cy} L ${pt.x} ${pt.y}`);
+    }else if(gDrag.role==="resize"){
+      const bar=svg.querySelector(`.gbar[data-task="${gDrag.id}"]`);
+      if(bar) bar.setAttribute("width",Math.max(gZoom*0.7,(+bar.dataset.w0||+bar.getAttribute("width"))+dx));
+      if(bar&&!bar.dataset.w0) bar.dataset.w0=String(+bar.getAttribute("width")-dx);
+    }else{
+      gDrag.el.setAttribute("transform",`translate(${dx},0)`);
+    }
+  });
+
+  svg.addEventListener('pointerup',e=>{
+    if(!gDrag)return;
+    const {id,role,moved}=gDrag, dx=e.clientX-gDrag.x0;
+    const hit=document.elementFromPoint(e.clientX,e.clientY);
+    const target=hit&&hit.closest?hit.closest('[data-task]'):null;
+    end();
+    const cur=S[id]; if(!cur){ render(); return; }
+
+    if(role==="link"){
+      if(target&&target.dataset.task!==id)
+        ganttCommit(pid,B.link(plan,{predecessorId:id,successorId:target.dataset.task}),"Dependencia creada");
+      else render();
+      return;
+    }
+    if(!moved){ gSel=id; ganttTaskDrawer(pid,id); return; }
+    const days=Math.round(dx/gZoom);
+    if(days===0){ render(); return; }
+    if(role==="resize"){
+      // A drag of N calendar days lands on a date; how many WORKING days that
+      // is, is the calendar's answer, not this view's.
+      const finish=isoAdd(cur.finish,days);
+      const duration=C.workingDaysInclusive(cal,cur.start,finish<cur.start?cur.start:finish);
+      ganttCommit(pid,B.setDuration(plan,id,Math.max(1,duration)),`Duración: ${Math.max(1,duration)} días laborables`);
+    }else{
+      ganttCommit(pid,B.move(plan,id,isoAdd(cur.start,days)),"Tarea movida — la planificación se ha recalculado");
+    }
+  });
+  svg.addEventListener('pointercancel',()=>{ end(); render(); });
+}
+function svgPoint(svg,e){
+  const r=svg.getBoundingClientRect();
+  return {x:e.clientX-r.left,y:e.clientY-r.top};
+}
+
+function ganttNewTask(pid,milestone){
+  const B=ganttApi(), plan=B.get(erp.state,pid);
+  const db=openDrawer(milestone?"Nuevo hito":"Nueva tarea de obra");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>${milestone?"Hito":"Tarea"} *</label><input id="g_title" placeholder="${milestone?"Entrega de obra":"Instalación eléctrica"}"></div>
+   <div class="field"><label>Empieza</label><input id="g_start" type="date" value="${erp.today}"></div>
+   ${milestone?"":`<div class="field"><label>Duración (días laborables)</label><input id="g_days" type="number" min="1" value="5"></div>`}
+   <div class="field full" style="margin-top:8px"><button class="btn primary" id="g_save">Añadir a la planificación</button></div></div>`;
+  $('#g_save').onclick=()=>mutate(()=>{
+    const title=$('#g_title').value.trim();
+    if(!title) throw new Error("Ponle un nombre");
+    const start=$('#g_start').value||erp.today;
+    const next=B.addTask(plan,{title,plannedStart:start,plannedEnd:start,
+      durationDays:milestone?0:Math.max(1,+$('#g_days').value||1),milestone:!!milestone,
+      projectRef:pid,earliestStart:start});
+    B.save(erp.state,pid,B.recalculate(next));
+    closeDrawer();
+  },milestone?"Hito añadido":"Tarea añadida");
+}
+
+function ganttFreeze(pid,plan){
+  const B=ganttApi();
+  const db=openDrawer("Congelar línea base");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full" style="font-size:12.5px;color:var(--body)">Una línea base guarda la planificación tal como está hoy. No se puede modificar después: es la referencia contra la que se mide el avance real.</div>
+   <div class="field full"><label>Nombre *</label><input id="g_lbl" value="Aprobada ${fmtD(erp.today)}"></div>
+   <div class="field full" style="margin-top:8px"><button class="btn primary" id="g_frz">Congelar</button></div>
+   ${(plan.baselines||[]).length?`<div class="field full"><label>Ya congeladas</label>${plan.baselines.map(b=>`<div class="it" style="font-size:12.5px">❄ ${esc(b.label)} · ${fmtD(b.frozenAt)} · fin ${fmtD(b.finish)}</div>`).join("")}</div>`:""}
+   </div>`;
+  $('#g_frz').onclick=()=>mutate(()=>{
+    const label=$('#g_lbl').value.trim();
+    if(!label) throw new Error("La línea base necesita un nombre");
+    B.save(erp.state,pid,B.freezeBaseline(plan,label,erp.today));
+    gBaseline=true; closeDrawer();
+  },"Línea base congelada");
+}
+
+function ganttTaskDrawer(pid,taskId){
+  const B=ganttApi(), plan=B.get(erp.state,pid), sch=B.schedule(plan);
+  const t=plan.tasks.find(x=>x.id===taskId); if(!t)return;
+  const p=(sch?sch.tasks.find(s=>s.taskId===taskId):null)||{start:t.plannedStart,finish:t.plannedEnd,durationDays:0,totalFloatDays:0,critical:false};
+  const preds=(plan.dependencies||[]).filter(d=>d.successorId===taskId);
+  const TYPE={FS:"fin → inicio",SS:"inicio → inicio",FF:"fin → fin"};
+  const db=openDrawer(t.title);
+  db.innerHTML=`
+   <div class="kpis" style="grid-template-columns:1fr 1fr">
+    <div class="kpi"><div class="lab">Fechas</div><div class="val" style="font-size:15px">${fmtD(p.start)} → ${fmtD(p.finish)}</div><div class="sub">${p.durationDays} días laborables</div></div>
+    <div class="kpi ${p.critical?"warn":""}"><div class="lab">Holgura</div><div class="val">${p.critical?"0":p.totalFloatDays}</div><div class="sub">${p.critical?"en la ruta crítica":"días de margen"}</div></div>
+   </div>
+   <div class="fgrid">
+    <div class="field full"><label>Nombre</label><input id="t_title" value="${esc(t.title)}"></div>
+    ${t.milestone?"":`<div class="field"><label>Duración (días laborables)</label><input id="t_days" type="number" min="1" value="${p.durationDays}"></div>`}
+    <div class="field"><label>Avance %</label><input id="t_pct" type="number" min="0" max="100" value="${t.progressPct||0}"></div>
+    <div class="field full"><label>No empezar antes de ${t.earliestStart?"":"(sin fijar)"}</label><input id="t_pin" type="date" value="${t.earliestStart||""}"></div>
+    <div class="field full"><button class="btn primary" id="t_save">Guardar</button> ${t.earliestStart?`<button class="btn" id="t_unpin">Soltar fecha</button>`:""}</div>
+   </div>
+   <div class="card" style="margin-top:12px"><div class="ch"><h3>Depende de</h3><span class="tag">${preds.length} dependencia${preds.length===1?"":"s"}</span></div><div class="daylist">
+    ${preds.map(d=>{const a=plan.tasks.find(x=>x.id===d.predecessorId);return `<div class="it" style="align-items:center;gap:8px">
+      <span style="flex:1">${esc(a?a.title:d.predecessorId)} <span class="pill b">${TYPE[d.type]}</span>${d.lagDays?` <span class="pill y">${d.lagDays>0?"+":""}${d.lagDays} d</span>`:""}</span>
+      <button class="btn sm" data-unlink="${d.id}">Quitar</button></div>`;}).join("")||'<div class="it">Ninguna. Arrastra el punto de otra barra hasta ésta para crear una.</div>'}
+   </div></div>
+   <div style="margin-top:12px"><button class="btn danger" id="t_del">Eliminar de la planificación</button></div>`;
+  $('#t_save').onclick=()=>mutate(()=>{
+    let next=B.rename(plan,taskId,$('#t_title').value);
+    if(!t.milestone) next=B.setDuration(next,taskId,Math.max(1,+$('#t_days').value||1));
+    next=B.setProgress(next,taskId,+$('#t_pct').value||0);
+    const pin=$('#t_pin').value;
+    next=pin?B.move(next,taskId,pin):B.unpin(next,taskId);
+    B.save(erp.state,pid,B.recalculate(next));
+    closeDrawer();
+  },"Tarea actualizada");
+  const up=$('#t_unpin'); if(up) up.onclick=()=>mutate(()=>{
+    B.save(erp.state,pid,B.recalculate(B.unpin(plan,taskId))); closeDrawer();
+  },"La tarea vuelve a su fecha más temprana");
+  db.querySelectorAll('[data-unlink]').forEach(b=>b.onclick=()=>mutate(()=>{
+    B.save(erp.state,pid,B.recalculate(B.unlink(plan,b.dataset.unlink)));
+  },"Dependencia eliminada"));
+  $('#t_del').onclick=()=>mutate(()=>{
+    B.save(erp.state,pid,B.recalculate(B.removeTask(plan,taskId)));
+    gSel=null; closeDrawer();
+  },"Tarea eliminada");
+}
+
 const VIEWS={
  /* ---------- Torre de control (DAS-02/03) ---------- */
  torre(v){
@@ -817,6 +1121,71 @@ const VIEWS={
    </tbody></table></div></div>`;
   v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>projectDrawer(tr.dataset.id));
   if(arg){const p=rows.find(x=>x.code===arg); if(p)projectDrawer(p.id);}
+ },
+
+ /* ---------- Seguimiento técnico: la carta Gantt (§3.3 · §4.3) ---------- */
+ seguimiento(v){
+  $('#sub').textContent="Planificación de obra con dependencias, ruta crítica y línea base. Arrastra una barra para moverla, tira del borde derecho para alargarla y arrastra el punto de una barra a otra para crear una dependencia.";
+  const P=erp.state.projects;
+  if(!P.length){ v.innerHTML='<div class="card"><div class="empty">Todavía no hay proyectos que planificar.</div></div>'; return; }
+  if(!gProject||!P.some(p=>p.id===gProject)) gProject=(P.find(p=>!p.closed)||P[0]).id;
+  const B=ganttApi();
+  if(!B){ v.innerHTML='<div class="card"><div class="empty">La planificación necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>'; return; }
+
+  const pid=gProject, plan=B.get(erp.state,pid), sch=B.schedule(plan);
+  const cmp=gBaseline?B.compareToBaseline(plan):null;
+  const pays=ErpBridge.scheduling.paymentMilestones(erp,pid);
+  const cal=plan.calendar||B.defaultCalendar();
+  const crit=sch?sch.criticalPath.length:0;
+
+  v.innerHTML=`<div class="card"><div class="gtools">
+     <select class="inline" id="gProj" style="max-width:none">${P.map(p=>`<option value="${p.id}"${p.id===pid?" selected":""}>${p.code} — ${esc(erp.party(p.partyId).name)}</option>`).join("")}</select>
+     <button class="btn sm" id="gAdd">＋ Tarea</button>
+     <button class="btn sm" id="gAddMs">◆ Hito</button>
+     ${plan.tasks.length?"":`<button class="btn sm primary" id="gSeed">Generar desde los capítulos</button>`}
+     <span style="flex:1"></span>
+     ${sch&&plan.tasks.length?`<span class="chip">Fin de obra <b>${fmtD(sch.finish)}</b></span>
+     <span class="chip">Ruta crítica <b>${crit}</b> de ${plan.tasks.length}</span>`:""}
+     ${cmp?`<span class="chip" title="Desvío frente a la línea base, en días laborables">Línea base «${esc(cmp.label)}» <b style="color:${cmp.finishDriftDays>0?'var(--danger)':'var(--greenDeep)'}">${cmp.finishDriftDays>0?"+":""}${cmp.finishDriftDays} d</b></span>`:""}
+     <select class="inline" id="gZoom">${[[14,"Mes"],[24,"Semanas"],[38,"Días"]].map(([z,l])=>`<option value="${z}"${gZoom===z?" selected":""}>${l}</option>`).join("")}</select>
+     ${plan.baselines&&plan.baselines.length?`<button class="btn sm${gBaseline?" primary":""}" id="gBl">Línea base</button>`:""}
+     <button class="btn sm" id="gFreeze" title="Congelar la planificación actual como referencia">❄ Congelar</button>
+   </div>
+   ${plan.tasks.length?ganttChart(plan,sch,cmp,pays):`<div class="empty">Sin tareas planificadas. Añade una tarea o genera la planificación desde los capítulos del proyecto.</div>`}
+   <div class="glegend">
+     <span><i style="background:var(--green)"></i>Tarea</span>
+     <span><i style="background:var(--danger)"></i>Ruta crítica — un día perdido aquí es un día perdido en la obra</span>
+     <span><i style="background:var(--greenDeep);border-radius:2px;transform:rotate(45deg)"></i>Hito</span>
+     <span><i style="background:var(--blue)"></i>Hito de cobro del contrato</span>
+     ${cmp?`<span><i style="background:transparent;border:1px dashed var(--faint)"></i>Línea base congelada</span>`:""}
+     <span><i style="background:var(--hair)"></i>Día no laborable</span>
+   </div>
+   <div class="gtools" style="border-top:1px solid var(--hair)">
+     <span style="font:600 11px var(--sans);color:var(--muted)">DÍAS NO LABORABLES</span>
+     ${(cal.nonWorkingDates||[]).map(d=>`<span class="chip"><b>${fmtD(d)}</b><button data-nw="${d}" title="Quitar">✕</button></span>`).join("")||'<span class="chip">ninguno</span>'}
+     <input class="dt" type="date" id="gNw"><button class="btn sm" id="gNwAdd">Añadir</button>
+     <span style="font-size:11.5px;color:var(--muted)">Semana laboral: ${cal.workingWeekdays.length} días</span>
+   </div></div>`;
+
+  $('#gProj').onchange=e=>{gProject=e.target.value;gSel=null;render();};
+  $('#gZoom').onchange=e=>{gZoom=+e.target.value;render();};
+  const bl=$('#gBl'); if(bl) bl.onclick=()=>{gBaseline=!gBaseline;render();};
+  $('#gAdd').onclick=()=>ganttNewTask(pid,false);
+  $('#gAddMs').onclick=()=>ganttNewTask(pid,true);
+  const seed=$('#gSeed'); if(seed) seed.onclick=()=>mutate(()=>{
+    const seeded=B.seedFromChapters(erp,pid,{calendar:cal});
+    if(!seeded) throw new Error("El proyecto no tiene capítulos de los que partir");
+    B.save(erp.state,pid,seeded);
+  },"Planificación generada desde los capítulos");
+  $('#gFreeze').onclick=()=>ganttFreeze(pid,plan);
+  $('#gNwAdd').onclick=()=>{
+    const d=$('#gNw').value; if(!d)return;
+    ganttCommit(pid,B.setCalendar(plan,{...cal,nonWorkingDates:[...new Set([...(cal.nonWorkingDates||[]),d])].sort()}),"Día no laborable añadido");
+  };
+  v.querySelectorAll('[data-nw]').forEach(b=>b.onclick=()=>{
+    ganttCommit(pid,B.setCalendar(plan,{...cal,nonWorkingDates:(cal.nonWorkingDates||[]).filter(x=>x!==b.dataset.nw)}),"Día no laborable quitado");
+  });
+  ganttWire(v,pid,plan,sch);
  },
 
  /* ---------- Captura (CAP) ---------- */

@@ -126,11 +126,11 @@
       "plannedSession": "12"
     },
     "scheduling-gantt": {
-      "owner": "unbuilt",
+      "owner": "factory",
       "specSection": "3.3 / 4.3",
       "engineSection": null,
-      "plannedSession": "6",
-      "note": "Session 5 built the domain half in @repo/capability-scheduling — working calendar, FS/SS/FF dependencies with lead/lag, forward/backward CPM pass with float and critical path, and append-only baselines — and it ships in the committed bundle (surface v2). Still 'unbuilt' on purpose: no screen reaches it yet, and an area is only 'factory' once erp.html genuinely goes through site/erp-bridge.js for it. Session 6 builds that chart and flips this."
+      "plannedSession": null,
+      "note": "Owned end to end by @repo/capability-scheduling and reached only through site/erp-bridge.js (ErpBridge.scheduling.plans). Session 5 built the domain — working calendar, FS/SS/FF dependencies with lead/lag, CPM with float and critical path, append-only baselines — and session 6 built the chart in erp.html (Proyectos → Seguimiento técnico) that consumes it: drag to move, edge-drag to resize, knob-drag to link, freeze and compare a baseline. The view computes no dates: every date, float, critical flag and drift on screen came from the capability. Plans persist in state.plans (schema v3), which the engine serialises without knowing what it is. engineSection is null because erp-engine.js never implemented this area."
     },
     "extraction-ocr": {
       "owner": "unbuilt",

@@ -69,6 +69,7 @@ async function main() {
     await testDataTabs(browser, base);
     await testRetired(browser, base);
     await testShell(browser, base);
+    await testGantt(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
   } finally {
@@ -218,6 +219,7 @@ async function testNoOverflow(browser, base) {
     "erp.html#torre",
     "erp.html#clientes",
     "erp.html#facturacion",
+    "erp.html#seguimiento",
   ];
   const page = await browser.newPage({
     viewport: { width: 390, height: 844 },
@@ -515,6 +517,125 @@ async function testShell(browser, base) {
     else bad("shell: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("three-panel shell", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── The Gantt (spec §3.3 / §4.3). Drives the real chart with real pointer
+//    gestures: drag to move, edge-drag to resize, knob-drag to link. Every
+//    assertion is about a number the ENGINE produced — the point of the
+//    session is that the view computes none of them.
+async function testGantt(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  const finishChip = () => pg.locator(".gtools .chip").first().innerText();
+  try {
+    await pg.goto(`${base}/erp.html#seguimiento`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(800);
+
+    // Empty plan → the seed from the project's accepted budget chapters.
+    if (await pg.locator("#gSeed").count()) {
+      await pg.locator("#gSeed").click();
+      await pg.waitForTimeout(600);
+    }
+    const bars = await pg.locator("#gSvg .gbar").count();
+    const rows = await pg.locator(".gnames .gn[data-task]").count();
+    const deps0 = await pg.locator("#gSvg path.gdep").count();
+    if (bars >= 3 && rows === bars && deps0 >= bars - 1)
+      ok(`gantt: seeds ${bars} chained tasks from the budget chapters`);
+    else bad("gantt: seeds from chapters", `bars=${bars} rows=${rows} deps=${deps0}`);
+
+    // Bars must render at their real height — an SVG rect is subject to CSS
+    // geometry, so a stray `.bar {height}` rule elsewhere silently flattens
+    // the whole chart. That regression happened once; this pins it.
+    const box = await pg.locator("#gSvg .gbar").first().boundingBox();
+    if (box && box.height > 15) ok("gantt: bars render at full height");
+    else bad("gantt: bar height", JSON.stringify(box));
+
+    if ((await pg.locator("#gSvg .gbar.crit").count()) > 0)
+      ok("gantt: the critical path is marked on the chart");
+    else bad("gantt: critical path marked", "no critical bars");
+
+    // Drag the first bar four days right: the engine reschedules and the
+    // plan's finish moves with it.
+    const finishBefore = await finishChip();
+    await pg.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await pg.mouse.down();
+    await pg.mouse.move(box.x + box.width / 2 + 96, box.y + box.height / 2, { steps: 10 });
+    await pg.mouse.up();
+    await pg.waitForTimeout(600);
+    const finishAfter = await finishChip();
+    if (finishAfter !== finishBefore)
+      ok(
+        `gantt: dragging a bar reschedules the plan (${finishBefore.split("\n")[1]} → ${finishAfter.split("\n")[1]})`,
+      );
+    else bad("gantt: drag reschedules", `finish unchanged: ${finishBefore}`);
+
+    // Edge-drag to lengthen: the toast reports the new duration in WORKING days.
+    const gb = await pg.locator("#gSvg .ggrip").first().boundingBox();
+    await pg.mouse.move(gb.x + gb.width / 2, gb.y + gb.height / 2);
+    await pg.mouse.down();
+    await pg.mouse.move(gb.x + gb.width / 2 + 72, gb.y + gb.height / 2, { steps: 10 });
+    await pg.mouse.up();
+    await pg.waitForTimeout(600);
+    const resizeToast = await pg.locator("#toast").innerText();
+    if (/d[ií]as laborables/i.test(resizeToast)) ok(`gantt: edge-drag resizes (${resizeToast})`);
+    else bad("gantt: edge-drag resizes", resizeToast);
+
+    // Drag the link knob onto another bar → a new dependency.
+    const kb = await pg.locator("#gSvg .gknob").nth(0).boundingBox();
+    const tb = await pg.locator("#gSvg .gbar").nth(2).boundingBox();
+    const before = await pg.locator("#gSvg path.gdep").count();
+    await pg.mouse.move(kb.x + kb.width / 2, kb.y + kb.height / 2);
+    await pg.mouse.down();
+    await pg.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2, { steps: 12 });
+    await pg.mouse.up();
+    await pg.waitForTimeout(600);
+    const after = await pg.locator("#gSvg path.gdep").count();
+    if (after > before) ok("gantt: dragging between bars creates a dependency");
+    else bad("gantt: link by drag", `deps ${before} → ${after}`);
+
+    // Freeze a baseline: the ghost bars appear and drift is reported.
+    await pg.locator("#gFreeze").click();
+    await pg.waitForTimeout(400);
+    await pg.locator("#g_frz").click();
+    await pg.waitForTimeout(700);
+    const chips = (await pg.locator(".gtools .chip").allInnerTexts()).join(" | ");
+    const ghosts = await pg.locator("#gSvg .gghost").count();
+    if (/nea base/.test(chips) && ghosts > 0)
+      ok(`gantt: baseline frozen and drawn (${ghosts} reference bars)`);
+    else bad("gantt: baseline", `chips="${chips}" ghosts=${ghosts}`);
+
+    // Close the finish day: the calendar reaches the engine, so the plan's
+    // finish must move — this is the one assertion that proves the working
+    // calendar is not decoration.
+    // Read it off the chip the user reads, rather than out of page internals.
+    const finishOf = async () => {
+      const m = (await finishChip()).match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
+    };
+    const finishIso = await finishOf();
+    await pg.locator("#gNw").fill(finishIso);
+    await pg.locator("#gNwAdd").click();
+    await pg.waitForTimeout(700);
+    const finishIso2 = await finishOf();
+    if (finishIso2 > finishIso)
+      ok(`gantt: closing a day pushes the finish (${finishIso} → ${finishIso2})`);
+    else bad("gantt: non-working day shifts the plan", `${finishIso} → ${finishIso2}`);
+
+    // The plan lives in the state blob (schema v3), so it survives a reload.
+    await pg.reload({ waitUntil: "networkidle" });
+    await pg.waitForTimeout(900);
+    const barsAfter = await pg.locator("#gSvg .gbar").count();
+    if (barsAfter === bars) ok("gantt: the plan persists across a reload");
+    else bad("gantt: plan persists", `${bars} → ${barsAfter}`);
+
+    if (errs.length === 0) ok("gantt: no console errors");
+    else bad("gantt: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("gantt chart", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }

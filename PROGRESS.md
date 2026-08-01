@@ -345,7 +345,22 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   artifact the phones load is a separate claim from the source being right.
   No UI: the chart is session 6, and `scheduling-gantt` stays `unbuilt` until
   a screen actually reaches it.
-- **Sessions 6-12 — not started.** See `docs/worklog/WORKLOG.md`.
+- **Session 6 — done (ASSUMPTIONS.md #50).** The Gantt. Proyectos →
+  Seguimiento técnico is now an SVG chart over the session-5 engine: bars with
+  the critical path in red, float tails, milestones, dependency arrows,
+  frozen-baseline ghosts and the contract's payment milestones on the same
+  timeline, with the working calendar editable as chips. Pointer-event
+  gestures — drag to move (which sets a start-no-earlier-than pin, so
+  successors still follow), edge-drag to resize, drag between bars to link —
+  share one path for mouse, pen and touch, because the ERP runs inside two
+  WebViews. **The view computes no dates:** every bar position, float,
+  critical flag, finish date and baseline drift is asked of
+  `@repo/capability-scheduling` through `ErpBridge.scheduling.plans`. Plans
+  persist per project in `state.plans` (schema v3), riding in the engine's
+  blob without `erp-engine.js` knowing they exist. `scheduling-gantt` becomes
+  the first `factory`-owned area. Site E2E 64/64, including a check that
+  closing the finish day pushes the plan's finish out.
+- **Sessions 7-12 — not started.** See `docs/worklog/WORKLOG.md`.
 
 ## Branch & discipline
 

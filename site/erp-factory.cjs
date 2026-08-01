@@ -401,6 +401,29 @@ var SchedulingService = class {
     };
     return { ...plan, tasks: [...plan.tasks, task] };
   }
+  /**
+   * Remove a task and every dependency that touched it. The cleanup is the
+   * point: a dependency left pointing at a deleted task makes the next
+   * schedule throw, so deletion has to be a single operation the engine owns
+   * rather than two the caller must remember to pair.
+   */
+  removeTask(plan, taskId) {
+    if (!plan.tasks.some((t) => t.id === taskId)) {
+      throw new FactoryError("NOT_FOUND", `Task ${taskId} not found.`);
+    }
+    return {
+      ...plan,
+      tasks: plan.tasks.filter((t) => t.id !== taskId),
+      dependencies: (plan.dependencies ?? []).filter(
+        (d) => d.predecessorId !== taskId && d.successorId !== taskId
+      )
+    };
+  }
+  renameTask(plan, taskId, title) {
+    const clean = title.trim();
+    if (!clean) throw new FactoryError("INVALID_STATE", "A task needs a title.");
+    return this.mutate(plan, taskId, (t) => ({ ...t, title: clean }));
+  }
   setStatus(plan, taskId, status) {
     return this.mutate(plan, taskId, (t) => ({
       ...t,
@@ -590,7 +613,21 @@ function createScheduling(ports = defaultPorts()) {
     overdue(plan, asOf) {
       return svc.overdue(plan, asOf);
     },
+    /**
+     * Calendar arithmetic, exposed because a chart genuinely needs it: to
+     * shade the closed days on its axis and to convert a pixel drag into a
+     * date. Without this the view would reimplement working-day maths beside
+     * the engine that owns it, and the two would drift apart on the first
+     * closure someone adds.
+     */
+    calendar: {
+      everyDay: everyDayCalendar,
+      isWorkingDay,
+      addWorkingDays,
+      workingDaysInclusive,
+      workingDayOffset
+    },
     service: svc
   };
 }
-var SURFACE_VERSION = 2;
+var SURFACE_VERSION = 3;
