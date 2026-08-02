@@ -152,6 +152,10 @@ binary in the repository, nothing fetched over the network.
 registry entry changed (`docs` was already composed into tenant #1), so the
 composed-capability count the Playwright suite asserts is still 17.
 
+Confirmed on GitHub for `f2524b3`: `CI` run 181 green (all five jobs, including
+the committed-bundle drift check and the Playwright End-to-end job) and
+`Site E2E` run 24 green. First push, no fixes needed.
+
 The thirteen new E2E checks are all made in a real browser, because that is
 where this kind of feature actually breaks: the three zones must be on screen
 _at once_, the panel must actually change _between keystrokes_ with the caret

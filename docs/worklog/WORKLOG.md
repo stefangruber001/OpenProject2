@@ -53,7 +53,7 @@ session too, including ones started from a fresh chat off this file.
 | 6   | Gantt UI (SVG drag/resize/link)                        | done        | d9e43a2, a83c49c                   |
 | 7   | Extraction capability + Spanish profile                | done        | 4361085, 3e063c9                   |
 | 8   | OCR bridge + invoice capture (Improvement #2)          | not started | —                                  |
-| 9   | Budget builder + graphic annex (Improvement #1)        | done        | (this session)                     |
+| 9   | Budget builder + graphic annex (Improvement #1)        | done        | f2524b3                            |
 | 10a | Projects: Gantt-from-budget, baselines, economics      | not started | —                                  |
 | 10b | Compras, subcontratos, modificaciones, horas           | not started | —                                  |
 | 11  | Administración: conciliación, gestoría, comunicaciones | not started | —                                  |
