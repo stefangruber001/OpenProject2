@@ -132,6 +132,23 @@ invoice with a CIF, an IBAN and 21 % VAT; a self-employed plumber's with a
 15 % withholding stated as a negative; a rate that was never in force; and a
 tax id whose check character fails.
 
+Confirmed on GitHub for `3e063c9`: `CI` run 179 green. (Site E2E does not run
+for this session — nothing under `site/` changed, and its path filter is
+correct to skip it.)
+
+**The first push was not green.** Composing the new capability into tenant #1
+changed what the tenant resolves to, and `apps/web/e2e/control-tower.spec.ts`
+asserts that count exactly — `expect(body.capabilities).toBe(16)`. CI's
+End-to-end job caught it; my local sweep had not, because `pnpm test` runs
+vitest while the web Playwright suite runs under `test:e2e`, which neither
+`make gates` nor `pnpm test` invokes. **Add `pnpm --filter web test:e2e` to the
+pre-push list whenever a tenant spec or the capability registry changes.** The
+count stayed an exact assertion rather than being loosened to a `>=`: composing
+a capability into a tenant is a deliberate act, and a loose bound notices
+nothing. It was verified against the real endpoint (`/api/diorka/control-tower`
+→ `capabilities: 17`, `marginCents: 81200`) because this sandbox's Chromium
+build does not match apps/web's pinned Playwright version.
+
 ## Three things the tooling caught, which is the point of having it
 
 1. **The boundary linter rejected my own doc-comment.** `ports.ts` used a
