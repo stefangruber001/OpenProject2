@@ -1,9 +1,10 @@
 {
-  "name": "@repo/pack-jurisdiction-es-es",
+  "name": "@repo/capability-extraction",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Jurisdiction pack es-ES: effective-dated Spanish VAT rules (incl. dwelling-renovation reduced rate), retention rules, invoice chaining, document labels.",
+  "sideEffects": false,
+  "description": "Generic document-field extraction: turns recognised text into candidate fields with confidence, provenance and arithmetic consistency checks. All locale knowledge (number/date formats, tax-id shapes, keywords, expected rates) arrives through a pack-supplied profile port. No jurisdiction or sector knowledge.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -13,8 +14,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@repo/capability-billing": "workspace:*",
-    "@repo/capability-extraction": "workspace:*",
     "@repo/kernel": "workspace:*",
     "zod": "^3.24.1"
   },

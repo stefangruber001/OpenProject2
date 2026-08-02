@@ -14,7 +14,12 @@ describe("es-ES pack manifest", () => {
       kernelConfig,
     });
     expect(ports.has(TAX_PORT)).toBe(true);
-    expect(ports.boundPorts()).toEqual(["doc-labels@1", "invoice-chain@1", "tax@1"]);
+    expect(ports.boundPorts()).toEqual([
+      "doc-labels@1",
+      "extraction-profile@1",
+      "invoice-chain@1",
+      "tax@1",
+    ]);
     expect(ports.provider(TAX_PORT)).toBe("jurisdiction/es-ES");
   });
 

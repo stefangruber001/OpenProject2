@@ -136,7 +136,8 @@
       "owner": "unbuilt",
       "specSection": "5.2 (Improvement #2)",
       "engineSection": null,
-      "plannedSession": "7 / 8"
+      "plannedSession": "8",
+      "note": "Session 7 built the reading half: @repo/capability-extraction turns recognised text into candidate fields with confidence, provenance and arithmetic checks, and @repo/pack-jurisdiction-es-es supplies the profile behind the extraction-profile@1 port (number and date notation, NIF/CIF/NIE and IBAN check characters, the words each field is announced by, the rates in force on a date). Still 'unbuilt' here because no screen reaches it: session 8 adds the camera, the recognition adapter and the validation screen, and flips this. Nothing is ever auto-confirmed — CAP-04 is enforced by the capability's type, which always reports confirmed:false."
     },
     "journey-project-selector": {
       "owner": "unbuilt",

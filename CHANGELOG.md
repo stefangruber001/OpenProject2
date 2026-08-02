@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Document-reading capability (`@repo/capability-extraction`): turns recognised
+  text into candidate invoice fields with a confidence, the place on the page
+  each value came from, runners-up for one-tap correction, and arithmetic and
+  rate checks that reconcile. Nothing it produces is ever marked confirmed —
+  a person confirms, elsewhere. All locale knowledge (number and date notation,
+  tax-id and account-number check characters, field keywords, the rates in
+  force on a date) arrives through the new `extraction-profile@1` port, which
+  `@repo/pack-jurisdiction-es-es` now implements for Spain.
 - Gantt chart in the ERP workspace (Proyectos → Seguimiento técnico): bars
   with the critical path, float, milestones, dependency arrows, frozen-baseline
   ghosts and the contract's payment milestones on one timeline, with an

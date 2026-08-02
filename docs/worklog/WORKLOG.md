@@ -51,7 +51,7 @@ session too, including ones started from a fresh chat off this file.
 | 4   | Three-panel shell, global bar, retire pages            | done        | 0ed8513                            |
 | 5   | Scheduling capability: calendar + CPM + baselines      | done        | 6e18112                            |
 | 6   | Gantt UI (SVG drag/resize/link)                        | done        | d9e43a2, a83c49c                   |
-| 7   | Extraction capability + Spanish profile                | not started | —                                  |
+| 7   | Extraction capability + Spanish profile                | done        | (see SESSION-07)                   |
 | 8   | OCR bridge + invoice capture (Improvement #2)          | not started | —                                  |
 | 9   | Budget builder + graphic annex (Improvement #1)        | not started | —                                  |
 | 10a | Projects: Gantt-from-budget, baselines, economics      | not started | —                                  |

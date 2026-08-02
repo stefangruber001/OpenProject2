@@ -581,3 +581,31 @@ languages: es-ES # source: synthetic
   flattened every bar. All chart classes are now `g`-prefixed and the e2e asserts bar height, so
   it cannot come back. Reversible: no engine code changed, and the migration only adds an empty
   object.
+- **#51 — CANEI session 7: the reader, and where a country's paperwork conventions live (2026-08-01).**
+  Spec §5.2 (Improvement #2) wants a photographed supplier invoice to pre-fill a received-invoice
+  record: issuer and tax id, number, dates, base, tax — several rates allowed — withholding, total,
+  payment details and an order reference, each with a confidence, each traceable back to the part of
+  the image it came from, and nothing taken as true without explicit human confirmation. Session 7
+  built the reading half. **Decisions:** (a) `ExtractionResult.confirmed` is the **literal type
+  `false`**, not a boolean — a caller cannot accidentally persist a confirmed-looking extraction,
+  which is the strongest form CAP-04 can take in a type system. (b) All locale knowledge sits behind
+  a **required** port, `extraction-profile@1`: number and date notation, tax-id shapes and their
+  check characters, the words that announce each field, and which tax rates were law on a given
+  date. Required rather than optional because an extractor with no profile silently reads nothing,
+  and resolve-time failure is exactly what a required port buys. (c) The profile is an **adapter,
+  not config**: it carries behaviour (parsers, checksum algorithms), and adapters are how behaviour
+  crosses a layer boundary here. (d) **An unlabelled amount is never the answer** — every number on
+  a page looks like every other, and only a word beside it says which is the net and which the
+  total; unlabelled amounts are offered as alternatives instead. The first version got this wrong
+  and nominated a random number as the withholding on documents that have none, which contradicted
+  the arithmetic and dragged every other field's confidence down with it. (e) A **failed check
+  character caps confidence at 0.5**, applied after every other bonus, so a beautifully labelled
+  wrong tax id still reaches a human. (f) `recheck()` lives in the capability so the validation
+  screen re-runs the _same_ arithmetic rather than a second copy in the view. (g) The Spanish
+  profile resolves expected rates from the pack's **effective-dated** tables, and declines to guess
+  for a date before the earliest encoded era. (h) `extraction-ocr` stays **`unbuilt`** in the
+  ownership file: the domain exists and is composed into tenant #1, but no screen reaches it until
+  session 8. **Tooling earned its keep:** the boundary linter rejected a rate-like literal in my own
+  doc-comment inside the capability, and a fabricated CIF in a fixture was caught by the very
+  control-character algorithm the session added. Reversible: nothing in `site/` changed, the browser
+  bundle is untouched, and the capability is additive.

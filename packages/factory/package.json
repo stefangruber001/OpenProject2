@@ -18,6 +18,7 @@
     "@repo/capability-catalogue": "workspace:*",
     "@repo/capability-crm": "workspace:*",
     "@repo/capability-docs": "workspace:*",
+    "@repo/capability-extraction": "workspace:*",
     "@repo/capability-messaging": "workspace:*",
     "@repo/capability-payables": "workspace:*",
     "@repo/capability-procurement": "workspace:*",

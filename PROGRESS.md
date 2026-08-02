@@ -360,7 +360,23 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   blob without `erp-engine.js` knowing they exist. `scheduling-gantt` becomes
   the first `factory`-owned area. Site E2E 64/64, including a check that
   closing the finish day pushes the plan's finish out.
-- **Sessions 7-12 — not started.** See `docs/worklog/WORKLOG.md`.
+- **Session 7 — done (ASSUMPTIONS.md #51).** The reading half of photo
+  capture (spec §5.2), in two halves that know nothing of each other. New
+  `@repo/capability-extraction` turns recognised text into candidate fields
+  with a confidence, a provenance (line, offsets, page — what lets a
+  validation screen highlight where a number was read from) and arithmetic
+  that reconciles; its `confirmed` field is the literal type `false`, so no
+  caller can persist something that looks confirmed — CAP-04 enforced by the
+  type system rather than by discipline. All locale knowledge sits behind the
+  new required port `extraction-profile@1`: `@repo/pack-jurisdiction-es-es`
+  supplies NIF/NIE/CIF and IBAN check characters, `1.234,56`, `14/03/2026` and
+  "2 de abril de 2026" (Spanish and Catalan), the keyword sets, and the rates
+  in force on a date read from its effective-dated tables. The capability's own
+  tests run against a profile for an invented country — if they pass, it cannot
+  be carrying Spanish knowledge. Registered and composed into tenant #1
+  (17 capabilities, 4 bound ports); `make demo` and the negative test unchanged.
+  No camera, no OCR engine, no UI: that is session 8.
+- **Sessions 8-12 — not started.** See `docs/worklog/WORKLOG.md`.
 
 ## Branch & discipline
 

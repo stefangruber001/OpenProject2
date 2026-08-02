@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { FactoryError, type PackManifest } from "@repo/kernel";
 import { DOC_LABELS_PORT, INVOICE_CHAIN_PORT, TAX_PORT } from "@repo/capability-billing";
+import { EXTRACTION_PROFILE_PORT } from "@repo/capability-extraction";
 import { EsInvoiceChainAdapter } from "./chain";
 import { ES_DOC_LABELS } from "./labels";
+import { ES_EXTRACTION_PROFILE } from "./extraction/profile";
 import { EsTaxAdapter, PACK_ID, PACK_VERSION } from "./tax/adapter";
 
 export const esConfigSchema = z.object({
@@ -41,5 +43,10 @@ export const esPack: PackManifest<EsConfig> = {
     // Chain head persists via host-provided KV when available (durable in P2).
     binder.bind(INVOICE_CHAIN_PORT, new EsInvoiceChainAdapter(ctx.infra?.kv));
     binder.bind(DOC_LABELS_PORT, ES_DOC_LABELS);
+    // How documents are written here — number and date notation, tax-id
+    // shapes and their check characters, the words each field is announced
+    // by, and the rates that were law on a given date. The extraction
+    // capability holds none of it.
+    binder.bind(EXTRACTION_PROFILE_PORT, ES_EXTRACTION_PROFILE);
   },
 };
