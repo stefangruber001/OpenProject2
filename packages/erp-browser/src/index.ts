@@ -14,6 +14,14 @@
    If you find yourself writing a domain rule here, it belongs one layer down.
    ========================================================================== */
 
+import { composeAnnex, resolveAnnexOptions } from "@repo/capability-docs";
+import type {
+  Annex,
+  AnnexImageInput,
+  AnnexOptions,
+  AnnexPage,
+  AnnexPlate,
+} from "@repo/capability-docs";
 import {
   SchedulingService,
   addWorkingDays,
@@ -120,6 +128,30 @@ export function createScheduling(ports: FactoryPorts = defaultPorts()) {
   };
 }
 
+/**
+ * Documents surface.
+ *
+ * Only the annex composer is exposed: it is the part a browser genuinely calls
+ * today (the document preview lays out its picture pages with it). The metadata
+ * register stays behind `service` in spirit — it is not here because nothing in
+ * the browser reaches for it yet, and a surface that grows methods before their
+ * callers exist is a surface nobody can safely change later.
+ */
+export function createDocs() {
+  return {
+    /** Fills in the defaults and pulls out-of-range values back into range. */
+    annexOptions(raw: AnnexOptions | undefined | null): Required<AnnexOptions> {
+      return resolveAnnexOptions(raw);
+    },
+    /** Lays the given images out as annex pages, in document order. */
+    compose(images: AnnexImageInput[], options?: AnnexOptions): Annex {
+      return composeAnnex(images, options);
+    },
+  };
+}
+
+export type { Annex, AnnexImageInput, AnnexOptions, AnnexPage, AnnexPlate };
+
 export type {
   Baseline,
   BaselineComparison,
@@ -143,5 +175,6 @@ export type {
  *     for `service.schedule` against a version-1 artifact would find nothing
  *     there, which is exactly the staleness this number exists to catch.
  * 3 — `calendar` namespace added for the chart's axis and drag arithmetic.
+ * 4 — `createDocs` added: the image-annex composer the document preview needs.
  */
-export const SURFACE_VERSION = 3;
+export const SURFACE_VERSION = 4;

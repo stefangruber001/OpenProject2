@@ -23,10 +23,88 @@ var index_exports = {};
 __export(index_exports, {
   BrowserIdGen: () => BrowserIdGen,
   SURFACE_VERSION: () => SURFACE_VERSION,
+  createDocs: () => createDocs,
   createScheduling: () => createScheduling,
   defaultPorts: () => defaultPorts
 });
 module.exports = __toCommonJS(index_exports);
+
+// ../capabilities/docs/src/annex.ts
+var ANNEX_DEFAULT_ENABLED = true;
+var ANNEX_DEFAULT_IMAGES_PER_PAGE = 2;
+var ANNEX_MAX_IMAGES_PER_PAGE = 12;
+function resolveAnnexOptions(o) {
+  const raw = Number(o?.imagesPerPage);
+  const perPage = Number.isFinite(raw) ? Math.min(ANNEX_MAX_IMAGES_PER_PAGE, Math.max(1, Math.round(raw))) : ANNEX_DEFAULT_IMAGES_PER_PAGE;
+  return {
+    enabled: typeof o?.enabled === "boolean" ? o.enabled : ANNEX_DEFAULT_ENABLED,
+    imagesPerPage: perPage
+  };
+}
+function compareNumbering(a, b) {
+  const pa = String(a).split(".");
+  const pb = String(b).split(".");
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const sa = pa[i];
+    const sb = pb[i];
+    if (sa === void 0) return -1;
+    if (sb === void 0) return 1;
+    const na = Number(sa);
+    const nb = Number(sb);
+    if (Number.isFinite(na) && Number.isFinite(nb)) {
+      if (na !== nb) return na - nb;
+    } else if (sa !== sb) {
+      return sa < sb ? -1 : 1;
+    }
+  }
+  return 0;
+}
+function composeAnnex(images, options) {
+  const opts = resolveAnnexOptions(options);
+  if (!opts.enabled || images.length === 0) {
+    return { enabled: opts.enabled, pages: [], plateCount: 0, markedItems: [] };
+  }
+  const ordered = images.map((img, i) => ({ img, i })).sort((a, b) => {
+    const g = compareNumbering(a.img.groupNum, b.img.groupNum);
+    if (g !== 0) return g;
+    const it = compareNumbering(a.img.itemNum, b.img.itemNum);
+    if (it !== 0) return it;
+    const o = (a.img.order ?? 0) - (b.img.order ?? 0);
+    if (o !== 0) return o;
+    return a.i - b.i;
+  }).map((x) => x.img);
+  const perItem = /* @__PURE__ */ new Map();
+  for (const img of ordered) perItem.set(img.itemNum, (perItem.get(img.itemNum) ?? 0) + 1);
+  const seen = /* @__PURE__ */ new Map();
+  const plates = ordered.map((img) => {
+    const siblings = perItem.get(img.itemNum) ?? 1;
+    const n = (seen.get(img.itemNum) ?? 0) + 1;
+    seen.set(img.itemNum, n);
+    return {
+      ref: img.ref,
+      groupNum: img.groupNum,
+      groupName: img.groupName,
+      itemNum: img.itemNum,
+      itemLabel: img.itemLabel,
+      caption: img.caption ?? "",
+      sequence: siblings > 1 ? n : null,
+      siblings
+    };
+  });
+  const pages = [];
+  for (let i = 0; i < plates.length; i += opts.imagesPerPage) {
+    pages.push({
+      number: pages.length + 1,
+      plates: plates.slice(i, i + opts.imagesPerPage)
+    });
+  }
+  return {
+    enabled: true,
+    pages,
+    plateCount: plates.length,
+    markedItems: [...perItem.keys()].sort(compareNumbering)
+  };
+}
 
 // ../kernel/src/errors.ts
 var FactoryError = class extends Error {
@@ -630,4 +708,16 @@ function createScheduling(ports = defaultPorts()) {
     service: svc
   };
 }
-var SURFACE_VERSION = 3;
+function createDocs() {
+  return {
+    /** Fills in the defaults and pulls out-of-range values back into range. */
+    annexOptions(raw) {
+      return resolveAnnexOptions(raw);
+    },
+    /** Lays the given images out as annex pages, in document order. */
+    compose(images, options) {
+      return composeAnnex(images, options);
+    }
+  };
+}
+var SURFACE_VERSION = 4;

@@ -204,6 +204,75 @@
   .glegend{display:flex;gap:12px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid var(--hair);font-size:11.5px;color:var(--muted)}
   .glegend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 
+  /* ---------- Budget builder: three simultaneous zones (spec §3.3) ----------
+     Left, the chapter/line tree with its per-chapter totals; centre, the
+     editable grid; right, the totals panel, which recalculates on every
+     keystroke. The zones stack on a narrow viewport rather than scrolling
+     sideways: a spreadsheet you have to pan is not a spreadsheet. */
+  .bwrap{display:grid;grid-template-columns:224px minmax(0,1fr) 264px;gap:12px;align-items:start}
+  @media(max-width:1240px){.bwrap{grid-template-columns:minmax(0,1fr)}}
+  .btree{padding:8px 8px 12px;display:flex;flex-direction:column;gap:1px;max-height:70vh;overflow-y:auto}
+  .btree .bc{display:flex;gap:6px;align-items:baseline;padding:6px 8px;border-radius:8px;cursor:pointer;
+    font:600 12.5px var(--sans);color:var(--ink)}
+  .btree .bc:hover{background:var(--greenSoft)}
+  .btree .bc.on{background:var(--greenSoft);color:var(--greenDeep)}
+  .btree .amt{margin-left:auto;font-variant-numeric:tabular-nums}
+  .btree .bl{display:flex;gap:6px;padding:3px 8px 3px 18px;font-size:11.5px;color:var(--muted);
+    cursor:pointer;border-radius:7px}
+  .btree .bl:hover{background:var(--hair);color:var(--ink)}
+  .btree .bl.pend{color:var(--amber)}
+  .bgrid table{min-width:940px}
+  .bgrid tbody td{padding:3px 6px;vertical-align:middle}
+  .bgrid thead th{padding:8px 7px}
+  .bgrid input,.bgrid select{font:12.5px var(--sans);color:var(--ink);background:transparent;
+    border:1px solid transparent;border-radius:7px;padding:4px 6px;width:100%;outline:0}
+  .bgrid input:hover:not(:disabled),.bgrid select:hover:not(:disabled){border-color:var(--line)}
+  .bgrid input:focus,.bgrid select:focus{border-color:var(--green);background:var(--paper);box-shadow:0 0 0 3px var(--greenSoft)}
+  .bgrid input:disabled,.bgrid select:disabled{color:var(--muted)}
+  .bgrid input.r{text-align:right;font-variant-numeric:tabular-nums}
+  .bgrid tr.chaprow td{background:var(--greenSoft);font:600 12px var(--sans);color:var(--greenDeep)}
+  .bgrid .out{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;display:block}
+  .bgrid .neg{color:var(--danger)}
+  /* Internal-use only: the count of pictures on a line. It is never part of
+     the emitted document — there the pictures are in the annex, not the row. */
+  .bimg{border:1px solid var(--line);background:var(--paper);border-radius:999px;font:600 11px var(--sans);
+    padding:2px 8px;cursor:pointer;color:var(--muted);white-space:nowrap}
+  .bimg.has{border-color:var(--green);color:var(--greenDeep);background:var(--greenSoft)}
+  .bside{position:sticky;top:calc(var(--top,59px) + 12px)}
+  .bside .row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:12.5px}
+  .bside .row b{font-variant-numeric:tabular-nums;color:var(--ink)}
+  .bside .row.big{border-top:2px solid var(--green);margin-top:6px;padding-top:8px}
+  .bside .row.big b{font-family:var(--serif);font-size:17px}
+  .bside .row.mut{color:var(--muted)}
+  .bside .row.warn b{color:var(--amber)}
+  .bside .opt{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--body);padding:3px 0}
+  .bside .opt select{font:12px var(--sans);border:1px solid var(--line);border-radius:8px;padding:3px 6px;
+    background:var(--paper);color:var(--ink);margin-left:auto}
+
+  /* ---------- Graphic annex (Improvement #1) ----------
+     Pictures never enter a line's row: they collect at the end of the document
+     and the row carries a discreet mark instead, so a table of numbers stays a
+     table of numbers whatever anyone attaches to it. */
+  .amark{font:700 8.5px var(--sans);color:var(--green);border:1px solid var(--green);border-radius:3px;
+    padding:0 2px;margin-left:4px;vertical-align:super}
+  .annexpg{border-top:1px dashed var(--line);margin-top:12px;padding-top:10px}
+  .annexpg .ah{font:700 9.5px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+  .plates{display:grid;gap:10px}
+  .plate{margin:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper)}
+  .plate img{display:block;width:100%;height:148px;object-fit:cover;background:var(--hair)}
+  .plate figcaption{padding:6px 9px;font-size:11px;color:var(--muted);line-height:1.4}
+  .plate figcaption b{color:var(--ink)}
+  .gal{display:flex;flex-direction:column;gap:10px}
+  .gal .gi{display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;border:1px solid var(--line);
+    border-radius:11px;padding:8px;background:var(--paper)}
+  .gal .gi img{width:96px;height:72px;object-fit:cover;border-radius:8px;background:var(--hair)}
+  .gal .gi .m{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .gal .gi .b{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .gal .gi input[type=text]{font:12.5px var(--sans);border:1px solid var(--line);border-radius:8px;
+    padding:5px 8px;outline:0;color:var(--ink);background:var(--paper)}
+  .gal .gi input[type=text]:focus{border-color:var(--green)}
+  .gal .gi label{font:600 11px var(--sans);color:var(--muted);display:inline-flex;gap:5px;align-items:center;cursor:pointer}
+
   .scrim{position:fixed;inset:0;background:rgba(20,26,14,.34);opacity:0;pointer-events:none;transition:.2s;z-index:60}
   .scrim.on{opacity:1;pointer-events:auto}
   .drawer{position:fixed;top:0;right:0;height:100%;width:min(540px,94vw);background:var(--bg);z-index:70;
@@ -361,6 +430,12 @@ async function boot(){
   if(imported?.ran&&imported.conflicts) notes.push(`${imported.conflicts} registros necesitan revisión.`);
   bootNotice=notes.join(" ");
 
+  // The demo budget references four pictures by storage key; draw them once so
+  // the graphic annex has something to show on a clean machine. Real pictures
+  // arrive from a camera or a file — this commits no binary to the repository
+  // and fetches nothing over the network.
+  try{ await ensureDemoImages(); }catch(e){ /* never block boot over a picture */ }
+
   // UI preferences (period) live in the store's `meta`, never in the state blob.
   try{ const prefs=await ErpStore.getMeta("ui.prefs"); if(prefs&&prefs.period) PERIOD={...PERIOD,...prefs.period}; }catch(e){}
 
@@ -369,6 +444,33 @@ async function boot(){
   measureTopbar(); buildPeriodControls(); buildUserMenu(); render();
   if(bootNotice) toast(bootNotice);
 }
+/* Demo pictures for the seeded budget's graphic annex, keyed exactly as
+   erp-seed.js references them. Drawn, not downloaded: the page must work from
+   a bare static host with no network, and a repository is the wrong place to
+   keep a JPEG that only exists to make a screenshot look plausible. */
+const DEMO_IMAGES={
+  seed_img_pavimento:["#c9b79a","Pavimento cerámico"],
+  seed_img_estado:["#9a9384","Estado actual"],
+  seed_img_pintura:["#dfe6d8","Carta de color"],
+  seed_img_interna:["#4f6b86","Detalle interno"],
+};
+async function ensureDemoImages(){
+  for(const key of Object.keys(DEMO_IMAGES)){
+    const [color,label]=DEMO_IMAGES[key];
+    try{
+      if(await ErpStore.getBlob(key)) continue;
+      const c=document.createElement('canvas'); c.width=480; c.height=320;
+      const x=c.getContext('2d');
+      x.fillStyle=color; x.fillRect(0,0,480,320);
+      x.fillStyle="rgba(255,255,255,.8)"; x.fillRect(0,246,480,74);
+      x.fillStyle="#14160f"; x.font="600 20px Inter, system-ui, sans-serif";
+      x.fillText(label,18,290);
+      const blob=await new Promise(r=>c.toBlob(r,"image/png"));
+      if(blob) await ErpStore.putBlob(key,blob);
+    }catch(e){ /* one undrawable picture must not cost the whole boot */ }
+  }
+}
+
 /* The sticky panels hang off the real topbar height: it wraps on narrow
    viewports, so a hard-coded offset would leave a gap or hide a row. */
 function measureTopbar(){
@@ -983,6 +1085,338 @@ function ganttTaskDrawer(pid,taskId){
   },"Tarea eliminada");
 }
 
+/* =============================== Budget builder (spec §3.3) =========================
+   Three zones at once: the chapter/line tree, the editable grid, and a totals
+   panel that recalculates on every keystroke.
+
+   ONE RULE HOLDS THIS TOGETHER: this block computes no money. Every figure on
+   screen — line amounts, chapter subtotals, base, tax, withholding, total,
+   margin, the value of the lines still pending a price — is asked of
+   erp.budgetTotals(), which is the same function the emitted document uses. The
+   "live" recalculation is therefore genuinely live rather than an optimistic
+   copy that drifts from the document by a cent and is discovered by a customer.
+
+   Editing writes through erp.updateLine(), which refuses on a frozen, issued or
+   accepted version. The grid disables its inputs in that case too, but the
+   refusal is the engine's, not the view's. */
+let bBudget=null, bChapter=null;
+const bMoney=s=>{const n=Number(String(s).replace(",","."));return Number.isFinite(n)?Math.round(n*100):0;};
+const bQty=s=>{const n=Number(String(s).replace(",","."));return Number.isFinite(n)?Math.round(n*1000):0;};
+/** Line amount and margin, exactly as budgetTotals computes them. */
+function bLineAmt(l){const q=l.subLines.length?l.subLines.reduce((a,s)=>a+Math.round(s.qtyMilli*(1+(s.wastePct||0)/100)),0):l.qtyMilli;
+  return {qtyMilli:q, saleCents:l.lumpSum?l.priceCents:Math.round(q*l.priceCents/1000), costCents:l.lumpSum?l.costCents:Math.round(q*l.costCents/1000)};}
+function bStatus(l){return l.pending?"pending":l.optionalLine?"optional":"normal";}
+
+/* Blob-backed images are fetched once per session and the object URL kept.
+   Revoking on every re-render would blank a thumbnail the user is still
+   looking at, and the cache is bounded by the number of distinct pictures in
+   the dataset, not by how often a view re-renders. */
+const IMGURL=new Map();
+async function imageUrl(key){
+  if(IMGURL.has(key)) return IMGURL.get(key);
+  try{ const b=await ErpStore.getBlob(key); if(!b) return null;
+    const u=URL.createObjectURL(b); IMGURL.set(key,u); return u; }catch(e){ return null; }
+}
+function paintImages(root){
+  (root||document).querySelectorAll('img[data-blob]').forEach(async im=>{
+    const u=await imageUrl(im.dataset.blob); if(u) im.src=u; else im.alt="(imagen no disponible)";
+  });
+}
+
+function openBuilder(id){ bChapter=null; go("presupuestos",id); }
+
+function budgetList(v){
+  const rows=erp.state.budgets;
+  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Número</th><th>Cliente</th><th>Estado</th><th>Versión</th><th class="num">Base</th><th class="num">Total</th><th class="num">Margen</th><th>Pendientes</th><th>Anexo</th><th>Validez</th></tr></thead><tbody>
+   ${rows.map(b=>{const t=erp.budgetTotals(b.id,b.acceptedVersionId||b.currentVersionId);const cv=b.versions[b.versions.length-1];
+    const imgs=erp.budgetImages(b.id,b.acceptedVersionId||b.currentVersionId).length;
+    const st=b.acceptedVersionId?'<span class="pill g">Aceptado</span>':b.status==="issued"?'<span class="pill b">Emitido</span>':'<span class="pill y">Borrador</span>';
+    return `<tr class="click" data-id="${b.id}"><td class="k">${b.number}</td><td>${esc(erp.party(b.partyId).name)}</td><td>${st}</td>
+     <td>v${cv.vNumber} · ${b.versions.length} versiones</td><td class="num">${eur0(t.baseCents)}</td><td class="num k">${eur0(t.grandCents)}</td>
+     <td class="num">${t.marginBasePct}%</td><td>${t.pendingCount?`<span class="pill y">${t.pendingCount} (${eur0(t.pendingEstCents)})</span>`:"—"}</td>
+     <td>${(b.annex&&b.annex.enabled)?(imgs?`<span class="pill g">${imgs} imágenes</span>`:'<span class="pill">activo</span>'):'<span class="pill">desactivado</span>'}</td>
+     <td>${fmtD(b.validityDate)}</td></tr>`;}).join("")}
+   </tbody></table></div></div>`;
+  v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>openBuilder(tr.dataset.id));
+}
+
+function budgetBuilder(v,id){
+  const b=erp.budget(id);
+  const vsel=b.currentVersionId; const V=erp.version(id,vsel);
+  const locked=V.frozen||V.issued||b.acceptedVersionId===V.id;
+  const dis=locked?" disabled":"";
+  const SECL={base:"Base",optional:"Opcional",outOfScope:"Fuera de presupuesto",extras:"Extras"};
+  $('#sub').textContent=`Constructor de ${b.number} · v${V.vNumber}. Árbol de capítulos, rejilla editable y totales en vivo; las imágenes van al anexo gráfico, nunca a la fila.`;
+
+  v.innerHTML=`
+   <div class="periodnote"><button class="btn sm" id="bBack">← Todos los presupuestos</button>
+     <span class="pill">${b.number} · v${V.vNumber}</span>
+     <span>${esc(erp.party(b.partyId).name)}</span>
+     ${locked?'<span class="pill b">Versión congelada — cree una versión nueva para editar</span>':''}</div>
+   <div class="bwrap">
+    <div class="card" style="margin:0"><div class="ch"><h3>Capítulos</h3>${locked?"":'<button class="btn sm" id="bAddChap">+</button>'}</div>
+      <div class="btree" id="bTree"></div></div>
+
+    <div class="card bgrid" style="margin:0"><div class="ch"><h3>Partidas</h3>
+       <span class="tag" id="bGridTag"></span></div>
+      <div class="scroll"><table><thead><tr>
+        <th>Nº</th><th>Código</th><th>Descripción</th><th>Ud</th><th class="num">Cantidad</th>
+        <th class="num">P. coste</th><th class="num">P. venta</th><th class="num">Importe</th><th class="num">Margen</th>
+        <th>Estado</th><th>Imágenes</th>${locked?"":"<th></th>"}
+      </tr></thead><tbody id="bRows"></tbody></table></div></div>
+
+    <div class="bside">
+     <div class="card" style="margin:0 0 12px"><div class="ch"><h3>Totales</h3><span class="tag">en vivo</span></div>
+       <div class="daylist" id="bTotals" style="padding:10px 14px"></div></div>
+     <div class="card" style="margin:0 0 12px"><div class="ch"><h3>Anexo gráfico</h3></div>
+       <div class="daylist" style="padding:10px 14px">
+        <label class="opt"><input type="checkbox" id="bAnnexOn"${(b.annex&&b.annex.enabled)?" checked":""}> Incluir anexo en el documento</label>
+        <label class="opt">Imágenes por página
+          <select id="bAnnexPer">${[1,2,3,4,6].map(n=>`<option value="${n}"${(b.annex&&b.annex.imagesPerPage)===n?" selected":""}>${n}</option>`).join("")}</select></label>
+        <div class="row mut" id="bAnnexCount"></div>
+       </div></div>
+     <div class="card" style="margin:0"><div class="daylist" style="padding:10px 14px;gap:8px">
+       <button class="btn" id="bPreview">Vista del cliente</button>
+       <button class="btn" id="bValidate">Validar</button>
+      </div></div>
+    </div>
+   </div>`;
+
+  $('#bBack').onclick=()=>go("presupuestos");
+  const addChap=$('#bAddChap');
+  if(addChap) addChap.onclick=()=>mutate(()=>{
+    const name=prompt("Nombre del capítulo","Nuevo capítulo"); if(name==null)return;
+    bChapter=erp.addChapter(id,{name:name||"Nuevo capítulo"}).id;
+  },"Capítulo añadido");
+  $('#bPreview').onclick=()=>budgetDrawer(id,vsel);
+  $('#bValidate').onclick=()=>{
+    const issues=erp.validateBudget(id);
+    toast(issues.length?`${issues.filter(i=>i.level==="block").length} bloqueos · ${issues.filter(i=>i.level==="warn").length} avisos`:"Sin incidencias");
+    builderIssues(id,issues);
+  };
+  $('#bAnnexOn').onchange=e=>mutate(()=>erp.setAnnexOptions(id,{enabled:e.target.checked}),
+    e.target.checked?"Anexo gráfico activado":"Anexo gráfico desactivado");
+  $('#bAnnexPer').onchange=e=>mutate(()=>erp.setAnnexOptions(id,{imagesPerPage:+e.target.value}),"Anexo actualizado");
+
+  builderRows(id,vsel,locked,SECL);
+  builderRecalc(id,vsel);
+
+  /* One delegated listener for the whole grid. `input` fires on every
+     keystroke — that is what makes the right-hand panel live — and writes
+     straight through to the engine record, so the tree, the panel and the
+     document can never disagree about what was typed. `change` fires once when
+     the field is left, and that is the one the audit trail hears: a trail with
+     an entry per character is a trail nobody reads. */
+  if(!locked){
+    const rows=$('#bRows');
+    const write=(target,audit)=>{
+      const f=target.dataset.f, lid=target.dataset.line; if(!f||!lid)return;
+      const val=target.value;
+      const patch=f==="qty"?{qtyMilli:bQty(val)}
+        :f==="cost"?{costCents:bMoney(val)}
+        :f==="price"?{priceCents:bMoney(val)}
+        :f==="status"?{pending:val==="pending",optionalLine:val==="optional"}
+        :{[f]:val};
+      try{ erp.editLine(id,lid,patch,{audit,user:"backoffice"}); }
+      catch(err){ toast("⚠ "+err.message); return; }
+      builderRecalc(id,vsel,lid); persist();
+    };
+    rows.addEventListener('input',e=>write(e.target,false));
+    rows.addEventListener('change',e=>write(e.target,true));
+  }
+}
+
+/** Renders the grid body. Called once per builder render — never on keystroke,
+    which would move the caret out from under the person typing. */
+function builderRows(id,vsel,locked,SECL){
+  const V=erp.version(id,vsel);
+  const chapters=bChapter?V.chapters.filter(c=>c.id===bChapter):V.chapters;
+  $('#bGridTag').textContent=bChapter?"capítulo seleccionado":`${V.chapters.length} capítulos`;
+  const cols=locked?11:12;
+  $('#bRows').innerHTML=chapters.map(c=>`
+    <tr class="chaprow"><td colspan="${cols}">${c.num}. ${esc(c.name)} · ${SECL[c.section]||c.section}
+      ${locked?"":`<button class="btn sm" data-addline="${c.id}" style="margin-left:8px">+ partida</button>`}</td></tr>
+    ${c.lines.map(l=>{const a=bLineAmt(l);const m=a.saleCents-a.costCents;
+      return `<tr data-row="${l.id}">
+      <td class="k">${l.num}</td>
+      <td><input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="6"${locked?" disabled":""}></td>
+      <td><input data-line="${l.id}" data-f="desc" value="${esc(l.desc)}"${locked?" disabled":""}></td>
+      <td><input data-line="${l.id}" data-f="unit" value="${esc(l.unit)}" style="width:52px"${locked?" disabled":""}></td>
+      <td><input class="r" data-line="${l.id}" data-f="qty" type="number" step="0.001" value="${l.qtyMilli/1000}"${locked||l.subLines.length?" disabled":""}></td>
+      <td><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents/100).toFixed(2)}"${locked?" disabled":""}></td>
+      <td><input class="r" data-line="${l.id}" data-f="price" type="number" step="0.01" value="${(l.priceCents/100).toFixed(2)}"${locked?" disabled":""}></td>
+      <td><span class="out" data-out="amt-${l.id}">${eur(a.saleCents)}</span></td>
+      <td><span class="out${m<0?" neg":""}" data-out="mar-${l.id}">${eur(m)}</span></td>
+      <td><select data-line="${l.id}" data-f="status"${locked?" disabled":""}>
+        <option value="normal"${bStatus(l)==="normal"?" selected":""}>Normal</option>
+        <option value="pending"${bStatus(l)==="pending"?" selected":""}>Pendiente</option>
+        <option value="optional"${bStatus(l)==="optional"?" selected":""}>Opcional</option></select></td>
+      <td><button class="bimg${l.imageRefs.length?" has":""}" data-gal="${l.id}">🖼 ${l.imageRefs.length}</button></td>
+      ${locked?"":`<td><button class="btn sm danger" data-delline="${l.id}">✕</button></td>`}
+    </tr>`;}).join("")}`).join("")
+    ||'<tr><td colspan="12"><div class="empty">Sin capítulos todavía.</div></td></tr>';
+
+  $('#bRows').querySelectorAll('[data-gal]').forEach(btn=>btn.onclick=()=>lineImagesDrawer(id,btn.dataset.gal));
+  $('#bRows').querySelectorAll('[data-addline]').forEach(btn=>btn.onclick=()=>mutate(()=>{
+    erp.addLine(id,btn.dataset.addline,{desc:"Nueva partida",unit:"ud",qtyMilli:1000});
+  },"Partida añadida"));
+  $('#bRows').querySelectorAll('[data-delline]').forEach(btn=>btn.onclick=()=>mutate(()=>{
+    erp.deleteLine(id,btn.dataset.delline,"backoffice");
+  },"Partida eliminada"));
+}
+
+/** The live half: tree totals, the edited row's own figures, and the panel. */
+function builderRecalc(id,vsel,lineId){
+  const b=erp.budget(id), V=erp.version(id,vsel), t=erp.budgetTotals(id,vsel);
+  const byId={}; t.chapters.forEach(c=>{byId[c.id]=c;});
+
+  $('#bTree').innerHTML=V.chapters.map(c=>{const ct=byId[c.id]||{saleCents:0};
+    return `<div class="bc${bChapter===c.id?" on":""}" data-chap="${c.id}"><span>${c.num}. ${esc(c.name||"—")}</span><span class="amt">${eur0(ct.saleCents)}</span></div>
+     ${c.lines.map(l=>{const a=bLineAmt(l);
+       return `<div class="bl${l.pending?" pend":""}" data-line="${l.id}"><span>${l.num} ${esc(l.desc||"—")}</span><span class="amt">${l.pending?"pdte.":eur0(a.saleCents)}</span></div>`;}).join("")}`;
+  }).join("")||'<div class="empty" style="padding:16px">Sin capítulos.</div>';
+  $('#bTree').querySelectorAll('[data-chap]').forEach(d=>d.onclick=()=>{
+    bChapter=bChapter===d.dataset.chap?null:d.dataset.chap; render();
+  });
+  $('#bTree').querySelectorAll('.bl[data-line]').forEach(d=>d.onclick=()=>{
+    const row=document.querySelector(`tr[data-row="${d.dataset.line}"]`);
+    if(row) row.scrollIntoView({block:"center",behavior:"smooth"});
+  });
+
+  if(lineId){
+    const found=erp.findLine(id,lineId,vsel);
+    if(found){const a=bLineAmt(found.line);const m=a.saleCents-a.costCents;
+      const ae=document.querySelector(`[data-out="amt-${lineId}"]`); if(ae)ae.textContent=eur(a.saleCents);
+      const me=document.querySelector(`[data-out="mar-${lineId}"]`);
+      if(me){me.textContent=eur(m);me.classList.toggle("neg",m<0);}}
+  }
+
+  const imgs=erp.budgetImages(id,vsel).length;
+  $('#bAnnexCount').innerHTML=imgs
+    ? `${imgs} ${imgs===1?"imagen":"imágenes"} en ${(b.annex&&b.annex.enabled)?Math.ceil(imgs/((b.annex&&b.annex.imagesPerPage)||2))+" página(s)":"—"}`
+    : "Ninguna partida tiene imágenes todavía.";
+
+  $('#bTotals').innerHTML=`
+    <div class="row"><span>Base</span><b>${eur(t.baseCents)}</b></div>
+    ${t.discountCents?`<div class="row"><span>Descuento</span><b>−${eur(t.discountCents)}</b></div>`:""}
+    <div class="row"><span>Base imponible</span><b>${eur(t.taxableCents)}</b></div>
+    <div class="row"><span>IVA ${t.vatBp/100}%</span><b>${eur(t.vatCents)}</b></div>
+    ${t.irpfCents?`<div class="row"><span>Retención ${t.irpfBp/100}%</span><b>−${eur(t.irpfCents)}</b></div>`:""}
+    <div class="row big"><span>Total</span><b>${eur(t.grandCents)}</b></div>
+    <div class="row"><span>Coste</span><b>${eur(t.costBaseCents)}</b></div>
+    <div class="row"><span>Margen</span><b class="${t.marginBaseCents<0?"neg":""}">${eur(t.marginBaseCents)} · ${t.marginBasePct}%</b></div>
+    ${t.optionsCents?`<div class="row mut"><span>Opcionales (aparte)</span><b>${eur(t.optionsCents)}</b></div>`:""}
+    <div class="row ${t.pendingCount?"warn":"mut"}"><span>Pendientes de precio</span><b>${t.pendingCount} · ${eur(t.pendingEstCents)}</b></div>
+    ${t.perM2Cents?`<div class="row mut"><span>Por m²</span><b>${eur(t.perM2Cents)}</b></div>`:""}`;
+}
+
+function builderIssues(id,issues){
+  const db=openDrawer("Validación · "+erp.budget(id).number);
+  db.innerHTML=`<div class="card"><div class="ch"><h3>${issues.length} incidencias</h3><span class="tag">PRE-09</span></div><div class="daylist">
+    ${issues.map(i=>`<div class="it"><span class="pill ${i.level==="block"?"r":"y"}">${i.level==="block"?"Bloquea":"Aviso"}</span> <span>${esc(i.line)} — ${esc(i.msg)}</span></div>`).join("")
+      ||'<div class="it">Nada que corregir. El presupuesto puede emitirse.</div>'}
+  </div></div>`;
+}
+
+/* ---------- Gallery for one line (Improvement #1) ----------
+   The pictures of a line are managed here and printed nowhere near it. Sources
+   are the four the spec names: the catalogue item's own reference picture, a
+   photo from the site visit, a file from this computer, and the phone camera
+   (same input, `capture` set, which is what a mobile browser needs to open the
+   camera instead of the file browser). Everything is compressed before it is
+   stored. */
+function lineImagesDrawer(budgetId,lineId){
+  const b=erp.budget(budgetId), vsel=b.currentVersionId;
+  const found=erp.findLine(budgetId,lineId,vsel); if(!found)return;
+  const V=erp.version(budgetId,vsel);
+  const locked=V.frozen||V.issued||b.acceptedVersionId===V.id;
+  const l=found.line;
+  const item=l.itemId?erp.state.catalogue.find(c=>c.id===l.itemId):null;
+  const catImgs=(item&&item.imageRefs||[]).filter(r=>!l.imageRefs.some(x=>x.storageKey===(r.storageKey||r)));
+  const visitPhotos=erp.state.visits.flatMap(x=>(x.photos||[]).map(p=>typeof p==="string"?p:p.storageKey)).filter(Boolean)
+    .filter(p=>!l.imageRefs.some(x=>x.storageKey===p));
+  const SRC={catalogue:"catálogo",visit:"visita",upload:"archivo",camera:"cámara"};
+
+  const db=openDrawer(`Imágenes · ${l.num} ${l.desc||""}`);
+  db.innerHTML=`
+   <div class="card"><div class="ch"><h3>${l.imageRefs.length} imágenes</h3>
+     <span class="tag">${b.annex&&b.annex.enabled?"el anexo está activo":"el anexo está desactivado"}</span></div>
+    <div class="daylist"><div class="it">Las imágenes no se imprimen en la fila de la partida: se reúnen en el anexo gráfico al final del documento, con su capítulo, su número de partida y su descripción.</div></div>
+    <div class="gal" style="padding:0 16px 14px">
+     ${l.imageRefs.map((im,i)=>`<div class="gi" data-img="${im.id}">
+       <img data-blob="${esc(im.storageKey)}" alt="">
+       <div class="m">
+        <input type="text" data-cap="${im.id}" value="${esc(im.caption)}" placeholder="Pie de imagen (opcional)"${locked?" disabled":""}>
+        <div class="b">
+         <label><input type="checkbox" data-int="${im.id}"${im.internal?" checked":""}${locked?" disabled":""}> Sólo uso interno</label>
+         <span class="pill">${SRC[im.source]||im.source}</span>
+         ${im.sizeBytes?`<span class="pill">${Math.round(im.sizeBytes/1024)} KB</span>`:""}
+         <span style="flex:1"></span>
+         ${locked?"":`<button class="btn sm" data-up="${im.id}"${i===0?" disabled":""}>↑</button>
+         <button class="btn sm" data-down="${im.id}"${i===l.imageRefs.length-1?" disabled":""}>↓</button>
+         <button class="btn sm danger" data-del="${im.id}">✕</button>`}
+        </div>
+       </div></div>`).join("")||'<div class="empty">Esta partida no tiene imágenes.</div>'}
+    </div>
+   </div>
+   ${locked?'<div class="card"><div class="daylist"><div class="it">La versión está congelada: su anexo se conserva tal como se emitió.</div></div></div>':`
+   <div class="card"><div class="ch"><h3>Añadir</h3></div><div class="daylist" style="gap:9px">
+     <div class="it"><label class="btn sm">Desde el ordenador<input type="file" id="imgFile" accept="image/*" multiple hidden></label>
+       <label class="btn sm">Cámara<input type="file" id="imgCam" accept="image/*" capture="environment" hidden></label></div>
+     ${catImgs.length?`<div class="it"><button class="btn sm" id="imgCat">Imagen del catálogo (${catImgs.length})</button></div>`:""}
+     ${visitPhotos.length?`<div class="it"><button class="btn sm" id="imgVisit">Foto de la visita (${visitPhotos.length})</button></div>`:""}
+   </div></div>`}`;
+
+  paintImages(db);
+  if(locked)return;
+  db.querySelectorAll('[data-cap]').forEach(inp=>inp.onchange=()=>mutate(()=>
+    erp.updateLineImage(budgetId,lineId,inp.dataset.cap,{caption:inp.value}),"Pie actualizado"));
+  db.querySelectorAll('[data-int]').forEach(cb=>cb.onchange=()=>mutate(()=>{
+    erp.updateLineImage(budgetId,lineId,cb.dataset.int,{internal:cb.checked});
+    lineImagesDrawer(budgetId,lineId);
+  },cb.checked?"Imagen marcada como interna":"Imagen incluida en el anexo"));
+  db.querySelectorAll('[data-up]').forEach(x=>x.onclick=()=>mutate(()=>{
+    erp.moveLineImage(budgetId,lineId,x.dataset.up,-1); lineImagesDrawer(budgetId,lineId);},"Orden actualizado"));
+  db.querySelectorAll('[data-down]').forEach(x=>x.onclick=()=>mutate(()=>{
+    erp.moveLineImage(budgetId,lineId,x.dataset.down,1); lineImagesDrawer(budgetId,lineId);},"Orden actualizado"));
+  db.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>mutate(()=>{
+    erp.removeLineImage(budgetId,lineId,x.dataset.del); lineImagesDrawer(budgetId,lineId);},"Imagen eliminada"));
+
+  const take=(input,source)=>{ if(!input)return;
+    input.onchange=()=>storeLineImages(budgetId,lineId,[...input.files],source); };
+  take($('#imgFile'),"upload"); take($('#imgCam'),"camera");
+  const cat=$('#imgCat');
+  if(cat) cat.onclick=()=>mutate(()=>{
+    const r=catImgs[0]; erp.attachLineImage(budgetId,lineId,{storageKey:r.storageKey||r,source:"catalogue",caption:(item&&item.desc)||""},"backoffice");
+    lineImagesDrawer(budgetId,lineId);
+  },"Imagen del catálogo añadida");
+  const vis=$('#imgVisit');
+  if(vis) vis.onclick=()=>mutate(()=>{
+    erp.attachLineImage(budgetId,lineId,{storageKey:visitPhotos[0],source:"visit"},"backoffice");
+    lineImagesDrawer(budgetId,lineId);
+  },"Foto de la visita añadida");
+}
+
+/** Compress → blob store → engine reference. Bytes never enter the state blob. */
+async function storeLineImages(budgetId,lineId,files,source){
+  if(!files.length)return;
+  let added=0;
+  for(const f of files){
+    if(!/^image\//.test(f.type||"")){ toast("⚠ "+f.name+" no es una imagen"); continue; }
+    try{
+      const c=(typeof ErpBridge!=="undefined"&&ErpBridge.docs)
+        ? await ErpBridge.docs.compressImage(f)
+        : {blob:f,mime:f.type,width:0,height:0};
+      const key="img_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,9);
+      await ErpStore.putBlob(key,c.blob);
+      erp.attachLineImage(budgetId,lineId,{storageKey:key,source,mime:c.mime,
+        sizeBytes:c.blob.size||0,width:c.width,height:c.height},"backoffice");
+      added++;
+    }catch(e){ toast("⚠ "+e.message); }
+  }
+  if(added){ persist(); render(); lineImagesDrawer(budgetId,lineId); toast(`${added} ${added===1?"imagen añadida":"imágenes añadidas"}`); }
+}
+
 const VIEWS={
  /* ---------- Torre de control (DAS-02/03) ---------- */
  torre(v){
@@ -1078,18 +1512,18 @@ const VIEWS={
    </tbody></table></div></div>`;
  },
 
- /* ---------- Presupuestos (PRE/QUO) ---------- */
+ /* ---------- Presupuestos (PRE/QUO) ----------
+    Two states of one subsection: the register of budgets, and — when one is
+    chosen — the three-zone constructor of §3.3. go() rewrites _arg on every
+    navigation, so arriving here from the menu, an alert or a search always
+    lands on the register, while mutate()'s re-render keeps the constructor
+    open on whatever was being edited. */
  presupuestos(v){
+  bBudget=window._arg||null;
+  if(bBudget&&!erp.state.budgets.some(b=>b.id===bBudget)) bBudget=null;
+  if(bBudget) return budgetBuilder(v,bBudget);
   $('#sub').textContent="Presupuestos con capítulos, partidas y sub-mediciones, opciones y pendientes separados, y control de versiones con una única versión aceptada.";
-  const rows=erp.state.budgets;
-  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Número</th><th>Cliente</th><th>Estado</th><th>Versión</th><th class="num">Base</th><th class="num">Total</th><th class="num">Margen</th><th>Pendientes</th><th>Validez</th></tr></thead><tbody>
-   ${rows.map(b=>{const t=erp.budgetTotals(b.id,b.acceptedVersionId||b.currentVersionId);const cv=b.versions[b.versions.length-1];
-    const st=b.acceptedVersionId?'<span class="pill g">Aceptado</span>':b.status==="issued"?'<span class="pill b">Emitido</span>':'<span class="pill y">Borrador</span>';
-    return `<tr class="click" data-id="${b.id}"><td class="k">${b.number}</td><td>${esc(erp.party(b.partyId).name)}</td><td>${st}</td>
-     <td>v${cv.vNumber} · ${b.versions.length} versiones</td><td class="num">${eur0(t.baseCents)}</td><td class="num k">${eur0(t.grandCents)}</td>
-     <td class="num">${t.marginBasePct}%</td><td>${t.pendingCount?`<span class="pill y">${t.pendingCount} (${eur0(t.pendingEstCents)})</span>`:"—"}</td><td>${fmtD(b.validityDate)}</td></tr>`;}).join("")}
-   </tbody></table></div></div>`;
-  v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>budgetDrawer(tr.dataset.id));
+  budgetList(v);
  },
 
  /* ---------- Contratos (CON-13) ---------- */
@@ -1505,9 +1939,17 @@ function newTaskDrawer(){
     closeDrawer(); go("hoy");
   },"Tarea creada");
 }
-function budgetDrawer(id){
-  const b=erp.budget(id); const vsel=b.acceptedVersionId||b.currentVersionId; const V=erp.version(id,vsel);
+function budgetDrawer(id,versionId){
+  const b=erp.budget(id); const vsel=versionId||b.acceptedVersionId||b.currentVersionId; const V=erp.version(id,vsel);
   const t=erp.budgetTotals(id,vsel); const doc=erp.renderBudgetDoc(id,vsel);
+  /* The annex is laid out by @repo/capability-docs through the bridge: which
+     picture goes on which page, in what order, under what reference. This view
+     decides none of it — it only paints what came back, and asks the same
+     object which rows carry the discreet mark. */
+  const annex=(typeof ErpBridge!=="undefined"&&ErpBridge.docs)
+    ? ErpBridge.docs.annex(doc) : {enabled:false,pages:[],plateCount:0,markedItems:[]};
+  const marked=new Set(annex.markedItems);
+  const perPage=(doc.annex&&doc.annex.imagesPerPage)||2;
   const db=openDrawer(b.number+" · v"+V.vNumber+(b.acceptedVersionId?" (aceptada)":""));
   const SEC={base:"",optional:" (opcional — aparte)",outOfScope:" (fuera de presupuesto)",extras:" (extras)"};
   db.innerHTML=`
@@ -1519,7 +1961,7 @@ function budgetDrawer(id){
     <div class="dh"><div><b>PRESUPUESTO ${doc.number} · v${doc.version}</b><br>${esc(doc.issuer.legalName)} · ${esc(doc.issuer.taxId)}<br>${esc(doc.issuer.address)}</div>
     <div style="text-align:right">${esc(doc.customer.name)}<br>${esc(doc.customer.taxId)}<br>${esc(doc.customer.address)}</div></div>
     ${doc.chapters.map(c=>`<div style="margin-bottom:8px"><b style="color:var(--greenDeep)">${c.num}. ${esc(c.name)}${SEC[c.section]||""}</b>
-      ${c.lines.map(l=>`<div class="chapline"><span>${l.num} ${esc(l.desc)} — ${l.qty} ${l.unit} × ${eur(l.priceCents)}</span><b>${eur(l.totalCents)}</b></div>`).join("")}</div>`).join("")}
+      ${c.lines.map(l=>`<div class="chapline"><span>${l.num} ${esc(l.desc)} — ${l.qty} ${l.unit} × ${eur(l.priceCents)}${marked.has(l.num)?'<span class="amark" title="Ver anexo gráfico">A</span>':""}</span><b>${eur(l.totalCents)}</b></div>`).join("")}</div>`).join("")}
     <div style="border-top:2px solid var(--green);padding-top:8px;margin-top:8px">
       <div class="chapline"><span>Base imponible</span><b>${eur(doc.totals.taxableCents)}</b></div>
       ${doc.totals.optionsCents?`<div class="chapline"><span>Opcionales (aparte)</span><span>${eur(doc.totals.optionsCents)}</span></div>`:""}
@@ -1528,12 +1970,23 @@ function budgetDrawer(id){
       ${doc.totals.perM2Cents?`<div class="chapline"><span>Total por m²</span><span>${eur(doc.totals.perM2Cents)}/m²</span></div>`:""}
       ${t.pendingCount?`<div class="chapline"><span>⚠ Líneas pendientes de precio (no incluidas)</span><span>${t.pendingCount} · ~${eur(t.pendingEstCents)}</span></div>`:""}
     </div>
+    ${annex.pages.map(pg=>`<div class="annexpg" data-annexpage="${pg.number}">
+      <div class="ah">Anexo gráfico · página ${pg.number} de ${annex.pages.length}</div>
+      <div class="plates" style="grid-template-columns:repeat(${Math.min(perPage,2)},minmax(0,1fr))">
+       ${pg.plates.map(p=>`<figure class="plate"><img data-blob="${esc(p.ref)}" alt="${esc(p.itemLabel)}">
+         <figcaption><b>${p.groupNum}. ${esc(p.groupName)} · partida ${p.itemNum}</b><br>${esc(p.itemLabel)}${p.sequence?` (${p.sequence} de ${p.siblings})`:""}${p.caption?`<br>${esc(p.caption)}`:""}</figcaption>
+        </figure>`).join("")}
+      </div></div>`).join("")}
     <div style="margin-top:8px;color:var(--muted)">Validez: ${fmtD(b.validityDate)} · ${esc(b.paymentConditions)} · IBAN ${esc(doc.issuer.iban)}</div>
    </div>
    <div class="card" style="margin-top:12px"><div class="ch"><h3>Margen interno</h3><span class="tag">nunca aparece en el documento del cliente</span></div><div class="daylist">
     <div class="it">Coste interno base: <b>${eur(t.costBaseCents)}</b> · Margen: <b>${eur(t.marginBaseCents)} (${t.marginBasePct}%)</b></div>
     ${t.chapters.filter(c=>c.section==="base").map(c=>`<div class="it">${c.num} ${esc(c.name)}: venta ${eur(c.saleCents)} · coste ${eur(c.costCents)} · <b style="color:${c.marginCents<0?'var(--danger)':'inherit'}">${eur(c.marginCents)}</b></div>`).join("")}
-   </div></div>`;
+   </div></div>
+   ${annex.plateCount?`<div class="card"><div class="ch"><h3>Anexo gráfico</h3><span class="tag">${annex.plateCount} imágenes · ${annex.pages.length} páginas</span></div>
+    <div class="daylist"><div class="it">Se imprime después de los totales y antes de las condiciones. Al emitir la versión, el anexo queda congelado con ella.</div></div></div>`
+    :(doc.annex&&doc.annex.enabled?"":`<div class="card"><div class="daylist"><div class="it">El anexo gráfico está desactivado para este presupuesto.</div></div></div>`)}`;
+  paintImages(db);
 }
 function projectDrawer(id){
   const p=erp.project(id); const e=erp.projectEconomics(id); const bill=erp.projectBilling(id); const ex=erp.extrasRegister(id);

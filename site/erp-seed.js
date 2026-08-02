@@ -914,6 +914,117 @@
       vatBp: 2100,
     });
 
+    /* ---- P5: a budget still being written ----
+       Every other budget here has been issued or accepted, which freezes it.
+       A dataset in which nothing is editable makes the constructor of §3.3
+       impossible to see, and a real pipeline always has one budget in
+       preparation — so this one stays a draft. It is also the one that carries
+       the graphic annex: two of its lines have reference pictures, which is
+       exactly the case the annex exists for. */
+    erp.setToday("2026-05-01");
+    const oBorr = erp.addOpportunity({
+      partyId: cRoca.id,
+      propertyId: pRoca.id,
+      source: "referrer",
+      requestedWork: "Segunda fase: salón y pasillo",
+      expectedValue: 1850000,
+    });
+    erp.addVisit({
+      opportunityId: oBorr.id,
+      measurements: [
+        { what: "Salón", qty: 28, unit: "m2" },
+        { what: "Pasillo", qty: 9, unit: "m2" },
+      ],
+      photos: ["visita-salon-1.jpg", "visita-pasillo-1.jpg"],
+      notes: "Suelo original recuperable en el pasillo; el salón necesita nivelación.",
+    });
+    const bBorr = budgetWith(
+      cRoca,
+      pRoca,
+      "renovation",
+      [
+        [
+          "Pavimentos",
+          [
+            {
+              code: "P1",
+              itemId: items["ALB-010"].id,
+              desc: "Nivelación y pavimento cerámico salón",
+              customerWording: "Nivelación del suelo y pavimento cerámico en salón",
+              unit: "m2",
+              qtyMilli: 28000,
+              priceCents: 4200,
+              costCents: 2650,
+              imageRefs: [
+                {
+                  id: "img_seed_pav_1",
+                  storageKey: "seed_img_pavimento",
+                  caption: "Acabado de referencia acordado en la visita",
+                  source: "visit",
+                  internal: false,
+                  mime: "image/png",
+                  sizeBytes: 0,
+                  width: 0,
+                  height: 0,
+                },
+                {
+                  id: "img_seed_pav_2",
+                  storageKey: "seed_img_estado",
+                  caption: "Estado actual antes de la nivelación",
+                  source: "visit",
+                  internal: false,
+                  mime: "image/png",
+                  sizeBytes: 0,
+                  width: 0,
+                  height: 0,
+                },
+              ],
+            },
+          ],
+        ],
+        [
+          "Pintura",
+          [
+            {
+              code: "PI1",
+              itemId: items["PIN-001"].id,
+              desc: "Pintura plástica salón y pasillo",
+              unit: "m2",
+              qtyMilli: 96000,
+              priceCents: 780,
+              costCents: 430,
+              imageRefs: [
+                {
+                  id: "img_seed_pin_1",
+                  storageKey: "seed_img_pintura",
+                  caption: "Carta de color elegida",
+                  source: "catalogue",
+                  internal: false,
+                  mime: "image/png",
+                  sizeBytes: 0,
+                  width: 0,
+                  height: 0,
+                },
+                {
+                  id: "img_seed_pin_2",
+                  storageKey: "seed_img_interna",
+                  caption: "Detalle del encuentro con el rodapié (nota interna)",
+                  source: "upload",
+                  internal: true,
+                  mime: "image/png",
+                  sizeBytes: 0,
+                  width: 0,
+                  height: 0,
+                },
+              ],
+            },
+          ],
+        ],
+      ],
+      { vatBp: 2100, validityDate: "2026-06-30" },
+    );
+    void bBorr;
+
     /* ---- open items that feed the day views & exception lists ---- */
     erp.setToday("2026-05-02");
     erp.addOpportunity({

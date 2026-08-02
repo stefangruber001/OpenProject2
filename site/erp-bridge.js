@@ -36,6 +36,7 @@
   var available = !!(F && F.createScheduling);
 
   var scheduling = available ? F.createScheduling() : null;
+  var docs = available && F.createDocs ? F.createDocs() : null;
 
   /* ------------------------------------------------------------------ *
    * Projections: engine state -> capability values
@@ -152,6 +153,83 @@
       previousId = added.id;
     });
     return svc.recalculate(plan, start);
+  }
+
+  /**
+   * A rendered customer document -> the annex composer's input.
+   *
+   * The projection reads the DOCUMENT, not the version, and that is the whole
+   * point: the document has already dropped the lines that do not print (the
+   * ones still pending a price) and the images marked internal, so the annex
+   * can never illustrate a line the customer never saw. Nothing is filtered
+   * again here.
+   */
+  function annexImagesOf(doc) {
+    var out = [];
+    (doc.chapters || []).forEach(function (c) {
+      (c.lines || []).forEach(function (l) {
+        (l.imageRefs || []).forEach(function (img, i) {
+          out.push({
+            ref: img.storageKey,
+            groupNum: c.num,
+            groupName: c.name,
+            itemNum: l.num,
+            itemLabel: l.desc,
+            caption: img.caption || "",
+            order: i,
+          });
+        });
+      });
+    });
+    return out;
+  }
+
+  /**
+   * Downscales and re-encodes a picture before it is stored.
+   *
+   * Infrastructure, not a rule: a phone camera produces 4-12 MB per shot, and
+   * a quotation with a dozen of them would be unusable over a mobile
+   * connection and slow to open on the device that took them. The numbers are
+   * the host's choice, which is why they live here rather than in a
+   * capability.
+   *
+   * Degrades to the original file if anything in the pipeline is unavailable —
+   * an uncompressed picture is a size problem, a lost picture is a data
+   * problem, and only one of those is worth failing over.
+   */
+  function compressImage(file, opts) {
+    var maxEdge = (opts && opts.maxEdge) || 1600;
+    var quality = (opts && opts.quality) || 0.72;
+    var fallback = function () {
+      return Promise.resolve({ blob: file, mime: file.type || "image/jpeg", width: 0, height: 0 });
+    };
+    if (typeof createImageBitmap !== "function" || typeof document === "undefined")
+      return fallback();
+    return createImageBitmap(file)
+      .then(function (bmp) {
+        var scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
+        var w = Math.max(1, Math.round(bmp.width * scale));
+        var h = Math.max(1, Math.round(bmp.height * scale));
+        var canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d").drawImage(bmp, 0, 0, w, h);
+        bmp.close && bmp.close();
+        return new Promise(function (res) {
+          canvas.toBlob(
+            function (blob) {
+              // Keep whichever is smaller: re-encoding an already-small PNG
+              // screenshot as a JPEG can easily make it bigger.
+              if (!blob || blob.size >= file.size)
+                res({ blob: file, mime: file.type || "image/jpeg", width: w, height: h });
+              else res({ blob: blob, mime: "image/jpeg", width: w, height: h });
+            },
+            "image/jpeg",
+            quality,
+          );
+        });
+      })
+      .catch(fallback);
   }
 
   /* ------------------------------------------------------------------ *
@@ -303,7 +381,32 @@
       },
     },
 
+    /* ------------------------------------------------------------------ *
+     * Documents: the graphic annex (spec §3.3 Improvement #1).
+     *
+     * @repo/capability-docs decides what goes on which page, in what order and
+     * under what reference; this file only projects the engine's rendered
+     * document into its input, and supplies the one thing a pure capability
+     * cannot: a browser to shrink a photograph with.
+     * ------------------------------------------------------------------ */
+    docs: {
+      /**
+       * The annex for a rendered customer document. Returns a disabled, empty
+       * annex when the bundle is missing, so a view can always call it.
+       */
+      annex: function (doc) {
+        if (!docs || !doc) return { enabled: false, pages: [], plateCount: 0, markedItems: [] };
+        return docs.compose(annexImagesOf(doc), doc.annex);
+      },
+      /** Defaults filled in and out-of-range values pulled back into range. */
+      annexOptions: function (raw) {
+        if (!docs) return { enabled: true, imagesPerPage: 2 };
+        return docs.annexOptions(raw);
+      },
+      compressImage: compressImage,
+    },
+
     /** Exposed for tests and the parity harness; not for view code. */
-    _projections: { tasksToPlan: tasksToPlan },
+    _projections: { tasksToPlan: tasksToPlan, annexImagesOf: annexImagesOf },
   };
 });

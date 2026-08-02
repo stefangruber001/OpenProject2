@@ -62,22 +62,98 @@ const retyped = Object.keys(v1).filter(
 );
 assert(retyped.length === 0, "no pre-existing top-level key changed type", retyped.join(","));
 
-const changed = Object.keys(v1).filter(
-  (k) => JSON.stringify(v1[k]) !== JSON.stringify(r1.state[k]),
+/**
+ * Additive at EVERY depth, not just the top level.
+ *
+ * The first version of this check compared each top-level value as a JSON
+ * string, which was right while every migration only added top-level
+ * collections. v4 adds a key inside each budget, and that check calls it a
+ * violation — wrongly: nothing was renamed, retyped or dropped. So the property
+ * is now stated the way it was always meant: the old blob must still be a
+ * SUBSET of the new one. Added keys are fine anywhere; a changed or vanished
+ * value is not, however deep it sits.
+ *
+ * Returns the paths that broke the rule, so a failure names the field.
+ */
+function additiveViolations(before, after, path = "") {
+  const at = path || "(root)";
+  if (Array.isArray(before)) {
+    if (!Array.isArray(after)) return [`${at}: array -> ${typeof after}`];
+    if (before.length !== after.length)
+      return [`${at}: length ${before.length} -> ${after.length}`];
+    return before.flatMap((x, i) => additiveViolations(x, after[i], `${path}[${i}]`));
+  }
+  if (before && typeof before === "object") {
+    if (!after || typeof after !== "object" || Array.isArray(after))
+      return [`${at}: object -> ${Array.isArray(after) ? "array" : typeof after}`];
+    return Object.keys(before).flatMap((k) =>
+      k in after
+        ? additiveViolations(before[k], after[k], path ? `${path}.${k}` : k)
+        : [`${at}.${k}: dropped`],
+    );
+  }
+  return before === after ? [] : [`${at}: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`];
+}
+
+const violations = additiveViolations(v1, r1.state);
+assert(
+  violations.length === 0,
+  "the whole ladder is additive at every depth (nothing renamed, retyped or dropped)",
+  violations.slice(0, 5).join(" · "),
 );
-assert(changed.length === 0, "v1->v2 is purely additive (no existing value altered)", changed.join(","));
 
 // ---- the keys v2 promises to declare ---------------------------------------
-for (const k of [
-  "feedback",
-  "supplierPerf",
-  "assignments",
-  "recurring",
-  "importConflicts",
-]) {
+for (const k of ["feedback", "supplierPerf", "assignments", "recurring", "importConflicts"]) {
   assert(Array.isArray(r1.state[k]), `v2 declares ${k} as an array`);
 }
-assert(r1.state.imports && typeof r1.state.imports === "object", "v2 declares imports as an object");
+assert(
+  r1.state.imports && typeof r1.state.imports === "object",
+  "v2 declares imports as an object",
+);
+
+// ---- what v3 and v4 promise -------------------------------------------------
+assert(
+  r1.state.plans && typeof r1.state.plans === "object" && !Array.isArray(r1.state.plans),
+  "v3 declares plans as an object",
+);
+{
+  const budgets = r1.state.budgets || [];
+  assert(budgets.length > 0, "the fixture actually carries budgets to migrate");
+  assert(
+    budgets.every(
+      (b) => b.annex && typeof b.annex.enabled === "boolean" && b.annex.imagesPerPage >= 1,
+    ),
+    "v4 gives every budget its annex settings",
+  );
+  const lines = budgets.flatMap((b) =>
+    (b.versions || []).flatMap((v) => (v.chapters || []).flatMap((c) => c.lines || [])),
+  );
+  assert(lines.length > 0, "the fixture actually carries budget lines to migrate");
+  assert(
+    lines.every(
+      (l) => Array.isArray(l.imageRefs) && l.imageRefs.every((i) => typeof i === "object"),
+    ),
+    "v4 leaves every image reference as a record, never a bare string",
+  );
+}
+{
+  // A blob that DID write bare strings: the widening must keep the reference
+  // and survive a second pass unchanged.
+  const legacy = JSON.parse(JSON.stringify(v1));
+  const line = legacy.budgets[0].versions[0].chapters[0].lines[0];
+  line.imageRefs = ["blob_abc"];
+  const w = M.migrate(legacy);
+  const got = w.state.budgets[0].versions[0].chapters[0].lines[0].imageRefs;
+  assert(
+    got.length === 1 && got[0].storageKey === "blob_abc" && got[0].internal === false,
+    "v4 widens a bare image reference into a record without losing it",
+    JSON.stringify(got),
+  );
+  assert(
+    JSON.stringify(M.migrate(w.state).state) === JSON.stringify(w.state),
+    "widening an image reference is idempotent",
+  );
+}
 
 // ---- idempotency -----------------------------------------------------------
 const r2 = M.migrate(r1.state);

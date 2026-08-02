@@ -609,3 +609,38 @@ languages: es-ES # source: synthetic
   doc-comment inside the capability, and a fabricated CIF in a fixture was caught by the very
   control-character algorithm the session added. Reversible: nothing in `site/` changed, the browser
   bundle is untouched, and the capability is additive.
+
+- **#52 — CANEI session 9: the constructor, and pictures that stay out of the table (2026-08-02).**
+  Spec §3.3 asks for a three-zone budget constructor and, as Improvement #1, a graphic annex:
+  pictures attached to a line but printed at the end of the document rather than in its row.
+  **Decisions:** (a) **The constructor computes no money.** Every figure it shows — line amounts,
+  chapter subtotals, base, tax, withholding, total, margin, the value of lines still pending a
+  price — is asked of `erp.budgetTotals()`, the same function the emitted document uses, so the
+  "live" panel is genuinely live rather than an optimistic copy that drifts from the document by a
+  cent and is discovered by a customer. `budgets-versions` therefore stays `engine`: the
+  constructor is a view. (b) **The annex layout is a capability** —
+  `@repo/capability-docs/annex.ts` — because grouping, ordering, correlative numbering, pagination
+  and which rows carry a mark are generic document composition with no sector or jurisdiction in
+  them. It is reached only through `ErpBridge.docs.annex`, and its tests use groups and items, not
+  chapters and lines. (c) **Annex options are an argument, not tenant config,** so they are plain
+  values with plain defaults rather than a zod schema: importing the schema into the browser
+  surface pulled all of zod into the committed bundle and took it from 23 KB to 152 KB, to validate
+  two numbers in a bundle that ships to a mobile WebView. (d) They are **repaired, not rejected** —
+  a stored `imagesPerPage: 40` clamps to 12 rather than making a customer's quotation unprintable
+  over a formatting preference. (e) **Default: annex on, two per page.** On costs nothing when no
+  line has a picture, and two is what stays readable on a portrait page. (f) **Issuing a version
+  snapshots the annex settings onto it.** The images were already frozen (a version deep-copies its
+  chapters), but the settings live on the budget and would otherwise keep changing under a document
+  that was already sent. (g) **Internal-only images are dropped by `renderBudgetDoc`,** beside cost
+  and margin: a value that never enters the customer document cannot leak out of one. (h) **A
+  deleted image does not delete its blob** — an earlier frozen version may still reference it, and
+  orphaning a sent document's picture to reclaim a few kilobytes is the wrong trade. (i) **The seed
+  gained a fifth budget, left in draft.** Every other seeded budget is issued or accepted, hence
+  frozen, which made the constructor impossible to see or test; a real pipeline always has one
+  budget in preparation. Its four demo pictures are _drawn_ on a canvas at first run, so no binary
+  enters the repository and nothing is fetched over the network. (j) **Keystrokes do not reach the
+  audit trail.** The grid writes through on every keystroke so the totals are real, and logs once
+  when a field is committed — an audit entry per character is a trail nobody reads. Reversible: the
+  annex is switchable per budget and off means no pages and no marks; the schema step (v4) is
+  additive and idempotent, and the constructor is an alternative view of data the engine already
+  owned.

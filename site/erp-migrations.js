@@ -77,6 +77,59 @@
         return s;
       },
     },
+    {
+      to: 4,
+      name: "graphic annex: settings per budget, image records per line",
+      /*
+       * Two shape changes the graphic annex needs, both additive.
+       *
+       * 1. `budget.annex` — the per-budget switch and images-per-page. Absent
+       *    on every blob written before this build.
+       * 2. `line.imageRefs` entries become RECORDS rather than bare strings.
+       *    The field has existed since the first build and has always been an
+       *    empty array in practice, but a bare string is what an early build
+       *    would plausibly have written, and a caption and an internal-only
+       *    flag have nowhere to live on a string.
+       *
+       * Rule 1 of this ladder says never retype an existing key — and this
+       * does exactly that, which is why it is done as a widening rather than a
+       * replacement: a string becomes {storageKey: <that string>}, so nothing
+       * is lost and running the migration twice is a no-op (a record is left
+       * alone). The readers were updated in the same commit.
+       */
+      up: function (s) {
+        var budgets = Array.isArray(s.budgets) ? s.budgets : [];
+        budgets.forEach(function (b) {
+          if (!b.annex || typeof b.annex !== "object")
+            b.annex = { enabled: true, imagesPerPage: 2 };
+          (Array.isArray(b.versions) ? b.versions : []).forEach(function (v) {
+            (Array.isArray(v.chapters) ? v.chapters : []).forEach(function (c) {
+              (Array.isArray(c.lines) ? c.lines : []).forEach(function (l) {
+                if (!Array.isArray(l.imageRefs)) {
+                  l.imageRefs = [];
+                  return;
+                }
+                l.imageRefs = l.imageRefs.map(function (img, i) {
+                  if (img && typeof img === "object") return img;
+                  return {
+                    id: "img_legacy_" + l.id + "_" + i,
+                    storageKey: String(img),
+                    caption: "",
+                    source: "upload",
+                    internal: false,
+                    mime: "image/jpeg",
+                    sizeBytes: 0,
+                    width: 0,
+                    height: 0,
+                  };
+                });
+              });
+            });
+          });
+        });
+        return s;
+      },
+    },
   ];
 
   var CURRENT_VERSION = MIGRATIONS.reduce(function (max, m) {

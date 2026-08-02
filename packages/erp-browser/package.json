@@ -9,6 +9,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@repo/capability-docs": "workspace:*",
     "@repo/capability-scheduling": "workspace:*",
     "@repo/kernel": "workspace:*"
   },

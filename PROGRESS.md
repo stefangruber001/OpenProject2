@@ -376,11 +376,36 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   be carrying Spanish knowledge. Registered and composed into tenant #1
   (17 capabilities, 4 bound ports); `make demo` and the negative test unchanged.
   No camera, no OCR engine, no UI: that is session 8.
-- **Sessions 8-12 — not started.** See `docs/worklog/WORKLOG.md`.
+- **Session 9 — done (ASSUMPTIONS.md #52).** The budget constructor of §3.3 and
+  the graphic annex (Improvement #1). Presupuestos now opens a three-zone
+  constructor: the chapter/line tree with per-chapter totals on the left, an
+  editable spreadsheet grid in the centre (code, description, unit, quantity,
+  cost price, sale price, amount, margin, line status), and a totals panel on
+  the right that recalculates on every keystroke — base, tax, withholding,
+  total, cost, margin in euros and per cent, and the value of the lines still
+  pending a price. **The view computes no money:** every one of those figures
+  comes from `erp.budgetTotals()`, the same function the emitted document uses,
+  so the live panel cannot drift from the document. Editing goes through
+  `erp.editLine()`, which refuses on a frozen, issued or accepted version.
+  The graphic annex is owned by `@repo/capability-docs` (`annex.ts`) and
+  reached through `ErpBridge.docs.annex`: pictures attach to a line and print
+  **at the end of the document**, after the totals and before the conditions,
+  grouped and ordered by chapter and line number, each captioned with both plus
+  a short description, numbered correlatively when a line has several, N per
+  page, with the line's own row carrying only a discreet mark. Switchable per
+  budget; issuing a version freezes its annex with it. Images come from the
+  catalogue, the site visit, a file or the phone camera, are compressed before
+  storage, and live in the blob store as `storageKey` strings — binary never
+  enters the state blob (schema v4 adds the settings and widens image
+  references into records). Internal-only images never reach the customer
+  document. `budget-graphic-annex` becomes the third `factory`-owned area.
+  Site E2E 77/77, all thirteen new checks made in a real browser.
+- **Session 8 — not started** (skipped for now), **10-12 — not started.** See
+  `docs/worklog/WORKLOG.md`.
 
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-
 status-1q50dt` for sessions 1-3, `claude/candi-programme-session-4-07amo8` for
-session 4. Small conventional commits, every commit green, no force-push, no
+sessions 4-9. Small conventional commits, every commit green, no force-push, no
 history rewrite.

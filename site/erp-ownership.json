@@ -45,13 +45,15 @@
       "owner": "engine",
       "specSection": "3.3",
       "engineSection": "PRE/QUO — budgets & versions",
-      "plannedSession": "9"
+      "plannedSession": null,
+      "note": "Session 9 built the three-zone constructor of §3.3 (chapter/line tree, editable grid, live totals panel) but deliberately did NOT move this area: the constructor is a view, and every figure it shows — line amounts, chapter subtotals, base, tax, withholding, total, margin, the value of the lines still pending a price — is asked of erp.budgetTotals(), the same function the emitted document uses. That is what makes the panel genuinely live rather than an optimistic copy that drifts from the document by a cent. The grid edits through erp.editLine(), which goes through _editableVersion, so a frozen, issued or accepted version refuses the edit. plannedSession is null because there is no pending move: totals and versioning are correct where they are, and a capability would be a rewrite for its own sake."
     },
     "budget-graphic-annex": {
-      "owner": "unbuilt",
+      "owner": "factory",
       "specSection": "3.3 (Improvement #1)",
       "engineSection": null,
-      "plannedSession": "9"
+      "plannedSession": null,
+      "note": "Owned by @repo/capability-docs (src/annex.ts) and reached only through site/erp-bridge.js (ErpBridge.docs.annex). The capability decides the whole layout — grouping and ordering by chapter then line number, the correlative numbering when a line has several pictures, the pagination at N per page, and which rows carry the discreet reference mark — from a list of images it is handed; it never touches bytes and never decides eligibility. The engine keeps what is genuinely its own: the image records on a line, the per-budget switch, and the fact that issuing a version snapshots the annex settings onto it so a sent document can always be reproduced. Bytes live in the blob store under storageKey (session 3's rule: binary never enters the state blob), compressed by the host before they are stored. Internal-only images are dropped at the document boundary by renderBudgetDoc, alongside cost and margin — a value that never enters the customer document cannot leak out of one."
     },
     "contracts": {
       "owner": "engine",

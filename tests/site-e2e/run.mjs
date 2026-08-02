@@ -70,6 +70,7 @@ async function main() {
     await testRetired(browser, base);
     await testShell(browser, base);
     await testGantt(browser, base);
+    await testBudgetBuilder(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
   } finally {
@@ -664,6 +665,159 @@ async function testGantt(browser, base) {
 
 // ── ERP workspace (BRD v2): Control Tower, and the BNK-02 flow — allocate a
 //    bank movement by typing the project number.
+// ── Budget constructor (§3.3) and the graphic annex (Improvement #1).
+//    Everything here is checked in a real browser rather than by reading code:
+//    the three zones must actually be on screen at once, the right-hand panel
+//    must actually change as keys are pressed, and the annex must actually
+//    print its pictures after the totals and not in the lines' rows.
+async function testBudgetBuilder(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#presupuestos`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(800);
+
+    // Open the one budget that is still a draft — a frozen version is
+    // deliberately read-only, so editing has to be tried on an editable one.
+    const rows = pg.locator("#view tr.click");
+    const n = await rows.count();
+    let opened = false;
+    for (let i = 0; i < n; i++) {
+      if (/Borrador/.test(await rows.nth(i).innerText())) {
+        await rows.nth(i).click();
+        opened = true;
+        break;
+      }
+    }
+    if (!opened) {
+      bad("builder: a draft budget exists to edit", `${n} budgets, none in draft`);
+      return;
+    }
+    await pg.waitForTimeout(500);
+
+    // Zone 1, 2 and 3 simultaneously — the whole point of the layout.
+    const tree = await pg.locator("#bTree .bc").count();
+    const gridRows = await pg.locator("#bRows tr[data-row]").count();
+    const totals = await pg.locator("#bTotals").isVisible();
+    if (tree >= 2 && gridRows >= 2 && totals)
+      ok(`builder: three zones at once (${tree} chapters · ${gridRows} lines · live totals)`);
+    else bad("builder: three zones", `tree=${tree} rows=${gridRows} totals=${totals}`);
+
+    // The panel recalculates ON EVERY KEYSTROKE, not on blur. Type into a
+    // price field and read the total back without leaving the field.
+    const totalOf = async () => pg.locator("#bTotals .row.big b").innerText();
+    const before = await totalOf();
+    const price = pg.locator('#bRows input[data-f="price"]').first();
+    await price.click();
+    await price.fill("");
+    await price.type("99", { delay: 40 });
+    await pg.waitForTimeout(200);
+    const during = await totalOf();
+    const focused = await pg.evaluate(() => document.activeElement?.dataset?.f || "");
+    if (during !== before && focused === "price")
+      ok(`builder: totals recalculate on every keystroke (${before} → ${during}, caret kept)`);
+    else bad("builder: live totals", `before=${before} during=${during} focus=${focused}`);
+
+    // Chapter subtotals in the tree move with the same edit.
+    const treeAmt = await pg.locator("#bTree .bc .amt").first().innerText();
+    if (/\d/.test(treeAmt)) ok("builder: the tree carries per-chapter totals");
+    else bad("builder: chapter totals", treeAmt);
+
+    // The picture count is an INTERNAL indicator on the row: a number, never
+    // the picture itself.
+    const galBtn = pg.locator("#bRows .bimg.has").first();
+    if ((await galBtn.count()) > 0 && /^🖼 [1-9]/.test((await galBtn.innerText()).trim()))
+      ok("builder: lines with pictures show a count, not the pictures");
+    else
+      bad(
+        "builder: image indicator",
+        await pg
+          .locator("#bRows")
+          .innerText()
+          .catch(() => ""),
+      );
+
+    // The gallery manages them: caption, internal-only flag, order, delete.
+    await galBtn.click();
+    await pg.waitForTimeout(400);
+    const gi = await pg.locator("#dbody .gal .gi").count();
+    const thumb = await pg
+      .locator("#dbody .gal .gi img")
+      .first()
+      .evaluate((im) => im.naturalWidth);
+    if (gi >= 2 && thumb > 0)
+      ok(`builder: the gallery loads ${gi} stored pictures from the blob store`);
+    else bad("builder: gallery", `items=${gi} naturalWidth=${thumb}`);
+    await pg.locator("#dClose").click();
+    await pg.waitForTimeout(250);
+
+    // ---- the annex itself ----
+    await pg.locator("#bPreview").click();
+    await pg.waitForTimeout(600);
+
+    const pages = await pg.locator("#dbody .annexpg").count();
+    const plates = await pg.locator("#dbody .plate").count();
+    if (pages >= 2 && plates >= 3) ok(`annex: ${plates} pictures laid out over ${pages} pages`);
+    else bad("annex: pages", `pages=${pages} plates=${plates}`);
+
+    // Grouped and ordered by chapter and line, each captioned with both.
+    const firstCap = await pg.locator("#dbody .plate figcaption").first().innerText();
+    if (/partida 1\.1/.test(firstCap) && /1\. Pavimentos/.test(firstCap))
+      ok("annex: each picture names its chapter and its line");
+    else bad("annex: caption reference", firstCap.replace(/\n/g, " ").slice(0, 90));
+
+    // Several pictures on one line are numbered correlatively.
+    if (/\(1 de 2\)/.test(await pg.locator("#dbody").innerText()))
+      ok("annex: a line with several pictures numbers them correlatively");
+    else bad("annex: correlative numbering", "no '(1 de 2)' found");
+
+    // An internal-only picture never reaches the customer document.
+    if (!/nota interna/i.test(await pg.locator("#dbody").innerText()))
+      ok("annex: internal-only pictures stay out of the customer document");
+    else bad("annex: internal picture leaked", "internal caption found in the document");
+
+    // The row carries a discreet mark and NOT the picture.
+    const marks = await pg.locator("#dbody .chapline .amark").count();
+    const inRow = await pg.locator("#dbody .chapline img").count();
+    if (marks >= 2 && inRow === 0) ok("annex: the line's row gets a mark, never the picture");
+    else bad("annex: row mark", `marks=${marks} imagesInRows=${inRow}`);
+
+    // The annex comes after the totals and before the conditions.
+    const order = await pg.evaluate(() => {
+      const doc = document.querySelector("#dbody .doc");
+      const kids = [...doc.children];
+      const annex = kids.findIndex((k) => k.classList.contains("annexpg"));
+      const conds = kids.length - 1; // the validity/conditions line closes the doc
+      const totals = kids.findIndex((k) => /TOTAL/.test(k.textContent || ""));
+      return { annex, conds, totals };
+    });
+    if (order.totals >= 0 && order.annex > order.totals && order.annex < order.conds)
+      ok("annex: printed after the totals and before the conditions");
+    else bad("annex: position in the document", JSON.stringify(order));
+    await pg.locator("#dClose").click();
+    await pg.waitForTimeout(200);
+
+    // Switching the annex off removes both the pages and the marks.
+    await pg.locator("#bAnnexOn").uncheck();
+    await pg.waitForTimeout(400);
+    await pg.locator("#bPreview").click();
+    await pg.waitForTimeout(500);
+    const offPages = await pg.locator("#dbody .annexpg").count();
+    const offMarks = await pg.locator("#dbody .amark").count();
+    if (offPages === 0 && offMarks === 0)
+      ok("annex: switching it off drops the pages and the marks together");
+    else bad("annex: switch off", `pages=${offPages} marks=${offMarks}`);
+
+    if (errs.length === 0) ok("builder: no console errors");
+    else bad("builder: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("budget builder", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
 async function testErp(browser, base) {
   // Workspace: Control Tower renders indicators + alerts; modules navigate.
   const pg = await browser.newPage({ viewport: { width: 1280, height: 950 } });

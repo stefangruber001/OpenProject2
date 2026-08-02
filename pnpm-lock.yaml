@@ -639,6 +639,9 @@ importers:
 
   packages/erp-browser:
     dependencies:
+      '@repo/capability-docs':
+        specifier: workspace:*
+        version: link:../capabilities/docs
       '@repo/capability-scheduling':
         specifier: workspace:*
         version: link:../capabilities/scheduling

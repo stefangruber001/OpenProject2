@@ -667,6 +667,10 @@
           currentVersionId: null,
           acceptedVersionId: null,
           internalVariant: false, // PRE-13/QUO-06
+          // PRE-10: the graphic annex is a property of the budget, switchable
+          // per budget. Its layout is not computed here — see the annex
+          // composer the document preview calls; this is only the setting.
+          annex: { enabled: true, imagesPerPage: 2 },
         },
         b,
       );
@@ -778,6 +782,179 @@
         throw new Error("Current version is frozen — create a new version"); // QUO-02
       if (b.acceptedVersionId === v.id) throw new Error("Accepted version is immutable"); // QUO-04
       return v;
+    }
+
+    /* ---- the builder's edit surface (PRE-02/05, spec §3.3 "Disposición del
+       constructor"). Every one of these goes through _editableVersion, so a
+       frozen, issued or accepted version refuses the edit rather than silently
+       rewriting a document that was already sent.
+
+       NOTE the deliberate absence of updateLine/updateChapter/removeLine here:
+       this class already defines them further down, keyed by chapter AND line
+       reference. A second definition of the same name in a class body silently
+       replaces the first, so adding one here would break every existing
+       caller — which is exactly what a first draft of this block did, caught
+       by the site E2E rather than by reading. ---- */
+
+    /** The line with this id, wherever it sits, plus its chapter and version. */
+    findLine(budgetId, lineId, versionId) {
+      const v = versionId ? this.version(budgetId, versionId) : this.currentVersion(budgetId);
+      for (const c of v.chapters) {
+        const l = c.lines.find((x) => x.id === lineId);
+        if (l) return { version: v, chapter: c, line: l };
+      }
+      return null;
+    }
+
+    /**
+     * Write-through edit of one line, addressed by line id alone (updateLine
+     * needs the chapter too, which a spreadsheet grid does not have to hand).
+     *
+     * `audit` exists because of how a grid is used: the constructor writes on
+     * EVERY keystroke, so that the totals panel beside it is genuinely live
+     * rather than an optimistic copy. Logging each of those would record one
+     * audit entry per character typed and drown the trail that ORG-07 exists
+     * to keep readable. The view therefore writes silently while a field is
+     * being typed into and logs once when it is committed, which records the
+     * same fact — this person changed this line — at the granularity a person
+     * can actually read.
+     */
+    editLine(budgetId, lineId, patch, { audit = false, user } = {}) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      // Identity and images are not patchable here: an id must stay stable for
+      // the version diff to work, and images have their own guarded methods.
+      const { id, num, imageRefs, ...safe } = patch || {};
+      void id;
+      void num;
+      void imageRefs;
+      Object.assign(found.line, safe);
+      if (found.line.subLines.length) found.line.qtyMilli = this._aggSubLines(found.line.subLines);
+      if (audit) this._log(user, "editLine", this.budget(budgetId).number + " " + found.line.num);
+      return found.line;
+    }
+
+    /** Delete a line addressed by its id alone, renumbering what remains. */
+    deleteLine(budgetId, lineId, user) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      found.chapter.lines = found.chapter.lines.filter((l) => l.id !== lineId);
+      // Line numbers are the reader's index into the document — and into the
+      // graphic annex — so they are renumbered to stay contiguous.
+      found.chapter.lines.forEach((l, i) => (l.num = found.chapter.num + "." + (i + 1)));
+      this._log(user, "deleteLine", this.budget(budgetId).number + " " + found.line.num);
+      return found.chapter;
+    }
+
+    removeChapter(budgetId, chapterId) {
+      const v = this._editableVersion(budgetId);
+      v.chapters = v.chapters.filter((c) => c.id !== chapterId);
+      v.chapters.forEach((c, i) => {
+        const num = String(i + 1);
+        c.num = num;
+        c.order = i;
+        c.lines.forEach((l, j) => (l.num = num + "." + (j + 1)));
+      });
+      return v;
+    }
+
+    /* ---- PRE-10 / CAT-08 / DOC-02: images on a line.
+       The image is informative and NEVER touches quantities, prices or totals —
+       none of these methods so much as reads an amount. Bytes live in the blob
+       store under `storageKey`; only the reference and its caption are state,
+       which is what keeps the state blob small enough to re-serialise on every
+       keystroke. Because a version deep-copies its chapters, freezing a version
+       freezes its annex with it: an issued document can always be reproduced
+       exactly as it was sent, even if the catalogue image changes later. ---- */
+    attachLineImage(budgetId, lineId, img, user) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      if (!img || !img.storageKey) throw new Error("Image needs a storage key");
+      const rec = Object.assign(
+        {
+          id: this._id("img"),
+          storageKey: "",
+          caption: "",
+          source: "upload", // catalogue | visit | upload | camera
+          internal: false, // internal-only images never reach the customer doc
+          mime: "image/jpeg",
+          sizeBytes: 0,
+          width: 0,
+          height: 0,
+        },
+        img,
+      );
+      found.line.imageRefs.push(rec);
+      this._log(user, "attachLineImage", found.line.num);
+      return rec;
+    }
+    updateLineImage(budgetId, lineId, imageId, patch) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      const img = found.line.imageRefs.find((x) => x.id === imageId);
+      if (!img) throw new Error("Image not found");
+      const { id, storageKey, ...safe } = patch || {};
+      void id;
+      void storageKey; // replacing the bytes is attach + remove, not a patch
+      Object.assign(img, safe);
+      return img;
+    }
+    removeLineImage(budgetId, lineId, imageId) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      const img = found.line.imageRefs.find((x) => x.id === imageId);
+      found.line.imageRefs = found.line.imageRefs.filter((x) => x.id !== imageId);
+      // The blob itself is deliberately NOT deleted: an earlier frozen version
+      // may still reference it, and orphaning a sent document's picture to
+      // reclaim a few kilobytes is the wrong trade.
+      return img || null;
+    }
+    moveLineImage(budgetId, lineId, imageId, delta) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      const arr = found.line.imageRefs;
+      const i = arr.findIndex((x) => x.id === imageId);
+      if (i < 0) throw new Error("Image not found");
+      const j = Math.max(0, Math.min(arr.length - 1, i + delta));
+      if (i !== j) arr.splice(j, 0, arr.splice(i, 1)[0]);
+      return arr;
+    }
+    setAnnexOptions(budgetId, opts) {
+      const b = this.budget(budgetId);
+      if (!b.annex) b.annex = { enabled: true, imagesPerPage: 2 };
+      if (typeof opts.enabled === "boolean") b.annex.enabled = opts.enabled;
+      if (opts.imagesPerPage != null) {
+        const n = Math.round(Number(opts.imagesPerPage));
+        b.annex.imagesPerPage = Math.max(1, Math.min(12, isFinite(n) ? n : 2));
+      }
+      return b.annex;
+    }
+    /** Every image on a version, flattened with the line it belongs to. */
+    budgetImages(budgetId, versionId, { includeInternal = false } = {}) {
+      const v = versionId ? this.version(budgetId, versionId) : this.currentVersion(budgetId);
+      const out = [];
+      for (const c of v.chapters)
+        for (const l of c.lines)
+          (l.imageRefs || []).forEach((img, i) => {
+            if (!includeInternal && img.internal) return;
+            out.push({
+              image: img,
+              order: i,
+              lineId: l.id,
+              lineNum: l.num,
+              lineDesc: l.customerWording || l.desc,
+              chapterNum: c.num,
+              chapterName: c.name,
+              section: c.section,
+            });
+          });
+      return out;
     }
     budgetTotals(budgetId, versionId) {
       // PRE-06/07: the totals engine
@@ -892,6 +1069,12 @@
         throw new Error("Email required to send electronically (MDM-04)");
       v.issued = true;
       v.frozen = true;
+      // PRE-10: freezing a version freezes its annex. The images are already
+      // frozen (they live on this version's own copy of the chapters), but the
+      // annex SETTINGS live on the budget and would otherwise keep changing
+      // under an already-sent document. Snapshot them here so a reissued PDF is
+      // laid out exactly as the one the customer received.
+      v.annex = clone(b.annex || { enabled: true, imagesPerPage: 2 });
       v.sent = { date: this.state.today, channel: ch }; // QUO-09 + MDM-04
       v.docRef = this._docName("presupuesto", b, v); // DOC-04
       b.status = "issued";
@@ -950,9 +1133,18 @@
               subLines: l.subLines
                 .filter((s) => s.customerVisible)
                 .map((s) => ({ room: s.room, qty: s.qtyMilli / 1000 })), // PRE-03 optional visibility
-              imageRefs: l.imageRefs, // PRE-10 / CAT-08
+              // PRE-10 / CAT-08. Internal-only images are dropped at the
+              // document boundary for the same reason cost and margin are: a
+              // value that never enters the customer document cannot leak out
+              // of one.
+              imageRefs: (l.imageRefs || []).filter((img) => !img.internal),
             })),
         })),
+        // The annex SETTINGS as they apply to this version: an issued version
+        // carries its own frozen copy, a draft follows the budget's current
+        // ones. What goes on which page is not decided here — the annex
+        // composer in the capability layer does that from these images.
+        annex: clone(v.annex || b.annex || { enabled: true, imagesPerPage: 2 }),
         totals: {
           baseCents: t.baseCents,
           optionsCents: t.optionsCents,
@@ -3088,8 +3280,10 @@
       const ln = this._findLine(ch, lineRef);
       delete patch.num;
       Object.assign(ln, patch);
-      if (ln.subLines && ln.subLines.length)
-        ln.qtyMilli = ln.subLines.reduce((s, sl) => s + (sl.qtyMilli || 0), 0);
+      // _aggSubLines, not a plain sum: addLine, budgetTotals and editLine all
+      // apply the waste percentage, so a plain sum here made an edited line
+      // quietly disagree with the total it feeds.
+      if (ln.subLines && ln.subLines.length) ln.qtyMilli = this._aggSubLines(ln.subLines);
       this._log(user, "updateLine", this.budget(budgetId).number + " " + ln.num);
       return ln;
     }
