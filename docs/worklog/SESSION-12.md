@@ -103,6 +103,17 @@ Ownership: alerts-tasks-control-tower plannedSession cleared (stays engine);
   journey-project-selector unbuilt→engine (19 engine · 7 factory · 1
   unbuilt — only extraction-ocr/session 8 remains unbuilt).
 
+PREVIEW / BETA: /preview (and therefore the iOS TestFlight + Android beta
+builds, see ios/CaneiSubirats/Support/Config.swift baseURL) is published by
+.github/workflows/pages.yml, which is read FROM MAIN — the github-pages
+environment refuses to deploy from any other branch (verified: a dispatch
+from this branch failed in 13s with zero steps run). main therefore carries
+ONE workflow-only commit this branch does not (8bea20e). pages.yml's
+DEV_BRANCH and preview-refresh.yml's push branch list must both name the
+current programme branch; they had named the sessions 1-3 branch since
+session 4, so /preview served session-3 content for nine sessions. If the
+programme branch ever changes again, change BOTH, on main, in that commit.
+
 ENVIRONMENT: Node 22 + pnpm 10. `pnpm install && pnpm lint && pnpm boundaries
 && pnpm check-types && pnpm test && pnpm build`, `make gates`, `make demo`,
 `node tests/site-e2e/run.mjs` (147), the five sims under tests/simulation/.
@@ -192,6 +203,39 @@ convert-to-task, edit a rule's threshold, hide a card), the calendar's month
 navigation and legend filter, and the full real-project loop in
 journey.html: pick a project, see its real status and ledger, duplicate it,
 download its folder as a real zip, switch back to the untouched demo.
+
+## The /preview deploy had been stale since session 4
+
+Opening `https://stefangruber001.github.io/OpenProject2/preview/` after this
+session showed session-**3** content. `pages.yml` hardcodes which branch is
+published under `/preview`, and it still named
+`claude/orin-project-status-1q50dt` — the branch sessions 1-3 used. Session 4
+moved the programme to `claude/candi-programme-session-4-07amo8` and that
+value never moved with it, so for nine sessions the preview was rebuilt, on
+every push, from a branch nobody was committing to. Nothing failed and
+nothing went red; the deploy was faithfully publishing the wrong thing.
+
+Two consequences worth knowing:
+
+- **`/preview` is not only a review link.** Per `site-e2e.yml`'s own header,
+  it is what the iOS TestFlight and Android beta builds load
+  (`ios/CaneiSubirats/Support/Config.swift` `baseURL`). So the betas were
+  pinned to session-3 content too, and this fix un-freezes them onto session
+  12 — a real behavioural change for anyone already running a beta build,
+  not just a documentation nicety.
+- **The fix had to land on `main`.** GitHub reads `pages.yml` from the branch
+  the deploy runs on, and the `github-pages` environment refuses to deploy
+  from anything but `main` — verified empirically here, not assumed: a
+  dispatch from the programme branch (pages run 63) failed in 13 seconds
+  having executed zero steps. `main` therefore carries **one workflow-only
+  commit** (`8bea20e`) that the programme branch does not: no `site/`, app,
+  package or test code, just `pages.yml` + `preview-refresh.yml`. CI run 192
+  on `main` is green. Both files are now commented so the next branch change
+  updates them in the same commit.
+
+`preview-refresh.yml` had drifted identically and is fixed alongside it,
+because a `push` trigger is read from the pushed branch's own copy of the
+file — the two must name the same branch or the auto-refresh silently stops.
 
 ## The bug the tooling caught
 
