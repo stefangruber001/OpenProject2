@@ -173,6 +173,10 @@ happen.
 `pnpm --filter web test:e2e` was not required: no tenant spec and no
 capability registry entry changed.
 
+Confirmed on GitHub for `5e372ed`: `CI` run 185 green (all five jobs,
+including the committed-bundle drift check and the Playwright End-to-end job)
+and `Site E2E` run 26 green. First push, no fixes needed.
+
 The eleven new E2E checks drive full lifecycles in a real browser — draft
 through received for a purchase order, blocked through certified for a
 subcontract, detected through an approved adenda for a change, assigned
