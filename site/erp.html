@@ -308,6 +308,65 @@
   .exrow:last-child{border-bottom:0}
   .exrow .why{font-size:11px;color:var(--muted)}
 
+  /* ---------- Torre de Control (spec §2.1) ---------- */
+  .torrebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:11px}
+  .torrebar .ts{font-size:11.5px;color:var(--muted)}
+  .tcards{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin:4px 0 16px}
+  @media(max-width:1080px){.tcards{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.tcards{grid-template-columns:1fr}}
+  .tcard{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:12px 14px;
+    box-shadow:var(--shadow);cursor:pointer;transition:.12s;position:relative}
+  .tcard:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--green) 36%,var(--line))}
+  .tcard .lab{font:600 10px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+    display:flex;align-items:center;gap:6px}
+  .tcard .dot{width:8px;height:8px;border-radius:50%;background:var(--danger);flex:none}
+  .tcard .val{font-family:var(--serif);font-size:22px;color:var(--ink);margin-top:5px;line-height:1;
+    font-variant-numeric:tabular-nums}
+  .tcard .sub{font-size:11px;color:var(--muted);margin-top:4px;min-height:14px}
+  .tcard .delta{font:700 10.5px var(--sans);margin-left:6px}
+  .tcard .delta.up{color:var(--greenDeep)} .tcard .delta.down{color:var(--danger)}
+  .tcard svg.spark{display:block;width:100%;height:26px;margin-top:6px}
+  .tcard svg.spark path{fill:none;stroke:var(--green);stroke-width:1.6;opacity:.75}
+  .cardmgr{display:flex;flex-direction:column;gap:1px}
+  .cardmgr .cmrow{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--hair);font-size:12.5px}
+  .cardmgr .cmrow:last-child{border-bottom:0}
+  .cardmgr .cmrow button{border:1px solid var(--line);background:var(--paper);border-radius:7px;
+    width:26px;height:26px;color:var(--body);font-size:12px}
+  /* ---------- Alerts as manager (DAS-06/07) ---------- */
+  .almgr{display:flex;flex-direction:column;gap:1px}
+  .alrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;
+    padding:9px 12px;border-bottom:1px solid var(--hair);font-size:12.5px}
+  .alrow:last-child{border-bottom:0}
+  .alrow .meta{font-size:11px;color:var(--muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
+  .alrow .acts{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+  .alrow .acts button{font-size:11px;padding:4px 8px}
+  .algroup{font:700 9.5px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
+    padding:9px 12px 4px}
+  .rulesrow{display:grid;grid-template-columns:minmax(0,1fr) 70px 90px 120px 90px;gap:8px;align-items:center;
+    padding:7px 12px;border-bottom:1px solid var(--hair);font-size:12px}
+  .rulesrow input,.rulesrow select{font:inherit;font-size:12px;padding:5px 6px;border:1px solid var(--line);
+    border-radius:6px;background:var(--paper);width:100%}
+  @media(max-width:700px){.rulesrow{grid-template-columns:1fr}}
+
+  /* ---------- Mi Día — hitos calendar (spec §2.2) ---------- */
+  .miday{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:12px;align-items:start}
+  @media(max-width:940px){.miday{grid-template-columns:minmax(0,1fr)}}
+  .calhead{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--hair)}
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--hair)}
+  .calcell{background:var(--paper);min-height:64px;padding:4px 5px;font-size:10.5px;position:relative}
+  .calcell .dnum{font:700 10px var(--sans);color:var(--faint)}
+  .calcell.today .dnum{color:var(--green)}
+  .calcell.out{background:var(--panel,#f4f8f1);opacity:.55}
+  .calcell .ev{display:block;border-radius:5px;padding:1px 4px;margin-top:2px;font-size:9.5px;
+    font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .miwk{font:700 9px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--faint);
+    text-align:center;padding:4px 0;background:var(--paper)}
+  .milegend{display:flex;flex-wrap:wrap;gap:7px;padding:9px 14px;font-size:10.5px}
+  .milegend span{display:inline-flex;align-items:center;gap:4px;color:var(--muted);cursor:pointer;
+    opacity:1;transition:.12s}
+  .milegend span.off{opacity:.35}
+  .milegend i{width:8px;height:8px;border-radius:2px;display:inline-block}
+
   /* ---------- Compras · Subcontratos · Modificaciones · Horas (spec §4.1/§4.2/§4.5/§4.6) ---------- */
   .dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
   .dot.g{background:var(--greenLt)} .dot.y{background:var(--spark)} .dot.r{background:var(--danger)}
@@ -556,9 +615,19 @@ async function boot(){
   try{ const prefs=await ErpStore.getMeta("ui.prefs"); if(prefs&&prefs.period) PERIOD={...PERIOD,...prefs.period}; }catch(e){}
   try{ const pp=await ErpStore.getMeta("ui.projects");
        if(pp){ projFavs=pp.favs||[]; projRecents=pp.recents||[]; } }catch(e){}
+  try{ const tp=await ErpStore.getMeta("ui.torre");
+       if(tp){ torreOrder=tp.order||[]; torreHidden=tp.hidden||[]; } }catch(e){}
 
   const hashKey=location.hash.slice(1);
   if(hashKey&&SUBMAP[hashKey]&&!SUBMAP[hashKey].href) cur=hashKey;
+  // Cross-page deep link (journey.html's "abrir pantalla real" per stage,
+  // §2.3): ?project=CODE preselects the project context, then the query
+  // string is dropped so reloading or sharing the URL doesn't re-trigger it.
+  const qsProject=new URLSearchParams(location.search).get('project');
+  if(qsProject && erp.state.projects.some(p=>p.code===qsProject)){
+    gProject=erp.state.projects.find(p=>p.code===qsProject).id;
+    history.replaceState(null,'',location.pathname+location.hash);
+  }
   measureTopbar(); buildPeriodControls(); buildUserMenu(); render();
   if(bootNotice) toast(bootNotice);
 }
@@ -865,10 +934,12 @@ function gotoAlert(ref){
   if(!ref)return go("torre");
   if(ref.project)go("proyectos",ref.project); else if(ref.invoice)go("facturacion"); else if(ref.contract)go("contratos");
   else if(ref.budget)go("presupuestos"); else if(ref.bill)go("pagos"); else if(ref.view==="bank"||ref.movement)go("banco");
-  else if(ref.opportunity)go("oportunidades"); else if(ref.price)go("precios"); else if(ref.change)go("proyectos"); else go("torre");
+  else if(ref.opportunity)go("oportunidades"); else if(ref.price)go("precios"); else if(ref.change)go("proyectos");
+  else if(ref.subcontract)go("subcontratos"); else if(ref.worker)go("horas"); else if(ref.purchase)go("compras");
+  else if(ref.quarter)go("gestoria"); else go("torre");
 }
 function renderBell(){
-  let list=[]; try{list=erp.alerts();}catch(e){}
+  let list=[]; try{list=erp.managedAlerts();}catch(e){}
   const urgent=list.filter(a=>a.sev==="critical"||a.sev==="high").length;
   const badge=$('#bellCt'); badge.textContent=urgent>99?"99+":String(urgent); badge.hidden=!urgent;
   const m=$('#mBell'); m.innerHTML='';
@@ -2100,6 +2171,348 @@ function wireQueuePanel(){
     erp.recordCommunicationSent(b.dataset.sentMsg,"backoffice"),"Registrado como enviado"));
 }
 
+/* ===================== Torre de Control (spec §2.1) =================================
+   Eight cards, each carrying exactly the big/small figures the spec names, a
+   twelve-period sparkline and the delta against the prior period. The colour
+   dot is wired to the SAME numbers the card already shows (negative result,
+   overdrawn balance, a payment week bigger than the cash on hand) rather than
+   a second per-tile threshold store — "el umbral de cada indicador" already
+   has a home in the alert rules below; duplicating it here is exactly the
+   kind of two-sources-of-truth bug the rest of this codebase avoids.
+   Card order/visibility is a viewing preference, not business data, so it
+   lives in ErpStore meta (like the project selector's favourites) rather
+   than in engine state — a second browser on the same tenant is allowed a
+   different layout. */
+const TORRE_CARDS=[
+ {key:"activeProjects",label:"Proyectos activos",dest:"proyectos",fmt:"count",
+  series:s=>s.activeProjects,
+  big:c=>String(c.activeProjects.count),
+  small:c=>eur0(c.activeProjects.contractedCents)+" contratado",
+  dot:()=>false},
+ {key:"monthResult",label:"Resultado operativo del mes",dest:"finanzas",fmt:"money",
+  series:s=>s.monthResult,
+  big:c=>eur0(c.monthResult.resultCents),
+  small:c=>`Ingresos ${eur0(c.monthResult.revenueCents)} − Gastos ${eur0(c.monthResult.expenseCents)}`,
+  dot:c=>c.monthResult.resultCents<0},
+ {key:"quarterResult",label:"Resultado operativo del trimestre",dest:"finanzas",fmt:"money",
+  series:s=>s.quarterResult,
+  big:c=>eur0(c.quarterResult.resultCents),
+  small:c=>`Ingresos ${eur0(c.quarterResult.revenueCents)} − Gastos ${eur0(c.quarterResult.expenseCents)}`,
+  dot:c=>c.quarterResult.resultCents<0},
+ {key:"bankBalance",label:"Saldo bancos",dest:"banco",fmt:"money",
+  series:s=>s.bankBalance,
+  big:c=>eur0(c.bankBalance.nowCents),
+  small:c=>"Cierre mes anterior "+eur0(c.bankBalance.prevMonthCloseCents),
+  dot:c=>c.bankBalance.nowCents<0},
+ {key:"cashForecast",label:"Proyección de caja",dest:"banco",fmt:null,
+  series:null, // forward-looking by nature — no honest "last 12 periods" to draw
+  big:c=>eur0(c.cashForecast.d7.netCents)+" (7 d)",
+  small:c=>`14 d ${eur0(c.cashForecast.d14.netCents)} · 30 d ${eur0(c.cashForecast.d30.netCents)}`,
+  dot:c=>c.cashForecast.d7.netCents<0},
+ {key:"supplierPayments",label:"Pagos a proveedores",dest:"pagos",fmt:"money",
+  series:s=>s.supplierPayments,
+  big:c=>eur0(c.supplierPayments.thisWeekCents),
+  small:c=>"Próxima semana "+eur0(c.supplierPayments.nextWeekCents),
+  dot:c=>c.supplierPayments.thisWeekCents>c.bankBalance.nowCents},
+ {key:"opportunities",label:"Oportunidades abiertas",dest:"oportunidades",fmt:"count",
+  series:s=>s.opportunities,
+  big:c=>String(c.opportunities.openCount),
+  small:c=>`Contratadas ${c.opportunities.wonCount12m} · Perdidas ${c.opportunities.lostCount12m} (12 m)`,
+  dot:()=>false},
+ {key:"visits",label:"Visitas",dest:"oportunidades",fmt:"count",
+  series:s=>s.visits,
+  big:c=>String(c.visits.pendingCount),
+  small:c=>"Realizadas 30 d: "+c.visits.done30dCount,
+  dot:()=>false},
+];
+let torreOrder=[], torreHidden=[];
+function saveTorrePrefs(){ try{ ErpStore.setMeta("ui.torre",{order:torreOrder,hidden:torreHidden}); }catch(e){} }
+function torreCardList(){
+  const known=TORRE_CARDS.map(c=>c.key);
+  const order=torreOrder.filter(k=>known.includes(k)).concat(known.filter(k=>!torreOrder.includes(k)));
+  return order.map(k=>TORRE_CARDS.find(c=>c.key===k)).filter(c=>!torreHidden.includes(c.key));
+}
+function sparklinePath(values){
+  const n=values.length;
+  const min=Math.min(...values), max=Math.max(...values), span=(max-min)||1;
+  return values.map((v,i)=>{
+    const x=n>1?(i/(n-1))*100:50, y=24-((v-min)/span)*20-2;
+    return (i===0?"M":"L")+x.toFixed(1)+","+y.toFixed(1);
+  }).join(" ");
+}
+function seriesDelta(values){
+  if(!values||values.length<2) return null;
+  const last=values[values.length-1], prev=values[values.length-2];
+  if(last===prev) return {diff:0,up:true};
+  return {diff:last-prev,up:last>=prev};
+}
+function torre(v){
+  $('#sub').textContent="Indicadores consolidados de toda la empresa. Cada indicador y alerta abre su detalle.";
+  const ct=erp.controlTower();
+  const cards=torreCardList();
+  v.innerHTML=`${importConflictsBanner()}
+   <div class="torrebar">
+    <span class="ts">Calculado a las ${fmtD(ct.lastCalculatedAt)} · <button class="btn sm" id="tRefresh">↻ Recalcular</button></span>
+    <span style="flex:1"></span>
+    <button class="btn sm" id="tNewOpp">＋ Oportunidad/visita</button>
+    <button class="btn sm" id="tNewTask">＋ Tarea</button>
+    <button class="btn sm" id="tNewBudget">＋ Presupuesto</button>
+    <button class="btn sm" id="tNewInvoice">＋ Factura</button>
+    <button class="btn sm" id="tExportCsv">⬇ CSV</button>
+    <button class="btn sm" id="tPrint">🖨️ Imprimir / PDF</button>
+    <button class="btn sm" id="tCustomize">⚙ Tarjetas</button>
+   </div>
+   <div class="tcards">${cards.map(c=>{
+     const vals=c.series?c.series(ct.series):null;
+     const delta=vals?seriesDelta(vals):null;
+     const dot=c.dot(ct.cards);
+     const deltaTxt=delta?(c.fmt==="money"?eur0(Math.abs(delta.diff)):String(Math.abs(delta.diff))):null;
+     return `<div class="tcard" data-go="${c.dest}"><div class="lab">${dot?'<span class="dot"></span>':''}${c.label}</div>
+      <div class="val">${c.big(ct.cards)}${delta?`<span class="delta ${delta.up?'up':'down'}">${delta.up?'▲':'▼'} ${deltaTxt}</span>`:''}</div>
+      <div class="sub">${c.small(ct.cards)}</div>
+      ${vals?`<svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none"><path d="${sparklinePath(vals)}"/></svg>`:''}
+     </div>`;}).join("")}
+   </div>
+   <div class="grid2">
+    <div class="card"><div class="ch"><h3>Proyectos</h3><span class="tag">avance · venta · coste · margen · desviación</span></div>
+      <div class="scroll"><table><thead><tr><th></th><th>Proyecto</th><th>Cliente</th><th>Avance</th>
+       <th class="num">Venta</th><th class="num">Coste real</th><th class="num">Margen acum.</th><th class="num">Desviación</th><th>Próx. fecha</th></tr></thead><tbody>
+      ${erp.state.projects.filter(p=>!p.closed).map(p=>{
+        const e=erp.projectEconomics(p.id);
+        const dev=e.actualCents-p.baseline.costCents;
+        const nextDate=[p.dates.targetEnd].concat((erp.state.contracts.find(c=>c.id===p.contractId)||{installments:[]}).installments
+          .filter(i=>i.status==="planned"&&i.expectedDate).map(i=>i.expectedDate)).filter(Boolean).sort()[0];
+        return `<tr><td><button class="btn sm" data-pin="${p.id}" title="Marcar prioritario">${p.priority?"★":"☆"}</button></td>
+         <td class="k click" data-go="proyectos" data-arg="${p.code}">${p.code}</td><td>${esc(erp.party(p.partyId).name)}</td>
+         <td><div class="bar"><i style="width:${e.progressPct}%"></i></div> ${e.progressPct}%</td>
+         <td class="num">${eur0(e.currentRevenueCents)}</td><td class="num">${eur0(e.actualCents)}</td>
+         <td class="num" style="color:${e.marginForecastCents<0?'var(--danger)':'var(--greenDeep)'}">${eur0(e.marginForecastCents)} · ${e.marginForecastPct}%</td>
+         <td class="num" style="color:${dev>0?'var(--danger)':'var(--muted)'}">${eur0(dev)}</td>
+         <td>${nextDate?fmtD(nextDate):"—"}</td></tr>`;}).join("")||'<tr><td colspan="9"><div class="empty">Sin proyectos activos.</div></td></tr>'}
+      </tbody></table></div></div>
+    ${alertsPanel(ct.alerts)}
+   </div>`;
+  v.querySelectorAll('[data-go]').forEach(n=>n.onclick=()=>go(n.dataset.go,n.dataset.arg));
+  v.querySelectorAll('[data-pin]').forEach(b=>b.onclick=(ev)=>{ev.stopPropagation();
+    mutate(()=>erp.setProjectPriority(b.dataset.pin,b.textContent.trim()==="☆","backoffice"),"Prioridad actualizada");});
+  $('#tRefresh').onclick=()=>render();
+  $('#tNewOpp').onclick=()=>newOpportunityDrawer();
+  $('#tNewTask').onclick=()=>newTaskDrawer();
+  $('#tNewBudget').onclick=()=>go("presupuestos");
+  $('#tNewInvoice').onclick=()=>go("facturacion");
+  $('#tExportCsv').onclick=()=>exportTorreCsv(ct);
+  $('#tPrint').onclick=()=>window.print();
+  $('#tCustomize').onclick=()=>torreCustomizeDrawer();
+  wireAlertsPanel();
+}
+/** §2.1 "exportar la vista a PDF/Excel" — a real CSV download; print (Ctrl+P) covers PDF honestly via the browser's own dialog. */
+function exportTorreCsv(ct){
+  const rows=[["Indicador","Valor principal","Detalle"]].concat(
+    torreCardList().map(c=>[c.label,c.big(ct.cards).replace(/\s/g," "),c.small(ct.cards).replace(/\s/g," ")]));
+  const csv=rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`torre-de-control-${erp.today}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function torreCustomizeDrawer(){
+  const db=openDrawer("Tarjetas de la Torre");
+  const list=TORRE_CARDS.map(c=>c.key);
+  const order=torreOrder.filter(k=>list.includes(k)).concat(list.filter(k=>!torreOrder.includes(k)));
+  const render2=()=>{
+    db.innerHTML=`<div class="cardmgr">${order.map((k,i)=>{const c=TORRE_CARDS.find(x=>x.key===k);
+      return `<div class="cmrow"><button data-up="${k}" ${i===0?"disabled":""}>↑</button><button data-down="${k}" ${i===order.length-1?"disabled":""}>↓</button>
+       <span style="flex:1">${c.label}</span><label style="display:flex;align-items:center;gap:5px">
+        <input type="checkbox" data-vis="${k}" ${torreHidden.includes(k)?"":"checked"}> visible</label></div>`;}).join("")}</div>`;
+    db.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const i=order.indexOf(b.dataset.up); if(i>0){[order[i-1],order[i]]=[order[i],order[i-1]]; torreOrder=order.slice(); saveTorrePrefs(); render(); render2();}});
+    db.querySelectorAll('[data-down]').forEach(b=>b.onclick=()=>{const i=order.indexOf(b.dataset.down); if(i<order.length-1){[order[i+1],order[i]]=[order[i],order[i+1]]; torreOrder=order.slice(); saveTorrePrefs(); render(); render2();}});
+    db.querySelectorAll('[data-vis]').forEach(cb=>cb.onchange=()=>{
+      torreHidden = cb.checked ? torreHidden.filter(k=>k!==cb.dataset.vis) : torreHidden.concat([cb.dataset.vis]);
+      saveTorrePrefs(); render();});
+  };
+  render2();
+}
+
+/* ---- Alerts panel as a manager, not a read-only feed (DAS-06/07) ----
+   Grouped by type then by project, because that is how a backoffice person
+   actually triages a list: "what kind of problem is this" first, "which job
+   does it belong to" second. Every row can be assigned, given a deadline,
+   snoozed with a reason, resolved with a note and evidence, or turned into a
+   task — the four verbs §2.1 names for "gestor, no aviso". */
+const ALERT_TYPE_LABEL={economica:"Económica",tecnica:"Técnica",documental:"Documental",fiscal:"Fiscal"};
+let almgrGroupBy="type";
+function alertsPanel(alerts){
+  const groups={};
+  alerts.forEach(a=>{
+    const g=almgrGroupBy==="type"?(ALERT_TYPE_LABEL[a.type]||a.type):(a.project||"Sin proyecto");
+    (groups[g]=groups[g]||[]).push(a);
+  });
+  const keys=Object.keys(groups).sort();
+  return `<div class="card" style="margin:0"><div class="ch"><h3>Alertas</h3>
+    <span class="tag">${alerts.filter(a=>a.sev==="critical").length} críticas · ${alerts.filter(a=>a.sev==="high").length} altas</span>
+    <span style="flex:1"></span>
+    <button class="btn sm ${almgrGroupBy==='type'?'primary':''}" data-grp="type">Por tipo</button>
+    <button class="btn sm ${almgrGroupBy==='project'?'primary':''}" data-grp="project">Por proyecto</button>
+    <button class="btn sm" id="aRules">⚙ Reglas</button></div>
+   <div class="almgr">${keys.map(g=>`<div class="algroup">${esc(g)}</div>${groups[g].map(a=>alertRowHtml(a)).join("")}`).join("")
+    ||'<div class="empty">Sin alertas. Todo en orden.</div>'}</div></div>`;
+}
+function alertRowHtml(a){
+  const icon=a.sev==="critical"?"🔴":a.sev==="high"?"🟡":"🔵";
+  return `<div class="alrow" data-key="${esc(a.key)}">
+   <div>${icon}</div>
+   <div><b class="click" data-goref='${esc(JSON.stringify(a.ref))}'>${esc(a.msg)}</b>
+    <div class="meta">${a.assignee?`<span>👤 ${esc(a.assignee)}</span>`:""}${a.dueDate?`<span>📅 ${fmtD(a.dueDate)}</span>`:""}${a.snoozedUntil?`<span>💤 hasta ${fmtD(a.snoozedUntil)}</span>`:""}</div></div>
+   <div class="acts">
+    <button class="btn sm" data-assign="${esc(a.key)}">Asignar</button>
+    <button class="btn sm" data-due="${esc(a.key)}">Fecha</button>
+    <button class="btn sm" data-snooze="${esc(a.key)}">Posponer</button>
+    <button class="btn sm" data-resolve="${esc(a.key)}">Resolver</button>
+    <button class="btn sm" data-totask="${esc(a.key)}" ${a.taskId?"disabled":""}>${a.taskId?"En tareas":"→ Tarea"}</button>
+   </div></div>`;
+}
+function wireAlertsPanel(){
+  document.querySelectorAll('[data-grp]').forEach(b=>b.onclick=()=>{almgrGroupBy=b.dataset.grp; render();});
+  document.querySelectorAll('[data-goref]').forEach(n=>n.onclick=()=>gotoAlert(JSON.parse(n.dataset.goref)));
+  $('#aRules')?.addEventListener('click',()=>alertRulesDrawer());
+  document.querySelectorAll('[data-assign]').forEach(b=>b.onclick=()=>{
+    const who=prompt("¿A quién se asigna esta alerta?"); if(who===null)return;
+    mutate(()=>erp.assignAlert(b.dataset.assign,who,"backoffice"),"Alerta asignada");
+  });
+  document.querySelectorAll('[data-due]').forEach(b=>b.onclick=()=>{
+    const d=prompt("Fecha límite (AAAA-MM-DD):",erp.today); if(d===null)return;
+    mutate(()=>erp.setAlertDue(b.dataset.due,d,"backoffice"),"Fecha límite guardada");
+  });
+  document.querySelectorAll('[data-snooze]').forEach(b=>b.onclick=()=>{
+    const d=prompt("Posponer hasta (AAAA-MM-DD):"); if(d===null||!d)return;
+    const reason=prompt("Motivo (opcional):")||"";
+    mutate(()=>erp.snoozeAlert(b.dataset.snooze,d,reason,"backoffice"),"Alerta pospuesta");
+  });
+  document.querySelectorAll('[data-resolve]').forEach(b=>b.onclick=()=>{
+    const note=prompt("Nota de resolución (obligatoria):"); if(note===null||!note.trim())return;
+    const ev=prompt("Evidencia (descripción; opcional):")||"";
+    mutate(()=>erp.resolveAlert(b.dataset.resolve,note,ev.trim()?[ev.trim()]:[],"backoffice"),"Alerta resuelta");
+  });
+  document.querySelectorAll('[data-totask]').forEach(b=>{ if(b.disabled)return; b.onclick=()=>{
+    const row=b.closest('.alrow'); const msg=row.querySelector('[data-goref]').textContent;
+    const due=prompt("Vence (AAAA-MM-DD):",erp.today); if(due===null)return;
+    mutate(()=>erp.convertAlertToTask(b.dataset.totask,msg,"backoffice",due,"backoffice"),"Convertida en tarea");
+  };});
+}
+/** §2.1 "editor de reglas: condición, umbral, destinatario y canal". */
+function alertRulesDrawer(){
+  const db=openDrawer("Reglas de alertas");
+  const render2=()=>{
+    const rules=erp.ensureAlertRules();
+    db.innerHTML=`<div class="rulesbox">${rules.map(r=>`<div class="rulesrow">
+      <span>${esc(r.label)} <span class="tag">${ALERT_TYPE_LABEL[r.type]||r.type}</span></span>
+      <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" data-en="${r.code}" ${r.enabled?"checked":""}> activa</label>
+      ${r.thresholdValue!=null?`<input type="number" min="0" data-th="${r.code}" value="${r.thresholdValue}" title="días">`:'<span></span>'}
+      <select data-rec="${r.code}"><option value="backoffice"${r.recipient==="backoffice"?" selected":""}>Oficina</option><option value="operations"${r.recipient==="operations"?" selected":""}>Obra</option></select>
+      <select data-ch="${r.code}"><option value="app"${r.channel==="app"?" selected":""}>App</option><option value="email"${r.channel==="email"?" selected":""}>Email</option></select>
+     </div>`).join("")}</div>`;
+    // No render2() after these: the field the user just edited already shows
+    // the value they set (native checkbox/select/input state), and rebuilding
+    // db.innerHTML from inside that same field's own change/blur handler
+    // fought the browser over a node it was mid-way through removing —
+    // "node to be removed is no longer a child of this node" — for no benefit,
+    // since nothing else on screen depends on the value that just changed.
+    db.querySelectorAll('[data-en]').forEach(cb=>cb.onchange=()=>mutate(()=>erp.updateAlertRule(cb.dataset.en,{enabled:cb.checked},"backoffice"),"Regla actualizada"));
+    db.querySelectorAll('[data-th]').forEach(inp=>inp.onchange=()=>mutate(()=>erp.updateAlertRule(inp.dataset.th,{thresholdValue:+inp.value||0},"backoffice"),"Umbral actualizado"));
+    db.querySelectorAll('[data-rec]').forEach(s=>s.onchange=()=>mutate(()=>erp.updateAlertRule(s.dataset.rec,{recipient:s.value},"backoffice"),"Destinatario actualizado"));
+    db.querySelectorAll('[data-ch]').forEach(s=>s.onchange=()=>mutate(()=>erp.updateAlertRule(s.dataset.ch,{channel:s.value},"backoffice"),"Canal actualizado"));
+  };
+  render2();
+}
+
+/* ---------- Mi día (DAS-04/05, §2.2) ---------- */
+const MILESTONE_META={
+ projectStart:{icon:"🏗️",label:"Inicio de obra",color:"var(--green)"},
+ projectEnd:{icon:"🏁",label:"Entrega prevista",color:"var(--greenDeep)"},
+ collectionMilestone:{icon:"💶",label:"Cobro previsto",color:"var(--blue)"},
+ paymentMilestone:{icon:"💸",label:"Pago a proveedor",color:"var(--amber)"},
+ materialDelivery:{icon:"📦",label:"Entrega de material",color:"#8a5a2c"},
+ contractDeadline:{icon:"📑",label:"Fin de obra contractual",color:"var(--ink)"},
+ warrantyExpiry:{icon:"🛡️",label:"Vencimiento de garantía",color:"var(--danger)"},
+ gestoriaDeadline:{icon:"🏛️",label:"Envío a gestoría",color:"var(--danger)"},
+ subcontractDocExpiry:{icon:"📄",label:"Documentación de subcontrata",color:"var(--danger)"},
+ workerDocExpiry:{icon:"📄",label:"Documentación de trabajador",color:"var(--danger)"},
+ task:{icon:"✅",label:"Tarea",color:"var(--muted)"},
+};
+let miCalMonth=null, miHiddenKinds=[];
+function hoy(v){
+  $('#sub').textContent="La vista corta del día para cada perfil: obra y oficina, y el calendario de hitos importantes.";
+  const op=erp.operationalDay(), bo=erp.backOfficeDay();
+  if(!miCalMonth) miCalMonth=erp.today.slice(0,7);
+  const [my,mm]=miCalMonth.split("-").map(Number);
+  const first=`${miCalMonth}-01`;
+  const firstDow=(new Date(first+"T00:00:00Z").getUTCDay()+6)%7; // Monday=0
+  const daysInMonth=new Date(Date.UTC(my,mm,0)).getUTCDate();
+  const gridFrom=addDaysLocal(first,-firstDow);
+  const cells=42; // 6 full weeks
+  const milestones=erp.upcomingMilestones(gridFrom, addDaysLocal(gridFrom,cells-1))
+    .filter(m=>!miHiddenKinds.includes(m.kind));
+  const byDate={}; milestones.forEach(m=>{(byDate[m.date]=byDate[m.date]||[]).push(m);});
+  const kindsPresent=[...new Set(erp.upcomingMilestones(gridFrom,addDaysLocal(gridFrom,cells-1)).map(m=>m.kind))];
+  v.innerHTML=`<div class="grid2">
+   <div class="card"><div class="ch"><h3>🔨 Hoy en obra</h3><span class="tag">perfil operativo</span></div><div class="daylist">
+     <div class="it"><b>${op.visitsDue.length}</b> visitas pendientes ${op.visitsDue.length?("— "+op.visitsDue.map(x=>esc(x.party)).join(", ")):""}</div>
+     <div class="it"><b>${op.milestones.length}</b> hitos de obra esta semana ${op.milestones.join(", ")}</div>
+     <div class="it"><b>${op.extrasToPrice}</b> extras por valorar</div>
+     <div class="it"><b>${op.hoursToReport}</b> obras con horas por registrar</div>
+     <div class="it"><b>${op.overdueTasks}</b> tareas vencidas</div>
+   </div></div>
+   <div class="card"><div class="ch"><h3>🗂️ Hoy en oficina</h3><span class="tag">perfil administración</span></div><div class="daylist">
+     <div class="it"><b>${bo.budgetsToPrepare}</b> presupuestos por preparar</div>
+     <div class="it"><b>${bo.followUpsDue}</b> seguimientos de presupuesto</div>
+     <div class="it"><b>${bo.invoicesToIssue}</b> hitos listos para facturar</div>
+     <div class="it"><b>${bo.collectionsDue}</b> cobros por reclamar</div>
+     <div class="it"><b>${bo.billsToAllocate}</b> facturas de proveedor sin asignar</div>
+     <div class="it"><b>${bo.paymentsDue}</b> pagos que vencen esta semana</div>
+     <div class="it"><b>${bo.docsMissing}</b> documentos capturados por validar</div>
+   </div></div></div>
+   <div class="miday" style="margin-top:12px">
+    <div class="card" style="margin:0">
+     <div class="calhead"><button class="btn sm" id="miPrev">←</button>
+      <b style="flex:1;text-align:center">${MONTH_NAMES[mm-1]} ${my}</b>
+      <button class="btn sm" id="miNext">→</button>
+      <button class="btn sm" id="miToday">Hoy</button>
+      <button class="btn sm" id="miAdd">＋ Hito/recordatorio</button></div>
+     <div class="calgrid">${["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(d=>`<div class="miwk">${d}</div>`).join("")}
+     ${Array.from({length:cells}).map((_,i)=>{
+       const d=addDaysLocal(gridFrom,i); const inMonth=d.slice(0,7)===miCalMonth;
+       const evs=(byDate[d]||[]).slice(0,3);
+       return `<div class="calcell ${inMonth?'':'out'} ${d===erp.today?'today':''}"><div class="dnum">${Number(d.slice(8,10))}</div>
+        ${evs.map(m=>`<span class="ev" data-mref='${esc(JSON.stringify(m.ref))}' data-mkind="${m.kind}" style="background:${(MILESTONE_META[m.kind]||{}).color||'var(--muted)'};color:#fff" title="${esc(m.label)}">${(MILESTONE_META[m.kind]||{}).icon||"•"} ${esc(m.label)}</span>`).join("")}
+        ${(byDate[d]||[]).length>3?`<span style="font-size:9px;color:var(--muted)">+${(byDate[d]||[]).length-3} más</span>`:""}
+       </div>`;}).join("")}
+     </div>
+     <div class="milegend">${kindsPresent.map(k=>{const m=MILESTONE_META[k]||{icon:"•",label:k,color:"var(--muted)"};
+       return `<span class="${miHiddenKinds.includes(k)?'off':''}" data-legend="${k}"><i style="background:${m.color}"></i>${m.icon} ${m.label}</span>`;}).join("")}</div>
+    </div>
+    <div class="card" style="margin:0"><div class="ch"><h3>Próximos hitos</h3></div><div class="daylist">
+     ${milestones.filter(m=>m.date>=erp.today).slice(0,12).map(m=>{const meta=MILESTONE_META[m.kind]||{icon:"•"};
+       return `<div class="it">${meta.icon} <b>${fmtD(m.date)}</b> — ${esc(m.label)}</div>`;}).join("")
+      ||'<div class="empty">Nada próximo en este rango.</div>'}
+    </div></div>
+   </div>
+   <div class="card" style="margin-top:12px"><div class="ch"><h3>Tareas</h3>${taskStatusTags()}</div><div class="scroll"><table><thead><tr><th>Tarea</th><th>Responsable</th><th>Vence</th><th>Estado</th></tr></thead><tbody>
+   ${erp.state.tasks.map(t=>`<tr><td class="k">${esc(t.title)}</td><td>${t.owner==="operations"?"Obra":"Oficina"}</td><td>${fmtD(t.due)}</td><td>${t.status==="open"?(t.due<erp.today?'<span class="pill r">Vencida</span>':'<span class="pill y">Abierta</span>'):'<span class="pill g">Hecha</span>'}</td></tr>`).join("")||'<tr><td colspan="4"><div class="empty">Sin tareas.</div></td></tr>'}
+   </tbody></table></div></div>`;
+  $('#miPrev').onclick=()=>{miCalMonth=shiftMonth(miCalMonth,-1); render();};
+  $('#miNext').onclick=()=>{miCalMonth=shiftMonth(miCalMonth,1); render();};
+  $('#miToday').onclick=()=>{miCalMonth=erp.today.slice(0,7); render();};
+  $('#miAdd').onclick=()=>newTaskDrawer();
+  v.querySelectorAll('[data-legend]').forEach(s=>s.onclick=()=>{
+    const k=s.dataset.legend;
+    miHiddenKinds = miHiddenKinds.includes(k) ? miHiddenKinds.filter(x=>x!==k) : miHiddenKinds.concat([k]);
+    render();
+  });
+  v.querySelectorAll('[data-mref]').forEach(s=>s.onclick=()=>gotoAlert(JSON.parse(s.dataset.mref)));
+ }
+const MONTH_NAMES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+function addDaysLocal(iso,n){ const d=new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+function shiftMonth(ym,n){ const [y,m]=ym.split("-").map(Number); const d=new Date(Date.UTC(y,m-1+n,1)); return d.toISOString().slice(0,7); }
+
 /* =============================== Project context (spec §4) ==========================
    "Lo primero de esta sección es la selección del proyecto, de modo que todo lo
    que aparece debajo quede asociado a un proyecto concreto."
@@ -2512,61 +2925,13 @@ async function storeLineImages(budgetId,lineId,files,source){
 }
 
 const VIEWS={
- /* ---------- Torre de control (DAS-02/03) ---------- */
- torre(v){
-  $('#sub').textContent="Indicadores consolidados de toda la empresa. Cada indicador y alerta abre su detalle.";
-  const ct=erp.controlTower();
-  const tiles=[
-    ["Proyectos activos",ct.activeCount,"con margen previsto "+eur0(ct.totalForecastMarginCents),"proyectos","hi"],
-    ["Facturado",eur0(ct.invoicedCents),"cobrado "+eur0(ct.collectedCents),"facturacion",""],
-    ["Pendiente de cobro",eur0(ct.outstandingCents),ct.outstandingCents>0?"reclamar según vencimientos":"al día","facturacion",ct.outstandingCents>0?"warn":""],
-    ["Pagos a proveedor",eur0(ct.supplierDueCents),"pendientes de pago","pagos",""],
-    ["Caja y bancos",eur0(ct.cash.totalCents),ct.cash.accounts.map(a=>a.name.split(" ")[0]+" "+eur0(a.balanceCents)).join(" · "),"banco","hi"],
-    ["Presupuestos en decisión",ct.budgetsAwaiting.length,eur0(ct.awaitingValueCents)+" en juego","presupuestos",""],
-    ["Extras sin aprobar",ct.unapprovedExtras,"no facturables hasta aprobación","proyectos",ct.unapprovedExtras?"warn":""],
-    ["Documentos por revisar",ct.docsAwaitingReview,"captura pendiente de validar","captura",""],
-  ];
-  v.innerHTML=`${importConflictsBanner()}<div class="kpis">${tiles.map(([lab,val,sub,dest,cls])=>`<div class="kpi ${cls}" data-go="${dest}"><div class="lab">${lab}</div><div class="val">${val}</div><div class="sub">${sub}</div></div>`).join("")}</div>
-   <div class="grid2">
-    <div class="card"><div class="ch"><h3>Proyectos — presupuesto vs. real</h3><span class="tag">margen previsto</span></div>
-      <div class="scroll"><table><thead><tr><th>Proyecto</th><th>Avance</th><th class="num">Venta</th><th class="num">Coste real</th><th class="num">Margen prev.</th></tr></thead><tbody>
-      ${ct.activeProjects.map(p=>`<tr class="click" data-go="proyectos" data-arg="${p.code}"><td class="k">${p.code}</td>
-        <td><div class="bar"><i style="width:${p.progressPct}%"></i></div></td>
-        <td class="num">${eur0(p.currentRevenueCents)}</td><td class="num">${eur0(p.actualCents)}</td>
-        <td class="num" style="color:${p.marginForecastCents<0?'var(--danger)':'var(--greenDeep)'}">${eur0(p.marginForecastCents)} · ${p.marginForecastPct}%</td></tr>`).join("")}
-      </tbody></table></div></div>
-    <div class="card"><div class="ch"><h3>Alertas</h3><span class="tag">${ct.alertCounts.critical} críticas · ${ct.alertCounts.high} altas</span></div>
-      <div class="alerts">${ct.alerts.slice(0,14).map(a=>`<div class="al ${a.sev}" data-ref='${esc(JSON.stringify(a.ref))}'><span>${a.sev==="critical"?"🔴":a.sev==="high"?"🟡":"🔵"}</span><div><b>${esc(a.msg)}</b></div></div>`).join("")||'<div class="empty">Sin alertas. Todo en orden.</div>'}</div></div>
-   </div>`;
-  v.querySelectorAll('[data-go]').forEach(n=>n.onclick=()=>go(n.dataset.go,n.dataset.arg));
-  v.querySelectorAll('.al').forEach(n=>n.onclick=()=>gotoAlert(JSON.parse(n.dataset.ref)));
- },
-
- /* ---------- Mi día (DAS-04/05) ---------- */
- hoy(v){
-  $('#sub').textContent="La vista corta del día para cada perfil: obra y oficina.";
-  const op=erp.operationalDay(), bo=erp.backOfficeDay();
-  v.innerHTML=`<div class="grid2">
-   <div class="card"><div class="ch"><h3>🔨 Hoy en obra</h3><span class="tag">perfil operativo</span></div><div class="daylist">
-     <div class="it"><b>${op.visitsDue.length}</b> visitas pendientes ${op.visitsDue.length?("— "+op.visitsDue.map(x=>esc(x.party)).join(", ")):""}</div>
-     <div class="it"><b>${op.milestones.length}</b> hitos de obra esta semana ${op.milestones.join(", ")}</div>
-     <div class="it"><b>${op.extrasToPrice}</b> extras por valorar</div>
-     <div class="it"><b>${op.hoursToReport}</b> obras con horas por registrar</div>
-     <div class="it"><b>${op.overdueTasks}</b> tareas vencidas</div>
-   </div></div>
-   <div class="card"><div class="ch"><h3>🗂️ Hoy en oficina</h3><span class="tag">perfil administración</span></div><div class="daylist">
-     <div class="it"><b>${bo.budgetsToPrepare}</b> presupuestos por preparar</div>
-     <div class="it"><b>${bo.followUpsDue}</b> seguimientos de presupuesto</div>
-     <div class="it"><b>${bo.invoicesToIssue}</b> hitos listos para facturar</div>
-     <div class="it"><b>${bo.collectionsDue}</b> cobros por reclamar</div>
-     <div class="it"><b>${bo.billsToAllocate}</b> facturas de proveedor sin asignar</div>
-     <div class="it"><b>${bo.paymentsDue}</b> pagos que vencen esta semana</div>
-     <div class="it"><b>${bo.docsMissing}</b> documentos capturados por validar</div>
-   </div></div></div>
-   <div class="card"><div class="ch"><h3>Tareas</h3>${taskStatusTags()}</div><div class="scroll"><table><thead><tr><th>Tarea</th><th>Responsable</th><th>Vence</th><th>Estado</th></tr></thead><tbody>
-   ${erp.state.tasks.map(t=>`<tr><td class="k">${esc(t.title)}</td><td>${t.owner==="operations"?"Obra":"Oficina"}</td><td>${fmtD(t.due)}</td><td>${t.status==="open"?(t.due<erp.today?'<span class="pill r">Vencida</span>':'<span class="pill y">Abierta</span>'):'<span class="pill g">Hecha</span>'}</td></tr>`).join("")||'<tr><td colspan="4"><div class="empty">Sin tareas.</div></td></tr>'}
-   </tbody></table></div></div>`;
- },
+ /* ---------- Torre de control · Mi día (DAS, spec §2.1/§2.2) ----------
+    Defined once, above, as standalone functions — big enough (sparklines,
+    the alert manager, the hitos calendar) that inlining them here would bury
+    the rest of the map, the same reasoning session 10b and 11 used for their
+    own screens. */
+ torre,
+ hoy,
 
  /* ---------- Clientes y terceros (MDM) ---------- */
  clientes(v){

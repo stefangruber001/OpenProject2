@@ -761,3 +761,61 @@ languages: es-ES # source: synthetic
   a new package nothing else depends on, schema v7 is additive and idempotent, `quarterlyPackage`
   stayed callable in its old `(quarter, user)` shape, and every engine addition is new methods over
   existing collections — nothing sessions 1–10b built was removed or renamed.
+
+- **#56 — CANEI session 12: a threshold lives in one place, and "real data" for Recorrido means a link, not a rewrite (2026-08-03).**
+  Spec §2.1 (Torre de Control), §2.2 (Mi Día) and §2.3 (Recorrido completo, Improvement #3).
+  **Decisions:** (a) **Every alert condition gained a stable `code` and a `type`**
+  (económica/técnica/documental/fiscal) via a single `ALERT_META` table, so classification lives in
+  one place rather than being repeated at each of alerts()'s ~28 call sites. (b) **A card's colour
+  dot reuses the SAME number the card already shows** (negative result, overdrawn balance, a
+  payment week bigger than cash on hand) instead of a second per-tile threshold store — "el umbral
+  de cada indicador" already has a home in the alert rules, and a second, parallel configuration
+  surface for the same idea is exactly the kind of thing that drifts out of sync with what it
+  duplicates. (c) **`managedAlerts()` layers assign/due-date/snooze/resolve-with-note-and-evidence/
+  convert-to-task over the pure `alerts()` projection**, keyed by `code + JSON(ref)` — the same
+  shape session 11 used for gestoría's justified exceptions and the comms queue: a computed list
+  recomputed fresh every time, plus a keyed overrides map for what a person did about each item,
+  never a mutated copy of the list itself. (d) **Only the alerts §3.2 and §2.1 explicitly call
+  "configurable" got a numeric threshold** in the rule editor (opportunity-stale days, quote-expiry
+  days, subcontract-unbilled days, warranty-expiry days, contract-start-at-risk days); the margin
+  threshold keeps using the existing `state.config.marginThresholdBp` rather than gaining a
+  competing copy. Every other rule still gets enabled/recipient/channel, satisfying the spec's
+  "condición, umbral, destinatario y canal" without inventing thresholds for booleans that don't
+  have one (a signed-or-not contract has no "days" to tune). (e) **The quarterly gestoría-package
+  reminder (`GES-PACKAGE-DUE`) is explicitly advisory, not a legal filing deadline** — no AEAT date
+  is asserted anywhere in the engine; the configurable number is "days after quarter-end this
+  tenant wants the package sent by," a self-imposed target, not a regulatory one. A one-line
+  clarifying entry was added to `LEGAL_REVIEW.md` §5 so nobody mistakes it for asserted tax law
+  later. (f) **`upcomingMilestones()` reads every calendar date off the record that already owns
+  it** — project dates, contract installments, bill due dates, purchase arrivals, guarantee expiry,
+  subcontract/worker doc expiry, open tasks — rather than a second, calendar-specific copy of any of
+  them; visits are deliberately excluded because they are logged AFTER they happen (VIS-01), so
+  there is no future date to put on a calendar for one. (g) **Card order/visibility and the Mi Día
+  legend filter are browser preferences, stored in `ErpStore` meta**, not engine state — a
+  dashboard's layout is a viewing choice, not business data, and a second browser on the same
+  tenant is allowed a different one. (h) **`exportar la vista a PDF/Excel` became a real CSV
+  download plus the browser's own print dialog for PDF** — both genuinely produce the artifact named,
+  neither is a fake behind a port, and building a real XLSX writer or a server-rendered PDF for a
+  dashboard export was judged not worth the weight next to those two. (i) **Recorrido's "Proyecto
+  existente" is read-only and reuses the real screens rather than re-implementing thirteen stages
+  of editing UI a second time.** journey.html's existing "Crear nuevo proyecto" walkthrough (its own
+  sample data, its own `caneiJourney` IndexedDB) is completely untouched and stays the default,
+  exactly as §2.3 asks ("se mantiene ... tal como está hoy"). The addition reads the SAME `caneiERP`
+  database erp.html writes; each of the thirteen stages shows a real status
+  (completa/en curso/pendiente) and a real summary derived straight from the record that owns it,
+  with a link into the actual erp.html screen — the spec's own framing ("acceso directo a la
+  pantalla real correspondiente ... de modo que el recorrido sirva también como lista de puesta en
+  marcha del proyecto") taken at its word rather than read as "clone every screen inline." (j) The
+  unsaved-changes confirm on switching project applies **only when leaving an in-progress demo
+  walkthrough** — a read-only real view has nothing local to lose, so switching between two real
+  projects never blocks. (k) **Duplicating a real project makes one real `createQuickProject` call**
+  (same customer, same estimated value, prefixed as a copy) rather than deep-cloning a frozen budget
+  baseline, which the real `presupuestos` screen this stage links to already does more carefully.
+  (l) **Downloading a real project's folder reuses the demo's existing `zipStore`/`download`
+  plumbing**, producing one summary text file per stage instead of captured photos — a second ZIP
+  implementation for the same button would be the bug. Reversible: schema v8 is additive
+  (`alertRules`, `alertOverrides`, `opportunity.decidedAt` backfilled from the existing creation
+  date, `project.priority` defaulted false), `controlTower()` only gained new fields (`cards`,
+  `series`, `lastCalculatedAt`) — nothing existing callers (year-sim, migrations-sim) already read
+  was renamed or removed, and no packages/capability changed, so the committed browser bundle is
+  untouched this session.

@@ -139,7 +139,8 @@
       "owner": "engine",
       "specSection": "2.1 / 2.2",
       "engineSection": "DAS — alerts, tasks, control tower",
-      "plannedSession": "12"
+      "plannedSession": null,
+      "note": "Session 12 rebuilt the Torre de Control (§2.1) around the eight cards the spec names — each with a sparkline, a delta against the prior period and a colour dot wired to the SAME numbers the card shows, not a second per-tile threshold store. Every alerts() condition now carries a stable code and a type (económica/técnica/documental/fiscal); ensureAlertRules()/alertRuleThreshold()/alertRuleEnabled() give each one a real enabled/threshold/recipient/channel, configurable from the rule editor, without inventing a second alert engine. managedAlerts() layers assign/due-date/snooze/resolve-with-note-and-evidence/convert-to-task over the pure alerts() projection — the same architecture session 11's gestoría exceptions and comunicaciones queue already established: a computed list plus a keyed overrides map, never a mutated copy. Mi Día (§2.2) gained the hitos calendar via upcomingMilestones(), reading every date off the record that already owns it (project dates, contract installments, bill due dates, purchase arrivals, guarantee expiry, subcontract/worker doc expiry, open tasks, one advisory — explicitly non-legal — gestoría reminder per quarter) rather than a second calendar-specific copy of any of them."
     },
     "scheduling-gantt": {
       "owner": "factory",
@@ -156,10 +157,11 @@
       "note": "Session 7 built the reading half: @repo/capability-extraction turns recognised text into candidate fields with confidence, provenance and arithmetic checks, and @repo/pack-jurisdiction-es-es supplies the profile behind the extraction-profile@1 port (number and date notation, NIF/CIF/NIE and IBAN check characters, the words each field is announced by, the rates in force on a date). Still 'unbuilt' here because no screen reaches it: session 8 adds the camera, the recognition adapter and the validation screen, and flips this. Nothing is ever auto-confirmed — CAP-04 is enforced by the capability's type, which always reports confirmed:false."
     },
     "journey-project-selector": {
-      "owner": "unbuilt",
+      "owner": "engine",
       "specSection": "2.3 (Improvement #3)",
       "engineSection": null,
-      "plannedSession": "12"
+      "plannedSession": null,
+      "note": "journey.html's existing 'Crear nuevo proyecto' walkthrough (its own sample data, its own \"caneiJourney\" IndexedDB) is untouched — it stays the default exactly as §2.3 asks. Session 12 added 'Proyecto existente' alongside it, reading the SAME \"caneiERP\" database erp.html writes, read-only. Rather than re-implement thirteen stages' worth of editing UI a second time in a different language and data shape, each stage shows a real status (completa/en curso/pendiente) and a real summary derived from the record that owns it, plus a link into the actual erp.html screen — \"acceso directo a la pantalla real correspondiente ... de modo que el recorrido sirva también como lista de puesta en marcha del proyecto\" taken at its word. Switching project asks for confirmation only when it would abandon an in-progress DEMO walkthrough — a read-only real view has nothing local to lose. Duplicating a project makes a real createQuickProject call; downloading a real project's folder reuses the demo's own zipStore/download plumbing with one summary file per stage instead of captured photos."
     },
     "comunicaciones-templates": {
       "owner": "factory",

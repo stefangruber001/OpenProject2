@@ -57,4 +57,4 @@ session too, including ones started from a fresh chat off this file.
 | 10a | Projects: Gantt-from-budget, baselines, economics      | done        | ae543af                            |
 | 10b | Compras, subcontratos, modificaciones, horas           | done        | 5e372ed                            |
 | 11  | Administración: conciliación, gestoría, comunicaciones | done        | 1883738                            |
-| 12  | Torre, Mi Día, Recorrido (Improvement #3), alerts      | not started | —                                  |
+| 12  | Torre, Mi Día, Recorrido (Improvement #3), alerts      | done        | (this session)                     |

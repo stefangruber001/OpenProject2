@@ -248,6 +248,55 @@
         return s;
       },
     },
+    {
+      to: 8,
+      name: "alert management, opportunity decisions, project priority",
+      /*
+       * Session 12 (§2.1 Torre de Control, §2.2 Mi Día). Three additions, all
+       * additive; nothing here is a new top-level collection erp-engine.js's
+       * constructor doesn't already declare, except the two the alert manager
+       * needs.
+       *
+       *   alertRules        one row per alert CONDITION (see ALERT_META in
+       *                     erp-engine.js), lazily filled in by
+       *                     ensureAlertRules() rather than by this migration —
+       *                     a code added in a later session should not need
+       *                     ANOTHER migration just to get a rule row. An
+       *                     absent array still reads as "everything enabled,
+       *                     no threshold overridden", which is exactly what a
+       *                     blob written before rules existed should mean.
+       *   alertOverrides    assign/due/snooze/resolve/task-link per alert,
+       *                     keyed by alertKey(). A map, not an array, for the
+       *                     same reason exceptionsAccepted (v7) is one: the
+       *                     key is the identity.
+       *   opportunity.decidedAt   when a won/lost decision was made — needed
+       *                     for "Contratadas/Perdidas últimos 12 meses" (§2.1)
+       *                     to mean something for an opportunity decided
+       *                     before this field existed. Backfilled to the
+       *                     opportunity's creation date, the only date an old
+       *                     record actually has; a decision recorded from now
+       *                     on gets its own, more accurate, real date.
+       *   project.priority  a pin, defaulting to false — an existing project
+       *                     was never marked priority because the feature
+       *                     did not exist, which is exactly what false means.
+       */
+      up: function (s) {
+        if (!Array.isArray(s.alertRules)) s.alertRules = [];
+        if (
+          !s.alertOverrides ||
+          typeof s.alertOverrides !== "object" ||
+          Array.isArray(s.alertOverrides)
+        )
+          s.alertOverrides = {};
+        (Array.isArray(s.opportunities) ? s.opportunities : []).forEach(function (o) {
+          if (!("decidedAt" in o)) o.decidedAt = ["won", "lost"].includes(o.status) ? o.date : null;
+        });
+        (Array.isArray(s.projects) ? s.projects : []).forEach(function (p) {
+          if (!("priority" in p)) p.priority = false;
+        });
+        return s;
+      },
+    },
   ];
 
   var CURRENT_VERSION = MIGRATIONS.reduce(function (max, m) {

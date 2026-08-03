@@ -1181,6 +1181,51 @@
       },
     ].forEach((r) => erp.addCommsRule(r, "seed"));
 
+    /* ---- §2.1: a pinned project, and worker documentation with real dates ---- */
+    erp.setProjectPriority(prjB.id, true, "seed");
+    erp.addWorkerDoc(
+      w1.id,
+      { kind: "Carné de instalador eléctrico", expiresOn: "2026-04-28" },
+      "seed",
+    ); // already expired
+    erp.addWorkerDoc(w2.id, { kind: "Reconocimiento médico", expiresOn: "2026-05-24" }, "seed"); // upcoming
+
+    /* ---- §2.1: the alerts panel as a manager, not a read-only feed ----
+       One of each action, so the demo shows a person actually working the
+       list rather than just staring at it: assigned, snoozed with a reason,
+       resolved with a note and evidence, and turned into a task. */
+    {
+      const open = erp.managedAlerts();
+      const overdue = open.find((a) => a.code === "AR-OVERDUE");
+      if (overdue) erp.assignAlert(overdue.key, "backoffice", "seed");
+      const stale = open.find((a) => a.code === "OPP-STALE");
+      if (stale)
+        erp.snoozeAlert(
+          stale.key,
+          "2026-05-12",
+          "Cliente de vacaciones — retomar a la vuelta",
+          "seed",
+        );
+      const pending = open.find((a) => a.code === "QUO-PENDING-LINES");
+      if (pending)
+        erp.resolveAlert(
+          pending.key,
+          "La línea pendiente es un extra opcional que el cliente todavía está valorando; no bloquea el envío.",
+          ["Captura del email del cliente confirmando que lo decide la semana que viene"],
+          "seed",
+        );
+      const priceExpired = open.find((a) => a.code === "PRICE-EXPIRED");
+      if (priceExpired)
+        erp.convertAlertToTask(
+          priceExpired.key,
+          "Pedir tarifa actualizada al proveedor",
+          "backoffice",
+          "2026-05-08",
+          "seed",
+        );
+      erp.updateAlertRule("AR-OVERDUE", { recipient: "backoffice", channel: "email" }, "seed");
+    }
+
     erp.setToday(today || "2026-05-05");
     return erp;
   }

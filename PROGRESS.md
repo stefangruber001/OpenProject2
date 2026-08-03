@@ -497,12 +497,50 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   aimed at the refusals rather than the happy paths. The zod-in-the-bundle trap
   was hit for the third time (52 → 190 KB) and fixed the same way as sessions 9
   and 10a; the committed bundle is 62 KB with zero zod references.
-- **Session 8 — not started** (skipped for now), **12 — not started.** See
-  `docs/worklog/WORKLOG.md`.
+- **Session 12 — done** (`docs/worklog/SESSION-12.md`). Torre de Control,
+  Mi Día, Recorrido (Improvement #3), alerts. Torre de Control (§2.1) now
+  shows the exact eight cards the spec names — proyectos activos, resultado
+  operativo del mes/trimestre, saldo bancos, proyección de caja, pagos a
+  proveedores, oportunidades abiertas, visitas — each with a twelve-period
+  sparkline on its own cadence, a delta against the prior period, and a
+  colour dot that reuses the card's own number rather than a second per-tile
+  threshold store. Every `alerts()` condition (~28 of them) now carries a
+  stable **code** and a **type** (económica/técnica/documental/fiscal) from
+  one lookup table. `managedAlerts()` layers assignment, a due date,
+  snoozing, resolution with a required note and evidence, and conversion to
+  a real task over the pure, recomputed `alerts()` projection — the same
+  computed-list-plus-keyed-overrides shape session 11 used for gestoría
+  exceptions and the comunicaciones queue. Only the alerts the spec
+  explicitly calls "configurable" (opportunity-stale days, quote-expiry,
+  subcontract-unbilled, warranty-expiry, start-at-risk) gained a tunable
+  threshold in a new rule editor; margin keeps its existing config field.
+  The gestoría quarterly reminder is **explicitly advisory, not an asserted
+  legal filing deadline** (see `LEGAL_REVIEW.md` §5). Mi Día (§2.2) gained
+  the hitos calendar, built entirely from dates records already own —
+  project/contract/bill/purchase/subcontract/worker dates, open tasks — with
+  no second copy of any of them; visits are deliberately excluded (logged
+  after they happen, so there's no future date for one). Recorrido (§2.3,
+  Improvement #3): `journey.html`'s original "Crear nuevo proyecto"
+  walkthrough is **completely untouched** and stays the default; a new
+  "Proyecto existente" mode reads the same tenant database erp.html writes
+  and shows each of the thirteen stages' real status (completa/en curso/
+  pendiente) and a real summary, linking out to the actual erp.html screen
+  that owns that data rather than re-implementing thirteen stages of editing
+  UI a second time. Schema v8 adds `alertRules`, `alertOverrides`,
+  `opportunity.decidedAt` (backfilled) and `project.priority` — all
+  additive; `controlTower()` only gained new fields. Ownership:
+  `alerts-tasks-control-tower` stays `engine`, `journey-project-selector`
+  `unbuilt` → `engine` (19 engine · 7 factory · 1 unbuilt — only
+  `extraction-ocr`/session 8 remains unbuilt). Site E2E 147/147, 26 new
+  checks driving the actual management verbs, calendar navigation, and the
+  full real-project loop end to end. No packages/capability changed, so the
+  committed bundle is untouched.
+- **Session 8 — not started** (skipped for now; the only item left from the
+  original 12-session plan). See `docs/worklog/WORKLOG.md`.
 
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-
 status-1q50dt` for sessions 1-3, `claude/candi-programme-session-4-07amo8` for
-sessions 4-11. Small conventional commits, every commit green, no force-push, no
+sessions 4-12. Small conventional commits, every commit green, no force-push, no
 history rewrite.

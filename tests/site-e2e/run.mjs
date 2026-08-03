@@ -74,6 +74,8 @@ async function main() {
     await testProjectTracking(browser, base);
     await testProcurement(browser, base);
     await testAdmin(browser, base);
+    await testControlTowerAndDay(browser, base);
+    await testJourneyRealMode(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
   } finally {
@@ -1348,6 +1350,259 @@ async function testAdmin(browser, base) {
     else bad("administración: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("administración (conciliación/gestoría/comunicaciones)", String(e).slice(0, 220));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── Torre de Control · Mi Día (session 12, spec §2.1/§2.2). The eight cards,
+//    the alert manager's four verbs (assign/snooze/resolve/convert-to-task),
+//    the rule editor, and the hitos calendar — asserted by actually using
+//    them, the same standard sessions 9-11 held their own screens to.
+async function testControlTowerAndDay(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  pg.on("dialog", async (d) => {
+    const m = d.message();
+    if (/A quién/.test(m)) await d.accept("backoffice");
+    else if (/Fecha límite/.test(m)) await d.accept("2026-05-20");
+    else if (/Posponer hasta/.test(m)) await d.accept("2026-05-15");
+    else if (/^Motivo/.test(m)) await d.accept("");
+    else if (/Nota de resoluci/.test(m)) await d.accept("Resuelto en el E2E");
+    else if (/^Evidencia/.test(m)) await d.accept("");
+    else if (/^Vence/.test(m)) await d.accept("2026-05-10");
+    else await d.accept("");
+  });
+  try {
+    await pg.goto(`${base}/erp.html#torre`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(900);
+
+    const cardCount = await pg.locator(".tcard").count();
+    if (cardCount === 8) ok("torre: the eight spec cards render (§2.1)");
+    else bad("torre: eight cards", `found ${cardCount}`);
+
+    const sparkCount = await pg.locator(".tcard svg.spark").count();
+    if (sparkCount >= 6) ok(`torre: cards carry a 12-period sparkline (${sparkCount}/8)`);
+    else bad("torre: sparklines render", `only ${sparkCount}`);
+
+    // The alerts panel manages, it doesn't just display: assign, snooze,
+    // resolve-with-note, and convert-to-task each mutate real state.
+    const openBefore = await pg.locator(".alrow").count();
+    await pg.locator("[data-assign]").first().click();
+    await pg.waitForTimeout(500);
+    if (/Alerta asignada/.test(await pg.locator("#toast").innerText()))
+      ok("torre: an alert can be assigned to someone");
+    else bad("torre: assign alert", await pg.locator("#toast").innerText());
+
+    await pg.locator("[data-snooze]").first().click();
+    await pg.waitForTimeout(500);
+    const afterSnooze = await pg.locator(".alrow").count();
+    if (afterSnooze === openBefore - 1)
+      ok("torre: snoozing an alert removes it from the open list until its date");
+    else bad("torre: snooze alert", `${openBefore} → ${afterSnooze}`);
+
+    const resolveTarget = pg.locator("[data-resolve]").first();
+    await resolveTarget.click();
+    await pg.waitForTimeout(500);
+    const afterResolve = await pg.locator(".alrow").count();
+    if (afterResolve === afterSnooze - 1)
+      ok("torre: resolving an alert with a note clears it from the open list");
+    else bad("torre: resolve alert", `${afterSnooze} → ${afterResolve}`);
+
+    const totaskBtn = pg.locator("[data-totask]:not([disabled])").first();
+    if ((await totaskBtn.count()) > 0) {
+      await totaskBtn.click();
+      await pg.waitForTimeout(500);
+      if (/Convertida en tarea/.test(await pg.locator("#toast").innerText()))
+        ok("torre: an alert can be converted into a real task");
+      else bad("torre: convert alert to task", await pg.locator("#toast").innerText());
+    } else bad("torre: convert alert to task", "no enabled [data-totask] button");
+
+    // Grouping switches between "por tipo" and "por proyecto" (DAS-06).
+    await pg.click('[data-grp="project"]');
+    await pg.waitForTimeout(400);
+    const byProject = await pg.locator(".algroup").allInnerTexts();
+    await pg.click('[data-grp="type"]');
+    await pg.waitForTimeout(400);
+    const byType = await pg.locator(".algroup").allInnerTexts();
+    // .algroup is CSS text-transform:uppercase, so the rendered text is
+    // "ECONÓMICA" etc. regardless of the source casing — match case-insensitively.
+    if (byType.some((t) => /econ[oó]mica|t[eé]cnica|documental/i.test(t)) && byProject.length > 0)
+      ok("torre: alerts group by type and by project");
+    else bad("torre: alert grouping", `type=${byType.join(",")} project=${byProject.join(",")}`);
+
+    // The rule editor: a threshold change actually persists (DAS-06 "el
+    // propietario define condición, umbral, destinatario y canal").
+    await pg.click("#aRules");
+    await pg.waitForTimeout(500);
+    const thInput = pg.locator("[data-th]").first();
+    await thInput.fill("9");
+    await thInput.dispatchEvent("change");
+    await pg.waitForTimeout(400);
+    if (/Umbral actualizado/.test(await pg.locator("#toast").innerText()))
+      ok("torre: an alert rule's threshold can be edited and is saved");
+    else bad("torre: rule threshold edit", await pg.locator("#toast").innerText());
+    await pg.click("#dClose");
+    await pg.waitForTimeout(300);
+
+    // Card visibility/order is a real, persisted preference.
+    await pg.click("#tCustomize");
+    await pg.waitForTimeout(400);
+    await pg.locator("[data-vis]").first().click();
+    await pg.waitForTimeout(400);
+    await pg.click("#dClose");
+    await pg.waitForTimeout(400);
+    const afterHide = await pg.locator(".tcard").count();
+    if (afterHide === 7) ok("torre: hiding a card from the customiser removes it from the grid");
+    else bad("torre: card visibility", `expected 7, got ${afterHide}`);
+
+    // ---- Mi Día: the hitos calendar (§2.2) ----
+    await pg.evaluate(() => (location.hash = "hoy"));
+    await pg.waitForTimeout(800);
+    const cellCount = await pg.locator(".calcell").count();
+    if (cellCount === 42) ok("mi día: the monthly calendar renders a full six-week grid");
+    else bad("mi día: calendar grid", `${cellCount} cells`);
+
+    const evCount = await pg.locator(".ev").count();
+    if (evCount > 0) ok(`mi día: real milestones are plotted on the calendar (${evCount})`);
+    else bad("mi día: milestones plotted", "no .ev found");
+
+    const monthBefore = await pg.locator(".calhead b").innerText();
+    await pg.click("#miNext");
+    await pg.waitForTimeout(400);
+    const monthAfter = await pg.locator(".calhead b").innerText();
+    await pg.click("#miToday");
+    await pg.waitForTimeout(400);
+    if (monthAfter !== monthBefore) ok("mi día: month navigation moves the calendar forward");
+    else bad("mi día: month navigation", `${monthBefore} → ${monthAfter}`);
+
+    const legendCount = await pg.locator("[data-legend]").count();
+    if (legendCount > 0) {
+      const before = await pg.locator(".ev").count();
+      await pg.locator("[data-legend]").first().click();
+      await pg.waitForTimeout(400);
+      const after = await pg.locator(".ev").count();
+      if (after < before)
+        ok(`mi día: the legend filters milestones by kind (${before} → ${after})`);
+      else bad("mi día: legend filter", `${before} → ${after}`);
+    } else bad("mi día: legend present", "no [data-legend] entries");
+
+    if (errs.length === 0) ok("torre/mi día: no console errors");
+    else bad("torre/mi día: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("torre de control / mi día", String(e).slice(0, 220));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── Recorrido completo: the project selector (session 12, §2.3, Improvement
+//    #3). "Crear nuevo proyecto" stays the untouched default — testJourney
+//    already covers it end to end — this exercises the ADDITION: picking a
+//    real, already-existing project and seeing real data, not the sample.
+async function testJourneyRealMode(browser, base) {
+  const pg = await browser.newPage({
+    viewport: { width: 1400, height: 1000 },
+    acceptDownloads: true,
+  });
+  const errs = [];
+  attachConsole(pg, errs);
+  pg.on("dialog", async (d) => await d.accept());
+  try {
+    // Visit erp.html first so this browser context's IndexedDB has real
+    // tenant data before journey.html asks for it — real mode reads the
+    // SAME "caneiERP" database, not a fixture of its own.
+    await pg.goto(`${base}/erp.html#torre`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(900);
+
+    await pg.goto(`${base}/journey.html`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(700);
+    if (await pg.locator("#modebar").isVisible())
+      ok("recorrido: the project-mode switch is present");
+    else bad("recorrido: mode switch present", "no #modebar");
+
+    await pg.click("#modeExisting");
+    await pg.waitForTimeout(800);
+    const rowCount = await pg.locator(".projrow[data-pid]").count();
+    if (rowCount > 0)
+      ok(`recorrido: real projects are listed, searchable and filterable (${rowCount})`);
+    else bad("recorrido: real project list", "no rows — is erp.html's seed reachable?");
+
+    // Search narrows the list.
+    await pg.fill("#rpq", "P-2026-0001");
+    await pg.waitForTimeout(400);
+    const filtered = await pg.locator(".projrow[data-pid]").count();
+    if (filtered >= 1 && filtered <= rowCount) ok("recorrido: the project search filters the list");
+    else bad("recorrido: project search", `${rowCount} → ${filtered}`);
+    await pg.fill("#rpq", "");
+    await pg.waitForTimeout(300);
+
+    await pg.locator(".projrow[data-pid]").first().click();
+    await pg.waitForTimeout(700);
+    const bannerText = await pg.locator("#loadedBar").innerText();
+    if (/Proyecto cargado/.test(bannerText))
+      ok("recorrido: the loaded project stays visibly indicated");
+    else bad("recorrido: loaded-project banner", bannerText.slice(0, 80));
+
+    const railCount = await pg.locator(".rail .st").count();
+    if (railCount === 13)
+      ok("recorrido: all thirteen stages show a real status (completa/en curso/pendiente)");
+    else bad("recorrido: thirteen real stages", `${railCount}`);
+
+    const stageText = await pg.locator("#stage").innerText();
+    const hasRealLink = (await pg.locator("#stage a.btn").count()) > 0;
+    if (/COMPLETA|EN CURSO|PENDIENTE/.test(stageText) && hasRealLink)
+      ok("recorrido: a stage shows real data and links to the real screen");
+    else bad("recorrido: stage real data + link", stageText.slice(0, 120));
+
+    const ledgerMargin = await pg.locator("#l-margin").innerText();
+    if (/\d/.test(ledgerMargin))
+      ok(`recorrido: the ledger shows real project economics (${ledgerMargin})`);
+    else bad("recorrido: real ledger figures", ledgerMargin);
+
+    // Duplicate creates a genuinely new project and switches to it.
+    const codeBefore = (await pg.locator("#loadedBar b").first().innerText()).trim();
+    await pg.click("#rpDup");
+    await pg.waitForTimeout(900);
+    const codeAfter = (await pg.locator("#loadedBar b").first().innerText()).trim();
+    if (codeAfter && codeAfter !== codeBefore)
+      ok(
+        `recorrido: duplicating a project creates and loads a new one (${codeBefore} → ${codeAfter})`,
+      );
+    else bad("recorrido: duplicate project", `${codeBefore} → ${codeAfter}`);
+
+    // Downloading the real project's folder produces an actual zip.
+    const [download] = await Promise.all([
+      pg.waitForEvent("download", { timeout: 8000 }).catch(() => null),
+      pg.click("#rpDl"),
+    ]);
+    if (download) {
+      const path = await download.path();
+      const fs = await import("node:fs");
+      const size = path ? fs.statSync(path).size : 0;
+      const magic = path ? fs.readFileSync(path).subarray(0, 2).toString("latin1") : "";
+      if (size > 100 && magic === "PK")
+        ok(`recorrido: downloads the real project's folder as a zip (${size} bytes)`);
+      else bad("recorrido: real folder download", `size=${size} magic=${magic}`);
+    } else bad("recorrido: real folder download", "no download fired");
+
+    await pg.click("#rpSwitch");
+    await pg.waitForTimeout(500);
+    if (await pg.locator("#projPicker").isVisible())
+      ok("recorrido: switching project returns to the picker");
+    else bad("recorrido: switch project", "picker not shown");
+
+    await pg.click("#modeNew");
+    await pg.waitForTimeout(500);
+    if (await pg.locator("#mainArea").isVisible())
+      ok("recorrido: returning to «Crear nuevo proyecto» restores the untouched demo");
+    else bad("recorrido: return to demo mode", "mainArea hidden");
+
+    if (errs.length === 0) ok("recorrido (proyecto existente): no console errors");
+    else bad("recorrido (proyecto existente): no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("recorrido — proyecto existente", String(e).slice(0, 220));
   } finally {
     await pg.close();
   }

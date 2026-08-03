@@ -207,9 +207,44 @@
     .top .links{gap:2px;font-size:12px}
     .top .links a{padding:5px 7px}
   }
+
+  /* ---------- Project selector (spec §2.3, Improvement #3) ---------- */
+  .modebar{max-width:1220px;margin:0 auto;padding:14px 24px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .modebar .seg{display:flex;gap:4px;background:var(--panel);border-radius:13px;padding:4px}
+  .modebar .seg button{border:0;background:transparent;border-radius:10px;padding:8px 14px;font:600 12.5px var(--sans);
+    color:var(--body);cursor:pointer}
+  .modebar .seg button.on{background:var(--paper);color:var(--green);box-shadow:var(--shadow-sm)}
+  .loadedbar{display:flex;align-items:center;gap:10px;background:var(--greenSoft);border:1px solid var(--greenLt);
+    border-radius:13px;padding:9px 16px;font-size:12.5px;color:var(--greenDeep);flex:1;min-width:220px}
+  .loadedbar b{color:var(--ink)}
+  .projpicker{max-width:1220px;margin:14px auto 0;padding:0 24px}
+  .projpicker .card{padding:16px 18px}
+  .projpicker input,.projpicker select{font:inherit;font-size:13px;padding:9px 10px;border:1px solid var(--line);
+    border-radius:9px;background:var(--paper);color:var(--ink)}
+  .projrow{display:grid;grid-template-columns:110px minmax(0,1fr) 90px 90px 100px;gap:10px;align-items:center;
+    padding:10px 8px;border-bottom:1px solid var(--hair,#e7eee1);cursor:pointer;font-size:12.5px}
+  .projrow:hover{background:var(--greenSoft)}
+  .projrow:last-child{border-bottom:0}
+  .stagestatus{display:inline-block;font:700 10px var(--sans);letter-spacing:.05em;text-transform:uppercase;
+    border-radius:999px;padding:3px 9px}
+  .stagestatus.done{background:var(--good-bg);color:var(--good)}
+  .stagestatus.cur{background:var(--warn-bg);color:var(--warn)}
+  .stagestatus.pending{background:var(--panel);color:var(--muted)}
+  .realgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0}
+  @media(max-width:600px){.realgrid{grid-template-columns:1fr}}
+  .realgrid .it{background:var(--panel);border-radius:11px;padding:10px 12px;font-size:12.5px}
+  .realgrid .it b{display:block;font-family:var(--serif);font-size:17px;color:var(--ink);margin-top:2px}
 </style>
 <script src="i18n-dict.js"></script>
 <script src="i18n.js"></script>
+<!-- Real-project mode (§2.3, Improvement #3) reads the SAME tenant data
+     erp.html does — same IndexedDB database, loaded read-only here. The
+     journey's own "Crear nuevo proyecto" walkthrough above is untouched and
+     keeps its separate "caneiJourney" database; these three scripts are
+     additive and degrade silently if, for any reason, they fail to load. -->
+<script src="erp-engine.js"></script>
+<script src="erp-migrations.js"></script>
+<script src="erp-store.js"></script>
 </head>
 <body>
 <header class="top">
@@ -232,7 +267,16 @@
   </span>
 </header>
 
-<main>
+<div class="modebar" id="modebar">
+  <div class="seg">
+    <button id="modeNew" class="on">Crear nuevo proyecto</button>
+    <button id="modeExisting">Proyecto existente</button>
+  </div>
+  <div class="loadedbar" id="loadedBar" style="display:none"></div>
+</div>
+<div class="projpicker" id="projPicker" style="display:none"></div>
+
+<main id="mainArea">
   <div class="rail" id="rail"></div>
 
   <section class="stage" id="stage"></section>
@@ -1393,6 +1437,243 @@ function clearAll(){
   const f=$("#feed"); f.innerHTML="<div>Cleared — enter your project to begin.</div>"; f.dataset.clean="";
   renderRail(); renderLedger(); renderTree(); renderStage();
 }
+/* ===================== Real-project mode (spec §2.3, Improvement #3) =====
+   "Crear nuevo proyecto" above (STAGES/PROJECT/S/idb*) is completely
+   untouched by everything below — it is the default and stays the default,
+   exactly as the spec asks ("se mantiene ... tal como está hoy"). This block
+   only ADDS the other half: pick a real, already-existing project and see
+   its thirteen stages populated with real data instead of the walkthrough's
+   sample profile.
+
+   Real-mode data is read-only here. "En cada etapa, acceso directo a la
+   pantalla real correspondiente" (§2.3) is taken literally: rather than
+   re-implement thirteen screens' worth of editing UI a second time in a
+   different language and shape, each stage shows a real summary and a link
+   into the actual erp.html screen that owns that data — which is also
+   exactly how the spec frames the payoff ("de modo que el recorrido sirva
+   también como lista de puesta en marcha del proyecto"). */
+let realErp=null, journeyMode="new", realProjects=[], selectedProject=null, realStageIdx=0;
+let realFilter="", realStatusFilter="", realDirtyGuardOn=true;
+
+async function loadRealErp(){
+  try{
+    if(typeof ErpStore==="undefined"||typeof ErpEngine==="undefined") return;
+    const loaded=await ErpStore.loadState();
+    if(loaded&&loaded.state) realErp=ErpEngine.ERP.from(loaded.state);
+  }catch(e){ /* real data just isn't reachable here — "Proyecto existente" stays empty, never blocks the demo */ }
+}
+/** §2.3 "el cambio de proyecto pide confirmación si hay cambios sin guardar" —
+    applies when leaving an in-progress demo walkthrough; a read-only real
+    view has nothing of its own to lose, so switching between two real
+    projects never needs to ask. */
+function journeyHasUnsavedDemo(){ return journeyMode==="new" && step>-1; }
+function confirmLeaveDemo(){
+  if(!journeyHasUnsavedDemo()) return true;
+  return confirm("Tienes un recorrido de demostración en curso. ¿Cambiar de modo de todas formas? (queda guardado en este dispositivo, no se pierde)");
+}
+function setJourneyMode(m){
+  if(m===journeyMode) return;
+  if(m!=="new" && !confirmLeaveDemo()) return;
+  journeyMode=m;
+  $("#modeNew").className=m==="new"?"on":"";
+  $("#modeExisting").className=m==="existing"?"on":"";
+  if(m==="new"){
+    selectedProject=null;
+    $("#projPicker").style.display="none";
+    $("#loadedBar").style.display="none";
+    $("#mainArea").style.display="";
+    renderRail(); renderLedger(); renderTree(); renderStage();
+  }else{
+    $("#mainArea").style.display=selectedProject?"":"none";
+    renderProjPicker();
+    $("#projPicker").style.display=selectedProject?"none":"";
+  }
+}
+function projectStatusLabel(p){ return p.closed?"Cerrado":(p.dates.start?"En curso":"Sin iniciar"); }
+function renderProjPicker(){
+  if(!realErp){
+    $("#projPicker").innerHTML=`<div class="card"><p style="margin:0;color:var(--muted)">No se encontraron datos reales en este dispositivo. Abre <a href="erp.html">el ERP</a> al menos una vez, o crea un proyecto nuevo desde aquí.</p></div>`;
+    return;
+  }
+  const all=realErp.state.projects.slice().sort((a,b)=>(b.dates.start||"").localeCompare(a.dates.start||""));
+  const q=realFilter.trim().toLowerCase();
+  const rows=all.filter(p=>{
+    if(realStatusFilter==="open"&&p.closed) return false;
+    if(realStatusFilter==="closed"&&!p.closed) return false;
+    if(!q) return true;
+    const party=realErp.party(p.partyId);
+    return (p.code+" "+party.name).toLowerCase().includes(q);
+  });
+  $("#projPicker").innerHTML=`<div class="card">
+    <h3 style="margin-bottom:10px">Proyecto existente</h3>
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <input id="rpq" placeholder="Buscar por código o cliente" value="${esc(realFilter)}" style="flex:1;min-width:200px">
+      <select id="rpstatus">
+        <option value=""${realStatusFilter===""?" selected":""}>Todos los estados</option>
+        <option value="open"${realStatusFilter==="open"?" selected":""}>En curso</option>
+        <option value="closed"${realStatusFilter==="closed"?" selected":""}>Cerrados</option>
+      </select>
+    </div>
+    <div class="projrow" style="font-weight:700;color:var(--muted);cursor:default">
+      <span>Proyecto</span><span>Cliente</span><span>Estado</span><span>Avance</span><span>Inicio</span></div>
+    ${rows.map(p=>{const party=realErp.party(p.partyId); const eco=realErp.projectEconomics(p.id);
+      return `<div class="projrow" data-pid="${p.id}"><b>${esc(p.code)}</b><span>${esc(party.name)}</span>
+        <span>${projectStatusLabel(p)}</span><span>${eco.progressPct}%</span><span>${p.dates.start?fmtDate(p.dates.start):"—"}</span></div>`;}).join("")
+     ||'<div style="padding:14px;color:var(--muted)">Sin proyectos que coincidan.</div>'}
+  </div>`;
+  $("#rpq").oninput=e=>{realFilter=e.target.value; renderProjPicker();};
+  $("#rpstatus").onchange=e=>{realStatusFilter=e.target.value; renderProjPicker();};
+  $("#projPicker").querySelectorAll("[data-pid]").forEach(r=>r.onclick=()=>selectRealProject(r.dataset.pid));
+}
+function selectRealProject(id){
+  selectedProject=realErp.project(id);
+  realStageIdx=0;
+  $("#projPicker").style.display="none";
+  $("#mainArea").style.display="";
+  renderLoadedBar();
+  renderRealAll();
+}
+function renderLoadedBar(){
+  const bar=$("#loadedBar");
+  if(!selectedProject){ bar.style.display="none"; return; }
+  const party=realErp.party(selectedProject.partyId);
+  bar.style.display="flex";
+  bar.innerHTML=`📂 Proyecto cargado: <b>${esc(selectedProject.code)}</b> — ${esc(party.name)} (${projectStatusLabel(selectedProject)})
+    <span style="flex:1"></span>
+    <button class="linkbtn" id="rpSwitch">Cambiar de proyecto</button>
+    <button class="linkbtn" id="rpDup">Duplicar</button>
+    <button class="linkbtn" id="rpDl">⤓ Carpeta</button>`;
+  $("#rpSwitch").onclick=()=>{ selectedProject=null; renderLoadedBar(); $("#mainArea").style.display="none"; renderProjPicker(); $("#projPicker").style.display=""; };
+  $("#rpDup").onclick=duplicateRealProject;
+  $("#rpDl").onclick=downloadRealFolder;
+}
+/** Every date each stage owns, read straight off the record that owns it —
+    never a second copy kept in step with the original. */
+function realStageInfo(p){
+  const eco=realErp.projectEconomics(p.id);
+  const party=realErp.party(p.partyId);
+  const contract=p.contractId?realErp.state.contracts.find(c=>c.id===p.contractId):null;
+  const invoices=realErp.state.invoices.filter(i=>i.projectId===p.id&&i.kind!=="creditNote");
+  const bills=realErp.state.bills.filter(b=>(b.allocations||[]).some(a=>a.projectId===p.id));
+  const purchases=realErp.state.purchases.filter(pu=>pu.projectId===p.id);
+  const outstandingRecv=sum(invoices,i=>realErp.invoiceOutstandingCents(i.id));
+  const outstandingPay=sum(bills,b=>realErp.billOutstandingCents(b.id));
+  const opp=realErp.state.opportunities.find(o=>o.partyId===p.partyId&&o.status==="won");
+  const visited=realErp.state.visits.some(v=>{const o=realErp.state.opportunities.find(x=>x.id===v.opportunityId); return o&&o.partyId===p.partyId;});
+  const S1="done",S2="cur",S3="pending";
+  return [
+    {status:S1, summary:`Origen: ${esc(opp?opp.source:"—")} · Cliente ${esc(party.name)}`, dest:"clientes"},
+    {status:visited?S1:S3, summary:visited?"Visita registrada con mediciones y fotos":"Sin visita registrada para este cliente", dest:"oportunidades"},
+    {status:p.budgetId?S1:S3, summary:p.budgetId?`Presupuesto ${esc(p.budgetNumber)}`:"Sin presupuesto formal (proyecto rápido)", dest:"presupuestos"},
+    {status:p.budgetId?S1:S3, summary:p.budgetId?`Presupuesto ${esc(p.budgetNumber)} emitido y versionado`:"—", dest:"presupuestos"},
+    {status:S1, summary:contract?`Contrato ${esc(contract.number)}${contract.signature.customerSignedAt?" firmado":" pendiente de firma"}`:"Aceptado como proyecto rápido, sin contrato formal", dest:"contratos"},
+    {status:p.dates.start?S1:S2, summary:p.dates.start?`Iniciado el ${fmtDate(p.dates.start)}`:"Adjudicado, obra aún sin iniciar", dest:"proyectos"},
+    {status:purchases.length?(purchases.every(pu=>pu.status.delivered)?S1:S2):S3, summary:`${purchases.length} orden(es) de compra`, dest:"compras"},
+    {status:p.closed?S1:(p.dates.start?S2:S3), summary:`Avance ${eco.progressPct}% · coste real ${eur(eco.actualCents)}`, dest:"seguimiento"},
+    {status:invoices.length?(outstandingRecv<=0?S1:S2):S3, summary:`${invoices.length} factura(s) emitida(s) · ${eur(sum(invoices,i=>i.totalCents))}`, dest:"facturacion"},
+    {status:invoices.length?(outstandingRecv<=0?S1:S2):S3, summary:`Pendiente de cobro: ${eur(outstandingRecv)}`, dest:"facturacion"},
+    {status:bills.length?(outstandingPay<=0?S1:S2):S3, summary:`${bills.length} factura(s) recibida(s) · pendiente ${eur(outstandingPay)}`, dest:"pagos"},
+    {status:p.closed?S1:S3, summary:p.closed?`Cerrado — margen final ${eur(eco.marginFinalCents||0)}`:"Obra todavía en curso", dest:"proyectos"},
+    {status:S3, summary:"Sin seguimiento de reseñas en los datos reales todavía", dest:null},
+  ];
+}
+function renderRealAll(){ renderRealRail(); renderRealStage(); renderRealLedger(); }
+function renderRealRail(){
+  const info=realStageInfo(selectedProject);
+  const r=$("#rail"); r.innerHTML="";
+  STAGES.forEach((name,i)=>{
+    const cls=info[i].status==="done"?"done":info[i].status==="cur"?"cur":"";
+    const st=el("div","st "+cls+" nav",`<div class="n">ETAPA ${i+1}</div><div class="t">${name}</div>`);
+    st.onclick=()=>{ realStageIdx=i; renderRealStage(); window.scrollTo({top:0,behavior:"smooth"}); };
+    r.append(st);
+  });
+}
+function realStatusPill(status){
+  return status==="done"?'<span class="stagestatus done">Completa</span>'
+    :status==="cur"?'<span class="stagestatus cur">En curso</span>'
+    :'<span class="stagestatus pending">Pendiente</span>';
+}
+function renderRealStage(){
+  const p=selectedProject, info=realStageInfo(p)[realStageIdx];
+  const stageEl=$("#stage");
+  const wrap=el("div");
+  wrap.append(el("div","eyebrow",`Etapa ${realStageIdx+1} de ${STAGES.length} · ${esc(p.code)}`));
+  wrap.append(el("h2",null,STAGES[realStageIdx]));
+  wrap.append(el("div","cap",realStatusPill(info.status)));
+  wrap.append(el("p",null,esc(info.summary)));
+  const acts=el("div","actions");
+  if(info.dest){
+    const a=el("a","btn sm",`Abrir ${esc(info.dest)} real ↗`);
+    a.href=`erp.html?project=${encodeURIComponent(p.code)}#${info.dest}`;
+    a.target="_blank"; a.rel="noopener";
+    acts.append(a);
+  }
+  if(realStageIdx<STAGES.length-1){
+    const next=el("button","btn sm ghost","Siguiente etapa ▸");
+    next.onclick=()=>{ realStageIdx++; renderRealStage(); window.scrollTo({top:0,behavior:"smooth"}); };
+    acts.append(next);
+  }
+  wrap.append(acts);
+  stageEl.innerHTML=""; stageEl.append(wrap);
+}
+function renderRealLedger(){
+  const p=selectedProject, eco=realErp.projectEconomics(p.id);
+  $("#l-margin").textContent=eur(eco.marginForecastCents);
+  $("#l-baseline").textContent=eur(eco.baselineRevenueCents);
+  $("#l-var").textContent=eur(eco.approvedChangesCents);
+  $("#l-committed").textContent=eur(eco.committedCents);
+  $("#l-actual").textContent=eur(eco.actualCents);
+  $("#l-revenue").textContent=eur(eco.currentRevenueCents);
+  const invoices=realErp.state.invoices.filter(i=>i.projectId===p.id&&i.kind!=="creditNote");
+  const bills=realErp.state.bills.filter(b=>(b.allocations||[]).some(a=>a.projectId===p.id));
+  const collected=sum(invoices,i=>i.totalCents)-sum(invoices,i=>realErp.invoiceOutstandingCents(i.id));
+  const paid=sum(bills,b=>b.totalCents)-sum(bills,b=>realErp.billOutstandingCents(b.id));
+  $("#l-collected").textContent=eur(collected);
+  $("#l-paid").textContent=eur(paid);
+  $("#l-cash").textContent=eur(collected-paid);
+  $("#l-forecast").textContent=eur(eco.marginForecastCents);
+  $("#l-bar").style.width=eco.progressPct+"%";
+}
+/** §2.3 "duplicar un proyecto existente como punto de partida de uno nuevo" —
+    a real, small write: a new quick project, same customer and estimated
+    value, prefixed so nobody mistakes the copy for the original. Kept to
+    createQuickProject (already the tool for "a project without going through
+    the full budget/contract flow") rather than deep-cloning the budget's
+    frozen baseline, which duplicateBudget already does more carefully from
+    inside the real screen this one links out to. */
+function duplicateRealProject(){
+  if(!confirm("¿Crear un proyecto nuevo a partir de "+selectedProject.code+"? Se copian cliente y valor estimado."))return;
+  try{
+    const p=selectedProject, party=realErp.party(p.partyId);
+    const rec=realErp.createQuickProject({partyId:p.partyId,
+      desc:"Copia de "+p.code, activityLine:p.activityLine,
+      valueCents:p.baseline.revenueCents},"backoffice");
+    ErpStore.saveState(realErp.toJSON()).catch(()=>{});
+    log("Proyecto duplicado — "+rec.code+" creado a partir de "+p.code+" ("+party.name+").");
+    selectRealProject(rec.id);
+  }catch(e){ log("⚠ No se pudo duplicar: "+e.message); }
+}
+/** §2.3 "descargar la carpeta completa del proyecto" for a REAL project —
+    one text file per stage with the real summary shown above, reusing the
+    exact zipStore/download plumbing the demo's own folder export uses. */
+function downloadRealFolder(){
+  const p=selectedProject, party=realErp.party(p.partyId), info=realStageInfo(p);
+  const enc=new TextEncoder();
+  const root="Canei — "+safe(p.code+" "+party.name);
+  const files=[{path:root+"/README.txt",bytes:enc.encode(
+    `${root}\nCanei Subirats, S.L. — resumen del proyecto\n\nCliente: ${party.name}\nProyecto: ${p.code}\nEstado: ${projectStatusLabel(p)}\n\nGenerado por el ERP de Canei Subirats.`
+  )}];
+  STAGES.forEach((name,i)=>{
+    files.push({path:root+"/"+FOLDERS[i]+"/resumen.txt",bytes:enc.encode(
+      `${name}\nEstado: ${info[i].status==="done"?"Completa":info[i].status==="cur"?"En curso":"Pendiente"}\n\n${info[i].summary}`
+    )});
+  });
+  download(root+".zip","application/zip",zipStore(files));
+  log("Carpeta del proyecto real descargada — "+p.code+".");
+}
+$("#modeNew").onclick=()=>setJourneyMode("new");
+$("#modeExisting").onclick=()=>setJourneyMode("existing");
+
 /* ---------- boot ---------- */
 $("#dlfolder").onclick=downloadFolder;
 $("#editdata").onclick=editData;
@@ -1401,6 +1682,7 @@ $("#clearall").onclick=clearAll;
   try{ const saved=await idbGet("project"); if(saved&&saved.folders){ PROJECT=saved; PROJECT.stageData=PROJECT.stageData||{}; if(PROJECT.profile){ draft=clone(PROJECT.profile); S=buildS(PROJECT.profile); } } }catch(e){}
   renderRail(); renderLedger(); renderTree(); renderStage();
   if(PROJECT.profile){ const f=$("#feed"); f.innerHTML="<div>Saved project loaded — press “Start the journey”.</div>"; f.dataset.clean=""; }
+  await loadRealErp(); // never blocks the demo above — best-effort, silent on failure
 })();
 </script>
 </body>
