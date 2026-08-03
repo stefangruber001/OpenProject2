@@ -508,6 +508,90 @@
       this.party(id).active = false;
       this._log(user, "deactivateParty", id);
     } // MDM-12
+    /**
+     * Everything that would be orphaned by deleting this party, as a list of
+     * human-readable references. Empty means the record is genuinely free.
+     */
+    partyEconomicRefs(id) {
+      const S = this.state;
+      const out = [];
+      const add = (label, arr, ref) => arr.forEach((x) => out.push(label + " " + ref(x)));
+      add(
+        "presupuesto",
+        S.budgets.filter((b) => b.partyId === id),
+        (b) => b.number,
+      );
+      add(
+        "contrato",
+        S.contracts.filter((c) => c.partyId === id),
+        (c) => c.number,
+      );
+      add(
+        "proyecto",
+        S.projects.filter((p) => p.partyId === id),
+        (p) => p.code,
+      );
+      add(
+        "factura",
+        S.invoices.filter((i) => i.partyId === id),
+        (i) => i.number,
+      );
+      add(
+        "recibo",
+        S.receipts.filter((r) => r.partyId === id),
+        (r) => r.number,
+      );
+      add(
+        "factura recibida",
+        S.bills.filter((b) => b.supplierId === id),
+        (b) => b.number,
+      );
+      add(
+        "cobro",
+        (S.collections || []).filter((c) => c.partyId === id),
+        (c) => c.id,
+      );
+      add(
+        "subcontrata",
+        (S.subcontracts || []).filter((s) => s.supplierId === id),
+        (s) => s.number,
+      );
+      add(
+        "orden de compra",
+        S.purchases.filter((p) => p.supplierId === id),
+        (p) => p.number,
+      );
+      return out;
+    }
+    /**
+     * Hard-delete a party (MDM-12 / §3.1).
+     *
+     * REFUSES while any economic document points at it — "no se permite
+     * eliminar un cliente con documentos económicos asociados: se desactiva y
+     * se conserva el histórico". Deleting the customer behind a issued invoice
+     * would leave that invoice pointing at nothing, and an issued document is
+     * immutable precisely so it can still be explained years later. The
+     * refusal names what is in the way so the caller can offer the honest
+     * alternative (deactivate) instead of guessing.
+     */
+    deleteParty(id, user) {
+      const p = this.party(id);
+      const refs = this.partyEconomicRefs(id);
+      if (refs.length)
+        throw new Error(
+          "No se puede eliminar: tiene " +
+            refs.length +
+            " documento(s) asociado(s) — " +
+            refs.slice(0, 4).join(", ") +
+            (refs.length > 4 ? "…" : "") +
+            ". Desactívalo para conservar el histórico.",
+        );
+      this.state.parties = this.state.parties.filter((x) => x.id !== id);
+      this.state.properties = this.state.properties.filter((x) => x.partyId !== id);
+      this.state.opportunities = this.state.opportunities.filter((x) => x.partyId !== id);
+      this._log(user, "deleteParty", p.code + " " + p.name);
+      return p;
+    }
     party(id) {
       const p = this.state.parties.find((x) => x.id === id);
       if (!p) throw new Error("Party not found");
