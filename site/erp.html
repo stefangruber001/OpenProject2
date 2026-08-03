@@ -533,6 +533,7 @@
       <!-- Project context (spec §4): the selector and the fixed header strip.
            Rendered outside #view so it survives every subsection change — the
            context is the section's, not any one screen's. -->
+      <div id="seedbar"></div>
       <div id="projbar"></div>
       <div id="view"></div>
     </main>
@@ -800,7 +801,7 @@ function render(){
   $('#crumbs').textContent="ERP › "+meta.sec.lab;
   $('#ttl').textContent=meta.lab;
   $('#sub').textContent="";
-  renderBell(); renderCreateMenu(); renderProjectBar();
+  renderBell(); renderCreateMenu(); renderProjectBar(); renderSeedBar();
   const v=$('#view');
   if(VIEWS[cur]) VIEWS[cur](v); else placeholderView(cur,v);
 }
@@ -979,6 +980,26 @@ $('#btnUser').onclick=()=>toggleMenu('#btnUser','#mUser');
    rather than silently dropped: an import that quietly discards records is
    indistinguishable, to the operator, from one that never ran. */
 const IMPORT_CONFLICT_ES={yaExiste:"ya existe en el sistema",rechazado:"datos no válidos",sinNombre:"sin nombre"};
+/* Tells you when the shipped demo dataset is newer than the one on this
+   device, and offers the reload. It does NOT reseed on its own: boot() must
+   never overwrite records somebody may have entered, so the decision stays a
+   click. Dismissable per device — the stored version is only compared, never
+   written, so dismissing does not pretend you upgraded. */
+let seedBarHidden=false;
+function renderSeedBar(){
+  const host=$('#seedbar'); if(!host) return;
+  const shipped=(typeof ErpSeed!=="undefined"&&ErpSeed.SEED_VERSION)||0;
+  const have=(erp&&erp.state&&erp.state.seedVersion)||0;
+  if(seedBarHidden||!shipped||have>=shipped){ host.innerHTML=""; return; }
+  host.innerHTML=`<div class="card" style="border-left:3px solid var(--spark);margin-bottom:12px">
+    <div class="queuebar"><b>Hay datos de demostración más recientes</b>
+    <span style="color:var(--muted)">esta versión incluye dos años de histórico (2024-2025) y más información por cliente.</span>
+    <span style="flex:1"></span>
+    <button class="btn sm primary" id="sbLoad">↻ Recargar</button>
+    <button class="btn sm" id="sbHide">Ahora no</button></div></div>`;
+  $('#sbLoad').onclick=()=>resetData();
+  $('#sbHide').onclick=()=>{seedBarHidden=true; renderSeedBar();};
+}
 function importConflictsBanner(){
   const cs=(erp.state.importConflicts)||[];
   if(!cs.length)return"";
@@ -2997,7 +3018,7 @@ const VIEWS={
     ||'<tr><td colspan="13"><div class="empty">Ningún cliente coincide con la búsqueda.</div></td></tr>'}
    </tbody></table></div></div>`;
   v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>partyDrawer(tr.dataset.id));
-  $('#bNew').onclick=()=>newPartyDrawer();
+  $('#bNew').onclick=()=>newPartyDrawer("customer");
   // Re-render on input would lose focus mid-word, so the field filters in
   // place and only the table body is rebuilt by the next render() call.
   const qi=$('#cliQ');
@@ -3525,24 +3546,44 @@ function editPartyDrawer(id){
     closeDrawer();
   },"Datos actualizados");
 }
+/* Create a party.
+   `role` is passed by every caller that already KNOWS what it is creating —
+   Clientes always creates a customer, the Administración quick-create always
+   creates a supplier — and in that case the Rol selector is not rendered at
+   all: offering a choice that has exactly one correct answer is a way to get
+   a supplier filed in the customer list. Only the generic "Nuevo tercero"
+   entry under Maestros, which genuinely does not know, still shows it.
+   The fields mirror the Clientes table column for column, so a client created
+   here is complete on the list instead of arriving with three empty cells. */
 function newPartyDrawer(role){
-  const db=openDrawer(role==="supplier"?"Nuevo proveedor":role==="customer"?"Nuevo cliente":"Nuevo tercero");
+  const KNOWN={customer:["Nuevo cliente","Guardar cliente","Cliente creado"],
+               supplier:["Nuevo proveedor","Guardar proveedor","Proveedor creado"],
+               subcontractor:["Nuevo industrial","Guardar industrial","Industrial creado"]};
+  const [title,cta,done]=KNOWN[role]||["Nuevo tercero","Guardar tercero","Tercero creado"];
+  const db=openDrawer(title);
   const ROLE=[["customer","Cliente"],["supplier","Proveedor"],["subcontractor","Industrial"],["selfEmployed","Autónomo"]];
   db.innerHTML=`<div class="fgrid">
    <div class="field full"><label>Nombre o razón social *</label><input id="f_name"></div>
    <div class="field"><label>NIF / CIF / NIE *</label><input id="f_tax" placeholder="12345678Z"></div>
-   <div class="field"><label>Rol</label><select id="f_role">${ROLE.map(([v,l])=>`<option value="${v}"${role===v?" selected":""}>${l}</option>`).join("")}</select></div>
+   ${role?"":`<div class="field"><label>Rol</label><select id="f_role">${ROLE.map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select></div>`}
+   <div class="field"><label>Persona de contacto</label><input id="f_contact"></div>
+   <div class="field"><label>Teléfono</label><input id="f_land"></div>
+   <div class="field"><label>Móvil *</label><input id="f_mob"></div>
+   <div class="field full"><label>Email</label><input id="f_mail"></div>
    <div class="field full"><label>Dirección de facturación *</label><input id="f_street"></div>
-   <div class="field"><label>C.P. *</label><input id="f_cp"></div><div class="field"><label>Población *</label><input id="f_city"></div>
-   <div class="field"><label>Móvil *</label><input id="f_mob"></div><div class="field"><label>Email</label><input id="f_mail"></div>
+   <div class="field"><label>C.P. *</label><input id="f_cp"></div>
+   <div class="field"><label>Población *</label><input id="f_city"></div>
+   <div class="field"><label>Provincia</label><input id="f_prov" value="Barcelona"></div>
    <div class="field"><label>Origen del contacto *</label><select id="f_src">${ErpEngine.LISTS.leadSources.map(s=>`<option>${s}</option>`).join("")}</select></div>
-   <div class="field full" style="margin-top:8px"><button class="btn primary" id="f_save">Guardar tercero</button></div></div>`;
+   <div class="field full" style="margin-top:8px"><button class="btn primary" id="f_save">${cta}</button></div></div>`;
   $('#f_save').onclick=()=>mutate(()=>{
-    erp.addParty({roles:[$('#f_role').value],name:$('#f_name').value.trim(),taxId:$('#f_tax').value.trim(),
-      billStreet:$('#f_street').value.trim(),billPostalCode:$('#f_cp').value.trim(),billCity:$('#f_city').value.trim(),billProvince:"Barcelona",
+    erp.addParty({roles:[role||$('#f_role').value],name:$('#f_name').value.trim(),taxId:$('#f_tax').value.trim(),
+      contactPerson:$('#f_contact').value.trim(),landline:$('#f_land').value.trim(),
+      billStreet:$('#f_street').value.trim(),billPostalCode:$('#f_cp').value.trim(),billCity:$('#f_city').value.trim(),
+      billProvince:$('#f_prov').value.trim()||"Barcelona",
       mobile:$('#f_mob').value.trim(),email:$('#f_mail').value.trim(),leadSource:$('#f_src').value},"backoffice");
     closeDrawer();
-  },"Tercero creado");
+  },done);
 }
 /* The three creations the global "+ Crear" offers. They call the engine's own
    entry points, so every validation (complete tax data before a project, a

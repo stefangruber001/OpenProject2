@@ -11,6 +11,9 @@
   "use strict";
   const { ERP, addDays } = E;
 
+  /* Demo-dataset version. See the assignment at the end of build(). */
+  const SEED_VERSION = 2;
+
   function build(today) {
     const erp = new ERP("2026-03-02");
     erp.configureEntity({
@@ -1365,9 +1368,15 @@
       erp.updateAlertRule("AR-OVERDUE", { recipient: "backoffice", channel: "email" }, "seed");
     }
 
+    /* Bump whenever this file or erp-history.js changes what the demo
+       contains. The app compares it with what is stored and offers a reload
+       — it never reseeds on its own (see boot()), because doing that to real
+       records would be data loss. */
+    erp.state.seedVersion = SEED_VERSION;
+
     erp.setToday(today || "2026-05-05");
     return erp;
   }
 
-  return { build };
+  return { build, SEED_VERSION };
 });
