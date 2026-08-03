@@ -308,30 +308,6 @@
   .exrow:last-child{border-bottom:0}
   .exrow .why{font-size:11px;color:var(--muted)}
 
-  /* ---------- Clientes: a 13-column table that fits the screen (spec §3.1) ----
-     Fixed layout so the columns keep their share instead of being pushed
-     around by one long email; every cell truncates with an ellipsis and
-     carries the full value in `title`, so nothing is lost, only folded.
-     Below each breakpoint the LEAST identifying column is dropped first
-     (C.P. → Provincia → Alta → Dirección/Ciudad → Teléfono → Email), so a
-     narrow screen still shows who the client is and how to reach them.
-     The horizontal scroll stays as the final fallback, but on a normal
-     desktop it should never be needed. */
-  .cli{table-layout:fixed;width:100%;min-width:0}
-  .cli th,.cli td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .cli col.c-cod{width:6.5%} .cli col.c-nom{width:15%} .cli col.c-nif{width:8.5%}
-  .cli col.c-con{width:12%}  .cli col.c-tel{width:8%}  .cli col.c-mov{width:8%}
-  .cli col.c-ema{width:15%}  .cli col.c-dir{width:11%} .cli col.c-ciu{width:8%}
-  .cli col.c-pro{width:7%}   .cli col.c-cp{width:5%}   .cli col.c-alt{width:7%}
-  .cli col.c-dat{width:8%}
-  @media(max-width:1480px){ .cli .c-cp,.cli th.h-cp,.cli td.d-cp{display:none} }
-  @media(max-width:1360px){ .cli .c-pro,.cli th.h-pro,.cli td.d-pro{display:none} }
-  @media(max-width:1240px){ .cli .c-alt,.cli th.h-alt,.cli td.d-alt{display:none} }
-  @media(max-width:1100px){ .cli .c-dir,.cli th.h-dir,.cli td.d-dir,
-                            .cli .c-ciu,.cli th.h-ciu,.cli td.d-ciu{display:none} }
-  @media(max-width:900px){  .cli .c-tel,.cli th.h-tel,.cli td.d-tel{display:none} }
-  @media(max-width:760px){  .cli .c-ema,.cli th.h-ema,.cli td.d-ema{display:none} }
-
   /* ---------- Torre de Control (spec §2.1) ---------- */
   .torrebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:11px}
   .torrebar .ts{font-size:11.5px;color:var(--muted)}
@@ -3026,21 +3002,19 @@ const VIEWS={
     <span class="tag">${(()=>{const tot=erp.state.parties.filter(p=>p.active&&p.roles.includes("customer")).length;
       const n=q?tot:rows.length; // when filtering, the noun agrees with the total ("1 de 17 clientes")
       return `${rows.length}${q?` de ${tot}`:""} cliente${n===1?"":"s"}`;})()}</span></div>
-   <div class="card"><div class="scroll"><table class="cli">
-    <colgroup><col class="c-cod"><col class="c-nom"><col class="c-nif"><col class="c-con"><col class="c-tel"><col class="c-mov"><col class="c-ema"><col class="c-dir"><col class="c-ciu"><col class="c-pro"><col class="c-cp"><col class="c-alt"><col class="c-dat"></colgroup>
-    <thead><tr>
-     <th>Código</th><th>Nombre / Razón social</th><th>NIF/CIF</th><th>Contacto</th><th class="h-tel">Teléfono</th><th>Móvil</th>
-     <th class="h-ema">Email</th><th class="h-dir">Dirección</th><th class="h-ciu">Ciudad</th><th class="h-pro">Provincia</th><th class="h-cp">C.P.</th><th class="h-alt">Alta</th><th>Datos</th></tr></thead><tbody>
-   ${rows.map(p=>{const c=erp.partyCompleteness(p.id);
-     const cell=(val,cls)=>`<td${cls?` class="${cls}"`:""} title="${esc(val||"")}">${esc(val||"—")}</td>`;
-     return `<tr class="click" data-id="${p.id}">
-     <td class="k">${p.code}</td><td class="k" title="${esc(p.name)}">${esc(p.name)}</td>
+   <div class="card"><div class="scroll"><table><thead><tr>
+     <th>Código</th><th>Nombre / Razón social</th><th>NIF/CIF</th><th>Contacto</th><th>Teléfono</th><th>Móvil</th>
+     <th>Email</th><th>Dirección</th><th>Ciudad</th><th>Provincia</th><th>C.P.</th><th>Alta</th><th>Datos</th></tr></thead><tbody>
+   ${rows.map(p=>{const c=erp.partyCompleteness(p.id);return `<tr class="click" data-id="${p.id}">
+     <td class="k">${p.code}</td><td class="k">${esc(p.name)}</td>
      <td>${p.taxId?esc(p.taxId):'<span class="pill r">Falta</span>'}</td>
-     ${cell(p.contactPerson)}${cell(p.landline,"d-tel")}${cell(p.mobile)}
-     ${cell(p.email,"d-ema")}${cell(p.billStreet,"d-dir")}${cell(p.billCity,"d-ciu")}
-     ${cell(p.billProvince,"d-pro")}${cell(p.billPostalCode,"d-cp")}
-     <td class="d-alt">${p.createdAt?fmtD(p.createdAt):"—"}</td>
-     <td>${c.ok?'<span class="pill g">Completo</span>':`<span class="pill r">${c.pct}%</span>`}</td></tr>`;}).join("")
+     <td>${esc(p.contactPerson||"—")}</td>
+     <td>${esc(p.landline||"—")}</td><td>${esc(p.mobile||"—")}</td>
+     <td>${esc(p.email||"—")}</td>
+     <td>${esc(p.billStreet||"—")}</td><td>${esc(p.billCity||"—")}</td>
+     <td>${esc(p.billProvince||"—")}</td><td>${esc(p.billPostalCode||"—")}</td>
+     <td>${p.createdAt?fmtD(p.createdAt):"—"}</td>
+     <td>${c.ok?'<span class="pill g">Completo</span>':`<span class="pill r">${c.pct}% · falta ${c.missing.length}</span>`}</td></tr>`;}).join("")
     ||'<tr><td colspan="13"><div class="empty">Ningún cliente coincide con la búsqueda.</div></td></tr>'}
    </tbody></table></div></div>`;
   v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>partyDrawer(tr.dataset.id));
