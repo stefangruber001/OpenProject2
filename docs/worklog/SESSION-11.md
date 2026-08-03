@@ -195,6 +195,10 @@ receive" stays answerable after somebody improves it.
 | `pnpm --filter web test:e2e`                                  | 5/5 — registry and tenant spec both changed        |
 | Committed bundle                                              | 62 KB, **0 zod references**                        |
 
+Confirmed on GitHub for `1883738`: `CI` run 187 green (all jobs, including the
+committed-bundle drift check and the Playwright end-to-end job) and `Site E2E`
+run 27 green. First push, no fixes needed.
+
 The eighteen new E2E checks drive the refusals, not the happy paths: a
 proposal that has to show its reasons, a period that refuses to close, a send
 button that is disabled until every exception carries a justification, an
