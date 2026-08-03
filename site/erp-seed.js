@@ -5,9 +5,9 @@
    ========================================================================== */
 (function (root, factory) {
   if (typeof module === "object" && module.exports)
-    module.exports = factory(require("./erp-engine.js"));
-  else root.ErpSeed = factory(root.ErpEngine);
-})(typeof globalThis !== "undefined" ? globalThis : this, function (E) {
+    module.exports = factory(require("./erp-engine.js"), require("./erp-history.js"));
+  else root.ErpSeed = factory(root.ErpEngine, root.ErpHistory);
+})(typeof globalThis !== "undefined" ? globalThis : this, function (E, History) {
   "use strict";
   const { ERP, addDays } = E;
 
@@ -294,15 +294,28 @@
     });
 
     /* workers */
+    // Rate bands go back to 2024 because the history below books real hours
+    // there and workerRateCents() refuses to guess a rate that was never in
+    // force — effective dating doing its job. The 2026 figures are unchanged,
+    // so every 2026 labour cost is exactly what it always was; the earlier
+    // bands simply give two years of pay rises something to be read from.
     const w1 = erp.addWorker({
       name: "Oficial 1ª — Álvaro",
       kind: "employee",
-      rateHistory: [{ from: "2026-01-01", rateCentsPerHour: 1900 }],
+      rateHistory: [
+        { from: "2024-01-01", rateCentsPerHour: 1700 },
+        { from: "2025-01-01", rateCentsPerHour: 1800 },
+        { from: "2026-01-01", rateCentsPerHour: 1900 },
+      ],
     });
     const w2 = erp.addWorker({
       name: "Peó — Ibra",
       kind: "employee",
-      rateHistory: [{ from: "2026-01-01", rateCentsPerHour: 1400 }],
+      rateHistory: [
+        { from: "2024-01-01", rateCentsPerHour: 1250 },
+        { from: "2025-01-01", rateCentsPerHour: 1320 },
+        { from: "2026-01-01", rateCentsPerHour: 1400 },
+      ],
     });
 
     /* helper to build a budget quickly */
@@ -325,6 +338,24 @@
         for (const l of lines) erp.addLine(b.id, ch.id, l);
       }
       return b;
+    }
+
+    /* ---- Two years of trading history (2024-06 … 2025-12) ----------------
+       Runs BEFORE the 2026 story on purpose. Document series restart per
+       fiscal year, so history occupies the 2024/2025 series and every 2026
+       number the staged story below produces — and that ~147 browser checks
+       assert by name — is exactly what it always was. See erp-history.js.
+       Degrades silently if the module is absent so erp-seed.js keeps working
+       standalone (some Node probes require it directly). */
+    if (History && typeof History.apply === "function") {
+      History.apply(erp, {
+        items,
+        suppliers: { material: supMat, electrical: supElec, plumbing: supFont, adviser: supArch },
+        workers: [w1, w2],
+        bank,
+        till,
+        budgetWith,
+      });
     }
 
     /* ---- P1: Reforma Roca — accepted, in execution, extra approved, 50% invoiced ---- */
@@ -1180,6 +1211,117 @@
         recipient: "supplier",
       },
     ].forEach((r) => erp.addCommsRule(r, "seed"));
+
+    /* ---- A CURRENT project with the whole §4 chain on it ------------------
+       The §4 screens (Compras, Subcontratos, Modificaciones, Horas) are scoped
+       to the selected project, so a rich two-year history behind closed jobs
+       still leaves them looking empty on the project the app opens with.
+       Balmes carries the full chain instead: an order received, an awarded
+       trade with valid paperwork and a certification, an approved extra, and
+       four weeks of booked hours.
+
+       Deliberately NOT the default project. P-2026-0001 sorts first and is
+       what the browser suite drives, and several of those checks take "the
+       first purchase order" or "the first subcontract" on screen — seeding
+       records there would silently change which row they grab. Balmes is one
+       click away in the project selector and carries no such coupling. */
+    erp.setToday("2026-04-06");
+    erp.startWorks(prjB.id, "operations");
+    const puB = erp.addPurchase({
+      supplierId: supMat.id,
+      projectId: prjB.id,
+      chapterNum: "2",
+      desc: "Mortero monocapa y malla para fachada",
+      qtyMilli: 1000,
+      unitCents: 486000,
+      totalCents: 486000,
+    });
+    erp.sendPurchase(puB.id, "backoffice");
+    erp.setToday("2026-04-08");
+    erp.acceptPurchase(puB.id, { expectedArrival: "2026-04-14" }, "backoffice");
+    erp.setToday("2026-04-14");
+    erp.receivePurchase(puB.id, { qtyMilli: 1000, docRef: "ALB-MV-4471" }, "operations");
+
+    erp.setToday("2026-04-07");
+    const scB = erp.addSubcontract(
+      prjB.id,
+      {
+        supplierId: supElec.id,
+        trade: "Electricidad — iluminación de fachada",
+        chapterNum: "2",
+        awardedCents: 640000,
+        retentionPct: 5,
+        retentionReleaseDate: "2027-01-25",
+      },
+      "backoffice",
+    );
+    ["insurance", "prl", "socialSecurity"].forEach((kind) =>
+      erp.renewSubcontractDoc(
+        scB.id,
+        { kind, expiresOn: "2027-03-31", docRef: kind + "-electrobaix.pdf" },
+        "backoffice",
+      ),
+    );
+    erp.sendSubcontract(scB.id, "backoffice");
+    erp.acceptSubcontract(
+      scB.id,
+      { plannedStart: "2026-04-20", plannedEnd: "2026-07-10" },
+      "backoffice",
+    );
+    erp.setToday("2026-04-20");
+    erp.markSubcontractStarted(scB.id, "operations");
+    erp.setToday("2026-04-30");
+    erp.certifySubcontract(
+      scB.id,
+      { amountCents: 210000, note: "Primera certificación — planta baja" },
+      "backoffice",
+    );
+
+    erp.setToday("2026-04-21");
+    const chB = erp.addChange(
+      prjB.id,
+      {
+        desc: "Sustitución de bajantes vistas detectada al retirar el revestimiento",
+        chapterNum: "2",
+        origin: "siteFinding",
+      },
+      "operations",
+    );
+    erp.priceChange(chB.id, 384000, 246000, 4, "backoffice");
+    erp.sendChange(chB.id, "backoffice");
+    erp.setToday("2026-04-24");
+    erp.approveChange(chB.id, "adenda-balmes-01.pdf", "backoffice");
+
+    [w1, w2].forEach((w) =>
+      erp.assignResource(
+        prjB.id,
+        { workerId: w.id, from: "2026-04-06", to: "2026-07-25" },
+        "backoffice",
+      ),
+    );
+    // The last two land in the week the demo opens on: the weekly grid shows
+    // the CURRENT week, so hours booked only in April would leave it looking
+    // empty on a screen that is meant to show a crew at work.
+    ["2026-04-07", "2026-04-14", "2026-04-21", "2026-04-28", "2026-05-04", "2026-05-05"].forEach(
+      (d, i) => {
+        erp.setToday(d);
+        [w1, w2].forEach((w) =>
+          erp.recordHours(
+            {
+              workerId: w.id,
+              projectId: prjB.id,
+              chapterNum: i === 0 ? "1" : "2",
+              date: d,
+              hoursMilli: 8000,
+            },
+            "operations",
+          ),
+        );
+      },
+    );
+    erp.setToday("2026-04-30");
+    erp.markProgress(prjB.id, "1", "done", 100, "operations");
+    erp.markProgress(prjB.id, "2", "inProgress", 35, "operations");
 
     /* ---- §2.1: a pinned project, and worker documentation with real dates ---- */
     erp.setProjectPriority(prjB.id, true, "seed");

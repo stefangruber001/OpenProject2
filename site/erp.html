@@ -547,6 +547,9 @@
   <div class="toast" id="toast"></div>
 
 <script src="erp-engine.js"></script>
+<!-- erp-history.js must load BEFORE erp-seed.js: the seed calls into it to
+     back-fill 2024-06…2025-12 before staging its own 2026 records. -->
+<script src="erp-history.js"></script>
 <script src="erp-seed.js"></script>
 <!-- Persistence: one module owns the IndexedDB version for every page. -->
 <script src="erp-migrations.js"></script>
@@ -610,6 +613,7 @@ async function boot(){
   // arrive from a camera or a file — this commits no binary to the repository
   // and fetches nothing over the network.
   try{ await ensureDemoImages(); }catch(e){ /* never block boot over a picture */ }
+  if(fresh){ seedPlans(); persist(); }
 
   // UI preferences (period) live in the store's `meta`, never in the state blob.
   try{ const prefs=await ErpStore.getMeta("ui.prefs"); if(prefs&&prefs.period) PERIOD={...PERIOD,...prefs.period}; }catch(e){}
@@ -961,7 +965,7 @@ function buildUserMenu(){
     <a href="journey.html">▶️ Recorrido completo</a>
     <div class="sep"></div>
     <button id="uExport">⤓ Exportar datos</button>
-    <button id="uReset">↻ Datos de ejemplo</button>`;
+    <button id="uReset">↻ Recargar datos de demostración</button>`;
   $('#uExport').onclick=()=>{closeMenus();exportData();};
   $('#uReset').onclick=()=>{closeMenus();resetData();};
 }
@@ -1011,6 +1015,27 @@ const G_ROW=30, G_HEAD=34;
 const isoAdd=(iso,d)=>{const t=new Date(iso+"T00:00:00Z");t.setUTCDate(t.getUTCDate()+d);return t.toISOString().slice(0,10);};
 const isoDiff=(a,b)=>Math.round((Date.parse(b+"T00:00:00Z")-Date.parse(a+"T00:00:00Z"))/86400000);
 function ganttApi(){ return (typeof ErpBridge!=="undefined"&&ErpBridge.available)?ErpBridge.scheduling.plans:null; }
+/* Give every freshly-seeded project a schedule.
+   Plans are owned by @repo/capability-scheduling and live in the bundle, not
+   in erp-engine.js, so erp-seed.js (which also has to run under plain Node)
+   cannot build one. Deriving here — once, right after a seed or a reset, and
+   only for projects that have none — is what stops Seguimiento opening on an
+   empty chart. Never touches a project that already has a plan, so a user's
+   own dragging and re-linking is never overwritten. */
+function seedPlans(){
+  const B=ganttApi(); if(!B) return 0;
+  let made=0;
+  const cal=B.defaultCalendar();
+  for(const p of erp.state.projects){
+    if(!p.budgetId||!p.acceptedVersionId) continue;
+    if(erp.state.plans&&erp.state.plans[p.id]) continue;
+    try{
+      const derived=B.fromBudget(erp,p.id,{calendar:cal});
+      if(derived){ B.save(erp.state,p.id,derived.plan); made++; }
+    }catch(e){ /* a project the capability cannot schedule is not a boot failure */ }
+  }
+  return made;
+}
 /* Every change goes through one door: recalculate, store, persist, re-render.
    mutate() turns an engine refusal (a cycle, a bad duration) into a toast. */
 function ganttCommit(pid,plan,msg){
@@ -3659,8 +3684,14 @@ function exportData(){
   const blob=new Blob([JSON.stringify({_meta:{app:"Canei ERP",exportedAt:erp.today},data:erp.toJSON()},null,1)],{type:'application/json'});
   const a=el('a');a.href=URL.createObjectURL(blob);a.download='canei-erp.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);toast("Datos exportados");
 }
-function resetData(){ if(!confirm("¿Restablecer el entorno con los datos de ejemplo? Se sustituye todo lo actual."))return;
-  erp=ErpSeed.build(); persist(); render(); toast("Datos de ejemplo cargados"); }
+/* The ONLY way the demo dataset is reloaded. Deliberately explicit and
+   confirmed: boot() never reseeds over stored data by itself (see the schema
+   guard there), so a device that already holds records keeps them until a
+   person asks for this. That is also why a richer seed does not appear on its
+   own after an update — you have to press this. */
+function resetData(){
+  if(!confirm("¿Recargar los datos de demostración?\n\nSe sustituye TODO lo que haya ahora en este dispositivo por el conjunto de ejemplo: dos años de actividad (2024-2025) más la situación actual de 2026."))return;
+  erp=ErpSeed.build(); seedPlans(); persist(); render(); toast("Datos de demostración recargados — 2024 a 2026"); }
 window.addEventListener('hashchange',()=>{const k=location.hash.slice(1);if(k&&SUBMAP[k]&&!SUBMAP[k].href&&k!==cur){cur=k;render();}});
 boot();
 </script>
