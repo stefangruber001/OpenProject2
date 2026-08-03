@@ -28,7 +28,17 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DEV_BRANCH: claude/orin-project-status-1q50dt
+  # The branch published under /preview.
+  #
+  # Sessions 1-3 ran on claude/orin-project-status-1q50dt; session 4 moved the
+  # programme to the branch below and this value did NOT move with it, so
+  # /preview quietly kept serving session-3 content for the whole of sessions
+  # 4-12. Nothing failed and nothing was red — the preview was simply built
+  # from a branch nobody was committing to any more, which is exactly the kind
+  # of drift that only shows up when somebody opens the link expecting to
+  # review the latest work. If the programme branch changes again, change it
+  # here in the SAME commit.
+  DEV_BRANCH: claude/candi-programme-session-4-07amo8
 
 jobs:
   deploy:

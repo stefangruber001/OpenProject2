@@ -8,7 +8,11 @@ name: Refresh dev preview on dev-branch push
 
 on:
   push:
-    branches: [claude/orin-project-status-1q50dt]
+    # Must name the CURRENT programme branch — see the same note in pages.yml.
+    # A `push` trigger is read from the pushed branch's own copy of this file,
+    # so this list and pages.yml's DEV_BRANCH have to be changed together or
+    # the preview silently stops tracking the work.
+    branches: [claude/candi-programme-session-4-07amo8]
     paths: ["site/**", ".github/workflows/pages.yml", ".github/workflows/preview-refresh.yml"]
   workflow_dispatch:
 
