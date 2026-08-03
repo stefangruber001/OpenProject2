@@ -165,6 +165,10 @@ import is the pack's zod-free `rates` subpath.
 `pnpm --filter web test:e2e` was not required: no tenant spec and no capability
 registry entry changed, so the composed-capability count stays 17.
 
+Confirmed on GitHub for `ae543af`: `CI` run 183 green (all five jobs, including
+the committed-bundle drift check and the Playwright End-to-end job) and
+`Site E2E` run 25 green. First push, no fixes needed.
+
 The fourteen new E2E checks are made in a real browser because that is where
 this kind of feature breaks: the header must actually carry nine fields, the
 selection must actually survive a hash change, the derived bars must have

@@ -54,7 +54,7 @@ session too, including ones started from a fresh chat off this file.
 | 7   | Extraction capability + Spanish profile                | done        | 4361085, 3e063c9                   |
 | 8   | OCR bridge + invoice capture (Improvement #2)          | not started | —                                  |
 | 9   | Budget builder + graphic annex (Improvement #1)        | done        | f2524b3                            |
-| 10a | Projects: Gantt-from-budget, baselines, economics      | done        | (this session)                     |
+| 10a | Projects: Gantt-from-budget, baselines, economics      | done        | ae543af                            |
 | 10b | Compras, subcontratos, modificaciones, horas           | not started | —                                  |
 | 11  | Administración: conciliación, gestoría, comunicaciones | not started | —                                  |
 | 12  | Torre, Mi Día, Recorrido (Improvement #3), alerts      | not started | —                                  |
