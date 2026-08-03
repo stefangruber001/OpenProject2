@@ -297,6 +297,42 @@
         return s;
       },
     },
+    {
+      to: 9,
+      name: "customer record: creation date in, activityLine out",
+      /*
+       * The ONLY migration in this ladder that REMOVES a key, and it does so
+       * deliberately rather than by accident — which is why migrations-sim's
+       * additive guard names this exact path as an allowed removal instead of
+       * being relaxed. Read that allowance as the change record.
+       *
+       *   party.activityLine   DROPPED. A línea de actividad describes the
+       *                        WORK, not the person paying for it: the same
+       *                        customer can have a bathroom, a damp survey and
+       *                        a shop fit-out. It stays on budgets and projects
+       *                        (profitability("activityLine") groups projects
+       *                        by it and is untouched); on the customer it was
+       *                        a second, weaker copy that could disagree with
+       *                        the job's own line. Nothing reads it any more.
+       *   party.createdAt      added — the "alta" date the customer list shows.
+       *                        Backfilled to null, not to today: a record
+       *                        migrated from an older blob genuinely has no
+       *                        known creation date, and inventing one would put
+       *                        a confident wrong date on every historic client.
+       *                        The UI renders null as "—".
+       *   party.contactPerson / .landline  declared as strings if absent, so
+       *                        the new columns never read undefined.
+       */
+      up: function (s) {
+        (Array.isArray(s.parties) ? s.parties : []).forEach(function (p) {
+          delete p.activityLine;
+          if (!("createdAt" in p)) p.createdAt = null;
+          if (typeof p.contactPerson !== "string") p.contactPerson = "";
+          if (typeof p.landline !== "string") p.landline = "";
+        });
+        return s;
+      },
+    },
   ];
 
   var CURRENT_VERSION = MIGRATIONS.reduce(function (max, m) {

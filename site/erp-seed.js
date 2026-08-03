@@ -52,7 +52,6 @@
       mobile: "937000001",
       email: "ventas@matvalles.example",
       paymentTermsDays: 30,
-      activityLine: "other",
       leadSource: "other",
     });
     const supElec = erp.addParty({
@@ -67,7 +66,6 @@
       mobile: "936000002",
       email: "info@electrobaix.example",
       paymentTermsDays: 30,
-      activityLine: "other",
       leadSource: "other",
     });
     const supFont = erp.addParty({
@@ -84,7 +82,6 @@
       paymentTermsDays: 15,
       irpfApplies: false,
       irpfRateBp: 0,
-      activityLine: "other",
       leadSource: "other",
     });
     const supArch = erp.addParty({
@@ -101,7 +98,6 @@
       paymentTermsDays: 15,
       irpfApplies: true,
       irpfRateBp: 1500,
-      activityLine: "other",
       leadSource: "other",
     });
 
@@ -111,6 +107,8 @@
       partyType: "individual",
       name: "Marta Roca Puig",
       taxId: "12345678Z",
+      contactPerson: "Marta Roca Puig",
+      landline: "934771208",
       billStreet: "Av. Barcelona 10, 3º 2ª",
       billPostalCode: "08960",
       billCity: "Sant Just Desvern",
@@ -118,7 +116,6 @@
       mobile: "600111222",
       email: "marta.roca@example.com",
       leadSource: "referrer",
-      activityLine: "renovation",
       paymentMethod: "transfer",
       paymentTermsDays: 15,
     });
@@ -127,6 +124,7 @@
       partyType: "community",
       name: "Comunidad Prop. Balmes 120",
       taxId: "H08571730",
+      contactPerson: "Jordi Vives (administrador de fincas)",
       billStreet: "C/ Balmes 120",
       billPostalCode: "08008",
       billCity: "Barcelona",
@@ -135,7 +133,6 @@
       mobile: "634000000",
       email: "vives@fincasvives.example",
       leadSource: "propertyManager",
-      activityLine: "commercial",
       paymentMethod: "transfer30",
       paymentTermsDays: 30,
     });
@@ -144,6 +141,8 @@
       partyType: "company",
       name: "Nou Local Gràcia S.L.",
       taxId: "B66957286",
+      contactPerson: "Jordi Massana",
+      landline: "932184460",
       billStreet: "C/ Verdi 22",
       billPostalCode: "08012",
       billCity: "Barcelona",
@@ -151,7 +150,6 @@
       mobile: "620333444",
       email: "jordi@noulocal.example",
       leadSource: "website",
-      activityLine: "commercial",
       paymentMethod: "transfer60",
       paymentTermsDays: 60,
       registry: "R.M. Barcelona, T.48001, F.120",
@@ -161,6 +159,8 @@
       partyType: "individual",
       name: "Pau Ferrer Vila",
       taxId: "46027840X",
+      contactPerson: "Pau Ferrer Vila",
+      landline: "933726611",
       billStreet: "C/ Laurel 8",
       billPostalCode: "08950",
       billCity: "Esplugues de Llobregat",
@@ -168,7 +168,6 @@
       mobile: "655001122",
       email: "pau.ferrer@example.com",
       leadSource: "leadPlatform",
-      activityLine: "damp",
       paymentMethod: "transfer",
       paymentTermsDays: 15,
     });
@@ -178,7 +177,6 @@
       name: "Sra. García (pendiente de datos)",
       mobile: "688777666",
       leadSource: "wordOfMouth",
-      activityLine: "repairs",
     }); // no taxId/address — cleansing queue
 
     /* properties */
@@ -933,7 +931,6 @@
     const prjQ = erp.createQuickProject({
       partyId: cRoca.id,
       desc: "Reparación persiana y grifería",
-      activityLine: "repairs",
       valueCents: 32000,
     });
     erp.recordHours({ workerId: w2.id, projectId: prjQ.id, chapterNum: "1", hoursMilli: 4000 });

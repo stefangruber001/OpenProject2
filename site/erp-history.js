@@ -186,6 +186,23 @@
     ],
   ];
 
+  /* Named contacts for the companies and communities, aligned with CUSTOMERS
+     by index. Private customers are their own contact and are not listed. */
+  const CONTACTS = [
+    "",
+    "",
+    "Sílvia Roca",
+    "Manel Torner (presidente)",
+    "",
+    "",
+    "Anna Prats",
+    "",
+    "Teresa Bonet (administradora)",
+    "",
+    "",
+    "Xavier Fort",
+  ];
+
   /* Every job is one complete commercial→delivery→cash cycle. `outcome`
      decides how far down that chain it travels, so the dataset contains
      genuinely lost deals and genuinely unfinished work rather than a
@@ -220,6 +237,10 @@
 
     const parties = [];
     const properties = [];
+    // The job's línea de actividad, kept alongside the customer rather than ON
+    // it: a line describes the work, and the same customer can commission a
+    // reforma one year and a damp survey the next.
+    const lines = [];
 
     // Customers are created dated to their first lead, so "antigüedad" and the
     // relationship segment mean something rather than everyone joining at once.
@@ -243,11 +264,15 @@
             .replace(/[^a-z]+/g, ".")
             .replace(/^\.|\.$/g, "") + "@example.com",
         leadSource,
-        activityLine,
+        // A company or a community is reached through a person; a private
+        // customer is their own contact. Both columns are shown in Clientes.
+        contactPerson: partyType === "individual" ? name : CONTACTS[i],
+        landline: "93" + String(1000000 + Math.floor(rand() * 8999999)),
         paymentMethod: partyType === "individual" ? "transfer" : "transfer30",
         paymentTermsDays: partyType === "individual" ? 15 : 30,
       });
       parties.push(p);
+      lines.push(activityLine);
       properties.push(
         erp.addProperty({
           partyId: p.id,
@@ -369,7 +394,7 @@
     for (const job of JOBS) {
       const party = parties[job.cust];
       const prop = properties[job.cust];
-      const line = party.activityLine || "renovation";
+      const line = lines[job.cust] || "renovation";
 
       // ── commercial: lead → visit → quote ────────────────────────────────
       erp.setToday(job.lead);

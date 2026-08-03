@@ -445,7 +445,13 @@
           email: "",
           preferredChannel: "mobile", // MDM-04
           leadSource: "",
-          activityLine: "", // MDM-06 / ORG-02
+          // No activityLine here on purpose. A "línea de actividad" belongs to
+          // the WORK, not to the person paying for it — the same customer can
+          // have a bathroom, a damp survey and a shop fit-out — so it lives on
+          // budgets and projects (where profitability("activityLine") reads it)
+          // and was removed from the party model. Schema v9 drops it from
+          // stored records too.
+          createdAt: this.state.today, // MDM-01: when this record entered the file
           paymentMethod: "transfer",
           paymentTermsDays: 30,
           vatRegime: "standard",

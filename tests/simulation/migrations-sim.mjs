@@ -75,6 +75,20 @@ assert(retyped.length === 0, "no pre-existing top-level key changed type", retyp
  *
  * Returns the paths that broke the rule, so a failure names the field.
  */
+/*
+ * Keys the product removed ON PURPOSE, written as the path with array indices
+ * collapsed to "[]". The guard below still fails on every other dropped key —
+ * this list is the change record, not an escape hatch. Adding to it should
+ * take an argument; the one entry here has one:
+ *
+ *   parties[].activityLine — v9. A línea de actividad describes the work, not
+ *   the person paying for it, so it lives on budgets and projects (where
+ *   profitability("activityLine") still reads it) and was a weaker duplicate
+ *   on the customer that could disagree with the job's own line.
+ */
+const INTENTIONAL_REMOVALS = new Set(["parties[].activityLine"]);
+const generalise = (p) => p.replace(/\[\d+\]/g, "[]");
+
 function additiveViolations(before, after, path = "") {
   const at = path || "(root)";
   if (Array.isArray(before)) {
@@ -86,11 +100,11 @@ function additiveViolations(before, after, path = "") {
   if (before && typeof before === "object") {
     if (!after || typeof after !== "object" || Array.isArray(after))
       return [`${at}: object -> ${Array.isArray(after) ? "array" : typeof after}`];
-    return Object.keys(before).flatMap((k) =>
-      k in after
-        ? additiveViolations(before[k], after[k], path ? `${path}.${k}` : k)
-        : [`${at}.${k}: dropped`],
-    );
+    return Object.keys(before).flatMap((k) => {
+      const here = path ? `${path}.${k}` : k;
+      if (k in after) return additiveViolations(before[k], after[k], here);
+      return INTENTIONAL_REMOVALS.has(generalise(here)) ? [] : [`${at}.${k}: dropped`];
+    });
   }
   return before === after ? [] : [`${at}: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`];
 }
