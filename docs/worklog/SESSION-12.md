@@ -237,6 +237,45 @@ Two consequences worth knowing:
 because a `push` trigger is read from the pushed branch's own copy of the
 file — the two must name the same branch or the auto-refresh silently stops.
 
+## Follow-up: two years of demo history (site/erp-history.js)
+
+Several screens opened empty because the seed only ever staged a _present_:
+Subcontratos, Recibos, the gestoría send history, accountant queries, crew
+assignments, feedback and supplier performance had zero records; Compras and
+Modificaciones had one each; and no project had a stored Gantt plan.
+
+`site/erp-history.js` generates **2024-06 → 2025-12** through the real engine
+API (no direct state writes, so history obeys the same refusals live data
+does). Roughly: 21 parties, 21 opportunities incl. lost/open/quoted, 14
+projects, 26 invoices, 8 subcontracts, 224 labour entries, 5 quarterly
+packages sent, and one aged receivable left unpaid deliberately.
+
+Three constraints a future session must not break:
+
+- **It stops at 2025-12-31.** Document series restart per fiscal year, so
+  history occupies the 2024/2025 series and cannot renumber the 2026
+  identifiers ~147 browser checks assert by name (`FAC-2026-0002`,
+  `PRE-2026-0003`, `P-2026-0001`, `EB-3301`). Extending history into 2026
+  would renumber them and break the suite.
+- **The §4 screens are project-scoped**, so history behind _closed_ jobs left
+  Compras/Subcontratos/Modificaciones/Horas empty on the project the app
+  opens with. `P-2026-0002` carries the full current chain instead —
+  deliberately NOT the default `P-2026-0001`, because several checks take
+  "the first purchase order / subcontract on screen" and seeding there would
+  change which row they grab.
+- **Nothing reseeds silently.** `boot()` still never overwrites stored data,
+  so a device that already holds records keeps them. The richer dataset
+  appears only via the profile menu's "↻ Recargar datos de demostración"
+  (`resetData()`). That is also why an app update alone does not show it.
+
+`seedPlans()` in erp.html derives a Gantt per project once after a seed or
+reset — plans belong to the scheduling capability and live in the bundle, so
+erp-seed.js (which must also run under plain Node) cannot build one. It skips
+any project that already has a plan, so user scheduling is never overwritten.
+
+Worker rate bands now start in 2024 because `workerRateCents` refuses to
+guess a rate that was never in force; the 2026 figures are unchanged.
+
 ## The bug the tooling caught
 
 **A drawer rebuilding its own `innerHTML` from inside a field's own
