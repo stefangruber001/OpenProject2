@@ -622,6 +622,8 @@ async function boot(){
        if(pp){ projFavs=pp.favs||[]; projRecents=pp.recents||[]; } }catch(e){}
   try{ const tp=await ErpStore.getMeta("ui.torre");
        if(tp){ torreOrder=tp.order||[]; torreHidden=tp.hidden||[]; } }catch(e){}
+  try{ const cp=await ErpStore.getMeta("ui.clientes");
+       if(cp&&CLI_PAGE_SIZES.includes(cp.pageSize)) cliPageSize=cp.pageSize; }catch(e){}
 
   const hashKey=location.hash.slice(1);
   if(hashKey&&SUBMAP[hashKey]&&!SUBMAP[hashKey].href) cur=hashKey;
@@ -2352,6 +2354,64 @@ function torre(v){
   wireAlertsPanel();
 }
 /** §2.1 "exportar la vista a PDF/Excel" — a real CSV download; print (Ctrl+P) covers PDF honestly via the browser's own dialog. */
+/* ===================== table export: CSV and real .xlsx =====================
+   A genuine .xlsx, not a CSV wearing an Excel extension. An .xlsx is a ZIP of
+   XML parts, so the ZIP writer below stores (never deflates) the five parts
+   Excel needs. Every cell is written as an inline string on purpose: postal
+   codes, phone numbers and client codes are text, and letting Excel guess
+   turns "08960" into 8960 and eats the leading zero. No dependency — the
+   whole writer is ~60 lines and the alternative was shipping a library into
+   a page that has to work from a bare static host. */
+const CRC_T=(()=>{let c,t=[];for(let n=0;n<256;n++){c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
+function crc32(b){let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRC_T[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function zipStore(files){
+  const enc=new TextEncoder(), parts=[], central=[]; let off=0;
+  const u16=(a,o,v)=>{a[o]=v&255;a[o+1]=(v>>>8)&255;};
+  const u32=(a,o,v)=>{a[o]=v&255;a[o+1]=(v>>>8)&255;a[o+2]=(v>>>16)&255;a[o+3]=(v>>>24)&255;};
+  for(const f of files){
+    const name=enc.encode(f.path), data=f.bytes, crc=crc32(data);
+    const lh=new Uint8Array(30+name.length);
+    u32(lh,0,0x04034b50); u16(lh,4,20); u16(lh,6,0); u16(lh,8,0); u16(lh,10,0); u16(lh,12,0);
+    u32(lh,14,crc); u32(lh,18,data.length); u32(lh,22,data.length); u16(lh,26,name.length); u16(lh,28,0);
+    lh.set(name,30); parts.push(lh,data);
+    const ch=new Uint8Array(46+name.length);
+    u32(ch,0,0x02014b50); u16(ch,4,20); u16(ch,6,20); u16(ch,8,0); u16(ch,10,0); u16(ch,12,0); u16(ch,14,0);
+    u32(ch,16,crc); u32(ch,20,data.length); u32(ch,24,data.length); u16(ch,28,name.length);
+    u16(ch,30,0); u16(ch,32,0); u16(ch,34,0); u16(ch,36,0); u32(ch,38,0); u32(ch,42,off);
+    ch.set(name,46); central.push(ch); off+=lh.length+data.length;
+  }
+  let cs=0; central.forEach(c=>cs+=c.length);
+  const end=new Uint8Array(22);
+  u32(end,0,0x06054b50); u16(end,4,0); u16(end,6,0); u16(end,8,files.length); u16(end,10,files.length);
+  u32(end,12,cs); u32(end,16,off); u16(end,20,0);
+  return new Blob([...parts,...central,end],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+const xmlEsc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]));
+const colRef=i=>{let s="",n=i;do{s=String.fromCharCode(65+(n%26))+s;n=Math.floor(n/26)-1;}while(n>=0);return s;};
+function xlsxBlob(sheetName,rows){
+  const enc=new TextEncoder();
+  const sheet=rows.map((r,ri)=>`<row r="${ri+1}">`+r.map((c,ci)=>
+      `<c r="${colRef(ci)}${ri+1}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(c)}</t></is></c>`).join("")+`</row>`).join("");
+  const f=(path,xml)=>({path,bytes:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+xml)});
+  return zipStore([
+    f("[Content_Types].xml",'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'),
+    f("_rels/.rels",'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'),
+    f("xl/workbook.xml",`<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xmlEsc(sheetName).slice(0,31)}" sheetId="1" r:id="rId1"/></sheets></workbook>`),
+    f("xl/_rels/workbook.xml.rels",'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'),
+    f("xl/worksheets/sheet1.xml",`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${sheet}</sheetData></worksheet>`),
+  ]);
+}
+function downloadBlob(blob,filename){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+/** Excel opens a UTF-8 CSV correctly only with a BOM; without it accents break. */
+function downloadCsv(rows,filename){
+  const csv=rows.map(r=>r.map(x=>`"${String(x??"").replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  downloadBlob(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}),filename);
+}
+
 function exportTorreCsv(ct){
   const rows=[["Indicador","Valor principal","Detalle"]].concat(
     torreCardList().map(c=>[c.label,c.big(ct.cards).replace(/\s/g," "),c.small(ct.cards).replace(/\s/g," ")]));
@@ -2570,6 +2630,30 @@ function shiftMonth(ym,n){ const [y,m]=ym.split("-").map(Number); const d=new Da
 const PROJECT_SUBS=["proyectos","compras","subcontratos","seguimiento","economia","modificaciones","horas"];
 let projFilter="", projStatus="open";
 let cliQuery="";   // Clientes name/code search (spec §3.1 buscador)
+/* Paging is a view concern, so it lives here and not in the state blob. The
+   page number is deliberately NOT persisted — coming back to Clientes should
+   start at the top — while the chosen page size is, because that is a habit. */
+let cliPage=1, cliPageSize=10;
+const CLI_PAGE_SIZES=[10,20,50];
+function saveCliPrefs(){ try{ ErpStore.setMeta("ui.clientes",{pageSize:cliPageSize}); }catch(e){} }
+/* One list drives the table head AND the export, so a column can never be
+   added to the screen and quietly missing from the file. The accessor returns
+   plain text: the table renders pills, a spreadsheet cell cannot. */
+const CLI_COLS=[
+  ["Código", p=>p.code],
+  ["Nombre / Razón social", p=>p.name],
+  ["NIF/CIF", p=>p.taxId||""],
+  ["Contacto", p=>p.contactPerson||""],
+  ["Teléfono", p=>p.landline||""],
+  ["Móvil", p=>p.mobile||""],
+  ["Email", p=>p.email||""],
+  ["Dirección", p=>p.billStreet||""],
+  ["Ciudad", p=>p.billCity||""],
+  ["Provincia", p=>p.billProvince||""],
+  ["C.P.", p=>p.billPostalCode||""],
+  ["Alta", p=>p.createdAt||""],
+  ["Datos", p=>{const c=erp.partyCompleteness(p.id); return c.ok?"Completo":`${c.pct}% · falta ${c.missing.length}`;}],
+];
 let projFavs=[], projRecents=[];
 function saveProjPrefs(){ try{ ErpStore.setMeta("ui.projects",{favs:projFavs,recents:projRecents}); }catch(e){} }
 function projectOptions(){
@@ -2995,17 +3079,28 @@ const VIEWS={
   const rows=erp.state.parties
     .filter(p=>p.active&&p.roles.includes("customer"))
     .filter(p=>!q||p.name.toLowerCase().includes(q)||String(p.code).toLowerCase().includes(q));
+  // Deleting or filtering can leave the current page past the end; clamp
+  // rather than showing an empty table on page 4 of 2.
+  const pages=Math.max(1,Math.ceil(rows.length/cliPageSize));
+  if(cliPage>pages) cliPage=pages;
+  const start=(cliPage-1)*cliPageSize, page=rows.slice(start,start+cliPageSize);
   v.innerHTML=`<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
     <button class="btn primary sm" id="bNew">＋ Nuevo</button>
     <input id="cliQ" placeholder="Buscar cliente por nombre" value="${esc(cliQuery)}"
       style="flex:0 1 280px;min-width:190px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)">
+    <span style="position:relative">
+      <button class="btn sm" id="bExp">⬇ Exportar</button>
+      <span id="expMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:40;min-width:160px;
+        background:var(--paper);border:1px solid var(--line);border-radius:9px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:4px;flex-direction:column">
+        <button class="btn sm" id="expXlsx" style="justify-content:flex-start;border:0;background:none">Excel (.xlsx)</button>
+        <button class="btn sm" id="expCsv" style="justify-content:flex-start;border:0;background:none">CSV (.csv)</button>
+      </span></span>
     <span class="tag">${(()=>{const tot=erp.state.parties.filter(p=>p.active&&p.roles.includes("customer")).length;
       const n=q?tot:rows.length; // when filtering, the noun agrees with the total ("1 de 17 clientes")
       return `${rows.length}${q?` de ${tot}`:""} cliente${n===1?"":"s"}`;})()}</span></div>
    <div class="card"><div class="scroll"><table><thead><tr>
-     <th>Código</th><th>Nombre / Razón social</th><th>NIF/CIF</th><th>Contacto</th><th>Teléfono</th><th>Móvil</th>
-     <th>Email</th><th>Dirección</th><th>Ciudad</th><th>Provincia</th><th>C.P.</th><th>Alta</th><th>Datos</th></tr></thead><tbody>
-   ${rows.map(p=>{const c=erp.partyCompleteness(p.id);return `<tr class="click" data-id="${p.id}">
+     ${CLI_COLS.map(c=>`<th>${c[0]}</th>`).join("")}</tr></thead><tbody>
+   ${page.map(p=>{const c=erp.partyCompleteness(p.id);return `<tr class="click" data-id="${p.id}">
      <td class="k">${p.code}</td><td class="k">${esc(p.name)}</td>
      <td>${p.taxId?esc(p.taxId):'<span class="pill r">Falta</span>'}</td>
      <td>${esc(p.contactPerson||"—")}</td>
@@ -3015,14 +3110,45 @@ const VIEWS={
      <td>${esc(p.billProvince||"—")}</td><td>${esc(p.billPostalCode||"—")}</td>
      <td>${p.createdAt?fmtD(p.createdAt):"—"}</td>
      <td>${c.ok?'<span class="pill g">Completo</span>':`<span class="pill r">${c.pct}% · falta ${c.missing.length}</span>`}</td></tr>`;}).join("")
-    ||'<tr><td colspan="13"><div class="empty">Ningún cliente coincide con la búsqueda.</div></td></tr>'}
-   </tbody></table></div></div>`;
+    ||`<tr><td colspan="${CLI_COLS.length}"><div class="empty">Ningún cliente coincide con la búsqueda.</div></td></tr>`}
+   </tbody></table></div>
+   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line)">
+     <label style="font-size:12px;color:var(--dim)">Filas por pantalla
+       <select id="cliSize" style="font:inherit;font-size:12px;margin-left:6px;padding:4px 6px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink)">
+         ${CLI_PAGE_SIZES.map(n=>`<option value="${n}"${n===cliPageSize?" selected":""}>${n}</option>`).join("")}
+       </select></label>
+     <span style="flex:1"></span>
+     <span style="font-size:12px;color:var(--dim)">${rows.length?`${start+1}–${Math.min(start+cliPageSize,rows.length)} de ${rows.length}`:"0 de 0"} · página ${cliPage} de ${pages}</span>
+     <button class="btn sm" id="cliPrev"${cliPage<=1?" disabled":""}>‹ Anterior</button>
+     <button class="btn sm" id="cliNext"${cliPage>=pages?" disabled":""}>Siguiente ›</button>
+   </div></div>`;
   v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>partyDrawer(tr.dataset.id));
   $('#bNew').onclick=()=>newPartyDrawer("customer");
   // Re-render on input would lose focus mid-word, so the field filters in
   // place and only the table body is rebuilt by the next render() call.
   const qi=$('#cliQ');
-  qi.oninput=()=>{ cliQuery=qi.value; const at=qi.selectionStart; render(); const n=$('#cliQ'); if(n){n.focus(); n.setSelectionRange(at,at);} };
+  qi.oninput=()=>{ cliQuery=qi.value; cliPage=1; const at=qi.selectionStart; render(); const n=$('#cliQ'); if(n){n.focus(); n.setSelectionRange(at,at);} };
+  $('#cliSize').onchange=e=>{ cliPageSize=Number(e.target.value)||10; cliPage=1; saveCliPrefs(); render(); };
+  $('#cliPrev').onclick=()=>{ if(cliPage>1){ cliPage--; render(); } };
+  $('#cliNext').onclick=()=>{ if(cliPage<pages){ cliPage++; render(); } };
+  // The menu exports what the user is looking at — every row the filter
+  // matched, not just the page on screen. Exporting one page of ten would be
+  // a surprise the moment anyone uses the result for anything.
+  // Visibility is toggled through style.display, not the `hidden` attribute:
+  // the popup needs an inline `display` for its layout, and any inline display
+  // silently overrides what `hidden` does, leaving the menu permanently open.
+  const menu=$('#expMenu');
+  const closeMenu=()=>{ menu.style.display="none"; };
+  $('#bExp').onclick=ev=>{ ev.stopPropagation();
+    const open=menu.style.display==="none";
+    menu.style.display=open?"flex":"none";
+    // The opening click never reaches document (stopPropagation above), so the
+    // next click anywhere else is what dismisses the menu.
+    if(open) document.addEventListener('click',closeMenu,{once:true}); };
+  menu.onclick=ev=>ev.stopPropagation();
+  const sheet=()=>[CLI_COLS.map(c=>c[0])].concat(rows.map(p=>CLI_COLS.map(c=>c[1](p))));
+  $('#expXlsx').onclick=()=>{ closeMenu(); downloadBlob(xlsxBlob("Clientes",sheet()),`clientes-${erp.today}.xlsx`); toast("Exportado a Excel"); };
+  $('#expCsv').onclick=()=>{ closeMenu(); downloadCsv(sheet(),`clientes-${erp.today}.csv`); toast("Exportado a CSV"); };
  },
 
  /* ---------- Oportunidades ---------- */

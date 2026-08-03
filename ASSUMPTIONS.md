@@ -819,3 +819,43 @@ languages: es-ES # source: synthetic
   `series`, `lastCalculatedAt`) — nothing existing callers (year-sim, migrations-sim) already read
   was renamed or removed, and no packages/capability changed, so the committed browser bundle is
   untouched this session.
+
+- **#57 — CANEI Clientes rework: a customer registry that a person can actually work in (2026-08-03).**
+  Spec §3.1 (Clientes / gestión de terceros), driven by direct operator annotations on the live
+  screen rather than by a session of the twelve-session plan.
+  **Decisions:** (a) **`Clientes` is now a customer-only registry.** The Roles column and the role
+  selector on the create drawer are gone, because a screen titled "Clientes" that lists suppliers
+  and industriales is lying about what it is; the underlying party record still carries `roles`, so
+  a supplier/industrial screen remains a pure UI addition whenever it is asked for, with no data
+  change. (b) **`party.activityLine` was removed outright — the one deliberate deletion in the whole
+  migration ladder (v9).** A línea de actividad describes the work, not the person paying for it, so
+  it belongs on budgets and projects (where `profitability("activityLine")` still reads it) and was
+  a weaker duplicate on the customer that could disagree with the job's own line. The additive-only
+  guard in `migrations-sim.mjs` was NOT loosened: it grew an explicit `INTENTIONAL_REMOVALS` set
+  with this one path and the argument for it, so the guard still fails on every other dropped key
+  and the removal is a change record rather than an escape hatch. (c) **Fields the operator asked
+  for that had no home were added to the record, not faked in the view** — `contactPerson`,
+  `landline` and `createdAt`. v9 backfills `createdAt` to **`null`, never to today**: a migration
+  that stamps today's date on a customer created two years ago is inventing a fact, and the list
+  renders "—" for it honestly. (d) **Deleting a customer is guarded by the documents that reference
+  it, not by a soft flag.** `deleteParty()` walks budgets, contracts, projects, invoices, receipts,
+  bills, collections, subcontracts and purchases and refuses by naming up to four blocking
+  documents; the UI then offers deactivation instead. Silently deleting a party that a filed
+  invoice points at is the failure mode this exists to prevent. (e) **Search, paging and page size
+  are view state.** The name/code filter and the page number reset on every visit; only the chosen
+  page size (10 default, 10/20/50) is persisted, in `ErpStore` meta alongside the other UI
+  preferences — never in the state blob, because how many rows fit a screen is a property of the
+  screen, not of the tenant. (f) **Export writes a genuine `.xlsx`, reversing #56(h).** That entry
+  judged a real XLSX writer not worth the weight _for a dashboard of eight indicators_; a customer
+  registry is a table people take to a gestoría, and a CSV renamed `.xlsx` is the kind of small lie
+  that gets found out in front of someone else. The writer is ~60 lines of ZIP + SpreadsheetML with
+  no dependency (a page served from a bare static host cannot pull a library), and **every cell is
+  an inline string on purpose**: postal codes, phone numbers and client codes are text, and letting
+  Excel guess turns `08960` into `8960`. (g) **One `CLI_COLS` table drives the table head and both
+  exports**, so a column can never be added to the screen and go quietly missing from the file.
+  (h) **Export sends every row the filter matched, not the page on screen** — exporting ten of
+  seventeen because ten happened to be visible is a surprise the moment anyone uses the result.
+  (i) **The fit-all-columns-to-width table sizing was built, shown, and reverted at the operator's
+  request**; the list keeps natural column widths and scrolls horizontally. Reversible: v9 is the
+  only non-additive step and is documented as such in both the ladder and the guard; everything
+  else is UI, and no packages/capability changed, so the committed browser bundle is untouched.

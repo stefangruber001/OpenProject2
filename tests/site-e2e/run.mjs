@@ -1673,6 +1673,45 @@ async function testErp(browser, base) {
     await pg.locator("#dClose").click();
     await pg.waitForTimeout(200);
 
+    // Clientes: the list pages at 10 by default, the size selector changes it,
+    // and "Siguiente" actually moves to different clients.
+    await pg.evaluate(() => (location.hash = "clientes"));
+    await pg.waitForTimeout(350);
+    const pageOne = await pg.locator("tbody tr.click").count();
+    const firstCode = await pg.locator("tbody tr.click").first().innerText();
+    await pg.locator("#cliNext").click();
+    await pg.waitForTimeout(300);
+    const secondCode = await pg.locator("tbody tr.click").first().innerText();
+    await pg.locator("#cliSize").selectOption("20");
+    await pg.waitForTimeout(300);
+    const pageTwenty = await pg.locator("tbody tr.click").count();
+    if (pageOne === 10 && firstCode !== secondCode && pageTwenty > 10)
+      ok("erp: clientes paginate at 10 by default and honour the size selector");
+    else
+      bad(
+        "erp: clientes pagination",
+        `page1=${pageOne} sizeChange=${pageTwenty} moved=${firstCode !== secondCode}`,
+      );
+
+    // Export: the menu offers both formats, and the .xlsx writer really emits a
+    // ZIP container (a CSV renamed .xlsx would fail this).
+    await pg.locator("#bExp").click();
+    await pg.waitForTimeout(150);
+    const menuTxt = await pg.locator("#expMenu").innerText();
+    const zipMagic = await pg.evaluate(async () => {
+      const b = xlsxBlob("Clientes", [
+        ["Código", "Nombre"],
+        ["T-0005", "Marta"],
+      ]);
+      const head = new Uint8Array(await b.slice(0, 4).arrayBuffer());
+      return { magic: String.fromCharCode(head[0], head[1]), size: b.size };
+    });
+    const menuOk = /xlsx/i.test(menuTxt) && /csv/i.test(menuTxt);
+    if (menuOk && zipMagic.magic === "PK" && zipMagic.size > 500)
+      ok("erp: clientes export offers .xlsx/.csv and writes a real workbook");
+    else
+      bad("erp: clientes export", `${menuTxt.replace(/\n/g, " ")} · ${JSON.stringify(zipMagic)}`);
+
     // Gestoría: exception list + VAT summary render
     await pg.evaluate(() => (location.hash = "gestoria"));
     await pg.waitForTimeout(400);
