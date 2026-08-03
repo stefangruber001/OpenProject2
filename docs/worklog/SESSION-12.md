@@ -183,6 +183,10 @@ as the design, not read as "clone every screen a second time."
 | `pnpm --filter web test:e2e`                                  | 5/5 (not required — ran as a sanity check anyway)  |
 | Committed bundle                                              | untouched — no capability/pack source changed      |
 
+Confirmed on GitHub for `d2de900`: `CI` run 189 green (all jobs, including
+the committed-bundle drift check and the Playwright end-to-end job) and
+`Site E2E` run 28 green. First push, no fixes needed.
+
 The new checks drive the actual management verbs (assign, snooze, resolve,
 convert-to-task, edit a rule's threshold, hide a card), the calendar's month
 navigation and legend filter, and the full real-project loop in
