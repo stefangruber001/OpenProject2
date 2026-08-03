@@ -72,13 +72,22 @@
       "owner": "engine",
       "specSection": "4.5",
       "engineSection": "CHG — change orders & extras",
-      "plannedSession": "10b"
+      "plannedSession": null,
+      "note": "Session 10b added the step §4.5 actually asks for — sendChange (priced → sent, before acceptance) — while approveChange still accepts a straight priced → approved jump, because a verbal yes on site is common enough that requiring the intermediate step would just get worked around. Added chapterNum so a change's cost/margin effect attributes to the right chapter in the forecast (session 10a's ChangeOrder shape already expected one; it silently defaulted to \"1\" until now). renderChangeDoc composes the adenda as a customer-facing document with no cost or margin field, the same QUO-10 rule the budget document follows. cancelChange unwinds an un-invoiced change. Applying an approved change's schedule effect to the Gantt is a deliberate separate action (ErpBridge.scheduling.plans.applyChapterDelay) rather than something approval triggers automatically — one action, one system of record."
     },
     "purchases": {
       "owner": "engine",
       "specSection": "4.1",
       "engineSection": "PUR — purchases",
-      "plannedSession": "10b"
+      "plannedSession": null,
+      "note": "Session 10b gave the order a real lifecycle (draft → sent → accepted → partial/received → invoiced → paid, plus cancelled) derived from dates and receipts rather than stored as its own field, so it can never fall out of sync with what actually happened. purchaseNeeds() reads the same committedByChapter() the economics screen uses, so \"what still needs ordering\" can never disagree with \"what economía shows as pending\". purchaseReconciliation() is the three-way check (order ↔ receipts ↔ invoice) §4.1 asks for. committedCostCents/committedByChapter now include awarded subcontracts too, not just orders — comprometido was always supposed to mean both."
+    },
+    "subcontracts": {
+      "owner": "engine",
+      "specSection": "4.2",
+      "engineSection": "SUB — subcontracts",
+      "plannedSession": null,
+      "note": "New in session 10b — the area had no owner at all before this. One record per awarded trade: awarded/certified/invoiced/pending, mandatory documentation (insurance, PRL, Social Security registration) with a traffic light, retention, and a link to whichever Gantt task executes that trade. markSubcontractStarted BLOCKS — not just alerts — on expired or missing documentation, per §4.2's own \"bloqueo ... si está vencida\": letting an uninsured trade start on site is the one thing on this screen that should not merely be visible, it should not happen. A terminated subcontract counts as committed only up to what was actually certified, never the full award — the rest of it was never going to be spent."
     },
     "document-capture": {
       "owner": "engine",
@@ -108,7 +117,8 @@
       "owner": "engine",
       "specSection": "4.6",
       "engineSection": "LAB — labour hours",
-      "plannedSession": "10b"
+      "plannedSession": null,
+      "note": "Session 10b added the weekly grid (worker × day, per §4.6) over the entry recordHours already did, plus what the grid needs to be more than a table: locking (approveLabourWeek/unapproveLabourWeek), \"repetir el parte del día anterior\" (repeatDay, which never duplicates a worker already logged that day), and worker documentation with its own expiry alert. Recording hours against a closed project is now refused outright rather than merely flagged — the spec's \"horas imputadas a un proyecto cerrado\" alert can then never actually fire going forward, which is a stronger guarantee than an alert is. correctHours doubles as the reallocation action (\"reimputar horas de un proyecto a otro\") the spec asks for — a project or chapter change is just another patch, guarded by the same closed-project and locked-week checks."
     },
     "project-economics": {
       "owner": "factory",

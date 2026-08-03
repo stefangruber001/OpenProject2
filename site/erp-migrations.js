@@ -166,6 +166,53 @@
         return s;
       },
     },
+    {
+      to: 6,
+      name: "purchases lifecycle, subcontracts, and locked labour weeks",
+      /*
+       * Session 10b (§4.1 Compras, §4.2 Subcontratos, §4.6 Personal y Horas).
+       * Every addition here is a new, previously-absent field or collection —
+       * nothing existing is renamed, retyped or reinterpreted.
+       *
+       *   state.subcontracts   — new collection, one record per awarded trade.
+       *   purchase.receipts / .sentAt / .acceptedAt / .expectedArrival /
+       *     .cancelledAt       — the lifecycle purchaseStatus() derives from;
+       *     absent reads as "draft", exactly as it always implicitly did.
+       *   change.chapterNum / .sentAt — additive; a change with no chapterNum
+       *     already fell back to "1" wherever it was read (see erp-bridge.js's
+       *     projectValue), so leaving it null here changes no prior behaviour.
+       *   labour.locked / .approvedAt / .approvedBy — an existing entry reads
+       *     as unlocked, which is the only sane default for hours that were
+       *     recorded before "approving a week" existed as an action.
+       *   worker.docs          — new, empty array.
+       */
+      up: function (s) {
+        if (!Array.isArray(s.subcontracts)) s.subcontracts = [];
+        if (s.series && typeof s.series === "object" && !s.series.subcontract)
+          s.series.subcontract = { prefix: "SUB-", next: 1, issued: [] };
+        (Array.isArray(s.purchases) ? s.purchases : []).forEach(function (pu) {
+          if (!Array.isArray(pu.receipts)) pu.receipts = [];
+          if (!("sentAt" in pu)) pu.sentAt = null;
+          if (!("acceptedAt" in pu)) pu.acceptedAt = null;
+          if (!("expectedArrival" in pu)) pu.expectedArrival = null;
+          if (!("cancelledAt" in pu)) pu.cancelledAt = null;
+          if (!("cancelReason" in pu)) pu.cancelReason = "";
+        });
+        (Array.isArray(s.changes) ? s.changes : []).forEach(function (c) {
+          if (!("chapterNum" in c)) c.chapterNum = null;
+          if (!("sentAt" in c)) c.sentAt = null;
+        });
+        (Array.isArray(s.labour) ? s.labour : []).forEach(function (l) {
+          if (!("locked" in l)) l.locked = false;
+          if (!("approvedAt" in l)) l.approvedAt = null;
+          if (!("approvedBy" in l)) l.approvedBy = null;
+        });
+        (Array.isArray(s.workers) ? s.workers : []).forEach(function (w) {
+          if (!Array.isArray(w.docs)) w.docs = [];
+        });
+        return s;
+      },
+    },
   ];
 
   var CURRENT_VERSION = MIGRATIONS.reduce(function (max, m) {

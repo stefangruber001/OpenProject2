@@ -249,6 +249,14 @@
   td.good{color:var(--greenDeep)}
   .adj{font:600 10px var(--sans);color:var(--amber);background:var(--amberSoft);border-radius:999px;padding:1px 6px;margin-left:5px}
 
+  /* ---------- Compras · Subcontratos · Modificaciones · Horas (spec §4.1/§4.2/§4.5/§4.6) ---------- */
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
+  .dot.g{background:var(--greenLt)} .dot.y{background:var(--spark)} .dot.r{background:var(--danger)}
+  .wgrid input.hin{width:52px;text-align:right;font-variant-numeric:tabular-nums}
+  .wgrid td.wtot,.wgrid th.wtot{background:var(--greenSoft);font-weight:700}
+  .wgrid td.wknd{background:var(--hair)}
+  .stepbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+
   /* ---------- Budget builder: three simultaneous zones (spec §3.3) ----------
      Left, the chapter/line tree with its per-chapter totals; centre, the
      editable grid; right, the totals panel, which recalculates on every
@@ -581,12 +589,6 @@ const SUBMAP={}; SECTIONS.forEach(s=>s.subs.forEach(x=>SUBMAP[x.k]={...x,sec:s})
    will live there and links to where that data is managed today, so the menu
    never leads to a blank screen. */
 const PLACEHOLDERS={
- compras:{sub:"Órdenes de compra, recepciones y compromiso por capítulo.",
-   body:"El registro de compras y el compromiso de coste por capítulo ya existen y se consultan hoy dentro de cada proyecto.",goto:["proyectos","Abrir Proyectos"]},
- subcontratos:{sub:"Contratación de industriales, ofertas comparadas y documentación obligatoria.",
-   body:"Las ofertas por proveedor y su comparativa se gestionan hoy en Precios y costes; la contratación se registra en el proyecto.",goto:["precios","Abrir Precios y costes"]},
- modificaciones:{sub:"Extras y modificaciones contractuales con su aprobación.",
-   body:"Los extras se registran, valoran y aprueban hoy en la ficha del proyecto; sin aprobación no son facturables.",goto:["proyectos","Abrir Proyectos"]},
  conciliacion:{sub:"Importación de extracto y emparejamiento asistido con los registros.",
    body:"Los movimientos y su estado sin asignar están en Banco y caja; el emparejamiento asistido todavía no existe.",goto:["banco","Abrir Banco y caja"]},
  comunicaciones:{sub:"Plantillas, reglas de envío y cola de comunicaciones al cliente.",
@@ -1256,6 +1258,464 @@ function wireProgressTable(pid,plan){
     erp.markLineProgress(pid,inp.dataset.lineqty,{qtyMilliDone:Math.round(+inp.value*1000)},"operations");
     B.save(erp.state,pid,B.syncProgress(erp,pid,plan));
   },"Cantidad ejecutada registrada"));
+}
+
+/* ===================== Compras · Subcontratos · Modificaciones · Horas ==============
+   §4.1, §4.2, §4.5, §4.6. Every one of these is project-scoped through gProject,
+   same as seguimiento/economía — one job is the context of the whole section.
+   Nothing here computes a commitment, a reconciliation or a projection: those
+   come from erp.purchaseNeeds()/purchaseReconciliation()/committedByChapter()/
+   subcontractsForProject(), the same calls economía uses, so the figures on
+   these screens can never disagree with the ones there. */
+const DOC_KIND_LABEL={insurance:"Seguro RC",prl:"PRL",socialSecurity:"Alta S.S."};
+const SUPPLIER_ROLES=["supplier","subcontractor","selfEmployed"];
+const PURCHASE_STATUS_LABEL={draft:["Borrador",""],sent:["Enviada","b"],accepted:["Aceptada","b"],
+  partialReceived:["Recibida parcial","y"],received:["Recibida","g"],invoiced:["Facturada","g"],
+  paid:["Pagada","g"],cancelled:["Anulada","r"]};
+const SUBCONTRACT_STATUS_LABEL={draft:["Borrador",""],sent:["Enviada","b"],accepted:["Aceptada","b"],
+  inExecution:["En ejecución","y"],completed:["Completada","g"],terminated:["Rescindida","r"],
+  rejected:["Rechazada","r"]};
+const CHANGE_STATUS_LABEL={identified:["Detectada","y"],priced:["Valorada","y"],sent:["Enviada","b"],
+  approved:["Aceptada","g"],executed:["Aceptada","g"],invoiced:["Aceptada","g"],
+  rejected:["Rechazada","r"],cancelled:["Anulada","r"]};
+function supplierOptions(sel){
+  return erp.state.parties.filter(p=>p.active&&p.roles.some(r=>SUPPLIER_ROLES.includes(r)))
+    .map(s=>`<option value="${s.id}"${s.id===sel?" selected":""}>${esc(s.name)}</option>`).join("");
+}
+function chapterOptions(pid,sel){
+  const p=erp.project(pid);
+  return (p.baseline.chapters||[]).map(c=>`<option value="${c.num}"${c.num===sel?" selected":""}>${c.num}. ${esc(c.name)}</option>`).join("");
+}
+function noProjectsCard(v){ v.innerHTML='<div class="card"><div class="empty">Todavía no hay proyectos.</div></div>'; }
+
+/* ---------- Compras (§4.1) ---------- */
+function compras(v){
+  $('#sub').textContent="Necesidades derivadas del presupuesto, órdenes de compra con su ciclo de vida y calendario de llegadas.";
+  if(!erp.state.projects.length) return noProjectsCard(v);
+  const pid=gProject;
+  const needs=erp.purchaseNeeds(pid).filter(c=>c.pendingCents>0);
+  const orders=erp.state.purchases.filter(p=>p.projectId===pid);
+  const arrivals=orders.filter(p=>p.expectedArrival&&!p.status.delivered&&!p.cancelledAt)
+    .sort((a,b)=>a.expectedArrival<b.expectedArrival?-1:1);
+  v.innerHTML=`
+   <div class="stepbar"><button class="btn primary sm" id="cNew">＋ Nueva orden de compra</button></div>
+   <div class="card"><div class="ch"><h3>Necesidades</h3><span class="tag">lo comprometido frente a lo pendiente, por capítulo</span></div>
+    <div class="scroll"><table><thead><tr><th>Capítulo</th><th class="num">Presupuestado</th><th class="num">Comprometido</th><th class="num">Pendiente</th><th></th></tr></thead><tbody>
+    ${needs.map(c=>`<tr><td>${c.num}. ${esc(c.name)}</td><td class="num">${eur0(c.budgetCostCents)}</td><td class="num">${eur0(c.committedCents)}</td>
+      <td class="num warn">${eur0(c.pendingCents)}</td><td><button class="btn sm" data-need="${c.num}">＋ OC</button></td></tr>`).join("")
+      ||'<tr><td colspan="5"><div class="empty">Todos los capítulos están comprometidos.</div></td></tr>'}
+    </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Órdenes de compra</h3><span class="tag">${orders.length}</span></div>
+    <div class="scroll"><table><thead><tr><th>Número</th><th>Proveedor</th><th>Capítulo</th><th class="num">Importe</th><th>Llegada prevista</th><th>Estado</th></tr></thead><tbody>
+    ${orders.slice().reverse().map(pu=>{const st=erp.purchaseStatus(pu),lab=PURCHASE_STATUS_LABEL[st];
+      return `<tr class="click" data-pu="${pu.id}"><td class="k">${pu.number}</td><td>${esc(erp.party(pu.supplierId).name)}</td>
+      <td>${pu.chapterNum||"—"}</td><td class="num">${eur(pu.totalCents-pu.status.returnedCents)}</td>
+      <td>${pu.expectedArrival?fmtD(pu.expectedArrival):"—"}</td><td><span class="pill ${lab[1]}">${lab[0]}</span></td></tr>`;}).join("")
+      ||'<tr><td colspan="6"><div class="empty">Sin órdenes de compra.</div></td></tr>'}
+    </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Calendario de llegadas</h3></div><div class="daylist">
+    ${arrivals.map(pu=>`<div class="it"><span class="pill ${pu.expectedArrival<erp.today?"r":"b"}">${fmtD(pu.expectedArrival)}</span> ${pu.number} — ${esc(erp.party(pu.supplierId).name)}</div>`).join("")
+     ||'<div class="it">Sin llegadas previstas.</div>'}
+   </div></div>`;
+  $('#cNew').onclick=()=>purchaseFormDrawer(pid);
+  v.querySelectorAll('[data-need]').forEach(b=>b.onclick=()=>purchaseFormDrawer(pid,b.dataset.need));
+  v.querySelectorAll('[data-pu]').forEach(tr=>tr.onclick=()=>purchaseDrawer(tr.dataset.pu));
+}
+function purchaseFormDrawer(pid,chapterNum){
+  const db=openDrawer("Nueva orden de compra");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Proveedor *</label><select id="p_sup"><option value="">—</option>${supplierOptions()}</select></div>
+   <div class="field"><label>Capítulo</label><select id="p_ch"><option value="">—</option>${chapterOptions(pid,chapterNum)}</select></div>
+   <div class="field"><label>Llegada prevista</label><input id="p_arr" type="date"></div>
+   <div class="field full"><label>Descripción</label><input id="p_desc" placeholder="Material"></div>
+   <div class="field"><label>Cantidad</label><input id="p_qty" type="number" step="0.001" value="1"></div>
+   <div class="field"><label>Precio unitario (€)</label><input id="p_price" type="number" step="0.01" value="0"></div>
+   <div class="field full" style="margin-top:6px"><button class="btn primary" id="p_save">Crear orden</button></div>
+  </div>`;
+  $('#p_save').onclick=()=>mutate(()=>{
+    const sup=$('#p_sup').value; if(!sup) throw new Error("Selecciona un proveedor");
+    erp.addPurchase({supplierId:sup,projectId:pid,chapterNum:$('#p_ch').value||null,
+      expectedArrival:$('#p_arr').value||null,desc:$('#p_desc').value,
+      qtyMilli:Math.round(+$('#p_qty').value*1000),unitCents:Math.round(+$('#p_price').value*100)},"backoffice");
+    closeDrawer();
+  },"Orden de compra creada");
+}
+function purchaseDrawer(id){
+  const pu=erp.state.purchases.find(x=>x.id===id);
+  const st=erp.purchaseStatus(pu), lab=PURCHASE_STATUS_LABEL[st];
+  const rec=pu.status.invoicedBillId?erp.purchaseReconciliation(id):null;
+  const db=openDrawer(pu.number+" · "+erp.party(pu.supplierId).name);
+  db.innerHTML=`
+   <div class="card"><div class="ch"><h3>${esc(pu.desc)||"Orden de compra"}</h3><span class="pill ${lab[1]}">${lab[0]}</span></div>
+    <div class="daylist">
+     <div class="it">Cantidad <b>${(pu.qtyMilli/1000).toLocaleString('es-ES')}</b> · Precio unitario <b>${eur(pu.unitCents)}</b> · Total <b>${eur(pu.totalCents)}</b></div>
+     ${pu.status.returnedCents?`<div class="it">Devuelto <b>${eur(pu.status.returnedCents)}</b></div>`:""}
+     <div class="it">Capítulo ${pu.chapterNum||"—"} · Llegada prevista ${pu.expectedArrival?fmtD(pu.expectedArrival):"—"}</div>
+     ${pu.cancelledAt?`<div class="it">Anulada el ${fmtD(pu.cancelledAt)}${pu.cancelReason?" — "+esc(pu.cancelReason):""}</div>`:""}
+    </div></div>
+   ${(pu.receipts||[]).length?`<div class="card"><div class="ch"><h3>Recepciones</h3></div><div class="daylist">
+    ${pu.receipts.map(r=>`<div class="it">${fmtD(r.date)} — <b>${(r.qtyMilli/1000).toLocaleString('es-ES')}</b>${r.docRef?" · "+esc(r.docRef):""}${r.photoRef?" · 📷":""}</div>`).join("")}
+   </div></div>`:""}
+   ${rec?`<div class="card"><div class="ch"><h3>Conciliación</h3><span class="pill ${rec.ok?'g':'r'}">${rec.ok?"OK":"Diferencias"}</span></div>
+    <div class="daylist"><div class="it">Pedido ${(rec.orderedQtyMilli/1000)} / Recibido ${(rec.receivedQtyMilli/1000)}${rec.qtyMismatch?' <span class="pill r">cantidad</span>':""}</div>
+    <div class="it">Pedido ${eur(rec.orderedCents)} / Facturado ${rec.invoicedCents!=null?eur(rec.invoicedCents):"—"}${rec.amountMismatch?' <span class="pill r">importe</span>':""}</div></div></div>`:""}
+   <div class="card"><div class="ch"><h3>Acciones</h3></div><div class="daylist" style="gap:8px">
+    ${st==="draft"?'<button class="btn sm" id="a_send">Enviar al proveedor</button>':""}
+    ${st==="sent"?`<div class="it"><label>Fecha de llegada</label><input id="a_arr" type="date" value="${pu.expectedArrival||""}"></div><button class="btn sm" id="a_accept">Registrar aceptación</button>`:""}
+    ${["accepted","partialReceived"].includes(st)?`<div class="it"><label>Cantidad recibida</label><input id="a_qty" type="number" step="0.001"></div>
+     <div class="it"><label>Albarán</label><input id="a_doc" placeholder="ALB-..."></div><button class="btn sm" id="a_recv">Registrar recepción</button>`:""}
+    ${!pu.cancelledAt&&!pu.status.invoicedBillId?'<button class="btn sm" id="a_dup">Duplicar</button><button class="btn sm danger" id="a_cancel">Anular</button>':""}
+    ${pu.status.delivered?`<div class="it"><label>Importe a devolver (€)</label><input id="a_ret" type="number" step="0.01" value="0"></div><button class="btn sm" id="a_return">Registrar devolución</button>`:""}
+   </div></div>`;
+  const send=$('#a_send'); if(send) send.onclick=()=>mutate(()=>{erp.sendPurchase(id,"backoffice");purchaseDrawer(id);},"Orden enviada");
+  const accept=$('#a_accept'); if(accept) accept.onclick=()=>mutate(()=>{
+    erp.acceptPurchase(id,{expectedArrival:$('#a_arr').value||null},"backoffice"); purchaseDrawer(id);
+  },"Aceptación registrada");
+  const recv=$('#a_recv'); if(recv) recv.onclick=()=>mutate(()=>{
+    const q=+$('#a_qty').value; if(!(q>0)) throw new Error("Indica la cantidad recibida");
+    erp.receivePurchase(id,{qtyMilli:Math.round(q*1000),docRef:$('#a_doc').value},"operations"); purchaseDrawer(id);
+  },"Recepción registrada");
+  const dup=$('#a_dup'); if(dup) dup.onclick=()=>mutate(()=>{erp.duplicatePurchase(id,"backoffice");closeDrawer();},"Orden duplicada");
+  const cancel=$('#a_cancel'); if(cancel) cancel.onclick=()=>{
+    const reason=prompt("Motivo de la anulación")||"";
+    mutate(()=>{erp.cancelPurchase(id,reason,"backoffice");closeDrawer();},"Orden anulada");
+  };
+  const ret=$('#a_return'); if(ret) ret.onclick=()=>mutate(()=>{
+    const amt=Math.round(+$('#a_ret').value*100); if(!(amt>0)) throw new Error("Indica el importe a devolver");
+    erp.recordReturn(id,amt,"backoffice"); purchaseDrawer(id);
+  },"Devolución registrada");
+}
+
+/* ---------- Subcontratos (§4.2) ---------- */
+function subcontratos(v){
+  $('#sub').textContent="Subcontratas por oficio: adjudicado, certificado, facturado y pendiente, con la documentación obligatoria y su vigencia.";
+  if(!erp.state.projects.length) return noProjectsCard(v);
+  const pid=gProject;
+  const rows=erp.subcontractsForProject(pid);
+  v.innerHTML=`
+   <div class="stepbar"><button class="btn primary sm" id="sNew">＋ Nueva subcontrata</button></div>
+   <div class="card"><div class="ch"><h3>Subcontratas</h3><span class="tag">${rows.length}</span></div>
+    <div class="scroll"><table><thead><tr><th>Nº</th><th>Oficio</th><th>Industrial</th><th class="num">Adjudicado</th><th class="num">Certificado</th><th class="num">Facturado</th><th class="num">Pendiente</th><th>Docs</th><th>Estado</th></tr></thead><tbody>
+    ${rows.map(s=>{const lab=SUBCONTRACT_STATUS_LABEL[s.status];
+      return `<tr class="click" data-sub="${s.id}"><td class="k">${s.number}</td><td>${esc(s.trade)}</td><td>${esc(erp.party(s.supplierId).name)}</td>
+      <td class="num">${eur0(s.awardedCents)}</td><td class="num">${eur0(s.certifiedCents)}</td><td class="num">${eur0(s.invoicedCents)}</td><td class="num">${eur0(s.pendingCents)}</td>
+      <td><span class="dot ${s.docStatus.worst}" title="${s.docStatus.worst==='g'?'En regla':s.docStatus.worst==='y'?'Próxima a vencer':'Caducada o falta'}"></span></td>
+      <td><span class="pill ${lab[1]}">${lab[0]}</span></td></tr>`;}).join("")
+      ||'<tr><td colspan="9"><div class="empty">Sin subcontratas en este proyecto.</div></td></tr>'}
+    </tbody></table></div></div>`;
+  $('#sNew').onclick=()=>subcontractFormDrawer(pid);
+  v.querySelectorAll('[data-sub]').forEach(tr=>tr.onclick=()=>subcontractDrawer(tr.dataset.sub));
+}
+function subcontractFormDrawer(pid){
+  const db=openDrawer("Nueva subcontrata");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Industrial / proveedor *</label><select id="s_sup"><option value="">—</option>${supplierOptions()}</select></div>
+   <div class="field"><label>Oficio *</label><input id="s_trade" placeholder="Fontanería"></div>
+   <div class="field"><label>Capítulo</label><select id="s_ch"><option value="">—</option>${chapterOptions(pid)}</select></div>
+   <div class="field"><label>Formato</label><select id="s_fmt"><option value="workOrder">Orden de trabajo</option><option value="contract">Contrato de subcontrata</option></select></div>
+   <div class="field"><label>Importe adjudicado (€)</label><input id="s_amt" type="number" step="0.01" value="0"></div>
+   <div class="field"><label>Retención (%)</label><input id="s_ret" type="number" step="0.1" value="0"></div>
+   <div class="field full" style="margin-top:6px"><button class="btn primary" id="s_save">Crear subcontrata</button></div>
+  </div>`;
+  $('#s_save').onclick=()=>mutate(()=>{
+    const sup=$('#s_sup').value; if(!sup) throw new Error("Selecciona un industrial");
+    const trade=$('#s_trade').value.trim(); if(!trade) throw new Error("El oficio es obligatorio");
+    erp.addSubcontract(pid,{supplierId:sup,trade,chapterNum:$('#s_ch').value||null,format:$('#s_fmt').value,
+      awardedCents:Math.round(+$('#s_amt').value*100),retentionPct:+$('#s_ret').value||0},"backoffice");
+    closeDrawer();
+  },"Subcontrata creada");
+}
+function subcontractDrawer(id){
+  const s=erp.state.subcontracts.find(x=>x.id===id);
+  const ds=erp.subcontractDocStatus(s);
+  const certifiedCents=(s.certifications||[]).reduce((a,c)=>a+c.amountCents,0);
+  const lab=SUBCONTRACT_STATUS_LABEL[s.status];
+  const db=openDrawer(s.number+" · "+s.trade);
+  db.innerHTML=`
+   <div class="card"><div class="ch"><h3>${esc(erp.party(s.supplierId).name)}</h3><span class="pill ${lab[1]}">${lab[0]}</span></div>
+    <div class="daylist">
+     <div class="it">Adjudicado <b>${eur(s.awardedCents)}</b> · Certificado <b>${eur(certifiedCents)}</b> · Retención ${s.retentionPct}%${s.retentionReleasedAt?` · liberada ${fmtD(s.retentionReleasedAt)}`:""}</div>
+     <div class="it">Capítulo ${s.chapterNum||"—"} · ${s.format==="contract"?"Contrato de subcontrata":"Orden de trabajo"}</div>
+     <div class="it">Previsto ${s.dates.plannedStart?fmtD(s.dates.plannedStart):"—"} → ${s.dates.plannedEnd?fmtD(s.dates.plannedEnd):"—"}${s.dates.actualStart?` · real desde ${fmtD(s.dates.actualStart)}`:""}${s.dates.actualEnd?` hasta ${fmtD(s.dates.actualEnd)}`:""}</div>
+     ${(s.rejectedWork||[]).length?`<div class="it">⚠ ${s.rejectedWork.length} trabajo(s) rechazado(s)</div>`:""}
+    </div></div>
+   <div class="card"><div class="ch"><h3>Documentación obligatoria</h3><span class="pill ${ds.worst}">${ds.worst==="g"?"En regla":ds.worst==="y"?"Próxima a vencer":"Caducada o falta"}</span></div>
+    <div class="daylist">
+    ${ds.items.map(it=>`<div class="it" style="align-items:center"><span class="dot ${it.sev}"></span> ${DOC_KIND_LABEL[it.kind]}
+      <span style="color:var(--muted)">${it.doc&&it.doc.expiresOn?"vence "+fmtD(it.doc.expiresOn):"sin registrar"}</span>
+      <span style="flex:1"></span><input class="inline" type="date" data-doc="${it.kind}" value="${it.doc&&it.doc.expiresOn?it.doc.expiresOn:""}">
+      <button class="btn sm" data-docsave="${it.kind}">Renovar</button></div>`).join("")}
+    </div></div>
+   <div class="card"><div class="ch"><h3>Certificaciones</h3></div><div class="daylist">
+    ${(s.certifications||[]).map(c=>`<div class="it">${fmtD(c.date)} — <b>${eur(c.amountCents)}</b>${c.note?" · "+esc(c.note):""}</div>`).join("")||'<div class="it">Sin certificaciones.</div>'}
+   </div></div>
+   <div class="card"><div class="ch"><h3>Acciones</h3></div><div class="daylist" style="gap:8px">
+    ${s.status==="draft"?'<button class="btn sm" id="x_send">Enviar</button>':""}
+    ${s.status==="sent"?`<div class="it"><label>Inicio previsto</label><input id="x_ps" type="date"></div><div class="it"><label>Fin previsto</label><input id="x_pe" type="date"></div><button class="btn sm" id="x_accept">Registrar aceptación</button>`:""}
+    ${["accepted","inExecution"].includes(s.status)?`${s.status==="accepted"?'<button class="btn sm" id="x_start">Iniciar en obra</button>':""}
+     <div class="it"><label>Certificar avance (€)</label><input id="x_cert" type="number" step="0.01"></div><button class="btn sm" id="x_certsave">Certificar</button>
+     <div class="it"><label>Aprobar factura — nº</label><input id="x_binv" placeholder="Nº factura"></div><div class="it"><label>Base imponible (€)</label><input id="x_bamt" type="number" step="0.01"></div><button class="btn sm" id="x_bsave">Aprobar factura</button>
+     <button class="btn sm" id="x_complete">Marcar completada</button>`:""}
+    ${!["completed","terminated"].includes(s.status)?`<div class="it"><label>Nueva fecha fin</label><input id="x_ext" type="date" value="${s.dates.plannedEnd||""}"></div><button class="btn sm" id="x_extend">Ampliar</button>
+     <button class="btn sm danger" id="x_term">Rescindir</button>`:""}
+    ${s.retentionPct>0&&!s.retentionReleasedAt?'<button class="btn sm" id="x_release">Liberar retención</button>':""}
+   </div></div>`;
+  db.querySelectorAll('[data-docsave]').forEach(b=>b.onclick=()=>mutate(()=>{
+    const kind=b.dataset.docsave, val=db.querySelector(`[data-doc="${kind}"]`).value;
+    erp.renewSubcontractDoc(id,{kind,expiresOn:val||null},"backoffice"); subcontractDrawer(id);
+  },"Documento renovado"));
+  const send=$('#x_send'); if(send) send.onclick=()=>mutate(()=>{erp.sendSubcontract(id,"backoffice");subcontractDrawer(id);},"Subcontrata enviada");
+  const accept=$('#x_accept'); if(accept) accept.onclick=()=>mutate(()=>{
+    erp.acceptSubcontract(id,{plannedStart:$('#x_ps').value,plannedEnd:$('#x_pe').value},"backoffice"); subcontractDrawer(id);
+  },"Aceptación registrada");
+  const start=$('#x_start'); if(start) start.onclick=()=>mutate(()=>{erp.markSubcontractStarted(id,"operations");subcontractDrawer(id);},"Inicio registrado");
+  const certsave=$('#x_certsave'); if(certsave) certsave.onclick=()=>mutate(()=>{
+    const amt=Math.round(+$('#x_cert').value*100); if(!(amt>0)) throw new Error("Indica el importe certificado");
+    erp.certifySubcontract(id,{amountCents:amt},"operations"); subcontractDrawer(id);
+  },"Certificación registrada");
+  const bsave=$('#x_bsave'); if(bsave) bsave.onclick=()=>mutate(()=>{
+    const num=$('#x_binv').value.trim(), amt=Math.round(+$('#x_bamt').value*100);
+    if(!num||!(amt>0)) throw new Error("Indica el número y el importe de la factura");
+    erp.approveSubcontractorInvoice(id,{number:num,baseCents:amt},"backoffice"); closeDrawer();
+  },"Factura aprobada");
+  const complete=$('#x_complete'); if(complete) complete.onclick=()=>mutate(()=>{erp.markSubcontractCompleted(id,"operations");closeDrawer();},"Subcontrata completada");
+  const extend=$('#x_extend'); if(extend) extend.onclick=()=>mutate(()=>{erp.extendSubcontract(id,{plannedEnd:$('#x_ext').value},"backoffice");subcontractDrawer(id);},"Fecha ampliada");
+  const term=$('#x_term'); if(term) term.onclick=()=>{
+    const reason=prompt("Motivo de la rescisión")||"";
+    mutate(()=>{erp.terminateSubcontract(id,reason,"backoffice");closeDrawer();},"Subcontrata rescindida");
+  };
+  const release=$('#x_release'); if(release) release.onclick=()=>mutate(()=>{erp.releaseSubcontractRetention(id,"backoffice");subcontractDrawer(id);},"Retención liberada");
+}
+
+/* ---------- Modificaciones contractuales (§4.5) ---------- */
+function modificaciones(v){
+  $('#sub').textContent="Extras y modificaciones contractuales: captura, valoración, envío y aprobación. El trabajo no aprobado nunca es facturable — CHG-04.";
+  if(!erp.state.projects.length) return noProjectsCard(v);
+  const pid=gProject;
+  const reg=erp.extrasRegister(pid);
+  const e=erp.projectEconomics(pid);
+  v.innerHTML=`
+   <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi"><div class="lab">Contrato original</div><div class="val">${eur0(e.baselineRevenueCents)}</div></div>
+    <div class="kpi"><div class="lab">Modificaciones aprobadas</div><div class="val">${eur0(e.approvedChangesCents)}</div><div class="sub">${reg.approved} de ${reg.items.length}</div></div>
+    <div class="kpi hi"><div class="lab">Contrato vigente</div><div class="val">${eur0(e.currentRevenueCents)}</div></div>
+   </div>
+   <div class="stepbar"><button class="btn primary sm" id="mNew">＋ Nueva modificación</button></div>
+   <div class="card"><div class="ch"><h3>Modificaciones</h3><span class="tag">no facturable sin aprobación</span></div>
+    <div class="scroll"><table><thead><tr><th>Descripción</th><th>Capítulo</th><th class="num">Venta</th><th class="num">Coste</th><th>Plazo</th><th>Fecha</th><th>Estado</th><th></th></tr></thead><tbody>
+    ${reg.items.slice().reverse().map(c=>{const lab=CHANGE_STATUS_LABEL[c.status]||[c.status,""];
+      return `<tr><td class="k">${esc(c.desc)}${c.photoRef?" 📷":""}</td><td>${c.chapterNum||"—"}</td>
+      <td class="num">${eur(c.priceCents)}</td><td class="num">${eur(c.costCents)}</td><td class="num">${c.scheduleImpactDays?(c.scheduleImpactDays>0?"+":"")+c.scheduleImpactDays+" d":"—"}</td>
+      <td>${fmtD(c.date)}</td><td><span class="pill ${lab[1]}">${lab[0]}</span></td>
+      <td>${changeActionsHtml(c)}</td></tr>`;}).join("")||'<tr><td colspan="8"><div class="empty">Sin modificaciones.</div></td></tr>'}
+    </tbody></table></div></div>`;
+  $('#mNew').onclick=()=>changeFormDrawer(pid);
+  wireChangeActions(pid);
+}
+function changeActionsHtml(c){
+  if(c.status==="identified") return `<button class="btn sm" data-price="${c.id}">Valorar</button>`;
+  if(c.status==="priced") return `<button class="btn sm" data-send="${c.id}">Enviar</button> <button class="btn sm danger" data-cancel="${c.id}">Anular</button>`;
+  if(c.status==="sent") return `<button class="btn sm primary" data-approve="${c.id}">Aprobar</button> <button class="btn sm danger" data-reject="${c.id}">Rechazar</button>`;
+  if(["approved","executed"].includes(c.status)){
+    let h=`<button class="btn sm" data-doc="${c.id}">Ver adenda</button>`;
+    if(c.chapterNum&&c.scheduleImpactDays) h+=` <button class="btn sm" data-apply="${c.id}">Aplicar a planificación</button>`;
+    return h;
+  }
+  return "";
+}
+function wireChangeActions(pid){
+  document.querySelectorAll('[data-price]').forEach(b=>b.onclick=()=>changePriceDrawer(b.dataset.price));
+  document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>mutate(()=>erp.sendChange(b.dataset.send,"backoffice"),"Modificación enviada"));
+  document.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>mutate(()=>erp.approveChange(b.dataset.approve,"aceptacion-cliente.png","backoffice"),"Modificación aprobada — adenda generada"));
+  document.querySelectorAll('[data-reject]').forEach(b=>b.onclick=()=>{
+    const reason=prompt("Motivo del rechazo"); if(reason==null)return;
+    mutate(()=>erp.rejectChange(b.dataset.reject,reason,"backoffice"),"Modificación rechazada");
+  });
+  document.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>{
+    const reason=prompt("Motivo de la anulación")||"";
+    mutate(()=>erp.cancelChange(b.dataset.cancel,reason,"backoffice"),"Modificación anulada");
+  });
+  document.querySelectorAll('[data-doc]').forEach(b=>b.onclick=()=>changeDocDrawer(b.dataset.doc));
+  document.querySelectorAll('[data-apply]').forEach(b=>b.onclick=()=>{
+    const B=ganttApi(); if(!B){ toast("⚠ Módulo de planificación no disponible"); return; }
+    const c=erp.state.changes.find(x=>x.id===b.dataset.apply);
+    mutate(()=>{
+      const plan=B.get(erp.state,pid);
+      const applied=B.applyChapterDelay(plan,c.chapterNum,c.scheduleImpactDays);
+      if(applied===plan) throw new Error("El capítulo "+c.chapterNum+" no tiene todavía una tarea derivada — deriva la planificación primero");
+      B.save(erp.state,pid,B.recalculate(applied));
+    },"Planificación actualizada "+(c.scheduleImpactDays>0?"+":"")+c.scheduleImpactDays+" días");
+  });
+}
+function changeFormDrawer(pid){
+  const db=openDrawer("Nueva modificación / extra");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Descripción *</label><input id="c_desc" placeholder="Suelo radiante en baño"></div>
+   <div class="field full"><label>Motivo</label><input id="c_reason" placeholder="Petición del cliente"></div>
+   <div class="field"><label>Capítulo</label><select id="c_ch"><option value="">—</option>${chapterOptions(pid)}</select></div>
+   <div class="field"><label>Foto</label><input id="c_photo" placeholder="extra-01.jpg"></div>
+   <div class="field full" style="margin-top:6px"><button class="btn primary" id="c_save">Registrar como detectada</button></div>
+  </div>`;
+  $('#c_save').onclick=()=>mutate(()=>{
+    const desc=$('#c_desc').value.trim(); if(!desc) throw new Error("La descripción es obligatoria");
+    erp.addChange(pid,{desc,reason:$('#c_reason').value,chapterNum:$('#c_ch').value||null,photoRef:$('#c_photo').value||null},"operations");
+    closeDrawer();
+  },"Extra registrado");
+}
+function changePriceDrawer(id){
+  const c=erp.state.changes.find(x=>x.id===id);
+  const db=openDrawer("Valorar · "+c.desc);
+  db.innerHTML=`<div class="fgrid">
+   <div class="field"><label>Efecto en venta (€)</label><input id="c_price" type="number" step="0.01" value="${(c.priceCents/100).toFixed(2)}"></div>
+   <div class="field"><label>Efecto en coste (€)</label><input id="c_cost" type="number" step="0.01" value="${(c.costCents/100).toFixed(2)}"></div>
+   <div class="field"><label>Efecto en plazo (días)</label><input id="c_days" type="number" step="1" value="${c.scheduleImpactDays||0}"></div>
+   <div class="field full" style="margin-top:6px"><button class="btn primary" id="c_psave">Guardar valoración</button></div>
+  </div>`;
+  $('#c_psave').onclick=()=>mutate(()=>{
+    erp.priceChange(id,Math.round(+$('#c_price').value*100),Math.round(+$('#c_cost').value*100),Math.round(+$('#c_days').value||0),"backoffice");
+    closeDrawer();
+  },"Modificación valorada");
+}
+function changeDocDrawer(id){
+  const doc=erp.renderChangeDoc(id);
+  const db=openDrawer("Adenda"+(doc.number?" "+doc.number:""));
+  db.innerHTML=`<div class="doc">
+   <div class="dh"><div><b>MODIFICACIÓN CONTRACTUAL${doc.number?" "+doc.number:""}</b><br>${esc(doc.issuer.legalName)} · ${esc(doc.issuer.taxId)}<br>${esc(doc.issuer.address)}</div>
+    <div style="text-align:right">${esc(doc.customer.name)}<br>${esc(doc.customer.taxId)}<br>${esc(doc.customer.address)}</div></div>
+   <div class="chapline"><span>Proyecto</span><b>${esc(doc.project)}</b></div>
+   ${doc.contractNumber?`<div class="chapline"><span>Contrato</span><b>${esc(doc.contractNumber)}</b></div>`:""}
+   <div class="chapline"><span>${esc(doc.desc)}</span></div>
+   ${doc.reason?`<div style="color:var(--muted);margin:6px 0">${esc(doc.reason)}</div>`:""}
+   <div style="border-top:2px solid var(--green);padding-top:8px;margin-top:8px">
+    <div class="chapline"><span>Efecto en venta</span><b>${eur(doc.priceCents)}</b></div>
+    ${doc.scheduleImpactDays?`<div class="chapline"><span>Efecto en plazo</span><b>${doc.scheduleImpactDays>0?"+":""}${doc.scheduleImpactDays} días</b></div>`:""}
+   </div>
+   <div style="margin-top:8px;color:var(--muted)">Fecha ${fmtD(doc.date)}</div>
+  </div>`;
+}
+
+/* ---------- Horas (§4.6) ---------- */
+let hWeekRef=null, hChapter=null;
+function horas(v){
+  $('#sub').textContent="Rejilla semanal por trabajador y capítulo. Un solo paso desde el móvil: marcar presentes y confirmar la jornada.";
+  if(!erp.state.projects.length) return noProjectsCard(v);
+  const pid=gProject;
+  if(!hWeekRef) hWeekRef=erp.today;
+  const week=erp.labourWeek(pid,hWeekRef);
+  const p=erp.project(pid), chapters=p.baseline.chapters||[];
+  if(!hChapter||!chapters.some(c=>c.num===hChapter)) hChapter=chapters[0]?chapters[0].num:null;
+  const DOW=["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+  v.innerHTML=`
+   <div class="stepbar">
+    <button class="btn sm" id="hPrev">← Semana anterior</button>
+    <span class="pill">${fmtD(week.days[0])} – ${fmtD(week.days[6])}</span>
+    <button class="btn sm" id="hNext">Semana siguiente →</button>
+    <span style="flex:1"></span>
+    <label style="font-size:12px;color:var(--muted)">Capítulo para horas nuevas</label>
+    <select class="inline" id="hChapSel">${chapters.map(c=>`<option value="${c.num}"${c.num===hChapter?" selected":""}>${c.num}. ${esc(c.name)}</option>`).join("")||'<option value="">—</option>'}</select>
+    <button class="btn sm" id="hRepeat" title="Copia las horas de ayer a hoy">↻ Repetir día anterior</button>
+    <button class="btn sm" id="hAssign">＋ Asignar trabajador</button>
+   </div>
+   <div class="card"><div class="ch"><h3>Semana</h3><span class="tag">${(week.totalsByDayMilli.reduce((a,b)=>a+b,0)/1000).toLocaleString('es-ES')} h totales</span></div>
+    <div class="scroll"><table class="wgrid"><thead><tr><th>Trabajador</th>${week.days.map((d,i)=>`<th class="${i>=5?'wknd':''}">${DOW[i]}<br>${fmtD(d).slice(0,5)}</th>`).join("")}<th class="wtot">Total</th><th></th></tr></thead><tbody>
+    ${week.rows.map(r=>`<tr><td class="k">${esc(r.name)}</td>
+      ${r.cells.map((c,i)=>`<td class="${i>=5?'wknd':''}">${c.entryIds.length>1
+        ?`<span class="pill y" title="Repartido en varios capítulos — corrige desde el registro">${(c.hoursMilli/1000).toLocaleString('es-ES')}</span>`
+        :`<input class="inline hin" type="number" step="0.25" min="0" data-worker="${r.workerId}" data-date="${c.date}" value="${c.hoursMilli?(c.hoursMilli/1000):''}"${c.locked?" disabled":""}>`}</td>`).join("")}
+      <td class="wtot num">${(r.totalMilli/1000).toLocaleString('es-ES')}</td>
+      <td>${r.cells.some(c=>c.locked)?`<button class="btn sm" data-unapprove="${r.workerId}">🔓 Reabrir</button>`:`<button class="btn sm" data-approve="${r.workerId}">🔒 Aprobar</button>`}
+       <button class="btn sm" data-workerdoc="${r.workerId}">🪪</button></td></tr>`).join("")
+      ||'<tr><td colspan="9"><div class="empty">Sin trabajadores asignados a este proyecto en esta semana.</div></td></tr>'}
+    <tr class="tot"><td>Total día</td>${week.totalsByDayMilli.map((m,i)=>`<td class="${i>=5?'wknd':''} num">${m?(m/1000).toLocaleString('es-ES'):"—"}</td>`).join("")}<td class="wtot"></td><td></td></tr>
+    </tbody></table></div></div>
+   ${labourRegister(pid)}`;
+  $('#hPrev').onclick=()=>{hWeekRef=isoAdd(week.weekStart,-7);render();};
+  $('#hNext').onclick=()=>{hWeekRef=isoAdd(week.weekStart,7);render();};
+  $('#hChapSel').onchange=e=>{hChapter=e.target.value;};
+  $('#hRepeat').onclick=()=>mutate(()=>{
+    erp.repeatDay(pid,isoAdd(erp.today,-1),erp.today,"operations");
+  },"Jornada repetida desde ayer");
+  $('#hAssign').onclick=()=>assignWorkerDrawer(pid);
+  v.querySelectorAll('.wgrid input.hin').forEach(inp=>inp.onchange=()=>{
+    const workerId=inp.dataset.worker, date=inp.dataset.date;
+    const row=week.rows.find(r=>r.workerId===workerId), cell=row.cells.find(c=>c.date===date);
+    const val=+inp.value||0;
+    // Zero clears the entry outright — that is what "corregir y eliminar" means
+    // for a grid cell, rather than leaving a stray zero-hour row behind.
+    mutate(()=>{
+      if(cell.entryIds.length===0){
+        if(val<=0) return;
+        if(!hChapter) throw new Error("Selecciona un capítulo antes de registrar horas");
+        erp.recordHours({workerId,projectId:pid,chapterNum:hChapter,hoursMilli:Math.round(val*1000),date},"operations");
+      } else if(val<=0){
+        erp.deleteHours(cell.entryIds[0],"operations");
+      } else {
+        erp.correctHours(cell.entryIds[0],{hoursMilli:Math.round(val*1000)},"operations");
+      }
+    },"Horas actualizadas");
+  });
+  v.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>mutate(()=>erp.approveLabourWeek(b.dataset.approve,week.weekStart,"backoffice"),"Semana aprobada"));
+  v.querySelectorAll('[data-unapprove]').forEach(b=>b.onclick=()=>mutate(()=>erp.unapproveLabourWeek(b.dataset.unapprove,week.weekStart,"backoffice"),"Semana reabierta"));
+  v.querySelectorAll('[data-workerdoc]').forEach(b=>b.onclick=()=>workerDocDrawer(b.dataset.workerdoc));
+  wireLabourRegister(pid);
+}
+function labourRegister(pid){
+  const lab=erp.state.labour.filter(l=>l.projectId===pid&&inPeriod(l.date));
+  return `<div class="card"><div class="ch"><h3>Registro</h3><span class="tag">reasigna o corrige una entrada</span></div>
+   <div class="scroll"><table><thead><tr><th>Fecha</th><th>Trabajador</th><th>Capítulo</th><th class="num">Horas</th><th class="num">Coste</th><th>Estado</th><th></th></tr></thead><tbody>
+   ${lab.slice().reverse().map(l=>`<tr><td>${fmtD(l.date)}</td><td>${esc(erp.state.workers.find(w=>w.id===l.workerId).name)}</td>
+    <td>${l.chapterNum||"—"}</td><td class="num">${(l.hoursMilli/1000).toLocaleString('es-ES')}</td><td class="num">${eur(l.costCents)}</td>
+    <td>${l.locked?'<span class="pill g">Aprobada</span>':'<span class="pill y">Abierta</span>'}</td>
+    <td>${l.locked?"":`<button class="btn sm" data-reassign="${l.id}">Reasignar</button><button class="btn sm danger" data-del="${l.id}">✕</button>`}</td></tr>`).join("")
+    ||'<tr><td colspan="7"><div class="empty">Sin horas en este proyecto para el periodo seleccionado.</div></td></tr>'}
+   </tbody></table></div></div>`;
+}
+function wireLabourRegister(pid){
+  document.querySelectorAll('[data-reassign]').forEach(b=>b.onclick=()=>{
+    const l=erp.state.labour.find(x=>x.id===b.dataset.reassign);
+    const code=prompt("Proyecto (código) — deja igual para no cambiar",erp.project(l.projectId).code); if(code==null)return;
+    const chap=prompt("Capítulo",l.chapterNum||""); if(chap==null)return;
+    mutate(()=>{
+      const patch={chapterNum:chap||null};
+      if(code&&code!==erp.project(l.projectId).code){
+        const np=erp.state.projects.find(x=>x.code===code);
+        if(!np) throw new Error("Proyecto no encontrado: "+code);
+        patch.projectId=np.id;
+      }
+      erp.correctHours(l.id,patch,"backoffice");
+    },"Horas reasignadas");
+  });
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>mutate(()=>erp.deleteHours(b.dataset.del,"backoffice"),"Entrada eliminada"));
+}
+function assignWorkerDrawer(pid){
+  const db=openDrawer("Asignar trabajador");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Trabajador *</label><select id="as_w">${erp.state.workers.map(w=>`<option value="${w.id}">${esc(w.name)}</option>`).join("")}</select></div>
+   <div class="field"><label>Desde</label><input id="as_from" type="date" value="${erp.today}"></div>
+   <div class="field"><label>Hasta</label><input id="as_to" type="date" value="${erp.today}"></div>
+   <div class="field full" style="margin-top:6px"><button class="btn primary" id="as_save">Asignar</button></div>
+  </div>`;
+  $('#as_save').onclick=()=>mutate(()=>{
+    erp.assignResource(pid,{workerId:$('#as_w').value,from:$('#as_from').value,to:$('#as_to').value},"backoffice");
+    closeDrawer();
+  },"Trabajador asignado");
+}
+function workerDocDrawer(workerId){
+  const w=erp.state.workers.find(x=>x.id===workerId);
+  const db=openDrawer("Documentación · "+w.name);
+  db.innerHTML=`<div class="card"><div class="daylist">
+   ${(w.docs||[]).map(d=>`<div class="it"><span class="dot ${d.expiresOn&&d.expiresOn<erp.today?'r':'g'}"></span> ${esc(d.kind)} — vence ${d.expiresOn?fmtD(d.expiresOn):"—"}</div>`).join("")||'<div class="it">Sin documentación registrada.</div>'}
+  </div></div>
+  <div class="card"><div class="ch"><h3>Añadir / renovar</h3></div><div class="fgrid" style="padding:12px 16px">
+   <div class="field"><label>Tipo</label><input id="wd_kind" placeholder="PRL, alta S.S., seguro…"></div>
+   <div class="field"><label>Vence</label><input id="wd_exp" type="date"></div>
+   <div class="field full" style="margin-top:6px"><button class="btn primary" id="wd_save">Guardar</button></div>
+  </div></div>`;
+  $('#wd_save').onclick=()=>mutate(()=>{
+    const kind=$('#wd_kind').value.trim(); if(!kind) throw new Error("Indica el tipo de documento");
+    erp.addWorkerDoc(workerId,{kind,expiresOn:$('#wd_exp').value||null},"backoffice");
+    workerDocDrawer(workerId);
+  },"Documento guardado");
 }
 
 /* =============================== Project context (spec §4) ==========================
@@ -1976,19 +2436,14 @@ const VIEWS={
    </tbody></table></div></div>`;
  },
 
- /* ---------- Horas (LAB) ---------- */
- horas(v){
-  $('#sub').textContent="Horas diarias por trabajador y proyecto, con tarifa histórica. El coste de mano de obra entra en el coste real de cada obra.";
-  const byP={};
-  const lab=erp.state.labour.filter(l=>inPeriod(l.date));
-  lab.forEach(l=>{const k=l.projectId?erp.project(l.projectId).code:"Sin asignar";(byP[k]=byP[k]||[]).push(l);});
-  v.innerHTML=`${periodNote(lab.length,erp.state.labour.length)}<div class="card"><div class="scroll"><table><thead><tr><th>Fecha</th><th>Trabajador</th><th>Proyecto</th><th>Capítulo</th><th class="num">Horas</th><th class="num">Coste</th></tr></thead><tbody>
-   ${lab.slice().reverse().map(l=>`<tr><td>${fmtD(l.date)}</td><td>${esc(erp.state.workers.find(w=>w.id===l.workerId).name)}</td>
-    <td class="k">${l.projectId?erp.project(l.projectId).code:'<span class="pill r">Sin asignar</span>'}</td><td>${l.chapterNum||"—"}</td>
-    <td class="num">${(l.hoursMilli/1000).toLocaleString('es-ES')}</td><td class="num">${eur(l.costCents)}</td></tr>`).join("")}
-   </tbody></table></div>
-   <div class="ch" style="border-top:1px solid var(--hair)"><h3 style="font-size:13px">Total por proyecto</h3><span class="tag">${Object.entries(byP).map(([k,ls])=>k+" "+eur0(ls.reduce((s,l)=>s+l.costCents,0))).join(" · ")}</span></div></div>`;
- },
+ /* ---------- Compras · Subcontratos · Modificaciones · Horas (§4.1/§4.2/§4.5/§4.6) ----------
+    Defined once, above, as standalone functions — project-scoped through
+    gProject like proyectos/seguimiento/economía, so they are referenced here
+    rather than re-implemented inline. */
+ compras,
+ subcontratos,
+ modificaciones,
+ horas,
 
  /* ---------- Facturación y cobros (AR) ---------- */
  facturacion(v){

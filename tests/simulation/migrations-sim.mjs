@@ -174,6 +174,54 @@ assert(
     "widening an image reference is idempotent",
   );
 }
+{
+  // v6 (session 10b): subcontracts collection, purchase lifecycle fields,
+  // change chapterNum/sentAt, locked labour weeks, worker docs.
+  assert(Array.isArray(r1.state.subcontracts), "v6 declares subcontracts as an array");
+  assert(
+    r1.state.series && r1.state.series.subcontract && r1.state.series.subcontract.prefix === "SUB-",
+    "v6 registers the subcontract numbering series",
+  );
+  const purchases = r1.state.purchases || [];
+  assert(purchases.length > 0, "the fixture actually carries purchases to migrate");
+  assert(
+    purchases.every(
+      (p) =>
+        Array.isArray(p.receipts) &&
+        "sentAt" in p &&
+        "acceptedAt" in p &&
+        "expectedArrival" in p &&
+        "cancelledAt" in p,
+    ),
+    "v6 gives every purchase its lifecycle fields",
+  );
+  const changes = r1.state.changes || [];
+  assert(
+    changes.every((c) => "chapterNum" in c && "sentAt" in c),
+    "v6 gives every change order a chapterNum and a sentAt",
+  );
+  const labour = r1.state.labour || [];
+  assert(labour.length > 0, "the fixture actually carries labour entries to migrate");
+  assert(
+    labour.every((l) => l.locked === false && l.approvedAt === null && l.approvedBy === null),
+    "v6 leaves every existing hours entry unlocked",
+  );
+  const workers = r1.state.workers || [];
+  assert(workers.length > 0, "the fixture actually carries workers to migrate");
+  assert(
+    workers.every((w) => Array.isArray(w.docs)),
+    "v6 gives every worker a docs array",
+  );
+  // The un-migrated v1 blob has none of this — alerts()/controlTower() must
+  // still run on it directly, which is exactly what the "behaviour is
+  // preserved" block below does. This is the regression that block exists to
+  // catch: a bare `this.state.subcontracts.filter(...)` crashed on it the
+  // first time this migration was written.
+  assert(
+    v1.subcontracts === undefined,
+    "sanity: the raw v1 fixture really has no subcontracts key",
+  );
+}
 
 // ---- idempotency -----------------------------------------------------------
 const r2 = M.migrate(r1.state);

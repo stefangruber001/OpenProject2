@@ -682,3 +682,40 @@ languages: es-ES # source: synthetic
   are, and only the two derivations that did not exist anywhere moved. Reversible: the derivation is
   a button the user presses, the schema step (v5) is additive and idempotent, and every new figure
   is a read-side derivation over data the engine already owned.
+
+- **#54 — CANEI session 10b: what "comprometido" actually means, and where a block earns its place over an alert (2026-08-03).**
+  Spec §4.1 (Compras), §4.2 (Subcontratos), §4.5 (Modificaciones Contractuales) and §4.6 (Personal y
+  Horas). **Decisions:** (a) **A purchase order's lifecycle is derived, never stored as its own
+  field.** `purchaseStatus(pu)` reads `sentAt`/`acceptedAt`/`receipts`/`status.delivered`/
+  `status.invoicedBillId`/`status.paid`/`cancelledAt` and computes draft→sent→accepted→partial→
+  received→invoiced→paid — a status string that forgets to update when, say, a payment is voided
+  is a worse bug than any of the fields it would replace. (b) **"Comprometido" includes awarded
+  subcontracts, not just purchase orders.** `committedByChapter`/`committedCostCents` were
+  purchases-only since session 10a; §4.1 and §4.4 both define comprometido as "órdenes y
+  subcontratos adjudicados", and the economics screen would have quietly undercounted every
+  project with a subcontract on it. A terminated subcontract counts only what was actually
+  certified, never the full award — the rest was never going to be spent. (c) **Starting work on
+  site is BLOCKED, not merely alerted, on expired or missing mandatory documentation** (insurance,
+  PRL, Social Security registration) — the one rule in this session that took the harder of the
+  two available forms on purpose, because §4.2 says so explicitly ("bloqueo ... si está vencida")
+  and because letting an uninsured trade start is the kind of thing a dashboard tile should not be
+  the only defence against. (d) **Recording hours against a closed project is refused outright**,
+  for the same reason: it makes the spec's own "horas imputadas a un proyecto cerrado" alert
+  structurally impossible going forward rather than a thing to notice after the fact — a stronger
+  guarantee than an alert is, wherever prevention is cheap enough to build. (e) **`priceChange`
+  gained a `scheduleImpactDays` parameter inserted BEFORE `user`**, not after: every existing
+  caller (the seed, year-sim) passes exactly three positional arguments and has never passed
+  `user`, so the new parameter could go in the one slot that changes nothing for them. (f) **A
+  change order's schedule effect is applied to the Gantt through an explicit, separate action**
+  (`ErpBridge.scheduling.plans.applyChapterDelay`), not automatically inside `approveChange` — the
+  engine's approval only ever touches the budget's numbers, and folding a Gantt mutation into that
+  call would make one action responsible for two systems of record. The baseline is "conserved" for
+  free, because a baseline is a frozen snapshot `setDuration` never touches. (g) **The adenda
+  document has no cost or margin field**, the same QUO-10/PRE-08 rule the budget document already
+  follows, for the same reason. (h) **The weekly hours grid deletes a cell's entry when its value
+  is set to zero**, rather than leaving a stray zero-hour row — "corregir y eliminar" for a grid is
+  one gesture, not two. (i) A grid cell that already carries more than one entry (hours split
+  across chapters by hand) is rendered read-only with a note pointing at the register table below,
+  rather than the grid silently collapsing a split day into one number. Reversible: every new
+  method is additive over existing collections, schema v6 backfills every new field to its
+  pre-existing default, and nothing here removed or renamed anything session 1-10a built.

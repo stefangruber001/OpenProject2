@@ -23,6 +23,13 @@
     return d.toISOString().slice(0, 10);
   };
   const daysBetween = (a, b) => Math.round((new Date(a) - new Date(b)) / 86400000);
+  // Monday of the ISO week containing dateIso (§4.6's weekly grid, LAB-01).
+  const weekStartOf = (dateIso) => {
+    const d = new Date(dateIso + "T00:00:00Z");
+    const day = d.getUTCDay(); // 0=Sun..6=Sat
+    d.setUTCDate(d.getUTCDate() + (day === 0 ? -6 : 1 - day));
+    return d.toISOString().slice(0, 10);
+  };
   const quarterOf = (isoDate) =>
     isoDate.slice(0, 4) + "-Q" + (Math.floor((+isoDate.slice(5, 7) - 1) / 3) + 1);
   // deterministic light hash for the invoice event chain (VFU-01)
@@ -127,6 +134,8 @@
       "paymentProof",
       "creditNote",
     ], // CAP-02
+    // §4.2: mandatory documentation before a trade enters the site.
+    subcontractDocTypes: ["insurance", "prl", "socialSecurity"],
     docStatuses: ["captured", "extracted", "validated", "allocated", "sentToAccounting", "paid"], // CAP-09
     installmentTriggers: ["onSignature", "atWorksStart", "atStage", "onCompletion", "fixedDate"], // CON-04
     contractStatuses: ["draft", "sent", "signed", "inForce", "completed", "cancelled"], // CON-13
@@ -195,6 +204,7 @@
         clauseBlocks: [],
         projects: [],
         purchases: [],
+        subcontracts: [],
         captured: [],
         changes: [],
         invoices: [],
@@ -270,6 +280,7 @@
       mk("receipt", "REC-");
       mk("creditNote", "ABO-");
       mk("purchaseOrder", "OC-");
+      mk("subcontract", "SUB-");
       this._log("backoffice", "configureEntity", this.state.config.legalName);
       return this.state.config;
     }
@@ -1511,14 +1522,50 @@
           return { num: c.num, progressPct: value ? Math.round((done / value) * 100) : 0 };
         });
     }
-    /** Committed cost per chapter — orders raised, net of returns (FIN-02). */
+    /** Committed cost per chapter — orders and awarded subcontracts, net of returns (FIN-02, §4.1). */
     committedByChapter(projectId) {
       const out = {};
       for (const pu of this.state.purchases) {
-        if (pu.projectId !== projectId || !pu.chapterNum) continue;
+        if (pu.projectId !== projectId || !pu.chapterNum || pu.cancelledAt) continue;
         out[pu.chapterNum] = (out[pu.chapterNum] || 0) + (pu.totalCents - pu.status.returnedCents);
       }
+      for (const s of this.state.subcontracts || []) {
+        if (s.projectId !== projectId || !s.chapterNum) continue;
+        if (["draft", "cancelled", "rejected"].includes(s.status)) continue;
+        out[s.chapterNum] = (out[s.chapterNum] || 0) + this._subcontractCommittedValue(s);
+      }
       return out;
+    }
+    /**
+     * What a subcontract counts as "comprometido": the full award, EXCEPT a
+     * terminated one, which is only as good as what was actually certified —
+     * the rest of the award was never going to be spent.
+     */
+    _subcontractCommittedValue(s) {
+      return s.status === "terminated"
+        ? sum(s.certifications, (c) => c.amountCents)
+        : s.awardedCents;
+    }
+    /**
+     * Material still to commit, by chapter (§4.1 block 1: "necesidades ...
+     * derivadas del presupuesto, con lo ya pedido y lo pendiente"). Reads the
+     * project's own frozen chapter budgets and compares them against
+     * committedByChapter — the same figures the economics screen shows, so
+     * the two can never disagree about how much of a chapter is still open.
+     */
+    purchaseNeeds(projectId) {
+      const p = this.project(projectId);
+      const committed = this.committedByChapter(projectId);
+      return (p.baseline.chapters || []).map((c) => {
+        const committedCents = committed[c.num] || 0;
+        return {
+          num: c.num,
+          name: c.name,
+          budgetCostCents: c.costCents,
+          committedCents,
+          pendingCents: Math.max(0, c.costCents - committedCents),
+        };
+      });
     }
     /**
      * A human's replacement for a calculated cost-at-completion (§4.4
@@ -1620,11 +1667,13 @@
           date: this.state.today,
           desc: "",
           reason: "",
+          chapterNum: null, // which chapter's cost/margin this extra affects
           priceCents: 0,
           costCents: 0,
           scheduleImpactDays: 0,
           photoRef: null,
           status: "identified",
+          sentAt: null,
           approvedAt: null,
           evidenceRef: null,
           invoiceId: null,
@@ -1636,17 +1685,35 @@
       this._log(user, "addChange", p.code + " " + rec.desc);
       return rec;
     }
-    priceChange(changeId, priceCents, costCents, user) {
+    priceChange(changeId, priceCents, costCents, scheduleImpactDays, user) {
+      // scheduleImpactDays sits before user (not after) so an existing 3-arg
+      // call — every caller before this session — keeps meaning exactly what
+      // it always meant, with the schedule effect simply left at its default.
       const c = this.state.changes.find((x) => x.id === changeId);
       c.priceCents = priceCents;
       c.costCents = costCents;
+      if (scheduleImpactDays != null) c.scheduleImpactDays = Math.round(scheduleImpactDays);
       c.status = "priced";
       this._log(user, "priceChange", changeId);
     }
-    approveChange(changeId, evidenceRef, user) {
-      // CHG-03/04 + CON-12
+    /** Send the valued extra to the client before asking for acceptance. */
+    sendChange(changeId, user) {
       const c = this.state.changes.find((x) => x.id === changeId);
-      if (c.status !== "priced") throw new Error("Change must be priced before approval");
+      if (!c) throw new Error("Change not found");
+      if (c.status !== "priced") throw new Error("Change must be priced before it can be sent");
+      c.status = "sent";
+      c.sentAt = this.state.today;
+      this._log(user, "sendChange", changeId);
+      return c;
+    }
+    approveChange(changeId, evidenceRef, user) {
+      // CHG-03/04 + CON-12. Accepts "priced" too — sending to the client first
+      // is a real step this spec adds, but skipping straight to acceptance
+      // (a verbal yes, a signature on the spot) is common enough on site that
+      // requiring the intermediate step would just get worked around.
+      const c = this.state.changes.find((x) => x.id === changeId);
+      if (!["priced", "sent"].includes(c.status))
+        throw new Error("Change must be priced before approval");
       c.status = "approved";
       c.approvedAt = this.state.today;
       c.evidenceRef = evidenceRef || null;
@@ -1672,15 +1739,17 @@
         items: list,
         identified: list.filter((c) => c.status === "identified").length,
         priced: list.filter((c) => c.status === "priced").length,
+        sent: list.filter((c) => c.status === "sent").length,
         approved: list.filter((c) => ["approved", "executed", "invoiced"].includes(c.status))
           .length,
         invoiced: list.filter((c) => c.status === "invoiced").length,
+        rejected: list.filter((c) => ["rejected", "cancelled"].includes(c.status)).length,
         approvedValueCents: sum(
           list.filter((c) => ["approved", "executed", "invoiced"].includes(c.status)),
           (c) => c.priceCents,
         ),
         unapprovedValueCents: sum(
-          list.filter((c) => ["identified", "priced"].includes(c.status)),
+          list.filter((c) => ["identified", "priced", "sent"].includes(c.status)),
           (c) => c.priceCents,
         ), // CHG-04 visible
       };
@@ -1703,6 +1772,12 @@
           vatBp: 2100,
           totalCents: 0,
           orderRef: "",
+          expectedArrival: null, // PUR-06: arrivals calendar
+          sentAt: null,
+          acceptedAt: null,
+          cancelledAt: null,
+          cancelReason: "",
+          receipts: [], // PUR-08: {date, qtyMilli, docRef, photoRef} — partial receiving accumulates
           status: {
             ordered: true,
             delivered: false,
@@ -1721,18 +1796,357 @@
       this._log(user, "addPurchase", rec.number);
       return rec;
     }
+    /**
+     * The lifecycle a purchase order visibly moves through (§4.1: "borrador,
+     * enviada, aceptada, recibida parcial, recibida, facturada, pagada").
+     * Derived from the underlying facts rather than stored as its own field —
+     * a status string that forgets to update when, say, a payment is voided
+     * is a worse bug than any of the booleans and dates it would replace.
+     */
+    purchaseStatus(pu) {
+      if (pu.cancelledAt) return "cancelled";
+      if (pu.status.paid) return "paid";
+      if (pu.status.invoicedBillId) return "invoiced";
+      if (pu.status.delivered) return "received";
+      if ((pu.receipts || []).length) return "partialReceived";
+      if (pu.acceptedAt) return "accepted";
+      if (pu.sentAt) return "sent";
+      return "draft";
+    }
+    /** Send the order to the supplier by email — PDF + template (PUR-...). */
+    sendPurchase(id, user) {
+      const pu = this.state.purchases.find((x) => x.id === id);
+      if (!pu) throw new Error("Purchase not found");
+      if (pu.cancelledAt) throw new Error("Purchase order is cancelled");
+      this._requireComplete(pu.supplierId, "purchase order"); // MDM-10
+      if (!validEmail(this.party(pu.supplierId).email))
+        throw new Error("Supplier email required to send the order");
+      pu.sentAt = this.state.today;
+      this._log(user, "sendPurchase", pu.number);
+      return pu;
+    }
+    acceptPurchase(id, { expectedArrival } = {}, user) {
+      // supplier's acceptance + confirmed arrival date
+      const pu = this.state.purchases.find((x) => x.id === id);
+      if (!pu) throw new Error("Purchase not found");
+      if (!pu.sentAt) throw new Error("Send the order before recording the supplier's acceptance");
+      pu.acceptedAt = this.state.today;
+      if (expectedArrival) pu.expectedArrival = expectedArrival;
+      this._log(user, "acceptPurchase", pu.number);
+      return pu;
+    }
+    cancelPurchase(id, reason, user) {
+      const pu = this.state.purchases.find((x) => x.id === id);
+      if (!pu) throw new Error("Purchase not found");
+      if (pu.status.invoicedBillId)
+        throw new Error("An invoiced order cannot be cancelled — register a return instead");
+      pu.cancelledAt = this.state.today;
+      pu.cancelReason = reason || "";
+      this._log(user, "cancelPurchase", pu.number);
+      return pu;
+    }
+    /**
+     * Receive against the order, in full or in part, with the delivery note
+     * and photo the spec asks for. Repeated partial receipts accumulate; the
+     * order becomes "recibida" on its own once the received quantity reaches
+     * what was ordered, so "recibida parcial" needs no separate close-out step.
+     */
+    receivePurchase(id, { qtyMilli, docRef, photoRef } = {}, user) {
+      const pu = this.state.purchases.find((x) => x.id === id);
+      if (!pu) throw new Error("Purchase not found");
+      if (pu.cancelledAt) throw new Error("Purchase order is cancelled");
+      const qty = Math.round(Number(qtyMilli) || 0);
+      if (qty <= 0) throw new Error("Received quantity must be positive");
+      pu.receipts = pu.receipts || [];
+      pu.receipts.push({
+        date: this.state.today,
+        qtyMilli: qty,
+        docRef: docRef || "",
+        photoRef: photoRef || null,
+      });
+      const receivedQty = sum(pu.receipts, (r) => r.qtyMilli);
+      if (receivedQty >= pu.qtyMilli) pu.status.delivered = true;
+      pu.deliveredDate = this.state.today;
+      this._log(user, "receivePurchase", pu.number + " " + qty / 1000);
+      return pu;
+    }
+    duplicatePurchase(id, user) {
+      const src = this.state.purchases.find((x) => x.id === id);
+      if (!src) throw new Error("Purchase not found");
+      return this.addPurchase(
+        {
+          supplierId: src.supplierId,
+          projectId: src.projectId,
+          chapterNum: src.chapterNum,
+          desc: src.desc,
+          qtyMilli: src.qtyMilli,
+          unitCents: src.unitCents,
+          vatBp: src.vatBp,
+          orderRef: src.orderRef,
+        },
+        user,
+      );
+    }
     recordReturn(purchaseId, amountCents, user) {
       // PUR-09
       const pu = this.state.purchases.find((x) => x.id === purchaseId);
       pu.status.returnedCents += amountCents;
       this._log(user, "recordReturn", pu.number);
     }
+    /** Order ↔ delivery note ↔ invoice, with the mismatches flagged (§4.1 "conciliación a tres bandas"). */
+    purchaseReconciliation(id) {
+      const pu = this.state.purchases.find((x) => x.id === id);
+      if (!pu) throw new Error("Purchase not found");
+      const receivedQty = sum(pu.receipts || [], (r) => r.qtyMilli);
+      const bill = pu.status.invoicedBillId
+        ? this.state.bills.find((b) => b.id === pu.status.invoicedBillId)
+        : null;
+      const qtyMismatch = pu.status.delivered && receivedQty !== pu.qtyMilli;
+      // 1€ tolerance: rounding on unit prices should never itself read as a mismatch.
+      const amountMismatch =
+        !!bill && Math.abs(bill.baseCents - (pu.totalCents - pu.status.returnedCents)) > 100;
+      return {
+        orderedQtyMilli: pu.qtyMilli,
+        receivedQtyMilli: receivedQty,
+        orderedCents: pu.totalCents,
+        invoicedCents: bill ? bill.baseCents : null,
+        qtyMismatch,
+        amountMismatch,
+        ok: !qtyMismatch && !amountMismatch,
+      };
+    }
+    /** Project-level committed cost: orders + awarded subcontracts, net of returns (FIN-02). */
     committedCostCents(projectId) {
-      // FIN-02: committed = orders net of returns
-      return sum(
-        this.state.purchases.filter((p) => p.projectId === projectId),
+      const purchases = sum(
+        this.state.purchases.filter((p) => p.projectId === projectId && !p.cancelledAt),
         (p) => p.totalCents - p.status.returnedCents,
       );
+      return purchases + this._committedSubcontractCents(projectId);
+    }
+    _committedSubcontractCents(projectId) {
+      return sum(
+        (this.state.subcontracts || []).filter(
+          (s) =>
+            s.projectId === projectId && !["draft", "cancelled", "rejected"].includes(s.status),
+        ),
+        (s) => this._subcontractCommittedValue(s),
+      );
+    }
+
+    /* =========================== SUB — subcontracts (§4.2) =========================== */
+    addSubcontract(projectId, s, user) {
+      // PUR-01/02 + SUP-01..24 + CON-04: awarded work by trade, versioned like a PO
+      const p = this.project(projectId);
+      const rec = Object.assign(
+        {
+          id: this._id("sub"),
+          number: this.nextNumber("subcontract"),
+          projectId: p.id,
+          supplierId: null,
+          trade: "",
+          chapterNum: null,
+          format: "workOrder", // "workOrder" | "contract"
+          awardedCents: 0,
+          status: "draft", // draft|sent|accepted|inExecution|completed|terminated|rejected
+          sentAt: null,
+          acceptedAt: null,
+          dates: { plannedStart: null, plannedEnd: null, actualStart: null, actualEnd: null },
+          scheduleTaskRef: null, // links to the Gantt task executing this trade
+          retentionPct: 0,
+          retentionReleaseDate: null,
+          retentionReleasedAt: null,
+          docs: [], // {kind, expiresOn, docRef}
+          certifications: [], // {date, amountCents, note}
+          rejectedWork: [], // {date, desc}
+          billIds: [],
+        },
+        s,
+      );
+      this.state.subcontracts.push(rec);
+      this._log(user, "addSubcontract", rec.number);
+      return rec;
+    }
+    sendSubcontract(id, user) {
+      const s = this._subcontract(id);
+      if (s.status !== "draft") throw new Error("Only a draft can be sent");
+      this._requireComplete(s.supplierId, "subcontract"); // MDM-10
+      if (!validEmail(this.party(s.supplierId).email))
+        throw new Error("Supplier email required to send the subcontract");
+      s.status = "sent";
+      s.sentAt = this.state.today;
+      this._log(user, "sendSubcontract", s.number);
+      return s;
+    }
+    acceptSubcontract(id, { plannedStart, plannedEnd } = {}, user) {
+      // PUR-...: registers acceptance with date; award value stands unless modifySubcontract changes it
+      const s = this._subcontract(id);
+      if (s.status !== "sent") throw new Error("Send the subcontract before recording acceptance");
+      s.status = "accepted";
+      s.acceptedAt = this.state.today;
+      if (plannedStart) s.dates.plannedStart = plannedStart;
+      if (plannedEnd) s.dates.plannedEnd = plannedEnd;
+      this._log(user, "acceptSubcontract", s.number);
+      return s;
+    }
+    /**
+     * Start work on site. Blocks — not just alerts — on expired mandatory
+     * documentation, per §4.2's "bloqueo ... si está vencida": the alert list
+     * can warn about a lot of things, but letting an uninsured trade start on
+     * site is the one that should not merely be visible, it should not happen.
+     */
+    markSubcontractStarted(id, user) {
+      const s = this._subcontract(id);
+      if (!["accepted", "inExecution"].includes(s.status))
+        throw new Error("Accept the subcontract before work can start");
+      const ds = this.subcontractDocStatus(s);
+      if (ds.worst === "r")
+        throw new Error("Mandatory documentation is missing or expired — cannot enter the site");
+      s.status = "inExecution";
+      if (!s.dates.actualStart) s.dates.actualStart = this.state.today;
+      this._log(user, "markSubcontractStarted", s.number);
+      return s;
+    }
+    markSubcontractCompleted(id, user) {
+      const s = this._subcontract(id);
+      if (s.status !== "inExecution") throw new Error("Only work in execution can be completed");
+      s.status = "completed";
+      s.dates.actualEnd = this.state.today;
+      this._log(user, "markSubcontractCompleted", s.number);
+      return s;
+    }
+    modifySubcontract(id, patch, user) {
+      const s = this._subcontract(id);
+      if (["completed", "terminated"].includes(s.status))
+        throw new Error("A completed or terminated subcontract cannot be modified");
+      const allowed = ["trade", "chapterNum", "format", "awardedCents", "retentionPct"];
+      for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      Object.assign(s, patch);
+      this._log(user, "modifySubcontract", s.number);
+      return s;
+    }
+    extendSubcontract(id, { plannedEnd }, user) {
+      const s = this._subcontract(id);
+      if (["completed", "terminated"].includes(s.status))
+        throw new Error("A completed or terminated subcontract cannot be extended");
+      s.dates.plannedEnd = plannedEnd;
+      this._log(user, "extendSubcontract", s.number);
+      return s;
+    }
+    terminateSubcontract(id, reason, user) {
+      const s = this._subcontract(id);
+      if (["completed", "terminated"].includes(s.status)) throw new Error("Already closed");
+      s.status = "terminated";
+      s.terminatedReason = reason || "";
+      s.dates.actualEnd = this.state.today;
+      this._log(user, "terminateSubcontract", s.number);
+      return s;
+    }
+    certifySubcontract(id, { amountCents, note }, user) {
+      // Valuation of executed work — the base for the subcontractor's invoice.
+      const s = this._subcontract(id);
+      if (!["accepted", "inExecution"].includes(s.status))
+        throw new Error("Certify only an accepted or in-execution subcontract");
+      if (!(amountCents > 0)) throw new Error("Certification amount must be positive");
+      s.certifications.push({
+        date: this.state.today,
+        amountCents: Math.round(amountCents),
+        note: note || "",
+      });
+      this._log(user, "certifySubcontract", s.number);
+      return s;
+    }
+    recordRejectedWork(id, desc, user) {
+      const s = this._subcontract(id);
+      s.rejectedWork.push({ date: this.state.today, desc: desc || "" });
+      this._log(user, "recordRejectedWork", s.number);
+      return s;
+    }
+    /** Approve the subcontractor's invoice: registers it as a supplier bill,
+        allocated to this subcontract's project and chapter (AP-01..07). */
+    approveSubcontractorInvoice(id, bill, user) {
+      const s = this._subcontract(id);
+      const rec = this.registerBill(
+        Object.assign({}, bill, {
+          supplierId: s.supplierId,
+          allocations: [
+            {
+              projectId: s.projectId,
+              chapterNum: s.chapterNum,
+              kind: "subcontract",
+              amountCents: bill.baseCents,
+            },
+          ],
+        }),
+        user,
+      );
+      s.billIds.push(rec.id);
+      this._log(user, "approveSubcontractorInvoice", s.number + " " + rec.number);
+      return rec;
+    }
+    releaseSubcontractRetention(id, user) {
+      const s = this._subcontract(id);
+      if (!(s.retentionPct > 0)) throw new Error("This subcontract has no retention to release");
+      if (s.retentionReleasedAt) throw new Error("Retention already released");
+      s.retentionReleasedAt = this.state.today;
+      this._log(user, "releaseSubcontractRetention", s.number);
+      return s;
+    }
+    /** Upsert one mandatory document by kind — a renewal replaces the prior expiry. */
+    renewSubcontractDoc(id, { kind, expiresOn, docRef }, user) {
+      const s = this._subcontract(id);
+      if (!LISTS.subcontractDocTypes.includes(kind)) throw new Error("Unknown document kind");
+      s.docs = s.docs.filter((d) => d.kind !== kind);
+      s.docs.push({ kind, expiresOn: expiresOn || null, docRef: docRef || "" });
+      this._log(user, "renewSubcontractDoc", s.number + " " + kind);
+      return s;
+    }
+    _subcontract(id) {
+      const s = this.state.subcontracts.find((x) => x.id === id);
+      if (!s) throw new Error("Subcontract not found");
+      return s;
+    }
+    /**
+     * Traffic light over the three mandatory documents (§4.2: insurance, PRL,
+     * Social Security registration). Missing counts the same as expired — an
+     * absent document cannot be assumed valid.
+     */
+    subcontractDocStatus(s) {
+      const t = this.state.today;
+      const byKind = {};
+      for (const d of s.docs || [])
+        if (!byKind[d.kind] || (d.expiresOn || "") > (byKind[d.kind].expiresOn || ""))
+          byKind[d.kind] = d;
+      let worst = "g";
+      const items = LISTS.subcontractDocTypes.map((kind) => {
+        const d = byKind[kind];
+        let sev = "g";
+        if (!d || !d.expiresOn) sev = "r";
+        else if (d.expiresOn < t) sev = "r";
+        else if (d.expiresOn <= addDays(t, 30)) sev = "y";
+        if (sev === "r") worst = "r";
+        else if (sev === "y" && worst !== "r") worst = "y";
+        return { kind, doc: d || null, sev };
+      });
+      return { items, worst };
+    }
+    /** The project's subcontracts with awarded/certified/invoiced/pending and doc status (§4.2 list). */
+    subcontractsForProject(projectId) {
+      return this.state.subcontracts
+        .filter((s) => s.projectId === projectId)
+        .map((s) => {
+          const certifiedCents = sum(s.certifications, (c) => c.amountCents);
+          const invoicedCents = sum(
+            this.state.bills.filter((b) => s.billIds.includes(b.id)),
+            (b) => b.baseCents,
+          );
+          return {
+            ...clone(s),
+            certifiedCents,
+            invoicedCents,
+            pendingCents: Math.max(0, s.awardedCents - certifiedCents),
+            docStatus: this.subcontractDocStatus(s),
+          };
+        });
     }
 
     /* =========================== CAP — document capture =========================== */
@@ -2302,9 +2716,9 @@
     addWorker(w, user) {
       // LAB-04/05
       const rec = Object.assign(
-        { id: this._id("wkr"), name: "", kind: "employee", rateHistory: [] },
+        { id: this._id("wkr"), name: "", kind: "employee", rateHistory: [], docs: [] },
         w,
-      ); // rateHistory {from, rateCentsPerHour}
+      ); // rateHistory {from, rateCentsPerHour}; docs {kind, expiresOn, docRef}
       this.state.workers.push(rec);
       this._log(user, "addWorker", rec.name);
       return rec;
@@ -2318,8 +2732,26 @@
       if (!applicable.length) throw new Error("No rate effective for " + date);
       return applicable[0].rateCentsPerHour;
     }
+    /** A worker's own mandatory documentation (§4.6's "trabajador sin
+        documentación válida" — the alert, not a hard block: only subcontracted
+        TRADES are blocked from entering the site, per §4.2). */
+    addWorkerDoc(workerId, { kind, expiresOn, docRef }, user) {
+      const w = this.state.workers.find((x) => x.id === workerId);
+      if (!w) throw new Error("Worker not found");
+      w.docs = (w.docs || []).filter((d) => d.kind !== kind);
+      w.docs.push({ kind, expiresOn: expiresOn || null, docRef: docRef || "" });
+      this._log(user, "addWorkerDoc", w.name + " " + kind);
+      return w;
+    }
     recordHours(h, user) {
       // LAB-01/02/03 + LAB-07 (kind: normal|extra|festivo; optional extra-pay supplement)
+      if (h.projectId) {
+        const p = this.state.projects.find((x) => x.id === h.projectId);
+        // Refusing this outright is worth more than an alert: "horas imputadas
+        // a un proyecto cerrado" (§4.6) can then never actually happen going
+        // forward, rather than being merely visible after the fact.
+        if (p && p.closed) throw new Error("Cannot record hours against a closed project");
+      }
       const rec = Object.assign(
         {
           id: this._id("lab"),
@@ -2330,12 +2762,26 @@
           hoursMilli: 0,
           kind: "normal",
           extraPayCents: 0,
+          locked: false,
+          approvedAt: null,
+          approvedBy: null,
         },
         h,
       );
       rec.rateCents = this.workerRateCents(rec.workerId, rec.date);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);
       this.state.labour.push(rec);
+      return rec;
+    }
+    deleteHours(id, user) {
+      // "registrar, corregir y eliminar horas" (§4.6)
+      const idx = this.state.labour.findIndex((x) => x.id === id);
+      if (idx < 0) throw new Error("Hours entry not found");
+      if (this.state.labour[idx].locked)
+        throw new Error("Hours entry is in an approved week — reopen the week first");
+      const rec = this.state.labour[idx];
+      this.state.labour.splice(idx, 1);
+      this._log(user, "deleteHours", id);
       return rec;
     }
     labourCostCents(projectId) {
@@ -2354,6 +2800,118 @@
         hours: l.hoursMilli / 1000,
         costCents: l.costCents,
       }));
+    }
+    /**
+     * The weekly grid §4.6 asks for: worker × day, with totals. Rows are every
+     * worker who is either assigned to the project over the week or already
+     * has hours logged on it — an assigned worker with nothing logged yet is
+     * exactly the "jornada sin registrar" the alert list flags, and it has to
+     * appear as an empty row for that to be visible rather than invisible.
+     */
+    labourWeek(projectId, weekStart) {
+      const start = weekStartOf(weekStart);
+      const days = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(start, i));
+      const workerIds = new Set([
+        ...(this.state.assignments || [])
+          .filter(
+            (a) => a.projectId === projectId && a.workerId && a.from <= days[6] && a.to >= days[0],
+          )
+          .map((a) => a.workerId),
+        ...this.state.labour
+          .filter((l) => l.projectId === projectId && days.includes(l.date))
+          .map((l) => l.workerId),
+      ]);
+      const rows = [...workerIds].map((workerId) => {
+        const w = this.state.workers.find((x) => x.id === workerId);
+        const cells = days.map((date) => {
+          const entries = this.state.labour.filter(
+            (l) => l.workerId === workerId && l.projectId === projectId && l.date === date,
+          );
+          return {
+            date,
+            hoursMilli: sum(entries, (e) => e.hoursMilli),
+            locked: entries.length > 0 && entries.every((e) => e.locked),
+            entryIds: entries.map((e) => e.id),
+          };
+        });
+        return {
+          workerId,
+          name: w ? w.name : "?",
+          kind: w ? w.kind : "employee",
+          cells,
+          totalMilli: sum(cells, (c) => c.hoursMilli),
+        };
+      });
+      return {
+        weekStart: start,
+        days,
+        rows,
+        totalsByDayMilli: days.map((date, i) => sum(rows, (r) => r.cells[i].hoursMilli)),
+      };
+    }
+    /** Approve (lock) a worker's week — "aprobar ... partes semanales" (§4.6). */
+    approveLabourWeek(workerId, weekStart, user) {
+      const start = weekStartOf(weekStart);
+      const end = addDays(start, 6);
+      const rows = this.state.labour.filter(
+        (l) => l.workerId === workerId && l.date >= start && l.date <= end,
+      );
+      if (!rows.length) throw new Error("No hours recorded for that worker in that week");
+      rows.forEach((l) => {
+        l.locked = true;
+        l.approvedAt = this.state.today;
+        l.approvedBy = user || "backoffice";
+      });
+      this._log(user, "approveLabourWeek", workerId + " " + start);
+      return rows;
+    }
+    /** Reject/reopen — the counterpart of approveLabourWeek. */
+    unapproveLabourWeek(workerId, weekStart, user) {
+      const start = weekStartOf(weekStart);
+      const end = addDays(start, 6);
+      const rows = this.state.labour.filter(
+        (l) => l.workerId === workerId && l.date >= start && l.date <= end,
+      );
+      rows.forEach((l) => {
+        l.locked = false;
+        l.approvedAt = null;
+        l.approvedBy = null;
+      });
+      this._log(user, "unapproveLabourWeek", workerId + " " + start);
+      return rows;
+    }
+    /**
+     * "Posibilidad de repetir el parte del día anterior" (§4.6) — the one-step
+     * mobile flow the spec asks for. A worker already logged on `toDate` is
+     * left alone rather than duplicated, so pressing the button twice is safe.
+     */
+    repeatDay(projectId, fromDate, toDate, user) {
+      const src = this.state.labour.filter((l) => l.projectId === projectId && l.date === fromDate);
+      if (!src.length) throw new Error("No hours recorded on " + fromDate + " to repeat");
+      const already = new Set(
+        this.state.labour
+          .filter((l) => l.projectId === projectId && l.date === toDate)
+          .map((l) => l.workerId),
+      );
+      const created = [];
+      for (const l of src) {
+        if (already.has(l.workerId)) continue;
+        created.push(
+          this.recordHours(
+            {
+              workerId: l.workerId,
+              projectId: l.projectId,
+              chapterNum: l.chapterNum,
+              hoursMilli: l.hoursMilli,
+              kind: l.kind,
+              date: toDate,
+            },
+            user,
+          ),
+        );
+      }
+      this._log(user, "repeatDay", projectId + " " + fromDate + "→" + toDate);
+      return created;
     }
 
     /* =========================== FIN — project economics =========================== */
@@ -2785,11 +3343,90 @@
             });
       }
       for (const c of this.state.changes.filter(
-        (x) => ["identified", "priced"].includes(x.status) && x.costCents > 0,
+        (x) => ["identified", "priced", "sent"].includes(x.status) && x.costCents > 0,
       ))
         push("high", `Extra sin aprobar con coste incurrido — ${this.project(c.projectId).code}`, {
           change: c.id,
         });
+      // §4.1 — orders overdue on their confirmed arrival, and a three-way
+      // reconciliation that does not add up once an order has been invoiced.
+      for (const pu of this.state.purchases) {
+        if (pu.cancelledAt || pu.status.delivered) continue;
+        if (pu.expectedArrival && pu.expectedArrival < t)
+          push("medium", `Llegada de material retrasada — orden ${pu.number}`, {
+            purchase: pu.number,
+          });
+      }
+      for (const pu of this.state.purchases.filter((p) => p.status.invoicedBillId)) {
+        if (!this.purchaseReconciliation(pu.id).ok)
+          push("medium", `Diferencias en la conciliación de la orden ${pu.number}`, {
+            purchase: pu.number,
+          });
+      }
+      // §4.2 — subcontracts: expired documentation, over-certification,
+      // an unbilled trade past a reasonable window, retention past its release.
+      for (const s of this.state.subcontracts || []) {
+        if (["draft", "cancelled", "rejected"].includes(s.status)) continue;
+        const proj = this.state.projects.find((x) => x.id === s.projectId);
+        if (!proj || proj.closed) continue;
+        if (this.subcontractDocStatus(s).worst === "r")
+          push("high", `Documentación caducada — subcontrata ${s.number} (${proj.code})`, {
+            subcontract: s.number,
+          });
+        const certifiedCents = sum(s.certifications, (c) => c.amountCents);
+        if (s.awardedCents > 0 && certifiedCents > s.awardedCents * 1.1)
+          push("medium", `Certificado por encima de lo adjudicado — subcontrata ${s.number}`, {
+            subcontract: s.number,
+          });
+        if (
+          ["accepted", "inExecution"].includes(s.status) &&
+          s.dates.actualStart &&
+          !s.billIds.length &&
+          daysBetween(t, s.dates.actualStart) > 60
+        )
+          push("medium", `Subcontrata sin factura tras 60 días — ${s.number}`, {
+            subcontract: s.number,
+          });
+        if (
+          s.retentionPct > 0 &&
+          !s.retentionReleasedAt &&
+          s.retentionReleaseDate &&
+          s.retentionReleaseDate < t
+        )
+          push("medium", `Retención no liberada tras el plazo de garantía — ${s.number}`, {
+            subcontract: s.number,
+          });
+      }
+      // §4.6 — a worker's own documentation has lapsed.
+      for (const w of this.state.workers)
+        for (const d of w.docs || [])
+          if (d.expiresOn && d.expiresOn < t) {
+            push("medium", `Documentación caducada — ${w.name} (${d.kind})`, { worker: w.id });
+            break;
+          }
+      // §4.6 — a worker assigned to an open project with a working day past
+      // and nothing logged for it. Counted, not itemised: one alert per
+      // project keeps this from drowning the list on a large crew.
+      for (const p of this.state.projects.filter((x) => !x.closed)) {
+        let missing = 0;
+        for (const a of (this.state.assignments || []).filter(
+          (x) => x.projectId === p.id && x.workerId,
+        )) {
+          const from = a.from > (p.dates.start || a.from) ? a.from : p.dates.start || a.from;
+          for (let d = from; d < t && d <= a.to; d = addDays(d, 1)) {
+            const wd = new Date(d + "T00:00:00Z").getUTCDay();
+            if (wd === 0 || wd === 6) continue; // weekends are not working days here
+            if (
+              !this.state.labour.some(
+                (l) => l.workerId === a.workerId && l.projectId === p.id && l.date === d,
+              )
+            )
+              missing++;
+          }
+        }
+        if (missing > 0)
+          push("medium", `${missing} jornada(s) sin registrar — ${p.code}`, { project: p.code });
+      }
       const un = this.unallocatedSummary();
       if (un.billsCount)
         push("high", `${un.billsCount} facturas de proveedor sin asignar`, { view: "payables" });
@@ -2845,7 +3482,7 @@
           })
           .map((p) => p.code),
         unapprovedExtras: this.state.changes.filter((c) =>
-          ["identified", "priced"].includes(c.status),
+          ["identified", "priced", "sent"].includes(c.status),
         ).length,
         budgetsAwaiting: this.state.budgets
           .filter((b) => b.status === "issued" && !b.acceptedVersionId)
@@ -3527,6 +4164,52 @@
       this._log(user, "markChangeExecuted", id);
       return ch;
     }
+    /** Annul a change that has not been invoiced yet — the effect it never
+        should have had unwinds because approved-only totals feed the economics. */
+    cancelChange(id, reason, user) {
+      const ch = this.state.changes.find((x) => x.id === id);
+      if (!ch) throw new Error("Change not found");
+      if (ch.invoiceId)
+        throw new Error("An invoiced extra cannot be cancelled — issue a credit note");
+      ch.status = "cancelled";
+      ch.cancelReason = reason || "";
+      this._log(user, "cancelChange", id);
+      return ch;
+    }
+    /**
+     * The adenda: a customer-facing document generated from the contract and
+     * the change, with a correlative number (§4.5). No cost or margin field —
+     * the same QUO-10 rule the budget document follows, for the same reason.
+     */
+    renderChangeDoc(changeId) {
+      const c = this.state.changes.find((x) => x.id === changeId);
+      if (!c) throw new Error("Change not found");
+      const p = this.project(c.projectId);
+      const con = p.contractId ? this.state.contracts.find((x) => x.id === p.contractId) : null;
+      const cfg = this.state.config;
+      return {
+        docType: "MODIFICACION",
+        number: c.annexNumber || null,
+        date: c.approvedAt || c.date,
+        contractNumber: con ? con.number : null,
+        issuer: {
+          legalName: cfg.legalName,
+          taxId: cfg.taxId,
+          address: `${cfg.street}, ${cfg.postalCode} ${cfg.city}`,
+        },
+        customer: (({ name, taxId, billStreet, billPostalCode, billCity }) => ({
+          name,
+          taxId,
+          address: `${billStreet}, ${billPostalCode} ${billCity}`,
+        }))(this.party(p.partyId)),
+        project: p.code,
+        chapterNum: c.chapterNum,
+        desc: c.desc,
+        reason: c.reason,
+        priceCents: c.priceCents,
+        scheduleImpactDays: c.scheduleImpactDays,
+      };
+    }
     updatePurchase(id, patch, user) {
       const pu = this.state.purchases.find((x) => x.id === id);
       if (!pu) throw new Error("Purchase not found");
@@ -3668,10 +4351,17 @@
       return w;
     }
     correctHours(id, patch, user) {
+      // Also how §4.6's "reimputar horas de un proyecto a otro" happens: pass
+      // a different projectId/chapterNum and the cost moves with it.
       const rec = this.state.labour.find((x) => x.id === id);
       if (!rec) throw new Error("Hours entry not found");
+      if (rec.locked) throw new Error("Hours entry is in an approved week — reopen the week first");
       const allowed = ["projectId", "chapterNum", "hoursMilli", "date", "kind", "extraPayCents"];
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      if (patch.projectId) {
+        const p = this.state.projects.find((x) => x.id === patch.projectId);
+        if (p && p.closed) throw new Error("Cannot reallocate hours onto a closed project");
+      }
       Object.assign(rec, patch);
       rec.rateCents = this.workerRateCents(rec.workerId, rec.date);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);

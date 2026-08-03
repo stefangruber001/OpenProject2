@@ -596,6 +596,33 @@
 
         /** Calendar arithmetic for the chart's axis and its drag maths. */
         calendar: scheduling ? scheduling.calendar : null,
+
+        /**
+         * Apply an approved change order's schedule effect to the derived bar
+         * for its chapter (§4.5: "actualiza ... la carta Gantt conservando la
+         * línea base original").
+         *
+         * Deliberately a separate, explicit action rather than something
+         * approveChange triggers on its own: the engine's approval only ever
+         * touches the budget's own numbers, and folding a Gantt mutation into
+         * that call would make one action responsible for two systems of
+         * record. The baseline is "conserved" for free — a baseline is a
+         * frozen snapshot in plan.baselines, and setDuration never touches it.
+         * No-ops (returns the plan unchanged) when the chapter has no bar yet.
+         */
+        applyChapterDelay: function (plan, chapterNum, deltaDays) {
+          if (!scheduling || !deltaDays) return plan;
+          var task = plan.tasks.find(function (t) {
+            return t.sourceRef === "group:" + chapterNum;
+          });
+          if (!task) return plan;
+          var cal = plan.calendar || DEFAULT_CALENDAR;
+          var current =
+            typeof task.durationDays === "number"
+              ? task.durationDays
+              : scheduling.calendar.workingDaysInclusive(cal, task.plannedStart, task.plannedEnd);
+          return scheduling.service.setDuration(plan, task.id, Math.max(1, current + deltaDays));
+        },
       },
     },
 

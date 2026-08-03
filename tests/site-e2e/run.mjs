@@ -72,6 +72,7 @@ async function main() {
     await testGantt(browser, base);
     await testBudgetBuilder(browser, base);
     await testProjectTracking(browser, base);
+    await testProcurement(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
   } finally {
@@ -959,6 +960,207 @@ async function testProjectTracking(browser, base) {
     else bad("tracking: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("project tracking", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── Compras (§4.1), Subcontratos (§4.2), Modificaciones (§4.5) and Horas
+//    (§4.6) — session 10b. Every screen here is project-scoped through the
+//    same gProject context session 10a introduced; the checks drive real
+//    lifecycles (draft → sent → accepted → received, draft → … → certified,
+//    detected → priced → sent → approved) rather than reading the code, which
+//    is where the "send doesn't refresh the drawer" bug in this session was
+//    actually found.
+async function testProcurement(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    // ---- Compras: needs → new order → send → accept → receive ----
+    await pg.goto(`${base}/erp.html#compras`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(800);
+    const needBtn = pg.locator("[data-need]").first();
+    if ((await needBtn.count()) === 0) {
+      bad("compras: a chapter still needs committing", "no [data-need] rows found");
+    } else {
+      await needBtn.click();
+      await pg.waitForTimeout(300);
+      await pg.selectOption("#p_sup", { index: 1 });
+      await pg.fill("#p_desc", "Material E2E");
+      await pg.fill("#p_qty", "10");
+      await pg.fill("#p_price", "5");
+      await pg.click("#p_save");
+      await pg.waitForTimeout(500);
+      ok("compras: a purchase order can be created from an open need");
+
+      await pg.locator("[data-pu]").first().click();
+      await pg.waitForTimeout(300);
+      const before = await pg.locator(".drawer .pill").first().innerText();
+      await pg.click("#a_send");
+      await pg.waitForTimeout(400);
+      const after = await pg.locator(".drawer .pill").first().innerText();
+      // The exact bug this session shipped once: the send handler updated the
+      // record but never re-rendered the open drawer, so the status pill and
+      // the next action both stayed stale until the drawer was closed and
+      // reopened.
+      if (after !== before && (await pg.locator("#a_accept").count()) > 0)
+        ok(`compras: sending an order refreshes the open drawer (${before} → ${after})`);
+      else bad("compras: drawer refreshes after send", `${before} → ${after}`);
+
+      await pg.fill("#a_arr", "2026-01-01");
+      await pg.click("#a_accept");
+      await pg.waitForTimeout(400);
+      await pg.fill("#a_qty", "10");
+      await pg.fill("#a_doc", "ALB-E2E-1");
+      await pg.click("#a_recv");
+      await pg.waitForTimeout(400);
+      const finalStatus = await pg.locator(".drawer .pill").first().innerText();
+      if (/Recibida/.test(finalStatus))
+        ok("compras: draft → sent → accepted → received, in one drawer session");
+      else bad("compras: full receiving lifecycle", finalStatus);
+      await pg.click("#dClose");
+      await pg.waitForTimeout(200);
+    }
+
+    // ---- Subcontratos: create → doc block → renew → start → certify ----
+    await pg.evaluate(() => (location.hash = "subcontratos"));
+    await pg.waitForTimeout(700);
+    await pg.click("#sNew");
+    await pg.waitForTimeout(300);
+    await pg.selectOption("#s_sup", { index: 1 });
+    await pg.fill("#s_trade", "Fontanería E2E");
+    await pg.fill("#s_amt", "3000");
+    await pg.fill("#s_ret", "5");
+    await pg.click("#s_save");
+    await pg.waitForTimeout(500);
+    await pg.locator("[data-sub]").first().click();
+    await pg.waitForTimeout(300);
+    await pg.click("#x_send");
+    await pg.waitForTimeout(300);
+    await pg.click("#x_accept");
+    await pg.waitForTimeout(300);
+
+    // Starting work is BLOCKED — not merely flagged — while the mandatory
+    // documentation is missing, per §4.2's own "bloqueo ... si está vencida".
+    const startBtn = pg.locator("#x_start");
+    if ((await startBtn.count()) > 0) {
+      await startBtn.click();
+      await pg.waitForTimeout(300);
+      const refusal = await pg.locator("#toast").innerText();
+      if (/^⚠/.test(refusal.trim()))
+        ok("subcontratos: entering the site is blocked without mandatory documentation");
+      else bad("subcontratos: doc block", refusal);
+    } else {
+      bad("subcontratos: start button available to test the doc block", "no #x_start");
+    }
+
+    const docInputs = pg.locator("[data-doc]");
+    const kinds = await docInputs.evaluateAll((els) => els.map((e) => e.dataset.doc));
+    for (const kind of kinds) {
+      await pg.fill(`[data-doc="${kind}"]`, "2027-01-01");
+      await pg.click(`[data-docsave="${kind}"]`);
+      await pg.waitForTimeout(300);
+    }
+    const docStatusAfter = await pg
+      .locator(".drawer .pill")
+      .nth(1)
+      .innerText()
+      .catch(() => "");
+    await pg.click("#x_start");
+    await pg.waitForTimeout(400);
+    const startedOk = (await pg.locator("#x_complete").count()) > 0;
+    if (startedOk) ok("subcontratos: renewing all three documents lifts the block");
+    else bad("subcontratos: doc renewal unblocks start", docStatusAfter);
+
+    await pg.fill("#x_cert", "1200");
+    await pg.click("#x_certsave");
+    await pg.waitForTimeout(400);
+    const certText = await pg.locator(".drawer").innerText();
+    if (/1.200,00/.test(certText) || /Certificado/i.test(certText))
+      ok("subcontratos: a certification is recorded and shown");
+    else bad("subcontratos: certification recorded", certText.slice(0, 150));
+    await pg.click("#dClose");
+    await pg.waitForTimeout(200);
+
+    // ---- Modificaciones: detect → value → send → approve → adenda ----
+    await pg.evaluate(() => (location.hash = "modificaciones"));
+    await pg.waitForTimeout(700);
+    const kpisBefore = await pg.locator("#view .kpi .val").allInnerTexts();
+    await pg.click("#mNew");
+    await pg.waitForTimeout(300);
+    await pg.fill("#c_desc", "Extra E2E");
+    await pg.click("#c_save");
+    await pg.waitForTimeout(500);
+    await pg.locator("[data-price]").first().click();
+    await pg.waitForTimeout(300);
+    await pg.fill("#c_price", "500");
+    await pg.fill("#c_cost", "300");
+    await pg.fill("#c_days", "2");
+    await pg.click("#c_psave");
+    await pg.waitForTimeout(500);
+    const sendBtn = pg.locator("[data-send]").first();
+    if ((await sendBtn.count()) === 0)
+      bad("modificaciones: priced extra offers Enviar", "no [data-send]");
+    await sendBtn.click();
+    await pg.waitForTimeout(400);
+    await pg.locator("[data-approve]").first().click();
+    await pg.waitForTimeout(500);
+    const kpisAfter = await pg.locator("#view .kpi .val").allInnerTexts();
+    if (JSON.stringify(kpisAfter) !== JSON.stringify(kpisBefore))
+      ok("modificaciones: approving an extra moves the contract-value header");
+    else bad("modificaciones: header updates on approval", kpisAfter.join(" | "));
+
+    await pg.locator("[data-doc]").first().click();
+    await pg.waitForTimeout(300);
+    const adenda = await pg.locator(".drawer .doc").innerText();
+    if (
+      /MODIFICACIÓN CONTRACTUAL/.test(adenda) &&
+      !/coste/i.test(adenda) &&
+      !/margen/i.test(adenda)
+    )
+      ok("modificaciones: the adenda shows the sale effect and no cost or margin");
+    else bad("modificaciones: adenda content", adenda.replace(/\n/g, " ").slice(0, 150));
+    await pg.click("#dClose");
+    await pg.waitForTimeout(200);
+
+    // ---- Horas: assign → enter → approve locks → repeat day ----
+    await pg.evaluate(() => (location.hash = "horas"));
+    await pg.waitForTimeout(700);
+    await pg.click("#hAssign");
+    await pg.waitForTimeout(300);
+    await pg.selectOption("#as_w", { index: 0 });
+    await pg.click("#as_save");
+    await pg.waitForTimeout(500);
+    const hin = pg.locator(".wgrid input.hin").first();
+    if ((await hin.count()) === 0) {
+      bad("horas: the grid shows an editable cell after assigning a worker", "no input.hin");
+    } else {
+      await hin.fill("6");
+      await hin.blur();
+      await pg.waitForTimeout(500);
+      const totalCell = await pg.locator(".wgrid td.wtot.num").first().innerText();
+      if (totalCell.trim() === "6")
+        ok("horas: hours entered in the grid update the worker's total");
+      else bad("horas: grid total after entry", totalCell);
+
+      await pg.locator("[data-approve]").first().click();
+      await pg.waitForTimeout(500);
+      const disabledCount = await pg.locator(".wgrid input.hin[disabled]").count();
+      if (disabledCount > 0) ok("horas: approving the week locks its entered cell");
+      else bad("horas: approve locks the cell", `disabled=${disabledCount}`);
+
+      await pg.click("#hRepeat");
+      await pg.waitForTimeout(500);
+      const repeatToast = await pg.locator("#toast").innerText();
+      if (/repetid/i.test(repeatToast)) ok("horas: repeating yesterday's day reports success");
+      else bad("horas: repeat day", repeatToast);
+    }
+
+    if (errs.length === 0) ok("procurement: no console errors");
+    else bad("procurement: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("procurement (compras/subcontratos/modificaciones/horas)", String(e).slice(0, 220));
   } finally {
     await pg.close();
   }

@@ -428,12 +428,44 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   its daily-output tables — which the **browser bundle now composes**, the first
   time a pack reaches the phone. `scheduling-gantt` and `project-economics` are
   `factory`-owned (18 engine · 4 factory · 3 unbuilt). Site E2E 91/91.
-- **Session 8 — not started** (skipped for now), **10b-12 — not started.** See
+- **Session 10b — done (ASSUMPTIONS.md #54).** Compras (§4.1): a purchase
+  order's lifecycle (borrador → enviada → aceptada → recibida parcial →
+  recibida → facturada → pagada) is DERIVED from its dates and receipts, never
+  stored as its own field; `purchaseNeeds()` shows what a project's chapters
+  still need to commit, reading the same `committedByChapter()` the economics
+  screen uses; `purchaseReconciliation()` is the order ↔ delivery note ↔
+  invoice three-way check. Subcontratos (§4.2) is a **new area** — one record
+  per awarded trade with awarded/certified/invoiced/pending, a traffic light
+  over three mandatory documents (insurance, PRL, Social Security), retention,
+  and a link to the Gantt task executing that trade. Starting work on site is
+  **blocked**, not merely alerted, while documentation is expired or missing —
+  the one rule this session gives the harder of its two available forms on
+  purpose. `committedByChapter`/`committedCostCents` now include awarded
+  subcontracts, which the economics screen was quietly undercounting since
+  session 10a. Modificaciones (§4.5): change orders gained a `sent` step, a
+  `chapterNum` (so their cost/margin effect attributes correctly in the
+  forecast), `cancelChange`, and `renderChangeDoc` — a customer-facing adenda
+  with no cost or margin field. An approved change's schedule effect applies
+  to the Gantt through an explicit action
+  (`ErpBridge.scheduling.plans.applyChapterDelay`), never automatically.
+  Horas (§4.6): a weekly worker × day grid, scoped to the section's project
+  like every other §4 subsection, with locking (`approveLabourWeek`), "repetir
+  el parte del día anterior," and reassignment through the existing
+  `correctHours`. Recording hours against a closed project is now refused
+  outright, which makes the spec's own alert for it structurally unreachable.
+  Schema v6 adds `state.subcontracts` and the lifecycle fields on purchases,
+  changes, labour and workers — every one of them additive. Ownership:
+  `subcontracts` added; `purchases`/`change-orders`/`labour-hours` stay
+  `engine` (19 engine · 4 factory · 3 unbuilt). Site E2E 103/103, 11 new
+  checks — including one that pins the exact bug this session shipped once:
+  sending a purchase order updated the record but left the open drawer
+  showing the stale status and the wrong next action.
+- **Session 8 — not started** (skipped for now), **11-12 — not started.** See
   `docs/worklog/WORKLOG.md`.
 
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-
 status-1q50dt` for sessions 1-3, `claude/candi-programme-session-4-07amo8` for
-sessions 4-10a. Small conventional commits, every commit green, no force-push, no
+sessions 4-10b. Small conventional commits, every commit green, no force-push, no
 history rewrite.
