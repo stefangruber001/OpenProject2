@@ -1452,6 +1452,145 @@
       });
       this._log(user, "markProgress", p.code + " cap." + chapterNum + " → " + state_);
     }
+    /**
+     * Progress on ONE line, by percentage or by the quantity actually built
+     * (§4.3: "avance por cantidad ejecutada además de por porcentaje").
+     *
+     * Quantity is the honest input on site — nobody knows what 40 % of a wall
+     * is, everybody knows how many square metres went up — so it is converted
+     * here rather than asked for as a percentage the foreman had to invent.
+     * The chapter's own state is then rolled up from its lines, so the two can
+     * never contradict each other.
+     */
+    markLineProgress(projectId, lineId, { pct, qtyMilliDone }, user) {
+      const p = this.project(projectId);
+      if (!p.budgetId) throw new Error("Project has no budget to mark progress against");
+      const v = this.version(p.budgetId, p.acceptedVersionId);
+      for (const c of v.chapters) {
+        const l = c.lines.find((x) => x.id === lineId);
+        if (!l) continue;
+        let value = pct;
+        if (value == null && qtyMilliDone != null) {
+          const total = l.subLines.length ? this._aggSubLines(l.subLines) : l.qtyMilli;
+          value = total > 0 ? (qtyMilliDone / total) * 100 : 0;
+        }
+        l.progressPct = Math.max(0, Math.min(100, Math.round(value || 0)));
+        l.progress =
+          l.progressPct >= 100 ? "done" : l.progressPct > 0 ? "inProgress" : "notStarted";
+        const pcts = c.lines.map((x) => x.progressPct || 0);
+        c.progress = pcts.every((x) => x >= 100)
+          ? "done"
+          : pcts.some((x) => x > 0)
+            ? "inProgress"
+            : "notStarted";
+        this._log(user, "markLineProgress", p.code + " " + l.num + " → " + l.progressPct + "%");
+        return l;
+      }
+      throw new Error("Line not found: " + lineId);
+    }
+    /** Value-weighted progress per chapter, the input a cost forecast needs. */
+    chapterProgress(projectId) {
+      const p = this.project(projectId);
+      if (!p.budgetId) {
+        const pct = p.progressSimple ? p.progressSimple.pct : 0;
+        return p.baseline.chapters.map((c) => ({ num: c.num, progressPct: pct }));
+      }
+      const v = this.version(p.budgetId, p.acceptedVersionId);
+      return v.chapters
+        .filter((c) => c.section === "base")
+        .map((c) => {
+          let value = 0,
+            done = 0;
+          for (const l of c.lines) {
+            if (l.pending) continue;
+            const qty = l.subLines.length ? this._aggSubLines(l.subLines) : l.qtyMilli;
+            const amount = l.lumpSum ? l.priceCents : mul(qty, l.priceCents);
+            value += amount;
+            done += (amount * (l.progressPct || 0)) / 100;
+          }
+          return { num: c.num, progressPct: value ? Math.round((done / value) * 100) : 0 };
+        });
+    }
+    /** Committed cost per chapter — orders raised, net of returns (FIN-02). */
+    committedByChapter(projectId) {
+      const out = {};
+      for (const pu of this.state.purchases) {
+        if (pu.projectId !== projectId || !pu.chapterNum) continue;
+        out[pu.chapterNum] = (out[pu.chapterNum] || 0) + (pu.totalCents - pu.status.returnedCents);
+      }
+      return out;
+    }
+    /**
+     * A human's replacement for a calculated cost-at-completion (§4.4
+     * "Proyección"). The reason is required and stored with it: an adjustment
+     * nobody can review later is indistinguishable from a typo, and the point
+     * of the figure is to start a conversation about why it moved.
+     */
+    setForecastOverride(projectId, chapterNum, { costCents, reason }, user) {
+      const p = this.project(projectId);
+      if (!reason || !String(reason).trim())
+        throw new Error("An adjusted projection needs a reason");
+      if (!p.forecastOverrides || typeof p.forecastOverrides !== "object") p.forecastOverrides = {};
+      p.forecastOverrides[chapterNum] = {
+        costCents: Math.round(costCents),
+        reason: String(reason).trim(),
+        at: this.state.today,
+        by: user || "backoffice",
+      };
+      this._log(user, "setForecastOverride", p.code + " cap." + chapterNum);
+      return p.forecastOverrides[chapterNum];
+    }
+    clearForecastOverride(projectId, chapterNum, user) {
+      const p = this.project(projectId);
+      if (p.forecastOverrides) delete p.forecastOverrides[chapterNum];
+      this._log(user, "clearForecastOverride", p.code + " cap." + chapterNum);
+    }
+    /**
+     * The fixed header of §4: everything the strip above every project
+     * subsection has to show, in one call, so six views cannot each assemble
+     * it slightly differently.
+     */
+    projectHeader(projectId) {
+      const p = this.project(projectId);
+      const e = this.projectEconomics(projectId);
+      const party = this.party(p.partyId);
+      const property = p.propertyId
+        ? this.state.properties.find((x) => x.id === p.propertyId)
+        : null;
+      const contract = p.contractId
+        ? this.state.contracts.find((c) => c.id === p.contractId)
+        : null;
+      // The next two dates that matter, whatever kind they are: a payment
+      // milestone, the committed finish, a permit expiry. A header that only
+      // knew about one kind would go quiet exactly when another is looming.
+      const dates = [];
+      if (p.dates.targetEnd) dates.push({ what: "Fin previsto", date: p.dates.targetEnd });
+      if (contract) {
+        for (const i of contract.installments || [])
+          if (i.expectedDate && i.status !== "invoiced")
+            dates.push({ what: "Hito de cobro", date: i.expectedDate });
+      }
+      for (const pm of p.permits || [])
+        if (pm.expiresOn) dates.push({ what: "Permiso " + (pm.kind || ""), date: pm.expiresOn });
+      dates.sort((a, b) => (a.date < b.date ? -1 : 1));
+      return {
+        id: p.id,
+        code: p.code,
+        partyId: p.partyId,
+        partyName: party.name,
+        address: property
+          ? `${property.street || ""}, ${property.postalCode || ""} ${property.city || ""}`.trim()
+          : "",
+        status: p.closed ? "closed" : p.status,
+        activityLine: p.activityLine,
+        progressPct: e.progressPct,
+        revenueCents: e.currentRevenueCents,
+        actualCents: e.actualCents,
+        marginCents: e.marginForecastCents,
+        marginPct: e.marginForecastPct,
+        nextDates: dates.slice(0, 2),
+      };
+    }
     projectProgressPct(projectId) {
       // value-weighted, feeds progress invoicing (PLN-03)
       const p = this.project(projectId);

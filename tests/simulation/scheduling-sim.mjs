@@ -171,6 +171,126 @@ assert(
   "a plan in the pre-CPM shape still schedules, unmigrated",
 );
 
+// ---- the session-10a additions are in the artifact, not just the sources ----
+// Same guard, one layer up: the derivation, the tracking and the cost forecast
+// are what the phones will run, and a tree-shaken export is indistinguishable
+// from a missing one until something calls it.
+{
+  const fiveDay = { workingWeekdays: [1, 2, 3, 4, 5], nonWorkingDates: [] };
+  const items = [
+    {
+      ref: "a",
+      groupNum: "1",
+      groupName: "Strip out",
+      title: "Strip out",
+      quantity: 45,
+      unit: "m2",
+      ratePerDay: 20,
+    },
+    {
+      ref: "b",
+      groupNum: "2",
+      groupName: "Finishes",
+      title: "Finishes",
+      quantity: 60,
+      unit: "m2",
+      ratePerDay: 15,
+    },
+  ];
+  const derived = svc.fromWorkBreakdown(items, {
+    from: "2026-09-07",
+    calendar: fiveDay,
+    granularity: "item",
+  });
+  eq(
+    derived.plan.tasks.map((t) => t.durationDays),
+    [3, 4],
+    "the bundle derives durations from quantity ÷ daily output",
+  );
+  eq(
+    derived.notes.map((n) => n.basis),
+    ["quantity", "quantity"],
+    "and reports how it got them",
+  );
+  assert(
+    derived.plan.tasks[0].plannedEnd < derived.plan.tasks[1].plannedStart,
+    "and chains the derived tasks finish-to-start",
+  );
+
+  const half = svc.setProgress(derived.plan, derived.plan.tasks[0].id, 100, "2026-09-09");
+  assert(
+    (half.progressLog || []).length === 1 && half.progressLog[0].date === "2026-09-09",
+    "the bundle records progress WITH its date, which nothing can reconstruct later",
+  );
+
+  const curve = svc.progressCurve(half, { asOf: "2026-09-09" });
+  assert(curve.points.length > 1 && curve.actualPct > 0, "the bundle draws the S curve");
+  assert(
+    curve.projectedFinish >= curve.plannedFinish || curve.performanceIndex > 1,
+    "and projects a finish from the observed pace",
+    `${curve.performanceIndex} → ${curve.projectedFinish} vs ${curve.plannedFinish}`,
+  );
+
+  const risk = svc.riskReport(derived.plan, { asOf: "2026-09-30" });
+  assert(
+    risk.items.length === 2,
+    "the bundle reports work that is late",
+    String(risk.items.length),
+  );
+  assert(
+    risk.items.every((i) => i.critical),
+    "and knows which of it is critical",
+  );
+}
+
+// ---- cost at completion, through the same artifact --------------------------
+{
+  const projects = F.createProjects();
+  const forecast = projects.forecast(
+    {
+      id: "p1",
+      name: "Job",
+      baselineCents: 20000,
+      baselineByChapter: [
+        { chapter: "1", budgetCents: 10000 },
+        { chapter: "2", budgetCents: 10000 },
+      ],
+      revenueCents: 30000,
+      costs: [
+        {
+          id: "c1",
+          kind: "actual",
+          chapter: "1",
+          description: "",
+          amountCents: 4000,
+          date: "2026-09-10",
+        },
+      ],
+      changeOrders: [],
+      status: "active",
+      createdAt: "2026-09-01",
+    },
+    { progress: [{ chapter: "1", progressPct: 25 }] },
+  );
+  // 40 spent to get a quarter of the way is heading for 160, not "comfortably
+  // under 100" — the whole reason the column exists.
+  eq(forecast.byChapter[0].calculatedCents, 16000, "the bundle carries cost at completion");
+  eq(forecast.forecastCents, 26000, "and totals it across the chapters");
+  eq(forecast.marginForecastCents, 4000, "and reports the margin the job is heading for");
+}
+
+// ---- the vertical pack's rates travelled with it ----------------------------
+{
+  const rates = F.createRates();
+  assert(rates.dailyOutputFor({ unit: "m2" }) > 0, "the bundle carries the pack's daily output");
+  assert(
+    rates.dailyOutputFor({ unit: "m2", chapter: "Pintura" }) !==
+      rates.dailyOutputFor({ unit: "m2", chapter: "Estructura" }),
+    "and the chapter, not just the unit, decides the pace",
+  );
+  assert(rates.dailyOutputFor({ unit: "furlong" }) === null, "and it declines to guess");
+}
+
 /* ---------------- report ---------------- */
 const failed = checks.filter((c) => !c.pass);
 console.log(`\n──── scheduling engine simulation (committed bundle) ────`);

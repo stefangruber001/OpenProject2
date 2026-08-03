@@ -78,6 +78,22 @@ export interface Baseline {
   tasks: BaselineTask[];
 }
 
+/**
+ * One recorded observation of how far a task had got, on a date.
+ *
+ * This exists because progress is the one thing about a plan that cannot be
+ * reconstructed afterwards. Dates, durations and the critical path can all be
+ * recomputed from the network at any time; "how much was done by the end of
+ * March" is only knowable if somebody wrote it down in March. Without the log
+ * an actual-progress curve is not a curve at all — it is today's percentage
+ * drawn as though it had always been true.
+ */
+export interface ProgressEntry {
+  taskId: string;
+  date: string;
+  pct: number;
+}
+
 export interface Plan {
   tasks: Task[];
   /** Absent on plans built before dependencies existed — treated as none. */
@@ -86,6 +102,8 @@ export interface Plan {
   calendar?: WorkCalendar;
   /** Append-only: a baseline is never modified once frozen. */
   baselines?: Baseline[];
+  /** Append-only history of progress observations. See ProgressEntry. */
+  progressLog?: ProgressEntry[];
 }
 
 export const schedulingConfigSchema = z.object({}).default({});

@@ -6,6 +6,7 @@ import {
   type ClockPort,
   type IdGenPort,
 } from "@repo/kernel";
+import { forecastToCompletion, type ForecastInput, type ProjectForecast } from "./forecast";
 import type {
   ChangeOrder,
   ChapterBudget,
@@ -159,6 +160,15 @@ export class ProjectsService {
       marginBelowFloor,
       byChapter: this.marginByChapter(project),
     };
+  }
+
+  /**
+   * Where the cost is heading, not where it has got to. `financials()` reports
+   * what has happened; this reports what it implies — see forecast.ts for why
+   * the two are different questions and why both are worth showing.
+   */
+  forecast(project: Project, input: ForecastInput): ProjectForecast {
+    return forecastToCompletion(project, input);
   }
 
   /** Per-chapter budget vs committed vs actual + variance (the core pain). */

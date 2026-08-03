@@ -137,6 +137,26 @@ assert(
   );
 }
 {
+  const projects = r1.state.projects || [];
+  assert(projects.length > 0, "the fixture actually carries projects to migrate");
+  assert(
+    projects.every(
+      (p) =>
+        p.forecastOverrides &&
+        typeof p.forecastOverrides === "object" &&
+        !Array.isArray(p.forecastOverrides),
+    ),
+    "v5 declares forecastOverrides on every project",
+  );
+  // A plan that predates the progress log must come back with an empty one,
+  // so a reader can tell "nothing recorded" from "key never existed".
+  const withPlans = M.migrate({ ...v1, plans: { prj_1: { tasks: [] } } });
+  assert(
+    Array.isArray(withPlans.state.plans.prj_1.progressLog),
+    "v5 declares progressLog on an existing plan",
+  );
+}
+{
   // A blob that DID write bare strings: the widening must keep the reference
   // and survive a second pass unchanged.
   const legacy = JSON.parse(JSON.stringify(v1));

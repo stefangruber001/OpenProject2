@@ -400,12 +400,40 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   references into records). Internal-only images never reach the customer
   document. `budget-graphic-annex` becomes the third `factory`-owned area.
   Site E2E 77/77, all thirteen new checks made in a real browser.
-- **Session 8 — not started** (skipped for now), **10-12 — not started.** See
+- **Session 10a — done (ASSUMPTIONS.md #53).** Projects: the plan derived from
+  the budget, the three tracking curves, and cost at completion. Every
+  subsection of Proyectos now sits under **one project context** — a persistent
+  selector with search, favourites and recents, and a fixed header carrying
+  customer, address, status, progress, contracted revenue, actual cost, current
+  margin and the next two critical dates (§4). Seguimiento técnico (§4.3)
+  replaces session 6's placeholder seed with the **real derivation**: chapters
+  and lines in, each duration from quantity ÷ the daily output of that unit in
+  that chapter, dependencies chained, and re-derivable after a quote change
+  without losing what the site recorded — derived task ids come from the
+  budget's own line ids, so re-deriving is a merge and not a reset. Progress is
+  recorded per chapter or **per executed quantity** (the number a site actually
+  knows), and one action writes both the budget and the plan so the two can
+  never disagree. An **S curve** draws planned, actual and projected, with the
+  actual line taken from an append-only progress log rather than from today's
+  percentages — the one thing about a plan that cannot be reconstructed
+  afterwards. A deviations panel names what is overdue, not started or merely
+  behind, and measures the slip against the frozen baseline. Seguimiento
+  económico (§4.4) is now a real screen: budgeted · committed · actual ·
+  **projected** · deviation · margin per chapter, where the projection carries
+  the observed cost per point of progress to the end, never falls below what is
+  spent or committed, keeps the budget while nothing has been booked, and can be
+  adjusted by hand only with a reason — with both figures shown. New:
+  `@repo/capability-scheduling` gained `derive.ts` and `tracking.ts`,
+  `@repo/capability-projects` gained `forecast.ts`, and the vertical pack gained
+  its daily-output tables — which the **browser bundle now composes**, the first
+  time a pack reaches the phone. `scheduling-gantt` and `project-economics` are
+  `factory`-owned (18 engine · 4 factory · 3 unbuilt). Site E2E 91/91.
+- **Session 8 — not started** (skipped for now), **10b-12 — not started.** See
   `docs/worklog/WORKLOG.md`.
 
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-
 status-1q50dt` for sessions 1-3, `claude/candi-programme-session-4-07amo8` for
-sessions 4-9. Small conventional commits, every commit green, no force-push, no
+sessions 4-10a. Small conventional commits, every commit green, no force-push, no
 history rewrite.

@@ -24,6 +24,8 @@ __export(index_exports, {
   BrowserIdGen: () => BrowserIdGen,
   SURFACE_VERSION: () => SURFACE_VERSION,
   createDocs: () => createDocs,
+  createProjects: () => createProjects,
+  createRates: () => createRates,
   createScheduling: () => createScheduling,
   defaultPorts: () => defaultPorts
 });
@@ -117,6 +119,32 @@ var FactoryError = class extends Error {
     this.details = details;
   }
 };
+
+// ../kernel/src/money.ts
+function assertInt(value, what) {
+  if (!Number.isSafeInteger(value)) {
+    throw new FactoryError("MONEY_NOT_INTEGER", `${what} must be a safe integer, got ${value}`);
+  }
+}
+function roundDivHalfUp(n, d) {
+  assertInt(n, "numerator");
+  assertInt(d, "denominator");
+  const sign = n < 0 ? -1 : 1;
+  const abs = Math.abs(n);
+  const q = Math.floor(abs / d);
+  const r = abs - q * d;
+  const result = sign * (r * 2 >= d ? q + 1 : q);
+  return result === 0 ? 0 : result;
+}
+function sumCents(values) {
+  let total = 0;
+  for (const v of values) {
+    assertInt(v, "cents value");
+    total += v;
+  }
+  assertInt(total, "sum");
+  return total;
+}
 
 // ../kernel/src/clock.ts
 var SystemClock = class {
@@ -449,6 +477,324 @@ function compareToBaseline(plan, baselineId) {
   };
 }
 
+// ../capabilities/scheduling/src/derive.ts
+var DEFAULT_DURATION_DAYS = 5;
+function compareNumbering2(a, b) {
+  const pa = String(a).split(".");
+  const pb = String(b).split(".");
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const sa = pa[i];
+    const sb = pb[i];
+    if (sa === void 0) return -1;
+    if (sb === void 0) return 1;
+    const na = Number(sa);
+    const nb = Number(sb);
+    if (Number.isFinite(na) && Number.isFinite(nb)) {
+      if (na !== nb) return na - nb;
+    } else if (sa !== sb) {
+      return sa < sb ? -1 : 1;
+    }
+  }
+  return 0;
+}
+function durationFor(item, defaultDays) {
+  if (typeof item.durationDays === "number" && Number.isFinite(item.durationDays)) {
+    return { days: Math.max(1, Math.round(item.durationDays)), basis: "explicit" };
+  }
+  const qty = Number(item.quantity);
+  const rate = Number(item.ratePerDay);
+  if (Number.isFinite(qty) && qty > 0 && Number.isFinite(rate) && rate > 0) {
+    return { days: Math.max(1, Math.ceil(qty / rate)), basis: "quantity" };
+  }
+  return { days: Math.max(1, Math.round(defaultDays)), basis: "default" };
+}
+function planFromWorkBreakdown(items, options) {
+  const cal = options.calendar ?? everyDayCalendar();
+  const granularity = options.granularity ?? "group";
+  const defaultDays = options.defaultDurationDays ?? DEFAULT_DURATION_DAYS;
+  const groupLag = options.groupLagDays ?? 0;
+  const start = snapForward(cal, options.from);
+  const skipped = [];
+  const usable = items.filter((it) => {
+    if (it.skip || !it.title) {
+      skipped.push(it.ref);
+      return false;
+    }
+    return true;
+  });
+  const ordered = usable.map((item, i) => ({ item, i })).sort((a, b) => {
+    const g = compareNumbering2(a.item.groupNum, b.item.groupNum);
+    if (g !== 0) return g;
+    const it = compareNumbering2(a.item.itemNum ?? "", b.item.itemNum ?? "");
+    if (it !== 0) return it;
+    return a.i - b.i;
+  }).map((x) => x.item);
+  const tasks = [];
+  const dependencies = [];
+  const notes = [];
+  const push = (id, title, days, note, assignee, sourceRef, lag) => {
+    const previous = tasks[tasks.length - 1];
+    tasks.push({
+      id,
+      title,
+      assignee,
+      // A first pass, deliberately: every task starts where the work could
+      // start, and the CPM engine then pushes it out behind its predecessors.
+      plannedStart: start,
+      plannedEnd: finishOf(cal, start, days),
+      status: "planned",
+      progressPct: 0,
+      milestone: false,
+      durationDays: days,
+      sourceRef
+    });
+    if (previous) {
+      dependencies.push({
+        id: `dep_${previous.id}__${id}`,
+        predecessorId: previous.id,
+        successorId: id,
+        type: "FS",
+        lagDays: lag
+      });
+    }
+    notes.push(note);
+  };
+  if (granularity === "item") {
+    let lastGroup = null;
+    for (const item of ordered) {
+      const { days, basis } = durationFor(item, defaultDays);
+      const lag = lastGroup !== null && lastGroup !== item.groupNum ? groupLag : 0;
+      lastGroup = item.groupNum;
+      push(
+        `task_${item.ref}`,
+        `${item.itemNum ? item.itemNum + " " : ""}${item.title}`,
+        days,
+        {
+          taskId: `task_${item.ref}`,
+          title: item.title,
+          durationDays: days,
+          basis,
+          quantity: item.quantity,
+          unit: item.unit,
+          ratePerDay: item.ratePerDay
+        },
+        item.assignee,
+        item.ref,
+        lag
+      );
+    }
+  } else {
+    const groups = /* @__PURE__ */ new Map();
+    for (const item of ordered) {
+      const { days } = durationFor(item, defaultDays);
+      const g = groups.get(item.groupNum);
+      if (g) {
+        g.days += days;
+        g.refs.push(item.ref);
+      } else {
+        groups.set(item.groupNum, { name: item.groupName, days, refs: [item.ref] });
+      }
+    }
+    let first = true;
+    for (const [num, g] of groups) {
+      const id = `task_group_${num}`;
+      push(
+        id,
+        `${num}. ${g.name}`,
+        g.days,
+        { taskId: id, title: g.name, durationDays: g.days, basis: "quantity" },
+        void 0,
+        `group:${num}`,
+        first ? 0 : groupLag
+      );
+      first = false;
+    }
+  }
+  return {
+    plan: { tasks, dependencies, calendar: cal, baselines: [] },
+    notes,
+    skipped
+  };
+}
+function mergeDerivedPlan(previous, derived) {
+  const before = new Map(previous.tasks.map((t) => [t.id, t]));
+  return {
+    ...derived,
+    tasks: derived.tasks.map((t) => {
+      const old = before.get(t.id);
+      if (!old) return t;
+      return {
+        ...t,
+        progressPct: old.progressPct,
+        status: old.status,
+        assignee: old.assignee ?? t.assignee,
+        earliestStart: old.earliestStart
+      };
+    }),
+    // Baselines are promises already made; a re-derivation does not get to
+    // rewrite them.
+    baselines: previous.baselines ?? [],
+    progressLog: previous.progressLog
+  };
+}
+
+// ../capabilities/scheduling/src/tracking.ts
+var clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+var pct = (part, whole) => whole === 0 ? 0 : Math.round(part / whole * 1e3) / 10;
+function weightOf(weights, st) {
+  const w = weights?.[st.taskId];
+  if (typeof w === "number" && Number.isFinite(w) && w > 0) return w;
+  return Math.max(st.durationDays, 1);
+}
+function plannedFractionAt(cal, st, date) {
+  if (date < st.start) return 0;
+  if (date >= st.finish) return 1;
+  const done = workingDaysInclusive(cal, st.start, date);
+  const total = Math.max(1, st.durationDays);
+  return clamp(done / total, 0, 1);
+}
+function recordedPctAt(log, taskId, date) {
+  let best = null;
+  for (const e of log) {
+    if (e.taskId !== taskId || e.date > date) continue;
+    if (!best || e.date > best.date) best = e;
+  }
+  return best ? best.pct : null;
+}
+function progressCurve(plan, schedule, options) {
+  const cal = calendarOf(plan);
+  const log = plan.progressLog ?? [];
+  const asOf = options.asOf;
+  const scheduled = schedule.tasks;
+  const totalWeight = scheduled.reduce((s, st) => s + weightOf(options.weights, st), 0);
+  const plannedAt = (date) => pct(
+    scheduled.reduce(
+      (s, st) => s + weightOf(options.weights, st) * plannedFractionAt(cal, st, date),
+      0
+    ),
+    totalWeight
+  );
+  const byId = new Map(plan.tasks.map((t) => [t.id, t]));
+  const actualAt = (date) => {
+    let any = false;
+    let sum = 0;
+    for (const st of scheduled) {
+      const recorded = recordedPctAt(log, st.taskId, date);
+      if (recorded !== null) any = true;
+      sum += weightOf(options.weights, st) * (clamp(recorded ?? 0, 0, 100) / 100);
+    }
+    return any ? pct(sum, totalWeight) : null;
+  };
+  const actualNow = pct(
+    scheduled.reduce((s, st) => {
+      const t = byId.get(st.taskId);
+      return s + weightOf(options.weights, st) * (clamp(t?.progressPct ?? 0, 0, 100) / 100);
+    }, 0),
+    totalWeight
+  );
+  const plannedNow = plannedAt(asOf);
+  const performanceIndex = plannedNow > 0 ? Math.round(actualNow / plannedNow * 100) / 100 : null;
+  const remainingDays = asOf >= schedule.finish ? 0 : Math.max(0, workingDaysInclusive(cal, asOf, schedule.finish) - 1);
+  const stretch = performanceIndex && performanceIndex > 0 ? 1 / performanceIndex : 1;
+  const projectedFinish = remainingDays === 0 ? schedule.finish : addWorkingDays(cal, snapForward(cal, asOf), Math.round(remainingDays * stretch));
+  const horizon = projectedFinish > schedule.finish ? projectedFinish : schedule.finish;
+  const span = Math.max(1, workingDaysInclusive(cal, schedule.start, horizon));
+  const samples = Math.max(2, Math.min(options.samples ?? 24, span));
+  const step = Math.max(1, Math.ceil(span / samples));
+  const points = [];
+  for (let d = 0; d < span; d += step) {
+    const date = addWorkingDays(cal, schedule.start, d);
+    points.push({
+      date,
+      plannedPct: plannedAt(date),
+      actualPct: date <= asOf ? actualAt(date) : null,
+      // Anchored on the actual line so the two meet rather than jumping at
+      // `asOf`, then continuing at the observed pace: the work the plan
+      // expects between now and `date`, achieved at `performanceIndex` of it.
+      projectedPct: date > asOf ? clamp(actualNow + (plannedAt(date) - plannedNow) * (performanceIndex ?? 1), 0, 100) : null
+    });
+  }
+  const last = points[points.length - 1];
+  if (!last || last.date !== horizon) {
+    points.push({
+      date: horizon,
+      plannedPct: plannedAt(horizon),
+      actualPct: horizon <= asOf ? actualAt(horizon) : null,
+      projectedPct: horizon > asOf ? 100 : null
+    });
+  }
+  return {
+    asOf,
+    points,
+    plannedPct: plannedNow,
+    actualPct: actualNow,
+    driftPct: Math.round((actualNow - plannedNow) * 10) / 10,
+    performanceIndex,
+    plannedFinish: schedule.finish,
+    projectedFinish
+  };
+}
+function riskReport(plan, schedule, options) {
+  const cal = calendarOf(plan);
+  const asOf = options.asOf;
+  const tolerance = options.tolerancePct ?? 10;
+  const threshold = options.thresholdDays ?? 5;
+  const byId = new Map(plan.tasks.map((t) => [t.id, t]));
+  const baselines = plan.baselines ?? [];
+  const baseline = options.baselineLabel ? baselines.find((b) => b.label === options.baselineLabel) : baselines[baselines.length - 1];
+  const baselineFinish = baseline ? baseline.finish : null;
+  const delayDays = baselineFinish ? workingDayOffset(cal, baselineFinish, schedule.finish) : 0;
+  const items = [];
+  for (const st of schedule.tasks) {
+    const task = byId.get(st.taskId);
+    if (!task) continue;
+    const actual = clamp(task.progressPct ?? 0, 0, 100);
+    const planned = Math.round(plannedFractionAt(cal, st, asOf) * 100);
+    if (actual >= 100) continue;
+    if (st.finish < asOf) {
+      items.push({
+        taskId: st.taskId,
+        title: task.title,
+        kind: "overdue",
+        critical: st.critical,
+        days: workingDayOffset(cal, st.finish, asOf),
+        plannedPct: planned,
+        actualPct: actual
+      });
+    } else if (actual === 0 && st.start < asOf) {
+      items.push({
+        taskId: st.taskId,
+        title: task.title,
+        kind: "not_started",
+        critical: st.critical,
+        days: workingDayOffset(cal, st.start, asOf),
+        plannedPct: planned,
+        actualPct: actual
+      });
+    } else if (planned - actual > tolerance) {
+      items.push({
+        taskId: st.taskId,
+        title: task.title,
+        kind: "behind",
+        critical: st.critical,
+        days: 0,
+        plannedPct: planned,
+        actualPct: actual
+      });
+    }
+  }
+  items.sort((a, b) => Number(b.critical) - Number(a.critical) || b.days - a.days);
+  return {
+    asOf,
+    finish: schedule.finish,
+    baselineFinish,
+    delayDays,
+    overThreshold: delayDays >= threshold,
+    items,
+    criticalAtRisk: items.filter((i) => i.critical).length
+  };
+}
+
 // ../capabilities/scheduling/src/service.ts
 var STATUSES = ["planned", "in_progress", "done", "blocked"];
 var SchedulingService = class {
@@ -509,13 +855,32 @@ var SchedulingService = class {
       progressPct: status === "done" ? 100 : t.progressPct
     }));
   }
-  setProgress(plan, taskId, pct) {
-    const clamped = Math.max(0, Math.min(100, Math.round(pct)));
-    return this.mutate(plan, taskId, (t) => ({
+  /**
+   * Record how far a task has got — and WHEN it got there.
+   *
+   * The observation is appended to the plan's progress log as well as written
+   * onto the task, because the two answer different questions. The task
+   * answers "where is this now", which is all a chart needs; the log answers
+   * "where was this in March", which nothing can reconstruct afterwards and
+   * which the actual-progress curve is entirely made of. One entry per task
+   * per day: correcting today's figure replaces today's entry rather than
+   * leaving a trail of keystrokes in the record.
+   */
+  setProgress(plan, taskId, pct2, asOf) {
+    const clamped = Math.max(0, Math.min(100, Math.round(pct2)));
+    const date = asOf ?? this.deps.clock.todayIso();
+    const next = this.mutate(plan, taskId, (t) => ({
       ...t,
       progressPct: clamped,
       status: clamped === 100 ? "done" : t.status === "planned" ? "in_progress" : t.status
     }));
+    const log = (next.progressLog ?? []).filter((e) => !(e.taskId === taskId && e.date === date));
+    return {
+      ...next,
+      progressLog: [...log, { taskId, date, pct: clamped }].sort(
+        (a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0
+      )
+    };
   }
   reschedule(plan, taskId, plannedStart, plannedEnd) {
     if (plannedEnd < plannedStart)
@@ -642,6 +1007,37 @@ var SchedulingService = class {
     const today = asOf ?? this.deps.clock.todayIso();
     return plan.tasks.filter((t) => t.status !== "done" && t.plannedEnd < today).sort((a, b) => a.plannedEnd < b.plannedEnd ? -1 : 1);
   }
+  /* ---------------------------------------------------------------------
+     Derivation and tracking
+     --------------------------------------------------------------------- */
+  /**
+   * A plan derived from a work breakdown, already put through the network so
+   * its dates are the scheduled ones rather than the first-pass layout.
+   *
+   * `previous` is the plan being replaced, if any: progress, pinned dates and
+   * frozen baselines are carried across for every task that survived the
+   * re-derivation. Without that, re-deriving after a quote change would quietly
+   * throw away everything the site had recorded.
+   */
+  fromWorkBreakdown(items, options, previous) {
+    const derived = planFromWorkBreakdown(items, options);
+    const merged = previous ? mergeDerivedPlan(previous, derived.plan) : derived.plan;
+    return { ...derived, plan: this.recalculate(merged, options.from) };
+  }
+  /** Planned vs actual vs projected, over time. */
+  progressCurve(plan, options) {
+    return progressCurve(plan, computeSchedule(plan), {
+      ...options,
+      asOf: options.asOf || this.deps.clock.todayIso()
+    });
+  }
+  /** Which tasks are late, by how much, and whether the slip crosses the line. */
+  riskReport(plan, options) {
+    return riskReport(plan, computeSchedule(plan), {
+      ...options,
+      asOf: options.asOf || this.deps.clock.todayIso()
+    });
+  }
   byAssignee(plan, assignee) {
     return plan.tasks.filter((t) => t.assignee === assignee);
   }
@@ -657,6 +1053,282 @@ var SchedulingService = class {
     return { ...plan, tasks: plan.tasks.map((t, i) => i === idx ? fn(t) : t) };
   }
 };
+
+// ../capabilities/projects/src/forecast.ts
+var bp = (part, whole) => whole === 0 ? 0 : roundDivHalfUp(part * 1e4, Math.abs(whole));
+var DEFAULT_OVERRUN_THRESHOLD_BP = 1e3;
+var DEFAULT_MIN_PROGRESS_PCT = 10;
+function calculatedFor(budgetCents, committedCents, actualCents, progressPct) {
+  const floor = Math.max(actualCents, committedCents);
+  if (actualCents <= 0) return Math.max(budgetCents, floor);
+  if (progressPct >= 100) return actualCents;
+  if (progressPct <= 0) return Math.max(budgetCents, floor);
+  const extrapolated = roundDivHalfUp(actualCents * 100, progressPct);
+  return Math.max(extrapolated, floor);
+}
+function forecastToCompletion(project, input) {
+  const threshold = input.overrunThresholdBp ?? DEFAULT_OVERRUN_THRESHOLD_BP;
+  const minProgress = input.minProgressPct ?? DEFAULT_MIN_PROGRESS_PCT;
+  const progressBy = new Map(input.progress.map((p) => [p.chapter, p.progressPct]));
+  const overrideBy = new Map((input.overrides ?? []).map((o) => [o.chapter, o]));
+  const chapters = /* @__PURE__ */ new Set([
+    ...project.baselineByChapter.map((c) => c.chapter),
+    ...project.costs.map((c) => c.chapter),
+    ...project.changeOrders.filter((c) => c.status === "approved").map((c) => c.chapter)
+  ]);
+  const byChapter = [...chapters].map((chapter) => {
+    const baseline = project.baselineByChapter.find((c) => c.chapter === chapter)?.budgetCents ?? 0;
+    const approved = project.changeOrders.filter((c) => c.status === "approved" && c.chapter === chapter).reduce((s, c) => s + c.deltaCents, 0);
+    const budgetCents2 = baseline + approved;
+    const committedCents = project.costs.filter((c) => c.kind === "committed" && c.chapter === chapter).reduce((s, c) => s + c.amountCents, 0);
+    const actualCents = project.costs.filter((c) => c.kind === "actual" && c.chapter === chapter).reduce((s, c) => s + c.amountCents, 0);
+    const progressPct = Math.max(0, Math.min(100, progressBy.get(chapter) ?? 0));
+    const calculatedCents = calculatedFor(budgetCents2, committedCents, actualCents, progressPct);
+    const override = overrideBy.get(chapter);
+    const usable = override && override.reason.trim() ? override : void 0;
+    const adjustedCents = usable ? usable.costCents : null;
+    const forecastCents2 = adjustedCents ?? calculatedCents;
+    const varianceCents2 = forecastCents2 - budgetCents2;
+    return {
+      chapter,
+      budgetCents: budgetCents2,
+      committedCents,
+      actualCents,
+      progressPct,
+      calculatedCents,
+      adjustedCents,
+      adjustmentReason: usable ? usable.reason : null,
+      forecastCents: forecastCents2,
+      varianceCents: varianceCents2,
+      varianceBp: bp(varianceCents2, budgetCents2),
+      provisional: progressPct > 0 && progressPct < minProgress && adjustedCents === null
+    };
+  });
+  const total = (pick) => byChapter.reduce((s, c) => s + pick(c), 0);
+  const budgetCents = total((c) => c.budgetCents);
+  const forecastCents = total((c) => c.forecastCents);
+  const varianceCents = forecastCents - budgetCents;
+  const revenueCents = project.revenueCents;
+  const marginForecastCents = revenueCents - forecastCents;
+  return {
+    byChapter,
+    budgetCents,
+    committedCents: total((c) => c.committedCents),
+    actualCents: total((c) => c.actualCents),
+    calculatedCents: total((c) => c.calculatedCents),
+    forecastCents,
+    varianceCents,
+    varianceBp: bp(varianceCents, budgetCents),
+    revenueCents,
+    marginForecastCents,
+    marginForecastBp: bp(marginForecastCents, revenueCents || budgetCents),
+    overrunChapters: byChapter.filter((c) => c.varianceCents > 0 && c.varianceBp >= threshold).sort((a, b) => b.varianceBp - a.varianceBp).map((c) => c.chapter)
+  };
+}
+
+// ../capabilities/projects/src/service.ts
+var bp2 = (part, whole) => whole === 0 ? 0 : roundDivHalfUp(part * 1e4, Math.abs(whole));
+var ProjectsService = class {
+  constructor(deps) {
+    this.deps = deps;
+  }
+  deps;
+  /**
+   * Create a project from an accepted quote WITHOUT re-entering figures. The
+   * chapter budgets and total are copied once and then frozen (PRJ baseline).
+   */
+  fromAcceptedQuote(input) {
+    if (input.baselineByChapter.length === 0) {
+      throw new FactoryError(
+        "INVALID_STATE",
+        "A project needs at least one chapter budget from the quote."
+      );
+    }
+    const baselineCents = sumCents(input.baselineByChapter.map((c) => c.budgetCents));
+    return {
+      id: this.deps.idGen.next("prj"),
+      name: input.name,
+      customerRef: input.customerRef,
+      sourceQuoteId: input.sourceQuoteId,
+      baselineCents,
+      baselineByChapter: input.baselineByChapter.map((c) => ({ ...c })),
+      revenueCents: 0,
+      costs: [],
+      changeOrders: [],
+      status: "active",
+      createdAt: this.deps.clock.nowIso()
+    };
+  }
+  bookCost(project, input) {
+    this.assertActive(project);
+    const entry = {
+      id: this.deps.idGen.next("cost"),
+      kind: input.kind,
+      chapter: input.chapter,
+      description: input.description,
+      amountCents: input.amountCents,
+      date: this.deps.clock.todayIso(),
+      ref: input.ref
+    };
+    return { ...project, costs: [...project.costs, entry] };
+  }
+  recordRevenue(project, amountCents) {
+    this.assertActive(project);
+    return { ...project, revenueCents: project.revenueCents + amountCents };
+  }
+  /** Raise a change order (proposed). The baseline is never touched. */
+  proposeChange(project, input) {
+    this.assertActive(project);
+    const co = {
+      id: this.deps.idGen.next("chg"),
+      chapter: input.chapter,
+      description: input.description,
+      deltaCents: input.deltaCents,
+      status: "proposed",
+      date: this.deps.clock.todayIso()
+    };
+    return { ...project, changeOrders: [...project.changeOrders, co] };
+  }
+  decideChange(project, changeId, approve) {
+    const idx = project.changeOrders.findIndex((c) => c.id === changeId);
+    if (idx === -1) throw new FactoryError("NOT_FOUND", `Change order ${changeId} not found.`);
+    if (project.changeOrders[idx].status !== "proposed") {
+      throw new FactoryError("INVALID_STATE", `Change order ${changeId} is already decided.`);
+    }
+    const changeOrders = project.changeOrders.map(
+      (c, i) => i === idx ? { ...c, status: approve ? "approved" : "rejected" } : c
+    );
+    return { ...project, changeOrders };
+  }
+  close(project) {
+    return { ...project, status: "closed" };
+  }
+  /** The financial truth: budget vs committed vs actual vs revenue, margin,
+   *  forecast, and quoted-vs-actual per chapter. */
+  financials(project) {
+    const approvedChangesCents = sumCents(
+      project.changeOrders.filter((c) => c.status === "approved").map((c) => c.deltaCents)
+    );
+    const currentBudgetCents = project.baselineCents + approvedChangesCents;
+    const committedCents = sumCents(
+      project.costs.filter((c) => c.kind === "committed").map((c) => c.amountCents)
+    );
+    const actualCents = sumCents(
+      project.costs.filter((c) => c.kind === "actual").map((c) => c.amountCents)
+    );
+    const marginCents = project.revenueCents - actualCents;
+    const forecastProfitCents = currentBudgetCents - Math.max(actualCents, committedCents);
+    const marginBp = bp2(marginCents, project.revenueCents || currentBudgetCents);
+    const marginBelowFloor = project.revenueCents > 0 && marginBp < this.deps.config.marginFloorBp;
+    return {
+      baselineCents: project.baselineCents,
+      approvedChangesCents,
+      currentBudgetCents,
+      committedCents,
+      actualCents,
+      revenueCents: project.revenueCents,
+      marginCents,
+      marginBp,
+      forecastProfitCents,
+      marginBelowFloor,
+      byChapter: this.marginByChapter(project)
+    };
+  }
+  /**
+   * Where the cost is heading, not where it has got to. `financials()` reports
+   * what has happened; this reports what it implies — see forecast.ts for why
+   * the two are different questions and why both are worth showing.
+   */
+  forecast(project, input) {
+    return forecastToCompletion(project, input);
+  }
+  /** Per-chapter budget vs committed vs actual + variance (the core pain). */
+  marginByChapter(project) {
+    const chapters = /* @__PURE__ */ new Set([
+      ...project.baselineByChapter.map((c) => c.chapter),
+      ...project.costs.map((c) => c.chapter),
+      ...project.changeOrders.filter((c) => c.status === "approved").map((c) => c.chapter)
+    ]);
+    return [...chapters].map((chapter) => {
+      const baseline = project.baselineByChapter.find((c) => c.chapter === chapter)?.budgetCents ?? 0;
+      const approved = sumCents(
+        project.changeOrders.filter((c) => c.status === "approved" && c.chapter === chapter).map((c) => c.deltaCents)
+      );
+      const budgetCents = baseline + approved;
+      const committedCents = sumCents(
+        project.costs.filter((c) => c.kind === "committed" && c.chapter === chapter).map((c) => c.amountCents)
+      );
+      const actualCents = sumCents(
+        project.costs.filter((c) => c.kind === "actual" && c.chapter === chapter).map((c) => c.amountCents)
+      );
+      const varianceCents = actualCents - budgetCents;
+      return {
+        chapter,
+        budgetCents,
+        committedCents,
+        actualCents,
+        varianceCents,
+        varianceBp: bp2(varianceCents, budgetCents)
+      };
+    });
+  }
+  assertActive(project) {
+    if (project.status !== "active") {
+      throw new FactoryError("INVALID_STATE", `Project ${project.id} is closed.`);
+    }
+  }
+};
+
+// ../packs/vertical-construction-reformas/src/rates.ts
+var DAILY_OUTPUT_BY_UNIT = {
+  m2: 20,
+  "m\xB2": 20,
+  m3: 6,
+  "m\xB3": 6,
+  m: 40,
+  ml: 40,
+  ud: 4,
+  u: 4,
+  pa: 1,
+  // a lump sum has no quantity to speak of; it takes a day unless told otherwise
+  PA: 1,
+  h: 8,
+  kg: 200,
+  l: 200
+};
+var DAILY_OUTPUT_BY_CHAPTER = {
+  "Demoliciones y trabajos previos": { m2: 30, "m\xB2": 30, m3: 8, "m\xB3": 8 },
+  Estructura: { m2: 8, "m\xB2": 8, m3: 3, "m\xB3": 3 },
+  "Alba\xF1iler\xEDa y tabiquer\xEDa": { m2: 12, "m\xB2": 12 },
+  "Revestimientos y acabados": { m2: 14, "m\xB2": 14 },
+  "Aparatos sanitarios": { ud: 3, u: 3 },
+  "Carpinter\xEDa interior": { ud: 3, u: 3 },
+  "Carpinter\xEDa exterior": { ud: 2, u: 2 },
+  Cocina: { ud: 1, u: 1, ml: 3, m: 3 },
+  Pintura: { m2: 60, "m\xB2": 60 },
+  "Instalaci\xF3n el\xE9ctrica": { ud: 8, u: 8, m2: 25, "m\xB2": 25 },
+  Climatizaci\u00F3n: { ud: 1, u: 1 },
+  Ventilaci\u00F3n: { ud: 2, u: 2, ml: 20, m: 20 },
+  Fontaner\u00EDa: { ud: 3, u: 3, ml: 15, m: 15 },
+  Saneamiento: { ud: 3, u: 3, ml: 15, m: 15 },
+  Telecomunicaciones: { ud: 8, u: 8 },
+  "Protecci\xF3n contra incendios": { ud: 6, u: 6 }
+};
+function dailyOutputFor(lookup) {
+  const unit = (lookup.unit ?? "").trim();
+  if (!unit) return null;
+  const sources = [
+    lookup.chapter ? lookup.overridesByChapter?.[lookup.chapter] : void 0,
+    lookup.chapter ? DAILY_OUTPUT_BY_CHAPTER[lookup.chapter] : void 0,
+    lookup.overridesByUnit,
+    DAILY_OUTPUT_BY_UNIT
+  ];
+  for (const table of sources) {
+    const rate = table?.[unit];
+    if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) return rate;
+  }
+  return null;
+}
 
 // src/index.ts
 var BrowserIdGen = class {
@@ -708,6 +1380,28 @@ function createScheduling(ports = defaultPorts()) {
     service: svc
   };
 }
+function createProjects(ports = defaultPorts()) {
+  const svc = new ProjectsService({
+    clock: ports.clock,
+    idGen: ports.idGen,
+    config: { marginFloorBp: 1200 }
+  });
+  return {
+    /** Where the cost is heading, per chapter and in total. */
+    forecast(project, input) {
+      return forecastToCompletion(project, input);
+    },
+    service: svc
+  };
+}
+function createRates() {
+  return {
+    /** Daily output for a line, or null when nothing in the tables applies. */
+    dailyOutputFor(lookup) {
+      return dailyOutputFor(lookup);
+    }
+  };
+}
 function createDocs() {
   return {
     /** Fills in the defaults and pulls out-of-range values back into range. */
@@ -720,4 +1414,4 @@ function createDocs() {
     }
   };
 }
-var SURFACE_VERSION = 4;
+var SURFACE_VERSION = 5;

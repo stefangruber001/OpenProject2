@@ -644,3 +644,41 @@ languages: es-ES # source: synthetic
   annex is switchable per budget and off means no pages and no marks; the schema step (v4) is
   additive and idempotent, and the constructor is an alternative view of data the engine already
   owned.
+
+- **#53 — CANEI session 10a: what a plan is derived from, and what a cost is heading for (2026-08-03).**
+  Spec §4 asks for one project as the context of every subsection; §4.3 for a Gantt built from the
+  accepted budget, progress recorded by executed quantity, planned-vs-actual-vs-projected and a
+  deviations panel; §4.4 for per-chapter budgeted/committed/actual/**projected** with the margin
+  that results. **Decisions:** (a) **The plan is derived, not seeded.** Session 6's placeholder gave
+  every chapter five days; the real derivation reads the accepted version's lines, and each
+  duration is quantity ÷ the daily output of that unit in that chapter. The division is the
+  capability's, the rates are the **vertical pack's** — put them in the capability and the planner
+  works for exactly one trade in one country. (b) **Derived task ids come from the caller's own
+  references, not a generator.** That is what makes re-deriving after a quote change a merge rather
+  than a reset: progress, pinned dates and frozen baselines survive for every line that survived.
+  (c) **The actual-progress curve is drawn from an append-only progress log**, never from today's
+  percentages. Dates and the critical path recompute from the network whenever you like; "how much
+  was done by the end of March" exists only if somebody wrote it down in March, and a curve that
+  drew today's figure backwards would make every past week look like it went to plan. Where the log
+  is empty the actual line is `null`, not zero — "nobody recorded anything" and "nothing was done"
+  are different claims. (d) **The projected line is labelled an extrapolation** and its
+  `performanceIndex` is returned, so what it rests on is visible. (e) **A cost forecast never comes
+  in below what is already spent or committed**, and a chapter with _nothing booked_ keeps its
+  budget whatever its progress says: finished-with-no-bill overwhelmingly means the bill has not
+  arrived, not that the work was free, and forecasting zero there hands the project a profit it is
+  about to lose. This was caught by driving the seeded data, not by reading the code — two of the
+  five chapters forecast €0. (f) **A manual adjustment requires a reason and never replaces the
+  calculation**: both figures are reported, because the reason is the only reviewable part of a
+  judgement call. (g) **Progress is written to both records in one action.** The budget's chapters
+  feed certification and the economics; the plan feeds the chart and the curve. Letting a user
+  update one is how a job comes to be 80 % done on one screen and 40 % on another, so the bridge
+  writes both — a projection concern, not a rule, which is why it lives there. (h) **The project
+  context is the section's, not a screen's.** One selector above every subsection, with favourites
+  and recents in `meta`; `gProject` was promoted from the chart's local dropdown. (i) **The browser
+  bundle now composes a PACK.** `@repo/erp-browser` is a host and may; the import is the pack's
+  zod-free `rates` subpath, because a validation library has no business travelling into a phone to
+  look up a number in a table. (j) `project-economics` and `scheduling-gantt` are **`factory`**;
+  `projects` stays **`engine`** — the baselines, numbering and cost ledger are correct where they
+  are, and only the two derivations that did not exist anywhere moved. Reversible: the derivation is
+  a button the user presses, the schema step (v5) is additive and idempotent, and every new figure
+  is a read-side derivation over data the engine already owned.

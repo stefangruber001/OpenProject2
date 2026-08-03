@@ -25,8 +25,8 @@ but is still where the `XXX-00` requirement ids cited throughout the code
 
 **Continuing from anywhere.** Everything needed is in this repository: open it
 on the branch the session mandate designates (sessions 1-3 used
-`claude/orin-project-status-1q50dt`, the default named in `CLAUDE.md`; session
-sessions 4-9 used `claude/candi-programme-session-4-07amo8`) and read `CLAUDE.md` → this
+`claude/orin-project-status-1q50dt`, the default named in `CLAUDE.md`;
+sessions 4-10a used `claude/candi-programme-session-4-07amo8`) and read `CLAUDE.md` → this
 file → the newest `SESSION-NN.md` context pack. Nothing lives on any one
 machine.
 Check `node --version` first: sessions 1-3 ran on a host with no Node
@@ -54,7 +54,7 @@ session too, including ones started from a fresh chat off this file.
 | 7   | Extraction capability + Spanish profile                | done        | 4361085, 3e063c9                   |
 | 8   | OCR bridge + invoice capture (Improvement #2)          | not started | —                                  |
 | 9   | Budget builder + graphic annex (Improvement #1)        | done        | f2524b3                            |
-| 10a | Projects: Gantt-from-budget, baselines, economics      | not started | —                                  |
+| 10a | Projects: Gantt-from-budget, baselines, economics      | done        | (this session)                     |
 | 10b | Compras, subcontratos, modificaciones, horas           | not started | —                                  |
 | 11  | Administración: conciliación, gestoría, comunicaciones | not started | —                                  |
 | 12  | Torre, Mi Día, Recorrido (Improvement #3), alerts      | not started | —                                  |

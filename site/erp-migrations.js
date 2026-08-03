@@ -130,6 +130,42 @@
         return s;
       },
     },
+    {
+      to: 5,
+      name: "per-project cost projections and their progress history",
+      /*
+       * Two additions, both belonging to the economic and technical tracking
+       * of a job in progress.
+       *
+       * `project.forecastOverrides` holds a human's replacement for a
+       * calculated cost at completion, keyed by chapter, each with the reason
+       * that justifies it. Absent means "nobody has overridden anything",
+       * which is the honest default and not the same as an override of zero.
+       *
+       * `plan.progressLog` is the append-only record of how far each task had
+       * got on a date. It is declared here rather than left to appear on first
+       * write because it is the only part of a plan that CANNOT be
+       * reconstructed afterwards: dates and the critical path recompute from
+       * the network at any time, but "how much was done by the end of March"
+       * exists only if somebody wrote it down in March. A reader that has to
+       * guess whether the key is missing or the history is genuinely empty
+       * cannot tell an unrecorded month from an idle one.
+       */
+      up: function (s) {
+        (Array.isArray(s.projects) ? s.projects : []).forEach(function (p) {
+          if (!p.forecastOverrides || typeof p.forecastOverrides !== "object")
+            p.forecastOverrides = {};
+        });
+        if (s.plans && typeof s.plans === "object" && !Array.isArray(s.plans)) {
+          Object.keys(s.plans).forEach(function (k) {
+            var plan = s.plans[k];
+            if (plan && typeof plan === "object" && !Array.isArray(plan.progressLog))
+              plan.progressLog = [];
+          });
+        }
+        return s;
+      },
+    },
   ];
 
   var CURRENT_VERSION = MIGRATIONS.reduce(function (max, m) {

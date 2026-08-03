@@ -642,12 +642,18 @@ importers:
       '@repo/capability-docs':
         specifier: workspace:*
         version: link:../capabilities/docs
+      '@repo/capability-projects':
+        specifier: workspace:*
+        version: link:../capabilities/projects
       '@repo/capability-scheduling':
         specifier: workspace:*
         version: link:../capabilities/scheduling
       '@repo/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@repo/pack-vertical-construction-reformas':
+        specifier: workspace:*
+        version: link:../packs/vertical-construction-reformas
     devDependencies:
       '@repo/typescript-config':
         specifier: workspace:*

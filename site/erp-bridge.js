@@ -37,6 +37,8 @@
 
   var scheduling = available ? F.createScheduling() : null;
   var docs = available && F.createDocs ? F.createDocs() : null;
+  var projects = available && F.createProjects ? F.createProjects() : null;
+  var rates = available && F.createRates ? F.createRates() : null;
 
   /* ------------------------------------------------------------------ *
    * Projections: engine state -> capability values
@@ -102,18 +104,22 @@
   }
 
   /**
-   * A starting schedule from the project's accepted budget chapters: one task
-   * per chapter, in order, each finish-to-start behind the previous one.
+   * The accepted budget of a project, as the scheduling capability's work
+   * breakdown (spec §3.3 "Carta Gantt del presupuesto", §4.3).
    *
-   * Deliberately a SEED, not the real generation. Session 10a builds the true
-   * budget→plan derivation (quantities, line-level durations, the baseline
-   * that the contract freezes). This exists so a chart opened on a real
-   * project has something to show other than an empty grid, and it is only
-   * ever run when the user asks for it.
+   * This is a PROJECTION and nothing else. It reads the accepted version's
+   * chapters and lines, asks the vertical pack how much of each unit gets done
+   * in a day, and hands the result over; the capability decides durations,
+   * order and dependencies, and the pack owns every rate. If a rate is missing
+   * the item simply arrives without one and the derivation falls back to its
+   * stated default, which is visible in the notes rather than hidden in a
+   * plausible-looking bar.
+   *
+   * Lines still pending a price are left out: they are not in the customer's
+   * document either, and a plan that schedules work nobody has agreed to buy
+   * promises a date against nothing.
    */
-  function seedFromChapters(erp, projectId, opts) {
-    if (!scheduling) return null;
-    var svc = scheduling.service;
+  function workBreakdownOf(erp, projectId) {
     var project = erp.project(projectId);
     var chapters = [];
     try {
@@ -127,32 +133,192 @@
     } catch (e) {
       chapters = [];
     }
-    if (!chapters.length && project.baseline && project.baseline.chapters) {
-      chapters = project.baseline.chapters;
-    }
-    if (!chapters.length) return null;
-
-    var start = (opts && opts.from) || (project.dates && project.dates.start) || erp.today;
-    var days = (opts && opts.durationDays) || 5;
-    var plan = svc.setCalendar(
-      { tasks: [], dependencies: [], baselines: [] },
-      (opts && opts.calendar) || DEFAULT_CALENDAR,
-    );
-    var previousId = null;
+    var items = [];
     chapters.forEach(function (c) {
-      plan = svc.addTask(plan, {
-        title: c.num + ". " + c.name,
-        plannedStart: start,
-        plannedEnd: start,
-        durationDays: days,
-        projectRef: projectId,
-        sourceRef: "chapter:" + c.num,
+      (c.lines || []).forEach(function (l) {
+        if (l.pending) return;
+        var qtyMilli = (l.subLines || []).length
+          ? l.subLines.reduce(function (s, sl) {
+              return s + Math.round(sl.qtyMilli * (1 + (sl.wastePct || 0) / 100));
+            }, 0)
+          : l.qtyMilli;
+        items.push({
+          ref: l.id,
+          groupNum: c.num,
+          groupName: c.name,
+          itemNum: l.num,
+          title: l.desc || l.customerWording || "",
+          quantity: l.lumpSum ? undefined : qtyMilli / 1000,
+          unit: l.unit,
+          ratePerDay: rates
+            ? rates.dailyOutputFor({ unit: l.unit, chapter: c.name }) || undefined
+            : undefined,
+        });
       });
-      var added = plan.tasks[plan.tasks.length - 1];
-      if (previousId) plan = svc.link(plan, { predecessorId: previousId, successorId: added.id });
-      previousId = added.id;
     });
-    return svc.recalculate(plan, start);
+    // A project with no budget lines still has its frozen baseline chapters,
+    // which is enough to lay out a plan at chapter granularity.
+    if (!items.length && project.baseline && project.baseline.chapters) {
+      project.baseline.chapters.forEach(function (c) {
+        items.push({ ref: "chapter_" + c.num, groupNum: c.num, groupName: c.name, title: c.name });
+      });
+    }
+    return items;
+  }
+
+  /**
+   * Derive the plan for a project from its accepted budget, keeping whatever
+   * only the site knows (progress, pinned dates, frozen baselines) for every
+   * task that survives.
+   */
+  function planFromBudget(erp, projectId, opts) {
+    if (!scheduling) return null;
+    var items = workBreakdownOf(erp, projectId);
+    if (!items.length) return null;
+    var project = erp.project(projectId);
+    var previous = planFor(erp.state, projectId);
+    var derived = scheduling.service.fromWorkBreakdown(
+      items,
+      {
+        from: (opts && opts.from) || (project.dates && project.dates.start) || erp.today,
+        calendar: (opts && opts.calendar) || previous.calendar || DEFAULT_CALENDAR,
+        granularity: (opts && opts.granularity) || "group",
+        groupLagDays: opts && opts.groupLagDays,
+        defaultDurationDays: (opts && opts.durationDays) || 5,
+      },
+      previous.tasks.length ? previous : undefined,
+    );
+    // Progress already recorded against the budget's own chapters is carried
+    // onto the derived bars. Without this a freshly derived chart claims a job
+    // that is half built has not started — and the two records of the same
+    // fact would be visibly contradicting each other on the same screen.
+    var recorded = {};
+    try {
+      erp.chapterProgress(projectId).forEach(function (c) {
+        recorded[c.num] = c.progressPct;
+      });
+    } catch (e) {
+      recorded = {};
+    }
+    return {
+      notes: derived.notes,
+      skipped: derived.skipped,
+      plan: applyChapterProgress(derived.plan, recorded),
+    };
+  }
+
+  /** Writes chapter progress onto whichever bars came from those chapters. */
+  function applyChapterProgress(plan, byChapter) {
+    return Object.assign({}, plan, {
+      tasks: plan.tasks.map(function (t) {
+        var m = /^group:(.+)$/.exec(t.sourceRef || "");
+        if (!m || byChapter[m[1]] == null) return t;
+        var pct = byChapter[m[1]];
+        return Object.assign({}, t, {
+          progressPct: pct,
+          status: pct >= 100 ? "done" : pct > 0 ? "in_progress" : t.status,
+        });
+      }),
+    });
+  }
+
+  /**
+   * Record progress once, so both records of it agree.
+   *
+   * Progress is recorded in two places for two different reasons: the budget's
+   * chapters, because certification and the economics are computed from them,
+   * and the plan, because the chart and the actual-progress curve are. Letting
+   * a user update one and not the other is how a project comes to be 80 % done
+   * on one screen and 40 % on another, so a single action writes both. That is
+   * a projection concern, which is why it lives here and not as a rule in
+   * either the engine or the capability.
+   */
+  function recordProgress(erp, projectId, plan, taskId, pct, asOf) {
+    var next = scheduling.service.setProgress(plan, taskId, pct, asOf || erp.today);
+    var task = plan.tasks.find(function (t) {
+      return t.id === taskId;
+    });
+    var m = task && /^group:(.+)$/.exec(task.sourceRef || "");
+    if (m) {
+      var state = pct >= 100 ? "done" : pct > 0 ? "inProgress" : "notStarted";
+      try {
+        erp.markProgress(projectId, m[1], state, pct, "operations");
+      } catch (e) {
+        // A bar with no chapter behind it any more must still update the
+        // chart; the engine simply has nothing to record it against.
+      }
+    }
+    return next;
+  }
+
+  /**
+   * The engine's project as the projects capability's value.
+   *
+   * The COST baseline is the one projected, not the sale: this feeds cost at
+   * completion, and forecasting revenue against a revenue baseline would only
+   * ever tell you what you already sold it for.
+   */
+  function projectValue(erp, projectId) {
+    var p = erp.project(projectId);
+    var economics = erp.projectEconomics(projectId);
+    var committed = erp.committedByChapter(projectId);
+    var actualByChapter = {};
+    erp.chapterEconomics(projectId).forEach(function (c) {
+      actualByChapter[c.num] = c.actualCents;
+    });
+    var costs = [];
+    p.baseline.chapters.forEach(function (c) {
+      if (committed[c.num])
+        costs.push({
+          id: "cm_" + c.num,
+          kind: "committed",
+          chapter: c.num,
+          description: "",
+          amountCents: committed[c.num],
+          date: erp.today,
+        });
+      if (actualByChapter[c.num])
+        costs.push({
+          id: "ac_" + c.num,
+          kind: "actual",
+          chapter: c.num,
+          description: "",
+          amountCents: actualByChapter[c.num],
+          date: erp.today,
+        });
+    });
+    return {
+      id: p.id,
+      name: p.code,
+      customerRef: p.partyId,
+      sourceQuoteId: p.budgetId || undefined,
+      baselineCents: p.baseline.costCents,
+      baselineByChapter: p.baseline.chapters.map(function (c) {
+        return { chapter: c.num, budgetCents: c.costCents };
+      }),
+      revenueCents: economics.currentRevenueCents,
+      costs: costs,
+      changeOrders: erp.state.changes
+        .filter(function (c) {
+          return c.projectId === projectId;
+        })
+        .map(function (c) {
+          return {
+            id: c.id,
+            chapter: c.chapterNum || "1",
+            description: c.desc || "",
+            deltaCents: c.costCents || 0,
+            status: ["approved", "executed", "invoiced"].includes(c.status)
+              ? "approved"
+              : c.status === "rejected"
+                ? "rejected"
+                : "proposed",
+            date: c.date || erp.today,
+          };
+        }),
+      status: p.closed ? "closed" : "active",
+      createdAt: p.dates && p.dates.start ? p.dates.start : erp.today,
+    };
   }
 
   /**
@@ -357,8 +523,42 @@
         setDuration: function (plan, taskId, days) {
           return scheduling.service.setDuration(plan, taskId, days);
         },
-        setProgress: function (plan, taskId, pct) {
-          return scheduling.service.setProgress(plan, taskId, pct);
+        setProgress: function (plan, taskId, pct, asOf) {
+          return scheduling.service.setProgress(plan, taskId, pct, asOf);
+        },
+
+        /** Progress recorded on the plan AND the budget chapter it came from. */
+        recordProgress: function (erp, projectId, plan, taskId, pct, asOf) {
+          return recordProgress(erp, projectId, plan, taskId, pct, asOf);
+        },
+
+        /**
+         * Pull the budget's own chapter progress onto the plan's bars.
+         *
+         * The other direction of recordProgress, for when progress was entered
+         * against a LINE — which is what a site actually reports, since nobody
+         * knows what 40 % of a chapter is but everybody knows how many square
+         * metres went up. The engine rolls the lines up into a chapter figure;
+         * this carries that figure to the bar and writes it to the history, so
+         * the curve sees the observation on the day it was made.
+         */
+        syncProgress: function (erp, projectId, plan, asOf) {
+          if (!scheduling) return plan;
+          var recorded = {};
+          try {
+            erp.chapterProgress(projectId).forEach(function (c) {
+              recorded[c.num] = c.progressPct;
+            });
+          } catch (e) {
+            return plan;
+          }
+          var next = plan;
+          plan.tasks.forEach(function (t) {
+            var m = /^group:(.+)$/.exec(t.sourceRef || "");
+            if (!m || recorded[m[1]] == null || recorded[m[1]] === t.progressPct) return;
+            next = scheduling.service.setProgress(next, t.id, recorded[m[1]], asOf || erp.today);
+          });
+          return next;
         },
         setCalendar: function (plan, calendar) {
           return scheduling.service.setCalendar(plan, calendar);
@@ -371,9 +571,27 @@
           return scheduling.service.compareToBaseline(plan, baselineId);
         },
 
-        /** One task per accepted-budget chapter, chained. See seedFromChapters. */
-        seedFromChapters: function (erp, projectId, opts) {
-          return seedFromChapters(erp, projectId, opts);
+        /**
+         * The real derivation from the accepted budget (§3.3, §4.3): chapters
+         * and lines in, durations from quantity ÷ the pack's daily output,
+         * dependencies chained, everything the site recorded preserved.
+         * Returns {plan, notes, skipped} — the notes say how each duration was
+         * arrived at, so the planner can see what was assumed.
+         */
+        fromBudget: function (erp, projectId, opts) {
+          return planFromBudget(erp, projectId, opts);
+        },
+
+        /** Planned vs actual vs projected over time. See tracking.ts. */
+        curve: function (plan, opts) {
+          if (!scheduling || !plan.tasks.length) return null;
+          return scheduling.service.progressCurve(plan, opts || {});
+        },
+
+        /** Which tasks are late, by how much, and whether the slip alerts. */
+        risk: function (plan, opts) {
+          if (!scheduling || !plan.tasks.length) return null;
+          return scheduling.service.riskReport(plan, opts || {});
         },
 
         /** Calendar arithmetic for the chart's axis and its drag maths. */
@@ -406,7 +624,46 @@
       compressImage: compressImage,
     },
 
+    /* ------------------------------------------------------------------ *
+     * Project economics: cost at completion (spec §4.4 "Proyección").
+     *
+     * @repo/capability-projects does the arithmetic; this file only projects
+     * the engine's project into its value shape and puts the stored human
+     * overrides beside it. The engine keeps reporting what HAS happened
+     * (projectEconomics); this reports what it implies.
+     * ------------------------------------------------------------------ */
+    projects: {
+      forecast: function (erp, projectId, opts) {
+        if (!projects) return null;
+        var p = erp.project(projectId);
+        var overrides = [];
+        var stored = p.forecastOverrides || {};
+        Object.keys(stored).forEach(function (chapter) {
+          overrides.push({
+            chapter: chapter,
+            costCents: stored[chapter].costCents,
+            reason: stored[chapter].reason,
+            at: stored[chapter].at,
+            by: stored[chapter].by,
+          });
+        });
+        return projects.forecast(projectValue(erp, projectId), {
+          progress: erp.chapterProgress(projectId).map(function (c) {
+            return { chapter: c.num, progressPct: c.progressPct };
+          }),
+          overrides: overrides,
+          overrunThresholdBp: opts && opts.overrunThresholdBp,
+          minProgressPct: opts && opts.minProgressPct,
+        });
+      },
+    },
+
     /** Exposed for tests and the parity harness; not for view code. */
-    _projections: { tasksToPlan: tasksToPlan, annexImagesOf: annexImagesOf },
+    _projections: {
+      tasksToPlan: tasksToPlan,
+      annexImagesOf: annexImagesOf,
+      workBreakdownOf: workBreakdownOf,
+      projectValue: projectValue,
+    },
   };
 });

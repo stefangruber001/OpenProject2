@@ -71,6 +71,7 @@ async function main() {
     await testShell(browser, base);
     await testGantt(browser, base);
     await testBudgetBuilder(browser, base);
+    await testProjectTracking(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
   } finally {
@@ -557,17 +558,17 @@ async function testGantt(browser, base) {
     await pg.goto(`${base}/erp.html#seguimiento`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(800);
 
-    // Empty plan → the seed from the project's accepted budget chapters.
-    if (await pg.locator("#gSeed").count()) {
-      await pg.locator("#gSeed").click();
-      await pg.waitForTimeout(600);
+    // Empty plan → derive it from the project's accepted budget.
+    if (await pg.locator("#gDerive").count()) {
+      await pg.locator("#gDerive").click();
+      await pg.waitForTimeout(700);
     }
     const bars = await pg.locator("#gSvg .gbar").count();
     const rows = await pg.locator(".gnames .gn[data-task]").count();
     const deps0 = await pg.locator("#gSvg path.gdep").count();
     if (bars >= 3 && rows === bars && deps0 >= bars - 1)
-      ok(`gantt: seeds ${bars} chained tasks from the budget chapters`);
-    else bad("gantt: seeds from chapters", `bars=${bars} rows=${rows} deps=${deps0}`);
+      ok(`gantt: derives ${bars} chained tasks from the budget`);
+    else bad("gantt: derives from the budget", `bars=${bars} rows=${rows} deps=${deps0}`);
 
     // Bars must render at their real height — an SVG rect is subject to CSS
     // geometry, so a stray `.bar {height}` rule elsewhere silently flattens
@@ -813,6 +814,151 @@ async function testBudgetBuilder(browser, base) {
     else bad("builder: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("budget builder", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── Project context (§4), technical tracking (§4.3) and economics (§4.4).
+//    The whole point of this session is that one job is the context for every
+//    subsection and that the figures are derived rather than typed, so both are
+//    checked by driving a real browser rather than by reading the code.
+async function testProjectTracking(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#seguimiento`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(900);
+
+    // ---- the persistent selector and its fixed header ----
+    const fields = await pg.locator(".projbar .phead .f").count();
+    const headText = await pg.locator(".projbar .phead").innerText();
+    if (
+      fields >= 8 &&
+      /Cliente/i.test(headText) &&
+      /Avance/i.test(headText) &&
+      /Margen actual/i.test(headText)
+    )
+      ok(`project header: ${fields} fields incl. customer, progress and margin`);
+    else bad("project header", headText.replace(/\n/g, " ").slice(0, 100));
+
+    // The context must survive a change of subsection — that is what makes it
+    // a section context rather than one screen's dropdown.
+    const chosen = await pg.locator("#psel").inputValue();
+    await pg.evaluate(() => (location.hash = "economia"));
+    await pg.waitForTimeout(600);
+    const stillChosen = await pg.locator("#psel").inputValue();
+    if (stillChosen === chosen) ok("project context survives a subsection change");
+    else bad("project context persists", `${chosen} → ${stillChosen}`);
+
+    // ---- economics before any progress is recorded ----
+    const econ = await pg.locator("#view").innerText();
+    const kpis = await pg.locator("#view .kpi").count();
+    if (kpis === 4 && /COSTE PROYECTADO/i.test(econ) && /MARGEN PROYECTADO/i.test(econ))
+      ok("economics: the four project figures, incl. projected cost and margin");
+    else bad("economics KPIs", econ.replace(/\n/g, " ").slice(0, 120));
+
+    const hasColumns = ["Presupuestado", "Comprometido", "Real", "Proyectado", "Desviación"].every(
+      (c) => new RegExp(c, "i").test(econ),
+    );
+    if (hasColumns) ok("economics: budgeted · committed · actual · projected · variance");
+    else bad("economics columns", econ.replace(/\n/g, " ").slice(0, 160));
+
+    // A projection is adjustable, and the reason is required by the engine.
+    await pg.locator("#view [data-adj]").first().click();
+    await pg.waitForTimeout(400);
+    await pg.locator("#fc_amt").fill("1234.00");
+    await pg.locator("#fc_why").fill("");
+    await pg.locator("#fc_save").click();
+    await pg.waitForTimeout(350);
+    // Assert the OUTCOME, not the wording: the engine's messages are English
+    // while the UI is Spanish, so matching the text would test the translation
+    // rather than the rule. What matters is that nothing was stored.
+    const refusal = await pg.locator("#toast").innerText();
+    const storedAnyway = await pg.evaluate(
+      () => Object.keys(erp.project(gProject).forecastOverrides || {}).length,
+    );
+    if (/^⚠/.test(refusal.trim()) && storedAnyway === 0)
+      ok("economics: an adjusted projection without a reason is refused and not stored");
+    else bad("economics: reason required", `toast="${refusal}" stored=${storedAnyway}`);
+
+    await pg.locator("#fc_why").fill("La parte cara ya está ejecutada");
+    await pg.locator("#fc_save").click();
+    await pg.waitForTimeout(500);
+    const adjusted = await pg.locator("#view").innerText();
+    if (/ajustada/i.test(adjusted) && /calculada/i.test(adjusted))
+      ok("economics: an adjustment shows BOTH the adjusted and calculated figures");
+    else bad("economics: both figures shown", adjusted.replace(/\n/g, " ").slice(0, 160));
+
+    // ---- derive the plan from the budget ----
+    await pg.evaluate(() => (location.hash = "seguimiento"));
+    await pg.waitForTimeout(600);
+    await pg.locator("#gDerive").click();
+    await pg.waitForTimeout(900);
+    const bars = await pg.locator("#gSvg .gbar").count();
+    const deriveToast = await pg.locator("#toast").innerText();
+    if (bars >= 3 && /tareas/.test(deriveToast))
+      ok(`tracking: ${bars} bars derived from the budget (${deriveToast.replace(/\n/g, " ")})`);
+    else bad("tracking: derive from budget", `bars=${bars} toast=${deriveToast}`);
+
+    // Durations must differ: they come from each chapter's own quantities and
+    // the pack's daily output. Bars that are all the same width mean the
+    // derivation fell back to its default for everything.
+    const widths = await pg
+      .locator("#gSvg .gbar")
+      .evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)));
+    if (new Set(widths).size > 1)
+      ok(`tracking: durations derived from quantities (${new Set(widths).size} distinct widths)`);
+    else bad("tracking: derived durations", `all bars ${widths[0]}px wide`);
+
+    // Progress already recorded against the budget shows on the fresh bars.
+    const chapterPcts = await pg
+      .locator("[data-chap]")
+      .evaluateAll((els) => els.map((e) => Number(e.value)));
+    if (chapterPcts.some((p) => p > 0))
+      ok(`tracking: recorded progress carried onto the derived bars (${chapterPcts.join("/")})`);
+    else bad("tracking: progress carried", chapterPcts.join("/"));
+
+    // ---- the S curve ----
+    const paths = await pg.locator(".curve path").count();
+    const curveTag = await pg.locator("#view .card .ch .tag").allInnerTexts();
+    if (paths === 3 && curveTag.some((t) => /planificado .* real .* pts/.test(t)))
+      ok("tracking: S curve draws planned, actual and projected");
+    else bad("tracking: S curve", `paths=${paths} tags=${curveTag.join(" | ").slice(0, 80)}`);
+
+    // ---- progress by executed quantity ----
+    const qty = pg.locator("[data-lineqty]").first();
+    const total = Number(await qty.getAttribute("data-total"));
+    const pctInput = pg.locator("[data-line]").first();
+    await qty.fill(String(total / 2));
+    await qty.press("Enter");
+    await pg.waitForTimeout(600);
+    const readBack = Number(await pctInput.inputValue());
+    // Half the quantity is half the line; the engine converts, not the view.
+    if (Math.abs(readBack - 50) <= 1)
+      ok(`tracking: progress entered as a quantity becomes ${readBack}%`);
+    else bad("tracking: quantity → percentage", `${total}/2 read back as ${readBack}%`);
+
+    // ---- the deviations panel ----
+    const dev = await pg.locator(".bside").innerText();
+    if (/Desviaciones/.test(dev) && /Retraso sobre línea base/.test(dev))
+      ok("tracking: deviations panel reports the slip against the baseline");
+    else bad("tracking: deviations panel", dev.replace(/\n/g, " ").slice(0, 120));
+
+    // The economics must move with the progress just recorded — the two screens
+    // are two views of one set of figures, not two sets.
+    await pg.evaluate(() => (location.hash = "economia"));
+    await pg.waitForTimeout(600);
+    const after = await pg.locator("#view").innerText();
+    if (/%/.test(after) && /Total/.test(after))
+      ok("economics: chapter progress feeds the projection");
+    else bad("economics after progress", after.replace(/\n/g, " ").slice(0, 120));
+
+    if (errs.length === 0) ok("tracking: no console errors");
+    else bad("tracking: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("project tracking", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }

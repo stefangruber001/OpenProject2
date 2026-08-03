@@ -65,7 +65,8 @@
       "owner": "engine",
       "specSection": "4",
       "engineSection": "PRJ — projects",
-      "plannedSession": "10a"
+      "plannedSession": null,
+      "note": "Session 10a built the persistent project selector and the fixed header of §4 (one context for every subsection, so two screens can never show different jobs at once) and added progress by executed quantity, per-chapter progress, committed cost per chapter and the stored forecast overrides. The area stays engine on purpose: the frozen baselines, the numbering, the acceptance-to-project inheritance and the cost ledger are all correct where they are, and the two derivations that genuinely did not exist — the plan from the budget, and cost at completion — went to capabilities instead. Moving the rest would be a rewrite for its own sake."
     },
     "change-orders": {
       "owner": "engine",
@@ -110,10 +111,11 @@
       "plannedSession": "10b"
     },
     "project-economics": {
-      "owner": "engine",
+      "owner": "factory",
       "specSection": "4.4",
-      "engineSection": "FIN — project economics",
-      "plannedSession": "10a"
+      "engineSection": null,
+      "plannedSession": null,
+      "note": "Cost at completion is owned by @repo/capability-projects (src/forecast.ts) and reached through ErpBridge.projects.forecast. The split is deliberate and is the whole point of the area: erp-engine.js keeps reporting what HAS happened — the frozen baseline, committed and actual cost, approved change orders, chapter progress — and the capability answers what it IMPLIES. \"Spent 40 of a 100 budget\" reads as comfortable and says nothing; \"spent 40 to get a quarter of the way, so heading for 160\" is the sentence somebody can act on, and it did not exist anywhere before. A forecast never comes in below what is already spent or committed, a chapter with nothing booked keeps its budget whatever its progress says (finished-with-no-bill means the bill has not arrived, not that the work was free), and a human override is stored with a required reason and reported ALONGSIDE the calculation rather than replacing it. Nothing moved out of the engine for this to be true."
     },
     "gestoria-package": {
       "owner": "engine",
@@ -132,7 +134,7 @@
       "specSection": "3.3 / 4.3",
       "engineSection": null,
       "plannedSession": null,
-      "note": "Owned end to end by @repo/capability-scheduling and reached only through site/erp-bridge.js (ErpBridge.scheduling.plans). Session 5 built the domain — working calendar, FS/SS/FF dependencies with lead/lag, CPM with float and critical path, append-only baselines — and session 6 built the chart in erp.html (Proyectos → Seguimiento técnico) that consumes it: drag to move, edge-drag to resize, knob-drag to link, freeze and compare a baseline. The view computes no dates: every date, float, critical flag and drift on screen came from the capability. Plans persist in state.plans (schema v3), which the engine serialises without knowing what it is. engineSection is null because erp-engine.js never implemented this area."
+      "note": "Owned by @repo/capability-scheduling and reached only through ErpBridge.scheduling.plans. Session 6 gave it the calendar, CPM and baselines; session 10a added the three things §4.3 asks for around them: the real derivation from the accepted budget (chapters and lines in, durations from quantity divided by the vertical pack's daily output, dependencies chained, re-derivable without losing what the site recorded), the progress curve, and the risk report. Two properties are load-bearing. Derived task ids come from the caller's own references rather than a generator, so re-deriving after a quote change is a merge and not a reset. And the actual-progress curve is drawn from an append-only progress log, never from today's percentages: dates and the critical path recompute from the network at any time, but how much was done by the end of March is only knowable if somebody wrote it down in March."
     },
     "extraction-ocr": {
       "owner": "unbuilt",

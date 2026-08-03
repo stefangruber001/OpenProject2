@@ -33,16 +33,39 @@ import {
 import type {
   Baseline,
   BaselineComparison,
+  CurveOptions,
   Dependency,
   DependencyType,
+  DeriveOptions,
+  DerivedPlan,
   Plan,
+  ProgressCurve,
+  ProgressEntry,
+  RiskOptions,
+  RiskReport,
   Schedule,
   ScheduledTask,
   StatusSummary,
   Task,
   TaskStatus,
   WorkCalendar,
+  WorkItem,
 } from "@repo/capability-scheduling";
+import { ProjectsService, forecastToCompletion } from "@repo/capability-projects";
+import type {
+  ChapterForecast,
+  ForecastInput,
+  ForecastOverride,
+  Project,
+  ProjectForecast,
+} from "@repo/capability-projects";
+// A PACK, in the browser bundle, on purpose. This package is a host: it may
+// compose packs as well as capabilities, and how fast a trade works is sector
+// knowledge that has to come from somewhere other than the planner. The import
+// is the zod-free `rates` subpath — a validation library has no business
+// travelling into a phone to look up a number in a table.
+import { dailyOutputFor } from "@repo/pack-vertical-construction-reformas/rates";
+import type { DailyOutputTable, RateLookup } from "@repo/pack-vertical-construction-reformas/rates";
 import { SystemClock, type ClockPort, type IdGenPort } from "@repo/kernel";
 
 /**
@@ -129,6 +152,48 @@ export function createScheduling(ports: FactoryPorts = defaultPorts()) {
 }
 
 /**
+ * Project economics surface.
+ *
+ * Only the forecast is exposed. The rest of `@repo/capability-projects` — the
+ * baseline, the cost ledger, the change orders — is still owned by
+ * site/erp-engine.js (see site/erp-ownership.json), and wrapping methods whose
+ * data lives somewhere else would be a surface pretending to own something.
+ * Cost at completion is different: it is a derivation the engine never had,
+ * so nothing has to move for it to be correct.
+ */
+export function createProjects(ports: FactoryPorts = defaultPorts()) {
+  const svc = new ProjectsService({
+    clock: ports.clock,
+    idGen: ports.idGen,
+    config: { marginFloorBp: 1200 },
+  });
+  return {
+    /** Where the cost is heading, per chapter and in total. */
+    forecast(project: Project, input: ForecastInput): ProjectForecast {
+      return forecastToCompletion(project, input);
+    },
+    service: svc,
+  };
+}
+
+/**
+ * Sector rates, from the vertical pack.
+ *
+ * The one thing in this file that is not a capability, and the reason is the
+ * point: a quantity becomes a duration only once something says how much of
+ * that unit gets done in a day, and that is knowledge about a trade, not about
+ * planning. The capability divides; the pack supplies the divisor.
+ */
+export function createRates() {
+  return {
+    /** Daily output for a line, or null when nothing in the tables applies. */
+    dailyOutputFor(lookup: RateLookup): number | null {
+      return dailyOutputFor(lookup);
+    },
+  };
+}
+
+/**
  * Documents surface.
  *
  * Only the annex composer is exposed: it is the part a browser genuinely calls
@@ -155,15 +220,30 @@ export type { Annex, AnnexImageInput, AnnexOptions, AnnexPage, AnnexPlate };
 export type {
   Baseline,
   BaselineComparison,
+  ChapterForecast,
+  CurveOptions,
+  DailyOutputTable,
   Dependency,
   DependencyType,
+  DeriveOptions,
+  DerivedPlan,
+  ForecastInput,
+  ForecastOverride,
   Plan,
+  ProgressCurve,
+  ProgressEntry,
+  Project,
+  ProjectForecast,
+  RateLookup,
+  RiskOptions,
+  RiskReport,
   Schedule,
   ScheduledTask,
   StatusSummary,
   Task,
   TaskStatus,
   WorkCalendar,
+  WorkItem,
 };
 
 /**
@@ -176,5 +256,8 @@ export type {
  *     there, which is exactly the staleness this number exists to catch.
  * 3 — `calendar` namespace added for the chart's axis and drag arithmetic.
  * 4 — `createDocs` added: the image-annex composer the document preview needs.
+ * 5 — `createProjects` (cost at completion) and `createRates` (the vertical
+ *     pack's daily output) added, and `service` gained the work-breakdown
+ *     derivation, the progress curve and the risk report.
  */
-export const SURFACE_VERSION = 4;
+export const SURFACE_VERSION = 5;

@@ -204,6 +204,51 @@
   .glegend{display:flex;gap:12px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid var(--hair);font-size:11.5px;color:var(--muted)}
   .glegend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 
+  /* ---------- Project context: selector + fixed header (spec §4) ----------
+     "El proyecto elegido queda como contexto activo y todas las subsecciones
+     muestran únicamente su información." The strip is sticky because it is the
+     frame of reference for everything below it — scrolling a cost table until
+     you can no longer see which job it belongs to is how costs end up on the
+     wrong project. */
+  .projbar{position:sticky;top:var(--top,59px);z-index:25;background:var(--paper);border:1px solid var(--line);
+    border-radius:14px;box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden}
+  .projbar .psel{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:9px 13px;border-bottom:1px solid var(--hair);
+    background:linear-gradient(120deg,var(--greenSoft),transparent 70%)}
+  .projbar .psel select{font:600 12.5px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);
+    border-radius:9px;padding:6px 9px;outline:0;max-width:min(340px,60vw)}
+  .projbar .psel input{font:12.5px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);
+    border-radius:9px;padding:6px 9px;outline:0;width:150px}
+  .projbar .psel input:focus,.projbar .psel select:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--greenSoft)}
+  .projbar .fav{border:0;background:transparent;cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;color:var(--faint)}
+  .projbar .fav.on{color:var(--spark)}
+  .projbar .phead{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:10px 13px}
+  .projbar .f{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .projbar .f .l{font:600 9.5px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .projbar .f .v{font:600 13px var(--sans);color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .projbar .f .v.neg{color:var(--danger)}
+  .projbar .f a{color:var(--green)}
+  .projbar .sep{width:1px;align-self:stretch;background:var(--hair)}
+  .projbar .pbar{min-width:90px}
+  @media(max-width:860px){.projbar{position:static}.projbar .phead{gap:10px}.projbar .sep{display:none}}
+
+  /* ---------- Technical + economic tracking (spec §4.3 / §4.4) ---------- */
+  .trk{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:12px;align-items:start}
+  @media(max-width:1180px){.trk{grid-template-columns:minmax(0,1fr)}}
+  .curve{display:block;width:100%;height:210px}
+  .curve .cplan{fill:none;stroke:var(--faint);stroke-width:1.6;stroke-dasharray:4 3}
+  .curve .cact{fill:none;stroke:var(--green);stroke-width:2.4}
+  .curve .cproj{fill:none;stroke:var(--spark);stroke-width:2;stroke-dasharray:5 3}
+  .curve .cnow{stroke:var(--blue);stroke-width:1.2;stroke-dasharray:2 2}
+  .curve .cgrid{stroke:var(--hair);stroke-width:1}
+  .curve text{font:10px var(--sans);fill:var(--muted)}
+  .riskitem{display:flex;gap:8px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--hair);font-size:12.5px}
+  .riskitem:last-child{border-bottom:0}
+  .riskitem .t{flex:1;min-width:0;color:var(--ink)}
+  .pctin{width:64px;text-align:right;font-variant-numeric:tabular-nums}
+  td.warn{color:var(--danger);font-weight:600}
+  td.good{color:var(--greenDeep)}
+  .adj{font:600 10px var(--sans);color:var(--amber);background:var(--amberSoft);border-radius:999px;padding:1px 6px;margin-left:5px}
+
   /* ---------- Budget builder: three simultaneous zones (spec §3.3) ----------
      Left, the chapter/line tree with its per-chapter totals; centre, the
      editable grid; right, the totals panel, which recalculates on every
@@ -359,6 +404,10 @@
     <main>
       <div class="crumbs" id="crumbs">ERP</div>
       <div class="head"><h1 id="ttl">—</h1><div class="sub" id="sub"></div></div>
+      <!-- Project context (spec §4): the selector and the fixed header strip.
+           Rendered outside #view so it survives every subsection change — the
+           context is the section's, not any one screen's. -->
+      <div id="projbar"></div>
       <div id="view"></div>
     </main>
   </div>
@@ -438,6 +487,8 @@ async function boot(){
 
   // UI preferences (period) live in the store's `meta`, never in the state blob.
   try{ const prefs=await ErpStore.getMeta("ui.prefs"); if(prefs&&prefs.period) PERIOD={...PERIOD,...prefs.period}; }catch(e){}
+  try{ const pp=await ErpStore.getMeta("ui.projects");
+       if(pp){ projFavs=pp.favs||[]; projRecents=pp.recents||[]; } }catch(e){}
 
   const hashKey=location.hash.slice(1);
   if(hashKey&&SUBMAP[hashKey]&&!SUBMAP[hashKey].href) cur=hashKey;
@@ -534,8 +585,6 @@ const PLACEHOLDERS={
    body:"El registro de compras y el compromiso de coste por capítulo ya existen y se consultan hoy dentro de cada proyecto.",goto:["proyectos","Abrir Proyectos"]},
  subcontratos:{sub:"Contratación de industriales, ofertas comparadas y documentación obligatoria.",
    body:"Las ofertas por proveedor y su comparativa se gestionan hoy en Precios y costes; la contratación se registra en el proyecto.",goto:["precios","Abrir Precios y costes"]},
- economia:{sub:"Venta, coste comprometido, coste real y desviación por capítulo.",
-   body:"La economía de cada obra se ve hoy en la ficha del proyecto, con coste previsto frente a real por capítulo.",goto:["proyectos","Abrir Proyectos"]},
  modificaciones:{sub:"Extras y modificaciones contractuales con su aprobación.",
    body:"Los extras se registran, valoran y aprueban hoy en la ficha del proyecto; sin aprobación no son facturables.",goto:["proyectos","Abrir Proyectos"]},
  conciliacion:{sub:"Importación de extracto y emparejamiento asistido con los registros.",
@@ -621,7 +670,7 @@ function render(){
   $('#crumbs').textContent="ERP › "+meta.sec.lab;
   $('#ttl').textContent=meta.lab;
   $('#sub').textContent="";
-  renderBell(); renderCreateMenu();
+  renderBell(); renderCreateMenu(); renderProjectBar();
   const v=$('#view');
   if(VIEWS[cur]) VIEWS[cur](v); else placeholderView(cur,v);
 }
@@ -1085,6 +1134,209 @@ function ganttTaskDrawer(pid,taskId){
   },"Tarea eliminada");
 }
 
+/* ===================== Technical tracking (spec §4.3) ==============================
+   The chart came in session 6; this is the half around it — progress recorded
+   per chapter and per line, the S curve, and the deviations panel.
+
+   Same rule as everywhere else in this file: NOTHING here computes a schedule,
+   a drift, a projection or a percentage of completion. Planned/actual/projected
+   and every risk item come from @repo/capability-scheduling through the bridge;
+   the value-weighting comes from erp.budgetTotals(). This block turns those
+   numbers into pixels and inputs, and that is all. */
+
+/** What each bar is worth, so the S curve is value- and not time-weighted:
+    a week of demolition and a week of joinery are not the same amount of job. */
+function planWeights(pid,plan){
+  const w={};
+  try{
+    const p=erp.project(pid);
+    const byNum={};
+    (p.baseline.chapters||[]).forEach(c=>{byNum[c.num]=c.saleCents;});
+    plan.tasks.forEach(t=>{
+      const m=/^group:(.+)$/.exec(t.sourceRef||"");
+      if(m&&byNum[m[1]]>0) w[t.id]=byNum[m[1]];
+    });
+  }catch(e){}
+  return w;
+}
+
+/* Re-derives the plan from the accepted budget. The toast reports how the
+   durations were arrived at, because "5 tasks, 2 with no known daily output"
+   is the difference between a plan and a guess, and the planner should be told
+   which one they just got rather than having to infer it from bar widths. */
+function deriveFromBudget(pid,cal){
+  const B=ganttApi();
+  let msg="Planificación derivada del presupuesto";
+  try{
+    const derived=B.fromBudget(erp,pid,{calendar:cal});
+    if(!derived) throw new Error("El proyecto no tiene presupuesto aceptado del que derivar");
+    const guessed=derived.notes.filter(n=>n.basis==="default").length;
+    msg=`${derived.plan.tasks.length} tareas · `+(guessed
+      ? `${guessed} sin rendimiento conocido (duración por defecto)`
+      : "duraciones derivadas de las cantidades");
+    mutate(()=>{ B.save(erp.state,pid,derived.plan); },msg);
+  }catch(e){ toast("⚠ "+e.message); }
+}
+
+/** Planned / actual / projected, drawn from the points the capability returned. */
+function curveChart(curve){
+  const W=560,H=210,L=34,R=10,T=12,Bm=26;
+  const pts=curve.points; if(pts.length<2) return "";
+  const x=i=>L+(i/(pts.length-1))*(W-L-R);
+  const y=v=>T+(1-v/100)*(H-T-Bm);
+  const path=key=>{
+    let d="",open=false;
+    pts.forEach((p,i)=>{ const v=p[key]; if(v==null){open=false;return;}
+      d+=(open?"L":"M")+x(i).toFixed(1)+" "+y(v).toFixed(1)+" "; open=true; });
+    return d.trim();
+  };
+  const nowIdx=pts.findIndex(p=>p.date>curve.asOf);
+  const nowX=nowIdx>0?x(nowIdx-1):null;
+  return `<svg class="curve" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Curva S de avance">
+    ${[0,25,50,75,100].map(v=>`<line class="cgrid" x1="${L}" y1="${y(v)}" x2="${W-R}" y2="${y(v)}"></line>
+      <text x="4" y="${y(v)+3}">${v}%</text>`).join("")}
+    ${nowX!=null?`<line class="cnow" x1="${nowX}" y1="${T}" x2="${nowX}" y2="${H-Bm}"></line>`:""}
+    <path class="cplan" d="${path("plannedPct")}"></path>
+    <path class="cproj" d="${path("projectedPct")}"></path>
+    <path class="cact" d="${path("actualPct")}"></path>
+    <text x="${L}" y="${H-8}">${fmtD(pts[0].date)}</text>
+    <text x="${W-R}" y="${H-8}" text-anchor="end">${fmtD(pts[pts.length-1].date)}</text>
+  </svg>`;
+}
+
+/** Chapters (the bars) and, under each, the budget lines they are made of. */
+function progressTable(pid,plan){
+  let chapters=[];
+  try{
+    const p=erp.project(pid);
+    chapters=p.budgetId?erp.version(p.budgetId,p.acceptedVersionId).chapters.filter(c=>c.section==="base"):[];
+  }catch(e){}
+  const taskFor={};
+  plan.tasks.forEach(t=>{const m=/^group:(.+)$/.exec(t.sourceRef||"");if(m)taskFor[m[1]]=t;});
+  if(!chapters.length&&!plan.tasks.length) return "";
+  return `<div class="card"><div class="ch"><h3>Avance</h3>
+    <span class="tag">por porcentaje o por cantidad ejecutada — lo que sepa la obra</span></div>
+   <div class="scroll"><table><thead><tr>
+     <th>Partida</th><th>Ud</th><th class="num">Cantidad</th><th class="num">Ejecutado</th>
+     <th class="num">Avance</th><th>Fechas previstas</th><th>Estado</th></tr></thead><tbody>
+   ${chapters.map(c=>{const t=taskFor[c.num];
+     return `<tr class="chaprow"><td>${c.num}. ${esc(c.name)}</td><td></td><td></td><td></td>
+       <td class="num"><input class="inline pctin" type="number" min="0" max="100" step="1" data-chap="${c.num}" value="${t?t.progressPct:0}"></td>
+       <td>${t?`${fmtD(t.plannedStart)} → ${fmtD(t.plannedEnd)}`:"—"}</td>
+       <td>${pillProg(c.progress)}</td></tr>
+      ${c.lines.filter(l=>!l.pending).map(l=>{
+        const qty=(l.subLines.length?l.subLines.reduce((a,s)=>a+Math.round(s.qtyMilli*(1+(s.wastePct||0)/100)),0):l.qtyMilli)/1000;
+        return `<tr><td style="padding-left:26px">${l.num} ${esc(l.desc)}</td><td>${esc(l.unit)}</td>
+         <td class="num">${qty}</td>
+         <td class="num"><input class="inline pctin" type="number" min="0" step="0.001" data-lineqty="${l.id}" data-total="${qty}" value="${Math.round(qty*(l.progressPct||0))/100}"></td>
+         <td class="num"><input class="inline pctin" type="number" min="0" max="100" step="1" data-line="${l.id}" value="${l.progressPct||0}"></td>
+         <td></td><td>${pillProg(l.progress)}</td></tr>`;}).join("")}`;}).join("")
+     ||'<tr><td colspan="7"><div class="empty">Sin capítulos aceptados: el avance se registra sobre las tareas del gráfico.</div></td></tr>'}
+   </tbody></table></div></div>`;
+}
+
+function wireProgressTable(pid,plan){
+  const B=ganttApi(); if(!B) return;
+  const taskFor={};
+  plan.tasks.forEach(t=>{const m=/^group:(.+)$/.exec(t.sourceRef||"");if(m)taskFor[m[1]]=t;});
+  document.querySelectorAll('[data-chap]').forEach(inp=>inp.onchange=()=>{
+    const t=taskFor[inp.dataset.chap];
+    mutate(()=>{
+      if(t) B.save(erp.state,pid,B.recalculate(B.recordProgress(erp,pid,plan,t.id,+inp.value)));
+      else erp.markProgress(pid,inp.dataset.chap,+inp.value>=100?"done":+inp.value>0?"inProgress":"notStarted",+inp.value,"operations");
+    },"Avance registrado");
+  });
+  document.querySelectorAll('[data-line]').forEach(inp=>inp.onchange=()=>mutate(()=>{
+    erp.markLineProgress(pid,inp.dataset.line,{pct:+inp.value},"operations");
+    B.save(erp.state,pid,B.syncProgress(erp,pid,plan));
+  },"Avance de la partida registrado"));
+  /* Quantity, not percentage: the number the site actually knows. The engine
+     converts it against the line's own quantity — the view does not divide. */
+  document.querySelectorAll('[data-lineqty]').forEach(inp=>inp.onchange=()=>mutate(()=>{
+    erp.markLineProgress(pid,inp.dataset.lineqty,{qtyMilliDone:Math.round(+inp.value*1000)},"operations");
+    B.save(erp.state,pid,B.syncProgress(erp,pid,plan));
+  },"Cantidad ejecutada registrada"));
+}
+
+/* =============================== Project context (spec §4) ==========================
+   "Lo primero de esta sección es la selección del proyecto, de modo que todo lo
+   que aparece debajo quede asociado a un proyecto concreto."
+
+   One context for the whole section, held in gProject — the same variable the
+   chart already used, promoted from a chart-local selector to the section's.
+   Two screens showing different projects at once is the bug this prevents, and
+   it is the kind that gets discovered when a cost lands on the wrong job. */
+const PROJECT_SUBS=["proyectos","compras","subcontratos","seguimiento","economia","modificaciones","horas"];
+let projFilter="", projStatus="open";
+let projFavs=[], projRecents=[];
+function saveProjPrefs(){ try{ ErpStore.setMeta("ui.projects",{favs:projFavs,recents:projRecents}); }catch(e){} }
+function projectOptions(){
+  const q=projFilter.trim().toLowerCase();
+  return erp.state.projects.filter(p=>{
+    if(projStatus==="open"&&p.closed) return false;
+    if(projStatus==="closed"&&!p.closed) return false;
+    if(projStatus==="fav"&&!projFavs.includes(p.id)) return false;
+    if(!q) return true;
+    return (p.code+" "+erp.party(p.partyId).name).toLowerCase().includes(q);
+  }).sort((a,b)=>{
+    // Favourites first, then most recently opened, then by code.
+    const fa=projFavs.includes(a.id),fb=projFavs.includes(b.id); if(fa!==fb) return fa?-1:1;
+    const ra=projRecents.indexOf(a.id),rb=projRecents.indexOf(b.id);
+    if(ra!==rb) return (ra<0?99:ra)-(rb<0?99:rb);
+    return a.code<b.code?-1:1;
+  });
+}
+function setProject(id){
+  gProject=id; gSel=null;
+  projRecents=[id,...projRecents.filter(x=>x!==id)].slice(0,5); saveProjPrefs();
+  render();
+}
+function renderProjectBar(){
+  const host=$('#projbar');
+  if(!PROJECT_SUBS.includes(cur)||!erp.state.projects.length){ host.innerHTML=""; return; }
+  const opts=projectOptions();
+  if(!gProject||!erp.state.projects.some(p=>p.id===gProject))
+    gProject=(opts[0]||erp.state.projects.find(p=>!p.closed)||erp.state.projects[0]).id;
+  let h;
+  try{ h=erp.projectHeader(gProject); }catch(e){ host.innerHTML=""; return; }
+  const fav=projFavs.includes(gProject);
+  const ST={active:['b','Activo'],suspended:['y','Suspendido'],closed:['g','Cerrado']};
+  host.innerHTML=`<div class="projbar">
+    <div class="psel">
+      <span style="font:700 9.5px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--faint)">Proyecto</span>
+      <input id="pqf" placeholder="Buscar…" value="${esc(projFilter)}">
+      <select id="psel">${opts.map(p=>`<option value="${p.id}"${p.id===gProject?" selected":""}>${p.code} — ${esc(erp.party(p.partyId).name)}</option>`).join("")
+        ||`<option value="${gProject}">${esc(h.code)}</option>`}</select>
+      <button class="fav${fav?" on":""}" id="pfav" title="${fav?"Quitar de favoritos":"Marcar como favorito"}">${fav?"★":"☆"}</button>
+      <select id="pst">${[["open","Abiertos"],["all","Todos"],["closed","Cerrados"],["fav","Favoritos"]].map(([v,l])=>`<option value="${v}"${projStatus===v?" selected":""}>${l}</option>`).join("")}</select>
+      ${projRecents.length>1?`<span style="font-size:11.5px;color:var(--muted)">Recientes: ${projRecents.slice(1,4).map(id=>{const p=erp.state.projects.find(x=>x.id===id);return p?`<a href="#" data-recent="${id}">${p.code}</a>`:"";}).filter(Boolean).join(" · ")}</span>`:""}
+    </div>
+    <div class="phead">
+      <div class="f"><span class="l">Obra</span><span class="v">${esc(h.code)}</span></div>
+      <div class="f"><span class="l">Cliente</span><span class="v"><a href="#" data-party="${h.partyId}">${esc(h.partyName)}</a></span></div>
+      ${h.address?`<div class="f" style="max-width:230px"><span class="l">Dirección</span><span class="v" style="white-space:normal;font-weight:500">${esc(h.address)}</span></div>`:""}
+      <div class="f"><span class="l">Estado</span><span class="v"><span class="pill ${(ST[h.status]||["b"])[0]}">${(ST[h.status]||["","—"])[1]}</span></span></div>
+      <div class="sep"></div>
+      <div class="f pbar"><span class="l">Avance</span><span class="v">${h.progressPct}% <span class="bar" style="display:inline-block;width:60px;vertical-align:middle"><i style="width:${h.progressPct}%"></i></span></span></div>
+      <div class="f"><span class="l">Venta contratada</span><span class="v">${eur0(h.revenueCents)}</span></div>
+      <div class="f"><span class="l">Coste real</span><span class="v">${eur0(h.actualCents)}</span></div>
+      <div class="f"><span class="l">Margen actual</span><span class="v${h.marginCents<0?" neg":""}">${eur0(h.marginCents)} · ${h.marginPct}%</span></div>
+      ${h.nextDates.length?`<div class="sep"></div><div class="f"><span class="l">Próximas fechas</span><span class="v" style="font-weight:500">${h.nextDates.map(d=>`${esc(d.what)} ${fmtD(d.date)}`).join(" · ")}</span></div>`:""}
+    </div></div>`;
+  $('#psel').onchange=e=>setProject(e.target.value);
+  $('#pst').onchange=e=>{projStatus=e.target.value;render();};
+  const qf=$('#pqf');
+  qf.oninput=e=>{ projFilter=e.target.value; renderProjectBar();
+    const n=$('#pqf'); n.focus(); n.setSelectionRange(n.value.length,n.value.length); };
+  $('#pfav').onclick=()=>{
+    projFavs=fav?projFavs.filter(x=>x!==gProject):[...projFavs,gProject];
+    saveProjPrefs(); renderProjectBar();
+  };
+  host.querySelectorAll('[data-recent]').forEach(a=>a.onclick=e=>{e.preventDefault();setProject(a.dataset.recent);});
+  const pl=host.querySelector('[data-party]');
+  if(pl) pl.onclick=e=>{e.preventDefault();go("clientes");partyDrawer(pl.dataset.party);};
+}
+
 /* =============================== Budget builder (spec §3.3) =========================
    Three zones at once: the chapter/line tree, the editable grid, and a totals
    panel that recalculates on every keystroke.
@@ -1526,6 +1778,59 @@ const VIEWS={
   budgetList(v);
  },
 
+ /* ---------- Seguimiento económico de obra (spec §4.4) ----------
+    Presupuestado · comprometido · real · proyectado · desviación · margen, por
+    capítulo. The column that matters is "proyectado": "spent 40 of 100" reads
+    as comfortable and says nothing, while "spent 40 to get a quarter of the way,
+    so heading for 160" is the sentence somebody can act on. It is computed by
+    @repo/capability-projects, never here. */
+ economia(v){
+  $('#sub').textContent="Presupuestado, comprometido, real y proyectado a fin de obra por capítulo, con la desviación y el margen que resultan. La proyección se calcula del avance real y del coste unitario observado, y puede ajustarse a mano justificando el motivo.";
+  const P=erp.state.projects;
+  if(!P.length){ v.innerHTML='<div class="card"><div class="empty">Todavía no hay proyectos.</div></div>'; return; }
+  const pid=gProject;
+  const f=(typeof ErpBridge!=="undefined"&&ErpBridge.projects)?ErpBridge.projects.forecast(erp,pid):null;
+  if(!f){ v.innerHTML='<div class="card"><div class="empty">El seguimiento económico necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>'; return; }
+  const names={};
+  try{ (erp.project(pid).baseline.chapters||[]).forEach(c=>{names[c.num]=c.name;}); }catch(e){}
+  const over=new Set(f.overrunChapters);
+
+  v.innerHTML=`
+   <div class="kpis">
+    <div class="kpi"><div class="lab">Venta actual</div><div class="val">${eur0(f.revenueCents)}</div><div class="sub">contratada + extras aprobados</div></div>
+    <div class="kpi"><div class="lab">Coste real</div><div class="val">${eur0(f.actualCents)}</div><div class="sub">comprometido ${eur0(f.committedCents)}</div></div>
+    <div class="kpi ${f.varianceCents>0?'warn':''}"><div class="lab">Coste proyectado</div><div class="val">${eur0(f.forecastCents)}</div><div class="sub">presupuestado ${eur0(f.budgetCents)} · ${f.varianceCents>0?"+":""}${eur0(f.varianceCents)}</div></div>
+    <div class="kpi ${f.marginForecastCents<0?'warn':'hi'}"><div class="lab">Margen proyectado</div><div class="val">${eur0(f.marginForecastCents)}</div><div class="sub">${(f.marginForecastBp/100).toFixed(1)}% sobre la venta actual</div></div>
+   </div>
+   <div class="card"><div class="ch"><h3>Por capítulo</h3>
+     ${over.size?`<span class="pill r">${over.size} capítulo(s) por encima del umbral</span>`:'<span class="tag">ninguno supera el umbral de desviación</span>'}</div>
+    <div class="scroll"><table><thead><tr>
+      <th>Capítulo</th><th class="num">Avance</th><th class="num">Presupuestado</th><th class="num">Comprometido</th>
+      <th class="num">Real</th><th class="num">Proyectado</th><th class="num">Desviación</th><th class="num">%</th><th></th>
+    </tr></thead><tbody>
+    ${f.byChapter.map(c=>`<tr>
+      <td class="k">${c.chapter}. ${esc(names[c.chapter]||"—")}${c.adjustedCents!=null?`<span class="adj" title="${esc(c.adjustmentReason||"")}">ajustada</span>`:""}${c.provisional?'<span class="adj" title="Muy poco avance para extrapolar con sentido">provisional</span>':""}</td>
+      <td class="num">${c.progressPct}%</td>
+      <td class="num">${eur0(c.budgetCents)}</td>
+      <td class="num">${c.committedCents?eur0(c.committedCents):"—"}</td>
+      <td class="num">${eur0(c.actualCents)}</td>
+      <td class="num k">${eur0(c.forecastCents)}${c.adjustedCents!=null?`<br><span style="font-size:10.5px;color:var(--muted)">calculada ${eur0(c.calculatedCents)}</span>`:""}</td>
+      <td class="num ${c.varianceCents>0?"warn":c.varianceCents<0?"good":""}">${c.varianceCents>0?"+":""}${eur0(c.varianceCents)}</td>
+      <td class="num ${over.has(c.chapter)?"warn":""}">${(c.varianceBp/100).toFixed(1)}%</td>
+      <td><button class="btn sm" data-adj="${c.chapter}">Ajustar</button></td></tr>`).join("")}
+    <tr class="tot"><td>Total</td><td></td><td class="num">${eur0(f.budgetCents)}</td><td class="num">${eur0(f.committedCents)}</td>
+      <td class="num">${eur0(f.actualCents)}</td><td class="num">${eur0(f.forecastCents)}</td>
+      <td class="num">${f.varianceCents>0?"+":""}${eur0(f.varianceCents)}</td><td class="num">${(f.varianceBp/100).toFixed(1)}%</td><td></td></tr>
+    </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Cómo se calcula</h3><span class="tag">FIN-01 a FIN-18</span></div><div class="daylist">
+     <div class="it">La proyección de cada capítulo parte del coste real y del avance registrado: gastar 40 para llegar al 25% proyecta 160. Nunca queda por debajo de lo ya gastado o comprometido, y mientras no haya coste imputado se mantiene el presupuesto — un capítulo terminado sin factura casi siempre significa que la factura no ha llegado, no que fuese gratis.</div>
+     <div class="it">Proyección total calculada <b>${eur0(f.calculatedCents)}</b>${f.calculatedCents!==f.forecastCents?` · con los ajustes manuales <b>${eur0(f.forecastCents)}</b>`:""}. Se muestran ambas cifras siempre que difieran.</div>
+   </div></div>`;
+
+  v.querySelectorAll('[data-adj]').forEach(b=>b.onclick=()=>forecastDrawer(pid,b.dataset.adj,names[b.dataset.adj]||"",
+    f.byChapter.find(c=>c.chapter===b.dataset.adj)));
+ },
+
  /* ---------- Contratos (CON-13) ---------- */
  contratos(v){
   $('#sub').textContent="Términos clave como datos, no texto libre: hitos de pago, regla de inicio, duración, penalizaciones y garantías. Sin firma no hay obra ni primera factura.";
@@ -1553,16 +1858,18 @@ const VIEWS={
     <td class="num" style="color:${e.marginForecastCents<0?'var(--danger)':'var(--greenDeep)'}">${eur0(e.marginForecastCents)}</td>
     <td>${p.closed?'<span class="pill g">Cerrado</span>':'<span class="pill b">Activo</span>'}</td></tr>`;}).join("")}
    </tbody></table></div></div>`;
-  v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>projectDrawer(tr.dataset.id));
-  if(arg){const p=rows.find(x=>x.code===arg); if(p)projectDrawer(p.id);}
+  // Choosing a row also makes it the section's active project: picking a job
+  // from a list and then finding another one selected above is the surprise
+  // this avoids.
+  v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>{setProject(tr.dataset.id);projectDrawer(tr.dataset.id);});
+  if(arg){const p=rows.find(x=>x.code===arg); if(p){setProject(p.id);projectDrawer(p.id);}}
  },
 
  /* ---------- Seguimiento técnico: la carta Gantt (§3.3 · §4.3) ---------- */
  seguimiento(v){
-  $('#sub').textContent="Planificación de obra con dependencias, ruta crítica y línea base. Arrastra una barra para moverla, tira del borde derecho para alargarla y arrastra el punto de una barra a otra para crear una dependencia.";
+  $('#sub').textContent="Carta Gantt derivada del presupuesto aceptado, avance por partida o por cantidad ejecutada, y desviación frente a la línea base. Arrastra una barra para moverla, tira del borde para alargarla y une dos barras para crear una dependencia.";
   const P=erp.state.projects;
   if(!P.length){ v.innerHTML='<div class="card"><div class="empty">Todavía no hay proyectos que planificar.</div></div>'; return; }
-  if(!gProject||!P.some(p=>p.id===gProject)) gProject=(P.find(p=>!p.closed)||P[0]).id;
   const B=ganttApi();
   if(!B){ v.innerHTML='<div class="card"><div class="empty">La planificación necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>'; return; }
 
@@ -1571,12 +1878,16 @@ const VIEWS={
   const pays=ErpBridge.scheduling.paymentMilestones(erp,pid);
   const cal=plan.calendar||B.defaultCalendar();
   const crit=sch?sch.criticalPath.length:0;
+  /* Every figure in the deviations panel and both curves come from
+     @repo/capability-scheduling. This view draws them and computes none. */
+  const curve=B.curve(plan,{asOf:erp.today,weights:planWeights(pid,plan)});
+  const risk=B.risk(plan,{asOf:erp.today,thresholdDays:5});
 
-  v.innerHTML=`<div class="card"><div class="gtools">
-     <select class="inline" id="gProj" style="max-width:none">${P.map(p=>`<option value="${p.id}"${p.id===pid?" selected":""}>${p.code} — ${esc(erp.party(p.partyId).name)}</option>`).join("")}</select>
+  v.innerHTML=`<div class="trk"><div>
+   <div class="card"><div class="gtools">
      <button class="btn sm" id="gAdd">＋ Tarea</button>
      <button class="btn sm" id="gAddMs">◆ Hito</button>
-     ${plan.tasks.length?"":`<button class="btn sm primary" id="gSeed">Generar desde los capítulos</button>`}
+     <button class="btn sm${plan.tasks.length?"":" primary"}" id="gDerive" title="Vuelve a derivar la planificación de los capítulos y partidas del presupuesto aceptado, conservando el avance registrado">↻ Derivar del presupuesto</button>
      <span style="flex:1"></span>
      ${sch&&plan.tasks.length?`<span class="chip">Fin de obra <b>${fmtD(sch.finish)}</b></span>
      <span class="chip">Ruta crítica <b>${crit}</b> de ${plan.tasks.length}</span>`:""}
@@ -1585,7 +1896,7 @@ const VIEWS={
      ${plan.baselines&&plan.baselines.length?`<button class="btn sm${gBaseline?" primary":""}" id="gBl">Línea base</button>`:""}
      <button class="btn sm" id="gFreeze" title="Congelar la planificación actual como referencia">❄ Congelar</button>
    </div>
-   ${plan.tasks.length?ganttChart(plan,sch,cmp,pays):`<div class="empty">Sin tareas planificadas. Añade una tarea o genera la planificación desde los capítulos del proyecto.</div>`}
+   ${plan.tasks.length?ganttChart(plan,sch,cmp,pays):`<div class="empty">Sin planificación. «Derivar del presupuesto» la construye a partir de los capítulos y partidas aceptados: la duración de cada capítulo sale de sus cantidades y del rendimiento diario del oficio.</div>`}
    <div class="glegend">
      <span><i style="background:var(--green)"></i>Tarea</span>
      <span><i style="background:var(--danger)"></i>Ruta crítica — un día perdido aquí es un día perdido en la obra</span>
@@ -1599,18 +1910,45 @@ const VIEWS={
      ${(cal.nonWorkingDates||[]).map(d=>`<span class="chip"><b>${fmtD(d)}</b><button data-nw="${d}" title="Quitar">✕</button></span>`).join("")||'<span class="chip">ninguno</span>'}
      <input class="dt" type="date" id="gNw"><button class="btn sm" id="gNwAdd">Añadir</button>
      <span style="font-size:11.5px;color:var(--muted)">Semana laboral: ${cal.workingWeekdays.length} días</span>
-   </div></div>`;
+   </div></div>
 
-  $('#gProj').onchange=e=>{gProject=e.target.value;gSel=null;render();};
+   ${curve?`<div class="card"><div class="ch"><h3>Curva S</h3>
+     <span class="tag">planificado ${curve.plannedPct}% · real ${curve.actualPct}% · ${curve.driftPct>=0?"+":""}${curve.driftPct} pts</span></div>
+     ${curveChart(curve)}
+     <div class="glegend">
+       <span><i style="background:var(--faint)"></i>Planificado</span>
+       <span><i style="background:var(--green)"></i>Real registrado</span>
+       <span><i style="background:var(--spark)"></i>Proyectado al ritmo observado${curve.performanceIndex!=null?` (×${curve.performanceIndex})`:""}</span>
+       <span>Fin previsto ${fmtD(curve.plannedFinish)} → proyectado <b>${fmtD(curve.projectedFinish)}</b></span>
+     </div></div>`:""}
+
+   ${progressTable(pid,plan)}
+  </div>
+
+  <div class="bside">
+   <div class="card" style="margin:0"><div class="ch"><h3>Desviaciones</h3>
+     ${risk&&risk.overThreshold?'<span class="pill r">Supera el umbral</span>':''}</div>
+    <div class="daylist" style="padding:10px 14px">
+     ${risk?`<div class="row" style="display:flex;justify-content:space-between"><span>Retraso sobre línea base</span><b style="color:${risk.delayDays>0?'var(--danger)':'var(--greenDeep)'}">${risk.delayDays>0?"+":""}${risk.delayDays} d</b></div>
+      <div class="row" style="display:flex;justify-content:space-between"><span>Tareas críticas en riesgo</span><b>${risk.criticalAtRisk}</b></div>
+      ${risk.baselineFinish?`<div class="row" style="display:flex;justify-content:space-between;color:var(--muted)"><span>Prometido</span><b>${fmtD(risk.baselineFinish)}</b></div>`:'<div class="row" style="color:var(--muted)">Sin línea base congelada: no hay promesa contra la que medir.</div>'}`
+      :'<div class="row" style="color:var(--muted)">Sin planificación.</div>'}
+    </div>
+    ${risk&&risk.items.length?`<div style="padding:0 14px 12px">
+      ${risk.items.slice(0,12).map(i=>`<div class="riskitem">
+        <span class="pill ${i.kind==="overdue"?"r":i.kind==="not_started"?"y":"b"}">${({overdue:"Vencida",not_started:"Sin empezar",behind:"Retrasada"})[i.kind]}</span>
+        <span class="t">${esc(i.title)}${i.critical?' <span class="pill r">crítica</span>':""}</span>
+        <b>${i.kind==="behind"?`${i.actualPct}/${i.plannedPct}%`:`${i.days} d`}</b></div>`).join("")}
+      ${risk.items.length>12?`<div class="riskitem" style="color:var(--muted)">…y ${risk.items.length-12} más</div>`:""}
+     </div>`:risk?'<div class="daylist" style="padding:0 14px 12px"><div class="it">Nada fuera de plazo.</div></div>':''}
+   </div>
+  </div></div>`;
+
   $('#gZoom').onchange=e=>{gZoom=+e.target.value;render();};
   const bl=$('#gBl'); if(bl) bl.onclick=()=>{gBaseline=!gBaseline;render();};
   $('#gAdd').onclick=()=>ganttNewTask(pid,false);
   $('#gAddMs').onclick=()=>ganttNewTask(pid,true);
-  const seed=$('#gSeed'); if(seed) seed.onclick=()=>mutate(()=>{
-    const seeded=B.seedFromChapters(erp,pid,{calendar:cal});
-    if(!seeded) throw new Error("El proyecto no tiene capítulos de los que partir");
-    B.save(erp.state,pid,seeded);
-  },"Planificación generada desde los capítulos");
+  $('#gDerive').onclick=()=>deriveFromBudget(pid,cal);
   $('#gFreeze').onclick=()=>ganttFreeze(pid,plan);
   $('#gNwAdd').onclick=()=>{
     const d=$('#gNw').value; if(!d)return;
@@ -1619,6 +1957,7 @@ const VIEWS={
   v.querySelectorAll('[data-nw]').forEach(b=>b.onclick=()=>{
     ganttCommit(pid,B.setCalendar(plan,{...cal,nonWorkingDates:(cal.nonWorkingDates||[]).filter(x=>x!==b.dataset.nw)}),"Día no laborable quitado");
   });
+  wireProgressTable(pid,plan);
   ganttWire(v,pid,plan,sch);
  },
 
@@ -1988,6 +2327,32 @@ function budgetDrawer(id,versionId){
     :(doc.annex&&doc.annex.enabled?"":`<div class="card"><div class="daylist"><div class="it">El anexo gráfico está desactivado para este presupuesto.</div></div></div>`)}`;
   paintImages(db);
 }
+/** Adjust one chapter's projection. The reason is required, by the engine. */
+function forecastDrawer(pid,chapterNum,name,row){
+  const db=openDrawer(`Proyección · ${chapterNum}. ${name}`);
+  const stored=(erp.project(pid).forecastOverrides||{})[chapterNum];
+  db.innerHTML=`<div class="card"><div class="ch"><h3>Coste a fin de obra</h3><span class="tag">§4.4</span></div>
+   <div class="daylist">
+    <div class="it">Presupuestado <b>${eur(row.budgetCents)}</b> · real <b>${eur(row.actualCents)}</b> · avance <b>${row.progressPct}%</b></div>
+    <div class="it">Proyección calculada <b>${eur(row.calculatedCents)}</b>${row.provisional?' <span class="pill y">provisional — muy poco avance para extrapolar</span>':""}</div>
+    ${stored?`<div class="it">Ajuste vigente <b>${eur(stored.costCents)}</b> · ${esc(stored.reason)} <span style="color:var(--muted)">(${esc(stored.by)}, ${fmtD(stored.at)})</span></div>`:""}
+   </div></div>
+   <div class="card"><div class="ch"><h3>Ajustar</h3></div><div class="fgrid" style="padding:12px 16px">
+    <div class="field"><label>Coste a fin de obra (€)</label><input id="fc_amt" type="number" step="0.01" value="${((stored?stored.costCents:row.calculatedCents)/100).toFixed(2)}"></div>
+    <div class="field full"><label>Motivo * — se guarda con el ajuste y es lo único revisable después</label>
+      <input id="fc_why" placeholder="La parte cara ya está ejecutada" value="${esc(stored?stored.reason:"")}"></div>
+    <div class="field full" style="margin-top:6px;display:flex;gap:8px">
+      <button class="btn primary" id="fc_save">Guardar ajuste</button>
+      ${stored?'<button class="btn danger" id="fc_clear">Volver a la calculada</button>':""}</div>
+   </div></div>`;
+  $('#fc_save').onclick=()=>mutate(()=>{
+    erp.setForecastOverride(pid,chapterNum,{costCents:Math.round(+$('#fc_amt').value*100),reason:$('#fc_why').value},"backoffice");
+    closeDrawer();
+  },"Proyección ajustada");
+  const cl=$('#fc_clear');
+  if(cl) cl.onclick=()=>mutate(()=>{erp.clearForecastOverride(pid,chapterNum,"backoffice");closeDrawer();},"Ajuste retirado");
+}
+
 function projectDrawer(id){
   const p=erp.project(id); const e=erp.projectEconomics(id); const bill=erp.projectBilling(id); const ex=erp.extrasRegister(id);
   const db=openDrawer(p.code+" — "+erp.party(p.partyId).name);

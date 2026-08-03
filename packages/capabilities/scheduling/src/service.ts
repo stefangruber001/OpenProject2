@@ -2,6 +2,21 @@ import { FactoryError, type ClockPort, type IdGenPort } from "@repo/kernel";
 import type { WorkCalendar } from "./calendar";
 import { compareToBaseline, freezeBaseline, type BaselineComparison } from "./baseline";
 import { applySchedule, computeSchedule, type Schedule } from "./cpm";
+import {
+  mergeDerivedPlan,
+  planFromWorkBreakdown,
+  type DeriveOptions,
+  type DerivedPlan,
+  type WorkItem,
+} from "./derive";
+import {
+  progressCurve,
+  riskReport,
+  type CurveOptions,
+  type ProgressCurve,
+  type RiskOptions,
+  type RiskReport,
+} from "./tracking";
 import type {
   Dependency,
   DependencyType,
@@ -98,13 +113,32 @@ export class SchedulingService {
     }));
   }
 
-  setProgress(plan: Plan, taskId: string, pct: number): Plan {
+  /**
+   * Record how far a task has got — and WHEN it got there.
+   *
+   * The observation is appended to the plan's progress log as well as written
+   * onto the task, because the two answer different questions. The task
+   * answers "where is this now", which is all a chart needs; the log answers
+   * "where was this in March", which nothing can reconstruct afterwards and
+   * which the actual-progress curve is entirely made of. One entry per task
+   * per day: correcting today's figure replaces today's entry rather than
+   * leaving a trail of keystrokes in the record.
+   */
+  setProgress(plan: Plan, taskId: string, pct: number, asOf?: string): Plan {
     const clamped = Math.max(0, Math.min(100, Math.round(pct)));
-    return this.mutate(plan, taskId, (t) => ({
+    const date = asOf ?? this.deps.clock.todayIso();
+    const next = this.mutate(plan, taskId, (t) => ({
       ...t,
       progressPct: clamped,
       status: clamped === 100 ? "done" : t.status === "planned" ? "in_progress" : t.status,
     }));
+    const log = (next.progressLog ?? []).filter((e) => !(e.taskId === taskId && e.date === date));
+    return {
+      ...next,
+      progressLog: [...log, { taskId, date, pct: clamped }].sort((a, b) =>
+        a.date < b.date ? -1 : a.date > b.date ? 1 : 0,
+      ),
+    };
   }
 
   reschedule(plan: Plan, taskId: string, plannedStart: string, plannedEnd: string): Plan {
@@ -259,6 +293,41 @@ export class SchedulingService {
     return plan.tasks
       .filter((t) => t.status !== "done" && t.plannedEnd < today)
       .sort((a, b) => (a.plannedEnd < b.plannedEnd ? -1 : 1));
+  }
+
+  /* ---------------------------------------------------------------------
+     Derivation and tracking
+     --------------------------------------------------------------------- */
+
+  /**
+   * A plan derived from a work breakdown, already put through the network so
+   * its dates are the scheduled ones rather than the first-pass layout.
+   *
+   * `previous` is the plan being replaced, if any: progress, pinned dates and
+   * frozen baselines are carried across for every task that survived the
+   * re-derivation. Without that, re-deriving after a quote change would quietly
+   * throw away everything the site had recorded.
+   */
+  fromWorkBreakdown(items: WorkItem[], options: DeriveOptions, previous?: Plan): DerivedPlan {
+    const derived = planFromWorkBreakdown(items, options);
+    const merged = previous ? mergeDerivedPlan(previous, derived.plan) : derived.plan;
+    return { ...derived, plan: this.recalculate(merged, options.from) };
+  }
+
+  /** Planned vs actual vs projected, over time. */
+  progressCurve(plan: Plan, options: CurveOptions): ProgressCurve {
+    return progressCurve(plan, computeSchedule(plan), {
+      ...options,
+      asOf: options.asOf || this.deps.clock.todayIso(),
+    });
+  }
+
+  /** Which tasks are late, by how much, and whether the slip crosses the line. */
+  riskReport(plan: Plan, options: RiskOptions): RiskReport {
+    return riskReport(plan, computeSchedule(plan), {
+      ...options,
+      asOf: options.asOf || this.deps.clock.todayIso(),
+    });
   }
 
   byAssignee(plan: Plan, assignee: string): Task[] {
