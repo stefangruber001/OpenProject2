@@ -39,6 +39,8 @@
   var docs = available && F.createDocs ? F.createDocs() : null;
   var projects = available && F.createProjects ? F.createProjects() : null;
   var rates = available && F.createRates ? F.createRates() : null;
+  var recon = available && F.createReconciliation ? F.createReconciliation() : null;
+  var comms = available && F.createComms ? F.createComms() : null;
 
   /* ------------------------------------------------------------------ *
    * Projections: engine state -> capability values
@@ -682,6 +684,98 @@
           overrunThresholdBp: opts && opts.overrunThresholdBp,
           minProgressPct: opts && opts.minProgressPct,
         });
+      },
+    },
+
+    /* ------------------------------------------------------------------ *
+     * Bank reconciliation (spec §5.3).
+     *
+     * @repo/capability-reconciliation scores; this file decides what a
+     * candidate IS. Money out looks at supplier bills and money in at issued
+     * invoices — a distinction only the engine layer can make, which is
+     * exactly why the capability does not try to.
+     * ------------------------------------------------------------------ */
+    reconciliation: {
+      available: !!recon,
+      /** Suggestions for one movement, best first. [] when the bundle is absent. */
+      suggest: function (erp, movId) {
+        if (!recon) return [];
+        return recon.suggest(
+          erp.movementValue(
+            erp.state.movements.find(function (m) {
+              return m.id === movId;
+            }),
+          ),
+          erp.reconciliationCandidates(movId),
+        );
+      },
+      /** Suggestions for every still-unexplained movement in a window. */
+      suggestAll: function (erp, from, to) {
+        if (!recon) return {};
+        var out = {};
+        erp.unreconciledMovements(from, to).forEach(function (m) {
+          var s = recon.suggest(erp.movementValue(m), erp.reconciliationCandidates(m.id));
+          if (s.length) out[m.id] = s;
+        });
+        return out;
+      },
+      /**
+       * Pairs that are one transfer between the tenant's own accounts. Left
+       * unlabelled these are counted twice — once as income, once as expense —
+       * and every figure downstream is wrong in a way that still reconciles.
+       */
+      internalTransfers: function (erp, from, to) {
+        if (!recon) return [];
+        return recon.internalTransfers(
+          erp.state.movements
+            .filter(function (m) {
+              return (
+                !m.excludedFromPL &&
+                (!from || m.accountingDate >= from) &&
+                (!to || m.accountingDate <= to)
+              );
+            })
+            .map(function (m) {
+              return erp.movementValue(m);
+            }),
+        );
+      },
+      /** The confidence at or above which the view may offer one-click accept. */
+      autoAcceptScore: recon ? recon.config.autoAcceptScore : 1,
+    },
+
+    /* ------------------------------------------------------------------ *
+     * Communications (spec §5.7).
+     *
+     * The capability plans and renders; the engine stores templates, rules and
+     * the queue. NOTHING here sends: `email-out@1`'s only bound adapter is the
+     * log-only outbox, and the mandate's "no real emails" is a property of the
+     * whole path rather than a promise made at one layer.
+     * ------------------------------------------------------------------ */
+    comms: {
+      available: !!comms,
+      /** Fill a template's `{{tokens}}`; unknown ones stay visible. */
+      render: function (text, vars) {
+        if (!comms) return text;
+        return comms.render(text || "", vars || {});
+      },
+      /**
+       * What the rules say should be queued that is not queued already.
+       * Recomputed from current state, so a rule added today still sees the
+       * invoice that went overdue last week.
+       */
+      pending: function (erp) {
+        if (!comms) return [];
+        var planned = comms.plan(erp.state.commsRules || [], erp.commsEvents(), erp.today);
+        var existing = (erp.state.commsQueue || []).map(function (q) {
+          return q.key;
+        });
+        return comms.unseen(planned, existing);
+      },
+      /** Everything the rules would produce, ignoring the queue — §5.7's simulation mode. */
+      simulate: function (erp, rules) {
+        if (!comms) return [];
+        return comms.plan(rules || erp.state.commsRules || [], erp.commsEvents(), erp.today);
       },
     },
 

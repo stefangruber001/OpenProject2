@@ -108,10 +108,11 @@
       "plannedSession": null
     },
     "banking-reconciliation": {
-      "owner": "engine",
+      "owner": "factory",
       "specSection": "5.3 / 5.4",
       "engineSection": "BNK — bank, cash, reconciliation",
-      "plannedSession": "11"
+      "plannedSession": null,
+      "note": "Matching is owned by @repo/capability-reconciliation (src/match.ts) and reached through ErpBridge.reconciliation; erp-engine.js keeps the records and the state transitions. The split follows the same line as project-economics: the engine says what is TRUE (which movements exist, which documents are still open, what a match does to both), and the capability says what is LIKELY (which document explains this line, how sure it is, and why). The 'why' is not decoration — a bare 0,99 next to an Accept button trains people to click without reading, so every suggestion carries the reasons that produced it and the screen renders them. Direction is a gate rather than a weight (a credit can never be explained by a bill), amounts outside tolerance return nothing rather than a weak guess, and a single document always outranks a combination of equal confidence. Session 11 also moved allocation off the Banco screen entirely: casar y repartir is one gesture, and doing it in two places produced movements assigned to a job with no invoice behind them."
     },
     "labour-hours": {
       "owner": "engine",
@@ -131,7 +132,8 @@
       "owner": "engine",
       "specSection": "5.6",
       "engineSection": "GES — accounting package",
-      "plannedSession": "11"
+      "plannedSession": null,
+      "note": "Session 11 made the quarterly package REFUSABLE. Before, 'Generar y registrar envío' always succeeded and the exception list sat beside it as decoration, which is exactly how a quarter goes out with four suppliers missing a tax id. quarterlyPackage now throws, naming the outstanding items, and the only way past is acceptException with a written justification per item — the two routes §5.6 allows and no third. A force flag was written and then deliberately removed: nobody ever takes one back out. The screen gained the eight completeness blocks (green/amber/red per block, because they fail independently and one aggregate number hides which), the late-document register with duplicate detection against earlier packages, the fixed-asset/vehicle/renting register kept out of site cost, accountant queries, recipient on every send, and a reopen that requires a reason."
     },
     "alerts-tasks-control-tower": {
       "owner": "engine",
@@ -160,10 +162,11 @@
       "plannedSession": "12"
     },
     "comunicaciones-templates": {
-      "owner": "unbuilt",
+      "owner": "factory",
       "specSection": "5.7",
-      "engineSection": null,
-      "plannedSession": "11"
+      "engineSection": "COM — communications",
+      "plannedSession": null,
+      "note": "Templates, rules and the queue, with planning owned by @repo/capability-messaging (src/rules.ts) through ErpBridge.comms. NOTHING SENDS. The rule default is mode:'draft' and that default is the single most important decision in the area — an ERP that mails customers by itself is one bad rule away from an apology, so a rule prepares a message and a person releases it. The engine's commsEvents() is a projection recomputed from current state rather than an append-only log, so a rule added today still sees the invoice that went overdue last week, which is what somebody adding 'chase at 3 days' actually expects. Editing a template mints a new version and retires the old one with supersededBy, so 'which wording did the customer receive' stays answerable."
     },
     "three-panel-shell": {
       "owner": "engine",
@@ -178,6 +181,13 @@
       "engineSection": null,
       "plannedSession": "2",
       "note": "First area served by the capability layer. Task counts by status are computed by @repo/capability-scheduling via site/erp-bridge.js, not by ad-hoc filtering in the view. The underlying task records are still owned by erp-engine.js (see alerts-tasks-control-tower) — only this derivation moved, which is what made it safe to land first."
+    },
+    "reconciliation-matching": {
+      "owner": "factory",
+      "specSection": "5.3",
+      "engineSection": null,
+      "plannedSession": null,
+      "note": "The capability itself: @repo/capability-reconciliation. Scores a bank line against the open documents that could explain it — exact and near amounts, same and near dates, a reference quoted in the free text, a counterparty named in it — and returns suggestions carrying their own reasons. Combinations up to three documents cover the one-transfer-pays-two-invoices case, and internal transfers are detected as mirrored pairs across accounts so they stop counting as income and expense. Zero jurisdiction or sector knowledge: it knows amounts, dates, directions and strings."
     }
   }
 }

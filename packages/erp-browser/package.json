@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@repo/capability-docs": "workspace:*",
+    "@repo/capability-messaging": "workspace:*",
     "@repo/capability-projects": "workspace:*",
+    "@repo/capability-reconciliation": "workspace:*",
     "@repo/capability-scheduling": "workspace:*",
     "@repo/kernel": "workspace:*",
     "@repo/pack-vertical-construction-reformas": "workspace:*"

@@ -1067,6 +1067,33 @@
       concept: "Compra pequeño material",
       amountCents: -4200,
     }); // cash without doc → flagged
+
+    /* ---- §5.3: statement lines the reconciliation screen has to explain ----
+       Three deliberate shapes, because a screen with nothing to match on is a
+       screen nobody can judge:
+         1. a customer transfer quoting its invoice number — the one-click case;
+         2. a supplier payment quoting its bill number — same, other direction;
+         3. an equal-and-opposite pair across two accounts — an internal
+            transfer, which counts as income AND expense until it is spotted.
+       All three arrive UNCLASSIFIED, exactly as a bank hands them over. */
+    erp.importMovements(bank.id, [
+      {
+        accountingDate: "2026-05-02",
+        concept: "TRANSFERENCIA RECIBIDA FAC-2026-0002",
+        counterparty: "COMUNIDAD BALMES 44",
+        amountCents: 98888,
+      },
+      {
+        accountingDate: "2026-05-04",
+        concept: "TRANSF /FRA EB-3301",
+        counterparty: "ELECTROBAIX SL",
+        amountCents: -179080,
+      },
+      { accountingDate: "2026-05-04", concept: "TRASPASO ENTRE CUENTAS", amountCents: -60000 },
+    ]);
+    erp.importMovements(till.id, [
+      { accountingDate: "2026-05-04", concept: "TRASPASO RECIBIDO", amountCents: 60000 },
+    ]);
     erp.registerBill({
       supplierId: supArch.id,
       number: "NC-88",
@@ -1086,6 +1113,73 @@
       title: "Reclamar factura reparación Roca",
       relatedRef: "factura",
     });
+
+    /* ---- §5.7: the starting template library and one rule per family ----
+       A communications screen with an empty library teaches nothing: the
+       question it has to answer is "what would go out, to whom, and when",
+       and that needs something to look at. Every rule below is mode:"draft"
+       — the shipped default — so the queue fills with things awaiting a
+       person, which is the behaviour §5.7 asks for and the mandate requires
+       (nothing is ever sent from here). */
+    [
+      {
+        key: "quote-followup",
+        label: "Seguimiento de presupuesto",
+        family: "comercial",
+        subject: "Su presupuesto {{number}}",
+        body: "Hola {{cliente}},\n\n¿Ha podido revisar el presupuesto {{number}}? Quedamos a su disposición para cualquier ajuste.\n\nUn saludo,\nCanei Subirats",
+        attach: "budget",
+      },
+      {
+        key: "invoice-reminder",
+        label: "Recordatorio de factura vencida",
+        family: "cobros",
+        subject: "Factura {{number}} pendiente",
+        body: "Hola {{cliente}},\n\nLa factura {{number}}, por importe de {{importe}} €, figura pendiente en nuestros registros. Si ya la ha abonado, indíquenoslo y la conciliamos.\n\nGracias,\nCanei Subirats",
+        attach: "invoice",
+      },
+      {
+        key: "works-start",
+        label: "Aviso de inicio de obra",
+        family: "obra",
+        subject: "Comenzamos su obra el {{fecha}}",
+        body: "Hola {{cliente}},\n\nConfirmamos el inicio de los trabajos. El equipo llegará a primera hora y le informaremos del avance semanalmente.\n\nUn saludo,\nCanei Subirats",
+      },
+      {
+        key: "docs-expired",
+        label: "Documentación caducada",
+        family: "proveedores",
+        subject: "Documentación pendiente — {{number}}",
+        body: "Buenos días,\n\nLa documentación asociada a {{number}} ({{oficio}}) figura caducada. Sin ella no es posible el acceso a obra.\n\nGracias,\nCanei Subirats",
+      },
+      {
+        key: "warranty-followup",
+        label: "Seguimiento posventa",
+        family: "posventa",
+        subject: "¿Todo correcto tras la obra?",
+        body: "Hola {{cliente}},\n\nHa pasado un tiempo desde que terminamos. ¿Está todo a su gusto? Cualquier detalle en garantía lo revisamos sin coste.\n\nUn saludo,\nCanei Subirats",
+      },
+    ].forEach((t) => erp.addCommsTemplate(t, "seed"));
+    [
+      {
+        label: "Seguir presupuesto a los 5 días",
+        event: "quote-sent",
+        template: "quote-followup",
+        afterDays: 5,
+      },
+      {
+        label: "Reclamar factura vencida a los 3 días",
+        event: "invoice-overdue",
+        template: "invoice-reminder",
+        afterDays: 3,
+      },
+      {
+        label: "Reclamar documentación a subcontrata",
+        event: "subcontractor-docs-expired",
+        template: "docs-expired",
+        recipient: "supplier",
+      },
+    ].forEach((r) => erp.addCommsRule(r, "seed"));
 
     erp.setToday(today || "2026-05-05");
     return erp;

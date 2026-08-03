@@ -460,12 +460,49 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   checks — including one that pins the exact bug this session shipped once:
   sending a purchase order updated the record but left the open drawer
   showing the stale status and the wrong next action.
-- **Session 8 — not started** (skipped for now), **11-12 — not started.** See
+- **Session 11 — done** (`docs/worklog/SESSION-11.md`). Administración: §5.3
+  conciliación bancaria, §5.4 banco, §5.6 gestoría, §5.7 comunicaciones. New
+  capability `@repo/capability-reconciliation` scores a statement line against
+  the documents that could explain it and returns suggestions **carrying their
+  own reasons** — exact amount, reference quoted, same counterparty — because a
+  bare confidence next to an Accept button teaches people to click without
+  reading. Direction is a gate rather than a weight, an amount outside
+  tolerance returns nothing rather than a weak guess, combinations stop at
+  three documents, and a single document outranks a combination of equal
+  confidence. Mirrored pairs across accounts are detected as internal
+  transfers. Closing a bank period **refuses** while anything in range is
+  unreconciled; reopening requires a written reason. Allocation was **removed
+  from the Banco screen** per §5.4 — casar un movimiento y repartirlo son el
+  mismo gesto, and splitting them across two screens produced movements
+  assigned to a job with no invoice behind them. Gestoría (§5.6) can now say
+  no: `quarterlyPackage` **throws**, naming the outstanding exceptions, and the
+  only way past is `acceptException` with a written reason per item — the two
+  routes the spec allows and no third (a `force` flag was written this session
+  and deliberately removed). The screen gained the completeness blocks, one
+  traffic light per block because they fail independently, plus the late-
+  document register (amber, never red), the fixed-asset/vehicle/renting
+  register, accountant queries, recipient on every send and a reason-bearing
+  reopen. Comunicaciones (§5.7) is templates, rules and a queue — and the rule
+  default is **`draft`**, the most consequential decision in the session:
+  nothing on the screen sends, "Aprobar" and "Registrar envío" are labelled
+  honestly, and the only thing that could put a message on a wire is a port
+  whose sole adapter delivers nothing. `commsEvents()` is a projection
+  recomputed from current state, not a log, so a rule added today still sees
+  last week's overdue invoice; editing a template mints a new version and
+  retires the old with `supersededBy`. Schema v7 adds `bankPeriods`,
+  `commsTemplates`, `commsRules`, `commsQueue`, `gestoriaQueries` and
+  `exceptionsAccepted` — all additive. Ownership: `banking-reconciliation` and
+  `comunicaciones-templates` → `factory`, `reconciliation-matching` added
+  (18 engine · 7 factory · 2 unbuilt). Site E2E 121/121, 18 new checks, all
+  aimed at the refusals rather than the happy paths. The zod-in-the-bundle trap
+  was hit for the third time (52 → 190 KB) and fixed the same way as sessions 9
+  and 10a; the committed bundle is 62 KB with zero zod references.
+- **Session 8 — not started** (skipped for now), **12 — not started.** See
   `docs/worklog/WORKLOG.md`.
 
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-
 status-1q50dt` for sessions 1-3, `claude/candi-programme-session-4-07amo8` for
-sessions 4-10b. Small conventional commits, every commit green, no force-push, no
+sessions 4-11. Small conventional commits, every commit green, no force-push, no
 history rewrite.

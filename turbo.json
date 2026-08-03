@@ -7,7 +7,8 @@
     "DATABASE_URL",
     "E2E_DATABASE_URL",
     "NEXT_PUBLIC_APP_URL",
-    "UI_LANG"
+    "UI_LANG",
+    "CHROME_PATH"
   ],
   "tasks": {
     "build": {

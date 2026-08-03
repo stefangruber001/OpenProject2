@@ -719,3 +719,45 @@ languages: es-ES # source: synthetic
   rather than the grid silently collapsing a split day into one number. Reversible: every new
   method is additive over existing collections, schema v6 backfills every new field to its
   pre-existing default, and nothing here removed or renamed anything session 1-10a built.
+
+- **#55 — CANEI session 11: where a suggestion earns trust, and the three refusals of Administración (2026-08-03).**
+  Spec §5.3 (Conciliación bancaria), §5.4 (Banco y caja), §5.6 (Gestoría) and §5.7 (Comunicaciones).
+  **Decisions:** (a) **Every match suggestion carries its reasons, and the screen renders them.**
+  `@repo/capability-reconciliation` returns `{confidence, reasons, differenceCents, combination}`
+  rather than a bare score, because a person is being asked to accept or reject a proposal and
+  "0,99" gives them nothing to judge on. A confidence with no argument behind it trains people to
+  click accept without reading, which is the exact failure the screen exists to prevent. (b)
+  **Direction is a gate, not a weight.** A credit can never be explained by a supplier bill, so a
+  wrong-direction candidate is excluded outright instead of scoring low and surfacing under a
+  thin threshold. For the same reason an amount outside tolerance returns nothing rather than a
+  weak guess: a suggestion nobody should accept is worse than no suggestion. (c) **A single
+  document outranks a combination of equal confidence**, and combinations stop at three — beyond
+  that the search finds coincidences, not explanations. (d) **Allocation was removed from the
+  Banco screen entirely** (§5.4's "retirando la parte de asignación"). Casar un movimiento con su
+  documento y repartirlo entre obras is one gesture; doing it in two screens produced movements
+  assigned to a job with no invoice behind them. Banco keeps position, movements and forecast, and
+  links across. (e) **`quarterlyPackage` now REFUSES**, naming up to four outstanding items rather
+  than counting them. §5.6 allows exactly two ways past — the list is empty, or every item has been
+  justified by name — so `acceptException(quarter, key, reason, user)` requires a written reason and
+  there is no third route. A `force` flag was written during this session and then deliberately
+  removed: an override nobody ever takes back out is how the check stops meaning anything. The
+  year-sim was updated to justify each exception, which is what a real quarter-end does. (f) **The
+  completeness traffic light is per block, not one number** — the eight blocks fail independently
+  (an empty cash register in a quarter with no petty cash is fine; an empty issued-invoice register
+  in a quarter that billed is not) and an aggregate hides which one. (g) **Late documents are amber,
+  never red**: an extemporaneous document is a fact to declare in its own block, not an error to
+  fix, and §5.6's goal is that the block shrinks over time, which needs it visible rather than
+  alarming. (h) **The communications rule default is `mode:"draft"`** — the single most consequential
+  default in the session. An ERP that mails customers by itself is one bad rule away from an apology,
+  so a rule prepares a message and a person releases it; "Aprobar" and "Registrar envío" are labelled
+  honestly as the two different things they do, and nothing on the screen sends. (i) **`commsEvents()`
+  is a projection, not an append-only log**, recomputed from current state so a rule added today
+  still sees the invoice that went overdue last week — which is what somebody adding "chase at 3
+  days" expects; an event log would only ever apply to the future. (j) **Editing a template mints a
+  new version and retires the old with `supersededBy`**, so "which wording did the customer receive"
+  stays answerable after somebody improves it. (k) **`closeBankPeriod` refuses while anything in the
+  range is unreconciled**, and reopening requires a reason: a closed period whose whole value is
+  that it contains no open question cannot be allowed to contain one. Reversible: the capability is
+  a new package nothing else depends on, schema v7 is additive and idempotent, `quarterlyPackage`
+  stayed callable in its old `(quarter, user)` shape, and every engine addition is new methods over
+  existing collections — nothing sessions 1–10b built was removed or renamed.

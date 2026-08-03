@@ -213,6 +213,41 @@
         return s;
       },
     },
+    {
+      to: 7,
+      name: "reconciliation periods, communications, gestoría follow-up",
+      /*
+       * Session 11 (§5.3 Conciliación, §5.6 Gestoría, §5.7 Comunicaciones).
+       * Five new top-level collections and one map, all additive.
+       *
+       *   bankPeriods         closed/reopened reconciliation windows. Empty
+       *                       means "nothing has been closed", which is the
+       *                       only honest reading of a blob written before
+       *                       closing a period was a thing you could do.
+       *   commsTemplates      the template library; versions are rows, not
+       *   commsRules          edits in place (see updateCommsTemplate).
+       *   commsQueue          drafted/approved/cancelled messages. NOTHING in
+       *                       here has ever been sent by this system.
+       *   gestoriaQueries     what the accountant asked, and the answer.
+       *   exceptionsAccepted  keyed justifications for GES-07 exceptions; a
+       *                       map rather than an array because the key is the
+       *                       identity and re-justifying should replace.
+       */
+      up: function (s) {
+        if (!Array.isArray(s.bankPeriods)) s.bankPeriods = [];
+        if (!Array.isArray(s.commsTemplates)) s.commsTemplates = [];
+        if (!Array.isArray(s.commsRules)) s.commsRules = [];
+        if (!Array.isArray(s.commsQueue)) s.commsQueue = [];
+        if (!Array.isArray(s.gestoriaQueries)) s.gestoriaQueries = [];
+        if (
+          !s.exceptionsAccepted ||
+          typeof s.exceptionsAccepted !== "object" ||
+          Array.isArray(s.exceptionsAccepted)
+        )
+          s.exceptionsAccepted = {};
+        return s;
+      },
+    },
   ];
 
   var CURRENT_VERSION = MIGRATIONS.reduce(function (max, m) {

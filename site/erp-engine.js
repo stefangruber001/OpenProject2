@@ -215,6 +215,11 @@
         bankAccounts: [],
         movements: [],
         merchantRules: [],
+        bankPeriods: [], // §5.3: closed/reopened reconciliation periods
+        commsTemplates: [], // §5.7
+        commsRules: [],
+        commsQueue: [],
+        gestoriaQueries: [], // §5.6: what the accountant asked, and the answer
         labour: [],
         workers: [],
         tasks: [],
@@ -2532,6 +2537,52 @@
       this._log(user, "addBankAccount", rec.name);
       return rec;
     }
+    /**
+     * Rows a statement import would ADD, and rows it would duplicate (§5.3
+     * "detección de duplicados y de solapamiento de periodos ya cargados").
+     *
+     * Read-only on purpose: the caller sees what an import would do before it
+     * does it. A statement re-uploaded because someone was not sure whether it
+     * had gone in is the single most common way a bank balance ends up wrong,
+     * and it is silent — every duplicated movement reconciles perfectly
+     * against a document that is now double-counted.
+     */
+    previewImport(accountId, rows) {
+      const existing = this.state.movements.filter((m) => m.accountId === accountId);
+      const key = (r) =>
+        [r.accountingDate, cents(r.amountCents), (r.concept || "").trim().toUpperCase()].join("|");
+      const seen = new Map();
+      for (const m of existing) seen.set(key(m), m.id);
+      const fresh = [];
+      const duplicates = [];
+      const withinBatch = new Set();
+      for (const r of rows) {
+        const k = key(r);
+        if (seen.has(k) || withinBatch.has(k))
+          duplicates.push({ row: r, existingId: seen.get(k) || null });
+        else {
+          withinBatch.add(k);
+          fresh.push(r);
+        }
+      }
+      const dates = rows
+        .map((r) => r.accountingDate)
+        .filter(Boolean)
+        .sort();
+      const overlaps = existing.some(
+        (m) =>
+          dates.length &&
+          m.accountingDate >= dates[0] &&
+          m.accountingDate <= dates[dates.length - 1],
+      );
+      return {
+        fresh,
+        duplicates,
+        overlapsExistingPeriod: overlaps,
+        from: dates[0] || null,
+        to: dates[dates.length - 1] || null,
+      };
+    }
     importMovements(accountId, rows, user) {
       // BNK-01: retain all export fields
       const out = rows.map((r) => {
@@ -2646,6 +2697,174 @@
       // BNK-05
       this.state.merchantRules.push({ match: match.toUpperCase(), ...mapping });
       this._log(user, "learnMerchantRule", match);
+    }
+
+    /* ---- §5.3: reconciliation as its own discipline ----
+       The matching itself is @repo/capability-reconciliation's; everything
+       here is the part that owns state — undoing, locking a period, and the
+       candidate list the matcher scores against. */
+
+    /**
+     * Undo a reconciliation (§5.3 "deshacer una conciliación").
+     *
+     * Reversing the movement's own status is the easy half. The half that
+     * matters is the payment or collection `matchMovement` created: leaving
+     * that behind would show the bill as paid on one screen and the movement
+     * as unreconciled on another, which is precisely the state reconciliation
+     * exists to make impossible.
+     */
+    unmatchMovement(movId, user) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      if (this.bankPeriodClosed(m.accountingDate))
+        throw new Error("The period is closed — reopen it before undoing a reconciliation");
+      for (const p of this.state.payments.filter((x) => x.movementId === movId)) {
+        this.voidPayment(p.id, user);
+      }
+      for (const c of this.state.collections.filter((x) => x.movementId === movId)) {
+        this.voidCollection(c.id, user);
+      }
+      m.matched = null;
+      m.allocations = [];
+      m.class = null;
+      m.status = "unallocated";
+      this._log(user, "unmatchMovement", movId);
+      return m;
+    }
+
+    /** Every movement of a period that nothing yet explains (§5.3's health indicator). */
+    unreconciledMovements(from, to) {
+      return this.state.movements.filter(
+        (m) =>
+          m.status === "unallocated" &&
+          !m.excludedFromPL &&
+          (!from || m.accountingDate >= from) &&
+          (!to || m.accountingDate <= to),
+      );
+    }
+
+    /**
+     * The documents a movement could plausibly be, projected into the shape
+     * the matcher wants. Money out looks at supplier bills, money in at issued
+     * invoices — the direction is decided here, from the sign the bank wrote,
+     * because only this layer knows what an invoice and a bill ARE.
+     */
+    reconciliationCandidates(movId) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      const out = [];
+      if (m.amountCents < 0) {
+        for (const b of this.state.bills) {
+          const open = this.billOutstandingCents(b.id);
+          if (open <= 0) continue;
+          out.push({
+            id: b.id,
+            kind: "bill",
+            amountCents: b.totalCents,
+            outstandingCents: open,
+            direction: "out",
+            date: b.date,
+            reference: b.number,
+            counterparty: this.party(b.supplierId).name,
+          });
+        }
+      } else {
+        for (const i of this.state.invoices) {
+          if (i.kind === "creditNote") continue;
+          const open = this.invoiceOutstandingCents(i.id);
+          if (open <= 0) continue;
+          out.push({
+            id: i.id,
+            kind: "invoice",
+            amountCents: i.totalCents,
+            outstandingCents: open,
+            direction: "in",
+            date: i.date,
+            reference: i.number,
+            counterparty: this.party(i.partyId).name,
+          });
+        }
+      }
+      return out;
+    }
+
+    /** A movement as the matcher's input value. Text is everything a bank wrote. */
+    movementValue(m) {
+      return {
+        id: m.id,
+        amountCents: m.amountCents,
+        date: m.accountingDate,
+        text: [m.concept, m.counterparty, m.merchantText, m.reference, m.observations]
+          .filter(Boolean)
+          .join(" "),
+        accountRef: m.accountId,
+      };
+    }
+
+    /**
+     * Mark a movement as having no supporting document, and raise the task to
+     * go and get it (§5.3 "marcar «sin respaldo» y generar la tarea").
+     *
+     * The task is the point. A flag on a movement is a fact nobody is
+     * responsible for; a task has an owner and a date, and turns up in the
+     * day view until somebody deals with it.
+     */
+    flagMovementNoDoc(movId, user) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      m.needsDoc = true;
+      this.addTask(
+        {
+          title: "Reclamar justificante — " + (m.merchantText || m.concept || m.id),
+          owner: "backoffice",
+          due: addDays(this.state.today, 7),
+          relatedRef: "movimiento",
+        },
+        user,
+      );
+      this._log(user, "flagMovementNoDoc", movId);
+      return m;
+    }
+
+    /**
+     * Close a reconciled period (§5.3 "cerrar y bloquear el periodo").
+     *
+     * Refuses while anything in it is still unexplained. A closed period whose
+     * movements do not all reconcile is a lie told to whoever reads it next,
+     * and the exception panel exists precisely so that this refusal is never a
+     * surprise.
+     */
+    closeBankPeriod(from, to, user) {
+      const open = this.unreconciledMovements(from, to);
+      if (open.length)
+        throw new Error(open.length + " movimientos sin conciliar — no se puede cerrar el periodo");
+      this.state.bankPeriods.push({
+        from,
+        to,
+        closedAt: this.state.today,
+        closedBy: user || "backoffice",
+        reopenedAt: null,
+        reopenReason: "",
+      });
+      this._log(user, "closeBankPeriod", from + "→" + to);
+      return this.state.bankPeriods[this.state.bankPeriods.length - 1];
+    }
+    /** Reopening leaves a record — "sin reapertura registrada" is the rule (§5.3). */
+    reopenBankPeriod(from, reason, user) {
+      const p = (this.state.bankPeriods || []).find((x) => x.from === from && !x.reopenedAt);
+      if (!p) throw new Error("No closed period starting on " + from);
+      if (!reason || !String(reason).trim())
+        throw new Error("Reopening a closed period needs a reason");
+      p.reopenedAt = this.state.today;
+      p.reopenReason = String(reason).trim();
+      p.reopenedBy = user || "backoffice";
+      this._log(user, "reopenBankPeriod", from);
+      return p;
+    }
+    bankPeriodClosed(dateIso) {
+      return (this.state.bankPeriods || []).some(
+        (p) => !p.reopenedAt && p.from <= dateIso && dateIso <= p.to,
+      );
     }
     recordCashMovement(tillId, mv, user) {
       // BNK-07: same discipline; flags when undocumented
@@ -3165,8 +3384,257 @@
           .map((m) => m.id),
       };
     }
-    quarterlyPackage(quarter, user) {
-      // GES-01/02/06/08
+    /**
+     * The completeness traffic light of §5.6: each block of the package with
+     * its document count, its value, and how many things are wrong with it.
+     *
+     * Green/amber/red rather than a single "ready" flag, because the blocks
+     * fail differently and independently: an empty cash register in a quarter
+     * with no petty cash is fine, an empty issued-invoice register in a
+     * quarter that billed is not, and both would read the same as "0 items".
+     */
+    packageBlocks(quarter) {
+      const inQ = (d) => quarterOf(d) === quarter;
+      const ex = this.exceptionList(quarter);
+      const invoices = this.state.invoices.filter((i) => inQ(i.date));
+      const bills = this.state.bills.filter((b) => inQ(b.date));
+      const movements = this.state.movements.filter((m) => inQ(m.accountingDate));
+      const tillIds = new Set(
+        this.state.bankAccounts.filter((a) => a.kind === "till").map((a) => a.id),
+      );
+      const cash = movements.filter((m) => tillIds.has(m.accountId));
+      const late = this.lateDocuments(quarter);
+      const assets = this.fixedAssetRegister(quarter);
+      const sev = (n) => (n > 0 ? "r" : "g");
+      return [
+        {
+          key: "issued",
+          label: "Facturas emitidas",
+          count: invoices.length,
+          amountCents: sum(invoices, (i) =>
+            i.kind === "creditNote" ? -i.totalCents : i.totalCents,
+          ),
+          issues: ex.seriesGaps.invoice.length,
+          sev: sev(ex.seriesGaps.invoice.length),
+        },
+        {
+          key: "received",
+          label: "Facturas soportadas",
+          count: bills.length,
+          amountCents: sum(bills, (b) => b.totalCents),
+          issues: ex.billsWithoutDocument.length,
+          sev: sev(ex.billsWithoutDocument.length),
+        },
+        {
+          key: "bank",
+          label: "Movimientos bancarios",
+          count: movements.length - cash.length,
+          amountCents: sum(
+            movements.filter((m) => !tillIds.has(m.accountId)),
+            (m) => m.amountCents,
+          ),
+          issues: ex.unallocatedMovements.length,
+          sev: sev(ex.unallocatedMovements.length),
+        },
+        {
+          key: "cash",
+          label: "Caja",
+          count: cash.length,
+          amountCents: sum(cash, (m) => m.amountCents),
+          issues: ex.undocumentedCash.length,
+          sev: sev(ex.undocumentedCash.length),
+        },
+        {
+          key: "late",
+          label: "Extemporáneos",
+          count: late.length,
+          amountCents: sum(late, (l) => (l.confirmed && l.confirmed.totalCents) || 0),
+          // Amber, never red: a late document is a fact to declare in its own
+          // block, not an error to fix. The goal §5.6 states is that this
+          // block shrinks over time, which needs it visible rather than alarming.
+          issues: 0,
+          sev: late.length ? "y" : "g",
+        },
+        {
+          key: "assets",
+          label: "Activos, vehículos y renting",
+          count: assets.length,
+          amountCents: sum(assets, (a) => a.baseCents),
+          issues: 0,
+          sev: "g",
+        },
+        {
+          key: "summaries",
+          label: "Resúmenes fiscales",
+          count: 2,
+          amountCents: this.vatSummary(quarter).netCents,
+          issues: ex.partiesWithoutTaxId.length,
+          sev: sev(ex.partiesWithoutTaxId.length),
+        },
+      ];
+    }
+
+    /**
+     * Block 8 of the package: fixed assets, vehicles and renting, kept apart
+     * from direct site cost. They are the costs an accountant treats
+     * differently from everything else, and lumping them into project cost is
+     * both wrong for the accounts and flattering to the job's margin.
+     */
+    fixedAssetRegister(quarter) {
+      const inQ = (d) => quarterOf(d) === quarter;
+      const CATS = ["fixedAsset", "renting", "vehicles"];
+      const out = [];
+      for (const b of this.state.bills.filter((x) => inQ(x.date))) {
+        for (const a of b.allocations || []) {
+          if (!a.overheadCategory || !CATS.includes(a.overheadCategory)) continue;
+          out.push({
+            billId: b.id,
+            number: b.number,
+            date: b.date,
+            supplier: this.party(b.supplierId).name,
+            category: a.overheadCategory,
+            baseCents: a.amountCents,
+          });
+        }
+      }
+      return out;
+    }
+
+    /**
+     * Documents belonging to this quarter that only arrived after it closed
+     * (§5.6's "documentos extemporáneos"), with duplicate detection against
+     * what an earlier package already carried.
+     */
+    lateDocuments(quarter) {
+      const inQ = (d) => quarterOf(d) === quarter;
+      const alreadySent = new Set(
+        (this.state.packagesSent || [])
+          .filter((p) => p.quarter === quarter)
+          .flatMap((p) => p.lateRefs || []),
+      );
+      return this.state.captured
+        .filter((c) => c.confirmed && inQ(c.confirmed.date) && quarterOf(c.capturedAt) > quarter)
+        .map((c) => ({ ...c, alreadySent: alreadySent.has(c.id) }));
+    }
+
+    /**
+     * Every exception, flattened, each with whether a person has justified it.
+     *
+     * §5.6 makes this list blocking: "el envío se permite sólo cuando la lista
+     * está a cero o cuando el usuario justifica y acepta expresamente cada
+     * excepción". Flattening it here means the blocking check and the screen
+     * read the same list, so the two can never disagree about what is
+     * outstanding.
+     */
+    exceptionsWithStatus(quarter) {
+      const ex = this.exceptionList(quarter);
+      const accepted = this.state.exceptionsAccepted || {};
+      const rows = [];
+      const push = (kind, label, refs) => {
+        for (const ref of refs) {
+          const key = quarter + "|" + kind + "|" + ref;
+          rows.push({ kind, label, ref, key, accepted: accepted[key] || null });
+        }
+      };
+      push("billNoDoc", "Factura sin documento", ex.billsWithoutDocument);
+      push("partyNoTaxId", "Tercero sin NIF válido", ex.partiesWithoutTaxId);
+      push("movUnallocated", "Movimiento sin asignar", ex.unallocatedMovements);
+      push("receiptUnmatched", "Cobro sin emparejar", ex.unmatchedReceipts);
+      push("cashNoDoc", "Caja sin justificante", ex.undocumentedCash);
+      push("seriesGap", "Hueco en la numeración", [
+        ...ex.seriesGaps.invoice,
+        ...ex.seriesGaps.receipt,
+      ]);
+      return rows;
+    }
+    /** Justify one exception so the package may go out despite it (GES-07). */
+    acceptException(quarter, key, reason, user) {
+      if (!reason || !String(reason).trim())
+        throw new Error("Accepting an exception needs a justification");
+      if (!this.state.exceptionsAccepted || typeof this.state.exceptionsAccepted !== "object")
+        this.state.exceptionsAccepted = {};
+      this.state.exceptionsAccepted[key] = {
+        reason: String(reason).trim(),
+        at: this.state.today,
+        by: user || "backoffice",
+      };
+      this._log(user, "acceptException", key);
+      return this.state.exceptionsAccepted[key];
+    }
+    /** Record a query the accountant raised, and later its answer (§5.6). */
+    addGestoriaQuery(quarter, question, user) {
+      const rec = {
+        id: this._id("gq"),
+        quarter,
+        question: String(question || "").trim(),
+        raisedAt: this.state.today,
+        resolvedAt: null,
+        resolution: "",
+      };
+      this.state.gestoriaQueries.push(rec);
+      this._log(user, "addGestoriaQuery", quarter);
+      return rec;
+    }
+    resolveGestoriaQuery(id, resolution, user) {
+      const q = this.state.gestoriaQueries.find((x) => x.id === id);
+      if (!q) throw new Error("Query not found");
+      q.resolvedAt = this.state.today;
+      q.resolution = String(resolution || "").trim();
+      this._log(user, "resolveGestoriaQuery", id);
+      return q;
+    }
+    /** Reopen a quarter already sent, leaving the record §5.6 requires. */
+    reopenQuarter(quarter, reason, user) {
+      const sent = (this.state.packagesSent || []).filter((p) => p.quarter === quarter);
+      if (!sent.length) throw new Error("That quarter has not been sent");
+      if (!reason || !String(reason).trim())
+        throw new Error("Reopening a sent quarter needs a reason");
+      const rec = {
+        quarter,
+        reopenedAt: this.state.today,
+        reopenReason: String(reason).trim(),
+        by: user || "backoffice",
+      };
+      sent[sent.length - 1].reopened = rec;
+      this._log(user, "reopenQuarter", quarter);
+      return rec;
+    }
+
+    /**
+     * Generate the package (GES-01/02/06/08).
+     *
+     * BLOCKING, per §5.6: an exception must either not exist or have been
+     * justified by name. `opts.recipient` records who it went to, which is the
+     * other half of "marcar el periodo como enviado con fecha y destinatario".
+     *
+     * The refusal names the outstanding items rather than just counting them.
+     * A blocked send that says "8 exceptions" sends someone hunting; one that
+     * says which eight is a to-do list.
+     */
+    quarterlyPackage(quarter, opts, user) {
+      // Kept callable as quarterlyPackage(quarter, user): every caller before
+      // this session passed the user second, and a signature change that
+      // silently reinterprets an existing argument is the worst kind.
+      if (typeof opts === "string" || opts == null) {
+        user = opts;
+        opts = {};
+      }
+      // No override, deliberately. §5.6 allows exactly two ways past this —
+      // the list is empty, or every item on it has been justified by name —
+      // and a `force` flag would be a third that nobody would ever remove.
+      const outstanding = this.exceptionsWithStatus(quarter).filter((x) => !x.accepted);
+      if (outstanding.length) {
+        throw new Error(
+          "Excepciones sin justificar (" +
+            outstanding.length +
+            "): " +
+            outstanding
+              .slice(0, 4)
+              .map((x) => x.label + " " + x.ref)
+              .join("; ") +
+            (outstanding.length > 4 ? "…" : ""),
+        );
+      }
       const inQ = (d) => quarterOf(d) === quarter;
       const txFromInvoice = (i) => {
         const sg = i.kind === "creditNote" ? -1 : 1; // a rectificativa registers negative
@@ -3241,9 +3709,14 @@
       this.state.packagesSent.push({
         quarter,
         date: this.state.today,
+        recipient: (opts && opts.recipient) || "",
         invoices: pkg.issuedInvoices.length,
         bills: pkg.receivedBills.length,
         exceptions: Object.values(pkg.exceptions).flat(2).length,
+        acceptedExceptions: this.exceptionsWithStatus(quarter).filter((x) => x.accepted).length,
+        // What went out as extemporaneous, so the NEXT package can tell an
+        // already-declared late document from a genuinely new one.
+        lateRefs: pkg.lateItems.map((c) => c.id),
       }); // GES-08
       // mark captured docs as sent
       this.state.captured
@@ -3251,6 +3724,235 @@
         .forEach((c) => (c.status = "sentToAccounting"));
       this._log(user, "quarterlyPackage", quarter);
       return pkg;
+    }
+
+    /* =========================== COM — communications (§5.7) ===========================
+       Templates, rules and the queue they fill. Deliberately NOT a sender:
+       every state here is "drafted", "approved" or "cancelled", and the only
+       thing that could put a message on a wire is the messaging capability's
+       email-out port, whose sole bound adapter records and delivers nothing.
+       The mandate is explicit — no real emails — and this section is where
+       that would otherwise leak. */
+    addCommsTemplate(t, user) {
+      const rec = Object.assign(
+        {
+          id: this._id("tpl"),
+          key: "",
+          label: "",
+          family: "comercial", // comercial|contractual|obra|cobros|proveedores|posventa
+          lang: "es",
+          subject: "",
+          body: "",
+          attach: "", // which document rides along: budget|invoice|contract|""
+          version: 1,
+          active: true,
+        },
+        t,
+      );
+      if (!rec.key) throw new Error("A template needs a key");
+      this.state.commsTemplates.push(rec);
+      this._log(user, "addCommsTemplate", rec.key);
+      return rec;
+    }
+    /**
+     * Editing a template makes a NEW version and retires the old one, rather
+     * than overwriting it. A message already sent was rendered from some exact
+     * wording, and "which version did the customer actually receive" has to
+     * stay answerable after somebody improves the template.
+     */
+    updateCommsTemplate(id, patch, user) {
+      const cur = this.state.commsTemplates.find((x) => x.id === id);
+      if (!cur) throw new Error("Template not found");
+      const allowed = ["label", "family", "lang", "subject", "body", "attach"];
+      const next = Object.assign({}, cur, { id: this._id("tpl"), version: cur.version + 1 });
+      for (const k of Object.keys(patch)) if (allowed.includes(k)) next[k] = patch[k];
+      cur.active = false;
+      cur.supersededBy = next.id;
+      this.state.commsTemplates.push(next);
+      this._log(user, "updateCommsTemplate", next.key + " v" + next.version);
+      return next;
+    }
+    commsTemplate(key, lang) {
+      const all = this.state.commsTemplates.filter(
+        (t) => t.key === key && t.active && (!lang || t.lang === lang),
+      );
+      return all[all.length - 1] || null;
+    }
+    addCommsRule(r, user) {
+      const rec = Object.assign(
+        {
+          id: this._id("crl"),
+          label: "",
+          event: "",
+          template: "",
+          recipient: "customer",
+          afterDays: 0,
+          channel: "email",
+          mode: "draft", // see the capability: draft is the default, on purpose
+          requiresFlag: undefined,
+          active: true,
+        },
+        r,
+      );
+      if (!rec.event || !rec.template) throw new Error("A rule needs an event and a template");
+      this.state.commsRules.push(rec);
+      this._log(user, "addCommsRule", rec.event + " → " + rec.template);
+      return rec;
+    }
+    updateCommsRule(id, patch, user) {
+      const r = this.state.commsRules.find((x) => x.id === id);
+      if (!r) throw new Error("Rule not found");
+      const allowed = [
+        "label",
+        "event",
+        "template",
+        "recipient",
+        "afterDays",
+        "channel",
+        "mode",
+        "requiresFlag",
+        "active",
+      ];
+      for (const k of Object.keys(patch)) if (allowed.includes(k)) r[k] = patch[k];
+      this._log(user, "updateCommsRule", id);
+      return r;
+    }
+    /**
+     * The lifecycle facts the rules watch, projected out of engine state.
+     *
+     * A projection, not a log: recomputed from what is true now, so a rule
+     * added today still sees the invoice that went overdue last week. The
+     * alternative — appending events as they happen — means a new rule only
+     * ever applies to the future, which is exactly not what somebody adding
+     * "chase at 3 days" expects.
+     */
+    commsEvents() {
+      const t = this.state.today;
+      const ev = [];
+      const addr = (partyId) => {
+        const p = this.party(partyId);
+        return { customer: p.email || "", supplier: p.email || "" };
+      };
+      for (const b of this.state.budgets) {
+        const v = b.versions.find((x) => x.id === b.currentVersionId);
+        if (v && v.sent && !b.acceptedVersionId)
+          ev.push({
+            event: "quote-sent",
+            subjectRef: b.number,
+            date: v.sent.date,
+            recipients: addr(b.partyId),
+            vars: { number: b.number, cliente: this.party(b.partyId).name },
+          });
+      }
+      for (const r of this.receivables()) {
+        if (r.outstandingCents > 0 && r.daysOverdue > 0)
+          ev.push({
+            event: "invoice-overdue",
+            subjectRef: r.number,
+            date: r.dueDate,
+            recipients: addr(r.partyId),
+            vars: { number: r.number, importe: r.outstandingCents / 100, cliente: r.party },
+            flags: { unpaid: true },
+          });
+      }
+      for (const c of this.state.contracts)
+        if (c.signature && c.signature.customerSignedAt)
+          ev.push({
+            event: "contract-signed",
+            subjectRef: c.number,
+            date: c.signature.customerSignedAt,
+            recipients: addr(c.partyId),
+            vars: { number: c.number },
+          });
+      for (const p of this.state.projects)
+        if (p.closed && p.dates.actualEnd)
+          ev.push({
+            event: "works-finished",
+            subjectRef: p.code,
+            date: p.dates.actualEnd,
+            recipients: addr(p.partyId),
+            vars: { number: p.code },
+          });
+      for (const s of this.state.subcontracts || []) {
+        const ds = this.subcontractDocStatus(s);
+        if (ds.worst === "r" && !["draft", "cancelled", "rejected"].includes(s.status))
+          ev.push({
+            event: "subcontractor-docs-expired",
+            subjectRef: s.number,
+            date: t,
+            recipients: addr(s.supplierId),
+            vars: { number: s.number, oficio: s.trade },
+          });
+      }
+      return ev;
+    }
+    /**
+     * Put a planned message in the queue. NOTHING is sent — `mode:"auto"` only
+     * means it does not need a person to approve it before its due date.
+     */
+    queueCommunication(planned, user) {
+      const tpl = this.commsTemplate(planned.template);
+      const rec = {
+        id: this._id("cq"),
+        key: planned.ruleId + "|" + planned.subjectRef,
+        ruleId: planned.ruleId,
+        event: planned.event,
+        subjectRef: planned.subjectRef,
+        templateKey: planned.template,
+        templateId: tpl ? tpl.id : null,
+        to: planned.to,
+        channel: planned.channel,
+        dueDate: planned.dueDate,
+        vars: planned.vars || {},
+        status: planned.blocked ? "blocked" : "draft",
+        blocked: planned.blocked || null,
+        approvedAt: null,
+        approvedBy: null,
+        cancelledAt: null,
+        sentAt: null,
+      };
+      this.state.commsQueue.push(rec);
+      this._log(user, "queueCommunication", rec.key);
+      return rec;
+    }
+    /** A person says yes. Still not sent — see the section note. */
+    approveCommunication(id, user) {
+      const q = this.state.commsQueue.find((x) => x.id === id);
+      if (!q) throw new Error("Queued message not found");
+      if (q.status === "blocked") throw new Error("This message has no recipient address");
+      if (q.status !== "draft") throw new Error("Only a draft can be approved");
+      q.status = "approved";
+      q.approvedAt = this.state.today;
+      q.approvedBy = user || "backoffice";
+      this._log(user, "approveCommunication", q.key);
+      return q;
+    }
+    cancelCommunication(id, user) {
+      const q = this.state.commsQueue.find((x) => x.id === id);
+      if (!q) throw new Error("Queued message not found");
+      if (q.sentAt) throw new Error("A sent message cannot be cancelled");
+      q.status = "cancelled";
+      q.cancelledAt = this.state.today;
+      this._log(user, "cancelCommunication", q.key);
+      return q;
+    }
+    /**
+     * Hand an approved message to the outbox.
+     *
+     * The name says "record", not "send", because that is what it does: the
+     * only bound adapter is the log-only one, and this method exists so the
+     * queue can move on rather than to put anything on a wire. When a real
+     * provider is bound one day it goes behind `email-out@1` — never here.
+     */
+    recordCommunicationSent(id, user) {
+      const q = this.state.commsQueue.find((x) => x.id === id);
+      if (!q) throw new Error("Queued message not found");
+      if (q.status !== "approved")
+        throw new Error("Only an approved message can be marked as sent");
+      q.status = "sent";
+      q.sentAt = this.state.today;
+      this._log(user, "recordCommunicationSent", q.key);
+      return q;
     }
 
     /* =========================== DAS — alerts, tasks, control tower =========================== */
@@ -4283,6 +4985,20 @@
           b.status = this.billOutstandingCents(b.id) >= b.totalCents ? "registered" : "partPaid";
       }
       this._log(user, "voidPayment", id + " " + rec.amountCents + "c");
+      return rec;
+    }
+    /**
+     * The mirror of voidPayment, on the money-in side. Added for §5.3's
+     * "deshacer una conciliación": undoing a match that created a collection
+     * has to remove the collection too, or the invoice stays settled while the
+     * movement goes back to unexplained — two screens, two different truths.
+     */
+    voidCollection(id, user) {
+      const i = this.state.collections.findIndex((c) => c.id === id);
+      if (i < 0) throw new Error("Collection not found");
+      const rec = this.state.collections[i];
+      this.state.collections.splice(i, 1);
+      this._log(user, "voidCollection", id + " " + rec.amountCents + "c");
       return rec;
     }
     allocateCollection(id, allocations, user) {

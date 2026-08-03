@@ -51,6 +51,21 @@ import type {
   WorkCalendar,
   WorkItem,
 } from "@repo/capability-scheduling";
+import {
+  findInternalTransfers,
+  resolveReconciliationConfig,
+  suggestForAll,
+  suggestMatches,
+} from "@repo/capability-reconciliation";
+import type {
+  BankMovement,
+  CandidateDoc,
+  InternalTransfer,
+  MatchSuggestion,
+  ReconciliationConfig,
+} from "@repo/capability-reconciliation";
+import { messageKey, newMessages, planMessages, renderTemplate } from "@repo/capability-messaging";
+import type { CommsEvent, CommsRule, PlannedMessage } from "@repo/capability-messaging";
 import { ProjectsService, forecastToCompletion } from "@repo/capability-projects";
 import type {
   ChapterForecast,
@@ -194,6 +209,61 @@ export function createRates() {
 }
 
 /**
+ * Bank-reconciliation surface.
+ *
+ * Pure scoring — no clock, no ids, no store — so the whole capability is
+ * exposed rather than a chosen slice of it: there is nothing here that could
+ * mean something different in a browser than it does on a server.
+ */
+export function createReconciliation(config?: Partial<ReconciliationConfig> | null) {
+  const cfg = resolveReconciliationConfig(config);
+  return {
+    config: cfg,
+    /** What might explain one movement, best first. */
+    suggest(movement: BankMovement, candidates: CandidateDoc[]): MatchSuggestion[] {
+      return suggestMatches(movement, candidates, cfg);
+    },
+    /** The same for a whole statement, keyed by movement id. */
+    suggestAll(
+      movements: BankMovement[],
+      candidates: CandidateDoc[],
+    ): Record<string, MatchSuggestion[]> {
+      return suggestForAll(movements, candidates, cfg);
+    },
+    /** Pairs that are one transfer between the tenant's own accounts. */
+    internalTransfers(movements: BankMovement[]): InternalTransfer[] {
+      return findInternalTransfers(movements, cfg);
+    },
+  };
+}
+
+/**
+ * Communications surface: templates rendered, rules planned. Nothing sent.
+ *
+ * Sending stays behind `email-out@1`, whose only bound adapter is the log-only
+ * outbox — see the note in messaging/rules.ts about why the default is always
+ * a draft a person approves.
+ */
+export function createComms() {
+  return {
+    /** Fill `{{tokens}}`; unknown ones are left visible rather than blanked. */
+    render(template: string, vars: Record<string, string | number>): string {
+      return renderTemplate(template, vars);
+    },
+    /** What the rules say should be queued, given what has happened. */
+    plan(rules: CommsRule[], events: CommsEvent[], asOf: string): PlannedMessage[] {
+      return planMessages(rules, events, { asOf });
+    },
+    /** Drop anything the caller has already queued, sent or cancelled. */
+    unseen(planned: PlannedMessage[], existingKeys: string[]): PlannedMessage[] {
+      return newMessages(planned, existingKeys);
+    },
+    /** The de-duplication key, exported so callers cannot drift from it. */
+    key: messageKey,
+  };
+}
+
+/**
  * Documents surface.
  *
  * Only the annex composer is exposed: it is the part a browser genuinely calls
@@ -259,5 +329,7 @@ export type {
  * 5 — `createProjects` (cost at completion) and `createRates` (the vertical
  *     pack's daily output) added, and `service` gained the work-breakdown
  *     derivation, the progress curve and the risk report.
+ * 6 — `createReconciliation` (statement matching) and `createComms` (template
+ *     rendering and rule planning) added.
  */
-export const SURFACE_VERSION = 5;
+export const SURFACE_VERSION = 6;

@@ -249,6 +249,65 @@
   td.good{color:var(--greenDeep)}
   .adj{font:600 10px var(--sans);color:var(--amber);background:var(--amberSoft);border-radius:999px;padding:1px 6px;margin-left:5px}
 
+  /* ---------- Conciliación bancaria (spec §5.3) ----------
+     Two columns and the suggestions between them: statement on the left,
+     candidate documents on the right, and the match with its reasons in the
+     middle. The unreconciled queue sits underneath because it is the period's
+     health indicator, not a footnote. */
+  .rec{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:start}
+  @media(max-width:1180px){.rec{grid-template-columns:minmax(0,1fr)}}
+  .movrow{display:grid;grid-template-columns:78px minmax(0,1fr) 96px;gap:8px;align-items:baseline;
+    padding:8px 12px;border-bottom:1px solid var(--hair);cursor:pointer}
+  .movrow:last-child{border-bottom:0}
+  .movrow:hover{background:var(--greenSoft)}
+  .movrow.on{background:var(--greenSoft);box-shadow:inset 3px 0 0 var(--green)}
+  .movrow .cpt{color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .movrow .amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+  .movrow .amt.neg{color:var(--danger)} .movrow .amt.pos{color:var(--greenDeep)}
+  .sugg{border:1px solid var(--line);border-radius:11px;padding:9px 11px;margin-bottom:8px;background:var(--paper)}
+  .sugg.strong{border-color:var(--green);background:var(--greenSoft)}
+  .sugg .hd{display:flex;gap:8px;align-items:baseline;margin-bottom:4px}
+  .sugg .conf{font:700 12px var(--sans);font-variant-numeric:tabular-nums}
+  .sugg .why{font-size:11px;color:var(--muted);margin-top:3px}
+  .sugg .why b{color:var(--body);font-weight:600}
+  .queuebar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 14px;font-size:12.5px}
+  .queuebar .n{font:700 15px var(--sans);color:var(--ink)}
+
+  /* ---------- Comunicaciones (spec §5.7) ---------- */
+  .comm{display:grid;grid-template-columns:230px minmax(0,1fr);gap:12px;align-items:start}
+  @media(max-width:1080px){.comm{grid-template-columns:minmax(0,1fr)}}
+  .tpllist{padding:8px;display:flex;flex-direction:column;gap:1px;max-height:64vh;overflow-y:auto}
+  .tpllist .fam{font:700 9.5px var(--sans);letter-spacing:.12em;text-transform:uppercase;
+    color:var(--faint);padding:8px 8px 3px}
+  .tpllist .tpl{text-align:left;border:0;background:transparent;cursor:pointer;padding:6px 9px;
+    border-radius:8px;font:600 12.5px var(--sans);color:var(--body)}
+  .tpllist .tpl:hover{background:var(--greenSoft);color:var(--ink)}
+  .tpllist .tpl.on{background:var(--greenSoft);color:var(--greenDeep)}
+  .tplbody{width:100%;min-height:170px;font:12.5px/1.55 var(--mono);color:var(--ink);
+    background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:9px 11px;outline:0;resize:vertical}
+  .tplbody:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--greenSoft)}
+  .varchip{display:inline-block;font:600 11px var(--mono);background:var(--hair);color:var(--body);
+    border-radius:6px;padding:1px 6px;margin:0 4px 4px 0;cursor:pointer}
+  .varchip:hover{background:var(--greenSoft);color:var(--greenDeep)}
+  .preview{background:#fbfdf9;border:1px dashed var(--line);border-radius:11px;padding:12px 14px;
+    font-size:12.5px;white-space:pre-wrap}
+
+  /* ---------- Gestoría: completeness traffic light (spec §5.6) ---------- */
+  .blocks{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:9px}
+  .blk{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--paper);
+    border-left-width:4px}
+  .blk.g{border-left-color:var(--green)} .blk.y{border-left-color:var(--amber)}
+  .blk.r{border-left-color:var(--danger)}
+  .blk .lab{font:600 10px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+  .blk .n{font-family:var(--serif);font-size:19px;color:var(--ink);margin-top:4px;line-height:1;
+    font-variant-numeric:tabular-nums}
+  .blk .sub{font-size:11px;color:var(--muted);margin-top:4px}
+  .blk .sub b{color:var(--danger)}
+  .exrow{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:9px;align-items:baseline;
+    padding:8px 14px;border-bottom:1px solid var(--hair);font-size:12.5px}
+  .exrow:last-child{border-bottom:0}
+  .exrow .why{font-size:11px;color:var(--muted)}
+
   /* ---------- Compras · Subcontratos · Modificaciones · Horas (spec §4.1/§4.2/§4.5/§4.6) ---------- */
   .dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
   .dot.g{background:var(--greenLt)} .dot.y{background:var(--spark)} .dot.r{background:var(--danger)}
@@ -589,10 +648,6 @@ const SUBMAP={}; SECTIONS.forEach(s=>s.subs.forEach(x=>SUBMAP[x.k]={...x,sec:s})
    will live there and links to where that data is managed today, so the menu
    never leads to a blank screen. */
 const PLACEHOLDERS={
- conciliacion:{sub:"Importación de extracto y emparejamiento asistido con los registros.",
-   body:"Los movimientos y su estado sin asignar están en Banco y caja; el emparejamiento asistido todavía no existe.",goto:["banco","Abrir Banco y caja"]},
- comunicaciones:{sub:"Plantillas, reglas de envío y cola de comunicaciones al cliente.",
-   body:"Aún no construido. Nada se envía al cliente sin confirmación: cuando exista, seguirá esa regla.",goto:null},
  reportes:{sub:"Espacio reservado en el menú (spec §8).",
    body:"No se desarrolla por ahora. Los informes se construirán sobre datos ya registrados, sin pedir información nueva.",goto:null},
 };
@@ -1718,6 +1773,333 @@ function workerDocDrawer(workerId){
   },"Documento guardado");
 }
 
+/* ===================== Conciliación bancaria (spec §5.3) ===========================
+   Statement on the left, candidate documents on the right, the proposed match
+   and its REASONS in between. Every score and every reason comes from
+   @repo/capability-reconciliation through the bridge; this block picks a
+   movement, draws what came back, and turns a click into an engine call.
+
+   The reasons are drawn deliberately, not decoratively. A person is being
+   asked to accept or reject a proposal, and "0,99" gives them nothing to
+   judge — "exact amount · reference quoted · same counterparty" gives them
+   everything. A confidence with no argument behind it teaches people to click
+   accept without reading, which is the failure mode this screen exists to
+   avoid. */
+let recSel=null;
+const REC_REASON={
+  exactAmount:"importe exacto", amountWithinTolerance:"importe casi exacto",
+  sameDate:"misma fecha", dateWithinTolerance:"fecha próxima",
+  referenceQuoted:"referencia citada", counterpartyNamed:"tercero coincidente",
+  directionAgrees:"signo correcto",
+};
+function reconApi(){ return (typeof ErpBridge!=="undefined"&&ErpBridge.reconciliation&&ErpBridge.reconciliation.available)?ErpBridge.reconciliation:null; }
+
+function conciliacion(v){
+  $('#sub').textContent="Extracto a la izquierda, documentos candidatos a la derecha y la propuesta de emparejamiento en medio, con el porqué. La cola de movimientos sin conciliar es el indicador de salud del periodo.";
+  const R=reconApi();
+  const r=periodRange();
+  const open=erp.unreconciledMovements(r.from,r.to);
+  const allOpen=erp.unreconciledMovements();
+  if(recSel&&!erp.state.movements.some(m=>m.id===recSel&&m.status==="unallocated")) recSel=null;
+  if(!recSel&&open.length) recSel=open[0].id;
+  const sel=recSel?erp.state.movements.find(m=>m.id===recSel):null;
+  const suggestions=(R&&sel)?R.suggest(erp,sel.id):[];
+  const candidates=sel?erp.reconciliationCandidates(sel.id):[];
+  const transfers=R?R.internalTransfers(erp,r.from,r.to):[];
+  const closed=sel?erp.bankPeriodClosed(sel.accountingDate):false;
+  const threshold=R?R.autoAcceptScore:1;
+
+  v.innerHTML=`${periodNote(open.length,allOpen.length)}
+   <div class="card"><div class="queuebar">
+     <span class="n">${open.length}</span><span>movimientos sin conciliar en el periodo</span>
+     <span style="flex:1"></span>
+     ${transfers.length?`<span class="pill b">${transfers.length} traspaso(s) interno(s) detectado(s)</span><button class="btn sm" id="rcTransfers">Marcar como internos</button>`:""}
+     <button class="btn sm" id="rcClose" title="Bloquea el periodo; exige cero movimientos sin conciliar">🔒 Cerrar periodo</button>
+   </div></div>
+   ${!R?'<div class="card"><div class="empty">El emparejamiento asistido necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>':""}
+   <div class="rec">
+    <div>
+     <div class="card"><div class="ch"><h3>Extracto</h3><span class="tag">sin conciliar</span></div>
+      ${open.map(m=>`<div class="movrow${m.id===recSel?" on":""}" data-mov="${m.id}">
+        <span style="color:var(--muted)">${fmtD(m.accountingDate)}</span>
+        <span class="cpt">${esc(m.concept||m.merchantText||"—")}${m.needsDoc?' <span class="pill r">sin respaldo</span>':""}</span>
+        <span class="amt ${m.amountCents<0?"neg":"pos"}">${eur(m.amountCents)}</span></div>`).join("")
+       ||'<div class="empty">Nada pendiente de conciliar en este periodo.</div>'}
+     </div>
+     ${sel?`<div class="card"><div class="ch"><h3>Propuestas</h3>
+       <span class="tag">${suggestions.length} para ${esc(sel.concept||sel.merchantText||"")}</span></div>
+      <div style="padding:11px 14px">
+       ${closed?'<div class="it" style="color:var(--danger);margin-bottom:8px">El periodo está cerrado. Reábrelo para conciliar.</div>':""}
+       ${suggestions.map(s=>{
+         const docs=s.docIds.map(id=>candidates.find(c=>c.id===id)).filter(Boolean);
+         const strong=s.confidence>=threshold;
+         return `<div class="sugg${strong?" strong":""}">
+          <div class="hd"><span class="conf" style="color:${strong?'var(--greenDeep)':'var(--body)'}">${Math.round(s.confidence*100)}%</span>
+           <span style="flex:1">${docs.map(d=>`${esc(d.reference)} · ${esc(d.counterparty)} · ${eur(d.outstandingCents)}`).join(" + ")}</span>
+           ${closed?"":`<button class="btn sm${strong?" primary":""}" data-accept="${s.docIds.join(",")}">Conciliar</button>`}</div>
+          <div class="why">${s.reasons.map(x=>`<b>${REC_REASON[x]||x}</b>`).join(" · ")}${s.differenceCents?` · diferencia ${eur(s.differenceCents)}`:""}${s.combination?" · varios documentos":""}</div>
+         </div>`;}).join("")
+        ||'<div class="it" style="color:var(--muted)">Ningún documento explica este movimiento. Asígnalo a un proyecto o clasifícalo abajo.</div>'}
+      </div>
+      ${closed?"":`<div class="gtools" style="border-top:1px solid var(--hair)">
+        <input class="inline" id="rcProj" placeholder="Nº de proyecto">
+        <select class="inline" id="rcKind"><option value="material">Material</option><option value="labour">Mano de obra</option><option value="subcontract">Industrial</option><option value="other">Otro</option></select>
+        <button class="btn sm" id="rcAssign">Asignar a proyecto</button>
+        <span style="width:10px"></span>
+        <select class="inline" id="rcClass">${["overhead","tax","salary","financial","internalTransfer"].map(c=>`<option value="${c}">${({overhead:"Gasto general",tax:"Impuestos",salary:"Nóminas",financial:"Financiero",internalTransfer:"Traspaso interno"})[c]}</option>`).join("")}</select>
+        <button class="btn sm" id="rcClassify">Clasificar</button>
+        <span style="flex:1"></span>
+        <button class="btn sm" id="rcNoDoc">Marcar sin respaldo</button>
+      </div>`}</div>`:""}
+    </div>
+    <div class="bside">
+     <div class="card" style="margin:0 0 12px"><div class="ch"><h3>Candidatos</h3><span class="tag">${candidates.length}</span></div>
+      <div class="daylist" style="padding:10px 14px">
+       ${candidates.slice(0,12).map(c=>`<div class="it"><span class="pill ${c.direction==="in"?"g":"b"}">${c.kind==="invoice"?"Emitida":"Recibida"}</span>
+         <span style="flex:1">${esc(c.reference)} · ${esc(c.counterparty)}</span><b>${eur(c.outstandingCents)}</b></div>`).join("")
+        ||'<div class="it">Sin documentos abiertos en este sentido.</div>'}
+       ${candidates.length>12?`<div class="it" style="color:var(--muted)">…y ${candidates.length-12} más</div>`:""}
+      </div></div>
+     <div class="card" style="margin:0"><div class="ch"><h3>Periodos cerrados</h3></div><div class="daylist" style="padding:10px 14px">
+      ${(erp.state.bankPeriods||[]).map(p=>`<div class="it">${fmtD(p.from)} – ${fmtD(p.to)} ${p.reopenedAt?`<span class="pill y">reabierto ${fmtD(p.reopenedAt)}</span>`:'<span class="pill g">cerrado</span>'}
+        ${p.reopenedAt?`<br><span style="color:var(--muted)">${esc(p.reopenReason)}</span>`:`<button class="btn sm" data-reopen="${p.from}">Reabrir</button>`}</div>`).join("")
+       ||'<div class="it">Ningún periodo cerrado todavía.</div>'}
+     </div></div>
+    </div>
+   </div>`;
+
+  v.querySelectorAll('[data-mov]').forEach(row=>row.onclick=()=>{recSel=row.dataset.mov;render();});
+  v.querySelectorAll('[data-accept]').forEach(b=>b.onclick=()=>mutate(()=>{
+    const ids=b.dataset.accept.split(",");
+    // One movement against several documents is exactly §5.3's partial
+    // reconciliation; matchMovement takes one at a time, so a combination is
+    // applied document by document against the same movement.
+    ids.forEach(id=>{
+      const c=candidates.find(x=>x.id===id);
+      erp.matchMovement(sel.id, c.kind==="invoice"?{invoiceId:id}:{billId:id}, "backoffice");
+    });
+    recSel=null;
+  },"Movimiento conciliado"));
+  const assign=$('#rcAssign');
+  if(assign) assign.onclick=()=>mutate(()=>{
+    const ref=$('#rcProj').value.trim(); if(!ref) throw new Error("Escribe el número de proyecto");
+    erp.allocateMovementToProject(sel.id,ref,$('#rcKind').value,"backoffice"); recSel=null;
+  },"Movimiento asignado");
+  const classify=$('#rcClassify');
+  if(classify) classify.onclick=()=>mutate(()=>{
+    erp.classifyMovement(sel.id,$('#rcClass').value,"backoffice"); recSel=null;
+  },"Movimiento clasificado");
+  const nodoc=$('#rcNoDoc');
+  if(nodoc) nodoc.onclick=()=>mutate(()=>erp.flagMovementNoDoc(sel.id,"backoffice"),
+    "Marcado sin respaldo — tarea creada para reclamarlo");
+  const tr=$('#rcTransfers');
+  if(tr) tr.onclick=()=>mutate(()=>{
+    transfers.forEach(t=>{
+      erp.classifyMovement(t.outMovementId,"internalTransfer","backoffice");
+      erp.classifyMovement(t.inMovementId,"internalTransfer","backoffice");
+    });
+  },transfers.length+" traspaso(s) marcados — no cuentan como ingreso ni gasto");
+  $('#rcClose').onclick=()=>mutate(()=>erp.closeBankPeriod(r.from,r.to,"backoffice"),"Periodo cerrado");
+  v.querySelectorAll('[data-reopen]').forEach(b=>b.onclick=()=>{
+    const reason=prompt("Motivo de la reapertura"); if(reason==null)return;
+    mutate(()=>erp.reopenBankPeriod(b.dataset.reopen,reason,"backoffice"),"Periodo reabierto");
+  });
+}
+
+/* ===================== Comunicaciones (spec §5.7) ==================================
+   Template library, the rules that fire them, and the queue they fill.
+
+   NOTHING ON THIS SCREEN SENDS ANYTHING. "Aprobar" moves a draft to approved
+   and "Registrar envío" marks it sent; the only thing that could put a message
+   on a wire is the messaging capability's email-out port, whose sole bound
+   adapter records and delivers nothing. The mandate says no real emails, and
+   the button labels are honest about which of the two things they do. */
+let comSel=null, comTab="plantillas";
+const COM_FAMILY={comercial:"Comercial",contractual:"Contractual",obra:"Obra",cobros:"Cobros",proveedores:"Proveedores",posventa:"Posventa"};
+const COM_EVENT={"quote-sent":"Presupuesto enviado","invoice-overdue":"Factura vencida",
+  "contract-signed":"Contrato firmado","works-finished":"Obra finalizada",
+  "subcontractor-docs-expired":"Documentación de subcontrata caducada"};
+function commsApi(){ return (typeof ErpBridge!=="undefined"&&ErpBridge.comms&&ErpBridge.comms.available)?ErpBridge.comms:null; }
+
+function comunicaciones(v){
+  $('#sub').textContent="Plantillas por familia, reglas evento → plantilla → destinatario → momento, y la cola resultante. Por defecto nada sale sin que una persona lo apruebe.";
+  const C=commsApi();
+  const tpls=erp.state.commsTemplates.filter(t=>t.active);
+  if(comSel&&!tpls.some(t=>t.id===comSel)) comSel=null;
+  if(!comSel&&tpls.length) comSel=tpls[0].id;
+  const tpl=tpls.find(t=>t.id===comSel)||null;
+  const pending=C?C.pending(erp):[];
+  const queue=erp.state.commsQueue||[];
+  const TABS=[["plantillas","Plantillas"],["reglas","Reglas"],["cola","Cola y historial"]];
+
+  v.innerHTML=`<div class="stepbar">
+    ${TABS.map(([k,l])=>`<button class="btn sm${comTab===k?" primary":""}" data-tab="${k}">${l}</button>`).join("")}
+    <span style="flex:1"></span>
+    ${pending.length?`<span class="pill y">${pending.length} por encolar</span><button class="btn sm" id="cmQueue">Encolar pendientes</button>`:'<span class="tag">nada pendiente de encolar</span>'}
+   </div>
+   ${!C?'<div class="card"><div class="empty">Las comunicaciones necesitan el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>':""}
+   ${comTab==="plantillas"?templatesPanel(tpls,tpl):comTab==="reglas"?rulesPanel():queuePanel(queue,pending)}`;
+
+  v.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{comTab=b.dataset.tab;render();});
+  const q=$('#cmQueue');
+  if(q) q.onclick=()=>mutate(()=>{
+    pending.forEach(p=>erp.queueCommunication(p,"backoffice"));
+  },pending.length+" mensaje(s) en cola — ninguno se ha enviado");
+  if(comTab==="plantillas") wireTemplatesPanel(tpl);
+  if(comTab==="reglas") wireRulesPanel();
+  if(comTab==="cola") wireQueuePanel();
+}
+function templatesPanel(tpls,tpl){
+  const fams={}; tpls.forEach(t=>{(fams[t.family]=fams[t.family]||[]).push(t);});
+  const vars=["cliente","number","importe","fecha"];
+  return `<div class="comm">
+   <div class="card" style="margin:0"><div class="ch"><h3>Biblioteca</h3><button class="btn sm" id="cmNewTpl">＋</button></div>
+    <div class="tpllist">
+     ${Object.keys(fams).map(f=>`<div class="fam">${COM_FAMILY[f]||f}</div>
+       ${fams[f].map(t=>`<button class="tpl${t.id===(tpl&&tpl.id)?" on":""}" data-tpl="${t.id}">${esc(t.label||t.key)} <span style="color:var(--faint)">v${t.version}</span></button>`).join("")}`).join("")
+      ||'<div class="empty">Sin plantillas.</div>'}
+    </div></div>
+   ${tpl?`<div>
+    <div class="card" style="margin:0 0 12px"><div class="ch"><h3>${esc(tpl.label||tpl.key)}</h3>
+      <span class="tag">${esc(tpl.key)} · ${tpl.lang} · v${tpl.version}</span></div>
+     <div class="fgrid" style="padding:12px 16px">
+      <div class="field full"><label>Asunto</label><input id="cm_subject" value="${esc(tpl.subject)}"></div>
+      <div class="field full"><label>Cuerpo</label><textarea class="tplbody" id="cm_body">${esc(tpl.body)}</textarea></div>
+      <div class="field full"><label>Variables — pulsa para insertar</label>
+        <div>${vars.map(x=>`<span class="varchip" data-var="${x}">{{${x}}}</span>`).join("")}</div></div>
+      <div class="field"><label>Adjunto automático</label><select id="cm_attach">${[["","Ninguno"],["budget","Presupuesto"],["invoice","Factura"],["contract","Contrato"]].map(([val,l])=>`<option value="${val}"${tpl.attach===val?" selected":""}>${l}</option>`).join("")}</select></div>
+      <div class="field"><label>Idioma</label><select id="cm_lang">${["es","ca"].map(l=>`<option value="${l}"${tpl.lang===l?" selected":""}>${l==="es"?"Español":"Català"}</option>`).join("")}</select></div>
+      <div class="field full" style="margin-top:6px"><button class="btn primary" id="cm_save">Guardar como nueva versión</button></div>
+     </div></div>
+    <div class="card" style="margin:0"><div class="ch"><h3>Previsualización</h3><span class="tag">con datos reales del primer registro que encaja</span></div>
+     <div style="padding:12px 16px"><div class="preview" id="cm_preview"></div></div></div>
+   </div>`:'<div class="card" style="margin:0"><div class="empty">Selecciona o crea una plantilla.</div></div>'}
+  </div>`;
+}
+function wireTemplatesPanel(tpl){
+  document.querySelectorAll('[data-tpl]').forEach(b=>b.onclick=()=>{comSel=b.dataset.tpl;render();});
+  $('#cmNewTpl').onclick=()=>newTemplateDrawer();
+  if(!tpl) return;
+  const refresh=()=>{
+    const C=commsApi(); if(!C) return;
+    // Previewed against a REAL record (§5.7 "previsualización con datos reales"),
+    // because a template that reads well against {{placeholders}} and badly
+    // against an actual customer name is the normal failure.
+    const ev=erp.commsEvents()[0]||{vars:{}};
+    const vars=Object.assign({cliente:"—",number:"—",importe:0,fecha:fmtD(erp.today)},ev.vars||{});
+    $('#cm_preview').textContent=C.render($('#cm_subject').value,vars)+"\n\n"+C.render($('#cm_body').value,vars);
+  };
+  $('#cm_subject').oninput=refresh; $('#cm_body').oninput=refresh; refresh();
+  document.querySelectorAll('[data-var]').forEach(c=>c.onclick=()=>{
+    const ta=$('#cm_body'); const tok="{{"+c.dataset.var+"}}";
+    ta.setRangeText(tok,ta.selectionStart,ta.selectionEnd,"end"); ta.focus(); refresh();
+  });
+  $('#cm_save').onclick=()=>mutate(()=>{
+    const next=erp.updateCommsTemplate(tpl.id,{subject:$('#cm_subject').value,body:$('#cm_body').value,
+      attach:$('#cm_attach').value,lang:$('#cm_lang').value},"backoffice");
+    comSel=next.id;
+  },"Nueva versión guardada — la anterior se conserva");
+}
+function newTemplateDrawer(){
+  const db=openDrawer("Nueva plantilla");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field"><label>Clave *</label><input id="nt_key" placeholder="quote-followup"></div>
+   <div class="field"><label>Nombre</label><input id="nt_label" placeholder="Seguimiento de presupuesto"></div>
+   <div class="field"><label>Familia</label><select id="nt_fam">${Object.entries(COM_FAMILY).map(([k,l])=>`<option value="${k}">${l}</option>`).join("")}</select></div>
+   <div class="field"><label>Idioma</label><select id="nt_lang"><option value="es">Español</option><option value="ca">Català</option></select></div>
+   <div class="field full"><label>Asunto</label><input id="nt_subject" placeholder="Su presupuesto {{number}}"></div>
+   <div class="field full"><label>Cuerpo</label><textarea class="tplbody" id="nt_body" placeholder="Hola {{cliente}},"></textarea></div>
+   <div class="field full" style="margin-top:6px"><button class="btn primary" id="nt_save">Crear plantilla</button></div>
+  </div>`;
+  $('#nt_save').onclick=()=>mutate(()=>{
+    const key=$('#nt_key').value.trim(); if(!key) throw new Error("La clave es obligatoria");
+    const rec=erp.addCommsTemplate({key,label:$('#nt_label').value,family:$('#nt_fam').value,
+      lang:$('#nt_lang').value,subject:$('#nt_subject').value,body:$('#nt_body').value},"backoffice");
+    comSel=rec.id; closeDrawer();
+  },"Plantilla creada");
+}
+function rulesPanel(){
+  const rules=erp.state.commsRules||[];
+  return `<div class="card"><div class="ch"><h3>Reglas</h3><span class="tag">evento → plantilla → destinatario → momento → canal</span>
+    <button class="btn sm" id="cmNewRule">＋ Nueva regla</button></div>
+   <div class="scroll"><table><thead><tr><th>Regla</th><th>Evento</th><th>Plantilla</th><th>Destinatario</th><th class="num">Momento</th><th>Canal</th><th>Modo</th><th>Estado</th><th></th></tr></thead><tbody>
+   ${rules.map(r=>`<tr><td class="k">${esc(r.label||r.id)}</td><td>${COM_EVENT[r.event]||esc(r.event)}</td>
+     <td>${esc(r.template)}</td><td>${esc(r.recipient)}</td>
+     <td class="num">${r.afterDays?`+${r.afterDays} d`:"inmediato"}</td><td>${esc(r.channel)}</td>
+     <td>${r.mode==="auto"?'<span class="pill y">Automático</span>':'<span class="pill g">Borrador</span>'}</td>
+     <td>${r.active?'<span class="pill b">Activa</span>':'<span class="pill">Inactiva</span>'}</td>
+     <td><button class="btn sm" data-sim="${r.id}">Simular</button> <button class="btn sm" data-toggle="${r.id}">${r.active?"Desactivar":"Activar"}</button></td></tr>`).join("")
+    ||'<tr><td colspan="9"><div class="empty">Sin reglas. Una regla dice cuándo se prepara un mensaje — nunca que se envíe solo.</div></td></tr>'}
+   </tbody></table></div></div>`;
+}
+function wireRulesPanel(){
+  $('#cmNewRule').onclick=()=>newRuleDrawer();
+  document.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>mutate(()=>{
+    const r=erp.state.commsRules.find(x=>x.id===b.dataset.toggle);
+    erp.updateCommsRule(r.id,{active:!r.active},"backoffice");
+  },"Regla actualizada"));
+  document.querySelectorAll('[data-sim]').forEach(b=>b.onclick=()=>simulateRuleDrawer(b.dataset.sim));
+}
+function newRuleDrawer(){
+  const tpls=erp.state.commsTemplates.filter(t=>t.active);
+  const db=openDrawer("Nueva regla");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Nombre</label><input id="nr_label" placeholder="Aviso de factura vencida a 3 días"></div>
+   <div class="field"><label>Evento *</label><select id="nr_event">${Object.entries(COM_EVENT).map(([k,l])=>`<option value="${k}">${l}</option>`).join("")}</select></div>
+   <div class="field"><label>Plantilla *</label><select id="nr_tpl">${tpls.map(t=>`<option value="${esc(t.key)}">${esc(t.label||t.key)}</option>`).join("")||'<option value="">—</option>'}</select></div>
+   <div class="field"><label>Destinatario</label><select id="nr_to"><option value="customer">Cliente</option><option value="supplier">Proveedor</option></select></div>
+   <div class="field"><label>Días tras el evento</label><input id="nr_days" type="number" min="0" value="0"></div>
+   <div class="field"><label>Canal</label><select id="nr_ch"><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="sms">SMS</option></select></div>
+   <div class="field"><label>Modo</label><select id="nr_mode"><option value="draft">Borrador para aprobar</option><option value="auto">Automático</option></select></div>
+   <div class="field full" style="margin-top:6px"><button class="btn primary" id="nr_save">Crear regla</button></div>
+  </div>`;
+  $('#nr_save').onclick=()=>mutate(()=>{
+    const tplKey=$('#nr_tpl').value; if(!tplKey) throw new Error("Crea una plantilla antes de la regla");
+    erp.addCommsRule({label:$('#nr_label').value,event:$('#nr_event').value,template:tplKey,
+      recipient:$('#nr_to').value,afterDays:+$('#nr_days').value||0,channel:$('#nr_ch').value,
+      mode:$('#nr_mode').value},"backoffice");
+    closeDrawer();
+  },"Regla creada");
+}
+/** §5.7 "probar una regla en modo simulación" — what it WOULD produce, sending nothing. */
+function simulateRuleDrawer(ruleId){
+  const C=commsApi(); const r=erp.state.commsRules.find(x=>x.id===ruleId);
+  const planned=C?C.simulate(erp,[Object.assign({},r,{active:true})]):[];
+  const db=openDrawer("Simulación · "+(r.label||r.event));
+  db.innerHTML=`<div class="card"><div class="ch"><h3>${planned.length} mensaje(s) que produciría</h3>
+    <span class="tag">simulación — no se encola ni se envía nada</span></div><div class="daylist">
+   ${planned.map(p=>`<div class="it"><span class="pill ${p.due?"y":"b"}">${p.due?"ya vencido":fmtD(p.dueDate)}</span>
+     <span style="flex:1">${esc(p.subjectRef)} → ${esc(p.to||"sin dirección")}</span>
+     ${p.blocked?'<span class="pill r">sin destinatario</span>':""}</div>`).join("")
+    ||'<div class="it">Esta regla no produciría ningún mensaje con los datos de hoy.</div>'}
+  </div></div>`;
+}
+function queuePanel(queue,pending){
+  const ST={draft:["Borrador","y"],approved:["Aprobado","b"],sent:["Registrado como enviado","g"],
+    cancelled:["Cancelado",""],blocked:["Sin destinatario","r"]};
+  return `<div class="card"><div class="ch"><h3>Cola</h3>
+    <span class="tag">nada sale sin aprobación — el envío real no está conectado</span></div>
+   <div class="scroll"><table><thead><tr><th>Vence</th><th>Asunto</th><th>Plantilla</th><th>Destinatario</th><th>Canal</th><th>Estado</th><th></th></tr></thead><tbody>
+   ${queue.slice().reverse().map(q=>{const st=ST[q.status]||[q.status,""];
+     return `<tr><td>${fmtD(q.dueDate)}</td><td class="k">${esc(q.subjectRef)}</td><td>${esc(q.templateKey)}</td>
+      <td>${esc(q.to||"—")}</td><td>${esc(q.channel)}</td><td><span class="pill ${st[1]}">${st[0]}</span></td>
+      <td>${q.status==="draft"?`<button class="btn sm primary" data-approve-msg="${q.id}">Aprobar</button> <button class="btn sm danger" data-cancel-msg="${q.id}">Cancelar</button>`:""}
+       ${q.status==="approved"?`<button class="btn sm" data-sent-msg="${q.id}">Registrar envío</button>`:""}</td></tr>`;}).join("")
+    ||'<tr><td colspan="7"><div class="empty">La cola está vacía.</div></td></tr>'}
+   </tbody></table></div>
+   ${pending.length?`<div class="queuebar" style="border-top:1px solid var(--hair)"><span class="pill y">${pending.length}</span>
+     <span>mensaje(s) que las reglas producirían y todavía no están en la cola</span></div>`:""}
+  </div>`;
+}
+function wireQueuePanel(){
+  document.querySelectorAll('[data-approve-msg]').forEach(b=>b.onclick=()=>mutate(()=>
+    erp.approveCommunication(b.dataset.approveMsg,"backoffice"),"Aprobado — sigue sin enviarse"));
+  document.querySelectorAll('[data-cancel-msg]').forEach(b=>b.onclick=()=>mutate(()=>
+    erp.cancelCommunication(b.dataset.cancelMsg,"backoffice"),"Cancelado"));
+  document.querySelectorAll('[data-sent-msg]').forEach(b=>b.onclick=()=>mutate(()=>
+    erp.recordCommunicationSent(b.dataset.sentMsg,"backoffice"),"Registrado como enviado"));
+}
+
 /* =============================== Project context (spec §4) ==========================
    "Lo primero de esta sección es la selección del proyecto, de modo que todo lo
    que aparece debajo quede asociado a un proyecto concreto."
@@ -2445,6 +2827,13 @@ const VIEWS={
  modificaciones,
  horas,
 
+ /* ---------- Conciliación bancaria · Comunicaciones (§5.3/§5.7) ----------
+    Also standalone functions above: both lean on the factory bundle
+    (matching, message planning) and are long enough that inlining them
+    here would bury the rest of the map. */
+ conciliacion,
+ comunicaciones,
+
  /* ---------- Facturación y cobros (AR) ---------- */
  facturacion(v){
   $('#sub').textContent="Facturas generadas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos; las emitidas son inmutables.";
@@ -2487,15 +2876,21 @@ const VIEWS={
  },
 
  /* ---------- Banco y caja (BNK) ---------- */
+ /* ---------- Banco y caja (§5.4) ----------
+    Posición, movimientos y previsión. La asignación se retiró de aquí en la
+    sesión 11: casar un movimiento con su documento y repartirlo entre obras
+    es el mismo gesto, y hacerlo en dos pantallas distintas producía
+    movimientos asignados a una obra pero sin factura detrás. Todo eso vive
+    ahora en Conciliación Bancaria; esta pantalla informa y enlaza. */
  banco(v){
-  $('#sub').textContent="Importa los movimientos y teclea el número de proyecto sobre cualquier movimiento: el coste queda asignado a esa obra sin volver a escribir nada.";
+  $('#sub').textContent="Posición de tesorería, movimientos importados y previsión de caja. La asignación y el casado con documentos se hacen en Conciliación Bancaria.";
   const cf=erp.cashForecast(6);
   const movAll=erp.state.movements, movs=movAll.filter(m=>inPeriod(m.accountingDate));
   v.innerHTML=`<div class="kpis" style="grid-template-columns:repeat(${erp.state.bankAccounts.length+1},1fr)">
     ${erp.state.bankAccounts.map(a=>`<div class="kpi"><div class="lab">${esc(a.name)}</div><div class="val">${eur0(erp.accountBalanceCents(a.id))}</div><div class="sub">${a.kind==="till"?"caja":"banco"}</div></div>`).join("")}
     <div class="kpi hi"><div class="lab">Total disponible</div><div class="val">${eur0(erp.cashPosition().totalCents)}</div><div class="sub">bancos + caja</div></div></div>
    ${periodNote(movs.length,movAll.length)}
-   <div class="card"><div class="ch"><h3>Movimientos</h3><span class="tag">escribe el nº de proyecto para asignar (p. ej. P-2026-0001)</span></div>
+   <div class="card"><div class="ch"><h3>Movimientos</h3><button class="btn sm" id="bToRec">Ir a Conciliación Bancaria →</button></div>
    <div class="scroll"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Clase</th><th>Asignación</th></tr></thead><tbody>
    ${movs.slice().reverse().map(m=>{
      const cls={projectCost:"Coste de obra",overhead:"Gasto general",tax:"Impuestos",salary:"Nóminas",financial:"Financiero",internalTransfer:"Traspaso interno",customerReceipt:"Cobro de cliente"}[m.class]||"—";
@@ -2504,16 +2899,12 @@ const VIEWS={
       <td>${esc(m.merchantText||m.counterparty||m.concept)}${m.card?` <span class="pill b">${m.card}</span>`:""}${m.needsDoc?' <span class="pill r">Falta justificante</span>':''}</td>
       <td class="num" style="color:${m.amountCents<0?'var(--danger)':'var(--greenDeep)'}">${eur(m.amountCents)}</td>
       <td>${m.class?`<span class="pill ${m.class==="internalTransfer"?"b":m.class==="customerReceipt"?"g":""}">${cls}</span>`:'<span class="pill r">Sin clasificar</span>'}</td>
-      <td>${alloc?esc(alloc):(m.status==="unallocated"?`<input class="inline" placeholder="Nº proyecto" data-mov="${m.id}"> <select class="inline" data-kind="${m.id}"><option value="material">Material</option><option value="labour">Mano de obra</option><option value="subcontract">Industrial</option><option value="other">Otro</option></select>`:"—")}</td></tr>`;}).join("")}
+      <td>${alloc?esc(alloc):(m.status==="unallocated"?'<span class="pill y">Sin asignar</span>':"—")}</td></tr>`;}).join("")}
    </tbody></table></div></div>
    <div class="card"><div class="ch"><h3>Previsión de caja — próximas 6 semanas</h3></div><div class="scroll"><table><thead><tr><th>Semana</th><th class="num">Cobros previstos</th><th class="num">Pagos previstos</th><th class="num">Neto</th></tr></thead><tbody>
    ${cf.map(w=>`<tr><td>${fmtD(w.from)} – ${fmtD(w.to)}</td><td class="num">${eur0(w.inflowCents)}</td><td class="num">${eur0(w.outflowCents)}</td><td class="num" style="color:${w.netCents<0?'var(--danger)':'var(--greenDeep)'}">${eur0(w.netCents)}</td></tr>`).join("")}
    </tbody></table></div></div>`;
-  v.querySelectorAll('input[data-mov]').forEach(inp=>inp.onkeydown=(e)=>{
-    if(e.key!=="Enter")return;
-    const kind=v.querySelector(`select[data-kind="${inp.dataset.mov}"]`).value;
-    mutate(()=>erp.allocateMovementToProject(inp.dataset.mov,inp.value.trim(),kind,"backoffice"),"Movimiento asignado a "+inp.value.trim());
-  });
+  $('#bToRec').onclick=()=>go("conciliacion");
  },
 
  /* ---------- Precios y costes (SUP/CAT) ---------- */
@@ -2541,41 +2932,102 @@ const VIEWS={
    </tbody></table></div></div>`;
  },
 
- /* ---------- Gestoría (GES) ---------- */
+ /* ---------- Gestoría (GES, spec §5.6) ----------
+    Rebuilt in session 11 around one idea: the screen must be able to say NO.
+    Before, "Generar y registrar envío" always worked and the exception list
+    was decoration next to it — which is precisely how a quarter goes out with
+    four suppliers missing a NIF. Now the engine refuses, and the only way past
+    is to justify each exception by name, so the button and the list finally
+    mean the same thing. The completeness blocks above them answer the
+    question people actually ask at quarter end ("is anything missing?")
+    per block rather than as one aggregate number, because the blocks fail
+    independently and an aggregate hides which one. */
  gestoria(v){
-  $('#sub').textContent="El paquete trimestral se genera desde los datos, con resúmenes de IVA e IRPF conciliados y la lista de excepciones antes de enviar.";
+  $('#sub').textContent="Ocho bloques de completitud, la lista de excepciones que bloquea el envío hasta justificarla, y el registro de lo enviado con fecha y destinatario.";
   // The quarter buttons stay; the default follows the global period selector
   // whenever that is expressed in quarters, so the two never contradict.
   const q=window._q||(PERIOD.mode==="quarter"?ErpEngine.quarterOf(periodRange().from):"2026-Q1");
-  const pkg=(()=>{const inQ=d=>ErpEngine.quarterOf(d)===q;return {
-    invoices:erp.state.invoices.filter(i=>inQ(i.date)), bills:erp.state.bills.filter(b=>inQ(b.date)),
-    vat:erp.vatSummary(q), irpf:erp.irpfSummary(q), ex:erp.exceptionList(q)};})();
-  const exCount=Object.values(pkg.ex).flat(2).filter(x=>typeof x==="string").length;
+  const inQ=d=>ErpEngine.quarterOf(d)===q;
+  const vat=erp.vatSummary(q), irpf=erp.irpfSummary(q);
+  const blocks=erp.packageBlocks(q), exs=erp.exceptionsWithStatus(q);
+  const open=exs.filter(x=>!x.accepted), late=erp.lateDocuments(q), assets=erp.fixedAssetRegister(q);
+  const sent=erp.state.packagesSent.filter(s=>s.quarter===q);
+  const queries=(erp.state.gestoriaQueries||[]).filter(x=>x.quarter===q);
+  const ready=open.length===0;
   v.innerHTML=`<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
     ${["2026-Q1","2026-Q2","2026-Q3","2026-Q4"].map(x=>`<button class="btn sm ${x===q?'primary':''}" data-q="${x}">${x.replace("2026-","T")}</button>`).join("")}
-    <span style="flex:1"></span><button class="btn primary sm" id="bSend">📦 Generar y registrar envío</button></div>
+    <span style="flex:1"></span>
+    ${sent.length?`<button class="btn sm" id="bReopen">Reabrir trimestre</button>`:""}
+    <button class="btn sm" id="bQuery">Consulta a gestoría</button>
+    <button class="btn primary sm" id="bSend" ${ready?"":'disabled title="Hay excepciones sin justificar"'}>📦 Generar y registrar envío</button></div>
+   ${ready?"":`<div class="card" style="border-color:var(--danger);margin-bottom:12px"><div class="queuebar">
+     <span class="n" style="color:var(--danger)">${open.length}</span> excepción${open.length===1?"":"es"} sin justificar bloquean el envío del ${q}.
+     <span style="flex:1"></span><span class="tag">justifica cada una abajo, o corrígela en su pantalla</span></div></div>`}
+   <div class="card"><div class="ch"><h3>Completitud del paquete</h3><span class="tag">${blocks.filter(b=>b.sev==="g").length}/${blocks.length} bloques en verde</span></div>
+    <div style="padding:12px 14px"><div class="blocks">
+    ${blocks.map(b=>`<div class="blk ${b.sev}"><div class="lab">${esc(b.label)}</div><div class="n">${b.count}</div>
+      <div class="sub">${eur0(b.amountCents)}${b.issues?` · <b>${b.issues} incidencia${b.issues===1?"":"s"}</b>`:""}</div></div>`).join("")}
+    </div></div></div>
    <div class="kpis">
-    <div class="kpi"><div class="lab">Facturas emitidas</div><div class="val">${pkg.invoices.length}</div><div class="sub">${eur0(pkg.invoices.reduce((s,i)=>s+(i.kind==="creditNote"?-i.totalCents:i.totalCents),0))}</div></div>
-    <div class="kpi"><div class="lab">Facturas recibidas</div><div class="val">${pkg.bills.length}</div><div class="sub">${eur0(pkg.bills.reduce((s,b)=>s+b.totalCents,0))}</div></div>
-    <div class="kpi ${pkg.vat.netCents>0?'warn':''}"><div class="lab">IVA neto (303)</div><div class="val">${eur0(pkg.vat.netCents)}</div><div class="sub">repercutido ${eur0(pkg.vat.outputVatCents)} − soportado ${eur0(pkg.vat.inputVatCents)}</div></div>
-    <div class="kpi"><div class="lab">IRPF retenido (111)</div><div class="val">${eur0(pkg.irpf.retainedCents)}</div><div class="sub">a autónomos y profesionales</div></div>
+    <div class="kpi ${vat.netCents>0?'warn':''}"><div class="lab">IVA neto (303)</div><div class="val">${eur0(vat.netCents)}</div><div class="sub">repercutido ${eur0(vat.outputVatCents)} − soportado ${eur0(vat.inputVatCents)}</div></div>
+    <div class="kpi"><div class="lab">IRPF retenido (111)</div><div class="val">${eur0(irpf.retainedCents)}</div><div class="sub">a autónomos y profesionales</div></div>
+    <div class="kpi"><div class="lab">Extemporáneos</div><div class="val">${late.length}</div><div class="sub">${late.filter(l=>l.alreadySent).length} ya declarados antes</div></div>
+    <div class="kpi"><div class="lab">Consultas abiertas</div><div class="val">${queries.filter(x=>!x.resolvedAt).length}</div><div class="sub">de ${queries.length} en el trimestre</div></div>
    </div>
-   <div class="card"><div class="ch"><h3>Lista de excepciones antes de enviar</h3><span class="tag">${exCount===0?"✓ limpio":exCount+" incidencias"}</span></div><div class="daylist">
-    ${pkg.ex.partiesWithoutTaxId.length?`<div class="it">🔴 <b>${pkg.ex.partiesWithoutTaxId.length}</b> terceros sin NIF válido: ${pkg.ex.partiesWithoutTaxId.join(", ")}</div>`:""}
-    ${pkg.ex.billsWithoutDocument.length?`<div class="it">🟡 <b>${pkg.ex.billsWithoutDocument.length}</b> facturas sin documento adjunto: ${pkg.ex.billsWithoutDocument.join(", ")}</div>`:""}
-    ${pkg.ex.unallocatedMovements.length?`<div class="it">🟡 <b>${pkg.ex.unallocatedMovements.length}</b> movimientos bancarios sin asignar</div>`:""}
-    ${pkg.ex.unmatchedReceipts.length?`<div class="it">🟡 <b>${pkg.ex.unmatchedReceipts.length}</b> recibos sin casar</div>`:""}
-    ${pkg.ex.undocumentedCash.length?`<div class="it">🔵 <b>${pkg.ex.undocumentedCash.length}</b> movimientos de caja sin justificante</div>`:""}
-    ${pkg.ex.seriesGaps.invoice.length?`<div class="it">🔴 Huecos en la serie de facturas: ${pkg.ex.seriesGaps.invoice.join(", ")}</div>`:`<div class="it">✅ Serie de facturas sin huecos</div>`}
-   </div></div>
+   <div class="card"><div class="ch"><h3>Excepciones antes de enviar</h3><span class="tag">${exs.length===0?"✓ limpio":`${open.length} pendientes · ${exs.length-open.length} justificadas`}</span></div>
+    ${exs.length?exs.map(x=>`<div class="exrow">
+      <div><span class="pill ${x.accepted?'g':'r'}">${x.accepted?"Justificada":"Pendiente"}</span></div>
+      <div><b>${esc(x.label)}</b> ${esc(x.ref)}${x.accepted?`<div class="why">${esc(x.accepted.reason)} — ${esc(x.accepted.by)}, ${fmtD(x.accepted.at)}</div>`:""}</div>
+      <div>${x.accepted?"":`<button class="btn sm" data-acc="${esc(x.key)}">Justificar</button>`}</div></div>`).join("")
+     :'<div class="empty">Sin excepciones: el paquete puede enviarse tal cual.</div>'}
+   </div>
    <div class="card"><div class="ch"><h3>IVA por tipo</h3><span class="tag">conciliado con los registros</span></div><div class="scroll"><table><thead><tr><th>Tipo</th><th class="num">Base repercutida</th><th class="num">IVA repercutido</th><th class="num">Base soportada</th><th class="num">IVA soportado</th></tr></thead><tbody>
-   ${Object.entries(pkg.vat.byRate).map(([bp,r])=>`<tr><td class="k">${bp/100}%</td><td class="num">${eur(r.outputBaseCents)}</td><td class="num">${eur(r.outputVatCents)}</td><td class="num">${eur(r.inputBaseCents)}</td><td class="num">${eur(r.inputVatCents)}</td></tr>`).join("")}
+   ${Object.entries(vat.byRate).map(([bp,r])=>`<tr><td class="k">${bp/100}%</td><td class="num">${eur(r.outputBaseCents)}</td><td class="num">${eur(r.outputVatCents)}</td><td class="num">${eur(r.inputBaseCents)}</td><td class="num">${eur(r.inputVatCents)}</td></tr>`).join("")}
+   </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Activos, vehículos y renting</h3><span class="tag">fuera del coste de obra</span></div><div class="scroll"><table><tbody>
+   ${assets.map(a=>`<tr><td class="k">${esc(a.number)}</td><td>${esc(a.supplier)}</td><td>${({fixedAsset:"Inmovilizado",renting:"Renting",vehicles:"Vehículos"})[a.category]}</td><td>${fmtD(a.date)}</td><td class="num">${eur(a.baseCents)}</td></tr>`).join("")||'<tr><td><div class="empty">Nada en este trimestre.</div></td></tr>'}
+   </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Documentos extemporáneos</h3><span class="tag">llegaron después de cerrar el trimestre</span></div><div class="scroll"><table><tbody>
+   ${late.map(l=>`<tr><td class="k">${esc(l.stdName||l.id)}</td><td>${fmtD(l.confirmed.date)}</td><td class="num">${eur(l.confirmed.totalCents)}</td><td>capturado ${fmtD(l.capturedAt)}</td><td>${l.alreadySent?'<span class="pill b">Ya declarado</span>':'<span class="pill y">Nuevo</span>'}</td></tr>`).join("")||'<tr><td><div class="empty">Ninguno.</div></td></tr>'}
+   </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Consultas con la gestoría</h3></div><div class="scroll"><table><tbody>
+   ${queries.map(x=>`<tr><td>${esc(x.question)}</td><td>${fmtD(x.raisedAt)}</td>
+     <td>${x.resolvedAt?`<span class="pill g">Resuelta</span> ${esc(x.resolution)}`:'<span class="pill y">Abierta</span>'}</td>
+     <td>${x.resolvedAt?"":`<button class="btn sm" data-rq="${x.id}">Responder</button>`}</td></tr>`).join("")||'<tr><td><div class="empty">Sin consultas.</div></td></tr>'}
    </tbody></table></div></div>
    <div class="card"><div class="ch"><h3>Envíos registrados</h3></div><div class="scroll"><table><tbody>
-   ${erp.state.packagesSent.map(s=>`<tr><td class="k">${s.quarter}</td><td>${fmtD(s.date)}</td><td>${s.invoices} emitidas · ${s.bills} recibidas</td><td>${s.exceptions} excepciones</td></tr>`).join("")||'<tr><td><div class="empty">Aún no se ha enviado ningún paquete.</div></td></tr>'}
+   ${erp.state.packagesSent.map(s=>`<tr><td class="k">${s.quarter}</td><td>${fmtD(s.date)}</td><td>${esc(s.recipient||"—")}</td>
+     <td>${s.invoices} emitidas · ${s.bills} recibidas</td><td>${s.acceptedExceptions?`${s.acceptedExceptions} justificadas`:"sin excepciones"}</td>
+     <td>${s.reopened?`<span class="pill y">Reabierto ${fmtD(s.reopened.reopenedAt)}</span> ${esc(s.reopened.reopenReason)}`:""}</td></tr>`).join("")||'<tr><td><div class="empty">Aún no se ha enviado ningún paquete.</div></td></tr>'}
    </tbody></table></div></div>`;
   v.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{window._q=b.dataset.q;render();});
-  $('#bSend').onclick=()=>mutate(()=>erp.quarterlyPackage(q,"backoffice"),"Paquete "+q+" generado y registrado");
+  // Justification is a free-text reason, required by the engine. Prompting for
+  // it here rather than accepting a blank keeps the audit trail worth reading.
+  v.querySelectorAll('[data-acc]').forEach(b=>b.onclick=()=>{
+    const r=prompt("¿Por qué puede enviarse el paquete con esta excepción?");
+    if(r===null)return;
+    mutate(()=>erp.acceptException(q,b.dataset.acc,r,"backoffice"),"Excepción justificada");
+  });
+  v.querySelectorAll('[data-rq]').forEach(b=>b.onclick=()=>{
+    const r=prompt("Respuesta de la gestoría:");
+    if(r===null)return;
+    mutate(()=>erp.resolveGestoriaQuery(b.dataset.rq,r,"backoffice"),"Consulta resuelta");
+  });
+  $('#bQuery').onclick=()=>{
+    const t=prompt("¿Qué se pregunta a la gestoría sobre "+q+"?");
+    if(t===null||!t.trim())return;
+    mutate(()=>erp.addGestoriaQuery(q,t,"backoffice"),"Consulta registrada");
+  };
+  if($('#bReopen')) $('#bReopen').onclick=()=>{
+    const r=prompt("Motivo para reabrir "+q+" (queda registrado):");
+    if(r===null)return;
+    mutate(()=>erp.reopenQuarter(q,r,"backoffice"),"Trimestre "+q+" reabierto");
+  };
+  $('#bSend').onclick=()=>{
+    const to=prompt("¿A quién se envía el paquete "+q+"?","Gestoría Subirats");
+    if(to===null)return;
+    mutate(()=>erp.quarterlyPackage(q,{recipient:to},"backoffice"),"Paquete "+q+" generado y registrado");
+  };
  },
 };
 

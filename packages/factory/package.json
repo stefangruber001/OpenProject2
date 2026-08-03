@@ -25,6 +25,7 @@
     "@repo/capability-projects": "workspace:*",
     "@repo/capability-quoting": "workspace:*",
     "@repo/capability-receivables": "workspace:*",
+    "@repo/capability-reconciliation": "workspace:*",
     "@repo/capability-scheduling": "workspace:*",
     "@repo/capability-sourcing": "workspace:*",
     "@repo/capability-suppliers": "workspace:*",

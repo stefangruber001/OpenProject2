@@ -73,6 +73,7 @@ async function main() {
     await testBudgetBuilder(browser, base);
     await testProjectTracking(browser, base);
     await testProcurement(browser, base);
+    await testAdmin(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
   } finally {
@@ -470,7 +471,10 @@ async function testShell(browser, base) {
     else bad("shell: outside click collapses", "still open");
 
     // Unbuilt subsections say what will live there instead of rendering blank.
-    await pg.evaluate(() => (location.hash = "conciliacion"));
+    // This used to probe `conciliacion`, which session 11 built; `reportes` is
+    // the last deliberate placeholder, and when it goes this check should be
+    // deleted rather than repointed at something that is merely unfinished.
+    await pg.evaluate(() => (location.hash = "reportes"));
     await pg.waitForTimeout(300);
     const ph = await pg.locator("#view").innerText();
     if (/En preparación/.test(ph)) ok("shell: unbuilt subsection explains itself");
@@ -1166,6 +1170,189 @@ async function testProcurement(browser, base) {
   }
 }
 
+// ── Administración (session 11): reconciliation §5.3, gestoría §5.6,
+//    communications §5.7. Three screens whose whole value is that they say NO
+//    at the right moment — a suggestion you can argue with, a period that
+//    refuses to close, a package that refuses to go. Asserting the refusals is
+//    the point; asserting that the happy path renders would miss all of it.
+async function testAdmin(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  // Both screens ask for free text before doing anything irreversible; answer
+  // whatever they ask so the run never blocks on a modal.
+  pg.on("dialog", async (d) => {
+    const m = d.message();
+    await d.accept(/envía/.test(m) ? "Gestoría Subirats" : "Justificado por el E2E");
+  });
+  try {
+    // ---- §5.3 Conciliación: suggestion + reasons → accept → transfers → close refuses
+    await pg.goto(`${base}/erp.html#conciliacion`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(900);
+    const openBefore = await pg.locator(".movrow").count();
+    if (openBefore > 0) ok(`conciliación: unreconciled statement lines are listed (${openBefore})`);
+    else bad("conciliación: statement lines listed", "no .movrow");
+
+    // Select the line whose free text quotes an invoice number.
+    let picked = false;
+    for (let i = 0; i < openBefore; i++) {
+      const t = await pg.locator(".movrow").nth(i).innerText();
+      if (/FAC-2026-0002/.test(t)) {
+        await pg.locator(".movrow").nth(i).click();
+        picked = true;
+        break;
+      }
+    }
+    await pg.waitForTimeout(500);
+    if (!picked) bad("conciliación: seeded statement line with a quoted reference", "not found");
+
+    const suggText = await pg
+      .locator(".sugg")
+      .first()
+      .innerText()
+      .catch(() => "");
+    // A confidence with no argument behind it teaches people to click accept
+    // without reading. The reasons are load-bearing, so the test demands them.
+    if (/%/.test(suggText) && /importe exacto/.test(suggText) && /referencia citada/.test(suggText))
+      ok("conciliación: the match proposal shows its confidence AND its reasons");
+    else bad("conciliación: proposal carries reasons", suggText.slice(0, 120));
+
+    await pg.locator("[data-accept]").first().click();
+    await pg.waitForTimeout(700);
+    const openAfter = await pg.locator(".movrow").count();
+    if (openAfter === openBefore - 1)
+      ok("conciliación: accepting a proposal clears the line from the queue");
+    else bad("conciliación: accepted line leaves the queue", `${openBefore} → ${openAfter}`);
+
+    const trBtn = pg.locator("#rcTransfers");
+    if ((await trBtn.count()) > 0) {
+      await trBtn.click();
+      await pg.waitForTimeout(700);
+      const afterTr = await pg.locator(".movrow").count();
+      if (afterTr === openAfter - 2)
+        ok("conciliación: the mirrored transfer pair is detected and cleared as internal");
+      else bad("conciliación: internal transfer pair", `${openAfter} → ${afterTr}`);
+    } else bad("conciliación: internal transfer detected", "no #rcTransfers button");
+
+    // Closing must REFUSE while anything is still unreconciled — the whole
+    // point of a closed period is that it cannot contain an open question.
+    await pg.click("#rcClose");
+    await pg.waitForTimeout(600);
+    const closeMsg = await pg.locator("#toast").innerText();
+    if (/^⚠/.test(closeMsg.trim()) && /sin conciliar/.test(closeMsg))
+      ok("conciliación: closing the period is refused while lines are unreconciled");
+    else bad("conciliación: close refuses", closeMsg.slice(0, 120));
+
+    // ---- §5.7 Comunicaciones: preview with real data, simulate, queue, approve
+    await pg.evaluate(() => (location.hash = "comunicaciones"));
+    await pg.waitForTimeout(800);
+    const preview = await pg
+      .locator("#cm_preview")
+      .innerText()
+      .catch(() => "");
+    // §5.7 asks for "previsualización con datos reales": a template that reads
+    // well against {{placeholders}} and badly against a real customer name is
+    // the normal failure, so the preview must not contain a placeholder.
+    if (preview.length > 20 && !/\{\{/.test(preview))
+      ok("comunicaciones: the template preview renders against a real record");
+    else bad("comunicaciones: preview uses real data", preview.slice(0, 120));
+
+    await pg.locator('[data-tab="reglas"]').click();
+    await pg.waitForTimeout(500);
+    const rulesText = await pg.locator("#view").innerText();
+    // The default mode is draft, deliberately. If a seeded rule ever reads
+    // "Automático" here, something changed the default and nobody noticed.
+    if (/Borrador/.test(rulesText) && !/Automático/.test(rulesText))
+      ok("comunicaciones: every rule is draft-mode — nothing is set to send by itself");
+    else bad("comunicaciones: rules default to draft", rulesText.slice(0, 160));
+
+    await pg.locator("[data-sim]").first().click();
+    await pg.waitForTimeout(600);
+    const simText = await pg.locator(".drawer").innerText();
+    if (/simulación/i.test(simText) && /produciría/.test(simText))
+      ok("comunicaciones: a rule can be simulated without queueing or sending");
+    else bad("comunicaciones: rule simulation", simText.slice(0, 140));
+    await pg.click("#dClose");
+    await pg.waitForTimeout(300);
+
+    await pg.locator('[data-tab="plantillas"]').click();
+    await pg.waitForTimeout(400);
+    const qBtn = pg.locator("#cmQueue");
+    if ((await qBtn.count()) > 0) {
+      await qBtn.click();
+      await pg.waitForTimeout(700);
+    }
+    await pg.locator('[data-tab="cola"]').click();
+    await pg.waitForTimeout(500);
+    const drafts = await pg.locator("[data-approve-msg]").count();
+    if (drafts > 0) ok(`comunicaciones: rules fill the queue as drafts (${drafts})`);
+    else bad("comunicaciones: queue fills from rules", "no drafts");
+    await pg.locator("[data-approve-msg]").first().click();
+    await pg.waitForTimeout(600);
+    const apprMsg = await pg.locator("#toast").innerText();
+    // The mandate forbids real sending. The label has to be honest that
+    // approving is not sending, and the copy is the only place that says so.
+    if (/sigue sin enviarse/i.test(apprMsg))
+      ok("comunicaciones: approving a message is explicitly not sending it");
+    else bad("comunicaciones: approve is not send", apprMsg.slice(0, 120));
+    if ((await pg.locator("[data-sent-msg]").count()) > 0)
+      ok("comunicaciones: an approved message can be recorded as sent, by hand");
+    else bad("comunicaciones: manual send record", "no [data-sent-msg]");
+
+    // ---- §5.6 Gestoría: blocked send → justify each exception → send with recipient
+    await pg.evaluate(() => (location.hash = "gestoria"));
+    await pg.waitForTimeout(800);
+    const blocks = await pg.locator(".blk").count();
+    if (blocks >= 7) ok(`gestoría: the package completeness blocks are shown (${blocks})`);
+    else bad("gestoría: completeness blocks", `${blocks} blocks`);
+
+    const openEx = await pg.locator("[data-acc]").count();
+    if (openEx > 0 && (await pg.locator("#bSend").isDisabled()))
+      ok(`gestoría: sending is blocked while exceptions are unjustified (${openEx})`);
+    else bad("gestoría: send blocked by exceptions", `open=${openEx}`);
+
+    let guard = 0;
+    while ((await pg.locator("[data-acc]").count()) > 0 && guard++ < 15) {
+      await pg.locator("[data-acc]").first().click();
+      await pg.waitForTimeout(450);
+    }
+    if (
+      (await pg.locator("[data-acc]").count()) === 0 &&
+      !(await pg.locator("#bSend").isDisabled())
+    )
+      ok("gestoría: justifying every exception unblocks the send");
+    else bad("gestoría: justification unblocks send", `remaining=${guard}`);
+
+    await pg.click("#bSend");
+    await pg.waitForTimeout(800);
+    const gesText = await pg.locator("#view").innerText();
+    if (/Gestoría Subirats/.test(gesText) && /justificadas/.test(gesText))
+      ok("gestoría: the send is recorded with its recipient and its justified exceptions");
+    else bad("gestoría: send record", gesText.slice(-200));
+
+    // ---- §5.4 Banco keeps position and forecast, and hands allocation over
+    await pg.evaluate(() => (location.hash = "banco"));
+    await pg.waitForTimeout(700);
+    const bancoText = await pg.locator("#view").innerText();
+    const stillHasInput = await pg.locator("#view input[data-mov]").count();
+    if (stillHasInput === 0 && /Previsión de caja/.test(bancoText))
+      ok("banco: allocation moved out to Conciliación; position and forecast stay");
+    else bad("banco: allocation removed", `inputs=${stillHasInput}`);
+    await pg.click("#bToRec");
+    await pg.waitForTimeout(600);
+    if (/#conciliacion$/.test(pg.url()))
+      ok("banco: the screen hands over to Conciliación Bancaria explicitly");
+    else bad("banco: link to reconciliation", pg.url());
+
+    if (errs.length === 0) ok("administración: no console errors");
+    else bad("administración: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("administración (conciliación/gestoría/comunicaciones)", String(e).slice(0, 220));
+  } finally {
+    await pg.close();
+  }
+}
+
 async function testErp(browser, base) {
   // Workspace: Control Tower renders indicators + alerts; modules navigate.
   const pg = await browser.newPage({ viewport: { width: 1280, height: 950 } });
@@ -1187,28 +1374,26 @@ async function testErp(browser, base) {
       ok("erp: budgets module lists versioned budgets");
     else bad("erp: budgets module", preText.slice(0, 80));
 
-    // BNK-02: type a project number on an unallocated movement → allocated
-    await pg.evaluate(() => (location.hash = "banco"));
-    await pg.waitForTimeout(400);
-    const inp = pg.locator("input[data-mov]").first();
+    // BNK-02: a movement is allocated to a job by its project number. Session
+    // 11 moved the gesture off Banco and into Conciliación — casar el
+    // movimiento y repartirlo son el mismo acto — so the requirement is
+    // asserted where it now lives, not where it used to.
+    await pg.evaluate(() => (location.hash = "conciliacion"));
+    await pg.waitForTimeout(600);
+    const inp = pg.locator("#rcProj");
     if ((await inp.count()) > 0) {
       await inp.fill("P-2026-0001");
-      await inp.press("Enter");
-      await pg.waitForTimeout(400);
-      const after = await pg.locator("#view").innerText();
-      if (
-        /P-2026-0001 · material/.test(after) ||
-        /Movimiento asignado/.test(
-          await pg
-            .locator("#toast")
-            .innerText()
-            .catch(() => ""),
-        )
-      )
-        ok("erp: BNK-02 — movement allocated by typing the project number");
-      else bad("erp: BNK-02 allocation", "allocation not reflected");
+      await pg.click("#rcAssign");
+      await pg.waitForTimeout(500);
+      const toastTxt = await pg
+        .locator("#toast")
+        .innerText()
+        .catch(() => "");
+      if (/Movimiento asignado/.test(toastTxt))
+        ok("erp: BNK-02 — movement allocated to a job by its project number");
+      else bad("erp: BNK-02 allocation", toastTxt.slice(0, 100));
     } else {
-      bad("erp: BNK-02 allocation", "no unallocated movement input found");
+      bad("erp: BNK-02 allocation", "no allocation control on the reconciliation screen");
     }
 
     // MDM: every party field is correctable from the UI (edit drawer → updateParty)

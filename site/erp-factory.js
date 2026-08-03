@@ -26,9 +26,11 @@ var ErpFactory = (() => {
   __export(index_exports, {
     BrowserIdGen: () => BrowserIdGen,
     SURFACE_VERSION: () => SURFACE_VERSION,
+    createComms: () => createComms,
     createDocs: () => createDocs,
     createProjects: () => createProjects,
     createRates: () => createRates,
+    createReconciliation: () => createReconciliation,
     createScheduling: () => createScheduling,
     defaultPorts: () => defaultPorts
   });
@@ -1055,6 +1057,248 @@ var ErpFactory = (() => {
     }
   };
 
+  // ../capabilities/reconciliation/src/model.ts
+  var RECONCILIATION_DEFAULTS = {
+    dateToleranceDays: 7,
+    amountToleranceCents: 50,
+    autoAcceptScore: 0.8,
+    maxCombinationSize: 3,
+    maxSuggestions: 5
+  };
+  function resolveReconciliationConfig(partial) {
+    const num = (v, fallback, lo, hi) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback;
+    };
+    const d = RECONCILIATION_DEFAULTS;
+    return {
+      dateToleranceDays: num(partial?.dateToleranceDays, d.dateToleranceDays, 0, 180),
+      amountToleranceCents: num(partial?.amountToleranceCents, d.amountToleranceCents, 0, 1e5),
+      autoAcceptScore: num(partial?.autoAcceptScore, d.autoAcceptScore, 0, 1),
+      maxCombinationSize: num(partial?.maxCombinationSize, d.maxCombinationSize, 1, 6),
+      maxSuggestions: num(partial?.maxSuggestions, d.maxSuggestions, 1, 50)
+    };
+  }
+
+  // ../capabilities/reconciliation/src/match.ts
+  var W_AMOUNT_EXACT = 0.45;
+  var W_AMOUNT_NEAR = 0.3;
+  var W_DATE_SAME = 0.2;
+  var W_DATE_NEAR = 0.12;
+  var W_REFERENCE = 0.3;
+  var W_COUNTERPARTY = 0.15;
+  var clamp01 = (n) => Math.max(0, Math.min(1, n));
+  var round2 = (n) => Math.round(n * 100) / 100;
+  function daysBetween(a, b) {
+    const ms = Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z");
+    return Number.isFinite(ms) ? Math.abs(Math.round(ms / 864e5)) : Number.MAX_SAFE_INTEGER;
+  }
+  function normalise(text) {
+    return String(text ?? "").toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Z0-9]/g, "");
+  }
+  function referenceQuoted(movementText, reference) {
+    if (!reference) return false;
+    const ref = normalise(reference);
+    if (ref.length < 4) return false;
+    return normalise(movementText).includes(ref);
+  }
+  function counterpartyNamed(movementText, counterparty) {
+    if (!counterparty) return false;
+    const haystack = normalise(movementText);
+    const words = counterparty.split(/\s+/).map(normalise).filter((w) => w.length > 3);
+    if (!words.length) return false;
+    return words.some((w) => haystack.includes(w));
+  }
+  function directionAgrees(movement, doc) {
+    return movement.amountCents < 0 ? doc.direction === "out" : doc.direction === "in";
+  }
+  var openAmount = (doc) => typeof doc.outstandingCents === "number" ? doc.outstandingCents : doc.amountCents;
+  function score(movement, docs, config) {
+    if (!docs.length) return null;
+    if (!docs.every((d) => directionAgrees(movement, d))) return null;
+    const reasons = ["directionAgrees"];
+    const target = Math.abs(movement.amountCents);
+    const total = docs.reduce((s, d) => s + openAmount(d), 0);
+    const differenceCents = target - total;
+    const gap = Math.abs(differenceCents);
+    let points = 0;
+    if (gap === 0) {
+      points += W_AMOUNT_EXACT;
+      reasons.push("exactAmount");
+    } else if (gap <= config.amountToleranceCents) {
+      points += W_AMOUNT_NEAR;
+      reasons.push("amountWithinTolerance");
+    } else {
+      return null;
+    }
+    const nearestDays = Math.min(...docs.map((d) => daysBetween(movement.date, d.date)));
+    if (nearestDays === 0) {
+      points += W_DATE_SAME;
+      reasons.push("sameDate");
+    } else if (nearestDays <= config.dateToleranceDays) {
+      points += W_DATE_NEAR * (1 - nearestDays / (config.dateToleranceDays + 1));
+      reasons.push("dateWithinTolerance");
+    }
+    if (docs.some((d) => referenceQuoted(movement.text, d.reference))) {
+      points += W_REFERENCE;
+      reasons.push("referenceQuoted");
+    }
+    if (docs.some((d) => counterpartyNamed(movement.text, d.counterparty))) {
+      points += W_COUNTERPARTY;
+      reasons.push("counterpartyNamed");
+    }
+    return {
+      movementId: movement.id,
+      docIds: docs.map((d) => d.id),
+      confidence: round2(clamp01(points)),
+      reasons,
+      differenceCents,
+      combination: docs.length > 1
+    };
+  }
+  function* subsets(docs, maxSize) {
+    const n = docs.length;
+    for (let size = 2; size <= Math.min(maxSize, n); size++) {
+      const idx = Array.from({ length: size }, (_, i) => i);
+      for (; ; ) {
+        yield idx.map((i) => docs[i]);
+        let k = size - 1;
+        while (k >= 0 && idx[k] === n - size + k) k--;
+        if (k < 0) break;
+        idx[k]++;
+        for (let j = k + 1; j < size; j++) idx[j] = idx[j - 1] + 1;
+      }
+    }
+  }
+  function suggestMatches(movement, candidates, config) {
+    const open = candidates.filter((d) => openAmount(d) > 0);
+    const singles = [];
+    for (const doc of open) {
+      const s = score(movement, [doc], config);
+      if (s) singles.push(s);
+    }
+    const combos = [];
+    if (config.maxCombinationSize > 1) {
+      const combinable = open.filter((d) => directionAgrees(movement, d)).filter((d) => openAmount(d) < Math.abs(movement.amountCents)).slice(0, 24);
+      for (const subset of subsets(combinable, config.maxCombinationSize)) {
+        const s = score(movement, subset, config);
+        if (s) combos.push(s);
+      }
+    }
+    return [...singles, ...combos].sort(
+      (a, b) => b.confidence - a.confidence || a.docIds.length - b.docIds.length || Math.abs(a.differenceCents) - Math.abs(b.differenceCents)
+    ).slice(0, config.maxSuggestions);
+  }
+  function suggestForAll(movements, candidates, config) {
+    const out = {};
+    for (const m of movements) {
+      const s = suggestMatches(m, candidates, config);
+      if (s.length) out[m.id] = s;
+    }
+    return out;
+  }
+  function findInternalTransfers(movements, config) {
+    const outs = movements.filter((m) => m.amountCents < 0);
+    const ins = movements.filter((m) => m.amountCents > 0);
+    const taken = /* @__PURE__ */ new Set();
+    const found = [];
+    for (const out of outs) {
+      let best = null;
+      for (const inc of ins) {
+        if (taken.has(inc.id)) continue;
+        if (out.accountRef && inc.accountRef && out.accountRef === inc.accountRef) continue;
+        if (Math.abs(Math.abs(out.amountCents) - inc.amountCents) > config.amountToleranceCents)
+          continue;
+        const days = daysBetween(out.date, inc.date);
+        if (days > config.dateToleranceDays) continue;
+        if (!best || days < best.days) best = { mv: inc, days };
+      }
+      if (best) {
+        taken.add(best.mv.id);
+        found.push({
+          outMovementId: out.id,
+          inMovementId: best.mv.id,
+          amountCents: Math.abs(out.amountCents),
+          daysApart: best.days
+        });
+      }
+    }
+    return found;
+  }
+
+  // ../capabilities/messaging/src/rules.ts
+  var COMMS_RULE_DEFAULTS = {
+    recipient: "customer",
+    afterDays: 0,
+    channel: "email",
+    mode: "draft",
+    active: true
+  };
+  function resolveRule(rule) {
+    return {
+      id: rule.id,
+      label: rule.label,
+      event: rule.event,
+      template: rule.template,
+      recipient: rule.recipient ?? COMMS_RULE_DEFAULTS.recipient,
+      afterDays: rule.afterDays ?? COMMS_RULE_DEFAULTS.afterDays,
+      channel: rule.channel ?? COMMS_RULE_DEFAULTS.channel,
+      mode: rule.mode ?? COMMS_RULE_DEFAULTS.mode,
+      requiresFlag: rule.requiresFlag,
+      active: rule.active ?? COMMS_RULE_DEFAULTS.active
+    };
+  }
+  function addDays(dateIso, days) {
+    const d = /* @__PURE__ */ new Date(dateIso + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+  function planMessages(rules, events, options) {
+    const planned = [];
+    for (const event of events) {
+      for (const raw of rules) {
+        const rule = resolveRule(raw);
+        if (!rule.active) continue;
+        if (rule.event !== event.event) continue;
+        if (rule.requiresFlag && !event.flags?.[rule.requiresFlag]) continue;
+        const dueDate = addDays(event.date, rule.afterDays);
+        const to = event.recipients?.[rule.recipient] ?? null;
+        planned.push({
+          ruleId: rule.id,
+          event: rule.event,
+          subjectRef: event.subjectRef,
+          template: rule.template,
+          recipient: rule.recipient,
+          to,
+          channel: rule.channel,
+          dueDate,
+          mode: rule.mode,
+          vars: event.vars ?? {},
+          due: dueDate <= options.asOf,
+          ...to ? {} : { blocked: "noRecipient" }
+        });
+      }
+    }
+    return planned.sort(
+      (a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0) || (a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : 0)
+    );
+  }
+  function newMessages(planned, existing) {
+    const seen = new Set(existing);
+    return planned.filter((p) => !seen.has(`${p.ruleId}|${p.subjectRef}`));
+  }
+  function messageKey(m) {
+    return `${m.ruleId}|${m.subjectRef}`;
+  }
+
+  // ../capabilities/messaging/src/service.ts
+  function renderTemplate(tpl, vars) {
+    return tpl.replace(
+      /\{\{\s*(\w+)\s*\}\}/g,
+      (_m, key) => key in vars ? String(vars[key]) : `{{${key}}}`
+    );
+  }
+
   // ../capabilities/projects/src/forecast.ts
   var bp = (part, whole) => whole === 0 ? 0 : roundDivHalfUp(part * 1e4, Math.abs(whole));
   var DEFAULT_OVERRUN_THRESHOLD_BP = 1e3;
@@ -1404,6 +1648,42 @@ var ErpFactory = (() => {
       }
     };
   }
+  function createReconciliation(config) {
+    const cfg = resolveReconciliationConfig(config);
+    return {
+      config: cfg,
+      /** What might explain one movement, best first. */
+      suggest(movement, candidates) {
+        return suggestMatches(movement, candidates, cfg);
+      },
+      /** The same for a whole statement, keyed by movement id. */
+      suggestAll(movements, candidates) {
+        return suggestForAll(movements, candidates, cfg);
+      },
+      /** Pairs that are one transfer between the tenant's own accounts. */
+      internalTransfers(movements) {
+        return findInternalTransfers(movements, cfg);
+      }
+    };
+  }
+  function createComms() {
+    return {
+      /** Fill `{{tokens}}`; unknown ones are left visible rather than blanked. */
+      render(template, vars) {
+        return renderTemplate(template, vars);
+      },
+      /** What the rules say should be queued, given what has happened. */
+      plan(rules, events, asOf) {
+        return planMessages(rules, events, { asOf });
+      },
+      /** Drop anything the caller has already queued, sent or cancelled. */
+      unseen(planned, existingKeys) {
+        return newMessages(planned, existingKeys);
+      },
+      /** The de-duplication key, exported so callers cannot drift from it. */
+      key: messageKey
+    };
+  }
   function createDocs() {
     return {
       /** Fills in the defaults and pulls out-of-range values back into range. */
@@ -1416,6 +1696,6 @@ var ErpFactory = (() => {
       }
     };
   }
-  var SURFACE_VERSION = 5;
+  var SURFACE_VERSION = 6;
   return __toCommonJS(index_exports);
 })();
