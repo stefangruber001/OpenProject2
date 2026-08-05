@@ -537,6 +537,15 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   committed bundle is untouched.
 - **Session 8 — not started** (skipped for now; the only item left from the
   original 12-session plan). See `docs/worklog/WORKLOG.md`.
+- **Full-scope audit (2026-08-05, operator-requested)**: adversarial audit of
+  the whole repo against the construction-CRM master prompt →
+  **`AUDIT_REPORT.md`** (stack baseline, 23 findings F-001…F-023 with
+  file:line evidence, 18-row feature gap matrix, 7 remediation batches).
+  Headlines: no auth/no durable storage on the shipped product (Critical),
+  19 high dependency advisories, `/preview` release channel pinned to a dev
+  branch, suppliers lost their registry screen, OCR still the one unbuilt
+  area. Report only — nothing was fixed; remediation batches await the
+  operator's pick.
 
 ## Branch & discipline
 
