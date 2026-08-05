@@ -1,0 +1,27 @@
+{
+  "pkg": "@repo/ui",
+  "globalName": "CaneiUI",
+  "shape": "package",
+  "buildCmd": "pnpm -F @repo/ui build",
+  "cssEntry": "styles.css",
+  "runtimeFontPrefixes": ["Inter", "Roboto Serif"],
+  "overrides": {
+    "Drawer": {
+      "cardMode": "single",
+      "viewport": "620x520"
+    },
+    "Table": {
+      "cardMode": "column"
+    },
+    "TopBar": {
+      "cardMode": "column"
+    },
+    "StatTile": {
+      "cardMode": "column"
+    },
+    "ModuleCard": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

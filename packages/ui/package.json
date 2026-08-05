@@ -3,12 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./styles.css": "./styles.css",
     "./*": "./src/*.tsx"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
     "generate:component": "turbo gen react-component",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
@@ -22,5 +28,8 @@
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
-  }
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts"
 }
