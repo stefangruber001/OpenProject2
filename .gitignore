@@ -43,3 +43,8 @@ pnpm-debug.log*
 !.vscode/extensions.json
 !.vscode/settings.json
 *.pem
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules

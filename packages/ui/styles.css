@@ -1,0 +1,542 @@
+/* Canei Subirats design system — tokens + component styles.
+ * Extracted 1:1 from the shipped site (site/index.html, site/erp.html).
+ * All classes are prefixed cnx- (Canei experience). */
+
+:root {
+  /* brand */
+  --cnx-green: #48733c;
+  --cnx-green-lt: #6ba85a;
+  --cnx-green-deep: #31532a;
+  --cnx-green-soft: #e7f0e1;
+  --cnx-green-pale: #dce8d4;
+  --cnx-spark: #f2c230;
+  /* ink */
+  --cnx-ink: #14160f;
+  --cnx-body: #4f5347;
+  --cnx-muted: #8b8f80;
+  --cnx-faint: #aab0a0;
+  /* surfaces */
+  --cnx-line: #dde5d6;
+  --cnx-hair: #e7eee1;
+  --cnx-bg: #eef3ea;
+  --cnx-paper: #fff;
+  /* status */
+  --cnx-danger: #b4402f;
+  --cnx-danger-soft: #f6e3df;
+  --cnx-amber: #8a6d12;
+  --cnx-amber-soft: #fbf0cf;
+  /* elevation */
+  --cnx-shadow: 0 1px 2px rgba(24, 32, 16, 0.03), 0 18px 40px -24px rgba(24, 32, 16, 0.18);
+  --cnx-shadow-lg: 0 2px 4px rgba(24, 32, 16, 0.04), 0 40px 80px -40px rgba(24, 32, 16, 0.3);
+  /* type */
+  --cnx-serif: "Roboto Serif", Georgia, "Times New Roman", serif;
+  --cnx-sans: Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  /* shape */
+  --cnx-r-sm: 9px;
+  --cnx-r-md: 13px;
+  --cnx-r-lg: 16px;
+}
+
+/* ---------- base ---------- */
+/* Every component carries the brand sans itself, so it renders correctly
+ * even outside a .cnx-root page shell; serif slots override explicitly. */
+.cnx-btn,
+.cnx-card,
+.cnx-stat,
+.cnx-module,
+.cnx-tag,
+.cnx-section,
+.cnx-drawer,
+.cnx-field,
+.cnx-table,
+.cnx-note,
+.cnx-topbar,
+.cnx-list,
+.cnx-item,
+.cnx-toast {
+  font-family: var(--cnx-sans);
+}
+.cnx-card,
+.cnx-module,
+.cnx-drawer,
+.cnx-note,
+.cnx-stat {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--cnx-body);
+  letter-spacing: -0.004em;
+}
+
+.cnx-root {
+  color: var(--cnx-body);
+  font: 15px/1.55 var(--cnx-sans);
+  letter-spacing: -0.004em;
+  background:
+    radial-gradient(1300px 640px at 86% -12%, rgba(72, 115, 60, 0.17), transparent 58%),
+    radial-gradient(880px 500px at 0% 3%, rgba(242, 194, 48, 0.1), transparent 55%), var(--cnx-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Button ---------- */
+.cnx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  appearance: none;
+  border: 1px solid var(--cnx-line);
+  background: var(--cnx-paper);
+  color: var(--cnx-ink);
+  font: 600 13px var(--cnx-sans);
+  border-radius: 11px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: 0.15s;
+  text-decoration: none;
+}
+.cnx-btn:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--cnx-green) 36%, var(--cnx-line));
+}
+.cnx-btn--primary {
+  border: 0;
+  background: linear-gradient(120deg, var(--cnx-green-deep), var(--cnx-green) 70%);
+  color: #fff;
+  box-shadow: 0 12px 24px -12px rgba(49, 83, 42, 0.55);
+}
+.cnx-btn--danger {
+  border: 0;
+  background: var(--cnx-danger);
+  color: #fff;
+}
+.cnx-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--cnx-green-deep);
+}
+.cnx-btn--sm {
+  padding: 6px 11px;
+  font-size: 12px;
+  border-radius: var(--cnx-r-sm);
+}
+.cnx-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ---------- Card ---------- */
+.cnx-card {
+  background: var(--cnx-paper);
+  border: 1px solid var(--cnx-line);
+  border-radius: var(--cnx-r-lg);
+  padding: 16px 18px;
+  box-shadow: var(--cnx-shadow);
+}
+.cnx-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.cnx-card__title {
+  font-family: var(--cnx-serif);
+  color: var(--cnx-ink);
+  font-weight: 600;
+  font-size: 16px;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- StatTile ---------- */
+.cnx-stat {
+  display: block;
+  background: var(--cnx-paper);
+  border: 1px solid var(--cnx-line);
+  border-radius: 14px;
+  padding: 13px 15px;
+  box-shadow: var(--cnx-shadow);
+  transition: 0.13s;
+  text-decoration: none;
+}
+.cnx-stat:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--cnx-green) 36%, var(--cnx-line));
+}
+.cnx-stat__label {
+  font: 600 10px var(--cnx-sans);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--cnx-muted);
+}
+.cnx-stat__value {
+  font-family: var(--cnx-serif);
+  font-size: 22px;
+  color: var(--cnx-ink);
+  margin-top: 5px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.cnx-stat__sub {
+  font-size: 11px;
+  color: var(--cnx-muted);
+  margin-top: 4px;
+}
+.cnx-stat--highlight {
+  background: linear-gradient(125deg, var(--cnx-green-deep), var(--cnx-green) 72%);
+  border-color: transparent;
+}
+.cnx-stat--highlight .cnx-stat__label {
+  color: rgba(255, 255, 255, 0.72);
+}
+.cnx-stat--highlight .cnx-stat__value {
+  color: #fff;
+}
+.cnx-stat--highlight .cnx-stat__sub {
+  color: rgba(255, 255, 255, 0.8);
+}
+.cnx-stat--warn .cnx-stat__value {
+  color: var(--cnx-danger);
+}
+
+/* ---------- ModuleCard ---------- */
+.cnx-module {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  background: var(--cnx-paper);
+  border: 1px solid var(--cnx-line);
+  border-radius: var(--cnx-r-lg);
+  padding: 16px 15px 14px;
+  box-shadow: var(--cnx-shadow);
+  transition:
+    transform 0.13s,
+    box-shadow 0.2s,
+    border-color 0.2s;
+  overflow: hidden;
+  text-decoration: none;
+}
+.cnx-module::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  transform: scaleX(0);
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--cnx-green), var(--cnx-green-lt) 60%, var(--cnx-spark));
+  transition: transform 0.22s;
+}
+.cnx-module:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--cnx-shadow-lg);
+  border-color: color-mix(in srgb, var(--cnx-green) 34%, var(--cnx-line));
+}
+.cnx-module:hover::before {
+  transform: scaleX(1);
+}
+.cnx-module__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--cnx-green-soft);
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+}
+.cnx-module__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cnx-ink);
+  letter-spacing: -0.01em;
+}
+.cnx-module__desc {
+  font-size: 11.5px;
+  color: var(--cnx-muted);
+  line-height: 1.45;
+}
+.cnx-module__live {
+  font: 600 11px var(--cnx-sans);
+  color: var(--cnx-green-deep);
+  margin-top: auto;
+}
+.cnx-module__live--alert {
+  color: var(--cnx-danger);
+}
+.cnx-module--tower {
+  background: linear-gradient(120deg, var(--cnx-green-deep), var(--cnx-green) 68%, #537f45);
+  border-color: transparent;
+}
+.cnx-module--tower .cnx-module__title {
+  color: #fff;
+  font-size: 16px;
+}
+.cnx-module--tower .cnx-module__desc {
+  color: rgba(255, 255, 255, 0.85);
+}
+.cnx-module--tower .cnx-module__icon {
+  background: rgba(255, 255, 255, 0.16);
+}
+.cnx-module--tower .cnx-module__live {
+  color: var(--cnx-spark);
+}
+
+/* ---------- Tag ---------- */
+.cnx-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 600 10.5px var(--cnx-sans);
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: var(--cnx-green-soft);
+  color: var(--cnx-green-deep);
+}
+.cnx-tag--neutral {
+  background: var(--cnx-hair);
+  color: var(--cnx-body);
+}
+.cnx-tag--warn {
+  background: var(--cnx-amber-soft);
+  color: var(--cnx-amber);
+}
+.cnx-tag--danger {
+  background: var(--cnx-danger-soft);
+  color: var(--cnx-danger);
+}
+.cnx-tag--spark {
+  background: #fdf3d0;
+  color: #7a5e0a;
+}
+
+/* ---------- SectionHeader ---------- */
+.cnx-section {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+.cnx-section__title {
+  font-family: var(--cnx-serif);
+  color: var(--cnx-ink);
+  font-weight: 600;
+  font-size: clamp(18px, 2.6vw, 23px);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+.cnx-section__hint {
+  font-size: 12px;
+  color: var(--cnx-muted);
+}
+
+/* ---------- Drawer ---------- */
+.cnx-drawer {
+  background: var(--cnx-bg);
+  border-left: 1px solid var(--cnx-line);
+  width: min(560px, 94vw);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--cnx-shadow-lg);
+}
+.cnx-drawer__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--cnx-line);
+  background: var(--cnx-paper);
+}
+.cnx-drawer__title {
+  font-family: var(--cnx-serif);
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--cnx-ink);
+  margin: 0;
+}
+.cnx-drawer__close {
+  appearance: none;
+  border: 1px solid var(--cnx-line);
+  background: var(--cnx-paper);
+  border-radius: 9px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  color: var(--cnx-muted);
+  font-size: 14px;
+}
+.cnx-drawer__body {
+  padding: 16px 18px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---------- Field / Input / Select ---------- */
+.cnx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.cnx-field__label {
+  font: 600 11px var(--cnx-sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--cnx-muted);
+}
+.cnx-input,
+.cnx-select {
+  appearance: none;
+  border: 1px solid var(--cnx-line);
+  background: var(--cnx-paper);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font: 400 13.5px var(--cnx-sans);
+  color: var(--cnx-ink);
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+.cnx-input:focus,
+.cnx-select:focus {
+  border-color: var(--cnx-green);
+  box-shadow: 0 0 0 3px rgba(72, 115, 60, 0.13);
+}
+.cnx-input::placeholder {
+  color: var(--cnx-faint);
+}
+
+/* ---------- Table ---------- */
+.cnx-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--cnx-paper);
+  border-radius: var(--cnx-r-md);
+  overflow: hidden;
+  box-shadow: var(--cnx-shadow);
+  font-size: 13px;
+}
+.cnx-table th {
+  text-align: left;
+  font: 600 10.5px var(--cnx-sans);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--cnx-muted);
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--cnx-line);
+  background: color-mix(in srgb, var(--cnx-green-soft) 40%, var(--cnx-paper));
+}
+.cnx-table td {
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--cnx-hair);
+  color: var(--cnx-body);
+}
+.cnx-table tr:last-child td {
+  border-bottom: 0;
+}
+.cnx-table tbody tr:hover {
+  background: color-mix(in srgb, var(--cnx-green-soft) 30%, var(--cnx-paper));
+}
+.cnx-table__num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ---------- NotePanel ---------- */
+.cnx-note {
+  border-left: 3px solid var(--cnx-green);
+  background: var(--cnx-green-soft);
+  border-radius: 0 12px 12px 0;
+  padding: 12px 16px;
+  font-size: 12.5px;
+  color: var(--cnx-body);
+}
+.cnx-note--warn {
+  border-left-color: var(--cnx-amber);
+  background: var(--cnx-amber-soft);
+}
+.cnx-note--danger {
+  border-left-color: var(--cnx-danger);
+  background: var(--cnx-danger-soft);
+}
+
+/* ---------- TopBar / LogoMark ---------- */
+.cnx-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.cnx-topbar__spacer {
+  flex: 1;
+}
+.cnx-logo {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-decoration: none;
+}
+.cnx-logo__name {
+  font-family: var(--cnx-serif);
+  font-weight: 600;
+  font-size: 19px;
+  color: var(--cnx-ink);
+  line-height: 1.05;
+}
+.cnx-logo__sub {
+  display: block;
+  font-family: var(--cnx-sans);
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--cnx-green);
+  margin-top: 3px;
+}
+
+/* ---------- ListItem ---------- */
+.cnx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cnx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--cnx-body);
+  background: var(--cnx-paper);
+  border: 1px solid var(--cnx-hair);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.cnx-item__strong {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--cnx-green-deep);
+  font-variant-numeric: tabular-nums;
+}
+.cnx-item--danger {
+  border-color: color-mix(in srgb, var(--cnx-danger) 30%, var(--cnx-hair));
+  background: color-mix(in srgb, var(--cnx-danger-soft) 45%, var(--cnx-paper));
+}
+
+/* ---------- Toast ---------- */
+.cnx-toast {
+  display: inline-block;
+  background: var(--cnx-ink);
+  color: #fff;
+  font: 600 12.5px var(--cnx-sans);
+  border-radius: 999px;
+  padding: 10px 18px;
+  box-shadow: var(--cnx-shadow-lg);
+}
+.cnx-toast--danger {
+  background: var(--cnx-danger);
+}
