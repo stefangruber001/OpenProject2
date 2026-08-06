@@ -21,6 +21,15 @@
     },
     "ModuleCard": {
       "cardMode": "column"
+    },
+    "Button": {
+      "cardMode": "column"
+    },
+    "Card": {
+      "cardMode": "column"
+    },
+    "Field": {
+      "cardMode": "column"
     }
   },
   "readmeHeader": ".design-sync/conventions.md"

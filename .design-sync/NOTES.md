@@ -16,6 +16,14 @@
   - LogoMark: "mounts have no text" — it is an SVG-only mark; renders fine.
 - Tr/Td ship as floor cards deliberately — they only make sense inside Table (whose
   preview composes them); Input/Select also have standalone authored previews.
+- Grades are keyed to the preview source hash, and the repo's prettier pre-commit hook
+  reformats `.design-sync/previews/*.tsx` on commit — so components edited late in a run
+  come back as `pendingGrade` on the next driver run. Harmless: re-read those sheets and
+  re-grade. To avoid it, run prettier over previews/ before grading.
+- Converter 2.1.223 flags more `[GRID_OVERFLOW]` cases than 2.1.222 did. Button, Card and
+  Field joined StatTile/ModuleCard/Table/TopBar on `cardMode: "column"`; Drawer stays
+  `single` with a 620x520 viewport. Expect a converter bump to surface more of these —
+  they are presentation-only, fixed by the override the warn names.
 
 ## Re-sync risks
 
