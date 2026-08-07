@@ -1,0 +1,71 @@
+# =============================================================================
+# Production stack for the Canei ERP. Runs on the Hetzner VPS.
+#
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# NOTE: no service publishes a port. The only way in is the Cloudflare tunnel,
+# so the server has nothing listening on the public internet. If you find
+# yourself adding `ports:` here, stop and ask why — it is almost always wrong.
+#
+# Configuration comes from a `.env` file sitting next to this one. See
+# `.env.production.example` for the full list.
+# =============================================================================
+name: canei-erp
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Deterministic collation, so index order cannot drift between a restore
+      # and the original. Matters for a system holding an invoice register.
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Read-only mount so the backup job can reach the socket without a password.
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # One-shot. Runs to completion, then exits — `docker compose up` waits for it
+  # because the app depends on it completing successfully.
+  migrate:
+    image: ${IMAGE_MIGRATE}
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    image: ${IMAGE_APP}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      NEXT_PUBLIC_APP_URL: ${APP_URL}
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # The only ingress. Dials out to Cloudflare and forwards to app:3000.
+  # No inbound firewall rule exists for this, by design.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - app
+
+volumes:
+  db-data:
