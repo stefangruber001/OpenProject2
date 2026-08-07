@@ -154,8 +154,11 @@ jobs:
             sleep 3
           done
           echo "$body"
-          echo "$body" | grep -q '"status":"ok"'        || { docker logs app; exit 1; }
-          echo "$body" | grep -q '"database":"connected"' || { docker logs app; exit 1; }
+          # Parsed, not grepped. Whether a route emits compact or indented JSON
+          # is a detail of which helper it happens to use, and a check that
+          # depends on it reports a healthy app as broken.
+          echo "$body" | jq -e '.status == "ok" and .database == "connected"' >/dev/null \
+            || { docker logs app; exit 1; }
           curl -fsS -o /dev/null http://127.0.0.1:3000/  || { docker logs app; exit 1; }
 
       # /api/health passes even when tenant specs are unreachable, because it
@@ -167,7 +170,11 @@ jobs:
         run: |
           out=$(curl -fsS http://127.0.0.1:3000/api/reformas-demo/quotes) || { docker logs app; exit 1; }
           echo "$out"
-          echo "$out" | grep -q '"tenant":"reformas-demo"' || {
+          # This route goes through lib/api.ts's json() helper, which indents.
+          # A grep for '"tenant":"reformas-demo"' can never match it, and spent
+          # a run claiming the tenant specs were missing when the route was
+          # returning 200 with the right body.
+          echo "$out" | jq -e '.tenant == "reformas-demo"' >/dev/null || {
             echo "::error::Tenant spec not resolvable in the image — check TENANTS_DIR and the tenants/ COPY."
             docker logs app; exit 1; }
 
