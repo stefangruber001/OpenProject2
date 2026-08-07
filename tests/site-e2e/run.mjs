@@ -114,6 +114,30 @@ async function testJourney(browser, base) {
   try {
     await page.goto(`${base}/journey.html`, { waitUntil: "networkidle" });
 
+    // ── Negative: an empty intake must not start the journey. The page is
+    // translated at runtime, so match on either language.
+    await page.locator("#clearform").click();
+    await page.waitForTimeout(150);
+    await page.locator("#startbtn").click();
+    await page.waitForTimeout(200);
+    const intakeErr = await page
+      .locator("#ierr")
+      .textContent()
+      .catch(() => "");
+    if (/customer name|nombre del cliente/i.test(intakeErr || "")) ok("blank intake is refused");
+    else bad("blank intake is refused", `#ierr = "${intakeErr}"`);
+
+    // ── Negative: the rail must not walk past the intake gate. Before this was
+    // closed, clicking "STEP 1" while step was -1 entered the journey with no
+    // customer name, no tax id and no email.
+    const afterRail = await page.evaluate(() => {
+      document.querySelector("#rail .st.nav")?.click();
+      return document.querySelector("#stage")?.innerText.slice(0, 80) || "";
+    });
+    if (/your project|su proyecto|proyecto/i.test(afterRail))
+      ok("rail cannot bypass the intake gate");
+    else bad("rail cannot bypass the intake gate", afterRail.replace(/\n/g, " "));
+
     // "Load sample data" pre-fills the intake form with the sample project.
     await page.locator("#loadsample").click();
     await page.waitForTimeout(300);
@@ -129,19 +153,56 @@ async function testJourney(browser, base) {
     await page.locator("#startbtn").click();
     await page.waitForTimeout(300);
 
+    // ── Negative: the gate must hold. Clearing a required field on the stage we
+    // are standing on has to disable Advance and say what is missing.
+    await page.evaluate(() => {
+      const el = document.querySelector('#stage [data-k="enquiry"]');
+      if (el) {
+        el.value = "";
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    await page.waitForTimeout(150);
+    const gated = await page.evaluate(() => ({
+      disabled: !!document.querySelector("#next")?.disabled,
+      gate: document.querySelector("#gate")?.innerText || "",
+    }));
+    if (gated.disabled && gated.gate.trim()) ok("a missing required field blocks Advance");
+    else bad("a missing required field blocks Advance", JSON.stringify(gated));
+    // put it back
+    await page.evaluate(() => {
+      const el = document.querySelector('#stage [data-k="enquiry"]');
+      if (el) {
+        el.value = "Full bathroom refit";
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    await page.waitForTimeout(150);
+
     // Walk the whole lifecycle with the Next control.
     let advanced = 0;
+    let stuck = "";
     for (let i = 0; i < 20; i++) {
       const next = page.locator("#next");
       if ((await next.count()) === 0) break;
       if (!(await next.isVisible().catch(() => false))) break;
-      if (await next.isDisabled().catch(() => false)) break;
+      if (await next.isDisabled().catch(() => false)) {
+        stuck = await page
+          .locator("#gate")
+          .innerText()
+          .catch(() => "");
+        break;
+      }
       await next.click();
       await page.waitForTimeout(160);
       advanced++;
     }
     if (advanced >= 10) ok(`advances through the full lifecycle (${advanced} steps)`);
-    else bad("advances through the full lifecycle", `only advanced ${advanced} steps`);
+    else
+      bad(
+        "advances through the full lifecycle",
+        `only advanced ${advanced} steps${stuck ? ` — gate: ${stuck.replace(/\n/g, " | ")}` : ""}`,
+      );
 
     // After the invoice stage the P&L ledger holds a real revenue figure.
     const revenue = await page.evaluate(() => {
@@ -170,6 +231,45 @@ async function testJourney(browser, base) {
     if (pcount >= 12 && rendered >= 12)
       ok(`all lifecycle stages navigable & render (${rendered}/${pcount})`);
     else bad("stages navigable & render", `${rendered}/${pcount} reached-nav pills`);
+
+    // ── The figures must come from entered purchase orders and bills, not from a
+    // percentage of the budget. When they were multipliers every chapter showed
+    // the SAME variance percentage — that identity is the regression to catch.
+    await page.evaluate(() => {
+      const pills = [...document.querySelectorAll("#rail .st.nav")];
+      pills[11]?.click(); // Close · profit
+    });
+    await page.waitForTimeout(300);
+    const variancePcts = await page.evaluate(() =>
+      [...document.querySelectorAll("#stage table tr")]
+        .map((r) => [...r.children].map((c) => c.textContent.trim()))
+        .filter((r) => r.length === 4)
+        .map((r) => r[3])
+        .filter((v) => /%/.test(v)),
+    );
+    if (variancePcts.length >= 3 && new Set(variancePcts).size > 1)
+      ok(`per-chapter variance derives from entered cost (${new Set(variancePcts).size} distinct)`);
+    else
+      bad(
+        "per-chapter variance derives from entered cost",
+        `values: ${variancePcts.join(" | ") || "(none)"} — identical values mean the multiplier is back`,
+      );
+
+    // ── A reload must resume the journey, ledger included. step/reached and the
+    // whole ledger used to be module variables, so a refresh dropped the
+    // operator back on the intake with zeroes beside a full document folder.
+    const before = await page.evaluate(
+      () => document.querySelector("#l-revenue")?.textContent.trim() || "",
+    );
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForTimeout(400);
+    const after = await page.evaluate(() => ({
+      revenue: document.querySelector("#l-revenue")?.textContent.trim() || "",
+      onIntake: !!document.querySelector("#startbtn"),
+    }));
+    if (!after.onIntake && after.revenue === before && /\d/.test(after.revenue))
+      ok(`reload resumes mid-journey with the ledger intact (${after.revenue})`);
+    else bad("reload resumes mid-journey", `before=${before} after=${JSON.stringify(after)}`);
 
     // Export the project folder as a real .zip and assert it's non-trivial.
     const dl = page.locator("#dlfolder");
