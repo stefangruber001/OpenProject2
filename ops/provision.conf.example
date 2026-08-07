@@ -37,6 +37,12 @@ ACCESS_EMAIL_DOMAIN="caneisubirats.com"
 # owner/repo — used for the image names and the GitHub secrets.
 GITHUB_REPO="stefangruber001/OpenProject2"
 
+# Who is using the ERP. Every change is stamped with this name in the audit
+# trail, so it must be a real person — not "admin" and not "system". There is
+# no login yet, so this is how a change becomes attributable at all; the API
+# refuses to write anything until it is set to something real.
+ERP_OPERATOR="CAMBIAR: nombre del operador"
+
 # --- R2 credentials ---------------------------------------------------------
 # Leave EMPTY on the first run. The script creates the bucket, then stops and
 # tells you to mint a token scoped to it — R2 tokens cannot be minted reliably
