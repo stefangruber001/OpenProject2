@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Canei ERP — Server Setup Guide</title>
+<style>
+  :root{
+    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a;
+    --greenSoft:#e7f0e1; --greenPale:#f2f7ee; --spark:#f2c230;
+    --ink:#14160f; --body:#43483c; --muted:#7d8273; --line:#dde5d6; --hair:#eaf0e4;
+    --warn:#a56a1c; --warnBg:#fdf6e7; --crit:#9a3b33; --critBg:#fbeeec;
+    --serif:Georgia,"Times New Roman",serif;
+    --sans:-apple-system,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+    --mono:"SF Mono",Menlo,Consolas,monospace;
+  }
+  @page{ size:A4; margin:16mm 15mm 14mm; }
+  *{box-sizing:border-box}
+  body{margin:0;font:10.5pt/1.55 var(--sans);color:var(--body);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);margin:0;font-weight:600;letter-spacing:-.01em}
+  p{margin:0 0 8px}
+  code{font-family:var(--mono);font-size:9pt;background:var(--greenPale);border:1px solid var(--hair);
+       border-radius:3px;padding:1px 4px;color:var(--greenDeep)}
+  .page{page-break-after:always}
+  .page:last-child{page-break-after:auto}
+  .avoid{page-break-inside:avoid}
+
+  /* ---------- cover ---------- */
+  .cover{height:265mm;display:flex;flex-direction:column;justify-content:space-between;
+         background:linear-gradient(150deg,var(--greenDeep) 0%,var(--green) 58%,var(--greenLt) 100%);
+         color:#fff;margin:-16mm -15mm 0;padding:24mm 18mm}
+  .cover h1{color:#fff;font-size:34pt;line-height:1.1;margin:0 0 10px}
+  .cover .sub{font-size:13pt;opacity:.92;max-width:120mm}
+  .mark{width:34px;height:34px;border-radius:9px;background:var(--spark);display:flex;
+        align-items:center;justify-content:center;font:700 17px var(--sans);color:var(--greenDeep)}
+  .cover .brand{display:flex;align-items:center;gap:11px;font:600 12pt var(--sans);letter-spacing:.02em}
+  .cover .foot{font-size:9.5pt;opacity:.8;border-top:1px solid rgba(255,255,255,.25);padding-top:10px}
+  .bignum{display:flex;gap:9mm;margin-top:14mm}
+  .bignum div{flex:1}
+  .bignum b{display:block;font:700 26pt var(--serif);color:var(--spark);line-height:1}
+  .bignum span{font-size:9.5pt;opacity:.9}
+
+  /* ---------- structure ---------- */
+  .h2{font-size:17pt;margin:0 0 3px}
+  .lede{color:var(--muted);font-size:10pt;margin-bottom:12px}
+  .rule{height:3px;width:44px;background:var(--spark);border-radius:2px;margin:0 0 10px}
+
+  .split{display:flex;gap:6mm}
+  .split>*{flex:1}
+
+  .card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:#fff}
+  .card h4{font-size:11pt;margin-bottom:4px}
+  .soft{background:var(--greenPale);border-color:var(--greenSoft)}
+
+  .step{display:flex;gap:10px;margin:0 0 11px;page-break-inside:avoid}
+  .step .n{flex:0 0 26px;height:26px;border-radius:50%;background:var(--green);color:#fff;
+           font:700 11pt var(--sans);display:flex;align-items:center;justify-content:center}
+  .step .b{flex:1}
+  .step h3{font-size:12pt;margin-bottom:3px}
+  .where{display:inline-block;font:600 8pt var(--sans);letter-spacing:.05em;text-transform:uppercase;
+         color:var(--greenDeep);background:var(--greenSoft);border-radius:3px;padding:2px 6px;margin-bottom:5px}
+
+  ul,ol{margin:5px 0 8px;padding-left:17px}
+  li{margin:2.5px 0}
+
+  pre{background:var(--ink);color:#e8efe2;border-radius:7px;padding:9px 11px;font:8.6pt/1.5 var(--mono);
+      overflow:hidden;white-space:pre-wrap;word-break:break-word;margin:6px 0}
+  pre .c{color:#98a68c}
+
+  table{width:100%;border-collapse:collapse;font-size:9.3pt;margin:6px 0}
+  th{text-align:left;font:600 8.5pt var(--sans);letter-spacing:.04em;text-transform:uppercase;
+     color:var(--muted);border-bottom:1.5px solid var(--line);padding:5px 7px 4px}
+  td{border-bottom:1px solid var(--hair);padding:5px 7px;vertical-align:top}
+  td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr.tot td{font-weight:700;color:var(--ink);border-top:1.5px solid var(--line);border-bottom:none}
+
+  .note{border-left:3px solid var(--spark);background:#fdf9ee;padding:8px 11px;border-radius:0 6px 6px 0;
+        margin:9px 0;font-size:9.6pt}
+  .warn{border-left:3px solid var(--warn);background:var(--warnBg);padding:8px 11px;border-radius:0 6px 6px 0;
+        margin:9px 0;font-size:9.6pt}
+  .stop{border-left:3px solid var(--crit);background:var(--critBg);padding:8px 11px;border-radius:0 6px 6px 0;
+        margin:9px 0;font-size:9.6pt}
+  .note b,.warn b,.stop b{color:var(--ink)}
+
+  .pill{display:inline-block;font:600 8pt var(--sans);border-radius:11px;padding:2px 8px;white-space:nowrap}
+  .pY{background:var(--spark);color:#4a3a05}
+  .pA{background:var(--greenSoft);color:var(--greenDeep)}
+
+  /* ---------- diagram ---------- */
+  .diagram{border:1px solid var(--line);border-radius:9px;padding:12px;background:var(--greenPale);margin:8px 0}
+  .row{display:flex;align-items:center;gap:8px;justify-content:center;margin:5px 0}
+  .box{border:1.5px solid var(--green);background:#fff;border-radius:7px;padding:7px 11px;
+       font:600 9pt var(--sans);color:var(--greenDeep);text-align:center;min-width:38mm}
+  .box small{display:block;font:400 7.8pt var(--sans);color:var(--muted);margin-top:1px}
+  .box.dash{border-style:dashed;background:#fbfdf9}
+  .arr{color:var(--green);font-size:14pt;line-height:1}
+  .vt{text-align:center;color:var(--green);font-size:13pt;line-height:1;margin:1px 0}
+  .host{border:1.5px dashed var(--greenLt);border-radius:9px;padding:9px;background:#fff;margin-top:5px}
+  .host .lbl{font:600 7.8pt var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+             text-align:center;margin-bottom:5px}
+
+  .kv{display:flex;gap:7px;margin:3px 0;font-size:9.4pt}
+  .kv .k{flex:0 0 46mm;color:var(--muted)}
+  .kv .v{flex:1;color:var(--ink)}
+  .chk{list-style:none;padding-left:0}
+  .chk li{padding-left:19px;position:relative;margin:4px 0}
+  .chk li:before{content:"";position:absolute;left:0;top:2.5px;width:11px;height:11px;
+                 border:1.5px solid var(--green);border-radius:3px}
+  .foot{margin-top:10mm;padding-top:6px;border-top:1px solid var(--line);
+        font-size:8.3pt;color:var(--muted);display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+
+<!-- ============================ COVER ============================ -->
+<section class="page">
+  <div class="cover">
+    <div class="brand"><div class="mark">C</div> CANEI SUBIRATS · ERP</div>
+    <div>
+      <h1>Server Setup<br>Guide</h1>
+      <p class="sub">Everything you do by hand, in order — and everything the
+      machine does for you. Three accounts, two tokens, one command.</p>
+      <div class="bignum">
+        <div><b>~35 min</b><span>of your attention</span></div>
+        <div><b>1</b><span>command to run</span></div>
+        <div><b>≈ €9</b><span>per month, all in</span></div>
+      </div>
+    </div>
+    <div class="foot">Canei Subirats, S.L. · Hetzner + Cloudflare · Revision 2026-08-07</div>
+  </div>
+</section>
+
+<!-- ============================ AT A GLANCE ============================ -->
+<section class="page">
+  <div class="rule"></div>
+  <h2 class="h2">At a glance</h2>
+  <p class="lede">The setup is automated except for the parts that legally need a
+  human with a credit card. Those are the only things on your list.</p>
+
+  <div class="split">
+    <div class="card soft">
+      <h4>🖐️ You do this — 5 things</h4>
+      <ol>
+        <li>Create the <b>Hetzner</b> account</li>
+        <li>Create the <b>Cloudflare</b> account and point the domain at it</li>
+        <li>Mint <b>two API tokens</b> (copy &amp; paste)</li>
+        <li>Run <b>one command</b></li>
+        <li>Mint <b>one R2 token</b>, run the command again</li>
+      </ol>
+      <p style="margin:6px 0 0"><span class="pill pY">≈ 35 minutes</span></p>
+    </div>
+    <div class="card">
+      <h4>🤖 The script does this</h4>
+      <ul>
+        <li>Creates the tunnel, DNS record and login policy</li>
+        <li>Creates the backup bucket</li>
+        <li>Generates the database password and encryption keys</li>
+        <li>Creates the server, firewalled to SSH only</li>
+        <li>Installs Docker, the app, the database</li>
+        <li>Turns on auto-patching, auto-deploy, nightly backups</li>
+        <li>Sets the GitHub secrets</li>
+        <li>Waits until the site answers, then tells you</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="font-size:12.5pt;margin:12px 0 2px">What you end up with</h3>
+  <div class="diagram">
+    <div class="row"><div class="box">Browser<small>anyone at Canei</small></div></div>
+    <div class="vt">▼</div>
+    <div class="row"><div class="box" style="border-color:var(--spark);background:#fefaf0">
+      Cloudflare<small>login · DNS · firewall · CDN</small></div></div>
+    <div class="vt">▼</div>
+    <div style="text-align:center;font-size:8.4pt;color:var(--muted);margin:2px 0">
+      tunnel — dialled <b>outwards</b> by the server</div>
+    <div class="vt">▼</div>
+    <div class="host">
+      <div class="lbl">Hetzner · Germany · no open ports</div>
+      <div class="row">
+        <div class="box">App<small>Next.js</small></div>
+        <div class="arr">→</div>
+        <div class="box">Database<small>PostgreSQL 17</small></div>
+      </div>
+      <div class="vt">▼</div>
+      <div class="row"><div class="box dash">Nightly encrypted backup<small>→ Cloudflare R2</small></div></div>
+    </div>
+  </div>
+
+  <div class="note"><b>Why no open ports?</b> The server never accepts an incoming
+  connection. It dials out to Cloudflare and traffic comes back down that pipe.
+  There is nothing on the public internet to attack, and no certificate to renew.</div>
+
+  <table>
+    <thead><tr><th>What</th><th>Where</th><th class="n">Per month</th></tr></thead>
+    <tbody>
+      <tr><td>Server — 4 vCPU, 8 GB, 80 GB</td><td>Hetzner, Falkenstein 🇩🇪</td><td class="n">€7.05</td></tr>
+      <tr><td>Whole-server snapshots</td><td>Hetzner</td><td class="n">€1.40</td></tr>
+      <tr><td>Encrypted database backups</td><td>Cloudflare R2</td><td class="n">€0.20</td></tr>
+      <tr><td>DNS, login, firewall, tunnel</td><td>Cloudflare free tier</td><td class="n">€0.00</td></tr>
+      <tr><td>Source, CI, image registry</td><td>GitHub free tier</td><td class="n">€0.00</td></tr>
+      <tr class="tot"><td>Total</td><td></td><td class="n">≈ €8.65</td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot"><span>Canei ERP — Server Setup Guide</span><span>2</span></div>
+</section>
+
+<!-- ============================ STEPS 1-2 ============================ -->
+<section class="page">
+  <div class="rule"></div>
+  <h2 class="h2">Step by step</h2>
+  <p class="lede">Do these in order. Step 1 first — Hetzner verifies new
+  accounts by hand and that can take a few hours.</p>
+
+  <div class="stop"><b>Read this before you click anything.</b> Every account
+  goes in <b>Canei Subirats, S.L.</b>'s name, with <b>their</b> card and a role
+  address like <code>sistemas@caneisubirats.com</code> — never a personal
+  mailbox. You add yourself afterwards as an admin and remove yourself at
+  handover. Some providers will not transfer account ownership at all, so doing
+  it the other way round turns the handover into a migration. It costs nothing
+  to get right today.</div>
+
+  <div class="step avoid">
+    <div class="n">1</div>
+    <div class="b">
+      <span class="where">console.hetzner.cloud</span>
+      <h3>Create the Hetzner account <span class="pill pY">10 min</span></h3>
+      <p>Register with the role address, company name, company address and CIF.
+      Hetzner verifies new company accounts manually — start here so the wait
+      overlaps everything else.</p>
+      <p>Then create a project called <code>canei-erp</code>. That is all —
+      <b>do not create a server</b>, the script does that with the right image,
+      firewall and configuration already attached.</p>
+    </div>
+  </div>
+
+  <div class="step avoid">
+    <div class="n">2</div>
+    <div class="b">
+      <span class="where">dash.cloudflare.com</span>
+      <h3>Create the Cloudflare account and add the domain <span class="pill pY">15 min</span></h3>
+      <p>Sign up with the same role address. Then add
+      <code>caneisubirats.com</code>:</p>
+      <ul>
+        <li><b>Domain already registered elsewhere?</b> <i>Add a site</i>, then
+        change the nameservers at the current registrar to the two Cloudflare
+        gives you. Propagation can take a few hours.</li>
+        <li><b>Not registered yet?</b> <i>Domain Registration → Register
+        Domain</i>. Simplest, because it lands in the right account already.</li>
+      </ul>
+      <p>Then set <b>SSL/TLS → Overview → Full (strict)</b>.</p>
+      <div class="note">The domain must be <b>active</b> in Cloudflare before
+      step 4, or the script stops and tells you so. Nothing is damaged — you
+      just re-run it once the nameservers have propagated.</div>
+    </div>
+  </div>
+
+  <div class="foot"><span>Canei ERP — Server Setup Guide</span><span>3</span></div>
+</section>
+
+<!-- ============================ STEP 3 TOKENS ============================ -->
+<section class="page">
+  <div class="rule"></div>
+  <h2 class="h2">Step 3 · The two API tokens <span class="pill pY">10 min</span></h2>
+  <p class="lede">These are what let the script do the other forty things for
+  you. Copy each one straight into the config file — they are shown once.</p>
+
+  <div class="card avoid" style="margin-bottom:10px">
+    <h4>🔑 Hetzner token</h4>
+    <div class="kv"><div class="k">Where</div><div class="v">console.hetzner.cloud → project <code>canei-erp</code> → <b>Security → API tokens</b> → Generate</div></div>
+    <div class="kv"><div class="k">Permission</div><div class="v"><b>Read &amp; Write</b> (Read alone cannot create the server)</div></div>
+    <div class="kv"><div class="k">Goes in</div><div class="v"><code>HCLOUD_TOKEN</code></div></div>
+  </div>
+
+  <div class="card avoid">
+    <h4>🔑 Cloudflare token</h4>
+    <div class="kv"><div class="k">Where</div><div class="v">dash.cloudflare.com → <b>My Profile → API Tokens</b> → Create Token → <b>Custom token</b></div></div>
+    <div class="kv"><div class="k">Goes in</div><div class="v"><code>CF_API_TOKEN</code></div></div>
+    <p style="margin:7px 0 3px"><b>Add all five permissions:</b></p>
+    <table>
+      <thead><tr><th>Type</th><th>Permission</th><th>Level</th></tr></thead>
+      <tbody>
+        <tr><td>Account</td><td>Cloudflare Tunnel</td><td>Edit</td></tr>
+        <tr><td>Account</td><td>Access: Apps and Policies</td><td>Edit</td></tr>
+        <tr><td>Account</td><td>Workers R2 Storage</td><td>Edit</td></tr>
+        <tr><td>Zone</td><td>DNS</td><td>Edit</td></tr>
+        <tr><td>Zone</td><td>Zone</td><td>Read</td></tr>
+      </tbody>
+    </table>
+    <p style="margin:2px 0 0">Under <b>Zone Resources</b>, include the Canei domain.</p>
+  </div>
+
+  <p style="margin-top:11px">You also need your <b>Account ID</b> — open any
+  domain in Cloudflare and it is in the right-hand sidebar. That goes in
+  <code>CF_ACCOUNT_ID</code>.</p>
+
+  <h3 style="font-size:12.5pt;margin:12px 0 3px">Put them in the config file</h3>
+  <pre><span class="c"># on your own laptop, in the project folder</span>
+cp ops/provision.conf.example ops/provision.conf
+nano ops/provision.conf</pre>
+  <p>Six values. The file is gitignored, so it never reaches GitHub.</p>
+
+  <div class="warn"><b>Keep them.</b> Paste both tokens into the customer's
+  password manager as you create them. Cloudflare and Hetzner show each token
+  exactly once.</div>
+
+  <div class="foot"><span>Canei ERP — Server Setup Guide</span><span>4</span></div>
+</section>
+
+<!-- ============================ STEPS 4-5 ============================ -->
+<section class="page">
+  <div class="rule"></div>
+  <h2 class="h2">Step 4 · Run the command <span class="pill pY">2 min + 10 waiting</span></h2>
+
+  <pre>./ops/provision.sh</pre>
+
+  <p>It checks both tokens before it creates anything, then works through the
+  list. Expect it to pause once:</p>
+
+  <div class="card soft avoid" style="margin:8px 0">
+    <h4>⏸ It will stop and ask for one more token</h4>
+    <p style="margin-bottom:4px">R2 storage tokens cannot be minted reliably
+    through the API, so the script creates the bucket, then stops:</p>
+    <div class="kv"><div class="k">Where</div><div class="v">dash.cloudflare.com → <b>R2 → Manage API tokens</b> → Create API token</div></div>
+    <div class="kv"><div class="k">Permission</div><div class="v"><b>Object Read &amp; Write</b></div></div>
+    <div class="kv"><div class="k">Scope</div><div class="v">only the bucket <code>canei-erp-backups</code> — not "all buckets"</div></div>
+    <div class="kv"><div class="k">Goes in</div><div class="v"><code>R2_ACCESS_KEY_ID</code> and <code>R2_SECRET_ACCESS_KEY</code></div></div>
+    <p style="margin:6px 0 0">Then run <code>./ops/provision.sh</code> again.
+    Everything already done is detected and skipped.</p>
+  </div>
+
+  <p>The second run creates the server and waits. The server installs itself
+  while booting — you never log into it. When the script prints
+  <b>LIVE</b>, open the URL: Cloudflare asks for an email code, then the ERP
+  loads.</p>
+
+  <div class="rule" style="margin-top:14px"></div>
+  <h2 class="h2">Step 5 · Three things to finish <span class="pill pY">10 min</span></h2>
+
+  <div class="step avoid">
+    <div class="n">A</div>
+    <div class="b">
+      <h3>Move the secrets into the password manager</h3>
+      <p>The script wrote everything to <code>ops/.provisioned/summary.txt</code>:
+      database password, SSH key, and the backup encryption keys. Copy them into
+      the customer's vault, then delete the folder.</p>
+      <pre>cat ops/.provisioned/summary.txt
+<span class="c"># …copy into the password manager, then:</span>
+rm -rf ops/.provisioned</pre>
+      <div class="stop"><b>The one that matters.</b> Lose the
+      <code>AGE-SECRET-KEY-…</code> and every backup ever taken becomes
+      permanently unreadable. It is deliberately not stored on the server — that
+      is what stops a compromised server giving away the invoice history.</div>
+    </div>
+  </div>
+
+  <div class="step avoid">
+    <div class="n">B</div>
+    <div class="b">
+      <h3>Prove a backup restores — today</h3>
+      <p>In GitHub: <b>Actions → Restore drill → Run workflow</b>. It takes the
+      newest backup, decrypts it, restores it into a scratch database and checks
+      it is real.</p>
+      <p><b>Green means the company is recoverable. Red means it is not.</b> A
+      backup nobody has restored is a hope, not a backup.</p>
+    </div>
+  </div>
+
+  <div class="step avoid">
+    <div class="n">C</div>
+    <div class="b">
+      <h3>Narrow SSH to your own address</h3>
+      <p>Hetzner console → <b>Firewalls → canei-erp</b> → edit the SSH rule,
+      source <code>&lt;your-ip&gt;/32</code>. Find your address with
+      <code>curl ifconfig.me</code>.</p>
+    </div>
+  </div>
+
+  <div class="foot"><span>Canei ERP — Server Setup Guide</span><span>5</span></div>
+</section>
+
+<!-- ============================ AFTER + TROUBLE ============================ -->
+<section class="page">
+  <div class="rule"></div>
+  <h2 class="h2">What runs by itself afterwards</h2>
+  <table>
+    <thead><tr><th>When</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td>Every 60 seconds</td><td>The server checks for a new version and updates itself if CI published one</td></tr>
+      <tr><td>Nightly, 02:30</td><td>Encrypted database backup to Cloudflare R2; anything over 30 days old is removed</td></tr>
+      <tr><td>Daily</td><td>Operating-system security patches install themselves; reboot window 04:00 if a kernel update needs one</td></tr>
+      <tr><td>1st of the month</td><td>Restore drill — a backup is actually restored and checked, and the run fails loudly if it cannot be</td></tr>
+      <tr><td>Every push to <code>main</code></td><td>CI builds the app, tests it against a real database, and only then publishes it for the server to pick up</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note"><b>Deployments are pull-based.</b> The server fetches new
+  versions; nothing pushes into it. That is why there is no deployment key, no
+  open port, and nothing to steal that would grant access to the box.</div>
+
+  <div class="rule" style="margin-top:14px"></div>
+  <h2 class="h2">If something looks wrong</h2>
+  <table>
+    <thead><tr><th>You see</th><th>It means</th><th>Do this</th></tr></thead>
+    <tbody>
+      <tr><td>Error <b>1033</b></td><td>The tunnel is down</td><td><code>docker compose -f docker-compose.prod.yml logs tunnel</code></td></tr>
+      <tr><td><b>502</b> or <b>521</b></td><td>The app is down</td><td><code>… logs app --tail 200</code>, then <code>… restart app</code></td></tr>
+      <tr><td>Login loops</td><td>Access policy mismatch</td><td>Zero Trust → Access → check the policy still includes the email domain</td></tr>
+      <tr><td>Script: <i>domain not in this account</i></td><td>Nameservers have not propagated</td><td>Wait, then re-run the script</td></tr>
+      <tr><td>Script: <i>Hetzner token rejected</i></td><td>Token is Read-only</td><td>Regenerate it as Read &amp; Write</td></tr>
+      <tr><td>Restore drill red</td><td><b>No recoverable backup</b></td><td>Treat as urgent — read the run log, take a manual backup</td></tr>
+    </tbody>
+  </table>
+  <p>Full operational detail, including rollback and restore, is in
+  <code>docs/HANDOVER-OPS.md</code> — the handbook for whoever maintains this.</p>
+
+  <div class="rule" style="margin-top:14px"></div>
+  <h2 class="h2">When you hand over</h2>
+  <p class="lede">The handover is finished when someone else has rebuilt it
+  without you in the room — not when the documents are written.</p>
+  <ul class="chk">
+    <li>Give the IT provider <code>docs/HANDOVER-OPS.md</code> and their own named accounts</li>
+    <li>Run the <b>rebuild drill</b> in that document together, onto a throwaway server</li>
+    <li>Transfer the password-manager vault to Canei</li>
+    <li>Remove your address from the Cloudflare Access policy</li>
+    <li>Remove your user from Hetzner, Cloudflare and the GitHub repository</li>
+    <li>Confirm all three accounts bill the customer's card, not yours</li>
+  </ul>
+
+  <div class="foot"><span>Canei ERP — Server Setup Guide</span><span>6</span></div>
+</section>
+
+</body>
+</html>

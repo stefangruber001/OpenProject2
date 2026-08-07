@@ -1,0 +1,51 @@
+# Everything ops/provision.sh needs. Copy to ops/provision.conf (gitignored)
+# and fill in. Six values, two of which are API tokens you mint by hand.
+#
+#   cp ops/provision.conf.example ops/provision.conf
+#   $EDITOR ops/provision.conf
+#   ./ops/provision.sh
+
+# --- Hetzner ----------------------------------------------------------------
+# console.hetzner.cloud → your project → Security → API tokens → Generate
+# Permission: READ & WRITE
+HCLOUD_TOKEN=""
+
+# --- Cloudflare -------------------------------------------------------------
+# dash.cloudflare.com → My Profile → API Tokens → Create Token → Custom token
+# Permissions needed (add all six):
+#   Account · Cloudflare Tunnel        · Edit
+#   Account · Access: Apps and Policies· Edit
+#   Account · Workers R2 Storage       · Edit
+#   Zone    · DNS                      · Edit
+#   Zone    · Zone                     · Read
+# Zone resources: include the domain below.
+CF_API_TOKEN=""
+
+# dash.cloudflare.com → any domain → right sidebar → Account ID
+CF_ACCOUNT_ID=""
+
+# --- What to build ----------------------------------------------------------
+# The domain must already be in this Cloudflare account (nameservers pointed).
+DOMAIN="caneisubirats.com"
+
+# The ERP will live at ${HOSTNAME_PREFIX}.${DOMAIN}
+HOSTNAME_PREFIX="erp"
+
+# Who may log in: anyone with an email address at this domain.
+ACCESS_EMAIL_DOMAIN="caneisubirats.com"
+
+# owner/repo — used for the image names and the GitHub secrets.
+GITHUB_REPO="stefangruber001/OpenProject2"
+
+# --- R2 credentials ---------------------------------------------------------
+# Leave EMPTY on the first run. The script creates the bucket, then stops and
+# tells you to mint a token scoped to it — R2 tokens cannot be minted reliably
+# through the API. Paste the two values here and run the script again.
+R2_ACCESS_KEY_ID=""
+R2_SECRET_ACCESS_KEY=""
+
+# --- Optional ---------------------------------------------------------------
+# SERVER_NAME="canei-erp-prod"
+# SERVER_TYPE="cx32"      # 4 vCPU / 8 GB / 80 GB, x86
+# SERVER_LOCATION="fsn1"  # fsn1 Falkenstein · nbg1 Nuremberg · hel1 Helsinki
+# R2_BUCKET="canei-erp-backups"

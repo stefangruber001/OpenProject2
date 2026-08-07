@@ -1,0 +1,144 @@
+#cloud-config
+# =============================================================================
+# Rendered by ops/provision.sh and handed to Hetzner at server-creation time.
+# The __PLACEHOLDERS__ are substituted before upload — this file is a template
+# and is not valid to apply directly.
+#
+# By the time this finishes the server is serving the ERP through the
+# Cloudflare tunnel. No SSH session is involved in setting it up.
+# =============================================================================
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - git
+  - jq
+  - ufw
+  - age
+  - awscli
+  - unattended-upgrades
+  - apt-listchanges
+
+write_files:
+  # The whole configuration, written before anything starts. 0600 root-only:
+  # it holds the database password and the tunnel token.
+  - path: /opt/canei-erp/.env
+    permissions: "0600"
+    owner: root:root
+    content: |
+      POSTGRES_USER=canei
+      POSTGRES_PASSWORD=__PG_PASSWORD__
+      POSTGRES_DB=canei_erp
+      APP_URL=__APP_URL__
+      IMAGE_APP=__IMAGE_APP__
+      IMAGE_MIGRATE=__IMAGE_MIGRATE__
+      CLOUDFLARE_TUNNEL_TOKEN=__TUNNEL_TOKEN__
+      R2_ACCOUNT_ID=__R2_ACCOUNT_ID__
+      R2_ACCESS_KEY_ID=__R2_ACCESS_KEY_ID__
+      R2_SECRET_ACCESS_KEY=__R2_SECRET__
+      R2_BUCKET=__R2_BUCKET__
+      BACKUP_AGE_RECIPIENT=__AGE_PUB__
+      BACKUP_RETENTION_DAYS=30
+
+  # Security patches install themselves; the box reboots at 04:00 if a kernel
+  # update needs it. Most compromises are unpatched known CVEs, not clever
+  # attacks, so on an unattended server this is the highest-value single item.
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+
+  - path: /etc/apt/apt.conf.d/51unattended-upgrades-local
+    content: |
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "04:00";
+      Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+
+runcmd:
+  # --- Docker -------------------------------------------------------------
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update -qq
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - systemctl enable --now docker
+  - systemctl enable --now unattended-upgrades
+
+  # --- Firewall -----------------------------------------------------------
+  # Inbound: SSH only. The app is reached through the tunnel, which dials OUT,
+  # so there is no inbound rule for it and there must never be one.
+  - ufw --force reset
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp comment 'SSH'
+  - ufw --force enable
+
+  # --- The application ----------------------------------------------------
+  # .env is already in place, so this clone lands around it.
+  - git clone --depth 1 __REPO__ /tmp/canei-src
+  - cp -r /tmp/canei-src/. /opt/canei-erp/
+  - rm -rf /tmp/canei-src
+  - chmod +x /opt/canei-erp/ops/*.sh
+  - mkdir -p /opt/canei-erp/backups
+  - cd /opt/canei-erp && docker compose -f docker-compose.prod.yml up -d
+
+  # --- Timers -------------------------------------------------------------
+  - |
+    cat > /etc/systemd/system/canei-deploy.service <<'UNIT'
+    [Unit]
+    Description=Pull the latest Canei ERP images and restart if they changed
+    After=docker.service
+    Requires=docker.service
+    [Service]
+    Type=oneshot
+    WorkingDirectory=/opt/canei-erp
+    ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml pull --quiet
+    ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d --remove-orphans
+    ExecStart=/usr/bin/docker image prune -f
+    UNIT
+  - |
+    cat > /etc/systemd/system/canei-deploy.timer <<'UNIT'
+    [Unit]
+    Description=Check for new Canei ERP images every minute
+    [Timer]
+    OnBootSec=3min
+    OnUnitActiveSec=60s
+    AccuracySec=15s
+    [Install]
+    WantedBy=timers.target
+    UNIT
+  - |
+    cat > /etc/systemd/system/canei-backup.service <<'UNIT'
+    [Unit]
+    Description=Encrypted Canei ERP database backup to Cloudflare R2
+    After=docker.service
+    [Service]
+    Type=oneshot
+    WorkingDirectory=/opt/canei-erp
+    ExecStart=/opt/canei-erp/ops/backup.sh
+    UNIT
+  - |
+    cat > /etc/systemd/system/canei-backup.timer <<'UNIT'
+    [Unit]
+    Description=Nightly Canei ERP backup
+    [Timer]
+    OnCalendar=*-*-* 02:30:00
+    Persistent=true
+    RandomizedDelaySec=10min
+    [Install]
+    WantedBy=timers.target
+    UNIT
+  - systemctl daemon-reload
+  - systemctl enable --now canei-deploy.timer canei-backup.timer
+
+  # A marker the provisioning script can look for, and a first log line for
+  # whoever has to work out later whether cloud-init actually finished.
+  - date -u +%Y-%m-%dT%H:%M:%SZ > /opt/canei-erp/.provisioned-at
+
+final_message: "Canei ERP provisioned in $UPTIME seconds. Reachable through the Cloudflare tunnel."

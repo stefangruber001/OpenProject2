@@ -1,5 +1,13 @@
 # Server setup — every step you do by hand
 
+> **Most of this is now automated.** `./ops/provision.sh` does steps 3–10 for
+> you: the tunnel, DNS, Access policy, R2 bucket, secrets, the server, and the
+> GitHub secrets. You need only create the two accounts and mint the tokens.
+> **Start with `docs/Canei-ERP-Server-Setup-Guide.pdf`** — about 35 minutes.
+>
+> This document remains the manual fallback: use it if the script fails, if you
+> want to understand what it did, or if you are rebuilding by hand.
+
 Follow this once, top to bottom. Roughly **90 minutes**, most of it waiting.
 
 Everything the repo can automate is already automated; what remains is
