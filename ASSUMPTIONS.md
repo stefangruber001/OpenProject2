@@ -746,3 +746,15 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   Also a note to self about this operator's environment: **never put `#` comments on the same
   line as a command in copy-paste instructions for zsh.** Put explanation in prose above the
   block instead.
+- **#63 — Remote checks swallowed the script they were part of (2026-08-07).** `status.sh`
+  and the earlier ad-hoc check both reported the first few results and then went quiet:
+  everything after the health check came back empty, so RLS, the tenant count, both timers
+  and the running image all read as "could not determine". Nothing was actually wrong with
+  the server. The script is piped to `ssh … bash -s` over **stdin**, and
+  `docker compose exec -T` **reads stdin** — so the first exec consumed the remainder of
+  the script as input to the container, and bash had nothing left to run. Reproduced with
+  `cat` as a stand-in: the line after the greedy command shows up as its _output_.
+  Fixed by closing stdin on every remote `exec -T` (`</dev/null`). Worth remembering
+  generally: any command that reads stdin — docker exec, ssh, psql, cat — poisons a
+  heredoc-piped remote script unless its stdin is redirected. The failure is silent and
+  looks exactly like the checks failing.
