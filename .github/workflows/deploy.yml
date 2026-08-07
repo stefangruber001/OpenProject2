@@ -160,7 +160,7 @@ jobs:
       # rather than silently overwriting. Runs against the PUBLISHED image with
       # the RESTRICTED database role, so a missing GRANT or a `public/` left out
       # of the container fails here instead of on the server.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
