@@ -196,6 +196,10 @@ if [ "$SKIP_CLOUDFLARE" = "1" ]; then
   TUNNEL_TOKEN=""
   R2_ACCOUNT_ID=""; R2_ACCESS_KEY_ID=""; R2_SECRET_ACCESS_KEY=""
   BACKUP_TARGET="local"
+  # Every Cloudflare-shaped variable gets a value on this path too. They are
+  # read later regardless of mode, and under `set -u` an unset one is fatal —
+  # which is survivable before the server exists and expensive afterwards.
+  : "${CF_API_TOKEN:=}"; : "${CF_ACCOUNT_ID:=}"; : "${ZONE_ID:=}"; : "${TUNNEL_ID:=}"
 else
   BACKUP_TARGET="r2"
   ZONE_ID="$(cf GET "/zones?name=${DOMAIN}" | jq -r '.result[0].id // empty')"
@@ -424,10 +428,27 @@ else
 fi
 
 # ── 7. Record everything ────────────────────────────────────────────────────
+#
+# Everything Cloudflare-shaped is only assigned on the Cloudflare path, and
+# `set -u` turns each one into a fatal "unbound variable" HERE — after the
+# server has been created, so the machine exists and the file recording its
+# passwords does not. Default them, and describe the interim setup honestly
+# rather than printing a URL that does not resolve.
+: "${TUNNEL_ID:=—}"
+: "${R2_BUCKET:=—}"
+: "${SERVER_IP:=unknown}"
+
+if [ "$SKIP_CLOUDFLARE" = "1" ]; then
+  ACCESS_LINE="  Reach it        ssh -i ops/.provisioned/id_ed25519 -L 3000:localhost:3000 root@${SERVER_IP}
+                  then open http://localhost:3000/workspace/erp.html"
+else
+  ACCESS_LINE="  URL             https://${FQDN}"
+fi
+
 cat > "$OUT/summary.txt" <<EOF
 Canei ERP — provisioned $(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-  URL              https://${FQDN}
+${ACCESS_LINE}
   Server IP        ${SERVER_IP}
   SSH              ssh -i ops/.provisioned/id_ed25519 root@${SERVER_IP}
   Tunnel ID        ${TUNNEL_ID}
