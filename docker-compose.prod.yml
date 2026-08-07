@@ -3,10 +3,22 @@
 #
 #   docker compose -f docker-compose.prod.yml up -d
 #
-# NOTE: no service publishes a port, in any mode. Reaching the app is either
-# through the Cloudflare tunnel (--profile cloudflare) or over an SSH tunnel
-# from your own machine. If you find yourself adding `ports:` here, stop — the
-# app has no login of its own, so publishing it publishes the data.
+# PORTS: the app binds 127.0.0.1 ONLY. Nothing is published to the internet in
+# any mode. Read that binding carefully before changing it:
+#
+#   "127.0.0.1:3000:3000"  loopback — reachable only from the machine itself,
+#                          which is what makes `ssh -L 3000:localhost:3000`
+#                          work. This is correct.
+#   "3000:3000"            means 0.0.0.0 — the whole internet. The app has NO
+#                          login of its own, so this publishes the customer's
+#                          invoice register to anyone who scans the address.
+#                          Never do this.
+#
+# The loopback binding exists because without it the SSH tunnel has nothing to
+# connect to: the tunnel forwards to the server's localhost, and with no
+# published port that is a closed door (ECONNRESET, which is how this was
+# found). The Cloudflare path does not need it — cloudflared reaches app:3000
+# over the compose network — but it is harmless there and keeps one file.
 #
 # Configuration comes from a `.env` file sitting next to this one. See
 # `.env.production.example` for the full list.
@@ -84,6 +96,9 @@ services:
       # Stamped on every ERP change in the audit trail. The API refuses to write
       # without it — see lib/session.ts.
       ERP_OPERATOR: ${ERP_OPERATOR}
+    # Loopback only. See the note at the top of this file before touching it.
+    ports:
+      - "127.0.0.1:3000:3000"
     depends_on:
       db:
         condition: service_healthy

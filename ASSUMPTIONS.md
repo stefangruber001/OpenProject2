@@ -717,3 +717,16 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   provisioning time is the cheap fix; building multi-arch images is the real one, and is
   the trigger to revisit. Verified against a representative payload: deprecated, ARM, and
   wrong-location types are all rejected, valid ones accepted, suggestions sorted by price.
+- **#61 — The SSH-tunnel access path never worked: nothing was listening (2026-08-07).**
+  The stack came up healthy on the real server and `ssh -L 3000:localhost:3000` then failed
+  with `ECONNRESET`. Cause: `docker-compose.prod.yml` deliberately published **no** ports —
+  a rule written to stop anyone exposing an app that has no login — so the server's own
+  `localhost:3000` was a closed door. The tunnel forwards to the server's loopback, finds
+  nothing, and resets. The interim access design and the compose file contradicted each
+  other, and neither was wrong on its own; the combination had simply never been run.
+  **Decision: publish `127.0.0.1:3000:3000` — loopback, never `0.0.0.0`.** Loopback is not
+  routable from outside, the firewall drops inbound regardless, and it is exactly what an
+  SSH tunnel needs. The distinction is one string and the difference between a private
+  server and the customer's invoice register on the open internet, so the file now spells
+  both forms out and says which is which. Verified with `docker compose config`: the app is
+  the only published service and its `host_ip` is `127.0.0.1`.
