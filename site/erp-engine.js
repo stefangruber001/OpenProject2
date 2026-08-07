@@ -211,6 +211,12 @@
         packagesSent: [],
         audit: [],
         invoiceEvents: [], // ORG-07 / VFU-01
+        // Declared here, not created on first write: a collection that only
+        // appears once used gives ERP.from(stored) an inconsistent shape.
+        feedback: [],
+        supplierPerf: [],
+        assignments: [],
+        recurring: [],
         seq: { id: 1 },
       };
     }
@@ -220,7 +226,12 @@
     }
     static from(json) {
       const e = new ERP();
+      const fresh = e.state;
       e.state = json;
+      // Backfill collections added after this blob was written, so restored
+      // state has the same shape as a new engine.
+      for (const k of Object.keys(fresh))
+        if (Array.isArray(fresh[k]) && !Array.isArray(e.state[k])) e.state[k] = [];
       return e;
     }
 
@@ -1610,8 +1621,8 @@
       );
       return inv.kind === "creditNote" ? 0 : inv.totalCents - collected - credited;
     }
-    receivables() {
-      // AR-08 follow-up list
+    invoiceRegister() {
+      // Every issued invoice, settled or not — the billing list.
       const t = this.state.today;
       return this.state.invoices
         .filter((i) => i.kind !== "creditNote")
@@ -1628,8 +1639,12 @@
             dueDate: i.dueDate,
             daysOverdue: out > 0 ? Math.max(0, daysBetween(t, i.dueDate)) : 0,
           };
-        })
-        .filter((x) => x.outstandingCents > 0.005 || true);
+        });
+    }
+    receivables() {
+      // AR-08 follow-up list — what is still owed. A settled invoice is not a
+      // receivable; use invoiceRegister() for the full billing list.
+      return this.invoiceRegister().filter((x) => x.outstandingCents > 0);
     }
     projectBilling(projectId) {
       // AR-09
@@ -3056,7 +3071,7 @@
       const cur = this.currentVersion(id);
       if (b.acceptedVersionId || (cur && cur.issued))
         throw new Error("Budget is issued/accepted — create a new version instead");
-      const allowed = ["internalRef", "propertyId", "discountCents", "vatBp", "validityDays"];
+      const allowed = ["internalRef", "propertyId", "discountCents", "vatBp", "validityDate"];
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
       Object.assign(b, patch);
       this._log(user, "updateBudget", b.number);
@@ -3153,7 +3168,9 @@
     }
     resolveRequirement(projectId, reqId, status, user) {
       const p = this.project(projectId);
-      const r = (p.requirements || []).find((x) => x.id === reqId);
+      // addProjectRequirement files into permits or dependencies by type, never
+      // into a `requirements` array — look where the record actually lives.
+      const r = [...(p.permits || []), ...(p.dependencies || [])].find((x) => x.id === reqId);
       if (!r) throw new Error("Requirement not found");
       r.status = status || "resolved";
       r.resolvedAt = this.state.today;
@@ -3191,6 +3208,7 @@
       if (ch.status !== "approved")
         throw new Error("Only an approved extra can be marked executed");
       ch.executed = { date: this.state.today };
+      ch.status = "executed"; // otherwise LISTS.changeStatuses "executed" is unreachable
       this._log(user, "markChangeExecuted", id);
       return ch;
     }
@@ -3238,10 +3256,9 @@
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
       Object.assign(b, patch);
       b.vatCents = Math.round((b.baseCents * (b.vatBp || 0)) / 10000);
-      b.irpfCents =
-        b.irpfCents && b.irpfRateBp
-          ? Math.round((b.baseCents * b.irpfRateBp) / 10000)
-          : b.irpfCents;
+      // Bills carry irpfBp; irpfRateBp is the party-level field and is undefined
+      // here, so reading it silently skipped the recalculation.
+      b.irpfCents = b.irpfBp ? Math.round((b.baseCents * b.irpfBp) / 10000) : b.irpfCents;
       b.totalCents = b.baseCents + b.vatCents - (b.irpfCents || 0);
       this._log(user, "correctBill", b.number);
       return b;
@@ -3282,12 +3299,14 @@
     updateRecurring(id, patch, user) {
       const r = (this.state.recurring || []).find((x) => x.id === id);
       if (!r) throw new Error("Recurring template not found");
+      // Field names must match addRecurringInvoice's record, or the patch is a no-op.
       const allowed = [
         "baseCents",
         "vatBp",
-        "concept",
+        "desc",
         "active",
-        "dayOfMonth",
+        "cadenceMonths",
+        "nextDate",
         "partyId",
         "projectId",
       ];
@@ -3385,7 +3404,7 @@
         workPackage: "packages",
         price: "prices",
         purchase: "purchases",
-        capture: "captures",
+        capture: "captured",
         task: "tasks",
         worker: "workers",
         bankAccount: "bankAccounts",

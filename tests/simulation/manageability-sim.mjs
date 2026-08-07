@@ -294,6 +294,123 @@ assert(
   "corrections audit-logged",
 );
 
+// ---------------------------------------------------------------------------
+// Regressions: methods that existed but could never succeed, because they read
+// a field or collection under a name nothing ever wrote. Each of these threw or
+// silently did nothing before; a passing check here is the whole point.
+// ---------------------------------------------------------------------------
+
+// resolveRequirement searched p.requirements; addProjectRequirement files into
+// p.permits / p.dependencies by type. Both branches must be reachable.
+const permit = erp.addProjectRequirement(prj.id, { type: "permit", desc: "Licencia" }, "bo");
+const dep = erp.addProjectRequirement(prj.id, { type: "access", desc: "Llaves" }, "bo");
+erp.resolveRequirement(prj.id, permit.id, "resolved", "bo");
+erp.resolveRequirement(prj.id, dep.id, "resolved", "bo");
+assert(
+  erp.state.projects.find((p) => p.id === prj.id).permits[0].status === "resolved",
+  "resolveRequirement resolves a permit",
+);
+assert(
+  erp.state.projects.find((p) => p.id === prj.id).dependencies[0].status === "resolved",
+  "resolveRequirement resolves a dependency",
+);
+
+// adminPatch mapped capture -> "captures"; the collection is state.captured.
+const cap = erp.captureDocument(
+  { docType: "supplierInvoice", imageRef: "f.jpg", keyFields: { note: "x" } },
+  "bo",
+);
+erp.adminPatch("capture", cap.id, { device: "desktop" }, "bo");
+assert(
+  erp.state.captured.find((c) => c.id === cap.id).device === "desktop",
+  "adminPatch reaches captures",
+);
+
+// markChangeExecuted stamped a date but left status "approved", so the
+// "executed" status in LISTS.changeStatuses was unreachable.
+const chg = erp.addChange(prj.id, { desc: "Extra tomas", priceCents: 20000 }, "bo");
+erp.priceChange(chg.id, 20000, 12000, "bo");
+erp.approveChange(chg.id, "firma.png", "bo");
+erp.markChangeExecuted(chg.id, "bo");
+assert(
+  erp.state.changes.find((c) => c.id === chg.id).status === "executed",
+  "markChangeExecuted sets the status",
+);
+
+// correctBill recalculated withholding from b.irpfRateBp; bills store irpfBp,
+// so the recalculation was skipped and the total stayed stale.
+const supIrpf = erp.addParty(
+  {
+    name: "Autónomo Pérez",
+    taxId: "87654321X",
+    partyType: "individual",
+    roles: ["supplier"],
+    irpfApplies: true,
+    irpfRateBp: 1500,
+    email: "p@example.com",
+    mobile: "600",
+    billStreet: "C/ A",
+    billPostalCode: "08001",
+    billCity: "BCN",
+  },
+  "bo",
+);
+const billIrpf = erp.registerBill(
+  { supplierId: supIrpf.id, number: "A-1", baseCents: 100000, vatBp: 2100, date: "2026-03-02" },
+  "bo",
+);
+assert(billIrpf.irpfCents === 15000, "bill withholding from supplier profile");
+erp.correctBill(billIrpf.id, { baseCents: 200000 }, "bo");
+assert(
+  billIrpf.irpfCents === 30000 && billIrpf.totalCents === 200000 + 42000 - 30000,
+  "correctBill recalculates withholding",
+  `irpf ${billIrpf.irpfCents} total ${billIrpf.totalCents}`,
+);
+
+// updateBudget whitelisted "validityDays"; the field is validityDate.
+const b2 = erp.createBudget({ partyId: cust.id }, "bo");
+erp.updateBudget(b2.id, { validityDate: "2026-12-31" }, "bo");
+assert(erp.budget(b2.id).validityDate === "2026-12-31", "updateBudget sets validityDate");
+
+// updateRecurring whitelisted "concept"/"dayOfMonth"; the record has
+// desc/cadenceMonths/nextDate.
+erp.updateRecurring(recu.id, { desc: "Mantenimiento anual", cadenceMonths: 12 }, "bo");
+assert(
+  erp.state.recurring[0].desc === "Mantenimiento anual" &&
+    erp.state.recurring[0].cadenceMonths === 12,
+  "updateRecurring sets desc and cadence",
+);
+
+// receivables() is what is still owed; a settled invoice belongs in the
+// register, not the follow-up list.
+const settled = erp.issueInvoice({ projectId: prj.id, kind: "progress", baseCents: 1000 }, "bo");
+erp.recordCollection(
+  {
+    partyId: cust.id,
+    amountCents: settled.totalCents,
+    allocations: [{ invoiceId: settled.id, amountCents: settled.totalCents }],
+  },
+  "bo",
+);
+assert(
+  !erp.receivables().some((r) => r.number === settled.number),
+  "receivables excludes settled invoices",
+);
+assert(
+  erp.invoiceRegister().some((r) => r.number === settled.number),
+  "invoiceRegister keeps settled invoices",
+);
+
+// A restored blob written before a collection existed must still have its shape.
+const legacyBlob = JSON.parse(JSON.stringify(erp.toJSON()));
+delete legacyBlob.assignments;
+delete legacyBlob.feedback;
+const restored = ERP.from(legacyBlob);
+assert(
+  Array.isArray(restored.state.assignments) && Array.isArray(restored.state.feedback),
+  "ERP.from backfills collections missing from an older blob",
+);
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

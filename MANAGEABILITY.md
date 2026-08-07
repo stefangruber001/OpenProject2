@@ -8,7 +8,15 @@ signed contract terms, the chained invoice event log, audit entries).
 Generic safety net: `adminPatch(entity, id, patch)` — audit-logged, refuses immutable
 entities/fields — guarantees no editable field is ever dead-ended.
 
-Verified by `tests/simulation/manageability-sim.mjs` (34 checks, in CI).
+Verified by `tests/simulation/manageability-sim.mjs` (45 checks, in CI).
+
+Seven of the paths below were advertised here but could never succeed — each read a
+field or collection under a name nothing ever wrote (`resolveRequirement` searched
+`p.requirements`, `adminPatch` mapped captures to `state.captures`, `correctBill` read
+`b.irpfRateBp`, `updateBudget` whitelisted `validityDays`, `updateRecurring` whitelisted
+`concept`/`dayOfMonth`, `markChangeExecuted` never set the status, and `receivables()`
+had a `|| true` that disabled its own filter). Fixed, and each now has a dedicated
+regression check so the claims in this table stay honest.
 
 | Entity        | Correction / update path                                                                                                          |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------- |

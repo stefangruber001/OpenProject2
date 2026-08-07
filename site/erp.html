@@ -497,7 +497,7 @@ const VIEWS={
  /* ---------- Facturación y cobros (AR) ---------- */
  facturacion(v){
   $('#sub').textContent="Facturas generadas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos; las emitidas son inmutables.";
-  const rows=erp.receivables();
+  const rows=erp.invoiceRegister();
   v.innerHTML=`<div class="card"><div class="ch"><h3>Facturas</h3><span class="tag">pendiente total ${eur0(rows.reduce((s,r)=>s+r.outstandingCents,0))}</span></div>
    <div class="scroll"><table><thead><tr><th>Número</th><th>Cliente</th><th>Proyecto</th><th class="num">Total</th><th class="num">Pendiente</th><th>Vence</th><th>Estado</th><th></th></tr></thead><tbody>
    ${rows.map(r=>{const st=r.outstandingCents<=0?'<span class="pill g">Cobrada</span>':r.daysOverdue>0?`<span class="pill r">Vencida ${r.daysOverdue}d</span>`:'<span class="pill y">Pendiente</span>';
