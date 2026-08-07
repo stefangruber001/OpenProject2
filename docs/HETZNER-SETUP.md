@@ -142,7 +142,10 @@ SSH in as root using the IP from step 1:
 ssh root@<SERVER_IP>
 
 apt-get update && apt-get install -y git
-git clone https://github.com/<OWNER>/<REPO>.git /opt/canei-erp
+# The repository is PRIVATE: an anonymous clone fails with "Repository not
+# found" and you end up with an empty /opt/canei-erp. Use a token with `repo`
+# scope, or prefer ops/provision.sh, which needs no clone at all.
+git clone https://<user>:<token>@github.com/<OWNER>/<REPO>.git /opt/canei-erp
 cd /opt/canei-erp
 bash ops/bootstrap-server.sh
 ```

@@ -669,3 +669,35 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   workflow's path filter also missed `ops/**`, `site/**`, `tenants/**` and
   `tests/server-e2e/**` — all of which are in the image or the smoke test — so changes to
   them never triggered the job that checks them.
+- **#58 — cloud-init cloned a private repository with no credentials; the server would
+  have started nothing (2026-08-07).** A verification sweep run before telling the operator
+  to provision found that `ops/cloud-init.yaml` did
+  `git clone --depth 1 https://github.com/stefangruber001/OpenProject2.git`. The repository
+  is private and a fresh machine has no GitHub identity, so the clone fails with
+  "Repository not found" — and everything downstream is repo content that then never
+  arrives: `docker-compose.prod.yml` (the `-f` target), `ops/harden-db-role.sh`
+  (bind-mounted by the db-role service) and `ops/backup.sh` (the backup unit's ExecStart).
+  `docker compose up -d` would fail with "no such file or directory" and **not one
+  container would start, database included.** The `read:packages` token added in #57 cannot
+  clone source, and its `docker login` runs after the clone in any case.
+  **Decision: stop cloning.** `provision.sh` now inlines the four files the machine actually
+  needs into cloud-init `write_files` (27.3 KB rendered, against Hetzner's 32 KB user_data
+  limit, checked before upload). This also keeps the server's only credential a read-only
+  package token rather than something that can read the source. Verified by rendering the
+  real thing: valid cloud-config, all four files byte-identical to the repo, modes 0644/0755,
+  the shell scripts still parse after the YAML round trip, and no `git clone` anywhere.
+  Two guards were added and both earned their place immediately — the marker check caught a
+  decoy `__PLACEHOLDER__` inside the template's own header comment, since removed.
+  The same anonymous-clone assumption existed in the manual path
+  (`ops/bootstrap-server.sh`, `docs/HETZNER-SETUP.md`, `docs/HANDOVER-OPS.md`) and is now
+  corrected there too — an IT provider following the runbook would have hit it identically.
+- **#59 — `tr | head` killed the provisioner silently (2026-08-07).** The first real run
+  stopped dead after "age keypair created" with no error and no exit message. Cause:
+  `tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40` — `head` exits the moment it has 40 bytes,
+  `tr` is killed by SIGPIPE, and under the script's own `set -o pipefail` the pipeline
+  returns 141 and `set -e` ends everything. Reproduced exactly (exit 141). It failed safely
+  — before any server existed — but it is the worst failure shape available: no output at
+  all. Fixed by bounding the read at the SOURCE (`head -c 4096 /dev/urandom | tr | cut`), so
+  no stage exits early, plus a length assertion on both generated passwords, because a
+  short or empty one would produce a database nobody can log into. Two other
+  `… | head -1` pipelines were changed to `sed -n '1p'` for the same reason.

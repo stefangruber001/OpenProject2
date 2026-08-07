@@ -161,17 +161,35 @@ if [ ! -f "$OUT/age-key.txt" ]; then
 else
   info "age keypair already present, reusing"
 fi
-AGE_PUB="$(grep -oE 'age1[a-z0-9]+' "$OUT/age-key.txt" | head -1)"
+AGE_PUB="$(grep -oE 'age1[a-z0-9]+' "$OUT/age-key.txt" | sed -n '1p')"
 AGE_PRIV="$(grep '^AGE-SECRET-KEY-' "$OUT/age-key.txt")"
 
-[ -f "$OUT/pg-password" ] || { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40 > "$OUT/pg-password"; }
+# A 40-character secret, generated so that every stage of the pipeline reads
+# its input to EOF.
+#
+# The obvious `tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40` looks correct and
+# is a trap under `set -o pipefail`: head exits the moment it has 40 bytes, tr
+# is killed by SIGPIPE, the pipeline reports 141, and the script dies with no
+# output at all. It did exactly that on a real machine, silently, right after
+# "age keypair created" — before anything was created, so at least it failed
+# safely. Bounding the read at the SOURCE instead means nothing exits early.
+gen_secret() {
+  LC_ALL=C head -c 4096 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | cut -c1-40
+}
+
+[ -f "$OUT/pg-password" ] || gen_secret > "$OUT/pg-password"
 PG_PASSWORD="$(cat "$OUT/pg-password")"
 
 # A separate password for the role the application connects as. It is a
 # different secret on purpose: the owner password is a superuser credential and
 # should never be the one sitting in the app container's environment.
-[ -f "$OUT/app-db-password" ] || { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40 > "$OUT/app-db-password"; }
+[ -f "$OUT/app-db-password" ] || gen_secret > "$OUT/app-db-password"
 APP_DB_PASSWORD="$(cat "$OUT/app-db-password")"
+
+# Both are used unquoted in shell and URLs downstream; a short or empty one
+# would produce a database nobody can log into and a very confusing morning.
+[ "${#PG_PASSWORD}" -eq 40 ] && [ "${#APP_DB_PASSWORD}" -eq 40 ] \
+  || die "Password generation produced ${#PG_PASSWORD}/${#APP_DB_PASSWORD} characters, expected 40 each."
 
 if [ ! -f "$OUT/id_ed25519" ]; then
   ssh-keygen -t ed25519 -N "" -C "canei-erp-provision" -f "$OUT/id_ed25519" >/dev/null
@@ -215,7 +233,7 @@ fi
 # ── 4. Access policy ────────────────────────────────────────────────────────
 say "Cloudflare Access (login in front of the ERP)"
 APP_ID="$(cf GET "/accounts/${CF_ACCOUNT_ID}/access/apps" \
-          | jq -r --arg d "$FQDN" '.result[]? | select(.domain==$d) | .id' | head -1)"
+          | jq -r --arg d "$FQDN" '.result[]? | select(.domain==$d) | .id' | sed -n '1p')"
 if [ -z "$APP_ID" ]; then
   APP_ID="$(cf POST "/accounts/${CF_ACCOUNT_ID}/access/apps" \
     "$(jq -nc --arg d "$FQDN" '{name:"Canei ERP", domain:$d, type:"self_hosted", session_duration:"24h"}')" \
@@ -290,9 +308,27 @@ if [ -n "$EXISTING" ]; then
   SERVER_IP="$EXISTING"
 else
   say "Rendering cloud-init"
+
+  # The server gets these files inlined rather than cloned — see the note in
+  # ops/cloud-init.yaml. Anything the machine needs from the repo must be
+  # listed here, or it simply will not be there.
+  EMB="$(mktemp)"; trap 'rm -f "$EMB"' EXIT
+  embed() { # embed <local path> <path on server> <mode>
+    [ -f "$1" ] || die "Cannot embed missing file: $1"
+    printf '  - path: %s\n    permissions: "%s"\n    owner: root:root\n    content: |\n' "$2" "$3" >> "$EMB"
+    # Six spaces of indent puts the body under `content: |`. Tabs would be
+    # invalid YAML here, so expand them.
+    expand "$1" | sed 's/^/      /' >> "$EMB"
+    printf '\n' >> "$EMB"
+  }
+  embed docker-compose.prod.yml  /opt/canei-erp/docker-compose.prod.yml 0644
+  embed ops/harden-db-role.sh    /opt/canei-erp/ops/harden-db-role.sh   0755
+  embed ops/backup.sh            /opt/canei-erp/ops/backup.sh           0755
+  embed ops/restore.sh           /opt/canei-erp/ops/restore.sh          0755
+  info "embedded $(grep -c '^  - path:' "$EMB") files ($(wc -c < "$EMB") bytes)"
+
   CLOUD_INIT="$(
-    sed -e "s|__REPO__|https://github.com/${GITHUB_REPO}.git|g" \
-        -e "s|__PG_PASSWORD__|${PG_PASSWORD}|g" \
+    sed -e "s|__PG_PASSWORD__|${PG_PASSWORD}|g" \
         -e "s|__APP_DB_PASSWORD__|${APP_DB_PASSWORD}|g" \
         -e "s|__APP_URL__|https://${FQDN}|g" \
         -e "s|__ERP_OPERATOR__|${ERP_OPERATOR:-CAMBIAR: nombre del operador}|g" \
@@ -308,8 +344,21 @@ else
         -e "s|__AGE_PUB__|${AGE_PUB}|g" \
         -e "s|__BACKUP_TARGET__|${BACKUP_TARGET}|g" \
         -e "s|__COMPOSE_PROFILE__|$([ "$SKIP_CLOUDFLARE" = "1" ] && echo "" || echo "--profile cloudflare")|g" \
-        ops/cloud-init.yaml
+        ops/cloud-init.yaml \
+    | awk -v f="$EMB" "/^[[:space:]]*# __EMBEDDED_FILES__$/ { while ((getline l < f) > 0) print l; next } { print }"
   )"
+
+  # Two things worth failing on here rather than 10 minutes into a boot that
+  # quietly produced nothing.
+  # Match the marker SHAPE, not any two underscores: the embedded files are
+  # 18 KB of shell and YAML, and a loose glob finds double underscores in them
+  # all day.
+  LEFTOVER="$(printf '%s' "$CLOUD_INIT" | grep -oE '__[A-Z][A-Z0-9_]*__' | sort -u | tr '\n' ' ' || true)"
+  [ -z "$LEFTOVER" ] || die "cloud-init still contains unsubstituted markers: ${LEFTOVER}"
+  CI_BYTES=$(printf '%s' "$CLOUD_INIT" | wc -c | tr -d ' ')
+  info "cloud-init is ${CI_BYTES} bytes"
+  [ "$CI_BYTES" -lt 32768 ] || die "cloud-init is ${CI_BYTES} bytes; Hetzner's user_data limit is 32768."
+
   say "Creating ${SERVER_NAME} (${SERVER_TYPE}, ${SERVER_LOCATION})"
   RESP="$(hz POST "/servers" "$(jq -nc \
       --arg n "$SERVER_NAME" --arg t "$SERVER_TYPE" --arg l "$SERVER_LOCATION" \

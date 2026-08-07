@@ -5,7 +5,14 @@
 # Run ONCE, as root, on a brand-new box:
 #
 #   apt-get update && apt-get install -y git
-#   git clone https://github.com/OWNER/REPO.git /opt/canei-erp
+#   git clone https://<user>:<token>@github.com/OWNER/REPO.git /opt/canei-erp
+#
+# NOTE the credentials in that URL: the repository is PRIVATE, so a plain
+# anonymous clone fails with "Repository not found" and the machine ends up
+# with no compose file and no containers. The token needs `repo` scope, which
+# is why the automated path (ops/provision.sh) does NOT clone at all — it
+# inlines the four files the server needs into cloud-init and keeps the only
+# credential on the box scoped to read:packages.
 #   cd /opt/canei-erp && bash ops/bootstrap-server.sh
 #
 # Idempotent: safe to re-run. Does NOT start the app — you still need to write

@@ -222,7 +222,11 @@ and once a year after that.
 repository and the backups. Target: **under one hour**.
 
 1. Hetzner → new CX32, Debian 12, same location. Do **not** touch the live one.
-2. `git clone` the repo to `/opt/canei-erp`; run `bash ops/bootstrap-server.sh`.
+2. `git clone` the repo to `/opt/canei-erp` **with credentials** — it is
+   private, and an anonymous clone fails with "Repository not found", leaving
+   the machine with no compose file and no containers. Then run
+   `bash ops/bootstrap-server.sh`. (`ops/provision.sh` avoids this entirely by
+   inlining the needed files into cloud-init.)
 3. Copy `.env` across (or rebuild it from the password manager — better, since
    that tests the password manager too).
 4. Create a **second** Cloudflare tunnel pointed at a temporary hostname, and

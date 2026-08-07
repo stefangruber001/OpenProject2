@@ -1,8 +1,10 @@
 #cloud-config
 # =============================================================================
 # Rendered by ops/provision.sh and handed to Hetzner at server-creation time.
-# The __PLACEHOLDERS__ are substituted before upload — this file is a template
-# and is not valid to apply directly.
+# The double-underscore markers below are substituted before upload — this file
+# is a template and is not valid to apply directly. (Deliberately not spelling
+# one out here: provision.sh refuses to upload a rendered file that still
+# contains one, and a decoy in a comment would fail that check.)
 #
 # By the time this finishes the server is serving the ERP through the
 # Cloudflare tunnel. No SSH session is involved in setting it up.
@@ -81,6 +83,21 @@ write_files:
       Unattended-Upgrade::Automatic-Reboot-Time "04:00";
       Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
 
+  # The handful of repo files the server actually needs, inlined by
+  # ops/provision.sh in place of the marker below.
+  #
+  # This used to be `git clone` — which cannot work: the repository is PRIVATE
+  # and a new machine has no GitHub identity, so the clone fails with
+  # "Repository not found" and every file after it is missing. The stack then
+  # dies on `docker compose -f docker-compose.prod.yml up -d` with "no such
+  # file or directory" and NOT ONE container starts, database included. The
+  # registry token does not help: it is scoped to reading packages, cannot
+  # clone source, and the login runs after the clone anyway.
+  #
+  # Inlining also keeps the server's only credential a read-only package
+  # token, rather than something that can read the source.
+  # __EMBEDDED_FILES__
+
 runcmd:
   # --- Docker -------------------------------------------------------------
   - install -m 0755 -d /etc/apt/keyrings
@@ -102,11 +119,8 @@ runcmd:
   - ufw --force enable
 
   # --- The application ----------------------------------------------------
-  # .env is already in place, so this clone lands around it.
-  - git clone --depth 1 __REPO__ /tmp/canei-src
-  - cp -r /tmp/canei-src/. /opt/canei-erp/
-  - rm -rf /tmp/canei-src
-  - chmod +x /opt/canei-erp/ops/*.sh
+  # No clone: the compose file and the ops scripts arrived via write_files
+  # above, already at the right paths and modes.
   - mkdir -p /opt/canei-erp/backups
 
   # Authenticate to the registry BEFORE the first pull. Writes
