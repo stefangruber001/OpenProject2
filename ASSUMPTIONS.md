@@ -620,3 +620,21 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   Next does not trace `public/` into the standalone output, and without the COPY the
   server would host an API with no user interface while reporting healthy. Reversible:
   delete the sync step and the marker, and the pages are local-only again.
+- **#56 — Duplicate tax identifiers were admissible; the rule is now enforced directly
+  (2026-08-07).** Found because the new server E2E suite was intermittent, which was worth
+  chasing rather than papering over. `addParty` enforced MDM-03 through
+  `findDuplicateParty`, a SOFT check that matches on tax id **or** name **or** phone and
+  returns the first hit — then rejected only if _that_ record shared the tax id. So a real
+  duplicate went in whenever an unrelated party matched first on a shared phone number.
+  `updateParty` never checked at all, so the rule could be sidestepped by creating a party
+  and editing its identifier afterwards. Both reproduced before fixing.
+  On a system holding tax records this is not cosmetic: two active parties with one NIF
+  means a customer's invoices split across two accounts and a tax filing built from them
+  that does not add up. **Decision: separate the hard rule from the soft signal** — a new
+  `_activeTaxIdHolder` enforces "no two ACTIVE parties share a tax id" in both `addParty`
+  and `updateParty`, while `findDuplicateParty` keeps its original job of flagging
+  suspects for review. Deliberately scoped to _active_ parties, so deactivating a record
+  still allows a legitimate re-registration under the same identifier.
+  Three checks added to `manageability-sim.mjs` (48/48); all three were confirmed to fail
+  against the previous engine before being trusted. Year simulations unchanged at 145/145
+  and 253/253.

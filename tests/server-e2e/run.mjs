@@ -37,15 +37,36 @@ const json = async (res) => {
   }
 };
 
-/** A party the engine will accept: the tax id check digit has to be right. */
-const party = (name) => ({
+/**
+ * A NIF the engine will accept: eight digits plus the check letter it derives
+ * from them. Generated fresh per run, because the engine rejects a duplicate
+ * tax id on an active party — rightly — and a fixed one would make this suite
+ * pass once and then fail against the same database forever.
+ */
+const NIF_LETTERS = "TRWAGMYFPDXBNJZSQVHLCKE";
+function freshTaxId(seed) {
+  const digits = String(seed % 100_000_000).padStart(8, "0");
+  return digits + NIF_LETTERS[Number(digits) % 23];
+}
+const RUN = Date.now();
+
+/**
+ * A party the engine will accept. `n` keeps tax ids distinct within a run.
+ *
+ * The mobile is unique per run too. A shared one made this suite intermittent:
+ * the engine's soft duplicate check matches on tax id OR name OR phone, so an
+ * accumulated pile of test parties sharing 600000000 changed which record it
+ * matched. That intermittency was worth chasing — it was the engine admitting
+ * genuine duplicate tax ids, now fixed and pinned in manageability-sim.mjs.
+ */
+const party = (name, n = 0) => ({
   name,
-  taxId: "B12345674",
+  taxId: freshTaxId(RUN + n),
   roles: ["customer"],
   billStreet: "Carrer de Prova 1",
   billPostalCode: "08240",
   billCity: "Manresa",
-  mobile: "600000000",
+  mobile: `6${String((RUN + n) % 100_000_000).padStart(8, "0")}`,
   leadSource: "Web",
 });
 
@@ -116,7 +137,7 @@ async function main() {
 
   // --- a write must quote the version it read -----------------------------
   {
-    const res = await command({ command: "addParty", args: [party("No Version")] });
+    const res = await command({ command: "addParty", args: [party("No Version", 2)] });
     check("a write without expectedVersion is refused", res.status === 400, `HTTP ${res.status}`);
   }
 
@@ -159,7 +180,7 @@ async function main() {
     const stale = version - 1;
     const res = await command({
       command: "addParty",
-      args: [party("Second Writer")],
+      args: [party("Second Writer", 1)],
       expectedVersion: stale,
     });
     const body = await json(res);
@@ -182,7 +203,7 @@ async function main() {
   {
     const res = await command({
       command: "addParty",
-      args: [party(unique)],
+      args: [party(`${unique} (again)`)],
       expectedVersion: version,
     });
     const body = await json(res);
@@ -190,6 +211,54 @@ async function main() {
       "a duplicate tax id is refused by the engine, in its own words",
       res.status === 409 && /duplicate/i.test(body.message ?? ""),
       `HTTP ${res.status} ${body.message}`,
+    );
+  }
+
+  // --- moving an existing document onto the server ------------------------
+  {
+    const importUrl = (q = "") => `${BASE}/api/${TENANT}/erp/import${q}`;
+    const post = (body, q = "") =>
+      fetch(importUrl(q), {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    // A wrong file must not import as an empty company and look like it worked.
+    const junk = await post({ hello: "world" });
+    check(
+      "a file that is not an ERP export is refused",
+      junk.status === 400,
+      `HTTP ${junk.status}`,
+    );
+
+    // A tenant that already holds records is a company already operating.
+    const clobber = await post({
+      _meta: {},
+      data: { parties: [], seq: { id: 1 }, today: "2026-01-05" },
+    });
+    check(
+      "importing over existing data is refused without an explicit overwrite",
+      clobber.status === 409,
+      `HTTP ${clobber.status}`,
+    );
+
+    // …and even then, the version has to match.
+    const stale = await post(
+      { _meta: {}, data: { parties: [], seq: { id: 1 }, today: "2026-01-05" } },
+      "?overwrite=true&expectedVersion=99999",
+    );
+    check(
+      "overwriting with a stale version is refused",
+      stale.status === 409,
+      `HTTP ${stale.status}`,
+    );
+
+    const untouched = await json(await api(`/api/${TENANT}/erp/state`));
+    check(
+      "and none of that emptied the company",
+      (untouched.state?.parties ?? []).length > 0,
+      `parties=${(untouched.state?.parties ?? []).length}`,
     );
   }
 

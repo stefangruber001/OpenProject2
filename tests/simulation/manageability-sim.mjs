@@ -411,6 +411,58 @@ assert(
   "ERP.from backfills collections missing from an older blob",
 );
 
+// -----------------------------------------------------------------------------
+// MDM-03: no two ACTIVE parties may share a tax identifier.
+//
+// This used to be enforced through findDuplicateParty, which matches on tax id
+// OR name OR phone and returns the FIRST hit — so a real duplicate slipped
+// through whenever an unrelated party matched first on a shared phone number.
+// On a system holding tax records that splits one customer's invoices across
+// two records and makes the filing built from them wrong.
+// -----------------------------------------------------------------------------
+{
+  const base = {
+    roles: ["customer"],
+    billStreet: "x",
+    billPostalCode: "08240",
+    billCity: "Manresa",
+    leadSource: "Web",
+  };
+  const mdm = new ERP("2026-03-02");
+  // Shares a phone with the party added last, so the soft duplicate check
+  // matches IT first and its tax id differs.
+  mdm.addParty({ ...base, name: "Unrelated", taxId: "35336088S", mobile: "600000000" }, "t");
+  mdm.addParty({ ...base, name: "Real Co", taxId: "35336089Q", mobile: "600111111" }, "t");
+  throws(
+    () => mdm.addParty({ ...base, name: "Sneaky", taxId: "35336089Q", mobile: "600000000" }, "t"),
+    "addParty refuses a duplicate tax id even when another party matches first on phone",
+  );
+
+  const edit = new ERP("2026-03-02");
+  edit.addParty({ ...base, name: "A", taxId: "35336088S", mobile: "600000001" }, "t");
+  const b = edit.addParty({ ...base, name: "B", taxId: "35336089Q", mobile: "600000002" }, "t");
+  throws(
+    () => edit.updateParty(b.id, { taxId: "35336088S" }, "t"),
+    "updateParty refuses editing a tax id into a collision",
+  );
+
+  // The rule is about ACTIVE parties: a deactivated holder must not block a
+  // legitimate re-registration under the same identifier.
+  const reuse = new ERP("2026-03-02");
+  const old = reuse.addParty(
+    { ...base, name: "Old", taxId: "35336088S", mobile: "600000003" },
+    "t",
+  );
+  reuse.deactivateParty(old.id, "t");
+  let reused = true;
+  try {
+    reuse.addParty({ ...base, name: "New", taxId: "35336088S", mobile: "600000004" }, "t");
+  } catch {
+    reused = false;
+  }
+  assert(reused, "an INACTIVE tax-id holder does not block re-registration");
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

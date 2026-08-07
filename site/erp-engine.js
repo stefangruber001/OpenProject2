@@ -357,16 +357,32 @@
       rec.accountingCode = rec.accountingCode || "43" + rec.code.replace(/\D/g, ""); // MDM-09 aligned pair
       if (rec.taxId && !validTaxId(rec.taxId))
         throw new Error("Invalid tax identifier: " + rec.taxId); // MDM-03
-      const dup = this.findDuplicateParty(rec);
-      if (dup && rec.taxId && dup.taxId === rec.taxId)
+      // Two separate things, deliberately not one.
+      //
+      // A shared tax id is a HARD rule (MDM-03): two active parties with the
+      // same identifier means one customer's invoices split across two records
+      // and a tax filing built from them that does not add up.
+      //
+      // findDuplicateParty is a SOFT signal — it matches on tax id OR name OR
+      // phone and returns the first hit. Asking it to enforce the hard rule
+      // let real duplicates through: if an unrelated party matched first on a
+      // shared phone number, its tax id differed and the check passed. Verified
+      // by admitting one before this was split.
+      if (rec.taxId && this._activeTaxIdHolder(rec.taxId, rec.id))
         throw new Error("Duplicate active party for tax id " + rec.taxId); // MDM-03
+      const dup = this.findDuplicateParty(rec);
       rec.duplicateSuspect = dup ? dup.id : null;
       this.state.parties.push(rec);
       this._log(user, "addParty", rec.code);
       return rec;
     }
+    /** The active party already holding this tax id, if any. MDM-03's hard rule. */
+    _activeTaxIdHolder(taxId, exceptId) {
+      return this.state.parties.find((x) => x.active && x.id !== exceptId && x.taxId === taxId);
+    }
     findDuplicateParty(rec) {
-      // MDM-03: on taxId, name, phone
+      // A SOFT signal for review — matches on taxId, name OR phone and returns
+      // the first hit. Never use it to enforce the tax-id rule; see addParty.
       const norm = (s) =>
         String(s || "")
           .toLowerCase()
@@ -386,6 +402,11 @@
     updateParty(id, patch, user) {
       const p = this.party(id);
       if (patch.taxId && !validTaxId(patch.taxId)) throw new Error("Invalid tax identifier");
+      // The same hard rule as addParty. Without it the rule was trivially
+      // sidestepped: create a party with any identifier, then edit it to
+      // whichever one is already in use.
+      if (patch.taxId && patch.taxId !== p.taxId && this._activeTaxIdHolder(patch.taxId, id))
+        throw new Error("Duplicate active party for tax id " + patch.taxId); // MDM-03
       if (patch.bank && patch.bank.iban && !validIban(patch.bank.iban))
         throw new Error("Invalid IBAN");
       if (patch.bank) this._log(user, "partyBankChange", p.code); // MDM-08 change-logged
