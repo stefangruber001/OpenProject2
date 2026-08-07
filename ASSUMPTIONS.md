@@ -466,8 +466,8 @@ languages: es-ES # source: synthetic
   tree-shakes out (verified: 5.7 KB bundle, no zod; CI fails if `ZodError` reappears).
   (d) `BrowserIdGen` overrides the kernel's `RandomIdGen`, which calls
   `globalThis.crypto.randomUUID()` — undefined in a non-secure context and older WKWebViews,
-  where it would throw on first id and blank the page. (e) The first bridge call is a *derived
-  read* (task counts by status in Mi día), not an ownership move: doing both at once would have
+  where it would throw on first id and blank the page. (e) The first bridge call is a _derived
+  read_ (task counts by status in Mi día), not an ownership move: doing both at once would have
   confounded "is the pipeline correct?" with "is the migration correct?". **Constraint worth
   recording:** this environment has no Node/pnpm/esbuild, so `pnpm-lock.yaml` could not be
   regenerated — the new package's importer entry was hand-written and passed `--frozen-lockfile`
@@ -486,7 +486,7 @@ languages: es-ES # source: synthetic
   (b) A blob newer than the build **throws** rather than being downgraded, and `erp.html` shows a
   dedicated screen instead of reseeding over it — the case is real, because the web ships
   continuously to `/preview` while the shells ship through store review. (c) Import conflicts
-  surface as a Torre *view banner*, not through the engine's `alerts()`, which `year-sim.mjs`
+  surface as a Torre _view banner_, not through the engine's `alerts()`, which `year-sim.mjs`
   asserts on. (d) `caneiMasterData` is imported one-way but **not deleted** (most reversible);
   `caneiFinance`/`caneiJourney` are deliberately untouched per spec §6 and session 12.
   **Also fixed a live bug:** `index.html` hardcoded `indexedDB.open("caneiERP", 1)`, which would
@@ -494,3 +494,31 @@ languages: es-ES # source: synthetic
   it now reads through `ErpStore` like every other page. Two new simulations (`migrations-sim`,
   `import-sim`) run in CI; the import test asserts what the import must REFUSE as hard as what it
   does. Reversible: `kv`/`"state"` coordinates unchanged, backups written, legacy stores intact.
+- **#48 — The 13-stage journey becomes a transaction, not a narration (2026-08-07).**
+  A full end-to-end audit of `site/journey.html` as an employee would use it
+  (`docs/JOURNEY-AUDIT.md`) found the stages produced a complete set of documents from an empty
+  form, and that the money on them was invented: committed cost was `chapter budget ×
+committedPct` and actual cost `× actualPct`, so every chapter reported an identical variance
+  and the supplier / PO-number / bill-number fields the operator filled in were never read.
+  **Decision:** fix the journey in place rather than demote it to a demo — the request framed the
+  reviewer as an employee "using this ERP system in daily operations", and each serious defect
+  (fabricated numbers, seven dead fields, no gates) is downstream of the page not deriving its
+  figures from entered data. Purchase orders and supplier bills are now rows the operator enters
+  and the ledger sums; `depositPct` and `progressPct` drive the invoice; collections take an
+  amount so a part payment is representable; every stage states its preconditions and Advance
+  refuses until they are met. Most reversible: no engine change was needed for any of it, and the
+  sample carries seeded PO/bill rows so the walkthrough still demonstrates a complete project.
+  **Deliberately NOT done in this pass:** wiring the journey through `erp-engine.js`. It remains
+  the right end state — the page still writes to its own `caneiJourney` database while the ERP
+  uses `caneiERP`, so a customer is typed twice and the journey's invoice is not the accountant's
+  invoice — but it needs idempotent stage→record mapping (re-advancing must not duplicate
+  records) and a decision about abandoned journeys polluting the live dataset. Started badly it
+  would leave the repo half-migrated, which the mandate forbids; it is scoped as Tier-1 item 1 in
+  the audit's roadmap and lands as its own commit series.
+- **#49 — `receivables()` means what it says; the billing list moves (2026-08-07).**
+  `receivables()` ended in `.filter(x => x.outstandingCents > 0.005 || true)` — a no-op that kept
+  settled invoices in the AR follow-up list. Fixing it would have silently removed paid invoices
+  from `erp.html`'s Facturación screen, which renders a "Cobrada" pill and therefore expects
+  them. Added `invoiceRegister()` (every issued invoice, same row shape) for the list and left
+  `receivables()` as true AR; the view now reads the register. Most reversible: no data change,
+  and the three engine consumers already filtered on `outstandingCents > 0` themselves.

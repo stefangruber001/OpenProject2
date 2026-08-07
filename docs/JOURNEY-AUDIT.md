@@ -11,6 +11,12 @@ would use daily), `site/erp-engine.js` (the transactional core).
 **Status markers.** `[FIXED]` — corrected in this pass, with a test. `[OPEN]` — real, not
 yet built. `[FEATURE]` — genuinely missing capability, costed in the roadmap.
 
+**What changed after this audit was written.** The engine's seven dead correction paths and
+every `[FIXED]` item below were repaired and are covered by tests (`manageability-sim` 45/45,
+site E2E 46/46). The scores above are the **as-found** assessment and are deliberately not
+restated — the largest single item, C1, is untouched: the journey still writes to its own
+database. See `PROGRESS.md` and `ASSUMPTIONS.md` #48.
+
 ---
 
 ## Executive summary

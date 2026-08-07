@@ -318,6 +318,49 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   instead of auto-merged. Two new simulations in CI (23/23, 25/25).
 - **Sessions 4-12 — not started.** See `docs/worklog/WORKLOG.md`.
 
+## End-to-end journey audit + repair (2026-08-07)
+
+`docs/JOURNEY-AUDIT.md` — all 13 stages walked as an employee would, per-stage
+9-point review plus scored summary (34/100 overall, 28/100 usability; engine 72,
+workspace UI 22), ranked issues, missing features, automation estimates,
+scalability limits and a tiered roadmap. Every finding anchored to `file:line`.
+
+Fixed this pass:
+
+- **Seven engine correction paths that could never succeed** — each read a field
+  or collection under a name nothing ever wrote (`resolveRequirement` →
+  `p.requirements`, `adminPatch` → `state.captures`, `correctBill` →
+  `b.irpfRateBp`, `updateBudget` → `validityDays`, `updateRecurring` →
+  `concept`/`dayOfMonth`, `markChangeExecuted` never setting the status,
+  `receivables()` with a `|| true` disabling its own filter). All were listed in
+  `MANAGEABILITY.md` as working. 11 regression checks added (45 total), verified
+  red against the previous engine.
+- **The journey stops inventing its numbers.** Committed and actual cost were
+  `chapter budget × a percentage typed at intake`, which made every chapter show
+  an identical variance and left the supplier / PO / bill-number fields
+  decorative. Both now come from purchase-order and bill rows the operator
+  enters. `depositPct` and `progressPct` drive the invoice; collections take an
+  amount so part payments are representable; supplier payments are ticked per
+  bill.
+- **Every stage has a gate.** Advance refuses and lists what is missing; the rail
+  can no longer walk past the intake checks (it could previously start a project
+  with no customer name, tax ID or email).
+- Withholding clamped (>100% produced a negative invoice total), baseline frozen
+  once, ledger derivations moved out of the render functions, step/reached/ledger
+  persisted so a reload resumes, storage failures surfaced, CIF control digit
+  verified, "Send" relabelled to "Mark as sent" (no transport is wired), 36 lines
+  of dead code removed.
+
+Site E2E 46/46 — the journey test now asserts the gates hold, that per-chapter
+variance has more than one distinct value, and that a reload resumes.
+
+**Next (Tier-1 item 1 of the audit roadmap):** wire the journey through
+`erp-engine.js`. It still writes to its own `caneiJourney` database while the ERP
+uses `caneiERP`, so every customer, quote and invoice is entered twice and the
+journey's invoice is not the accountant's. Needs idempotent stage→record mapping
+and a decision on abandoned journeys polluting the live dataset — see
+`ASSUMPTIONS.md` #48.
+
 ## Branch & discipline
 
 Work lands on `claude/orin-project-status-1q50dt` (designated). Small
