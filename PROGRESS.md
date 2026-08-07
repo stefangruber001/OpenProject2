@@ -361,6 +361,38 @@ journey's invoice is not the accountant's. Needs idempotent stage→record mappi
 and a decision on abandoned journeys polluting the live dataset — see
 `ASSUMPTIONS.md` #48.
 
+## Off the laptop (2026-08-07)
+
+The operator asked to stop using their Mac entirely. Two things depended on it —
+reaching the ERP at all, and running the ops scripts — and deploying code already
+did not. Both halves of the gap are now addressed in code; one switch remains,
+and it needs credentials only the operator holds.
+
+- **Release gate fixed.** `deploy.yml` published the rolling `main` tag in the
+  build job, so the server pulled an image roughly three minutes before the smoke
+  test finished deciding whether it worked. The build now publishes only the
+  immutable sha tag and a `promote` job, gated on `smoke`, retags it in the
+  registry. Verified live: images → smoke (23:06:45) → promote (23:06:46).
+- **Identity.** `requireUser` returns the signed-in email when an identity
+  provider is configured, verified from the signed assertion rather than read
+  from a header — algorithm pinned, audience and issuer and expiry checked, keys
+  cached with refetch-on-rotation and stale-serve on outage. Half-configuration
+  is refused rather than downgraded to the shared operator name. 21 tests, each
+  a real forgery attempt. Unset variables leave today's behaviour identical.
+- **Ops from a browser.** `ops.yml` runs status, backup-now and list-ssh-allowed
+  from an Actions button that works from a phone. `ops/ssh-allow.sh` changes ONE
+  firewall entry instead of replacing the set — `narrow-ssh.sh` would have had
+  the second of two people silently lock out the first. Seven fixtures.
+- **Written down:** `docs/OPS-WITHOUT-A-LAPTOP.md`, including what storing the
+  SSH key in repository secrets actually costs.
+
+**Next:** publish the ERP. `ops/provision.sh` already builds the tunnel, DNS
+record and login policy behind `SKIP_CLOUDFLARE=1`; switching it on is what turns
+"the server is healthy" into "the company runs on it". Needs the domain in
+Cloudflare and the two `CF_ACCESS_*` variables reaching the app. Until then the
+workspace is still tunnel-only, and the nine-command whitelist still cannot run a
+job from lead to close.
+
 ## Branch & discipline
 
 Work lands on `claude/orin-project-status-1q50dt` (designated). Small
