@@ -11,9 +11,12 @@
  * here, reviewed like any other change, rather than a side effect of adding a
  * method to the engine.
  *
- * The set below is exactly the mutations `site/erp.html` performs today — the
+ * The set below started as exactly the mutations `site/erp.html` performs — the
  * ten `mutate()` call sites collapse to nine engine methods, because the party
- * activate/deactivate toggle uses two of them.
+ * activate/deactivate toggle uses two of them. The scheduling three were added
+ * afterwards, ahead of a UI: a task entered by one person was staying on that
+ * person's device, and a command the server will not accept is the first of the
+ * reasons why. See `docs/WHY-THE-CALENDAR-IS-NOT-SHARED.md` for the others.
  *
  * `user` is deliberately NOT part of `arity`. Every mutating engine method
  * takes the acting user as its last argument and writes it to `state.audit`;
@@ -52,6 +55,15 @@ export const COMMANDS = {
   // --- site work -------------------------------------------------------
   markProgress: { method: "markProgress", arity: 4, describes: "record progress on site" },
   approveChange: { method: "approveChange", arity: 2, describes: "approve a change order" },
+
+  // --- scheduling ------------------------------------------------------
+  // Shared work planning: without these the engine can hold tasks but the
+  // server cannot be told about one, so a schedule entered by one person stays
+  // on that person's device and a colleague never sees it. That is the whole
+  // point of the data being on a server.
+  addTask: { method: "addTask", arity: 1, describes: "add a task" },
+  updateTask: { method: "updateTask", arity: 2, describes: "update a task" },
+  completeTask: { method: "completeTask", arity: 1, describes: "complete a task" },
 
   // --- periodic --------------------------------------------------------
   quarterlyPackage: {

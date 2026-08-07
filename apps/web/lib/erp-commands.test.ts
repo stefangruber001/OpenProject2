@@ -45,20 +45,66 @@ describe("the command whitelist", () => {
     }
   });
 
-  it("accepts exactly the nine mutations the workspace performs", () => {
+  // Pinned deliberately. Widening what a request body may invoke should be a
+  // visible line in a diff, not something that arrives with an unrelated change
+  // — so adding a command is expected to fail this test until it is listed.
+  it("accepts exactly these mutations and no others", () => {
     expect(commandNames().sort()).toEqual(
       [
         "addParty",
+        "addTask",
         "allocateMovementToProject",
         "approveChange",
+        "completeTask",
         "deactivateParty",
         "markProgress",
         "payBills",
         "quarterlyPackage",
         "recordCollection",
         "updateParty",
+        "updateTask",
       ].sort(),
     );
+  });
+});
+
+/**
+ * The reported symptom: one person adds a task, the other never sees it.
+ *
+ * The engine half of that is what these cover — a task added through the
+ * whitelist has to survive being written out and read back by somebody else,
+ * because that round trip through the stored document is the only thing that
+ * makes shared work planning possible.
+ */
+describe("a task survives the trip between two people", () => {
+  it("is in the serialised document, so a colleague loading it sees the task", () => {
+    const mine = new ERP("2026-03-01") as unknown as Record<string, (...a: unknown[]) => unknown>;
+    mine.addTask?.({ title: "Site visit — Barcelona", due: "2026-03-09" }, "stefan@example.com");
+
+    // What the server would store, and hand to the next person to ask.
+    const stored = JSON.parse(JSON.stringify((mine as unknown as { state: unknown }).state));
+    const theirs = ERP.from(stored) as unknown as { state: { tasks: Record<string, unknown>[] } };
+
+    const task = theirs.state.tasks.find((t) => t.title === "Site visit — Barcelona");
+    expect(task, "the task a colleague loads").toBeDefined();
+    expect(task?.due).toBe("2026-03-09");
+    expect(task?.status).toBe("open");
+  });
+
+  it("records who added it, so the schedule is attributable", () => {
+    const erp = new ERP("2026-03-01") as unknown as Record<string, (...a: unknown[]) => unknown> & {
+      state: { audit: { user?: string; action?: string }[]; tasks: { id: string }[] };
+    };
+    erp.addTask?.({ title: "Order tiles" }, "ignacio@example.com");
+    erp.completeTask?.(erp.state.tasks[0]!.id, "stefan@example.com");
+
+    const actions = erp.state.audit.map((a) => `${a.user}:${a.action}`);
+    expect(actions).toContain("stefan@example.com:completeTask");
+  });
+
+  it("refuses to complete a task that does not exist rather than inventing one", () => {
+    const erp = new ERP("2026-03-01") as unknown as Record<string, (...a: unknown[]) => unknown>;
+    expect(() => erp.completeTask?.("tsk-nope", anyUser)).toThrow(/not found/i);
   });
 });
 

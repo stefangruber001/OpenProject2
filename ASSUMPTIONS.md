@@ -851,3 +851,27 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   recognises. Credentials are shredded from the runner afterwards, and the key is validated
   with `ssh-keygen -y` at the point of use so a CRLF-mangled paste fails with a sentence
   instead of "invalid format".
+- **#69 — "The server is not working" was four other things (2026-08-07).** A task added to
+  the calendar on one phone never appeared on the other, and the reasonable conclusion was
+  that the server was broken. It is not; it had been verified end to end hours earlier. The
+  calendar cannot reach a colleague for four independent reasons, any one of which is
+  sufficient on its own:
+  (1) both mobile apps load `stefangruber001.github.io/OpenProject2/preview/` — GitHub Pages,
+  a static site with no server behind it, so everything entered on a phone stays on that
+  phone. This is not calendar-specific: customers and invoices are equally private.
+  (2) the Pages copy of `erp.html` carries no `erp-api` marker (`grep -c` → 0), so even that
+  page uses browser storage there; the marker is injected only into the copy the server
+  serves.
+  (3) the scheduler lives in `journey.html` and persists to the `caneiJourney` browser
+  database, a different store from the ERP's — it has never passed through `erp-engine.js`.
+  (4) `addTask` was not on the API's command whitelist, so a correctly wired calendar would
+  still have been refused.
+  **Decision: fix (4) now and document the rest rather than half-fix the chain.** `addTask`,
+  `updateTask` and `completeTask` are on the whitelist with round-trip tests — a task written
+  by one person is loaded by another, and the audit trail names who completed it. The other
+  three are ordered in `docs/WHY-THE-CALENDAR-IS-NOT-SHARED.md`, because they must be done in
+  sequence: publishing has to come first or there is no address to point the apps at.
+  Worth recording as a class of failure: **a save into browser storage is indistinguishable
+  from a save to the server** from the operator's side. The page looks identical, the toast
+  is identical, the record appears. Everything downstream of that ambiguity gets diagnosed as
+  a broken backend. The ten-second test is the address bar, which is now written down.
