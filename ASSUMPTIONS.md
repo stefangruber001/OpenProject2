@@ -532,3 +532,34 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   and doing it half-way would leave the fixtures inconsistent with the validator. Logged as M1
   in `docs/JOURNEY-E2E-TEST.md` and Tier-1 item 5. Most reversible: no behaviour changed, and
   the stricter of the two validators is the one facing the operator.
+- **#51 — Hosting: Hetzner + Cloudflare, built for handover to a third party (2026-08-07).**
+  The owner will hand the running system to Canei Subirats and step away, with a third-party
+  IT provider maintaining it. **Decisions:** (a) **Hetzner CX32 (x86), Falkenstein/Nuremberg,
+  ~€9/mo all-in** — EU data residency for personal and tax data, 3–5× cheaper than a
+  hyperscaler; x86 rather than the cheaper ARM CAX21 so no cross-architecture image build has
+  to be explained to whoever inherits it (€0.50/mo for one less moving part). (b) **Cloudflare
+  for the edge, not the compute** — Tunnel (no inbound port exists), Access (auth without
+  building auth), R2 (encrypted backups), Pages; Workers were rejected because the app needs
+  Node crypto for the invoice hash chain, interactive Prisma transactions carrying the RLS
+  GUC, and long-running jobs, and an OpenNext compatibility layer under a system holding tax
+  records buys nothing. (c) **Self-hosted PostgreSQL with encrypted off-site backups** rather
+  than managed: at one tenant, spend on backups, not redundancy — an hour of downtime is
+  annoying, a lost invoice register is fatal. Revisit at ~10 paying tenants. (d) **Pull-based
+  deployment** (systemd timer pulls from GHCR every 60s) rather than SSH-from-CI, so no deploy
+  key exists and no inbound rule is needed. (e) **Full `node:22-bookworm`, not `-slim`** — the
+  slim image ships no libssl, so Prisma falls back to an openssl-1.1.x engine and dies with a
+  bare "Schema engine error"; the full image needs no apt-get at all, so the build works
+  behind a proxy or an air-gapped mirror. Found by building it the wrong way first.
+  (f) **Boring technology on purpose** — Docker Compose, PostgreSQL, systemd. The constraint
+  is not "can it be built" but "can a stranger keep it alive". Most reversible: nothing is
+  Hetzner-specific; the compose stack runs on any Debian host, and the rebuild drill in
+  `docs/HANDOVER-OPS.md` is the test that it genuinely does.
+- **#52 — Accounts are created in the customer's name from day one (2026-08-07).**
+  Hetzner, Cloudflare and GitHub are registered to `Canei Subirats, S.L.` with a role address
+  (`sistemas@…`), the customer's card, and the builder added afterwards as an admin who
+  removes himself at handover — never the reverse. Several providers make ownership transfer
+  painful and some impossible, and a domain transfer carries a 60-day registrar lock, so
+  retro-fitting ownership turns a handover into a migration. Costs nothing now.
+  The **age backup private key is deliberately not on the server**: a backup the compromised
+  host can decrypt is not protection. It lives only in the customer's password manager, which
+  means losing it makes every backup unreadable — recorded in the escalation table.
