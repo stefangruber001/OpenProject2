@@ -93,9 +93,19 @@ services:
       DATABASE_URL: postgresql://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
       NEXT_PUBLIC_APP_URL: ${APP_URL}
       NODE_ENV: production
-      # Stamped on every ERP change in the audit trail. The API refuses to write
-      # without it — see lib/session.ts.
+      # Who gets stamped on every ERP change in the audit trail. Two modes, and
+      # lib/session.ts refuses to write without one of them.
+      #
+      # SINGLE SEAT — no login, one named person, reachable only over a tunnel.
       ERP_OPERATOR: ${ERP_OPERATOR}
+      # PUBLISHED — set BOTH of these and the signed-in email is used instead,
+      # so several people are attributable individually. Setting only one is
+      # refused rather than quietly falling back to the shared name above.
+      # Team domain: <team>.cloudflareaccess.com. Audience: the Access app's AUD
+      # tag. Empty here means single-seat; compose passes "" for an unset value,
+      # and session.ts treats empty as absent.
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN:-}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD:-}
     # Loopback only. See the note at the top of this file before touching it.
     ports:
       - "127.0.0.1:3000:3000"

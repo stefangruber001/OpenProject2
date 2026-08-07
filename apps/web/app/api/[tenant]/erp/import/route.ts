@@ -49,7 +49,7 @@ function asState(body: unknown): ErpState {
 export async function POST(req: Request, ctx: { params: Promise<{ tenant: string }> }) {
   const { tenant } = await ctx.params;
   return guarded(async () => {
-    const user = requireUser();
+    const user = await requireUser(req);
     if (!listTenants().includes(tenant)) {
       throw new FactoryError("NOT_FOUND", `No tenant "${tenant}".`);
     }

@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request, ctx: { params: Promise<{ tenant: string }> }) {
   const { tenant } = await ctx.params;
   return guarded(async () => {
-    const user = requireUser();
+    const user = await requireUser(req);
 
     let body: unknown;
     try {

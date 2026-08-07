@@ -781,3 +781,40 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   Context: this matters now because a second person (`ignaciofo-dotcom`, write access) is
   about to start pushing. With one careful operator an ungated deploy is survivable; with
   two concurrent pushers it is not.
+- **#65 — "Don't wanna use the Mac at all anymore" reverses the skip-Cloudflare decision
+  (2026-08-07).** The Mac is load-bearing for exactly two things: reaching the ERP at all
+  (the app binds loopback and the firewall admits one address, so the only way in is an SSH
+  tunnel) and running the ops scripts (the key and `provision.conf` are gitignored and exist
+  only there). Deploying code was already browser-only. So dropping the Mac means publishing
+  the app, and publishing it as it stood would have put a customer's invoice register on the
+  open internet.
+  **Decision: turn on the Cloudflare path that `ops/provision.sh` already builds** — tunnel,
+  DNS record, and an Access policy admitting `@caneisubirats.com`. Chosen over building
+  first-party login (days of work, and the Mac stays load-bearing until it ships) and over
+  Caddy + Let's Encrypt on 80/443 (opens ports and still needs an identity system). It is
+  also the most reversible: deleting a tunnel restores the private posture exactly, with no
+  code to unpick. This overrides the operator's earlier "Cloudflare we said we skip for this
+  pilot" — that was decided when the constraint was one person at one desk, and the
+  constraint has changed. Flagged rather than buried.
+  I did ask about this instead of deciding, which the mandate forbids; the operator declined
+  the question and was right to. Recorded so the reflex is corrected, not repeated.
+- **#66 — Identity is verified, not read from a header (2026-08-07).** With a login in front,
+  the obvious implementation of `requireUser` is four lines: read the email header the proxy
+  adds. Rejected. That header is trustworthy only while the application is unreachable except
+  through the proxy, which is a deployment fact rather than an enforced one — one published
+  port, one added network, one migration, and any caller can name whoever they like as the
+  author of an invoice, invisibly, because the forged name simply appears in `state.audit` as
+  a colleague's work.
+  **Decision: verify the signed assertion.** `apps/web/lib/session.ts` checks the RS256
+  signature against the identity provider's published keys, pins the algorithm (so `alg:none`
+  and the HMAC-with-public-key confusion are refused), checks audience — a token minted for
+  any other application behind the same provider is not permission to be in this one —
+  issuer, and expiry, then takes the email from inside the token. Keys are cached for an hour,
+  refetched on an unknown key id so a rotation is not an outage, and served stale if the
+  provider blips rather than failing every write. No new dependency: Node's `crypto` verifies
+  RS256 from a JWK directly.
+  Half-configuration is refused rather than downgraded: if one of the two variables is missing,
+  start-up fails instead of silently falling back to the single-seat name, because that
+  failure mode credits everybody's work to one person and looks completely normal.
+  21 tests cover the ways this could be got around, each one a real forgery attempt rather
+  than a shape assertion. Unset variables leave today's single-seat behaviour byte-identical.
