@@ -1,0 +1,120 @@
+name: Ops (run from a browser)
+
+# Everything you would otherwise need a laptop and an SSH key for, behind a
+# "Run workflow" button. Actions -> Ops -> Run workflow, pick one, read the log.
+# Works from a phone.
+#
+# THE FIREWALL. SSH is restricted to a small set of addresses, and a GitHub
+# runner's address is different every time, so each run lets itself in, does the
+# work, and takes itself back out. The removal runs in an always() step: if it
+# were skipped on failure, every red run would leave a stranger's address on the
+# firewall forever. ops/ssh-allow.sh adds and removes ONE entry rather than
+# replacing the set, so a run never disturbs the humans already listed.
+#
+# THE KEY. This needs the production SSH key, which lives in repository secrets.
+# That is a real widening: anyone who can push a workflow to this repository can
+# print a secret, so the set of people who can reach the server is now the set of
+# people with write access. That is a deliberate trade for being able to operate
+# without a laptop, and the way to tighten it is the `production` environment
+# below — add a required reviewer to it in Settings -> Environments and every run
+# waits for an approval.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to do"
+        required: true
+        default: status
+        type: choice
+        options:
+          - status
+          - backup-now
+          - list-ssh-allowed
+
+concurrency:
+  # Two runs mutating the same firewall would race: the first one's cleanup
+  # removes an address while the second is still using it.
+  group: ops-server
+  cancel-in-progress: false
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the secrets this needs are present
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          missing=""
+          [ -n "$HCLOUD_TOKEN" ]   || missing="$missing HCLOUD_TOKEN"
+          [ -n "$SERVER_SSH_KEY" ] || missing="$missing SERVER_SSH_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing — see docs/OPS-WITHOUT-A-LAPTOP.md"
+            exit 1
+          fi
+
+      - name: Materialise the config the ops scripts expect
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          # Written with printf rather than echo so a value containing a
+          # backslash survives intact, and quoted because the scripts source it.
+          mkdir -p ops/.provisioned
+          printf 'HCLOUD_TOKEN="%s"\n' "$HCLOUD_TOKEN" > ops/provision.conf
+          printf '%s\n' "$SERVER_SSH_KEY" > ops/.provisioned/id_ed25519
+          chmod 600 ops/.provisioned/id_ed25519
+          # A key with CRLF or a missing trailing newline fails with the
+          # spectacularly unhelpful "invalid format", so check it here where the
+          # error can say what is actually wrong.
+          ssh-keygen -y -f ops/.provisioned/id_ed25519 >/dev/null 2>&1 || {
+            echo "::error::SERVER_SSH_KEY is not a usable private key. Paste the whole file, including the BEGIN and END lines and a trailing newline."
+            exit 1; }
+
+      - name: Let this runner through the firewall
+        id: allow
+        run: |
+          RUNNER_IP="$(curl -sS --max-time 10 https://api.ipify.org)"
+          echo "runner_ip=$RUNNER_IP" >> "$GITHUB_OUTPUT"
+          echo "This run is coming from $RUNNER_IP"
+          bash ops/ssh-allow.sh add "$RUNNER_IP"
+          # Hetzner applies rules asynchronously; connecting immediately
+          # sometimes still gets refused.
+          sleep 5
+
+      - name: status
+        if: inputs.action == 'status'
+        run: bash ops/status.sh
+
+      - name: list-ssh-allowed
+        if: inputs.action == 'list-ssh-allowed'
+        run: bash ops/ssh-allow.sh list
+
+      - name: backup-now
+        if: inputs.action == 'backup-now'
+        run: |
+          IP="$(curl -sS -H "Authorization: Bearer ${{ secrets.HCLOUD_TOKEN }}" \
+                 "https://api.hetzner.cloud/v1/servers?name=${SERVER_NAME:-canei-erp-prod}" \
+               | jq -r '.servers[0].public_net.ipv4.ip')"
+          SSH="ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -i ops/.provisioned/id_ed25519 root@${IP}"
+          # </dev/null on every remote command: anything that reads stdin eats
+          # the rest of a piped script, silently. That cost a day once.
+          $SSH "systemctl start canei-backup.service" </dev/null
+          echo "Backup service started. Most recent dumps on the machine:"
+          $SSH "ls -lt /opt/canei-erp/backups/*.age 2>/dev/null | head -5 || echo '(none yet)'" </dev/null
+
+      - name: Take this runner back out of the firewall
+        # always(), because a failed run that leaves its address allowed is how
+        # the allow-list silently fills up with addresses nobody recognises.
+        if: always() && steps.allow.outputs.runner_ip != ''
+        run: bash ops/ssh-allow.sh remove "${{ steps.allow.outputs.runner_ip }}"
+
+      - name: Shred the credentials from the runner's disk
+        if: always()
+        run: rm -f ops/provision.conf ops/.provisioned/id_ed25519

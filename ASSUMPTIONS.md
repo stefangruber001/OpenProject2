@@ -818,3 +818,36 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   failure mode credits everybody's work to one person and looks completely normal.
   21 tests cover the ways this could be got around, each one a real forgery attempt rather
   than a shape assertion. Unset variables leave today's single-seat behaviour byte-identical.
+- **#67 — Ops moved to a browser button, and the firewall had to stop being
+  single-occupancy first (2026-08-07).** Checking what the operator's laptop was actually
+  load-bearing for turned up a blocker neither of us had noticed: `ops/narrow-ssh.sh` uses
+  Hetzner's `set_rules`, which REPLACES every rule. It was written for one person at one
+  desk and is actively harmful with two — the second person runs it and locks out the first,
+  with no error on either side. The same property blocks any automation, which needs to let
+  itself in briefly and then leave.
+  **Decision: add `ops/ssh-allow.sh`, which changes exactly one entry** and writes the whole
+  set back, preserving non-SSH rules and anyone already listed. `add` of a present address
+  and `remove` of an absent one are no-ops rather than errors, because the remove half
+  usually runs in a cleanup handler after something else has already failed. Removing the
+  last address is permitted — denying access is the safe direction and a prompt would break
+  automated cleanup — but says so loudly, since the resulting state is invisible from
+  outside. `narrow-ssh.sh` is left alone; "set it to only me" is still a legitimate thing to
+  want.
+  Verified against seven fixtures before it went near the live API: add-second, add-duplicate,
+  remove-one-of-two, remove-last, remove-absent, non-SSH-rules-preserved, add-when-no-rules.
+- **#68 — The production SSH key now lives in repository secrets (2026-08-07).** `ops.yml`
+  runs `status`, `backup-now` and `list-ssh-allowed` from an Actions button, which needs the
+  key. This is a genuine widening and is recorded rather than buried: **anyone who can push a
+  workflow to this repository can print that secret**, so repository write access and
+  production SSH access are now the same privilege — and a second person with write access
+  was just added.
+  **Decision: accept it, gated on the `production` environment**, so a required reviewer can
+  be added in one browser click and every run then waits for approval. The alternative —
+  hand-editing on the machine through Hetzner's web console — stores no credential anywhere
+  but makes every routine check a manual typing exercise on a phone, which in practice means
+  the checks stop happening. A stale, unmonitored server is the larger risk.
+  Each run adds its own address to the firewall and removes it in an `always()` step: a
+  cleanup that only ran on success would slowly fill the allow-list with addresses nobody
+  recognises. Credentials are shredded from the runner afterwards, and the key is validated
+  with `ssh-keygen -y` at the point of use so a CRLF-mangled paste fails with a sentence
+  instead of "invalid format".
