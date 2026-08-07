@@ -33,6 +33,11 @@ write_files:
       POSTGRES_USER=canei
       POSTGRES_PASSWORD=__PG_PASSWORD__
       POSTGRES_DB=canei_erp
+      # The role the application connects as. Separate from the owner above
+      # because the owner is a superuser, and superusers bypass row-level
+      # security — see ops/harden-db-role.sh.
+      APP_DB_USER=canei_app
+      APP_DB_PASSWORD=__APP_DB_PASSWORD__
       APP_URL=__APP_URL__
       IMAGE_APP=__IMAGE_APP__
       IMAGE_MIGRATE=__IMAGE_MIGRATE__

@@ -97,6 +97,10 @@ jobs:
           --health-interval 10s --health-timeout 5s --health-retries 5
         ports: ["5432:5432"]
     steps:
+      # Needed for ops/harden-db-role.sh below — the images come from the
+      # registry, but the role script is repo content.
+      - uses: actions/checkout@v4
+
       - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -109,10 +113,24 @@ jobs:
             -e DATABASE_URL="postgresql://canei:canei@127.0.0.1:5432/canei_erp?schema=public" \
             ${{ env.REGISTRY }}/${{ github.repository }}/migrate:sha-${{ github.sha }}
 
+      # Production does not run the app as the database owner — the owner is a
+      # superuser and superusers bypass RLS. So the smoke test must not either,
+      # or it proves the image works under privileges it will never have and
+      # misses every missing GRANT.
+      - name: Create the restricted application role
+        env:
+          PGHOST: 127.0.0.1
+          PGPASSWORD: canei
+          POSTGRES_USER: canei
+          POSTGRES_DB: canei_erp
+          APP_DB_USER: canei_app
+          APP_DB_PASSWORD: canei_app
+        run: bash ops/harden-db-role.sh
+
       - name: Start the published app image and check it serves
         run: |
           docker run -d --name app --network host \
-            -e DATABASE_URL="postgresql://canei:canei@127.0.0.1:5432/canei_erp?schema=public" \
+            -e DATABASE_URL="postgresql://canei_app:canei_app@127.0.0.1:5432/canei_erp?schema=public" \
             ${{ env.REGISTRY }}/${{ github.repository }}/app:sha-${{ github.sha }}
           for i in $(seq 1 40); do
             body=$(curl -fsS http://127.0.0.1:3000/api/health 2>/dev/null) && break

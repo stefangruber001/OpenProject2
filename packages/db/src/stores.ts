@@ -225,3 +225,87 @@ export class PrismaEventLog implements EventLogPort {
     );
   }
 }
+
+/** A document plus the version a writer must present to replace it. */
+export interface VersionedState<T = unknown> {
+  readonly state: T | null;
+  readonly version: number;
+}
+
+/**
+ * Durable home for a whole-document state, with optimistic concurrency.
+ *
+ * The usage is deliberately read-modify-write across two transactions rather
+ * than one long one: load, do the work, then save quoting the version that was
+ * loaded. Holding a transaction open for the duration of the work would serialise
+ * every user behind whoever is slowest; the version check gives the same safety,
+ * because a writer whose document moved underneath them is rejected instead of
+ * overwriting. A caller that ignores the rejection is back to losing data, so
+ * `save` throws rather than returning a flag.
+ *
+ * `version` 0 means "nothing stored yet" — the value to present on a first save.
+ */
+export class PrismaErpStateStore {
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly tenantId: string,
+    private readonly key = "state",
+  ) {}
+
+  async load<T = unknown>(): Promise<VersionedState<T>> {
+    const row = await withTenant(this.prisma, this.tenantId, (tx) =>
+      tx.erpState.findUnique({
+        where: { tenantId_key: { tenantId: this.tenantId, key: this.key } },
+      }),
+    );
+    if (!row) return { state: null, version: 0 };
+    return { state: row.payload as T, version: row.version };
+  }
+
+  /** Replaces the document, or throws STALE_WRITE. Returns the new version. */
+  async save(state: unknown, expectedVersion: number, user = ""): Promise<number> {
+    const payload = state as Prisma.InputJsonValue;
+
+    if (expectedVersion === 0) {
+      try {
+        const created = await withTenant(this.prisma, this.tenantId, (tx) =>
+          tx.erpState.create({
+            data: {
+              tenantId: this.tenantId,
+              key: this.key,
+              version: 1,
+              payload,
+              updatedBy: user,
+            },
+          }),
+        );
+        return created.version;
+      } catch (e) {
+        // Someone else created it between our load and our save.
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+          throw await this.stale(expectedVersion);
+        }
+        throw e;
+      }
+    }
+
+    const { count } = await withTenant(this.prisma, this.tenantId, (tx) =>
+      tx.erpState.updateMany({
+        where: { tenantId: this.tenantId, key: this.key, version: expectedVersion },
+        data: { payload, version: { increment: 1 }, updatedBy: user },
+      }),
+    );
+    if (count === 0) throw await this.stale(expectedVersion);
+    return expectedVersion + 1;
+  }
+
+  /** Names the version the caller should have had, so the UI can say something useful. */
+  private async stale(expectedVersion: number): Promise<FactoryError> {
+    const { version } = await this.load();
+    return new FactoryError(
+      "STALE_WRITE",
+      `This record changed while you were editing it (you had version ${expectedVersion}, it is now ${version}). Reload before saving again.`,
+      { expectedVersion, currentVersion: version },
+    );
+  }
+}

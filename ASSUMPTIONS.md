@@ -583,3 +583,25 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   ~20-minute switch-on with no rebuild and no data migration, and records what would have to
   replace Cloudflare (another zero-trust proxy, Caddy + basic auth, or building real auth
   into the app) if the customer declines.
+- **#54 — Row-level security was decorative; the app now connects as a restricted role
+  (2026-08-07).** Verification step 5 of the server-move plan ("query the table with no
+  `app.tenant_id` set and get zero rows") **failed**. Every tenant table has had an RLS policy
+  and `FORCE ROW LEVEL SECURITY` since `0001_init`, and ADR-0007 calls it defense in depth —
+  but the application connected as `POSTGRES_USER`, which the postgres image makes a
+  SUPERUSER, and **Postgres lets superusers bypass RLS unconditionally; FORCE does not change
+  that**. Measured on a real database: as the owner, an unscoped `SELECT` returned every row
+  of every tenant; as a plain role, zero. So the database half of the isolation did not exist,
+  and the existing test named "tenant scoping (defense in depth)" only ever exercised the
+  adapters' own `WHERE tenant_id` — it passes with RLS switched off entirely.
+  **Decision: split the roles.** The owner keeps DDL and runs migrations; the app connects as
+  `canei_app` — `NOSUPERUSER NOBYPASSRLS`, DML only, no access to `_prisma_migrations`.
+  `ops/harden-db-role.sh` creates it, is idempotent (it is also the password-rotation path),
+  and **refuses to exit 0 unless it can prove the role sees zero rows without a tenant set**.
+  It runs as a one-shot compose service after `migrate`, in CI, and in the deploy smoke test —
+  so the published image is now exercised under the privileges it will actually have, which
+  also catches a missing GRANT before the server does.
+  Four new tests assert the database-level behaviour over a restricted connection; they were
+  confirmed to **fail** against the owner connection before being trusted. The misleading test
+  name was corrected rather than left to reassure the next reader.
+  Most reversible: additive. Existing data untouched, no schema change to existing tables, and
+  a server that has not yet run `db-role` keeps working until it does.

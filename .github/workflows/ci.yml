@@ -155,7 +155,13 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
+      # The OWNER connection: DDL, migrations, and the contract tests.
       DATABASE_URL: postgresql://factory:factory@localhost:5432/factory
+      # The RESTRICTED connection the application would really use. It has to be
+      # a different role: `factory` is a superuser, and superusers bypass RLS
+      # unconditionally, so RLS assertions made over the owner connection pass
+      # for the wrong reason — or rather, fail to fail when RLS is broken.
+      RLS_TEST_DATABASE_URL: postgresql://factory_app:factory_app@localhost:5432/factory
     steps:
       - uses: actions/checkout@v4
 
@@ -171,6 +177,18 @@ jobs:
 
       - name: Apply migrations (incl. RLS policies)
         run: pnpm --filter @repo/db exec prisma migrate deploy
+
+      - name: Create the restricted application role
+        # Same script production runs, so a change that breaks the grants breaks
+        # here rather than on the server.
+        env:
+          PGHOST: localhost
+          PGPASSWORD: factory
+          POSTGRES_USER: factory
+          POSTGRES_DB: factory
+          APP_DB_USER: factory_app
+          APP_DB_PASSWORD: factory_app
+        run: bash ops/harden-db-role.sh
 
       - name: Seed fleet registry
         run: pnpm --filter @repo/db exec tsx prisma/seed.ts

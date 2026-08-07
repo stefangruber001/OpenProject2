@@ -129,6 +129,12 @@ AGE_PRIV="$(grep '^AGE-SECRET-KEY-' "$OUT/age-key.txt")"
 [ -f "$OUT/pg-password" ] || { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40 > "$OUT/pg-password"; }
 PG_PASSWORD="$(cat "$OUT/pg-password")"
 
+# A separate password for the role the application connects as. It is a
+# different secret on purpose: the owner password is a superuser credential and
+# should never be the one sitting in the app container's environment.
+[ -f "$OUT/app-db-password" ] || { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40 > "$OUT/app-db-password"; }
+APP_DB_PASSWORD="$(cat "$OUT/app-db-password")"
+
 if [ ! -f "$OUT/id_ed25519" ]; then
   ssh-keygen -t ed25519 -N "" -C "canei-erp-provision" -f "$OUT/id_ed25519" >/dev/null
   info "SSH keypair created"
@@ -249,6 +255,7 @@ else
   CLOUD_INIT="$(
     sed -e "s|__REPO__|https://github.com/${GITHUB_REPO}.git|g" \
         -e "s|__PG_PASSWORD__|${PG_PASSWORD}|g" \
+        -e "s|__APP_DB_PASSWORD__|${APP_DB_PASSWORD}|g" \
         -e "s|__APP_URL__|https://${FQDN}|g" \
         -e "s|__IMAGE_APP__|ghcr.io/${GITHUB_REPO}/app:main|g" \
         -e "s|__IMAGE_MIGRATE__|ghcr.io/${GITHUB_REPO}/migrate:main|g" \
@@ -287,7 +294,8 @@ Canei ERP — provisioned $(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 PUT THESE IN THE CUSTOMER'S PASSWORD MANAGER, THEN DELETE ops/.provisioned/
 
-  Postgres password    ${PG_PASSWORD}
+  Postgres password    ${PG_PASSWORD}          (owner / migrations, superuser)
+  App DB password      ${APP_DB_PASSWORD}          (canei_app, what the app uses)
   age public key       ${AGE_PUB}
   age PRIVATE key      ${AGE_PRIV}
   SSH private key      ops/.provisioned/id_ed25519

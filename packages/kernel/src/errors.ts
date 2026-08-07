@@ -12,6 +12,7 @@ export type FactoryErrorCode =
   | "MISSING_PORT_IMPLEMENTATION"
   | "IMMUTABLE"
   | "INVALID_STATE"
+  | "STALE_WRITE"
   | "NO_TEMPLATE"
   | "NO_OUTBOX"
   | "NOT_FOUND";

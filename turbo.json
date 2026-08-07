@@ -6,6 +6,8 @@
     "NODE_ENV",
     "DATABASE_URL",
     "E2E_DATABASE_URL",
+    "RLS_TEST_DATABASE_URL",
+    "TENANTS_DIR",
     "NEXT_PUBLIC_APP_URL",
     "UI_LANG"
   ],

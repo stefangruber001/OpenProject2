@@ -16,10 +16,12 @@ export async function guarded(fn: () => Promise<Response>): Promise<Response> {
       const status =
         e.code === "NOT_FOUND" || e.code === "SPEC_INVALID"
           ? 404
-          : e.code === "IMMUTABLE" || e.code === "INVALID_STATE"
+          : e.code === "IMMUTABLE" || e.code === "INVALID_STATE" || e.code === "STALE_WRITE"
             ? 409
             : 400;
-      return json({ error: e.code, message: e.message }, status);
+      // `details` carries what the caller needs to recover — a STALE_WRITE says
+      // which version won, so the client can reload rather than guess.
+      return json({ error: e.code, message: e.message, ...(e.details ?? {}) }, status);
     }
     throw e;
   }
