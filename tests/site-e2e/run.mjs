@@ -255,6 +255,31 @@ async function testJourney(browser, base) {
         `values: ${variancePcts.join(" | ") || "(none)"} — identical values mean the multiplier is back`,
       );
 
+    // ── The narrative body shows derived figures (invoice table, collection
+    // status). A field edit must redraw it: it once updated the ledger and the
+    // filed PDF but left the screen as first drawn, so a 5.000 € part payment
+    // read "Outstanding: 0,00 € · paid" on screen while the ledger said 5.000.
+    await page.evaluate(() => {
+      [...document.querySelectorAll("#rail .st.nav")][9]?.click(); // Collections
+    });
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      const el = document.querySelector('#stage [data-k="amountReceived"]');
+      if (el) {
+        el.value = "5000";
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    await page.waitForTimeout(300);
+    const partial = await page.evaluate(() => ({
+      screen:
+        document.querySelector("#stagebody .did")?.innerText.replace(/\s+/g, " ").trim() || "",
+      collected: document.querySelector("#l-collected")?.textContent.trim() || "",
+    }));
+    if (/5\.?000/.test(partial.screen) && /5\.?000/.test(partial.collected))
+      ok("a part payment redraws the stage body, not just the ledger");
+    else bad("part payment redraws the stage body", JSON.stringify(partial));
+
     // ── A reload must resume the journey, ledger included. step/reached and the
     // whole ledger used to be module variables, so a refresh dropped the
     // operator back on the intake with zeroes beside a full document folder.

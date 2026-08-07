@@ -1180,7 +1180,9 @@ function renderFields(wrap){
   const flds=FIELDS[step]; if(!flds) return;
   const sd=sdOf(step);
   const fs=el("div","fsec"); fs.style.margin="18px 0 0";
-  fs.append(el("h4",null,"Details for this step — fill what applies"));
+  // "fill what applies" contradicted the required markers once stages gated.
+  const anyReq=flds.some(f=>f.req);
+  fs.append(el("h4",null,anyReq?"Details for this step — required fields are marked":"Details for this step"));
   const grid=el("div","frow");
   // Commit the value the control actually shows. A date field rendered with
   // today's date but left out of stageData would read as empty to the gate —
@@ -1196,7 +1198,7 @@ function renderFields(wrap){
     const commit=()=>{ sd[ctrl.dataset.k]=ctrl.value; persistSoon(); saveStageDetails(step);
       if(step===8){ recomputeRevenue(); regenInvoice(); }
       if(step===9) recomputeCollected();
-      renderLedger(); refreshGate(); };
+      renderLedger(); refreshBody(); refreshGate(); };
     ctrl.oninput=commit; ctrl.onchange=commit;
   });
 }
@@ -1384,7 +1386,7 @@ function renderChangeOrders(wrap){
     // A variation added after the invoice stage has been reached must reach the
     // invoice: revenue was previously only recomputed inside FLOW[8].body().
     if(reached>=8){ recomputeRevenue(); regenInvoice(); }
-    renderLedger();
+    renderLedger(); refreshBody();
     const cur=(S.baseline||sum(S.chapters,c=>c.budget))+S.variations;
     tot.innerHTML=`<b>Baseline:</b> ${eur(S.baseline||sum(S.chapters,c=>c.budget))} · <b>Variations:</b> ${S.variations>=0?"+":""}${eur(S.variations)} · <b>Current contract:</b> ${eur(cur)}`;
     textArt("08 Execution","change-orders.txt","Change orders (variations):\n"+(sd.changes.filter(c=>c.desc).map(c=>"  "+c.desc+": "+(num(c.amount)>=0?"+":"")+eurTxt(Math.round((num(c.amount)||0)*100))).join("\n")||"  (none)")+"\nBaseline preserved: "+eurTxt(S.baseline||sum(S.chapters,c=>c.budget))+"\nCurrent contract: "+eurTxt(cur)); };
@@ -1446,7 +1448,7 @@ function renderPurchaseOrders(wrap){
   const addb=el("button","btn sm ghost","＋ Add purchase order"); addb.type="button"; box.append(addb);
   const tot=el("div"); tot.style.cssText="margin-top:10px;font-size:13.5px"; box.append(tot);
   wrap.append(box);
-  const total=()=>{ recalcCommitted(); renderLedger();
+  const total=()=>{ recalcCommitted(); renderLedger(); refreshBody(); refreshGate();
     const over=S.chapters.filter(c=>c.committed>c.budget);
     tot.innerHTML=`<b>Committed:</b> ${eur(committed())} of ${eur(sum(S.chapters,c=>c.budget))} budget`
       +(over.length?` · <span style="color:var(--crit)">⚠ over budget: ${over.map(c=>esc(c.chapter)).join(", ")}</span>`:"");
@@ -1484,7 +1486,7 @@ function renderBills(wrap){
   const addb=el("button","btn sm ghost","＋ Add supplier bill"); addb.type="button"; box.append(addb);
   const tot=el("div"); tot.style.cssText="margin-top:10px;font-size:13.5px"; box.append(tot);
   wrap.append(box);
-  const total=()=>{ recalcActual(); renderLedger();
+  const total=()=>{ recalcActual(); renderLedger(); refreshBody(); refreshGate();
     const dups=duplicateBillNumbers();
     tot.innerHTML=`<b>Actual:</b> ${eur(actual())} · <b>Committed:</b> ${eur(committed())} · <b>Budget:</b> ${eur(sum(S.chapters,c=>c.budget))}`
       +(dups.length?` · <span style="color:var(--crit)">⚠ duplicate bill number: ${esc(dups.join(", "))}</span>`:"");
@@ -1523,7 +1525,7 @@ function renderSupplierPayments(wrap){
   const list=el("div"); box.append(list);
   const tot=el("div"); tot.style.cssText="margin-top:10px;font-size:13.5px"; box.append(tot);
   wrap.append(box);
-  const total=()=>{ recomputeSupplierPaid(); renderLedger();
+  const total=()=>{ recomputeSupplierPaid(); renderLedger(); refreshBody();
     tot.innerHTML=`<b>Paid:</b> ${eur(S.supplierPaid)} · <b>Outstanding to suppliers:</b> ${eur(Math.max(0,actual()-S.supplierPaid))}`; };
   const draw=()=>{
     list.innerHTML="";
@@ -1677,7 +1679,7 @@ function renderStage(){
   wrap.append(el("div","eyebrow",`Step ${step+1} of ${STAGES.length}`));
   wrap.append(el("h2",null,STAGES[step]));
   wrap.append(el("div","cap",`capability: <b>${f.cap}</b> · folder: <b>${FOLDERS[step]}</b>`));
-  const bodyDiv=el("div",null,f.body());
+  const bodyDiv=el("div",null,f.body()); bodyDiv.id="stagebody";
   bodyDiv.querySelectorAll("table").forEach(t=>{ const w=el("div","tblwrap"); t.replaceWith(w); w.append(t); });
   wrap.append(bodyDiv);
 
@@ -1731,6 +1733,18 @@ function renderStage(){
   if(step===1){ renderThumbs(); const pi=$("#photoin"); if(pi) pi.onchange=e=>onFiles("02 Site visit",e.target.files,true); }
   const gi=$("#genin"); if(gi) gi.onchange=e=>onFiles(FOLDERS[step],e.target.files,false);
   if(!isLast){ $("#next").onclick=advance; refreshGate(); }
+}
+/* Re-renders the narrative body of the current stage.
+   The body displays derived figures — the invoice table, the collection status,
+   the chapter variance. Editing a field updated the ledger and the filed
+   documents but left the body as first drawn, so the screen contradicted both:
+   entering a 5.000 € part payment left "Outstanding: 0,00 € · paid" on screen
+   while the ledger said 5.000. The body functions are pure recomputations, so
+   redrawing is safe; the operator's focus stays in the field below it. */
+function refreshBody(){
+  const bd=$("#stagebody"); if(!bd||step<0||!FLOW[step]) return;
+  bd.innerHTML=FLOW[step].body();
+  bd.querySelectorAll("table").forEach(t=>{ const w=el("div","tblwrap"); t.replaceWith(w); w.append(t); });
 }
 /* Reflects the gate into the Advance button. Called after every field commit so
    the button unlocks as the operator types, rather than rejecting on click. */
