@@ -15,7 +15,16 @@ cd "$(dirname "$0")/.."
 set -a; . ./.env; set +a
 
 : "${POSTGRES_USER:?}" "${POSTGRES_DB:?}" "${BACKUP_AGE_RECIPIENT:?}"
-: "${R2_ACCOUNT_ID:?}" "${R2_ACCESS_KEY_ID:?}" "${R2_SECRET_ACCESS_KEY:?}" "${R2_BUCKET:?}"
+
+# BACKUP_TARGET=r2 (default) uploads off-site. BACKUP_TARGET=local keeps the
+# encrypted dumps on this server only — an interim setting for before the
+# object-storage decision is made. Local means ONE machine holds both the
+# database and its backups, so it is not disaster recovery; Hetzner's own
+# snapshots are the second copy until off-site storage exists.
+BACKUP_TARGET="${BACKUP_TARGET:-r2}"
+if [ "$BACKUP_TARGET" = "r2" ]; then
+  : "${R2_ACCOUNT_ID:?}" "${R2_ACCESS_KEY_ID:?}" "${R2_SECRET_ACCESS_KEY:?}" "${R2_BUCKET:?}"
+fi
 
 STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
 NAME="canei-erp-${STAMP}.dump.age"
@@ -37,6 +46,20 @@ fi
 
 echo "[backup] encrypting to ${BACKUP_AGE_RECIPIENT} …"
 age -r "$BACKUP_AGE_RECIPIENT" -o "$TMP/$NAME" "$TMP/dump"
+
+if [ "$BACKUP_TARGET" = "local" ]; then
+  mkdir -p ./backups
+  mv "$TMP/$NAME" "./backups/$NAME"
+  # Prune by count rather than by parsing dates — simpler and hard to get wrong.
+  ls -1t ./backups/canei-erp-*.dump.age 2>/dev/null \
+    | tail -n +$(( ${BACKUP_RETENTION_DAYS:-30} + 1 )) \
+    | xargs -r rm -f
+  KEPT=$(ls -1 ./backups/canei-erp-*.dump.age 2>/dev/null | wc -l)
+  echo "[backup] OK — backups/${NAME} ($(numfmt --to=iec "$RAW") uncompressed, ${KEPT} kept)"
+  echo "[backup] NOTE: local target — this server holds both the data and its backups."
+  echo "[backup]       Off-site copies start as soon as BACKUP_TARGET=r2 is set."
+  exit 0
+fi
 
 echo "[backup] uploading to r2://${R2_BUCKET}/${NAME} …"
 AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" \

@@ -563,3 +563,23 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   The **age backup private key is deliberately not on the server**: a backup the compromised
   host can decrypt is not protection. It lives only in the customer's password manager, which
   means losing it makes every backup unreadable — recorded in the escalation table.
+- **#53 — Cloudflare deferred; the interim server is private, not published (2026-08-07).**
+  The Hetzner account and `canei-erp` project exist, but Cloudflare is on hold pending
+  agreement with the customer. **Decision: run without it, and keep the server unreachable
+  from the internet rather than exposing it.** The reason is specific, not cautious —
+  `apps/web` has **no authentication of any kind**: no middleware, no auth library, no login
+  route. Cloudflare Access was the entire login layer. Publishing ports 80/443 in its absence
+  would put the customer's invoice register on the open internet behind nothing. So the
+  interim mode reaches the app over an SSH tunnel (`ssh -L 3000:localhost:3000`), which is in
+  fact stricter than the Cloudflare design, just less convenient.
+  **Implementation:** the `tunnel` service moved behind a compose profile, so the default
+  `up -d` starts a fully private stack; `backup.sh` gained `BACKUP_TARGET=local` (still
+  age-encrypted, pruned by count) and `provision.sh` gained `SKIP_CLOUDFLARE=1`.
+  **The accepted gap:** with no R2, the encrypted dumps live on the same machine as the
+  database. Hetzner snapshots are the second copy, so disk/instance failure is survivable,
+  but losing the account or region takes both — and the monthly restore drill cannot run.
+  Acceptable for test data; **not once Canei enters a real invoice**, which is the trigger to
+  finish the Cloudflare step. Fully reversible: `docs/INTERIM-HETZNER-ONLY.md` documents the
+  ~20-minute switch-on with no rebuild and no data migration, and records what would have to
+  replace Cloudflare (another zero-trust proxy, Caddy + basic auth, or building real auth
+  into the app) if the customer declines.

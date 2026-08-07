@@ -43,6 +43,9 @@ write_files:
       R2_BUCKET=__R2_BUCKET__
       BACKUP_AGE_RECIPIENT=__AGE_PUB__
       BACKUP_RETENTION_DAYS=30
+      # r2 = off-site. local = encrypted dumps stay on this server, which is
+      # the interim setting until object storage is agreed.
+      BACKUP_TARGET=__BACKUP_TARGET__
 
   # Security patches install themselves; the box reboots at 04:00 if a kernel
   # update needs it. Most compromises are unpatched known CVEs, not clever
@@ -86,7 +89,9 @@ runcmd:
   - rm -rf /tmp/canei-src
   - chmod +x /opt/canei-erp/ops/*.sh
   - mkdir -p /opt/canei-erp/backups
-  - cd /opt/canei-erp && docker compose -f docker-compose.prod.yml up -d
+  # __COMPOSE_PROFILE__ is "--profile cloudflare" when a tunnel exists, and
+  # empty otherwise — in which case the stack comes up entirely private.
+  - cd /opt/canei-erp && docker compose -f docker-compose.prod.yml __COMPOSE_PROFILE__ up -d
 
   # --- Timers -------------------------------------------------------------
   - |
@@ -98,8 +103,8 @@ runcmd:
     [Service]
     Type=oneshot
     WorkingDirectory=/opt/canei-erp
-    ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml pull --quiet
-    ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d --remove-orphans
+    ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml __COMPOSE_PROFILE__ pull --quiet
+    ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml __COMPOSE_PROFILE__ up -d --remove-orphans
     ExecStart=/usr/bin/docker image prune -f
     UNIT
   - |

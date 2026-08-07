@@ -3,9 +3,10 @@
 #
 #   docker compose -f docker-compose.prod.yml up -d
 #
-# NOTE: no service publishes a port. The only way in is the Cloudflare tunnel,
-# so the server has nothing listening on the public internet. If you find
-# yourself adding `ports:` here, stop and ask why — it is almost always wrong.
+# NOTE: no service publishes a port, in any mode. Reaching the app is either
+# through the Cloudflare tunnel (--profile cloudflare) or over an SSH tunnel
+# from your own machine. If you find yourself adding `ports:` here, stop — the
+# app has no login of its own, so publishing it publishes the data.
 #
 # Configuration comes from a `.env` file sitting next to this one. See
 # `.env.production.example` for the full list.
@@ -58,9 +59,20 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # The only ingress. Dials out to Cloudflare and forwards to app:3000.
-  # No inbound firewall rule exists for this, by design.
+  # Ingress, when Cloudflare is in use. Dials out and forwards to app:3000; no
+  # inbound firewall rule exists for it, by design.
+  #
+  # It sits behind a PROFILE, so the default `up -d` starts a completely private
+  # stack with no way in from the internet at all:
+  #
+  #   docker compose -f docker-compose.prod.yml up -d                      → private
+  #   docker compose -f docker-compose.prod.yml --profile cloudflare up -d → published
+  #
+  # Private mode is the correct default while Cloudflare is undecided: the app
+  # has NO authentication of its own, so anything that publishes it also
+  # publishes the customer's data.
   tunnel:
+    profiles: ["cloudflare"]
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}

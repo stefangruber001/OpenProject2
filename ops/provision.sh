@@ -51,9 +51,18 @@ EOF
 fi
 
 : "${HCLOUD_TOKEN:?set HCLOUD_TOKEN in $CONF}"
-: "${CF_API_TOKEN:?set CF_API_TOKEN in $CONF}"
-: "${CF_ACCOUNT_ID:?set CF_ACCOUNT_ID in $CONF}"
-: "${DOMAIN:?set DOMAIN in $CONF (e.g. caneisubirats.com)}"
+
+# SKIP_CLOUDFLARE=1 builds a PRIVATE server: no tunnel, no DNS, no login, no
+# off-site backups. Reachable only over an SSH tunnel from your own machine.
+# The right mode while the Cloudflare decision is still open, because the app
+# has no authentication of its own — see docs/INTERIM-HETZNER-ONLY.md.
+SKIP_CLOUDFLARE="${SKIP_CLOUDFLARE:-0}"
+if [ "$SKIP_CLOUDFLARE" != "1" ]; then
+  : "${CF_API_TOKEN:?set CF_API_TOKEN in $CONF (or SKIP_CLOUDFLARE=1)}"
+  : "${CF_ACCOUNT_ID:?set CF_ACCOUNT_ID in $CONF (or SKIP_CLOUDFLARE=1)}"
+  : "${DOMAIN:?set DOMAIN in $CONF (or SKIP_CLOUDFLARE=1)}"
+fi
+DOMAIN="${DOMAIN:-local}"
 : "${HOSTNAME_PREFIX:=erp}"
 : "${ACCESS_EMAIL_DOMAIN:=$DOMAIN}"
 : "${GITHUB_REPO:?set GITHUB_REPO in $CONF (e.g. owner/repo)}"
@@ -85,14 +94,25 @@ hz() { # hz METHOD PATH [JSON]
 
 # ── 0. Validate the tokens before creating anything ─────────────────────────
 say "Checking API tokens"
-cf GET "/user/tokens/verify" >/dev/null && info "Cloudflare token OK"
+[ "$SKIP_CLOUDFLARE" = "1" ] || { cf GET "/user/tokens/verify" >/dev/null && info "Cloudflare token OK"; }
 hz GET "/servers?per_page=1" | jq -e '.servers' >/dev/null 2>&1 \
   || die "Hetzner token rejected. Check HCLOUD_TOKEN (it must be Read & Write)."
 info "Hetzner token OK"
 
-ZONE_ID="$(cf GET "/zones?name=${DOMAIN}" | jq -r '.result[0].id // empty')"
-[ -n "$ZONE_ID" ] || die "Domain '${DOMAIN}' is not in this Cloudflare account yet. Add it first (docs step 2)."
-info "Zone ${DOMAIN} → ${ZONE_ID}"
+if [ "$SKIP_CLOUDFLARE" = "1" ]; then
+  say "Cloudflare SKIPPED — building a private server"
+  info "no tunnel, no DNS, no login page, no off-site backups"
+  info "reachable only over an SSH tunnel; see docs/INTERIM-HETZNER-ONLY.md"
+  FQDN="localhost:3000"
+  TUNNEL_TOKEN=""
+  R2_ACCOUNT_ID=""; R2_ACCESS_KEY_ID=""; R2_SECRET_ACCESS_KEY=""
+  BACKUP_TARGET="local"
+else
+  BACKUP_TARGET="r2"
+  ZONE_ID="$(cf GET "/zones?name=${DOMAIN}" | jq -r '.result[0].id // empty')"
+  [ -n "$ZONE_ID" ] || die "Domain '${DOMAIN}' is not in this Cloudflare account yet. Add it first (docs step 2)."
+  info "Zone ${DOMAIN} → ${ZONE_ID}"
+fi
 
 # ── 1. Secrets, generated locally ───────────────────────────────────────────
 say "Generating secrets"
@@ -115,6 +135,7 @@ if [ ! -f "$OUT/id_ed25519" ]; then
 fi
 SSH_PUB="$(cat "$OUT/id_ed25519.pub")"
 
+if [ "$SKIP_CLOUDFLARE" != "1" ]; then
 # ── 2. Cloudflare tunnel ────────────────────────────────────────────────────
 say "Cloudflare tunnel"
 TUNNEL_ID="$(cf GET "/accounts/${CF_ACCOUNT_ID}/cfd_tunnel?name=${SERVER_NAME}&is_deleted=false" \
@@ -197,6 +218,7 @@ EOF
   exit 2
 fi
 info "R2 credentials present"
+fi   # end SKIP_CLOUDFLARE guard
 
 # ── 6. The server, booting pre-configured ───────────────────────────────────
 say "Hetzner server"
@@ -236,6 +258,8 @@ else
         -e "s|__R2_SECRET__|${R2_SECRET_ACCESS_KEY}|g" \
         -e "s|__R2_BUCKET__|${R2_BUCKET}|g" \
         -e "s|__AGE_PUB__|${AGE_PUB}|g" \
+        -e "s|__BACKUP_TARGET__|${BACKUP_TARGET}|g" \
+        -e "s|__COMPOSE_PROFILE__|$([ "$SKIP_CLOUDFLARE" = "1" ] && echo "" || echo "--profile cloudflare")|g" \
         ops/cloud-init.yaml
   )"
   say "Creating ${SERVER_NAME} (${SERVER_TYPE}, ${SERVER_LOCATION})"
@@ -274,7 +298,9 @@ chmod 600 "$OUT/summary.txt"
 
 # ── 8. GitHub secrets for the restore drill ─────────────────────────────────
 say "GitHub secrets (for the monthly restore drill)"
-if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
+if [ "$SKIP_CLOUDFLARE" = "1" ]; then
+  info "skipped — the restore drill needs off-site backups, which arrive with Cloudflare R2"
+elif command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
   gh variable set APP_URL --repo "$GITHUB_REPO" --body "https://${FQDN}" >/dev/null
   gh secret set R2_ACCOUNT_ID          --repo "$GITHUB_REPO" --body "$CF_ACCOUNT_ID"        >/dev/null
   gh secret set R2_ACCESS_KEY_ID       --repo "$GITHUB_REPO" --body "$R2_ACCESS_KEY_ID"     >/dev/null
@@ -296,6 +322,34 @@ EOF
 fi
 
 # ── 9. Wait for it to answer ────────────────────────────────────────────────
+if [ "$SKIP_CLOUDFLARE" = "1" ]; then
+  cat <<EOF
+
+────────────────────────────────────────────────────────────────────────────
+Private server is up at ${SERVER_IP}. It is not on the internet.
+
+Reach it from your laptop with an SSH tunnel:
+
+    ssh -i ops/.provisioned/id_ed25519 -L 3000:localhost:3000 root@${SERVER_IP}
+
+…then open  http://localhost:3000  in your browser. The tunnel lives as long
+as that ssh session does.
+
+Still to do:
+  1. Copy ops/.provisioned/summary.txt into the password manager, then
+     rm -rf ops/.provisioned
+  2. Check it came up:
+       ssh -i ops/.provisioned/id_ed25519 root@${SERVER_IP} \\
+         'cd /opt/canei-erp && docker compose -f docker-compose.prod.yml ps'
+  3. Narrow SSH: Hetzner console → Firewalls → canei-erp → source <your-ip>/32
+
+When the customer agrees to Cloudflare, see docs/INTERIM-HETZNER-ONLY.md §
+"Switching Cloudflare on" — about 20 minutes, no rebuild, no data migration.
+────────────────────────────────────────────────────────────────────────────
+EOF
+  exit 0
+fi
+
 say "Waiting for https://${FQDN}/api/health"
 info "(cloud-init takes 5–10 minutes on a fresh server; Ctrl-C is safe)"
 for i in $(seq 1 90); do
