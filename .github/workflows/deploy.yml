@@ -59,10 +59,16 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.image }}
-          # `main` is the rolling tag the server follows; the sha tag is what
-          # you pin to in .env when rolling back.
+          # ONLY the sha tag. The server follows `:main`, so publishing that tag
+          # here would put the image into production the moment the build ends —
+          # roughly three minutes before `smoke` finishes deciding whether it
+          # works. It did exactly that: `smoke` sat red for a day with a broken
+          # image name while every push shipped to the server anyway.
+          #
+          # `main` now moves in the `promote` job, which needs: smoke. A sha tag
+          # is addressable but nothing follows it, so publishing it early is
+          # harmless and is what lets `smoke` test the real artifact.
           tags: |
-            type=ref,event=branch
             type=sha,format=long
 
       - uses: docker/build-push-action@v6
@@ -82,6 +88,10 @@ jobs:
   # Proves the image actually starts and reaches a database before the server
   # is allowed to pull it. Without this the first sign of a broken image would
   # be the app failing to come back up in production.
+  #
+  # This is a real gate only because `promote` needs it and the rolling tag is
+  # published nowhere else. If you ever add `type=ref,event=branch` back to the
+  # meta step above, this job goes back to being a post-mortem.
   smoke:
     needs: images
     runs-on: ubuntu-latest
@@ -192,3 +202,42 @@ jobs:
           ERP_BASE_URL: http://127.0.0.1:3000
           ERP_TEST_TENANT: reformas-demo
         run: node tests/server-e2e/run.mjs || { docker logs app; exit 1; }
+
+  # The actual release step: move the rolling `main` tag onto images that have
+  # just been proven to boot, migrate, serve a tenant and pass the ERP suite.
+  # The server pulls `:main` every 60s, so THIS job is the deploy — everything
+  # above it is a build.
+  #
+  # `imagetools create` retags inside the registry by pointing a new tag at the
+  # existing manifest. Nothing is pulled, nothing is rebuilt, so the bytes that
+  # go to production are byte-identical to the bytes `smoke` tested. Rebuilding
+  # here instead would ship an artifact no test had ever run against.
+  promote:
+    needs: smoke
+    # `workflow_dispatch` can be fired from ANY branch, and without this guard a
+    # manual run from a feature branch would build that branch and point `:main`
+    # at it — a deploy to production from a branch nobody reviewed, one dropdown
+    # away. Dispatching from a branch still builds and smokes it; it just does
+    # not release it.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    strategy:
+      matrix:
+        image: [app, migrate]
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Lowercased for the same reason as in `smoke`: this repository has
+      # capitals in its name and OCI rejects them outright.
+      - name: Point :main at the tested image
+        run: |
+          BASE="${REGISTRY}/${GITHUB_REPOSITORY,,}/${{ matrix.image }}"
+          docker buildx imagetools create -t "$BASE:main" "$BASE:sha-${GITHUB_SHA}"
+          echo "::notice::${{ matrix.image }} promoted — the server will pull it within 60s."

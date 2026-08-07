@@ -758,3 +758,26 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   generally: any command that reads stdin — docker exec, ssh, psql, cat — poisons a
   heredoc-piped remote script unless its stdin is redirected. The failure is silent and
   looks exactly like the checks failing.
+- **#64 — The smoke test was not a deploy gate, despite saying so (2026-08-07).** Asked
+  whether two people could push updates to the server, I checked the path rather than
+  recalling it, and found the release ordering wrong. `deploy.yml`'s `images` job published
+  **both** the immutable `sha-…` tag and the rolling `main` tag; `smoke` ran afterwards as a
+  separate job. The server follows `:main` and pulls every 60s — so an image reached
+  production roughly three minutes _before_ the tests that decide whether it boots had
+  finished. The comment above `smoke` claimed it ran "before the server is allowed to pull
+  it", which is worse than no gate: it reads as protection. This is not hypothetical; the
+  lowercase-image-name bug already left `smoke` red for a day while every push shipped
+  regardless.
+  **Decision: publish only the sha tag from the build, and move `:main` in a new `promote`
+  job that `needs: smoke`.** `docker buildx imagetools create` retags inside the registry,
+  so production runs the byte-identical manifest that was tested — rebuilding at promote
+  time would ship an artifact no test had ever seen. `promote` is additionally guarded with
+  `if: github.ref == 'refs/heads/main'`, because `workflow_dispatch` can be fired from any
+  branch and would otherwise point `:main` at unreviewed code from a dropdown.
+  Chosen over the alternatives — gating on the sha tag in the server's `.env` (needs a
+  server edit per release) or having CI SSH in (puts a production key in CI, which the whole
+  design avoids). Reversible: deleting the `promote` job and restoring
+  `type=ref,event=branch` returns the previous behaviour exactly.
+  Context: this matters now because a second person (`ignaciofo-dotcom`, write access) is
+  about to start pushing. With one careful operator an ungated deploy is survivable; with
+  two concurrent pushers it is not.
