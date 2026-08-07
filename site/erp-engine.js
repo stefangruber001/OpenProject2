@@ -2414,7 +2414,14 @@
         },
         t,
       );
+      // Who created it, on the record and in the audit trail. This took the
+      // acting user and ignored it, so a task showed no author anywhere while
+      // completeTask and updateTask both recorded one — invisible with a single
+      // operator, and wrong the moment two people share a schedule: "who put
+      // this in the calendar?" had no answer.
+      rec.createdBy = user || "system";
       this.state.tasks.push(rec);
+      this._log(user, "addTask", rec.title || rec.id);
       return rec;
     }
     alerts() {

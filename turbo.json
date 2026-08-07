@@ -11,6 +11,8 @@
     "ERP_OPERATOR",
     "CF_ACCESS_TEAM_DOMAIN",
     "CF_ACCESS_AUD",
+    "ERP_USERS",
+    "SESSION_SECRET",
     "NEXT_PUBLIC_APP_URL",
     "UI_LANG"
   ],

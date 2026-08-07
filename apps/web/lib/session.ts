@@ -9,14 +9,19 @@
  * There are two modes, and which one is live is decided by configuration, never
  * by the request:
  *
- *   PUBLISHED  CF_ACCESS_TEAM_DOMAIN + CF_ACCESS_AUD are set. The identity
+ *   PUBLISHED  CF_ACCESS_TEAM_DOMAIN + CF_ACCESS_AUD are set. An identity
  *              provider sits in front of the application and every request
  *              carries a signed assertion of who signed in. That signature is
  *              verified here, and the email inside it is the acting user.
  *
- *   SINGLE-SEAT  Neither is set. There is no login, the application is reachable
- *              only over a tunnel from one machine, and the single operator is
- *              named in configuration. Honest while it is true.
+ *   LOGIN      ERP_USERS + SESSION_SECRET are set. The application has its own
+ *              accounts and its own signed session cookie — no third party
+ *              involved, no domain required. The acting user is whoever the
+ *              cookie says, once its signature checks out.
+ *
+ *   SINGLE-SEAT  None of the above. There is no login, the application is
+ *              reachable only over a tunnel from one machine, and the single
+ *              operator is named in configuration. Honest while it is true.
  *
  * Both modes fail closed. What is NOT acceptable is defaulting to "system" or ""
  * and producing an audit trail that reads as if nobody did anything.
@@ -33,6 +38,24 @@
  */
 import { createPublicKey, createVerify, timingSafeEqual } from "node:crypto";
 import { FactoryError } from "@repo/kernel";
+import { SESSION_COOKIE, readSession } from "./session-token";
+
+/**
+ * One cookie out of a Cookie header.
+ *
+ * Split on ";" and take everything after the FIRST "=" — a session token is
+ * base64url and contains none, but writing `split("=")[1]` here is how a value
+ * that ever does contain one gets silently truncated into an invalid signature.
+ */
+function readCookie(header: string | null, name: string): string | undefined {
+  if (!header) return undefined;
+  for (const part of header.split(";")) {
+    const raw = part.trim();
+    const i = raw.indexOf("=");
+    if (i > 0 && raw.slice(0, i) === name) return raw.slice(i + 1);
+  }
+  return undefined;
+}
 
 /** Claims this application cares about. Everything else in the token is ignored. */
 interface AccessClaims {
@@ -209,6 +232,27 @@ export async function requireUser(req: Request): Promise<string> {
   }
 
   if (teamDomain && audience) return identityFromAssertion(req, teamDomain, audience);
+
+  // Our own login. Checked here as well as in middleware, not instead of it:
+  // middleware is a route-matching rule and this is the thing that actually
+  // stamps a name onto a stored record. A future route excluded from the
+  // matcher by accident must not become a way to write anonymously.
+  const secret = process.env.SESSION_SECRET?.trim();
+  const usersConfigured = Boolean(process.env.ERP_USERS?.trim());
+  if (Boolean(secret) !== usersConfigured) {
+    throw new FactoryError(
+      "CONFIG_INVALID",
+      "Sign-in is half-configured: ERP_USERS and SESSION_SECRET must both be set, " +
+        "or neither. Refusing to fall back to a single shared operator name while " +
+        "one of them is present.",
+    );
+  }
+  if (secret && usersConfigured) {
+    const cookie = readCookie(req.headers.get("cookie"), SESSION_COOKIE);
+    const email = await readSession(cookie, secret, Math.floor(Date.now() / 1000));
+    if (!email) throw unauthenticated("no valid session cookie");
+    return email;
+  }
 
   const operator = process.env.ERP_OPERATOR?.trim();
   if (!operator) {

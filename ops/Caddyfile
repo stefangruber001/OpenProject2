@@ -1,0 +1,66 @@
+# =============================================================================
+# TLS termination for the pilot, without owning a domain.
+#
+# PUBLIC_HOSTNAME is something like  178-105-10-156.sslip.io
+#
+# sslip.io is a public DNS service that answers any name containing an address
+# with that address — no account, no registration, nothing to configure. It is a
+# real domain, so Let's Encrypt will issue a real certificate for it, which is
+# the whole point: a self-signed certificate is refused outright by the web view
+# inside an iOS app, and a bare IP address cannot have a public certificate at
+# all. This is what makes the ERP openable on a phone before the company's own
+# domain has moved.
+#
+# It is a pilot arrangement and has one dependency worth stating: if sslip.io
+# stops resolving, the name stops working. Nothing is lost — the data is on the
+# server and the certificate is on disk — but the address is unreachable until
+# either sslip.io returns or PUBLIC_HOSTNAME is pointed at something else. When
+# the real domain arrives, change one variable and restart; nothing else here
+# needs to know.
+#
+# Caddy obtains and renews the certificate by itself. That needs port 80
+# reachable from the internet for the ACME challenge, and port 443 for the site.
+# Both are opened by ops/open-web.sh.
+# =============================================================================
+
+{
+	# Where Let's Encrypt sends expiry warnings if renewal ever stops working.
+	email {$ACME_EMAIL}
+}
+
+{$PUBLIC_HOSTNAME} {
+	encode zstd gzip
+
+	# The application. `app` resolves on the compose network; nothing about this
+	# service is published directly, so the proxy is the only way in.
+	reverse_proxy app:3000 {
+		# The application needs to know the browser used HTTPS even though this
+		# hop is plain HTTP — otherwise the session cookie is issued without the
+		# Secure flag and sign-in silently fails to stick.
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	header {
+		# A year, and only sent over HTTPS. Removing this later means waiting out
+		# the max-age in every browser that saw it, so it is deliberately not
+		# preload — that decision is much harder to undo.
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "same-origin"
+		# Server software and version is free reconnaissance.
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 20mb
+			roll_keep 5
+		}
+		# The login form posts a password. Caddy does not log bodies, but the
+		# query string can carry a `next` path, and access logs are the one place
+		# people paste into a chat window without thinking.
+		format json
+	}
+}

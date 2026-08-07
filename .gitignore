@@ -9,6 +9,11 @@ node_modules
 .env
 .env.*
 !.env.example
+# The template the runbooks tell you to copy. It contains no secrets — only
+# placeholders and the explanation of what each value is for — and being
+# swallowed by the rule above meant it never existed in a fresh clone, so the
+# one instruction everybody follows first pointed at a missing file.
+!.env.production.example
 
 # Testing / coverage
 coverage

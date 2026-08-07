@@ -12,6 +12,7 @@
 import { generateKeyPairSync, createSign, randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { requireUser } from "./session";
+import { signSession } from "./session-token";
 
 const TEAM = "canei.cloudflareaccess.com";
 const AUD = "a".repeat(64);
@@ -70,6 +71,8 @@ describe("requireUser", () => {
     delete process.env.CF_ACCESS_TEAM_DOMAIN;
     delete process.env.CF_ACCESS_AUD;
     delete process.env.ERP_OPERATOR;
+    delete process.env.SESSION_SECRET;
+    delete process.env.ERP_USERS;
     vi.restoreAllMocks();
     // The key set is public data over HTTPS; serving it locally keeps these
     // tests offline and lets a rotation be simulated.
@@ -98,6 +101,85 @@ describe("requireUser", () => {
       process.env.ERP_OPERATOR = "Stefan Gruber";
       const forged = token({ email: "attacker@example.com" }, { key: other.privateKey });
       await expect(requireUser(withToken(forged))).resolves.toBe("Stefan Gruber");
+    });
+  });
+
+  describe("login mode (our own accounts, no third party)", () => {
+    const SECRET = "a-long-random-server-secret-value";
+    const withSession = async (token?: string) =>
+      new Request("https://erp.example.com/api/x/erp/command", {
+        method: "POST",
+        headers: token ? { cookie: `other=1; canei_session=${token}; another=2` } : {},
+      });
+
+    beforeEach(() => {
+      process.env.SESSION_SECRET = SECRET;
+      process.env.ERP_USERS = "ana@example.com:scrypt$16384$8$1$AA==$AA==";
+      // Present, and must never win — a signed-in person's changes must not be
+      // stamped with the single-seat name.
+      process.env.ERP_OPERATOR = "Stefan Gruber";
+    });
+
+    it("stamps the person in the cookie, not the configured operator", async () => {
+      const t = await signSession("ana@example.com", SECRET, Math.floor(Date.now() / 1000));
+      await expect(requireUser(await withSession(t))).resolves.toBe("ana@example.com");
+    });
+
+    it("finds the cookie among others", async () => {
+      const t = await signSession("luis@example.com", SECRET, Math.floor(Date.now() / 1000));
+      await expect(requireUser(await withSession(t))).resolves.toBe("luis@example.com");
+    });
+
+    it("refuses a request with no cookie", async () => {
+      await expectRejected(await withSession());
+    });
+
+    it("refuses a cookie signed with a different secret", async () => {
+      const t = await signSession(
+        "ana@example.com",
+        "not-the-secret",
+        Math.floor(Date.now() / 1000),
+      );
+      await expectRejected(await withSession(t));
+    });
+
+    it("refuses an expired cookie", async () => {
+      const t = await signSession(
+        "ana@example.com",
+        SECRET,
+        Math.floor(Date.now() / 1000) - 100000,
+      );
+      await expectRejected(await withSession(t));
+    });
+
+    it("refuses a cookie whose name was edited", async () => {
+      const t = await signSession("ana@example.com", SECRET, Math.floor(Date.now() / 1000));
+      const [, sig] = t.split(".");
+      const forged = `${Buffer.from(
+        JSON.stringify({ sub: "boss@example.com", exp: 9_999_999_999 }),
+      ).toString("base64url")}.${sig}`;
+      await expectRejected(await withSession(forged));
+    });
+
+    it("is refused when only the secret is set", async () => {
+      delete process.env.ERP_USERS;
+      const t = await signSession("ana@example.com", SECRET, Math.floor(Date.now() / 1000));
+      await expectRejected(await withSession(t), "CONFIG_INVALID");
+    });
+
+    it("is refused when only the account list is set", async () => {
+      delete process.env.SESSION_SECRET;
+      await expectRejected(await withSession(), "CONFIG_INVALID");
+    });
+
+    it("yields to the identity provider when both are configured", async () => {
+      // One deployment, one source of truth. If a provider sits in front, its
+      // signed assertion decides — a cookie this app minted must not be an
+      // alternative way in past it.
+      process.env.CF_ACCESS_TEAM_DOMAIN = TEAM;
+      process.env.CF_ACCESS_AUD = AUD;
+      const t = await signSession("ana@example.com", SECRET, Math.floor(Date.now() / 1000));
+      await expectRejected(await withSession(t));
     });
   });
 

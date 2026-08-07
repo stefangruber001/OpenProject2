@@ -92,6 +92,8 @@ describe("a task survives the trip between two people", () => {
   });
 
   it("records who added it, so the schedule is attributable", () => {
+    // addTask took the acting user and ignored it: no audit entry, no author on
+    // the record. Caught by driving two signed-in sessions against a real server.
     const erp = new ERP("2026-03-01") as unknown as Record<string, (...a: unknown[]) => unknown> & {
       state: { audit: { user?: string; action?: string }[]; tasks: { id: string }[] };
     };
@@ -99,7 +101,18 @@ describe("a task survives the trip between two people", () => {
     erp.completeTask?.(erp.state.tasks[0]!.id, "stefan@example.com");
 
     const actions = erp.state.audit.map((a) => `${a.user}:${a.action}`);
+    expect(actions).toContain("ignacio@example.com:addTask");
     expect(actions).toContain("stefan@example.com:completeTask");
+  });
+
+  it("puts the author on the task itself, not only in the audit trail", () => {
+    // "Who put this in the calendar?" has to be answerable from the task, which
+    // is what a schedule screen actually renders.
+    const erp = new ERP("2026-03-01") as unknown as Record<string, (...a: unknown[]) => unknown> & {
+      state: { tasks: { createdBy?: string }[] };
+    };
+    erp.addTask?.({ title: "Order tiles" }, "ignacio@example.com");
+    expect(erp.state.tasks[0]?.createdBy).toBe("ignacio@example.com");
   });
 
   it("refuses to complete a task that does not exist rather than inventing one", () => {

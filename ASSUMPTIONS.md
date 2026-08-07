@@ -875,3 +875,44 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   from a save to the server** from the operator's side. The page looks identical, the toast
   is identical, the record appears. Everything downstream of that ambiguity gets diagnosed as
   a broken backend. The ten-second test is the address bar, which is now written down.
+- **#70 — The pilot gets its own login rather than a third party's (2026-08-07).** The
+  operator ruled out Cloudflare and said the domain will not transfer soon, so the published
+  path built earlier is unavailable: it needs a domain in a Cloudflare account. Publishing
+  the ERP without any login was never an option — that puts a customer's invoice register on
+  the open internet.
+  **Decision: build first-party sign-in, and get HTTPS from a hostname nobody has to own.**
+  Accounts are `ERP_USERS` in the server's `.env` (email + scrypt hash, no password stored),
+  sessions are a signed cookie with no session table, and `middleware.ts` is default-deny —
+  a short allow-list of public paths, everything else protected, so a route added next month
+  by somebody who never read the file is still behind the lock. Reachability is Caddy
+  terminating TLS for `<ip-with-dashes>.sslip.io`, which resolves to the server with no
+  registration and is a real enough name for Let's Encrypt to certify. A self-signed
+  certificate was rejected: an iOS web view refuses it outright, so the phone app could never
+  work. Moving to the company domain later is one variable.
+  Chosen over Tailscale (a VPN client on every device, and still a third party) and over
+  waiting for the domain (blocks the pilot indefinitely). Reversible: `./ops/open-web.sh
+--close` takes it off the internet, and unsetting two variables restores today's behaviour
+  byte-for-byte.
+  Pilot-shaped compromises, recorded rather than discovered later: accounts in an environment
+  variable instead of a table (no migration, no admin screen, no password-reset flow — fine
+  for two people, wrong for a third); no session store, so an individual session cannot be
+  revoked before it expires (rotating `SESSION_SECRET` revokes all of them); and no rate
+  limiting on the login form yet, which is why the hash script refuses a password under 12
+  characters.
+- **#71 — addTask ignored the acting user (2026-08-07).** Found by driving two signed-in
+  sessions against a real server rather than by reading: Ignacio added a task, and the audit
+  trail's last entry still named Stefan. Not misattribution — `addTask` took `user` and never
+  called `_log`, so a task had no author anywhere, while `completeTask` and `updateTask` both
+  recorded one. Invisible with a single operator; wrong the moment two people share a
+  schedule, because "who put this in the calendar?" had no answer at all.
+  **Decision: log it and stamp `createdBy` on the record**, so the question is answerable
+  from the task itself — which is what a schedule screen renders — and not only from the
+  audit trail. Two regression tests. All four simulations still pass.
+- **#72 — The env template the runbooks tell you to copy was gitignored (2026-08-07).**
+  `.gitignore` has `.env.*`, which swallowed `.env.production.example`. It contains no
+  secrets — only placeholders and the explanation of each value — but it was never in a
+  fresh clone, so the first instruction in two runbooks pointed at a missing file.
+  **Decision: negate it explicitly** (`!.env.production.example`) rather than rename it,
+  because every document already refers to it by that name. The pilot variables were also
+  added to the `.env` that `ops/cloud-init.yaml` writes, so a newly provisioned server has
+  them present and empty instead of absent.

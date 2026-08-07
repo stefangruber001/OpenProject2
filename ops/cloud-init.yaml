@@ -50,6 +50,24 @@ write_files:
       # the shell try to run a command called `Ruiz` and abort the nightly
       # backup. Compose strips the quotes; the shell needs them.
       ERP_OPERATOR="__ERP_OPERATOR__"
+      # SIGN-IN (the pilot). Fill these in and the signed-in person is recorded
+      # instead of ERP_OPERATOR above, which is what makes more than one person
+      # attributable. Set BOTH or neither — the application refuses to start
+      # with only one rather than quietly crediting everyone's work to one name.
+      #
+      #   ERP_USERS       "email:hash,email:hash" — generate each hash with
+      #                   node apps/web/scripts/hash-password.mjs someone@example.com
+      #   SESSION_SECRET  head -c 48 /dev/urandom | base64
+      #
+      # QUOTED for the same reason as ERP_OPERATOR: ops/backup.sh sources this
+      # file, and base64 output can contain characters the shell would act on.
+      ERP_USERS=""
+      SESSION_SECRET=""
+      # Reachability for the pilot ingress (docker compose --profile pilot).
+      # PUBLIC_HOSTNAME is this server's IPv4 with dashes plus .sslip.io, e.g.
+      # 203-0-113-7.sslip.io — see docs/PILOT-WITHOUT-CLOUDFLARE.md.
+      PUBLIC_HOSTNAME=""
+      ACME_EMAIL=""
       IMAGE_APP=__IMAGE_APP__
       IMAGE_MIGRATE=__IMAGE_MIGRATE__
       # Read-only credentials for the container registry. The repository is

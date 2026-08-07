@@ -106,6 +106,12 @@ services:
       # and session.ts treats empty as absent.
       CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN:-}
       CF_ACCESS_AUD: ${CF_ACCESS_AUD:-}
+      # LOGIN — this application's own accounts, no third party and no domain
+      # required. Set BOTH. Generate entries with:
+      #   node apps/web/scripts/hash-password.mjs someone@example.com
+      # Same both-or-neither rule as above.
+      ERP_USERS: ${ERP_USERS:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
     # Loopback only. See the note at the top of this file before touching it.
     ports:
       - "127.0.0.1:3000:3000"
@@ -129,6 +135,38 @@ services:
   # Private mode is the correct default while Cloudflare is undecided: the app
   # has NO authentication of its own, so anything that publishes it also
   # publishes the customer's data.
+  # Ingress for the PILOT: real HTTPS on a name nobody had to buy.
+  #
+  #   docker compose -f docker-compose.prod.yml --profile pilot up -d
+  #
+  # See ops/Caddyfile for how a certificate is obtained without owning a domain.
+  #
+  # THIS PUBLISHES THE APPLICATION TO THE INTERNET. Only start it once sign-in
+  # is configured — ERP_USERS and SESSION_SECRET above — because without them
+  # the middleware has nothing to enforce and this opens a company's invoice
+  # register to anyone who scans the address. ops/open-web.sh checks for exactly
+  # that before it will open the firewall.
+  web:
+    profiles: ["pilot"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      # 80 is not optional: it is how the certificate is issued and renewed.
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates survive restarts. Without this every restart asks Let's
+      # Encrypt for a new one and walks into a rate limit within a day.
+      - caddy-data:/data
+      - caddy-config:/config
+      - caddy-logs:/var/log/caddy
+    depends_on:
+      - app
+
   tunnel:
     profiles: ["cloudflare"]
     image: cloudflare/cloudflared:latest
@@ -139,3 +177,6 @@ services:
 
 volumes:
   db-data:
+  caddy-data:
+  caddy-config:
+  caddy-logs:
