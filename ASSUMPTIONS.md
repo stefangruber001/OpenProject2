@@ -605,3 +605,18 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   name was corrected rather than left to reassure the next reader.
   Most reversible: additive. Existing data untouched, no schema change to existing tables, and
   a server that has not yet run `db-role` keeps working until it does.
+- **#55 — The workspace UI is served by the server, same-origin (2026-08-07).**
+  Pointing `site/erp.html` at the API raised a question the plan had not: the static
+  site is published by GitHub Pages, so a browser there talking to the Hetzner box is
+  cross-origin. That needs CORS, and a permissive CORS policy in front of an API with no
+  authentication is worse than it sounds. **Decision: the Next server publishes its own
+  copy of `site/` at `/workspace/`**, generated at build time by
+  `apps/web/scripts/sync-workspace.mjs`, which injects `<meta name="erp-api" content="">`
+  — the marker `erp-backend.js` reads to use the server instead of IndexedDB. The Pages
+  copy is byte-identical apart from that tag and stays the offline demo, so nothing
+  published today changes. Same-origin also means that when real accounts land, one
+  session cookie covers the workspace and the API; two origins would mean inventing token
+  plumbing. `public/` is generated and gitignored, and `Dockerfile` copies it explicitly —
+  Next does not trace `public/` into the standalone output, and without the COPY the
+  server would host an API with no user interface while reporting healthy. Reversible:
+  delete the sync step and the marker, and the pages are local-only again.

@@ -51,3 +51,8 @@ ds-bundle/
 
 ops/.provisioned/
 ops/provision.conf
+
+# Generated at build time by apps/web/scripts/sync-workspace.mjs: a copy of
+# site/ served same-origin with the ERP API. Never edit it — it is overwritten
+# on every build.
+apps/web/public/

@@ -6,13 +6,19 @@
  *   → 400 unknown command, wrong arity, or a business rule refused it
  *   → 409 STALE_WRITE — somebody else saved first; reload and retry
  *
- * The response deliberately does NOT echo the state back. The document is
+ * The response does NOT echo the state back by default. The document is
  * ~0.74 MB after a simulated year of trading and grows ~64 KB a month; sending
- * it on every keystroke-driven mutation would make the app feel broken over a
- * domestic connection. The client already knows what it changed, and can GET
- * the state when it needs to resynchronise.
+ * it to a script that only wanted to record a payment is pure waste.
+ *
+ * `?include=state` asks for it, which is what an interactive client wants: it
+ * renders from the whole document, so without this it would have to GET the
+ * state straight after every command — the same bytes over two round trips
+ * instead of one. The alternative, replaying the command against a local copy
+ * of the engine, would be faster still and is exactly the kind of cleverness
+ * that ends with two divergent versions of an invoice register and no way to
+ * tell which is right.
  */
-import { runCommand } from "@/lib/erp-runtime";
+import { loadErp, runCommand } from "@/lib/erp-runtime";
 import { requireUser } from "@/lib/session";
 import { guarded, json } from "@/lib/api";
 import { FactoryError } from "@repo/kernel";
@@ -44,6 +50,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ tenant: string
       },
       user,
     );
-    return json({ tenant, ...outcome });
+
+    if (new URL(req.url).searchParams.get("include") !== "state") {
+      return json({ tenant, ...outcome });
+    }
+    // Re-read rather than reuse the in-memory engine, so what the client
+    // renders is what the database actually holds.
+    const { erp } = await loadErp(tenant);
+    return json({ tenant, ...outcome, state: erp.toJSON() });
   });
 }

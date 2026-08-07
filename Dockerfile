@@ -75,7 +75,12 @@ RUN groupadd --system --gid 1001 nodejs \
 # monorepo layout, so server.js lands at apps/web/server.js.
 COPY --from=build --chown=nextjs:nodejs /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /repo/apps/web/.next/static     ./apps/web/.next/static
-# apps/web has no public/ today. Add a COPY for it here if one is ever created.
+# `public/` is NOT traced into the standalone output — Next requires it to be
+# copied by hand. It holds the ERP workspace UI (a copy of site/, generated at
+# build time by scripts/sync-workspace.mjs), which is the whole point of this
+# server: without it /workspace/erp.html is a 404 and the box serves an API
+# nobody can use.
+COPY --from=build --chown=nextjs:nodejs /repo/apps/web/public            ./apps/web/public
 
 # Tenant specs are read from disk at request time. The standalone bundle traces
 # imported modules only, so these YAML files have to be copied explicitly, and

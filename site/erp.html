@@ -183,6 +183,9 @@
 <!-- Persistence: one module owns the IndexedDB version for every page. -->
 <script src="erp-migrations.js"></script>
 <script src="erp-store.js"></script>
+<!-- Decides WHERE the data lives: this browser, or the server. Same command
+     interface either way, so the workspace below has one code path. -->
+<script src="erp-backend.js"></script>
 <!-- Typed capability layer: erp-factory.js is GENERATED from packages/erp-browser
      (do not edit by hand); erp-bridge.js is the seam erp.html calls through.
      Both degrade silently if unavailable, so the ERP still runs without them. -->
@@ -197,51 +200,81 @@ const eur0=c=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',max
 const fmtD=iso=>{if(!iso)return'—';const p=String(iso).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;};
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2200);}
 
-/* Persistence lives in erp-store.js — one module owns the IndexedDB version,
-   because a second page opening "caneiERP" at a different version would throw
-   VersionError and render nothing. */
-let saveT;function persist(){clearTimeout(saveT);saveT=setTimeout(()=>ErpStore.saveState(erp.toJSON()).catch(()=>{}),140);}
+/* WHERE the data lives is erp-backend.js's decision: this browser (IndexedDB,
+   the offline demo) or the server (PostgreSQL, shared). The workspace only
+   issues commands and re-renders from whatever comes back. */
+let erp, backend, cur="torre", bootNotice="";
 
-let erp, cur="torre", bootNotice="";
+/* A "?tenant=" override exists so one server can be opened as either company;
+   it is ignored entirely in local mode. */
+function tenantId(){ try{ return new URLSearchParams(location.search).get("tenant")||"diorka"; }catch(e){ return "diorka"; } }
+
+function fatal(title,detail,hint){
+  document.body.innerHTML='<div style="max-width:36rem;margin:18vh auto;padding:0 24px;font:15px/1.6 var(--sans,system-ui);color:#14160f">'
+    +'<h1 style="font-size:19px;margin:0 0 10px">'+esc(title)+'</h1>'
+    +'<p style="color:#4f5347">'+esc(detail)+'</p>'
+    +(hint?'<p style="color:#8b8f80;font-size:13px">'+esc(hint)+'</p>':'')+'</div>';
+}
+
 async function boot(){
-  let migration=null, fresh=false;
+  backend=ErpBackend.create(tenantId());
   try{
-    const loaded=await ErpStore.loadState();      // migrates + backs up if needed
-    migration=loaded.migration;
-    if(loaded.state){ erp=ErpEngine.ERP.from(loaded.state); }
-    else { erp=ErpSeed.build(); fresh=true; }
+    const loaded=await backend.load();
+    erp=loaded.erp; bootNotice=loaded.notice||"";
   }catch(e){
     // A blob newer than this build lands here. Never silently reseed over it:
     // that would destroy the user's data to make the page render.
     if(/schema v/i.test(String(e&&e.message))){
-      document.body.innerHTML='<div style="max-width:36rem;margin:18vh auto;padding:0 24px;font:15px/1.6 var(--sans,system-ui);color:#14160f">'
-        +'<h1 style="font-size:19px;margin:0 0 10px">Datos más recientes que la aplicación</h1>'
-        +'<p style="color:#4f5347">'+esc(e.message)+'</p>'
-        +'<p style="color:#8b8f80;font-size:13px">No se ha modificado nada. Actualiza la aplicación para volver a abrir estos datos.</p></div>';
-      return;
+      return fatal("Datos más recientes que la aplicación", e.message,
+        "No se ha modificado nada. Actualiza la aplicación para volver a abrir estos datos.");
     }
-    erp=ErpSeed.build(); fresh=true;
+    // In remote mode there is no local copy to fall back to, and inventing one
+    // would show fabricated figures next to the company's real ones.
+    if(backend.isRemote()){
+      return fatal("No se ha podido conectar con el servidor", String(e&&e.message||e),
+        "Los datos están en el servidor. Vuelve a intentarlo cuando esté disponible.");
+    }
+    erp=ErpSeed.build();
   }
 
-  // One-way, non-destructive fold-in of the legacy master-data store. Runs at
-  // most once (recorded in state.imports); anything ambiguous becomes a
-  // reviewable conflict rather than an automatic overwrite.
-  let imported=null;
-  try{ imported=await ErpStore.importLegacyMasterData(erp); }catch(e){ /* never block boot */ }
-
-  if(fresh||migration?.applied.length||imported?.ran) persist();
-
-  const notes=[];
-  if(migration?.applied.length) notes.push(`Datos actualizados al formato v${migration.to} (copia de seguridad guardada).`);
-  if(imported?.ran&&imported.imported) notes.push(`${imported.imported} clientes importados de Datos Maestros.`);
-  if(imported?.ran&&imported.conflicts) notes.push(`${imported.conflicts} registros necesitan revisión.`);
-  bootNotice=notes.join(" ");
+  // One-way, non-destructive fold-in of the legacy master-data store. Local
+  // only: it reads this browser's IndexedDB, which the server cannot see.
+  if(!backend.isRemote()){
+    try{
+      const imported=await ErpStore.importLegacyMasterData(erp);
+      if(imported?.ran&&imported.imported) bootNotice+=` ${imported.imported} clientes importados de Datos Maestros.`;
+      if(imported?.ran&&imported.conflicts) bootNotice+=` ${imported.conflicts} registros necesitan revisión.`;
+      if(imported?.ran) await ErpStore.saveState(erp.toJSON());
+    }catch(e){ /* never block boot */ }
+  }
 
   if(location.hash) cur=location.hash.slice(1)||"torre";
   buildNav(); render();
-  if(bootNotice) toast(bootNotice);
+  if(bootNotice.trim()) toast(bootNotice.trim());
 }
-function mutate(fn,msg){ try{ fn(); persist(); render(); if(msg)toast(msg);}catch(e){ toast("⚠ "+e.message); } }
+
+/* Runs one named command wherever the data lives, then re-renders.
+   `args` must NOT include the acting user: local mode appends its own, and the
+   server takes the identity from the session — a name sent by the client is a
+   claim, not an identity. */
+async function mutate(command,args,msg){
+  try{
+    const out=await backend.command(command,args);
+    erp=out.erp;
+    render();
+    if(msg) toast(msg);
+    return out.result;
+  }catch(e){
+    // A stale version means somebody else saved first. Reload their version
+    // rather than leaving this tab showing figures the server disagrees with.
+    if(e&&e.code==="STALE_WRITE"){
+      try{ const r=await backend.refresh(); erp=r.erp; render(); }catch(_){ /* keep the message below */ }
+      toast("⚠ Otra persona ha guardado antes. Se han recargado los datos; revisa y repite el cambio.");
+      return;
+    }
+    toast("⚠ "+(e&&e.message?e.message:e));
+  }
+}
 
 /* =============================== navigation (DAS-01) =============================== */
 const NAV=[
@@ -511,7 +544,7 @@ const VIEWS={
   v.querySelectorAll('[data-collect]').forEach(b=>b.onclick=()=>{
     const num=b.dataset.collect; const inv=erp.state.invoices.find(i=>i.number===num);
     const out=erp.invoiceOutstandingCents(inv.id);
-    mutate(()=>erp.recordCollection({partyId:inv.partyId,amountCents:out,method:"transfer",allocations:[{invoiceId:inv.id,amountCents:out}]},"backoffice"),"Cobro registrado: "+eur(out));
+    mutate("recordCollection",[{partyId:inv.partyId,amountCents:out,method:"transfer",allocations:[{invoiceId:inv.id,amountCents:out}]}],"Cobro registrado: "+eur(out));
   });
  },
 
@@ -529,7 +562,7 @@ const VIEWS={
    </tbody></table></div></div>`;
   v.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{
     const bill=erp.state.bills.find(x=>x.id===b.dataset.pay); const out=erp.billOutstandingCents(bill.id);
-    mutate(()=>erp.payBills({amountCents:out,method:"transfer",billAllocations:[{billId:bill.id,amountCents:out}]},"backoffice"),"Pago registrado: "+eur(out));
+    mutate("payBills",[{amountCents:out,method:"transfer",billAllocations:[{billId:bill.id,amountCents:out}]}],"Pago registrado: "+eur(out));
   });
  },
 
@@ -557,7 +590,7 @@ const VIEWS={
   v.querySelectorAll('input[data-mov]').forEach(inp=>inp.onkeydown=(e)=>{
     if(e.key!=="Enter")return;
     const kind=v.querySelector(`select[data-kind="${inp.dataset.mov}"]`).value;
-    mutate(()=>erp.allocateMovementToProject(inp.dataset.mov,inp.value.trim(),kind,"backoffice"),"Movimiento asignado a "+inp.value.trim());
+    mutate("allocateMovementToProject",[inp.dataset.mov,inp.value.trim(),kind],"Movimiento asignado a "+inp.value.trim());
   });
  },
 
@@ -618,7 +651,7 @@ const VIEWS={
    ${erp.state.packagesSent.map(s=>`<tr><td class="k">${s.quarter}</td><td>${fmtD(s.date)}</td><td>${s.invoices} emitidas · ${s.bills} recibidas</td><td>${s.exceptions} excepciones</td></tr>`).join("")||'<tr><td><div class="empty">Aún no se ha enviado ningún paquete.</div></td></tr>'}
    </tbody></table></div></div>`;
   v.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{window._q=b.dataset.q;render();});
-  $('#bSend').onclick=()=>mutate(()=>erp.quarterlyPackage(q,"backoffice"),"Paquete "+q+" generado y registrado");
+  $('#bSend').onclick=()=>mutate("quarterlyPackage",[q],"Paquete "+q+" generado y registrado");
  },
 };
 
@@ -651,11 +684,12 @@ function partyDrawer(id){
      <button class="btn" id="p_act">${p.active?"Desactivar":"Reactivar"}</button>
    </div>`;
   $('#p_edit').onclick=()=>editPartyDrawer(id);
-  $('#p_act').onclick=()=>mutate(()=>{
-    if(p.active) erp.deactivateParty(id,"backoffice");
-    else erp.updateParty(id,{active:true},"backoffice");
+  $('#p_act').onclick=async()=>{
+    await mutate(p.active?"deactivateParty":"updateParty",
+                 p.active?[id]:[id,{active:true}],
+                 p.active?"Tercero desactivado":"Tercero reactivado");
     closeDrawer();
-  },p.active?"Tercero desactivado":"Tercero reactivado");
+  };
 }
 function editPartyDrawer(id){
   const p=erp.party(id);
@@ -683,10 +717,12 @@ function editPartyDrawer(id){
    <div class="field full"><label>IBAN (opcional — el cambio queda registrado)</label><input id="e_iban" value="${esc((p.bank&&p.bank.iban)||"")}" placeholder="ES.."></div>
    <div class="field full"><label>Notas</label><input id="e_notes" value="${esc(p.notes||"")}"></div>
    <div class="field full" style="margin-top:8px"><button class="btn primary" id="e_save">Guardar cambios</button></div></div>`;
-  $('#e_save').onclick=()=>mutate(()=>{
+  $('#e_save').onclick=async()=>{
     const roles=[...db.querySelectorAll('input[data-role]:checked')].map(x=>x.dataset.role);
-    if(!roles.length) throw new Error("El tercero necesita al menos un rol");
-    if(!$('#e_name').value.trim()) throw new Error("El nombre es obligatorio");
+    // Client-side checks stay client-side: they are about filling the form in,
+    // and there is no point spending a round trip to be told so.
+    if(!roles.length) return toast("⚠ El tercero necesita al menos un rol");
+    if(!$('#e_name').value.trim()) return toast("⚠ El nombre es obligatorio");
     const patch={name:$('#e_name').value.trim(),taxId:$('#e_tax').value.trim(),partyType:$('#e_type').value,roles,
       billStreet:$('#e_street').value.trim(),billPostalCode:$('#e_cp').value.trim(),billCity:$('#e_city').value.trim(),billProvince:$('#e_prov').value.trim(),
       contactPerson:$('#e_contact').value.trim(),mobile:$('#e_mob').value.trim(),landline:$('#e_land').value.trim(),email:$('#e_mail').value.trim(),
@@ -695,9 +731,9 @@ function editPartyDrawer(id){
       irpfApplies:$('#e_irpf').value==="1",irpfRateBp:Math.round((+$('#e_irpfr').value||0)*100),notes:$('#e_notes').value.trim()};
     const iban=$('#e_iban').value.trim().replace(/\s+/g,"");
     if(iban) patch.bank=Object.assign({},p.bank||{},{iban,holder:(p.bank&&p.bank.holder)||patch.name});
-    erp.updateParty(id,patch,"backoffice");
+    await mutate("updateParty",[id,patch],"Datos actualizados");
     closeDrawer();
-  },"Datos actualizados");
+  };
 }
 function newPartyDrawer(){
   const db=openDrawer("Nuevo tercero");
@@ -711,12 +747,13 @@ function newPartyDrawer(){
    <div class="field"><label>Origen del contacto *</label><select id="f_src">${ErpEngine.LISTS.leadSources.map(s=>`<option>${s}</option>`).join("")}</select></div>
    <div class="field"><label>Línea de actividad</label><select id="f_line"><option value="renovation">Reforma</option><option value="repairs">Reparaciones</option><option value="damp">Humedades</option><option value="commercial">Comercial</option><option value="other">Otra</option></select></div>
    <div class="field full" style="margin-top:8px"><button class="btn primary" id="f_save">Guardar tercero</button></div></div>`;
-  $('#f_save').onclick=()=>mutate(()=>{
-    erp.addParty({roles:[$('#f_role').value],name:$('#f_name').value.trim(),taxId:$('#f_tax').value.trim(),
+  $('#f_save').onclick=async()=>{
+    await mutate("addParty",[{roles:[$('#f_role').value],name:$('#f_name').value.trim(),taxId:$('#f_tax').value.trim(),
       billStreet:$('#f_street').value.trim(),billPostalCode:$('#f_cp').value.trim(),billCity:$('#f_city').value.trim(),billProvince:"Barcelona",
-      mobile:$('#f_mob').value.trim(),email:$('#f_mail').value.trim(),leadSource:$('#f_src').value,activityLine:$('#f_line').value},"backoffice");
+      mobile:$('#f_mob').value.trim(),email:$('#f_mail').value.trim(),leadSource:$('#f_src').value,activityLine:$('#f_line').value}],
+      "Tercero creado");
     closeDrawer();
-  },"Tercero creado");
+  };
 }
 function budgetDrawer(id){
   const b=erp.budget(id); const vsel=b.acceptedVersionId||b.currentVersionId; const V=erp.version(id,vsel);
@@ -773,8 +810,8 @@ function projectDrawer(id){
    <div class="card"><div class="ch"><h3>Facturación del proyecto</h3></div><div class="daylist">
     <div class="it">Facturado <b>${eur(bill.invoicedCents)}</b> · Cobrado <b>${eur(bill.collectedCents)}</b> · Pendiente <b>${eur(bill.outstandingCents)}</b> · Por facturar <b>${eur(bill.remainingToInvoiceCents)}</b></div>
    </div></div>`;
-  db.querySelectorAll('[data-prog]').forEach(b2=>b2.onclick=()=>mutate(()=>erp.markProgress(id,b2.dataset.prog,b2.dataset.st,null,"operations"),"Avance actualizado"));
-  db.querySelectorAll('[data-approve]').forEach(b2=>b2.onclick=()=>mutate(()=>erp.approveChange(b2.dataset.approve,"aprobación-cliente.png","backoffice"),"Extra aprobado — anexo generado"));
+  db.querySelectorAll('[data-prog]').forEach(b2=>b2.onclick=()=>mutate("markProgress",[id,b2.dataset.prog,b2.dataset.st,null],"Avance actualizado"));
+  db.querySelectorAll('[data-approve]').forEach(b2=>b2.onclick=()=>mutate("approveChange",[b2.dataset.approve,"aprobación-cliente.png"],"Extra aprobado — anexo generado"));
 }
 
 /* =============================== toolbar =============================== */
@@ -782,8 +819,16 @@ $('#btnExport').onclick=()=>{
   const blob=new Blob([JSON.stringify({_meta:{app:"Canei ERP",exportedAt:erp.today},data:erp.toJSON()},null,1)],{type:'application/json'});
   const a=el('a');a.href=URL.createObjectURL(blob);a.download='canei-erp.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);toast("Datos exportados");
 };
-$('#btnReset').onclick=()=>{ if(!confirm("¿Restablecer el entorno con los datos de ejemplo? Se sustituye todo lo actual."))return;
-  erp=ErpSeed.build(); persist(); render(); toast("Datos de ejemplo cargados"); };
+$('#btnReset').onclick=async()=>{
+  // Only ever offered against this browser's own copy. Overwriting a shared
+  // company's records with demo figures is not something a button should be
+  // able to do, however clear the confirmation text is.
+  if(backend.isRemote()) return toast("⚠ No disponible: los datos están en el servidor.");
+  if(!confirm("¿Restablecer el entorno con los datos de ejemplo? Se sustituye todo lo actual.")) return;
+  erp=ErpSeed.build();
+  try{ await ErpStore.saveState(erp.toJSON()); }catch(e){ return toast("⚠ No se ha podido guardar: "+e.message); }
+  render(); toast("Datos de ejemplo cargados");
+};
 window.addEventListener('hashchange',()=>{const k=location.hash.slice(1);if(k&&NAVMAP[k]&&k!==cur){cur=k;render();}});
 boot();
 </script>

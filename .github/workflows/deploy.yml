@@ -131,6 +131,7 @@ jobs:
         run: |
           docker run -d --name app --network host \
             -e DATABASE_URL="postgresql://canei_app:canei_app@127.0.0.1:5432/canei_erp?schema=public" \
+            -e ERP_OPERATOR="ci-smoke" \
             ${{ env.REGISTRY }}/${{ github.repository }}/app:sha-${{ github.sha }}
           for i in $(seq 1 40); do
             body=$(curl -fsS http://127.0.0.1:3000/api/health 2>/dev/null) && break
@@ -153,3 +154,18 @@ jobs:
           echo "$out" | grep -q '"tenant":"reformas-demo"' || {
             echo "::error::Tenant spec not resolvable in the image — check TENANTS_DIR and the tenants/ COPY."
             docker logs app; exit 1; }
+
+      # Exercises the ERP the way it is actually used: the workspace UI is
+      # served, commands run, the whitelist holds, and a stale write is refused
+      # rather than silently overwriting. Runs against the PUBLISHED image with
+      # the RESTRICTED database role, so a missing GRANT or a `public/` left out
+      # of the container fails here instead of on the server.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: The ERP must work end to end inside the published image
+        env:
+          ERP_BASE_URL: http://127.0.0.1:3000
+          ERP_TEST_TENANT: reformas-demo
+        run: node tests/server-e2e/run.mjs || { docker logs app; exit 1; }

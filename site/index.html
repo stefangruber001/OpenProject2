@@ -180,6 +180,7 @@
 <script src="erp-seed.js"></script>
 <script src="erp-migrations.js"></script>
 <script src="erp-store.js"></script>
+<script src="erp-backend.js"></script>
 <script>
 /* Live indicators from the SAME dataset the workspace uses (IndexedDB "caneiERP"). */
 (async function(){
@@ -188,12 +189,18 @@
   $('#today').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
   let erp;
   try{
-    // Read through ErpStore, never by opening IndexedDB here: the database
-    // version is per-database, so a hardcoded version on this page would throw
-    // VersionError the moment erp.html upgraded the schema. Read-only — the
-    // launchpad shows indicators, it does not own the data.
-    const loaded=await ErpStore.loadState();
-    erp = loaded.state ? ErpEngine.ERP.from(loaded.state) : ErpSeed.build();
+    // Read through ErpBackend so the launchpad shows whatever the workspace
+    // shows — this browser's copy, or the server's. Never by opening IndexedDB
+    // here: the database version is per-database, so a hardcoded version on
+    // this page would throw VersionError the moment erp.html upgraded the
+    // schema. Read-only — the launchpad shows indicators, it does not own the
+    // data.
+    const backend=ErpBackend.create(new URLSearchParams(location.search).get("tenant")||"diorka");
+    // In remote mode a failure must NOT fall back to the demo seed: showing
+    // fabricated figures on a page the owner reads as "the business right now"
+    // is worse than showing nothing.
+    try{ erp=(await backend.load()).erp; }
+    catch(e){ if(backend.isRemote()) return; throw e; }
   }catch(e){ try{ erp=ErpSeed.build(); }catch(e2){ return; } }
   try{
     const ct=erp.controlTower(), op=erp.operationalDay(), bo=erp.backOfficeDay(), S=erp.state;
