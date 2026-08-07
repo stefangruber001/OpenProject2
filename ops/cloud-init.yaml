@@ -42,9 +42,19 @@ write_files:
       # Who is using this server. Every ERP change is attributed to this name in
       # the audit trail, and the API refuses to write without it. Replace the
       # placeholder with a real person before entering real data.
-      ERP_OPERATOR=__ERP_OPERATOR__
+      #
+      # QUOTED because a person's name contains spaces, and ops/backup.sh and
+      # ops/restore.sh read this file with `. ./.env` — a bare `Ana Ruiz` makes
+      # the shell try to run a command called `Ruiz` and abort the nightly
+      # backup. Compose strips the quotes; the shell needs them.
+      ERP_OPERATOR="__ERP_OPERATOR__"
       IMAGE_APP=__IMAGE_APP__
       IMAGE_MIGRATE=__IMAGE_MIGRATE__
+      # Read-only credentials for the container registry. The repository is
+      # private, so its images are private too and an anonymous pull is refused.
+      # Empty when the packages have deliberately been made public.
+      GHCR_USERNAME=__GHCR_USERNAME__
+      GHCR_TOKEN=__GHCR_TOKEN__
       CLOUDFLARE_TUNNEL_TOKEN=__TUNNEL_TOKEN__
       R2_ACCOUNT_ID=__R2_ACCOUNT_ID__
       R2_ACCESS_KEY_ID=__R2_ACCESS_KEY_ID__
@@ -98,6 +108,25 @@ runcmd:
   - rm -rf /tmp/canei-src
   - chmod +x /opt/canei-erp/ops/*.sh
   - mkdir -p /opt/canei-erp/backups
+
+  # Authenticate to the registry BEFORE the first pull. Writes
+  # /root/.docker/config.json, which persists — so the auto-deploy timer below
+  # keeps working across reboots without repeating this. Skipped when no token
+  # was supplied, which means the packages are public.
+  # Read just the two values rather than sourcing the file: .env holds
+  # human-entered text, and one unquoted name with a space in it would turn a
+  # `.` into a stray command.
+  - |
+    GHCR_USERNAME="$(sed -n 's/^GHCR_USERNAME=//p' /opt/canei-erp/.env | tr -d '"')"
+    GHCR_TOKEN="$(sed -n 's/^GHCR_TOKEN=//p' /opt/canei-erp/.env | tr -d '"')"
+    if [ -n "$GHCR_TOKEN" ]; then
+      printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin \
+        && echo "ghcr: logged in as $GHCR_USERNAME" \
+        || echo "ghcr: LOGIN FAILED — the stack cannot pull its images"
+    else
+      echo "ghcr: no token supplied — assuming the packages are public"
+    fi
+
   # __COMPOSE_PROFILE__ is "--profile cloudflare" when a tunnel exists, and
   # empty otherwise — in which case the stack comes up entirely private.
   - cd /opt/canei-erp && docker compose -f docker-compose.prod.yml __COMPOSE_PROFILE__ up -d

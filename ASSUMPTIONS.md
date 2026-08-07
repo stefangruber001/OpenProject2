@@ -638,3 +638,34 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   Three checks added to `manageability-sim.mjs` (48/48); all three were confirmed to fail
   against the previous engine before being trusted. Year simulations unchanged at 145/145
   and 253/253.
+- **#57 — The deploy smoke test never ran, and the server could not have pulled anything
+  (2026-08-07).** Checking the real GitHub state before writing provisioning instructions
+  turned up three faults, each verified against the live registry rather than reasoned about:
+  **(a) An uppercase image name.** `github.repository` is `stefangruber001/OpenProject2`;
+  OCI names must be lowercase. `docker/metadata-action` lowercases it for the push, so the
+  `images` job was green all along and the images really are published — but the `smoke`
+  job's bare `docker run` was rejected before contacting the registry
+  (`invalid reference format … must be lowercase`), failing every run for a day. Because
+  `images` still succeeded and the VPS follows the rolling `:main` tag, **unsmoked images
+  would have shipped to the server regardless of the red workflow.** The newly added
+  `db-role` step, `ERP_OPERATOR`, the tenant-route check and `tests/server-e2e` had
+  therefore never executed in CI once. `ops/provision.sh` rendered the same uppercase name
+  into cloud-init, so the server's own pull would have failed identically — the stack would
+  simply never have started, with the error buried in a systemd timer's journal.
+  **(b) Private images, no credentials.** The repository is private, so its packages are
+  private; `docker pull` as an anonymous client returns `unauthorized` (measured). cloud-init
+  had no `docker login`. Making the packages public was rejected as the fix: the image
+  contains the built application, i.e. the private repository's code. A `read:packages`
+  token is now required by `provision.sh`, which refuses to provision without one and says
+  exactly how to mint it.
+  **(c) A regression from #55.** `ERP_OPERATOR` is a person's name and went into `.env`
+  unquoted, but `ops/backup.sh:15` and `ops/restore.sh:19` read that file with `. ./.env` —
+  `Ana Ruiz` would have run `Ruiz` as a command and aborted the nightly backup under
+  `set -e`. Now quoted; verified that `sh` sources it and that Compose still strips the
+  quotes.
+  Verified end to end by rendering the real cloud-init with a spaced name: valid YAML, no
+  placeholders left, `.env` sources cleanly under `sh`, `docker compose config` resolves the
+  lowercase images and the restricted database role, and the login snippet runs. The deploy
+  workflow's path filter also missed `ops/**`, `site/**`, `tenants/**` and
+  `tests/server-e2e/**` — all of which are in the image or the smoke test — so changes to
+  them never triggered the job that checks them.

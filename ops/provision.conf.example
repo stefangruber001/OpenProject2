@@ -34,8 +34,29 @@ HOSTNAME_PREFIX="erp"
 # Who may log in: anyone with an email address at this domain.
 ACCESS_EMAIL_DOMAIN="caneisubirats.com"
 
-# owner/repo — used for the image names and the GitHub secrets.
+# owner/repo — used for the image names and the GitHub secrets. Lowercased
+# automatically for the image names, which may not contain capitals.
 GITHUB_REPO="stefangruber001/OpenProject2"
+
+# How the server downloads the application.
+#
+# A private repository publishes PRIVATE container images, and a brand new
+# server has no GitHub identity — an anonymous pull is simply refused, and the
+# stack never starts. So it needs a read-only token:
+#
+#   github.com/settings/tokens → Generate new token (classic)
+#     • Note:  canei-erp server pull
+#     • Scope: read:packages     (that one box, nothing else)
+#
+# Read-only and package-scoped: if the server is ever compromised, this token
+# cannot push code, read the repository, or touch anything else.
+GHCR_USERNAME="stefangruber001"
+GHCR_TOKEN=""
+
+# Set to 1 ONLY if the packages have deliberately been made public, in which
+# case the token above is unnecessary. Note that publishing them publishes the
+# built application — i.e. the private repository's code.
+# GHCR_PUBLIC=0
 
 # Who is using the ERP. Every change is stamped with this name in the audit
 # trail, so it must be a real person — not "admin" and not "system". There is

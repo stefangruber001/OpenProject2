@@ -66,6 +66,44 @@ DOMAIN="${DOMAIN:-local}"
 : "${HOSTNAME_PREFIX:=erp}"
 : "${ACCESS_EMAIL_DOMAIN:=$DOMAIN}"
 : "${GITHUB_REPO:?set GITHUB_REPO in $CONF (e.g. owner/repo)}"
+
+# OCI repository names must be lowercase. "stefangruber001/OpenProject2" is a
+# perfectly good GitHub name and an invalid image name, and docker rejects the
+# reference before it ever contacts the registry — so the server would sit there
+# pulling nothing, forever, with the error buried in a systemd timer's journal.
+GHCR_REPO="$(printf '%s' "$GITHUB_REPO" | tr '[:upper:]' '[:lower:]')"
+
+# Credentials for pulling those images. A private repo publishes PRIVATE
+# packages, and a fresh server has no GitHub identity, so an anonymous pull is
+# refused ("unauthorized") — verified against the real registry. Making the
+# packages public instead would publish the built application, which is the
+# customer's source code, so a read-only token is the right trade.
+#
+# GHCR_PUBLIC=1 says the packages are deliberately public and skips this.
+: "${GHCR_USERNAME:=}"
+: "${GHCR_TOKEN:=}"
+if [ "${GHCR_PUBLIC:-0}" != "1" ] && { [ -z "$GHCR_USERNAME" ] || [ -z "$GHCR_TOKEN" ]; }; then
+  cat >&2 <<EOF
+
+✗ The server will not be able to download the application.
+
+  ${GITHUB_REPO} is private, so its container images are private too, and the
+  new server has no way to authenticate. Create a token that can read them:
+
+    github.com/settings/tokens  →  Generate new token (classic)
+      • Note:   canei-erp server pull
+      • Scope:  read:packages     (that one box, nothing else)
+
+  Then in ${CONF}:
+
+      GHCR_USERNAME="your-github-username"
+      GHCR_TOKEN="ghp_..."
+
+  If you have deliberately made the packages public, set GHCR_PUBLIC=1 instead.
+
+EOF
+  exit 1
+fi
 : "${SERVER_NAME:=canei-erp-prod}"
 : "${SERVER_TYPE:=cx32}"
 : "${SERVER_LOCATION:=fsn1}"
@@ -258,8 +296,10 @@ else
         -e "s|__APP_DB_PASSWORD__|${APP_DB_PASSWORD}|g" \
         -e "s|__APP_URL__|https://${FQDN}|g" \
         -e "s|__ERP_OPERATOR__|${ERP_OPERATOR:-CAMBIAR: nombre del operador}|g" \
-        -e "s|__IMAGE_APP__|ghcr.io/${GITHUB_REPO}/app:main|g" \
-        -e "s|__IMAGE_MIGRATE__|ghcr.io/${GITHUB_REPO}/migrate:main|g" \
+        -e "s|__IMAGE_APP__|ghcr.io/${GHCR_REPO}/app:main|g" \
+        -e "s|__IMAGE_MIGRATE__|ghcr.io/${GHCR_REPO}/migrate:main|g" \
+        -e "s|__GHCR_USERNAME__|${GHCR_USERNAME}|g" \
+        -e "s|__GHCR_TOKEN__|${GHCR_TOKEN}|g" \
         -e "s|__TUNNEL_TOKEN__|${TUNNEL_TOKEN}|g" \
         -e "s|__R2_ACCOUNT_ID__|${CF_ACCOUNT_ID}|g" \
         -e "s|__R2_ACCESS_KEY_ID__|${R2_ACCESS_KEY_ID}|g" \

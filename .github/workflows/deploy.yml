@@ -11,6 +11,10 @@ on:
     paths:
       - "apps/**"
       - "packages/**"
+      - "site/**" # bundled into the image: the engine and the workspace UI
+      - "tenants/**" # copied into the image and read at request time
+      - "ops/**" # harden-db-role.sh runs in the smoke job
+      - "tests/server-e2e/**" # ditto
       - "Dockerfile"
       - "pnpm-lock.yaml"
       - ".github/workflows/deploy.yml"
@@ -107,11 +111,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # OCI repository names must be lowercase, and this repo has capitals in it
+      # ("OpenProject2"). docker/metadata-action lowercases ${{ github.repository }}
+      # for the push, so the images publish fine — but a bare `docker run` does
+      # not, and rejects the reference before it ever contacts the registry:
+      #
+      #   invalid reference format: repository name (…/OpenProject2/…) must be lowercase
+      #
+      # That killed this job on every run for a day while `images` stayed green,
+      # so unsmoked images shipped to the server regardless. Compute the name once.
+      - name: Resolve the published image names
+        run: echo "IMAGE_BASE=${REGISTRY}/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Apply migrations with the published migrate image
         run: |
           docker run --rm --network host \
             -e DATABASE_URL="postgresql://canei:canei@127.0.0.1:5432/canei_erp?schema=public" \
-            ${{ env.REGISTRY }}/${{ github.repository }}/migrate:sha-${{ github.sha }}
+            "$IMAGE_BASE/migrate:sha-${{ github.sha }}"
 
       # Production does not run the app as the database owner — the owner is a
       # superuser and superusers bypass RLS. So the smoke test must not either,
@@ -132,7 +148,7 @@ jobs:
           docker run -d --name app --network host \
             -e DATABASE_URL="postgresql://canei_app:canei_app@127.0.0.1:5432/canei_erp?schema=public" \
             -e ERP_OPERATOR="ci-smoke" \
-            ${{ env.REGISTRY }}/${{ github.repository }}/app:sha-${{ github.sha }}
+            "$IMAGE_BASE/app:sha-${{ github.sha }}"
           for i in $(seq 1 40); do
             body=$(curl -fsS http://127.0.0.1:3000/api/health 2>/dev/null) && break
             sleep 3
