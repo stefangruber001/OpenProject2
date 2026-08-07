@@ -51,6 +51,16 @@ info "${FW_NAME} → ${FW_ID}"
 info "SSH currently allowed from: $(jq -r '[.firewalls[0].rules[] | select(.port=="22") | .source_ips[]] | join(", ")' <<<"$FW")"
 
 if [ "${1:-}" = "--open" ]; then
+  # Reopening is the dangerous direction, and it is one word — which is enough
+  # for a stray paste to undo the hardening without anyone noticing. It did,
+  # once. So it asks, unless a human has explicitly said --yes.
+  if [ "${2:-}" != "--yes" ]; then
+    [ -t 0 ] || die "--open needs a terminal to confirm in, or an explicit: $0 --open --yes"
+    printf '\n\033[1;31m  This reopens SSH to the ENTIRE internet.\033[0m\n'
+    printf '  Type "open" to confirm, anything else to cancel: '
+    read -r CONFIRM
+    [ "$CONFIRM" = "open" ] || die "Not confirmed. Nothing was changed."
+  fi
   SOURCES='["0.0.0.0/0","::/0"]'
   DESC="SSH — open to the internet (recovery mode; narrow this again)"
   say "Reopening SSH to the whole internet"

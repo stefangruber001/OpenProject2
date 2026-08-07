@@ -730,3 +730,19 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   server and the customer's invoice register on the open internet, so the file now spells
   both forms out and says which is which. Verified with `docker compose config`: the app is
   the only published service and its `host_ip` is `127.0.0.1`.
+- **#62 — Reopening the firewall was one word, and a stray paste triggered it (2026-08-07).**
+  SSH was correctly narrowed to a single address and verified. Two illustrative commands
+  were then pasted together, each carrying a trailing `# comment` — and **zsh does not treat
+  `#` as a comment interactively** (`INTERACTIVE_COMMENTS` is off by default), so both lines
+  ran. The first was refused by the IP validation, which did its job. The second was
+  `--open`, and the firewall went back to `0.0.0.0/0` with nothing asking whether that was
+  intended.
+  **Decision: make the dangerous direction ask.** `--open` now requires either an interactive
+  confirmation (typing `open`) or an explicit `--yes`, and refuses outright when stdin is not
+  a terminal — so a paste, a script, or a copied line cannot silently undo the hardening.
+  Narrowing stays a single command, because the safe direction should be frictionless.
+  Verified across all four paths: no-tty refuses, wrong answer cancels, `--yes` proceeds, and
+  a stray `#` argument is still rejected by the address check.
+  Also a note to self about this operator's environment: **never put `#` comments on the same
+  line as a command in copy-paste instructions for zsh.** Put explanation in prose above the
+  block instead.
