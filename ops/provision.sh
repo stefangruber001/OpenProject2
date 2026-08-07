@@ -137,6 +137,57 @@ hz GET "/servers?per_page=1" | jq -e '.servers' >/dev/null 2>&1 \
   || die "Hetzner token rejected. Check HCLOUD_TOKEN (it must be Read & Write)."
 info "Hetzner token OK"
 
+# ── 0b. The server type must still exist, and must be one our images run on ──
+#
+# Hetzner retires server types. A hardcoded name silently rots and surfaces as
+# `server type NNN is deprecated` from the create call — after the SSH key and
+# firewall have already been made, which is a confusing place to stop.
+#
+# ARCHITECTURE MATTERS: .github/workflows/deploy.yml builds amd64 images only.
+# An ARM instance (cax*) is cheaper and would boot fine, then fail to run a
+# single container. So x86 is a hard requirement until the images are built
+# multi-arch.
+say "Checking server type"
+TYPES="$(hz GET "/server_types?per_page=100")"
+jq -e '.server_types' >/dev/null 2>&1 <<<"$TYPES" || die "Could not list Hetzner server types."
+
+TYPE_OK="$(jq -r --arg n "$SERVER_TYPE" --arg loc "$SERVER_LOCATION" '
+  .server_types[]
+  | select(.name == $n and .deprecation == null and .architecture == "x86")
+  | select([.prices[].location] | index($loc))
+  | .name' <<<"$TYPES" | sed -n '1p')"
+
+if [ -z "$TYPE_OK" ]; then
+  SUGGEST="$(jq -r --arg loc "$SERVER_LOCATION" '
+    .server_types[]
+    | select(.deprecation == null and .architecture == "x86")
+    | select(.cores >= 4 and .memory >= 8)
+    | select([.prices[].location] | index($loc))
+    | . as $t
+    | ($t.prices[] | select(.location == $loc) | .price_monthly.gross | tonumber) as $p
+    | "\($p)\t\($t.name)\t\($t.cores) vCPU\t\($t.memory | floor) GB\t\($t.disk) GB\t€\($p | .*100 | round / 100)/mo"
+    ' <<<"$TYPES" | sort -n | cut -f2- | sed 's/^/    /')"
+  cat >&2 <<EOF
+
+✗ Server type "${SERVER_TYPE}" is not usable in ${SERVER_LOCATION}.
+
+  It is either retired by Hetzner, unavailable in that location, or ARM —
+  and the application images are built for x86 only, so an ARM instance would
+  boot and then run nothing.
+
+  Suitable types here (4+ vCPU, 8+ GB), cheapest first:
+
+${SUGGEST:-    (none found — check SERVER_LOCATION="${SERVER_LOCATION}")}
+
+  Put your choice in ${CONF}:
+
+      SERVER_TYPE="<name from the list above>"
+
+EOF
+  exit 1
+fi
+info "${SERVER_TYPE} available in ${SERVER_LOCATION}, x86, not deprecated"
+
 if [ "$SKIP_CLOUDFLARE" = "1" ]; then
   say "Cloudflare SKIPPED — building a private server"
   info "no tunnel, no DNS, no login page, no off-site backups"

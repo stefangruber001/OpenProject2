@@ -701,3 +701,19 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   no stage exits early, plus a length assertion on both generated passwords, because a
   short or empty one would produce a database nobody can log into. Two other
   `… | head -1` pipelines were changed to `sed -n '1p'` for the same reason.
+- **#60 — The hardcoded server type had been retired (2026-08-07).** The first successful
+  run of `provision.sh` reached server creation and was refused by Hetzner with
+  `server type 105 is deprecated` — `SERVER_TYPE="cx32"`, correct when written, retired
+  since. It failed after the SSH key and firewall had been created, which is a confusing
+  place to stop, and the message names an internal id rather than anything actionable.
+  **Decision: validate against the API instead of hardcoding a guess.** `provision.sh` now
+  lists `/server_types` before creating anything and requires the configured type to be
+  present, not deprecated, and available in `SERVER_LOCATION`; on failure it prints the
+  suitable alternatives (4+ vCPU, 8+ GB) with prices, cheapest first.
+  **The check also requires `architecture == "x86"`, which matters more than the
+  deprecation.** Hetzner's ARM line (`cax*`) is cheaper and an operator picking on price
+  would choose it — and `.github/workflows/deploy.yml` builds amd64 images only, so the
+  machine would boot perfectly and then run not one container. Rejecting ARM at
+  provisioning time is the cheap fix; building multi-arch images is the real one, and is
+  the trigger to revisit. Verified against a representative payload: deprecated, ARM, and
+  wrong-location types are all rejected, valid ones accepted, suggestions sorted by price.
