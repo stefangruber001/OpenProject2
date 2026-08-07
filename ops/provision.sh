@@ -257,6 +257,7 @@ else
         -e "s|__PG_PASSWORD__|${PG_PASSWORD}|g" \
         -e "s|__APP_DB_PASSWORD__|${APP_DB_PASSWORD}|g" \
         -e "s|__APP_URL__|https://${FQDN}|g" \
+        -e "s|__ERP_OPERATOR__|${ERP_OPERATOR:-CAMBIAR: nombre del operador}|g" \
         -e "s|__IMAGE_APP__|ghcr.io/${GITHUB_REPO}/app:main|g" \
         -e "s|__IMAGE_MIGRATE__|ghcr.io/${GITHUB_REPO}/migrate:main|g" \
         -e "s|__TUNNEL_TOKEN__|${TUNNEL_TOKEN}|g" \

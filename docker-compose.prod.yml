@@ -81,6 +81,9 @@ services:
       DATABASE_URL: postgresql://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
       NEXT_PUBLIC_APP_URL: ${APP_URL}
       NODE_ENV: production
+      # Stamped on every ERP change in the audit trail. The API refuses to write
+      # without it — see lib/session.ts.
+      ERP_OPERATOR: ${ERP_OPERATOR}
     depends_on:
       db:
         condition: service_healthy
