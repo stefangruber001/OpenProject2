@@ -522,3 +522,13 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   them. Added `invoiceRegister()` (every issued invoice, same row shape) for the list and left
   `receivables()` as true AR; the view now reads the register. Most reversible: no data change,
   and the three engine consumers already filtered on `outstandingCents > 0` themselves.
+- **#50 — Tax-ID validation now differs between the journey and the engine (2026-08-07).**
+  Driving the journey found that `B66666666` — the CIF used throughout the repo's seed and
+  test fixtures — is refused by the journey (which verifies the CIF control digit) and accepted
+  by `erp-engine.js`, whose `validTaxId` checks CIF structure only (`:47`). The journey is
+  right: the control digit for `B6666666_` is `0`. **Decision:** report it rather than tighten
+  the engine in this pass. Tightening means correcting seed data and re-baselining the year and
+  manageability simulations, which is real work with real blast radius — not a one-line change —
+  and doing it half-way would leave the fixtures inconsistent with the validator. Logged as M1
+  in `docs/JOURNEY-E2E-TEST.md` and Tier-1 item 5. Most reversible: no behaviour changed, and
+  the stricter of the two validators is the one facing the operator.

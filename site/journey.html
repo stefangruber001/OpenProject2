@@ -1192,7 +1192,10 @@ function renderFields(wrap){
     if(sd[fld.k]==null&&val!=="") sd[fld.k]=String(val);
     grid.append(fieldEl(fld,val));
   });
-  if(Object.keys(sd).length) persistSoon();
+  // File them straight away. advance() saves the stage being LEFT, so the last
+  // stage's details reached no document unless the operator happened to edit a
+  // field — the review platform and send date were simply lost.
+  if(Object.keys(sd).length){ persistSoon(); saveStageDetails(step); }
   fs.append(grid); wrap.append(fs);
   fs.querySelectorAll("[data-k]").forEach(ctrl=>{
     const commit=()=>{ sd[ctrl.dataset.k]=ctrl.value; persistSoon(); saveStageDetails(step);
