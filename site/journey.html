@@ -1342,9 +1342,20 @@ function renderScheduler(wrap){
     });
     gantt();
   };
+  /* The schedule is filed with the project. It previously lived only in
+     stageData, so it appeared in no export and the operator's plan was absent
+     from the folder they hand over. Rows the Gantt cannot draw are reported
+     rather than silently dropped. */
+  const fileSchedule=(drawable)=>{
+    const bad=sd.tasks.filter(t=>(t.name||"").trim()&&!drawable.some(x=>x.t===t));
+    textArt("06 Project","schedule.txt","Work schedule — "+S.customer+"\n"
+      +(sd.tasks.filter(t=>(t.name||"").trim()).map(t=>"  "+t.name+": "+(t.start||"?")+" → "+(t.end||"?")+"  ("+(Math.max(0,Math.min(100,Number(t.progress)||0)))+"%)").join("\n")||"  (no tasks)")
+      +(bad.length?"\n\nNot shown on the timeline (missing or inverted dates):\n"+bad.map(t=>"  "+t.name).join("\n"):""));
+  };
   const gantt=()=>{
     gant.innerHTML="";
     const ts=sd.tasks.map(t=>({t, s:Date.parse(t.start), e:Date.parse(t.end)})).filter(x=>!isNaN(x.s)&&!isNaN(x.e)&&x.e>=x.s);
+    fileSchedule(ts);
     if(!ts.length){ gant.innerHTML='<div class="hint">Add dates to see the timeline.</div>'; return; }
     const min=Math.min(...ts.map(x=>x.s)), max=Math.max(...ts.map(x=>x.e)); const span=Math.max(1,max-min);
     ts.forEach(({t,s,e})=>{
@@ -1369,7 +1380,11 @@ function renderChangeOrders(wrap){
   const addb=el("button","btn sm ghost","＋ Add change order"); addb.type="button"; box.append(addb);
   const tot=el("div"); tot.id="cotot"; tot.style.cssText="margin-top:10px;font-size:13.5px"; box.append(tot);
   wrap.append(box);
-  const total=()=>{ recalcVariations(); renderLedger();
+  const total=()=>{ recalcVariations();
+    // A variation added after the invoice stage has been reached must reach the
+    // invoice: revenue was previously only recomputed inside FLOW[8].body().
+    if(reached>=8){ recomputeRevenue(); regenInvoice(); }
+    renderLedger();
     const cur=(S.baseline||sum(S.chapters,c=>c.budget))+S.variations;
     tot.innerHTML=`<b>Baseline:</b> ${eur(S.baseline||sum(S.chapters,c=>c.budget))} · <b>Variations:</b> ${S.variations>=0?"+":""}${eur(S.variations)} · <b>Current contract:</b> ${eur(cur)}`;
     textArt("08 Execution","change-orders.txt","Change orders (variations):\n"+(sd.changes.filter(c=>c.desc).map(c=>"  "+c.desc+": "+(num(c.amount)>=0?"+":"")+eurTxt(Math.round((num(c.amount)||0)*100))).join("\n")||"  (none)")+"\nBaseline preserved: "+eurTxt(S.baseline||sum(S.chapters,c=>c.budget))+"\nCurrent contract: "+eurTxt(cur)); };
