@@ -77,6 +77,14 @@ COPY --from=build --chown=nextjs:nodejs /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /repo/apps/web/.next/static     ./apps/web/.next/static
 # apps/web has no public/ today. Add a COPY for it here if one is ever created.
 
+# Tenant specs are read from disk at request time. The standalone bundle traces
+# imported modules only, so these YAML files have to be copied explicitly, and
+# TENANTS_DIR points at them — in the container there is no repo above the app
+# to walk up to. Without this the app starts healthy and fails every tenant
+# request.
+COPY --from=build --chown=nextjs:nodejs /repo/tenants ./tenants
+ENV TENANTS_DIR=/app/tenants
+
 USER nextjs
 EXPOSE 3000
 

@@ -122,3 +122,16 @@ jobs:
           echo "$body" | grep -q '"status":"ok"'        || { docker logs app; exit 1; }
           echo "$body" | grep -q '"database":"connected"' || { docker logs app; exit 1; }
           curl -fsS -o /dev/null http://127.0.0.1:3000/  || { docker logs app; exit 1; }
+
+      # /api/health passes even when tenant specs are unreachable, because it
+      # only touches the database. The image once shipped without tenants/ and
+      # without TENANTS_DIR: it built, started, reported healthy, and then
+      # failed EVERY tenant request with "repo root not found". Health alone is
+      # not proof the app works — exercise a real tenant route.
+      - name: A tenant route must resolve its spec from inside the container
+        run: |
+          out=$(curl -fsS http://127.0.0.1:3000/api/reformas-demo/quotes) || { docker logs app; exit 1; }
+          echo "$out"
+          echo "$out" | grep -q '"tenant":"reformas-demo"' || {
+            echo "::error::Tenant spec not resolvable in the image — check TENANTS_DIR and the tenants/ COPY."
+            docker logs app; exit 1; }
