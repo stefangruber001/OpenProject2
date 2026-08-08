@@ -37,7 +37,12 @@ struct RootView: View {
             // which means they all load BEFORE anyone has signed in. Opening one
             // that is still showing the login page refreshes it; a tab holding
             // real work is left alone.
-            .onChange(of: app.selection) { _, id in app.didSelect(id) }
+            // The single-closure form on purpose: the deployment target is iOS
+            // 16 (see IPHONEOS_DEPLOYMENT_TARGET), and `onChange(of:initial:_:)`
+            // — the two-parameter variant — starts at iOS 17. It is deprecated
+            // on newer systems but not unavailable, so this compiles for the
+            // phones this app actually has to run on.
+            .onChange(of: app.selection) { id in app.didSelect(id) }
 
             if app.showSplash {
                 SplashView()
