@@ -31,8 +31,33 @@ function repoRoot(): string {
   throw new FactoryError("NOT_FOUND", "repo root not found from " + process.cwd());
 }
 
+/**
+ * Where tenant specs live.
+ *
+ * In development that is `<repo>/tenants`, found by walking up for the
+ * workspace file. A production container has neither the workspace file nor
+ * the repo above it — `next build --output standalone` ships only the traced
+ * server — so TENANTS_DIR is set explicitly in the image. Without this the
+ * app builds, starts, passes its health check and then fails every tenant
+ * request with "repo root not found", which is a miserable way to discover the
+ * problem in production.
+ */
+function tenantsDir(): string {
+  const explicit = process.env.TENANTS_DIR;
+  if (explicit) {
+    if (!existsSync(explicit)) {
+      throw new FactoryError(
+        "NOT_FOUND",
+        `TENANTS_DIR is set to "${explicit}" but it does not exist`,
+      );
+    }
+    return explicit;
+  }
+  return join(repoRoot(), "tenants");
+}
+
 export function listTenants(): string[] {
-  const dir = join(repoRoot(), "tenants");
+  const dir = tenantsDir();
   return readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith("_"))
     .filter((e) => existsSync(join(dir, e.name, "tenant.yaml")))
@@ -55,7 +80,7 @@ export async function getTenantRuntime(tenantId: string): Promise<FactoryService
 }
 
 async function buildRuntime(tenantId: string): Promise<FactoryServices> {
-  const specPath = join(repoRoot(), "tenants", tenantId, "tenant.yaml");
+  const specPath = join(tenantsDir(), tenantId, "tenant.yaml");
   if (!existsSync(specPath)) {
     throw new FactoryError("NOT_FOUND", `No tenant spec at tenants/${tenantId}/tenant.yaml`);
   }

@@ -7,48 +7,6 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- Document-reading capability (`@repo/capability-extraction`): turns recognised
-  text into candidate invoice fields with a confidence, the place on the page
-  each value came from, runners-up for one-tap correction, and arithmetic and
-  rate checks that reconcile. Nothing it produces is ever marked confirmed —
-  a person confirms, elsewhere. All locale knowledge (number and date notation,
-  tax-id and account-number check characters, field keywords, the rates in
-  force on a date) arrives through the new `extraction-profile@1` port, which
-  `@repo/pack-jurisdiction-es-es` now implements for Spain.
-- Gantt chart in the ERP workspace (Proyectos → Seguimiento técnico): bars
-  with the critical path, float, milestones, dependency arrows, frozen-baseline
-  ghosts and the contract's payment milestones on one timeline, with an
-  editable working calendar. Drag to move, pull the right edge to lengthen,
-  drag between bars to link — mouse, pen and touch alike. Plans are stored per
-  project (schema v3) and every date on screen is computed by the scheduling
-  capability, never by the view.
-- Planning engine in `@repo/capability-scheduling`: a working calendar
-  supplied as data (working weekdays + closed dates), finish-to-start,
-  start-to-start and finish-to-finish dependencies with positive and negative
-  lag, a critical-path pass giving each task its total float, automatic
-  movement of the plan's finish date, and append-only baselines whose drift is
-  reported in working days. It ships in the committed browser bundle
-  (`site/erp-factory.{js,cjs}`, surface version 3) and is what the Gantt above
-  draws.
-
-### Changed
-
-- The ERP workspace (`site/erp.html`) is the whole web app: three-panel
-  navigation (sections → subsections → content, bottom bar + sheet on phones)
-  and a global bar with universal search, a section-contextual "+ Crear" menu,
-  an alert bell and a period selector shared by every list that filters by
-  date. The iOS and Android shells' tabs now deep-link into its sections.
-
-### Removed
-
-- Retired the standalone screens the workspace supersedes: the home launchpad
-  (`site/index.html`), the classic control tower (`site/dashboard.html`), the
-  customer zone (`site/clientes.html`) and the quote builder
-  (`site/frontend.html`). Each file remains as a redirect into the
-  corresponding section, so existing links and bookmarks keep working.
-
-### Added
-
 - Customer management zone (`site/clientes.html`): a back-office CRUD app to
   add, edit, delete and classify clients (status + engagement), with per-client
   detail showing linked projects, a payment/terms summary and a communications

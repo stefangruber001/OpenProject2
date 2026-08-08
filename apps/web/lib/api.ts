@@ -14,12 +14,19 @@ export async function guarded(fn: () => Promise<Response>): Promise<Response> {
   } catch (e) {
     if (isFactoryError(e)) {
       const status =
-        e.code === "NOT_FOUND" || e.code === "SPEC_INVALID"
-          ? 404
-          : e.code === "IMMUTABLE" || e.code === "INVALID_STATE"
-            ? 409
-            : 400;
-      return json({ error: e.code, message: e.message }, status);
+        e.code === "UNAUTHENTICATED"
+          ? 401
+          : e.code === "NOT_FOUND" || e.code === "SPEC_INVALID"
+            ? 404
+            : e.code === "IMMUTABLE" || e.code === "INVALID_STATE" || e.code === "STALE_WRITE"
+              ? 409
+              : // BAD_REQUEST and everything else: the caller's problem. It is
+                // deliberately NOT 404 — a client cannot act on "not found" when
+                // what actually happened is a malformed body or an unknown command.
+                400;
+      // `details` carries what the caller needs to recover — a STALE_WRITE says
+      // which version won, so the client can reload rather than guess.
+      return json({ error: e.code, message: e.message, ...(e.details ?? {}) }, status);
     }
     throw e;
   }

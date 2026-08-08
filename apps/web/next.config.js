@@ -9,6 +9,13 @@ config({ path: resolve(rootDir, ".env") });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Emit a self-contained server bundle (server.js plus only the node_modules
+  // Next traced) so the production container needs no pnpm, no workspace and no
+  // second install. Required by the root Dockerfile.
+  output: "standalone",
+  // Trace from the monorepo root, not apps/web — otherwise the workspace
+  // packages above are missed and the container starts with missing modules.
+  outputFileTracingRoot: rootDir,
   // Workspace packages export TypeScript sources; Next transpiles them.
   transpilePackages: [
     "@repo/kernel",

@@ -148,6 +148,11 @@
 </style>
 <script src="i18n-dict.js"></script>
 <script src="i18n.js"></script>
+<!-- erp-sync.js must load BEFORE the stores: they register their
+     documents with it as soon as the first read comes back. Without it
+     the page still works, it just never notices a change made elsewhere. -->
+<script src="erp-sync.js"></script>
+<script src="erp-docs.js"></script>
 </head>
 <body>
   <div class="topbar">
@@ -192,9 +197,12 @@
 <script>
 /* ============ persistence ============ */
 const DB="caneiFinance",STORE="kv",KEY="data";
-function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
-async function idbGet(k){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(STORE,"readonly").objectStore(STORE).get(k);t.onsuccess=()=>res(t.result);t.onerror=()=>rej(t.error);});}
-async function idbSet(k,v){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(STORE,"readwrite").objectStore(STORE).put(v,k);rq.onsuccess=()=>res();rq.onerror=()=>rej(rq.error);});}
+function idb(){return null;}
+/* Storage moved behind ErpDocs: the server when this copy is served by it,
+   IndexedDB otherwise. Same three calls, same shapes, so nothing above changes. */
+const _docs=ErpDocs.open(DB,STORE);
+async function idbGet(k){return _docs.get(k);}
+async function idbSet(k,v){return _docs.set(k,v);}
 let saveT;function persistSoon(){clearTimeout(saveT);saveT=setTimeout(()=>idbSet(KEY,DATA).catch(()=>{}),150);}
 
 /* ============ helpers ============ */

@@ -1,0 +1,226 @@
+#cloud-config
+# =============================================================================
+# Rendered by ops/provision.sh and handed to Hetzner at server-creation time.
+# The double-underscore markers below are substituted before upload — this file
+# is a template and is not valid to apply directly. (Deliberately not spelling
+# one out here: provision.sh refuses to upload a rendered file that still
+# contains one, and a decoy in a comment would fail that check.)
+#
+# By the time this finishes the server is serving the ERP through the
+# Cloudflare tunnel. No SSH session is involved in setting it up.
+# =============================================================================
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - git
+  - jq
+  - ufw
+  - age
+  - awscli
+  - unattended-upgrades
+  - apt-listchanges
+
+write_files:
+  # The whole configuration, written before anything starts. 0600 root-only:
+  # it holds the database password and the tunnel token.
+  - path: /opt/canei-erp/.env
+    permissions: "0600"
+    owner: root:root
+    content: |
+      POSTGRES_USER=canei
+      POSTGRES_PASSWORD=__PG_PASSWORD__
+      POSTGRES_DB=canei_erp
+      # The role the application connects as. Separate from the owner above
+      # because the owner is a superuser, and superusers bypass row-level
+      # security — see ops/harden-db-role.sh.
+      APP_DB_USER=canei_app
+      APP_DB_PASSWORD=__APP_DB_PASSWORD__
+      APP_URL=__APP_URL__
+      # Who is using this server. Every ERP change is attributed to this name in
+      # the audit trail, and the API refuses to write without it. Replace the
+      # placeholder with a real person before entering real data.
+      #
+      # QUOTED because a person's name contains spaces, and ops/backup.sh and
+      # ops/restore.sh read this file with `. ./.env` — a bare `Ana Ruiz` makes
+      # the shell try to run a command called `Ruiz` and abort the nightly
+      # backup. Compose strips the quotes; the shell needs them.
+      ERP_OPERATOR="__ERP_OPERATOR__"
+      # SIGN-IN (the pilot). Fill these in and the signed-in person is recorded
+      # instead of ERP_OPERATOR above, which is what makes more than one person
+      # attributable. Set BOTH or neither — the application refuses to start
+      # with only one rather than quietly crediting everyone's work to one name.
+      #
+      #   ERP_USERS       "email:hash,email:hash" — generate each hash with
+      #                   node apps/web/scripts/hash-password.mjs someone@example.com
+      #   SESSION_SECRET  head -c 48 /dev/urandom | base64
+      #
+      # SINGLE quotes: a hash contains "$16384", and inside double quotes the
+      # shell reads that as a variable rather than text.
+      ERP_USERS=''
+      SESSION_SECRET=''
+      # SHARED ACCESS — one link and one password, no account needed, for
+      # letting an owner or operator try the system on their own device.
+      # THIS REACHES THE LIVE DATA: back up before a session, change the
+      # password after one. Empty means shared access is off.
+      ERP_ACCESS_PASSWORD=''
+      # What the workspace's "~" resolves to.
+      ERP_DEFAULT_TENANT="diorka"
+      # Reachability for the pilot ingress (docker compose --profile pilot).
+      # PUBLIC_HOSTNAME is this server's IPv4 with dashes plus .sslip.io, e.g.
+      # 203-0-113-7.sslip.io — see docs/PILOT-WITHOUT-CLOUDFLARE.md.
+      PUBLIC_HOSTNAME=""
+      ACME_EMAIL=""
+      IMAGE_APP=__IMAGE_APP__
+      IMAGE_MIGRATE=__IMAGE_MIGRATE__
+      # Read-only credentials for the container registry. The repository is
+      # private, so its images are private too and an anonymous pull is refused.
+      # Empty when the packages have deliberately been made public.
+      GHCR_USERNAME=__GHCR_USERNAME__
+      GHCR_TOKEN=__GHCR_TOKEN__
+      CLOUDFLARE_TUNNEL_TOKEN=__TUNNEL_TOKEN__
+      R2_ACCOUNT_ID=__R2_ACCOUNT_ID__
+      R2_ACCESS_KEY_ID=__R2_ACCESS_KEY_ID__
+      R2_SECRET_ACCESS_KEY=__R2_SECRET__
+      R2_BUCKET=__R2_BUCKET__
+      BACKUP_AGE_RECIPIENT=__AGE_PUB__
+      BACKUP_RETENTION_DAYS=30
+      # r2 = off-site. local = encrypted dumps stay on this server, which is
+      # the interim setting until object storage is agreed.
+      BACKUP_TARGET=__BACKUP_TARGET__
+
+  # Security patches install themselves; the box reboots at 04:00 if a kernel
+  # update needs it. Most compromises are unpatched known CVEs, not clever
+  # attacks, so on an unattended server this is the highest-value single item.
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+
+  - path: /etc/apt/apt.conf.d/51unattended-upgrades-local
+    content: |
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "04:00";
+      Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+
+  # The handful of repo files the server actually needs, inlined by
+  # ops/provision.sh in place of the marker below.
+  #
+  # This used to be `git clone` — which cannot work: the repository is PRIVATE
+  # and a new machine has no GitHub identity, so the clone fails with
+  # "Repository not found" and every file after it is missing. The stack then
+  # dies on `docker compose -f docker-compose.prod.yml up -d` with "no such
+  # file or directory" and NOT ONE container starts, database included. The
+  # registry token does not help: it is scoped to reading packages, cannot
+  # clone source, and the login runs after the clone anyway.
+  #
+  # Inlining also keeps the server's only credential a read-only package
+  # token, rather than something that can read the source.
+  # __EMBEDDED_FILES__
+
+runcmd:
+  # --- Docker -------------------------------------------------------------
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update -qq
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - systemctl enable --now docker
+  - systemctl enable --now unattended-upgrades
+
+  # --- Firewall -----------------------------------------------------------
+  # Inbound: SSH only. The app is reached through the tunnel, which dials OUT,
+  # so there is no inbound rule for it and there must never be one.
+  - ufw --force reset
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp comment 'SSH'
+  - ufw --force enable
+
+  # --- The application ----------------------------------------------------
+  # No clone: the compose file and the ops scripts arrived via write_files
+  # above, already at the right paths and modes.
+  - mkdir -p /opt/canei-erp/backups
+
+  # Authenticate to the registry BEFORE the first pull. Writes
+  # /root/.docker/config.json, which persists — so the auto-deploy timer below
+  # keeps working across reboots without repeating this. Skipped when no token
+  # was supplied, which means the packages are public.
+  # Read just the two values rather than sourcing the file: .env holds
+  # human-entered text, and one unquoted name with a space in it would turn a
+  # `.` into a stray command.
+  - |
+    GHCR_USERNAME="$(sed -n 's/^GHCR_USERNAME=//p' /opt/canei-erp/.env | tr -d '"')"
+    GHCR_TOKEN="$(sed -n 's/^GHCR_TOKEN=//p' /opt/canei-erp/.env | tr -d '"')"
+    if [ -n "$GHCR_TOKEN" ]; then
+      printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin \
+        && echo "ghcr: logged in as $GHCR_USERNAME" \
+        || echo "ghcr: LOGIN FAILED — the stack cannot pull its images"
+    else
+      echo "ghcr: no token supplied — assuming the packages are public"
+    fi
+
+  # __COMPOSE_PROFILE__ is "--profile cloudflare" when a tunnel exists, and
+  # empty otherwise — in which case the stack comes up entirely private.
+  - cd /opt/canei-erp && docker compose -f docker-compose.prod.yml __COMPOSE_PROFILE__ up -d
+
+  # --- Timers -------------------------------------------------------------
+  - |
+    cat > /etc/systemd/system/canei-deploy.service <<'UNIT'
+    [Unit]
+    Description=Pull the latest Canei ERP images and restart if they changed
+    After=docker.service
+    Requires=docker.service
+    [Service]
+    Type=oneshot
+    WorkingDirectory=/opt/canei-erp
+    ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml __COMPOSE_PROFILE__ pull --quiet
+    ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml __COMPOSE_PROFILE__ up -d --remove-orphans
+    ExecStart=/usr/bin/docker image prune -f
+    UNIT
+  - |
+    cat > /etc/systemd/system/canei-deploy.timer <<'UNIT'
+    [Unit]
+    Description=Check for new Canei ERP images every minute
+    [Timer]
+    OnBootSec=3min
+    OnUnitActiveSec=60s
+    AccuracySec=15s
+    [Install]
+    WantedBy=timers.target
+    UNIT
+  - |
+    cat > /etc/systemd/system/canei-backup.service <<'UNIT'
+    [Unit]
+    Description=Encrypted Canei ERP database backup to Cloudflare R2
+    After=docker.service
+    [Service]
+    Type=oneshot
+    WorkingDirectory=/opt/canei-erp
+    ExecStart=/opt/canei-erp/ops/backup.sh
+    UNIT
+  - |
+    cat > /etc/systemd/system/canei-backup.timer <<'UNIT'
+    [Unit]
+    Description=Nightly Canei ERP backup
+    [Timer]
+    OnCalendar=*-*-* 02:30:00
+    Persistent=true
+    RandomizedDelaySec=10min
+    [Install]
+    WantedBy=timers.target
+    UNIT
+  - systemctl daemon-reload
+  - systemctl enable --now canei-deploy.timer canei-backup.timer
+
+  # A marker the provisioning script can look for, and a first log line for
+  # whoever has to work out later whether cloud-init actually finished.
+  - date -u +%Y-%m-%dT%H:%M:%SZ > /opt/canei-erp/.provisioned-at
+
+final_message: "Canei ERP provisioned in $UPTIME seconds. Reachable through the Cloudflare tunnel."

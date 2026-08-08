@@ -14,21 +14,7 @@ export default defineConfig({
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
   },
-  projects: [
-    {
-      name: "chromium",
-      use: {
-        ...devices["Desktop Chrome"],
-        // CHROME_PATH points at a browser that is already on the machine, for
-        // sandboxes whose pre-installed Chromium build does not match the one
-        // this Playwright version would download. Same escape hatch the
-        // site-e2e harness uses; CI leaves it unset and gets the default.
-        ...(process.env.CHROME_PATH
-          ? { launchOptions: { executablePath: process.env.CHROME_PATH } }
-          : {}),
-      },
-    },
-  ],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: "pnpm dev",
     url: "http://localhost:3000",

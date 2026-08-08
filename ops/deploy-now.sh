@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Put the latest release on the server, now, and PROVE it arrived.
+#
+#   ./ops/deploy-now.sh
+#
+# The pipeline already builds, tests and publishes every push to main, and the
+# server has a timer that pulls every minute. When all of that is working this
+# script is unnecessary. It exists because when it is NOT working, every part
+# still looks fine: green ticks in Actions, a running timer, a healthy container
+# — serving a version from days ago.
+#
+# So the check at the end is the point. It does not ask "did the commands
+# succeed", it asks "is the code I just pushed the code that is answering", by
+# comparing the running image against this checkout's commit and by fetching a
+# file over the public address. Anything less has already fooled us once.
+# =============================================================================
+set -euo pipefail
+
+say() { printf '\n\033[1;32m▸ %s\033[0m\n' "$*"; }
+info() { printf '  %s\n' "$*"; }
+warn() { printf '  \033[1;33m!\033[0m %s\n' "$*"; }
+die() {
+  printf '\n\033[1;31m✗ %s\033[0m\n' "$*" >&2
+  exit 1
+}
+
+command -v jq >/dev/null || die "jq is required (brew install jq)"
+[ -f docker-compose.prod.yml ] || die "Run this from the repository root."
+
+CONF="${CONF:-ops/provision.conf}"
+if [ -f "$CONF" ]; then
+  # shellcheck disable=SC1090
+  set -a
+  . "./$CONF"
+  set +a
+fi
+: "${HCLOUD_TOKEN:?HCLOUD_TOKEN missing — set it in $CONF or the environment}"
+SERVER_NAME="${SERVER_NAME:-canei-erp-prod}"
+KEY="${KEY:-ops/.provisioned/id_ed25519}"
+
+HEAD_SHA="$(git rev-parse HEAD)"
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+# The commit the server can ACTUALLY be running.
+#
+# Not HEAD. `deploy.yml` only builds an image when a push touches apps/,
+# packages/, site/, tenants/ or ops/ — so a commit that changes only the iOS app
+# or a document produces no image at all, and the server rightly stays where it
+# is. Comparing against HEAD in that case reports a failed deploy over a server
+# that is perfectly up to date, which is precisely the false alarm this script
+# already learned once not to raise.
+#
+# So: the newest commit that touches something the image is built from.
+IMAGE_PATHS=(apps packages site tenants ops)
+WANT="$(git log -1 --format=%H -- "${IMAGE_PATHS[@]}" 2>/dev/null || true)"
+if [ -z "$WANT" ]; then
+  # A shallow clone cannot answer the question. Fall back to HEAD and say so,
+  # rather than quietly comparing against something meaningless.
+  WANT="$HEAD_SHA"
+  SHALLOW=1
+fi
+
+IP="$(curl -sS -H "Authorization: Bearer $HCLOUD_TOKEN" \
+  "https://api.hetzner.cloud/v1/servers?name=${SERVER_NAME}" |
+  jq -r '.servers[0].public_net.ipv4.ip // empty')"
+[ -n "$IP" ] || die "No server named '${SERVER_NAME}'."
+SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -i "$KEY")
+
+say "Local checkout"
+info "branch ${BRANCH} at ${HEAD_SHA:0:8}"
+if [ "$WANT" != "$HEAD_SHA" ]; then
+  info "newest commit that builds an image: ${WANT:0:8}"
+  info "(later commits touch only things the server does not run)"
+fi
+[ "${SHALLOW:-0}" = "1" ] && warn "Shallow clone — comparing against HEAD, which may not have built an image."
+if [ -n "$(git status --porcelain)" ]; then
+  warn "You have uncommitted changes. Only what is PUSHED can be deployed."
+fi
+
+say "Pulling the published release onto the server"
+# `pull` before `up` and reported separately: an authentication failure here is
+# the single most common reason a release does not arrive, and it is worth
+# naming rather than letting `up -d` report "Running" over a stale image.
+ssh "${SSH_OPTS[@]}" "root@${IP}" "bash -s" <<'PY' 2>&1 | sed 's/^/  /'
+set -uo pipefail
+cd /opt/canei-erp
+if ! docker compose -f docker-compose.prod.yml pull 2>&1 | tail -4; then
+  echo "PULL FAILED"
+fi
+PY
+
+say "Restarting"
+ssh "${SSH_OPTS[@]}" "root@${IP}" "bash -s" <<'PY' 2>&1 | tail -14 | sed 's/^/  /'
+set -uo pipefail
+cd /opt/canei-erp
+PROFILE=""
+grep -q '^PUBLIC_HOSTNAME=.\+' .env && PROFILE="--profile pilot"
+# shellcheck disable=SC2086
+docker compose -f docker-compose.prod.yml $PROFILE up -d 2>&1 | tail -8
+sleep 4
+docker compose -f docker-compose.prod.yml ps --format '{{.Service}} {{.Status}}'
+PY
+
+say "Is the new version actually the one answering?"
+RUNNING="$(ssh "${SSH_OPTS[@]}" "root@${IP}" \
+  "docker inspect --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}' \
+   \$(docker compose -f /opt/canei-erp/docker-compose.prod.yml -p canei-erp ps -q app 2>/dev/null | head -1) 2>/dev/null" </dev/null || true)"
+RUNNING="$(printf '%s' "$RUNNING" | tr -d '[:space:]')"
+
+if [ -z "$RUNNING" ]; then
+  warn "The image carries no revision label, so it cannot be compared to a commit."
+  warn "Falling back to checking the served files below."
+elif [ "$RUNNING" = "$WANT" ]; then
+  info "running revision ${RUNNING:0:8} — matches this checkout"
+else
+  warn "running revision ${RUNNING:0:8}, this checkout is ${WANT:0:8}"
+  warn "The server is NOT on your latest commit. Usual causes, in order:"
+  warn "  1. the commit is not pushed, or its build has not finished"
+  warn "  2. the registry token is missing or revoked → ./ops/set-ghcr-token.sh"
+  warn "  3. the compose file on the server is stale     → ./ops/sync-server.sh"
+fi
+
+HOST="$(ssh "${SSH_OPTS[@]}" "root@${IP}" \
+  "sed -n 's/^PUBLIC_HOSTNAME=//p' /opt/canei-erp/.env | tr -d '\"' | tr -d \"'\"" </dev/null || true)"
+HOST="$(printf '%s' "$HOST" | tr -d '[:space:]')"
+
+if [ -n "$HOST" ]; then
+  say "What the public address reports"
+  # /api/health is the ONE path that is public by design and says which commit
+  # built the running image.
+  #
+  # This used to fetch workspace files and treat anything but 200 as missing —
+  # which was wrong in a way worth keeping a note about. Every page is behind
+  # the login, so an unauthenticated request is answered 307 to /login. The
+  # script read the lock working correctly as "the file is not there" and
+  # announced a failed deploy over a deploy that had in fact succeeded. A check
+  # that cries wolf is worse than no check: it trains you to ignore it.
+  HEALTH="$(curl -s -m 20 "https://${HOST}/api/health" || true)"
+  SERVED="$(printf '%s' "$HEALTH" | jq -r '.revision // empty' 2>/dev/null || true)"
+  DB="$(printf '%s' "$HEALTH" | jq -r '.database // empty' 2>/dev/null || true)"
+
+  [ "$DB" = "connected" ] && info "database: connected" || warn "database: ${DB:-unreachable}"
+
+  echo
+  if [ -z "$SERVED" ]; then
+    warn "This build predates the revision stamp in /api/health, so the public"
+    warn "address cannot confirm its own version yet. The image comparison above"
+    warn "is the answer until the next release lands."
+  elif [ "$SERVED" = "unknown" ]; then
+    warn "The running image reports revision 'unknown' — it was built without"
+    warn "BUILD_REVISION. Rebuild from main once and this becomes exact."
+  elif [ "$SERVED" = "$WANT" ]; then
+    printf '  \033[1;32mThe public address is serving %s — your latest commit.\033[0m\n' "${SERVED:0:8}"
+    printf '  Open https://%s and sign in.\n\n' "$HOST"
+  else
+    printf '  \033[1;31mThe public address is serving %s, you have %s.\033[0m\n' "${SERVED:0:8}" "${WANT:0:8}"
+    printf '  Work through the three causes listed above, then run this again.\n\n'
+    exit 1
+  fi
+else
+  warn "PUBLIC_HOSTNAME is not set on the server, so there is no public address to check."
+fi

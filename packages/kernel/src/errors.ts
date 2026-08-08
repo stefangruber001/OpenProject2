@@ -12,9 +12,18 @@ export type FactoryErrorCode =
   | "MISSING_PORT_IMPLEMENTATION"
   | "IMMUTABLE"
   | "INVALID_STATE"
+  | "STALE_WRITE"
   | "NO_TEMPLATE"
   | "NO_OUTBOX"
-  | "NOT_FOUND";
+  | "NOT_FOUND"
+  // The CALLER got it wrong — a malformed body, an unknown command, the wrong
+  // number of arguments. Distinct from SPEC_INVALID, which means the tenant's
+  // own spec is broken and is the operator's problem, not the caller's. They
+  // deserve different HTTP statuses and different people looking at them.
+  | "BAD_REQUEST"
+  // Nobody proved who they are. Distinct from BAD_REQUEST because the caller's
+  // recovery is completely different — not "fix your payload" but "log in".
+  | "UNAUTHENTICATED";
 
 /**
  * Single error type for the whole factory. `code` is stable API; message is

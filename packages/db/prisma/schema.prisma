@@ -67,6 +67,49 @@ model KvState {
   @@map("kv_state")
 }
 
+/// Whole-document state, versioned for optimistic concurrency.
+///
+/// Distinct from KvState on purpose. KvState is for small values whose last
+/// writer is legitimately the winner (chain heads); this table holds a document
+/// that two people can edit at once, so a blind upsert would silently discard
+/// one of them. `version` makes a stale write fail loudly instead.
+model ErpState {
+  tenantId  String   @map("tenant_id")
+  key       String
+  version   Int      @default(0)
+  payload   Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String   @default("") @map("updated_by")
+
+  @@id([tenantId, key])
+  @@map("erp_state")
+}
+
+/// Binary attachments — the site photographs taken on a visit.
+///
+/// A separate table rather than another field on the document, for the same
+/// reason `erp_state` keeps bytes out of the payload: the document is
+/// re-serialised on a debounce as somebody types, and megabytes of JPEG in that
+/// blob would be re-encoded and re-sent on every keystroke. The symptom of
+/// getting this wrong reads as "the ERP is slow", which points nowhere near the
+/// photographs.
+///
+/// No `version` column. These are written once and read many times; a photo is
+/// not edited concurrently, it is added or removed. Optimistic concurrency here
+/// would be ceremony protecting nothing.
+model ErpBlob {
+  tenantId  String   @map("tenant_id")
+  key       String
+  mime      String   @default("application/octet-stream")
+  bytes     Bytes
+  size      Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String   @default("") @map("created_by")
+
+  @@id([tenantId, key])
+  @@map("erp_blob")
+}
+
 /// Append-only domain events (EventLogPort).
 model Event {
   tenantId String @map("tenant_id")

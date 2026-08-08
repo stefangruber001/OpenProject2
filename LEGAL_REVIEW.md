@@ -68,10 +68,3 @@ feeds; Registro de jornada (RD-ley 8/2019) retention rules; SEPA N19/N34/N43;
 REA + Libro de Subcontratación + CAE/PRL docs (bridge-adapter pattern,
 ADR-0011); RGPD/LOPDGDD data residency + retention + subject rights as
 features. Each lands with its own entry here when implemented.
-
-**Note (session 12):** the Torre de Control alert `GES-PACKAGE-DUE` and the
-Mi Día calendar's matching "Envío a gestoría" milestone are an **internal,
-tenant-configurable reminder** ("send the package within N days of
-quarter-end," default 15) — not an asserted AEAT filing deadline. No specific
-Modelo 303/390/etc. due date is modelled anywhere in `site/erp-engine.js`;
-that remains tracked above, unstarted.

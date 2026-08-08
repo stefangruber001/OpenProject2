@@ -31,12 +31,3 @@ assumption; answers here overwrite config/data, not code.
     (§11.6) → drives AR/AP slice defaults.
 12. Devices used daily by both owners; site connectivity (§11.7) → shapes
     the mobile capture slice.
-13. **IRPF on the customer/party record — flagged "A revisar" in the UI, not
-    yet confirmed.** The Clientes edit drawer keeps the IRPF toggle and rate,
-    both badged _A revisar_, because the retention rule is profile-dependent
-    (professional 15 % / 7 % first three years, empresarial none, módulos 1 %)
-    and the correct profile per real third party has never been confirmed —
-    see `LEGAL_REVIEW.md` §3, `legally_verified: false`. Nothing was deleted
-    so no data is lost either way; the question to settle with the gestoría is
-    which profile each real supplier and autónomo falls under, after which the
-    field either becomes derived from that profile or disappears.

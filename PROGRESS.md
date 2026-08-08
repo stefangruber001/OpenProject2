@@ -316,249 +316,84 @@ fresh chat) is in `docs/worklog/SESSION-NN.md`.
   once the schema upgraded. Legacy `caneiMasterData` customers now fold in
   one-way and non-destructively, with anything ambiguous surfaced for review
   instead of auto-merged. Two new simulations in CI (23/23, 25/25).
-- **Session 4 — done (ASSUMPTIONS.md #48).** The ERP is now one workspace with
-  the spec's three-panel shell: sections (always visible) → subsections (open
-  on demand, collapse on choice or outside click) → content, with a bottom bar
-  and sheet on phones. A global bar landed with it: universal search across
-  clients, suppliers, projects, budgets, invoices and documents (grouped by
-  type, a hit opens the record); a "+ Crear" menu contextual to the active
-  section, calling the engine's own entry points so every validation still
-  applies; an alert bell with a live count and drill-down; and a period
-  selector (year/quarter/month/range) that filters the invoice, movement and
-  hours lists and always says how many rows it is hiding. `index.html`,
-  `dashboard.html`, `clientes.html` and `frontend.html` are retired to
-  redirect stubs, and both native shells' tabs now deep-link into the
-  workspace's sections. Spec'd-but-unbuilt subsections say what will live
-  there instead of opening blank. Site E2E: 53/53.
-- **Session 5 — done (ASSUMPTIONS.md #49).** `@repo/capability-scheduling`
-  grew from a task list into a planning engine: a working calendar supplied as
-  data (no weekend, closure or country hardcoded — a five-day week is a local
-  convention, so the neutral fallback works every day), finish-to-start,
-  start-to-start and finish-to-finish dependencies with positive and negative
-  lag, a forward/backward CPM pass yielding total float and the critical path,
-  cycles refused by name, and append-only baselines whose drift is reported in
-  working days. Dragging a task sets a start-no-earlier-than pin, so it holds
-  a human's date while its successors still follow. Every new field is
-  optional, so the plans `site/erp-bridge.js` builds by hand keep scheduling
-  unmigrated. 30 vitest tests, plus a new simulation that drives the whole
-  engine through the **committed browser bundle** (16 checks, in CI) — the
-  artifact the phones load is a separate claim from the source being right.
-  No UI: the chart is session 6, and `scheduling-gantt` stays `unbuilt` until
-  a screen actually reaches it.
-- **Session 6 — done (ASSUMPTIONS.md #50).** The Gantt. Proyectos →
-  Seguimiento técnico is now an SVG chart over the session-5 engine: bars with
-  the critical path in red, float tails, milestones, dependency arrows,
-  frozen-baseline ghosts and the contract's payment milestones on the same
-  timeline, with the working calendar editable as chips. Pointer-event
-  gestures — drag to move (which sets a start-no-earlier-than pin, so
-  successors still follow), edge-drag to resize, drag between bars to link —
-  share one path for mouse, pen and touch, because the ERP runs inside two
-  WebViews. **The view computes no dates:** every bar position, float,
-  critical flag, finish date and baseline drift is asked of
-  `@repo/capability-scheduling` through `ErpBridge.scheduling.plans`. Plans
-  persist per project in `state.plans` (schema v3), riding in the engine's
-  blob without `erp-engine.js` knowing they exist. `scheduling-gantt` becomes
-  the first `factory`-owned area. Site E2E 64/64, including a check that
-  closing the finish day pushes the plan's finish out.
-- **Session 7 — done (ASSUMPTIONS.md #51).** The reading half of photo
-  capture (spec §5.2), in two halves that know nothing of each other. New
-  `@repo/capability-extraction` turns recognised text into candidate fields
-  with a confidence, a provenance (line, offsets, page — what lets a
-  validation screen highlight where a number was read from) and arithmetic
-  that reconciles; its `confirmed` field is the literal type `false`, so no
-  caller can persist something that looks confirmed — CAP-04 enforced by the
-  type system rather than by discipline. All locale knowledge sits behind the
-  new required port `extraction-profile@1`: `@repo/pack-jurisdiction-es-es`
-  supplies NIF/NIE/CIF and IBAN check characters, `1.234,56`, `14/03/2026` and
-  "2 de abril de 2026" (Spanish and Catalan), the keyword sets, and the rates
-  in force on a date read from its effective-dated tables. The capability's own
-  tests run against a profile for an invented country — if they pass, it cannot
-  be carrying Spanish knowledge. Registered and composed into tenant #1
-  (17 capabilities, 4 bound ports); `make demo` and the negative test unchanged.
-  No camera, no OCR engine, no UI: that is session 8.
-- **Session 9 — done (ASSUMPTIONS.md #52).** The budget constructor of §3.3 and
-  the graphic annex (Improvement #1). Presupuestos now opens a three-zone
-  constructor: the chapter/line tree with per-chapter totals on the left, an
-  editable spreadsheet grid in the centre (code, description, unit, quantity,
-  cost price, sale price, amount, margin, line status), and a totals panel on
-  the right that recalculates on every keystroke — base, tax, withholding,
-  total, cost, margin in euros and per cent, and the value of the lines still
-  pending a price. **The view computes no money:** every one of those figures
-  comes from `erp.budgetTotals()`, the same function the emitted document uses,
-  so the live panel cannot drift from the document. Editing goes through
-  `erp.editLine()`, which refuses on a frozen, issued or accepted version.
-  The graphic annex is owned by `@repo/capability-docs` (`annex.ts`) and
-  reached through `ErpBridge.docs.annex`: pictures attach to a line and print
-  **at the end of the document**, after the totals and before the conditions,
-  grouped and ordered by chapter and line number, each captioned with both plus
-  a short description, numbered correlatively when a line has several, N per
-  page, with the line's own row carrying only a discreet mark. Switchable per
-  budget; issuing a version freezes its annex with it. Images come from the
-  catalogue, the site visit, a file or the phone camera, are compressed before
-  storage, and live in the blob store as `storageKey` strings — binary never
-  enters the state blob (schema v4 adds the settings and widens image
-  references into records). Internal-only images never reach the customer
-  document. `budget-graphic-annex` becomes the third `factory`-owned area.
-  Site E2E 77/77, all thirteen new checks made in a real browser.
-- **Session 10a — done (ASSUMPTIONS.md #53).** Projects: the plan derived from
-  the budget, the three tracking curves, and cost at completion. Every
-  subsection of Proyectos now sits under **one project context** — a persistent
-  selector with search, favourites and recents, and a fixed header carrying
-  customer, address, status, progress, contracted revenue, actual cost, current
-  margin and the next two critical dates (§4). Seguimiento técnico (§4.3)
-  replaces session 6's placeholder seed with the **real derivation**: chapters
-  and lines in, each duration from quantity ÷ the daily output of that unit in
-  that chapter, dependencies chained, and re-derivable after a quote change
-  without losing what the site recorded — derived task ids come from the
-  budget's own line ids, so re-deriving is a merge and not a reset. Progress is
-  recorded per chapter or **per executed quantity** (the number a site actually
-  knows), and one action writes both the budget and the plan so the two can
-  never disagree. An **S curve** draws planned, actual and projected, with the
-  actual line taken from an append-only progress log rather than from today's
-  percentages — the one thing about a plan that cannot be reconstructed
-  afterwards. A deviations panel names what is overdue, not started or merely
-  behind, and measures the slip against the frozen baseline. Seguimiento
-  económico (§4.4) is now a real screen: budgeted · committed · actual ·
-  **projected** · deviation · margin per chapter, where the projection carries
-  the observed cost per point of progress to the end, never falls below what is
-  spent or committed, keeps the budget while nothing has been booked, and can be
-  adjusted by hand only with a reason — with both figures shown. New:
-  `@repo/capability-scheduling` gained `derive.ts` and `tracking.ts`,
-  `@repo/capability-projects` gained `forecast.ts`, and the vertical pack gained
-  its daily-output tables — which the **browser bundle now composes**, the first
-  time a pack reaches the phone. `scheduling-gantt` and `project-economics` are
-  `factory`-owned (18 engine · 4 factory · 3 unbuilt). Site E2E 91/91.
-- **Session 10b — done (ASSUMPTIONS.md #54).** Compras (§4.1): a purchase
-  order's lifecycle (borrador → enviada → aceptada → recibida parcial →
-  recibida → facturada → pagada) is DERIVED from its dates and receipts, never
-  stored as its own field; `purchaseNeeds()` shows what a project's chapters
-  still need to commit, reading the same `committedByChapter()` the economics
-  screen uses; `purchaseReconciliation()` is the order ↔ delivery note ↔
-  invoice three-way check. Subcontratos (§4.2) is a **new area** — one record
-  per awarded trade with awarded/certified/invoiced/pending, a traffic light
-  over three mandatory documents (insurance, PRL, Social Security), retention,
-  and a link to the Gantt task executing that trade. Starting work on site is
-  **blocked**, not merely alerted, while documentation is expired or missing —
-  the one rule this session gives the harder of its two available forms on
-  purpose. `committedByChapter`/`committedCostCents` now include awarded
-  subcontracts, which the economics screen was quietly undercounting since
-  session 10a. Modificaciones (§4.5): change orders gained a `sent` step, a
-  `chapterNum` (so their cost/margin effect attributes correctly in the
-  forecast), `cancelChange`, and `renderChangeDoc` — a customer-facing adenda
-  with no cost or margin field. An approved change's schedule effect applies
-  to the Gantt through an explicit action
-  (`ErpBridge.scheduling.plans.applyChapterDelay`), never automatically.
-  Horas (§4.6): a weekly worker × day grid, scoped to the section's project
-  like every other §4 subsection, with locking (`approveLabourWeek`), "repetir
-  el parte del día anterior," and reassignment through the existing
-  `correctHours`. Recording hours against a closed project is now refused
-  outright, which makes the spec's own alert for it structurally unreachable.
-  Schema v6 adds `state.subcontracts` and the lifecycle fields on purchases,
-  changes, labour and workers — every one of them additive. Ownership:
-  `subcontracts` added; `purchases`/`change-orders`/`labour-hours` stay
-  `engine` (19 engine · 4 factory · 3 unbuilt). Site E2E 103/103, 11 new
-  checks — including one that pins the exact bug this session shipped once:
-  sending a purchase order updated the record but left the open drawer
-  showing the stale status and the wrong next action.
-- **Session 11 — done** (`docs/worklog/SESSION-11.md`). Administración: §5.3
-  conciliación bancaria, §5.4 banco, §5.6 gestoría, §5.7 comunicaciones. New
-  capability `@repo/capability-reconciliation` scores a statement line against
-  the documents that could explain it and returns suggestions **carrying their
-  own reasons** — exact amount, reference quoted, same counterparty — because a
-  bare confidence next to an Accept button teaches people to click without
-  reading. Direction is a gate rather than a weight, an amount outside
-  tolerance returns nothing rather than a weak guess, combinations stop at
-  three documents, and a single document outranks a combination of equal
-  confidence. Mirrored pairs across accounts are detected as internal
-  transfers. Closing a bank period **refuses** while anything in range is
-  unreconciled; reopening requires a written reason. Allocation was **removed
-  from the Banco screen** per §5.4 — casar un movimiento y repartirlo son el
-  mismo gesto, and splitting them across two screens produced movements
-  assigned to a job with no invoice behind them. Gestoría (§5.6) can now say
-  no: `quarterlyPackage` **throws**, naming the outstanding exceptions, and the
-  only way past is `acceptException` with a written reason per item — the two
-  routes the spec allows and no third (a `force` flag was written this session
-  and deliberately removed). The screen gained the completeness blocks, one
-  traffic light per block because they fail independently, plus the late-
-  document register (amber, never red), the fixed-asset/vehicle/renting
-  register, accountant queries, recipient on every send and a reason-bearing
-  reopen. Comunicaciones (§5.7) is templates, rules and a queue — and the rule
-  default is **`draft`**, the most consequential decision in the session:
-  nothing on the screen sends, "Aprobar" and "Registrar envío" are labelled
-  honestly, and the only thing that could put a message on a wire is a port
-  whose sole adapter delivers nothing. `commsEvents()` is a projection
-  recomputed from current state, not a log, so a rule added today still sees
-  last week's overdue invoice; editing a template mints a new version and
-  retires the old with `supersededBy`. Schema v7 adds `bankPeriods`,
-  `commsTemplates`, `commsRules`, `commsQueue`, `gestoriaQueries` and
-  `exceptionsAccepted` — all additive. Ownership: `banking-reconciliation` and
-  `comunicaciones-templates` → `factory`, `reconciliation-matching` added
-  (18 engine · 7 factory · 2 unbuilt). Site E2E 121/121, 18 new checks, all
-  aimed at the refusals rather than the happy paths. The zod-in-the-bundle trap
-  was hit for the third time (52 → 190 KB) and fixed the same way as sessions 9
-  and 10a; the committed bundle is 62 KB with zero zod references.
-- **Session 12 — done** (`docs/worklog/SESSION-12.md`). Torre de Control,
-  Mi Día, Recorrido (Improvement #3), alerts. Torre de Control (§2.1) now
-  shows the exact eight cards the spec names — proyectos activos, resultado
-  operativo del mes/trimestre, saldo bancos, proyección de caja, pagos a
-  proveedores, oportunidades abiertas, visitas — each with a twelve-period
-  sparkline on its own cadence, a delta against the prior period, and a
-  colour dot that reuses the card's own number rather than a second per-tile
-  threshold store. Every `alerts()` condition (~28 of them) now carries a
-  stable **code** and a **type** (económica/técnica/documental/fiscal) from
-  one lookup table. `managedAlerts()` layers assignment, a due date,
-  snoozing, resolution with a required note and evidence, and conversion to
-  a real task over the pure, recomputed `alerts()` projection — the same
-  computed-list-plus-keyed-overrides shape session 11 used for gestoría
-  exceptions and the comunicaciones queue. Only the alerts the spec
-  explicitly calls "configurable" (opportunity-stale days, quote-expiry,
-  subcontract-unbilled, warranty-expiry, start-at-risk) gained a tunable
-  threshold in a new rule editor; margin keeps its existing config field.
-  The gestoría quarterly reminder is **explicitly advisory, not an asserted
-  legal filing deadline** (see `LEGAL_REVIEW.md` §5). Mi Día (§2.2) gained
-  the hitos calendar, built entirely from dates records already own —
-  project/contract/bill/purchase/subcontract/worker dates, open tasks — with
-  no second copy of any of them; visits are deliberately excluded (logged
-  after they happen, so there's no future date for one). Recorrido (§2.3,
-  Improvement #3): `journey.html`'s original "Crear nuevo proyecto"
-  walkthrough is **completely untouched** and stays the default; a new
-  "Proyecto existente" mode reads the same tenant database erp.html writes
-  and shows each of the thirteen stages' real status (completa/en curso/
-  pendiente) and a real summary, linking out to the actual erp.html screen
-  that owns that data rather than re-implementing thirteen stages of editing
-  UI a second time. Schema v8 adds `alertRules`, `alertOverrides`,
-  `opportunity.decidedAt` (backfilled) and `project.priority` — all
-  additive; `controlTower()` only gained new fields. Ownership:
-  `alerts-tasks-control-tower` stays `engine`, `journey-project-selector`
-  `unbuilt` → `engine` (19 engine · 7 factory · 1 unbuilt — only
-  `extraction-ocr`/session 8 remains unbuilt). Site E2E 147/147, 26 new
-  checks driving the actual management verbs, calendar navigation, and the
-  full real-project loop end to end. No packages/capability changed, so the
-  committed bundle is untouched.
-- **Session 8 — not started** (skipped for now; the only item left from the
-  original 12-session plan). See `docs/worklog/WORKLOG.md`.
-- **Full-scope audit (2026-08-05, operator-requested)**: adversarial audit of
-  the whole repo against the construction-CRM master prompt →
-  **`AUDIT_REPORT.md`** (stack baseline, 23 findings F-001…F-023 with
-  file:line evidence, 18-row feature gap matrix, 7 remediation batches).
-  Headlines: no auth/no durable storage on the shipped product (Critical),
-  19 high dependency advisories, `/preview` release channel pinned to a dev
-  branch, suppliers lost their registry screen, OCR still the one unbuilt
-  area. Report only — nothing was fixed; remediation batches await the
-  operator's pick.
+- **Sessions 4-12 — not started.** See `docs/worklog/WORKLOG.md`.
+
+## End-to-end journey audit + repair (2026-08-07)
+
+`docs/JOURNEY-AUDIT.md` — all 13 stages walked as an employee would, per-stage
+9-point review plus scored summary (34/100 overall, 28/100 usability; engine 72,
+workspace UI 22), ranked issues, missing features, automation estimates,
+scalability limits and a tiered roadmap. Every finding anchored to `file:line`.
+
+Fixed this pass:
+
+- **Seven engine correction paths that could never succeed** — each read a field
+  or collection under a name nothing ever wrote (`resolveRequirement` →
+  `p.requirements`, `adminPatch` → `state.captures`, `correctBill` →
+  `b.irpfRateBp`, `updateBudget` → `validityDays`, `updateRecurring` →
+  `concept`/`dayOfMonth`, `markChangeExecuted` never setting the status,
+  `receivables()` with a `|| true` disabling its own filter). All were listed in
+  `MANAGEABILITY.md` as working. 11 regression checks added (45 total), verified
+  red against the previous engine.
+- **The journey stops inventing its numbers.** Committed and actual cost were
+  `chapter budget × a percentage typed at intake`, which made every chapter show
+  an identical variance and left the supplier / PO / bill-number fields
+  decorative. Both now come from purchase-order and bill rows the operator
+  enters. `depositPct` and `progressPct` drive the invoice; collections take an
+  amount so part payments are representable; supplier payments are ticked per
+  bill.
+- **Every stage has a gate.** Advance refuses and lists what is missing; the rail
+  can no longer walk past the intake checks (it could previously start a project
+  with no customer name, tax ID or email).
+- Withholding clamped (>100% produced a negative invoice total), baseline frozen
+  once, ledger derivations moved out of the render functions, step/reached/ledger
+  persisted so a reload resumes, storage failures surfaced, CIF control digit
+  verified, "Send" relabelled to "Mark as sent" (no transport is wired), 36 lines
+  of dead code removed.
+
+Site E2E 46/46 — the journey test now asserts the gates hold, that per-chapter
+variance has more than one distinct value, and that a reload resumes.
+
+**Next (Tier-1 item 1 of the audit roadmap):** wire the journey through
+`erp-engine.js`. It still writes to its own `caneiJourney` database while the ERP
+uses `caneiERP`, so every customer, quote and invoice is entered twice and the
+journey's invoice is not the accountant's. Needs idempotent stage→record mapping
+and a decision on abandoned journeys polluting the live dataset — see
+`ASSUMPTIONS.md` #48.
+
+## Off the laptop (2026-08-07)
+
+The operator asked to stop using their Mac entirely. Two things depended on it —
+reaching the ERP at all, and running the ops scripts — and deploying code already
+did not. Both halves of the gap are now addressed in code; one switch remains,
+and it needs credentials only the operator holds.
+
+- **Release gate fixed.** `deploy.yml` published the rolling `main` tag in the
+  build job, so the server pulled an image roughly three minutes before the smoke
+  test finished deciding whether it worked. The build now publishes only the
+  immutable sha tag and a `promote` job, gated on `smoke`, retags it in the
+  registry. Verified live: images → smoke (23:06:45) → promote (23:06:46).
+- **Identity.** `requireUser` returns the signed-in email when an identity
+  provider is configured, verified from the signed assertion rather than read
+  from a header — algorithm pinned, audience and issuer and expiry checked, keys
+  cached with refetch-on-rotation and stale-serve on outage. Half-configuration
+  is refused rather than downgraded to the shared operator name. 21 tests, each
+  a real forgery attempt. Unset variables leave today's behaviour identical.
+- **Ops from a browser.** `ops.yml` runs status, backup-now and list-ssh-allowed
+  from an Actions button that works from a phone. `ops/ssh-allow.sh` changes ONE
+  firewall entry instead of replacing the set — `narrow-ssh.sh` would have had
+  the second of two people silently lock out the first. Seven fixtures.
+- **Written down:** `docs/OPS-WITHOUT-A-LAPTOP.md`, including what storing the
+  SSH key in repository secrets actually costs.
+
+**Next:** publish the ERP. `ops/provision.sh` already builds the tunnel, DNS
+record and login policy behind `SKIP_CLOUDFLARE=1`; switching it on is what turns
+"the server is healthy" into "the company runs on it". Needs the domain in
+Cloudflare and the two `CF_ACCESS_*` variables reaching the app. Until then the
+workspace is still tunnel-only, and the nine-command whitelist still cannot run a
+job from lead to close.
 
 ## Branch & discipline
 
-Work lands on the branch designated for the session — `claude/orin-project-
-status-1q50dt` for sessions 1-3, `claude/candi-programme-session-4-07amo8` for
-sessions 4-12. Small conventional commits, every commit green, no force-push, no
-history rewrite.
-
-- **S0 — CANEI v4 mapping (2026-08-08)**: `docs/CANEI-V4-MAPPING.md`. Answers the doc's six
-  open questions (Q1 stack fixed by the code · Q2 no data loaded, variables covered · Q3 nine
-  types stand · Q4 the money chain validated structurally · Q5 gestoría rules once imported,
-  recommend a logged reopen rather than a hard lock · Q6 the Plan de Cuentas already exists in
-  `financial-data.html`, only the wiring is missing). Maps all 26 screens doc-vs-built and all
-  100 green-sheet columns to model fields: **~85 covered, 13 new fields, the rest derived or
-  discarded**. Q4 verdict: the chain closes for every job-costed euro; the one break is the
-  non-job branch (rule 07's "or to an account"), scheduled S11. No code changed.
+Work lands on `claude/orin-project-status-1q50dt` (designated). Small
+conventional commits, every commit green, no force-push, no history rewrite.

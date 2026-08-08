@@ -1,9 +1,14 @@
 # Google Play — one-time setup, then push-button publishing
 
 The Android app (`android/`) is the twin of the iOS shell: a premium native
-wrapper around the live web app, pointed at the dev preview
-(`…/OpenProject2/preview/`). Content updates need **no** store release — the
-app follows the website. A store build is only needed for native changes.
+wrapper around the live web app, pointed at **the server**
+(`https://178-105-10-156.sslip.io/workspace/`). Content updates need **no**
+store release — the app follows the website. A store build is only needed for
+native changes, or for changing which address the app points at.
+
+It used to point at the GitHub Pages dev preview, which is a static copy with
+no database behind it; that is why a record entered on one device never
+appeared on another.
 
 Once the steps below are done **once**, every release is one button:
 **Actions → "Android → Google Play" → Run workflow** → the signed bundle is
@@ -16,10 +21,17 @@ Play Console. Nothing else.
    account; company needs the CIF and a D-U-N-S check).
 2. Create the app: **Create app** → name "Canei Subirats", default language
    Spanish, App (not game), Free.
-3. Fill the mandatory declarations (privacy policy URL — the GitHub Pages
-   site works: `https://stefangruber001.github.io/OpenProject2/` —, content
-   rating questionnaire, target audience, data safety: "no data collected"
-   is accurate: everything stays on-device in IndexedDB).
+3. Fill the mandatory declarations: privacy policy URL, content rating
+   questionnaire, target audience, and **data safety**.
+
+   > **Data safety is no longer "no data collected".** That answer was accurate
+   > only while the app wrapped a static copy and everything stayed on the
+   > device. The app now signs in to a server and sends the company's records
+   > to it, so the declaration must say so: personal information (name, email,
+   > phone) and financial information (invoices, payments) are **collected and
+   > transferred**, encrypted in transit, for app functionality, and are not
+   > shared with third parties. Answering the old way would be a false
+   > statement on a compliance form, not a rounding error.
 
 ## 2. Upload keystore (5 min, on any machine with Java)
 

@@ -1,0 +1,105 @@
+name: Restore drill (monthly)
+
+# An untested backup is not a backup. Once a month this pulls the newest
+# encrypted backup out of R2, decrypts it, restores it into a throwaway
+# PostgreSQL, and asserts the result is a real database rather than a
+# zero-byte file that has been rotating quietly for weeks.
+#
+# It fails loudly on purpose: a red badge here means the company currently has
+# no recoverable copy of its invoice register.
+
+on:
+  schedule:
+    - cron: "0 6 1 * *" # 06:00 UTC on the 1st
+  workflow_dispatch:
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: canei
+          POSTGRES_PASSWORD: canei
+          POSTGRES_DB: restore_target
+        options: >-
+          --health-cmd "pg_isready -U canei"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+        ports: ["5432:5432"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install age and the PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age postgresql-client
+
+      - name: Fetch the newest backup from R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          NAME=$(aws s3 ls "s3://$BUCKET/" --endpoint-url "$ENDPOINT" \
+                 | awk '{print $4}' | grep -E '^canei-erp-' | sort | tail -1)
+          if [ -z "$NAME" ]; then
+            echo "::error::No backups in $BUCKET — the nightly job is not running."
+            exit 1
+          fi
+          echo "Newest backup: $NAME"
+          echo "BACKUP_NAME=$NAME" >> "$GITHUB_ENV"
+
+          # A backup older than 48h means the nightly timer has stopped.
+          BACKUP_DAY=$(echo "$NAME" | sed -E 's/^canei-erp-([0-9-]+)T.*/\1/')
+          AGE_DAYS=$(( ( $(date -u +%s) - $(date -u -d "$BACKUP_DAY" +%s) ) / 86400 ))
+          echo "Backup is ${AGE_DAYS} day(s) old."
+          if [ "$AGE_DAYS" -gt 2 ]; then
+            echo "::error::Newest backup is ${AGE_DAYS} days old — nightly backups have stopped."
+            exit 1
+          fi
+          aws s3 cp "s3://$BUCKET/$NAME" ./backup.age --endpoint-url "$ENDPOINT" --only-show-errors
+
+      - name: Decrypt
+        env:
+          AGE_KEY: ${{ secrets.BACKUP_AGE_PRIVATE_KEY }}
+        run: |
+          printf '%s' "$AGE_KEY" > key.txt
+          age -d -i key.txt -o backup.dump backup.age
+          rm -f key.txt
+          ls -l backup.dump
+
+      - name: Restore into a throwaway database
+        env:
+          PGPASSWORD: canei
+        run: |
+          pg_restore -h 127.0.0.1 -U canei -d restore_target --clean --if-exists --no-owner backup.dump
+
+      - name: Assert the restore produced a real database
+        env:
+          PGPASSWORD: canei
+        run: |
+          q() { psql -h 127.0.0.1 -U canei -d restore_target -tAc "$1"; }
+
+          TABLES=$(q "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'")
+          echo "Tables restored: $TABLES"
+          [ "$TABLES" -ge 6 ] || { echo "::error::Only $TABLES tables — restore is not complete."; exit 1; }
+
+          # The migration ledger must be present and at head, otherwise the
+          # restored database cannot be brought forward by the app.
+          MIGRATIONS=$(q "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
+          echo "Applied migrations: $MIGRATIONS"
+          [ "$MIGRATIONS" -ge 1 ] || { echo "::error::No applied migrations in the restore."; exit 1; }
+
+          # Row-level security must survive the restore. If it does not, a
+          # restored database would serve every tenant's data to every tenant.
+          UNPROTECTED=$(q "SELECT count(*) FROM pg_tables t
+                           WHERE t.schemaname='public'
+                             AND t.tablename <> '_prisma_migrations'
+                             AND NOT t.rowsecurity")
+          echo "Tables without RLS: $UNPROTECTED"
+          [ "$UNPROTECTED" -eq 0 ] || { echo "::error::$UNPROTECTED restored tables have RLS disabled."; exit 1; }
+
+          echo "Restore drill passed: ${BACKUP_NAME} is recoverable."

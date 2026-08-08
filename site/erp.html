@@ -553,6 +553,10 @@
 <script src="erp-history.js"></script>
 <script src="erp-seed.js"></script>
 <!-- Persistence: one module owns the IndexedDB version for every page. -->
+<!-- erp-sync.js must load BEFORE the stores: they register their
+     documents with it as soon as the first read comes back. Without it
+     the page still works, it just never notices a change made elsewhere. -->
+<script src="erp-sync.js"></script>
 <script src="erp-migrations.js"></script>
 <script src="erp-store.js"></script>
 <!-- Typed capability layer: erp-factory.js is GENERATED from packages/erp-browser
@@ -590,6 +594,19 @@ async function boot(){
         +'<h1 style="font-size:19px;margin:0 0 10px">Datos más recientes que la aplicación</h1>'
         +'<p style="color:#4f5347">'+esc(e.message)+'</p>'
         +'<p style="color:#8b8f80;font-size:13px">No se ha modificado nada. Actualiza la aplicación para volver a abrir estos datos.</p></div>';
+      return;
+    }
+    // When the document lives on the server there is no local copy to fall back
+    // to, and inventing one is not a degraded mode — it is destruction. The
+    // seeded document would be saved over the company's register by the next
+    // debounced persist(), so a dropped connection would erase real invoices.
+    // Stop, say so, change nothing.
+    if(ErpStore.isRemote()){
+      document.body.innerHTML='<div style="max-width:36rem;margin:18vh auto;padding:0 24px;font:15px/1.6 var(--sans,system-ui);color:#14160f">'
+        +'<h1 style="font-size:19px;margin:0 0 10px">No se ha podido conectar con el servidor</h1>'
+        +'<p style="color:#4f5347">'+esc(String(e&&e.message||e))+'</p>'
+        +'<p style="color:#8b8f80;font-size:13px">Los datos están en el servidor y no se ha modificado nada. '
+        +'Vuelva a intentarlo cuando esté disponible.</p></div>';
       return;
     }
     erp=ErpSeed.build(); fresh=true;
@@ -649,6 +666,12 @@ const DEMO_IMAGES={
   seed_img_interna:["#4f6b86","Detalle interno"],
 };
 async function ensureDemoImages(){
+  // Never against the server. These exist so the DEMONSTRATION budget has
+  // something to show on a clean machine; uploading four invented pictures into
+  // the company's real attachment store — where they would be backed up,
+  // restored, and indistinguishable from a photograph of an actual wall — is
+  // exactly the kind of fiction the remote guards elsewhere already refuse.
+  if(ErpStore.isRemote()) return;
   for(const key of Object.keys(DEMO_IMAGES)){
     const [color,label]=DEMO_IMAGES[key];
     try{
@@ -990,6 +1013,12 @@ const IMPORT_CONFLICT_ES={yaExiste:"ya existe en el sistema",rechazado:"datos no
 let seedBarHidden=false;
 function renderSeedBar(){
   const host=$('#seedbar'); if(!host) return;
+  // Never on the server. resetData() already refuses there, so the button was
+  // safe — but offering "load two years of demonstration data" on a company's
+  // live register and then refusing the click is the wrong way round. Do not
+  // advertise what will not be honoured; on a shared register the whole idea is
+  // out of place.
+  if(typeof ErpStore!=="undefined"&&ErpStore.isRemote()){ host.innerHTML=""; return; }
   const shipped=(typeof ErpSeed!=="undefined"&&ErpSeed.SEED_VERSION)||0;
   const have=(erp&&erp.state&&erp.state.seedVersion)||0;
   if(seedBarHidden||!shipped||have>=shipped){ host.innerHTML=""; return; }
@@ -2752,6 +2781,13 @@ function bStatus(l){return l.pending?"pending":l.optionalLine?"optional":"normal
 const IMGURL=new Map();
 async function imageUrl(key){
   if(IMGURL.has(key)) return IMGURL.get(key);
+  // On the server a picture already HAS an address, so point the <img> at it
+  // and let the browser stream and cache it like any other image. Downloading
+  // the bytes to build an object URL would hold every thumbnail on screen in
+  // memory for as long as the page is open, and re-download them all on the
+  // next visit — the response is marked immutable precisely so it need not be.
+  const direct=ErpStore.blobUrl(key);
+  if(direct){ IMGURL.set(key,direct); return direct; }
   try{ const b=await ErpStore.getBlob(key); if(!b) return null;
     const u=URL.createObjectURL(b); IMGURL.set(key,u); return u; }catch(e){ return null; }
 }
@@ -3402,7 +3438,7 @@ const VIEWS={
  /* ---------- Facturación y cobros (AR) ---------- */
  facturacion(v){
   $('#sub').textContent="Facturas generadas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos; las emitidas son inmutables.";
-  const all=erp.receivables();
+  const all=erp.invoiceRegister();
   const issued={}; erp.state.invoices.forEach(i=>{issued[i.number]=i.date;});
   const rows=all.filter(r=>inPeriod(issued[r.number]));
   v.innerHTML=`${periodNote(rows.length,all.length)}<div class="card"><div class="ch"><h3>Facturas</h3><span class="tag">pendiente total ${eur0(rows.reduce((s,r)=>s+r.outstandingCents,0))}</span></div>
@@ -3903,6 +3939,15 @@ function exportData(){
    person asks for this. That is also why a richer seed does not appear on its
    own after an update — you have to press this. */
 function resetData(){
+  // On the server this is not "reload the demo on this device" — the document
+  // is the company's, so it would replace the real register, for everyone, from
+  // one click behind one confirm box. The wording of that box ("en este
+  // dispositivo") would also be a lie. Refused outright rather than confirmed
+  // harder: there is no version of this that is safe against live data.
+  if(ErpStore.isRemote()){
+    alert("Estos son los datos reales de la empresa, en el servidor.\n\nNo se pueden sustituir por datos de demostración desde aquí.");
+    return;
+  }
   if(!confirm("¿Recargar los datos de demostración?\n\nSe sustituye TODO lo que haya ahora en este dispositivo por el conjunto de ejemplo: dos años de actividad (2024-2025) más la situación actual de 2026."))return;
   erp=ErpSeed.build(); seedPlans(); persist(); render(); toast("Datos de demostración recargados — 2024 a 2026"); }
 window.addEventListener('hashchange',()=>{const k=location.hash.slice(1);if(k&&SUBMAP[k]&&!SUBMAP[k].href&&k!==cur){cur=k;render();}});

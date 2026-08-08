@@ -1,0 +1,244 @@
+name: Deploy (build & publish images)
+
+# Builds the two production images and pushes them to GHCR. It does NOT touch
+# the server: the VPS pulls new images itself every 60s via canei-deploy.timer.
+# That is deliberate — no SSH key in CI, no inbound port on the box, and a bad
+# deploy is undone by re-tagging rather than by logging in somewhere.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "site/**" # bundled into the image: the engine and the workspace UI
+      - "tenants/**" # copied into the image and read at request time
+      - "ops/**" # harden-db-role.sh runs in the smoke job
+      - "tests/server-e2e/**" # ditto
+      - "Dockerfile"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      # Both images share the build stage's layer cache, but publishing them
+      # independently means a migrate-only change does not force an app redeploy.
+      matrix:
+        target: [runtime, migrate]
+        include:
+          - target: runtime
+            image: app
+          - target: migrate
+            image: migrate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.image }}
+          # ONLY the sha tag. The server follows `:main`, so publishing that tag
+          # here would put the image into production the moment the build ends —
+          # roughly three minutes before `smoke` finishes deciding whether it
+          # works. It did exactly that: `smoke` sat red for a day with a broken
+          # image name while every push shipped to the server anyway.
+          #
+          # `main` now moves in the `promote` job, which needs: smoke. A sha tag
+          # is addressable but nothing follows it, so publishing it early is
+          # harmless and is what lets `smoke` test the real artifact.
+          tags: |
+            type=sha,format=long
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # NEXT_PUBLIC_* is inlined at build time, so the public URL has to be
+          # known here rather than at run time.
+          build-args: |
+            NEXT_PUBLIC_APP_URL=${{ vars.APP_URL }}
+            BUILD_REVISION=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.target }}
+          cache-to: type=gha,scope=${{ matrix.target }},mode=max
+
+  # Proves the image actually starts and reaches a database before the server
+  # is allowed to pull it. Without this the first sign of a broken image would
+  # be the app failing to come back up in production.
+  #
+  # This is a real gate only because `promote` needs it and the rolling tag is
+  # published nowhere else. If you ever add `type=ref,event=branch` back to the
+  # meta step above, this job goes back to being a post-mortem.
+  smoke:
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: canei
+          POSTGRES_PASSWORD: canei
+          POSTGRES_DB: canei_erp
+        options: >-
+          --health-cmd "pg_isready -U canei"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+        ports: ["5432:5432"]
+    steps:
+      # Needed for ops/harden-db-role.sh below — the images come from the
+      # registry, but the role script is repo content.
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # OCI repository names must be lowercase, and this repo has capitals in it
+      # ("OpenProject2"). docker/metadata-action lowercases ${{ github.repository }}
+      # for the push, so the images publish fine — but a bare `docker run` does
+      # not, and rejects the reference before it ever contacts the registry:
+      #
+      #   invalid reference format: repository name (…/OpenProject2/…) must be lowercase
+      #
+      # That killed this job on every run for a day while `images` stayed green,
+      # so unsmoked images shipped to the server regardless. Compute the name once.
+      - name: Resolve the published image names
+        run: echo "IMAGE_BASE=${REGISTRY}/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - name: Apply migrations with the published migrate image
+        run: |
+          docker run --rm --network host \
+            -e DATABASE_URL="postgresql://canei:canei@127.0.0.1:5432/canei_erp?schema=public" \
+            "$IMAGE_BASE/migrate:sha-${{ github.sha }}"
+
+      # Production does not run the app as the database owner — the owner is a
+      # superuser and superusers bypass RLS. So the smoke test must not either,
+      # or it proves the image works under privileges it will never have and
+      # misses every missing GRANT.
+      - name: Create the restricted application role
+        env:
+          PGHOST: 127.0.0.1
+          PGPASSWORD: canei
+          POSTGRES_USER: canei
+          POSTGRES_DB: canei_erp
+          APP_DB_USER: canei_app
+          APP_DB_PASSWORD: canei_app
+        run: bash ops/harden-db-role.sh
+
+      - name: Start the published app image and check it serves
+        run: |
+          docker run -d --name app --network host \
+            -e DATABASE_URL="postgresql://canei_app:canei_app@127.0.0.1:5432/canei_erp?schema=public" \
+            -e ERP_OPERATOR="ci-smoke" \
+            "$IMAGE_BASE/app:sha-${{ github.sha }}"
+          for i in $(seq 1 40); do
+            body=$(curl -fsS http://127.0.0.1:3000/api/health 2>/dev/null) && break
+            sleep 3
+          done
+          echo "$body"
+          # Parsed, not grepped. Whether a route emits compact or indented JSON
+          # is a detail of which helper it happens to use, and a check that
+          # depends on it reports a healthy app as broken.
+          echo "$body" | jq -e '.status == "ok" and .database == "connected"' >/dev/null \
+            || { docker logs app; exit 1; }
+          curl -fsS -o /dev/null http://127.0.0.1:3000/  || { docker logs app; exit 1; }
+
+      # /api/health passes even when tenant specs are unreachable, because it
+      # only touches the database. The image once shipped without tenants/ and
+      # without TENANTS_DIR: it built, started, reported healthy, and then
+      # failed EVERY tenant request with "repo root not found". Health alone is
+      # not proof the app works — exercise a real tenant route.
+      - name: A tenant route must resolve its spec from inside the container
+        run: |
+          out=$(curl -fsS http://127.0.0.1:3000/api/reformas-demo/quotes) || { docker logs app; exit 1; }
+          echo "$out"
+          # This route goes through lib/api.ts's json() helper, which indents.
+          # A grep for '"tenant":"reformas-demo"' can never match it, and spent
+          # a run claiming the tenant specs were missing when the route was
+          # returning 200 with the right body.
+          echo "$out" | jq -e '.tenant == "reformas-demo"' >/dev/null || {
+            echo "::error::Tenant spec not resolvable in the image — check TENANTS_DIR and the tenants/ COPY."
+            docker logs app; exit 1; }
+
+      # Exercises the ERP the way it is actually used: the workspace UI is
+      # served, commands run, the whitelist holds, and a stale write is refused
+      # rather than silently overwriting. Runs against the PUBLISHED image with
+      # the RESTRICTED database role, so a missing GRANT or a `public/` left out
+      # of the container fails here instead of on the server.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: The ERP must work end to end inside the published image
+        env:
+          ERP_BASE_URL: http://127.0.0.1:3000
+          ERP_TEST_TENANT: reformas-demo
+        run: node tests/server-e2e/run.mjs || { docker logs app; exit 1; }
+
+  # The actual release step: move the rolling `main` tag onto images that have
+  # just been proven to boot, migrate, serve a tenant and pass the ERP suite.
+  # The server pulls `:main` every 60s, so THIS job is the deploy — everything
+  # above it is a build.
+  #
+  # `imagetools create` retags inside the registry by pointing a new tag at the
+  # existing manifest. Nothing is pulled, nothing is rebuilt, so the bytes that
+  # go to production are byte-identical to the bytes `smoke` tested. Rebuilding
+  # here instead would ship an artifact no test had ever run against.
+  promote:
+    needs: smoke
+    # `workflow_dispatch` can be fired from ANY branch, and without this guard a
+    # manual run from a feature branch would build that branch and point `:main`
+    # at it — a deploy to production from a branch nobody reviewed, one dropdown
+    # away. Dispatching from a branch still builds and smokes it; it just does
+    # not release it.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    strategy:
+      matrix:
+        image: [app, migrate]
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Lowercased for the same reason as in `smoke`: this repository has
+      # capitals in its name and OCI rejects them outright.
+      - name: Point :main at the tested image
+        run: |
+          BASE="${REGISTRY}/${GITHUB_REPOSITORY,,}/${{ matrix.image }}"
+          docker buildx imagetools create -t "$BASE:main" "$BASE:sha-${GITHUB_SHA}"
+          echo "::notice::${{ matrix.image }} promoted — the server will pull it within 60s."

@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Canei Subirats ERP — Landscape and Next Steps</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 14mm 13mm 12mm 13mm;
+      }
+      :root {
+        --canei: #1f4e5f;
+        --canei-2: #2c6b7f;
+        --ink: #16232a;
+        --mid: #56666e;
+        --line: #dfe5e7;
+        --bg: #f6f8f8;
+        --ok: #1c7a52;
+        --warn: #9a6a11;
+        --bad: #a63030;
+        --amber: #f4a419;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        color: var(--ink);
+        font-size: 10pt;
+        line-height: 1.5;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .page {
+        page-break-after: always;
+        position: relative;
+        min-height: 262mm;
+        /* The footer is absolutely positioned at the bottom, so without this the
+           last paragraph of a full page prints underneath it. Reserving the
+           footer's own height keeps text clear of it. */
+        padding-bottom: 26px;
+      }
+      .page:last-child {
+        page-break-after: auto;
+      }
+
+      h1 {
+        font-size: 25pt;
+        line-height: 1.15;
+        margin: 0 0 6px;
+        color: var(--canei);
+        letter-spacing: -0.4px;
+      }
+      h2 {
+        font-size: 14pt;
+        margin: 0 0 3px;
+        color: var(--canei);
+        letter-spacing: -0.2px;
+      }
+      h3 {
+        font-size: 10.5pt;
+        margin: 16px 0 5px;
+        color: var(--ink);
+      }
+      p {
+        margin: 0 0 9px;
+      }
+      .lede {
+        font-size: 11pt;
+        color: var(--mid);
+        margin-bottom: 16px;
+      }
+      .rule {
+        height: 3px;
+        background: var(--canei);
+        width: 54px;
+        margin: 10px 0 16px;
+        border-radius: 2px;
+      }
+      .kicker {
+        font-size: 8pt;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: var(--canei-2);
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+      .foot {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        border-top: 1px solid var(--line);
+        padding-top: 5px;
+        font-size: 7.5pt;
+        color: #8a979d;
+        display: flex;
+        justify-content: space-between;
+      }
+      code,
+      .mono {
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        font-size: 8.6pt;
+      }
+      code {
+        background: #eef2f3;
+        padding: 1px 4px;
+        border-radius: 3px;
+        color: #123;
+      }
+      pre {
+        background: #12232b;
+        color: #dbe9ee;
+        padding: 10px 12px;
+        border-radius: 6px;
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        font-size: 8.4pt;
+        line-height: 1.55;
+        overflow: hidden;
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 6px 0 10px;
+      }
+      pre .c {
+        color: #7fa8b5;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 6px 0 12px;
+        font-size: 9pt;
+      }
+      th {
+        text-align: left;
+        background: var(--canei);
+        color: #fff;
+        padding: 6px 9px;
+        font-size: 8.5pt;
+        letter-spacing: 0.3px;
+      }
+      td {
+        padding: 6px 9px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      tr:nth-child(even) td {
+        background: #fafcfc;
+      }
+      .tag {
+        display: inline-block;
+        padding: 1px 7px;
+        border-radius: 20px;
+        font-size: 7.5pt;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+      }
+      .t-ok {
+        background: #e2f3ea;
+        color: var(--ok);
+      }
+      .t-warn {
+        background: #fdf2dc;
+        color: var(--warn);
+      }
+      .t-bad {
+        background: #fbe6e6;
+        color: var(--bad);
+      }
+
+      .step {
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--canei);
+        border-radius: 5px;
+        padding: 9px 13px;
+        margin-bottom: 7px;
+        background: #fff;
+        page-break-inside: avoid;
+      }
+      .step .n {
+        display: inline-block;
+        background: var(--canei);
+        color: #fff;
+        width: 19px;
+        height: 19px;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 19px;
+        font-size: 9pt;
+        font-weight: 700;
+        margin-right: 7px;
+      }
+      .step h4 {
+        display: inline;
+        font-size: 10.5pt;
+        margin: 0;
+        color: var(--ink);
+      }
+      .where {
+        margin: 7px 0 6px;
+        font-size: 8.6pt;
+        color: var(--canei-2);
+        background: #eef4f6;
+        border-radius: 4px;
+        padding: 4px 8px;
+        display: inline-block;
+        font-weight: 600;
+      }
+      .note {
+        font-size: 8.6pt;
+        color: var(--mid);
+        margin-top: 4px;
+      }
+      .callout {
+        border: 1px solid #f0d9a8;
+        background: #fffaf0;
+        border-radius: 5px;
+        padding: 9px 12px;
+        font-size: 9pt;
+        margin: 10px 0;
+      }
+      .callout.bad {
+        border-color: #f2c9c9;
+        background: #fff6f6;
+      }
+      .callout b {
+        color: var(--canei);
+      }
+      .callout.bad b {
+        color: var(--bad);
+      }
+      ul {
+        margin: 4px 0 10px;
+        padding-left: 17px;
+      }
+      li {
+        margin-bottom: 4px;
+      }
+      .two {
+        display: flex;
+        gap: 14px;
+      }
+      .two > div {
+        flex: 1;
+      }
+      .cover-badge {
+        background: var(--canei);
+        color: #fff;
+        border-radius: 8px;
+        padding: 16px 20px;
+        margin: 18px 0;
+      }
+      .cover-badge .big {
+        font-size: 13pt;
+        font-weight: 700;
+        margin-bottom: 3px;
+      }
+      .cover-badge .sm {
+        font-size: 9.5pt;
+        opacity: 0.9;
+      }
+      svg {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ══════════════════ PAGE 1 — COVER + STATUS ══════════════════ -->
+    <div class="page">
+      <div class="kicker">Canei Subirats, S.L. · Pilot</div>
+      <h1>The ERP landscape,<br />and exactly what to do next</h1>
+      <div class="rule"></div>
+      <p class="lede">
+        Where the system stands, why nobody yet sees the same data, and the six steps that fix it —
+        ending with a link and a password anyone can use. No Cloudflare, no domain, no laptop.
+      </p>
+
+      <div class="cover-badge">
+        <div class="big">The one sentence that explains everything</div>
+        <div class="sm">
+          Your server works. The app on your phone has never been connected to it — it loads a
+          static website that saves everything into that phone's own storage. Six steps connect
+          them, and hand you a link and a password anyone can use.
+        </div>
+      </div>
+
+      <h2>Status at a glance</h2>
+      <table>
+        <tr>
+          <th style="width: 40%">Part of the system</th>
+          <th style="width: 17%">State</th>
+          <th>What that means</th>
+        </tr>
+        <tr>
+          <td><b>Server</b> — Hetzner Cloud, 178.105.10.156</td>
+          <td><span class="tag t-ok">RUNNING</span></td>
+          <td>Application, database and nightly backups all up.</td>
+        </tr>
+        <tr>
+          <td><b>Database</b> — PostgreSQL</td>
+          <td><span class="tag t-ok">VERIFIED</span></td>
+          <td>Customers written from the app land here and read back.</td>
+        </tr>
+        <tr>
+          <td><b>Deploying code</b> — GitHub → server</td>
+          <td><span class="tag t-ok">WORKING</span></td>
+          <td>Both of you can ship. Tests now gate the release.</td>
+        </tr>
+        <tr>
+          <td><b>Login</b> — named accounts for your team</td>
+          <td><span class="tag t-ok">BUILT</span></td>
+          <td>Tested end to end. Needs switching on (steps 1–4).</td>
+        </tr>
+        <tr>
+          <td><b>Shared access</b> — one link, one password</td>
+          <td><span class="tag t-ok">BUILT</span></td>
+          <td>Anyone you send it to signs in with no account. Live data.</td>
+        </tr>
+        <tr>
+          <td><b>Reachable from a phone</b></td>
+          <td><span class="tag t-warn">NOT YET</span></td>
+          <td>Needs steps 3–5. Everything for it is written.</td>
+        </tr>
+        <tr>
+          <td><b>Phone apps</b> — iOS &amp; Android</td>
+          <td><span class="tag t-bad">WRONG TARGET</span></td>
+          <td>Point at a static website, not your server. Step 6.</td>
+        </tr>
+        <tr>
+          <td><b>Shared calendar screen</b></td>
+          <td><span class="tag t-bad">NOT SHARED</span></td>
+          <td>Data and commands work; the screen still saves locally.</td>
+        </tr>
+        <tr>
+          <td><b>Limits on what a visitor may do</b></td>
+          <td><span class="tag t-bad">NONE</span></td>
+          <td>Shared access can change and delete live records. See page 6.</td>
+        </tr>
+        <tr>
+          <td><b>Restore from backup</b></td>
+          <td><span class="tag t-warn">UNTESTED</span></td>
+          <td>Backups are taken. Restoring has never been rehearsed.</td>
+        </tr>
+      </table>
+
+      <div class="callout">
+        <b>Read this before the steps.</b> Steps 1–5 are done once, in about half an hour. Step 4 is
+        the only one that exposes the server, and it refuses to run until the login genuinely works
+        — the order matters, and the system enforces it.
+      </div>
+
+      <h2 style="margin-top: 16px">The six steps, at a glance</h2>
+      <svg viewBox="0 12 760 72" width="100%">
+        <defs>
+          <marker id="a3" markerWidth="8" markerHeight="8" refX="7" refY="2.6" orient="auto">
+            <path d="M0,0 L0,5.2 L7,2.6 z" fill="#9fb3bb" />
+          </marker>
+        </defs>
+        <g font-family="Helvetica, Arial, sans-serif">
+          <!-- 1 -->
+          <rect x="2" y="18" width="118" height="58" rx="7" fill="#fff" stroke="#dfe5e7" />
+          <circle cx="22" cy="36" r="9" fill="#1f4e5f" />
+          <text x="22" y="39.5" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">
+            1
+          </text>
+          <text x="37" y="40" font-size="9" font-weight="700" fill="#16232a">Passwords</text>
+          <text x="12" y="59" font-size="7.6" fill="#56666e">your terminal</text>
+          <text x="12" y="70" font-size="7.6" fill="#8a979d">2 min</text>
+          <path d="M120,47 L134,47" stroke="#9fb3bb" stroke-width="1.6" marker-end="url(#a3)" />
+          <!-- 2 -->
+          <rect x="138" y="18" width="118" height="58" rx="7" fill="#fff" stroke="#dfe5e7" />
+          <circle cx="158" cy="36" r="9" fill="#1f4e5f" />
+          <text x="158" y="39.5" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">
+            2
+          </text>
+          <text x="173" y="40" font-size="9" font-weight="700" fill="#16232a">Accounts</text>
+          <text x="148" y="59" font-size="7.6" fill="#56666e">server .env</text>
+          <text x="148" y="70" font-size="7.6" fill="#8a979d">10 min</text>
+          <path d="M256,47 L270,47" stroke="#9fb3bb" stroke-width="1.6" marker-end="url(#a3)" />
+          <!-- 3 -->
+          <rect x="274" y="18" width="118" height="58" rx="7" fill="#fff" stroke="#dfe5e7" />
+          <circle cx="294" cy="36" r="9" fill="#1f4e5f" />
+          <text x="294" y="39.5" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">
+            3
+          </text>
+          <text x="309" y="40" font-size="9" font-weight="700" fill="#16232a">Start HTTPS</text>
+          <text x="284" y="59" font-size="7.6" fill="#56666e">server, one command</text>
+          <text x="284" y="70" font-size="7.6" fill="#8a979d">1 min</text>
+          <path d="M392,47 L406,47" stroke="#9fb3bb" stroke-width="1.6" marker-end="url(#a3)" />
+          <!-- 4 -->
+          <rect x="410" y="18" width="118" height="58" rx="7" fill="#fdf2dc" stroke="#f0d9a8" />
+          <circle cx="430" cy="36" r="9" fill="#9a6a11" />
+          <text x="430" y="39.5" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">
+            4
+          </text>
+          <text x="445" y="40" font-size="9" font-weight="700" fill="#9a6a11">Open the door</text>
+          <text x="420" y="59" font-size="7.6" fill="#9a6a11">your terminal</text>
+          <text x="420" y="70" font-size="7.6" fill="#b08a3a">checks first</text>
+          <path d="M528,47 L542,47" stroke="#9fb3bb" stroke-width="1.6" marker-end="url(#a3)" />
+          <!-- 5 -->
+          <rect x="546" y="18" width="102" height="58" rx="7" fill="#eef7f2" stroke="#bfe3d1" />
+          <circle cx="566" cy="36" r="9" fill="#1c7a52" />
+          <text x="566" y="39.5" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">
+            5
+          </text>
+          <text x="581" y="40" font-size="9" font-weight="700" fill="#1c7a52">Test it</text>
+          <text x="556" y="59" font-size="7.6" fill="#1c7a52">your phone</text>
+          <text x="556" y="70" font-size="7.6" fill="#5a9a7b">mobile data</text>
+          <path d="M648,47 L662,47" stroke="#9fb3bb" stroke-width="1.6" marker-end="url(#a3)" />
+          <!-- 6 -->
+          <rect x="666" y="18" width="92" height="58" rx="7" fill="#fff" stroke="#dfe5e7" />
+          <circle cx="686" cy="36" r="9" fill="#56666e" />
+          <text x="686" y="39.5" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">
+            6
+          </text>
+          <text x="701" y="40" font-size="9" font-weight="700" fill="#16232a">Apps</text>
+          <text x="676" y="59" font-size="7.6" fill="#56666e">2 files + build</text>
+          <text x="676" y="70" font-size="7.6" fill="#8a979d">later</text>
+        </g>
+      </svg>
+
+      <div class="foot">
+        <span>Canei Subirats ERP — landscape &amp; instructions</span><span>Page 1 of 6</span>
+      </div>
+    </div>
+
+    <!-- ══════════════════ PAGE 2 — THE LANDSCAPE ══════════════════ -->
+    <div class="page">
+      <div class="kicker">The landscape</div>
+      <h2>Today: three separate islands</h2>
+      <p class="lede" style="font-size: 10pt; margin-bottom: 10px">
+        Data does not move between these. That is the whole problem.
+      </p>
+
+      <svg viewBox="0 0 760 300" width="100%">
+        <defs>
+          <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#8a979d" />
+          </marker>
+          <marker id="arG" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#1c7a52" />
+          </marker>
+        </defs>
+
+        <!-- island 1 -->
+        <rect x="8" y="20" width="228" height="180" rx="9" fill="#fff6f6" stroke="#f2c9c9" />
+        <text x="122" y="42" text-anchor="middle" font-size="12" font-weight="700" fill="#a63030">
+          1 · Your phone
+        </text>
+        <rect x="40" y="56" width="76" height="112" rx="8" fill="#fff" stroke="#dfe5e7" />
+        <text x="78" y="78" text-anchor="middle" font-size="9" fill="#16232a">iOS app</text>
+        <rect x="52" y="88" width="52" height="62" rx="4" fill="#eef2f3" />
+        <text x="78" y="112" text-anchor="middle" font-size="7.5" fill="#56666e">stefan's</text>
+        <text x="78" y="124" text-anchor="middle" font-size="7.5" fill="#56666e">own</text>
+        <text x="78" y="136" text-anchor="middle" font-size="7.5" fill="#56666e">storage</text>
+        <rect x="128" y="56" width="76" height="112" rx="8" fill="#fff" stroke="#dfe5e7" />
+        <text x="166" y="78" text-anchor="middle" font-size="9" fill="#16232a">Ignacio</text>
+        <rect x="140" y="88" width="52" height="62" rx="4" fill="#eef2f3" />
+        <text x="166" y="112" text-anchor="middle" font-size="7.5" fill="#56666e">his</text>
+        <text x="166" y="124" text-anchor="middle" font-size="7.5" fill="#56666e">own</text>
+        <text x="166" y="136" text-anchor="middle" font-size="7.5" fill="#56666e">storage</text>
+        <line
+          x1="120"
+          y1="112"
+          x2="124"
+          y2="112"
+          stroke="#a63030"
+          stroke-width="2"
+          stroke-dasharray="3 3"
+        />
+        <text x="122" y="188" text-anchor="middle" font-size="8.5" fill="#a63030">
+          never exchange anything
+        </text>
+
+        <!-- island 2 -->
+        <rect x="256" y="20" width="228" height="180" rx="9" fill="#f6f8f8" stroke="#dfe5e7" />
+        <text x="370" y="42" text-anchor="middle" font-size="12" font-weight="700" fill="#56666e">
+          2 · GitHub Pages
+        </text>
+        <rect x="290" y="60" width="160" height="88" rx="8" fill="#fff" stroke="#dfe5e7" />
+        <text x="370" y="86" text-anchor="middle" font-size="9" fill="#16232a">
+          static demo website
+        </text>
+        <text x="370" y="104" text-anchor="middle" font-size="8" fill="#8a979d">no server</text>
+        <text x="370" y="118" text-anchor="middle" font-size="8" fill="#8a979d">no database</text>
+        <text x="370" y="132" text-anchor="middle" font-size="8" fill="#8a979d">no login</text>
+        <text x="370" y="172" text-anchor="middle" font-size="8.5" fill="#56666e">
+          this is what the apps load
+        </text>
+        <text x="370" y="186" text-anchor="middle" font-size="8.5" fill="#56666e">
+          — the cause of the problem
+        </text>
+
+        <!-- island 3 -->
+        <rect x="504" y="20" width="248" height="180" rx="9" fill="#eef7f2" stroke="#bfe3d1" />
+        <text x="628" y="42" text-anchor="middle" font-size="12" font-weight="700" fill="#1c7a52">
+          3 · Your real server
+        </text>
+        <rect x="530" y="58" width="196" height="34" rx="6" fill="#fff" stroke="#dfe5e7" />
+        <text x="628" y="79" text-anchor="middle" font-size="9" fill="#16232a">
+          ERP application
+        </text>
+        <rect x="530" y="98" width="196" height="34" rx="6" fill="#fff" stroke="#dfe5e7" />
+        <text x="628" y="119" text-anchor="middle" font-size="9" fill="#16232a">
+          PostgreSQL — the real data
+        </text>
+        <rect x="530" y="138" width="196" height="30" rx="6" fill="#fff" stroke="#dfe5e7" />
+        <text x="628" y="157" text-anchor="middle" font-size="9" fill="#16232a">
+          nightly encrypted backups
+        </text>
+        <text x="628" y="188" text-anchor="middle" font-size="8.5" fill="#1c7a52">
+          healthy — and nobody can reach it
+        </text>
+
+        <path
+          d="M236,110 L252,110"
+          stroke="#a63030"
+          stroke-width="2"
+          stroke-dasharray="4 3"
+          fill="none"
+        />
+        <path
+          d="M484,110 L500,110"
+          stroke="#a63030"
+          stroke-width="2"
+          stroke-dasharray="4 3"
+          fill="none"
+        />
+        <text x="370" y="228" text-anchor="middle" font-size="10" fill="#a63030" font-weight="700">
+          ✕ &nbsp; no connection anywhere along this line
+        </text>
+        <text x="370" y="248" text-anchor="middle" font-size="9" fill="#56666e">
+          The server is only reachable through an SSH tunnel from one Mac, because it has had no
+          login of its own.
+        </text>
+      </svg>
+
+      <h2 style="margin-top: 8px">After the six steps: one system</h2>
+
+      <svg viewBox="0 0 760 250" width="100%">
+        <rect x="8" y="26" width="200" height="150" rx="9" fill="#f6f8f8" stroke="#dfe5e7" />
+        <text x="108" y="48" text-anchor="middle" font-size="11" font-weight="700" fill="#1f4e5f">
+          You and Ignacio
+        </text>
+        <rect x="30" y="62" width="70" height="96" rx="7" fill="#fff" stroke="#dfe5e7" />
+        <text x="65" y="86" text-anchor="middle" font-size="8.5" fill="#16232a">phone</text>
+        <text x="65" y="102" text-anchor="middle" font-size="8.5" fill="#16232a">browser</text>
+        <text x="65" y="126" text-anchor="middle" font-size="7.5" fill="#8a979d">or the</text>
+        <text x="65" y="138" text-anchor="middle" font-size="7.5" fill="#8a979d">app</text>
+        <rect x="116" y="62" width="70" height="96" rx="7" fill="#fff" stroke="#dfe5e7" />
+        <text x="151" y="86" text-anchor="middle" font-size="8.5" fill="#16232a">laptop</text>
+        <text x="151" y="102" text-anchor="middle" font-size="8.5" fill="#16232a">tablet</text>
+        <text x="151" y="126" text-anchor="middle" font-size="7.5" fill="#8a979d">anywhere</text>
+
+        <path d="M208,101 L268,101" stroke="#1c7a52" stroke-width="2.5" marker-end="url(#arG)" />
+        <text x="238" y="92" text-anchor="middle" font-size="8" fill="#1c7a52">HTTPS</text>
+
+        <rect x="272" y="26" width="480" height="150" rx="9" fill="#eef7f2" stroke="#bfe3d1" />
+        <text x="512" y="48" text-anchor="middle" font-size="11" font-weight="700" fill="#1c7a52">
+          Hetzner server · 178.105.10.156
+        </text>
+
+        <rect x="292" y="62" width="118" height="96" rx="7" fill="#1f4e5f" />
+        <text x="351" y="88" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">
+          Caddy
+        </text>
+        <text x="351" y="104" text-anchor="middle" font-size="7.5" fill="#cfe3ea">certificate</text>
+        <text x="351" y="116" text-anchor="middle" font-size="7.5" fill="#cfe3ea">HTTPS in</text>
+        <text x="351" y="136" text-anchor="middle" font-size="7" fill="#9fc4d1">port 80 · 443</text>
+
+        <path d="M410,110 L440,110" stroke="#56666e" stroke-width="2" marker-end="url(#ar)" />
+
+        <rect x="444" y="62" width="140" height="96" rx="7" fill="#fff" stroke="#dfe5e7" />
+        <text x="514" y="86" text-anchor="middle" font-size="9" font-weight="700" fill="#16232a">
+          ERP application
+        </text>
+        <rect x="458" y="96" width="112" height="24" rx="4" fill="#fdf2dc" />
+        <text x="514" y="112" text-anchor="middle" font-size="8" fill="#9a6a11">
+          🔒 login required
+        </text>
+        <text x="514" y="140" text-anchor="middle" font-size="7.5" fill="#8a979d">
+          stamps who did what
+        </text>
+
+        <path d="M584,110 L614,110" stroke="#56666e" stroke-width="2" marker-end="url(#ar)" />
+
+        <rect x="618" y="62" width="116" height="96" rx="7" fill="#fff" stroke="#dfe5e7" />
+        <text x="676" y="90" text-anchor="middle" font-size="9" font-weight="700" fill="#16232a">
+          PostgreSQL
+        </text>
+        <text x="676" y="110" text-anchor="middle" font-size="8" fill="#56666e">one dataset</text>
+        <text x="676" y="126" text-anchor="middle" font-size="8" fill="#56666e">both of you</text>
+        <text x="676" y="144" text-anchor="middle" font-size="7.5" fill="#8a979d">
+          backed up nightly
+        </text>
+
+        <text x="380" y="208" text-anchor="middle" font-size="10" fill="#1c7a52" font-weight="700">
+          ✓ Stefan enters a customer → Ignacio sees it. Ignacio adds a task → Stefan sees it.
+        </text>
+        <text x="380" y="228" text-anchor="middle" font-size="9" fill="#56666e">
+          Both names recorded. Already proven with two signed-in sessions against a real database —
+          see page 6.
+        </text>
+      </svg>
+
+      <h3 style="margin-top: 14px">Where each kind of data actually lives</h3>
+      <table>
+        <tr>
+          <th style="width: 26%">What you enter</th>
+          <th style="width: 30%">Today</th>
+          <th>After the six steps</th>
+        </tr>
+        <tr>
+          <td><b>Customers &amp; suppliers</b></td>
+          <td><span class="tag t-bad">on that device</span> in the phone app</td>
+          <td><span class="tag t-ok">shared</span> — already proven working</td>
+        </tr>
+        <tr>
+          <td><b>Money in and out</b></td>
+          <td><span class="tag t-bad">on that device</span></td>
+          <td><span class="tag t-ok">shared</span></td>
+        </tr>
+        <tr>
+          <td><b>Site progress, change orders</b></td>
+          <td><span class="tag t-bad">on that device</span></td>
+          <td><span class="tag t-ok">shared</span></td>
+        </tr>
+        <tr>
+          <td><b>Calendar tasks</b></td>
+          <td><span class="tag t-bad">on that device</span></td>
+          <td>
+            <span class="tag t-warn">half</span> — the data is shared, the calendar
+            <i>screen</i> still saves locally until it is moved
+          </td>
+        </tr>
+        <tr>
+          <td><b>Quotes, contracts, invoices</b></td>
+          <td><span class="tag t-bad">on that device</span></td>
+          <td>
+            <span class="tag t-warn">not yet</span> — the server does not accept these operations
+            yet
+          </td>
+        </tr>
+      </table>
+      <p class="note" style="font-size: 8.8pt">
+        The two amber rows are the honest remaining gap, and they are separate from anything in this
+        document's six steps. Neither blocks the pilot: customers, money and site progress are the
+        parts you need shared first.
+      </p>
+
+      <div class="foot"><span>The landscape</span><span>Page 2 of 6</span></div>
+    </div>
+
+    <!-- ══════════════════ PAGE 3 — HOW CODE REACHES THE SERVER ══════════════════ -->
+    <div class="page">
+      <div class="kicker">How work reaches the server</div>
+      <h2>Deploying code — this already works, for both of you</h2>
+      <p>
+        Neither of you needs a key, a password or a laptop to ship a change. You push; the server
+        collects it. Nothing ever logs into the machine.
+      </p>
+
+      <svg viewBox="0 0 760 200" width="100%" height="165">
+        <defs>
+          <marker id="a2" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#1f4e5f" />
+          </marker>
+        </defs>
+        <rect x="4" y="46" width="128" height="70" rx="8" fill="#fff" stroke="#dfe5e7" />
+        <text x="68" y="72" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1f4e5f">
+          You or Ignacio
+        </text>
+        <text x="68" y="90" text-anchor="middle" font-size="8.5" fill="#56666e">push to main</text>
+        <path d="M132,81 L160,81" stroke="#1f4e5f" stroke-width="2" marker-end="url(#a2)" />
+
+        <rect x="164" y="46" width="128" height="70" rx="8" fill="#fff" stroke="#dfe5e7" />
+        <text x="228" y="72" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1f4e5f">
+          GitHub builds
+        </text>
+        <text x="228" y="90" text-anchor="middle" font-size="8.5" fill="#56666e">
+          two container images
+        </text>
+        <path d="M292,81 L320,81" stroke="#1f4e5f" stroke-width="2" marker-end="url(#a2)" />
+
+        <rect x="324" y="46" width="128" height="70" rx="8" fill="#fdf2dc" stroke="#f0d9a8" />
+        <text x="388" y="70" text-anchor="middle" font-size="9.5" font-weight="700" fill="#9a6a11">
+          Tests run
+        </text>
+        <text x="388" y="86" text-anchor="middle" font-size="8" fill="#9a6a11">
+          against a real database
+        </text>
+        <text x="388" y="100" text-anchor="middle" font-size="8" fill="#9a6a11">
+          fail → stops here
+        </text>
+        <path d="M452,81 L480,81" stroke="#1f4e5f" stroke-width="2" marker-end="url(#a2)" />
+
+        <rect x="484" y="46" width="120" height="70" rx="8" fill="#fff" stroke="#dfe5e7" />
+        <text x="544" y="72" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1f4e5f">
+          Released
+        </text>
+        <text x="544" y="90" text-anchor="middle" font-size="8.5" fill="#56666e">
+          only if tests pass
+        </text>
+        <path d="M604,81 L632,81" stroke="#1f4e5f" stroke-width="2" marker-end="url(#a2)" />
+
+        <rect x="636" y="46" width="120" height="70" rx="8" fill="#eef7f2" stroke="#bfe3d1" />
+        <text x="696" y="66" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1c7a52">
+          Server pulls
+        </text>
+        <text x="696" y="84" text-anchor="middle" font-size="8.5" fill="#1c7a52">
+          checks every 60s
+        </text>
+        <text x="696" y="100" text-anchor="middle" font-size="8" fill="#56666e">
+          restarts itself
+        </text>
+
+        <text x="380" y="150" text-anchor="middle" font-size="9" fill="#56666e">
+          Total: roughly four minutes from pushing to running. Only the
+          <tspan font-family="monospace">main</tspan>
+          branch releases — a feature branch is built and tested but not shipped.
+        </text>
+        <text x="380" y="172" text-anchor="middle" font-size="8.5" fill="#8a979d">
+          Fixed this week: the release used to happen BEFORE the tests finished. It no longer does.
+        </text>
+      </svg>
+
+      <h3>Running the server itself — from a browser, no laptop</h3>
+      <p>
+        Health checks and backups now run from a button. One-time setup, done on your phone if you
+        like.
+      </p>
+      <table>
+        <tr>
+          <th style="width: 26%">Where</th>
+          <th>What</th>
+        </tr>
+        <tr>
+          <td><b>GitHub → Settings → Secrets and variables → Actions</b></td>
+          <td>
+            Add two secrets, once: <code>HCLOUD_TOKEN</code> (your Hetzner API token) and
+            <code>SERVER_SSH_KEY</code> (the whole private key file from
+            <code>ops/.provisioned/id_ed25519</code>).
+          </td>
+        </tr>
+        <tr>
+          <td><b>GitHub → Settings → Environments → production</b></td>
+          <td>
+            Add yourself as a <b>required reviewer</b>. Then every ops run waits for your approval —
+            worth doing, because anyone with write access to the repository can otherwise use those
+            secrets.
+          </td>
+        </tr>
+        <tr>
+          <td><b>GitHub → Actions → “Ops (run from a browser)”</b></td>
+          <td>
+            Run workflow → choose <code>status</code>, <code>backup-now</code> or
+            <code>list-ssh-allowed</code>. Read the log: every line is a ✓, a ! or a ✗, and the ones
+            that are not ✓ say what to do.
+          </td>
+        </tr>
+      </table>
+
+      <div class="callout">
+        <b>Two people, one server.</b> The old script set the SSH allow-list to exactly one address,
+        so whoever ran it second locked the first one out — silently. Use
+        <code>./ops/ssh-allow.sh add</code> instead: it changes one entry and leaves everyone else
+        alone. If you ever do lock yourself out, Hetzner's web console reaches the machine anyway:
+        <b>console.hetzner.com → the server → Console</b>.
+      </div>
+
+      <h3>Who does what, once the pilot is on</h3>
+      <table>
+        <tr>
+          <th style="width: 30%">Task</th>
+          <th style="width: 23%">Who</th>
+          <th>Where</th>
+        </tr>
+        <tr>
+          <td>Use the ERP day to day</td>
+          <td><b>You and Ignacio</b></td>
+          <td>The address from step 5, any device, after signing in.</td>
+        </tr>
+        <tr>
+          <td>Ship a code change</td>
+          <td><b>You and Ignacio</b></td>
+          <td>Push to <code>main</code>. Tests gate it; the server collects it within a minute.</td>
+        </tr>
+        <tr>
+          <td>Check the server is healthy</td>
+          <td><b>You and Ignacio</b></td>
+          <td>GitHub → Actions → Ops → <code>status</code>. No key needed.</td>
+        </tr>
+        <tr>
+          <td>Add a colleague, or change the shared password</td>
+          <td><b>You</b></td>
+          <td>
+            Edit <code>ERP_USERS</code> or <code>ERP_ACCESS_PASSWORD</code> in the server's
+            <code>.env</code>, then restart.
+          </td>
+        </tr>
+        <tr>
+          <td>Open or close internet access</td>
+          <td><b>You</b></td>
+          <td><code>./ops/open-web.sh</code> or <code>--close</code>.</td>
+        </tr>
+        <tr>
+          <td>Backups, certificate renewal</td>
+          <td><b>Automatic</b></td>
+          <td>Nightly at 02:30 UTC, encrypted. Nothing to remember.</td>
+        </tr>
+      </table>
+      <p class="note" style="font-size: 8.8pt">
+        <b>Keep the last two to yourself for now.</b> Both mean editing the server's
+        <code>.env</code>, which is also where the database passwords live — the difference between
+        a colleague having an account and a colleague having the keys.
+      </p>
+
+      <div class="foot"><span>How work reaches the server</span><span>Page 3 of 6</span></div>
+    </div>
+
+    <!-- ══════════════════ PAGE 4 — STEPS 1–3 ══════════════════ -->
+    <div class="page">
+      <div class="kicker">What to do · part one</div>
+      <h2>Turning the pilot on</h2>
+      <p class="lede" style="font-size: 10pt">
+        Six steps, about half an hour. Steps 1–2 create the accounts, 3–4 put the ERP on the
+        internet behind them, 5–6 get it onto the phones.
+      </p>
+
+      <div class="step">
+        <span class="n">1</span>
+        <h4>Make a password for each of you</h4>
+        <div class="where">WHERE — a terminal, in your clone of the repository</div>
+        <pre>
+node apps/web/scripts/hash-password.mjs stefan@caneisubirats.com
+node apps/web/scripts/hash-password.mjs ignacio@caneisubirats.com</pre>
+        <p class="note">
+          Asks twice without showing it, then prints one long line per person. Copy both. Nothing is
+          sent anywhere. Use at least 12 characters from the password manager — the ERP will be on
+          the internet and there is no lockout after repeated guesses yet.
+        </p>
+      </div>
+
+      <div class="step">
+        <span class="n">2</span>
+        <h4>Put the accounts on the server</h4>
+        <div class="where">
+          WHERE — on the server, in the file <span class="mono">/opt/canei-erp/.env</span>
+        </div>
+        <p class="note" style="margin-bottom: 6px">
+          <code>ssh -i ops/.provisioned/id_ed25519 root@178.105.10.156</code> then
+          <code>nano /opt/canei-erp/.env</code> — or Hetzner's web console.
+        </p>
+        <pre><span class="c"># the two lines you copied in step 1, comma-separated, all on one line</span>
+ERP_USERS="stefan@caneisubirats.com:scrypt$...,ignacio@caneisubirats.com:scrypt$..."
+
+<span class="c"># run: head -c 48 /dev/urandom | base64   and paste the result here</span>
+SESSION_SECRET="..."
+
+<span class="c"># THE ONE YOU HAND OUT. No account, no email — just this.</span>
+ERP_ACCESS_PASSWORD="Obras-2026-Barcelona"
+ERP_DEFAULT_TENANT="diorka"
+
+<span class="c"># your server's address with dots replaced by dashes</span>
+PUBLIC_HOSTNAME="178-105-10-156.sslip.io"
+ACME_EMAIL="stefan@caneisubirats.com"</pre>
+        <p class="note">
+          <code>ERP_ACCESS_PASSWORD</code> is what makes "a link and a password" work: whoever has
+          it signs in by leaving the email box <b>empty</b>. Named accounts put a real name in the
+          audit trail; a shared session is recorded as <code>invitado-XXXX</code>.
+          <b><code>SESSION_SECRET</code> must be set alongside them</b> — without it the application
+          refuses to start rather than recording everyone's work under one name.
+        </p>
+      </div>
+
+      <div class="step">
+        <span class="n">3</span>
+        <h4>Start the piece that handles HTTPS</h4>
+        <div class="where">WHERE — on the server, still in that SSH session</div>
+        <pre>
+cd /opt/canei-erp
+docker compose -f docker-compose.prod.yml --profile pilot up -d</pre>
+        <p class="note">
+          Starts Caddy, which obtains a real certificate for
+          <code>178-105-10-156.sslip.io</code> — a free naming service turning your IP into a proper
+          name. It matters because iPhones refuse a self-signed certificate outright. When your
+          domain transfers you change <code>PUBLIC_HOSTNAME</code>, nothing else.
+        </p>
+      </div>
+
+      <div class="callout bad">
+        <b>Do not skip ahead to step 4.</b> It opens the server to the world, and checks first — on
+        the machine — that a request with no login is actually turned away, not merely that you
+        configured one. If the running application predates the login it refuses and opens nothing.
+      </div>
+
+      <div class="foot"><span>What to do · steps 1–3</span><span>Page 4 of 6</span></div>
+    </div>
+
+    <!-- ══════════════════ PAGE 5 — STEPS 4–6 ══════════════════ -->
+    <div class="page">
+      <div class="kicker">What to do · part two</div>
+      <h2>Opening it up, and getting it on the phones</h2>
+
+      <div class="step">
+        <span class="n">4</span>
+        <h4>Open the door</h4>
+        <div class="where">
+          WHERE — a terminal, in your clone (needs <span class="mono">ops/provision.conf</span>)
+        </div>
+        <pre>./ops/open-web.sh</pre>
+        <p class="note">
+          Opens ports 80 and 443 — but only after confirming the login is real. Wait a minute: the
+          certificate is obtained on the first request.
+        </p>
+        <p class="note">
+          <b>To take it back off the internet at any time:</b>
+          <code>./ops/open-web.sh --close</code>. SSH is unaffected and nothing is lost — the
+          address simply stops answering.
+        </p>
+      </div>
+
+      <div class="step">
+        <span class="n">5</span>
+        <h4>Check it from your phone — on mobile data</h4>
+        <div class="where">WHERE — the browser on your phone, wifi turned off</div>
+        <pre>https://178-105-10-156.sslip.io</pre>
+        <p class="note">
+          Wifi off, so you are testing the real path in. You should get the Canei sign-in screen.
+          Try <b>both</b> ways: your own address and password, then the shared password with the
+          email box left empty — that second one is what you will be sending out.
+        </p>
+        <p class="note" style="margin-top: 8px">
+          <b>What to send somebody:</b>
+        </p>
+        <pre>
+Aquí tiene el acceso al sistema:
+https://178-105-10-156.sslip.io
+Contraseña: Obras-2026-Barcelona
+Deje el campo de correo vacío. Funciona en portátil, tablet y móvil.</pre>
+      </div>
+
+      <div class="step">
+        <span class="n">6</span>
+        <h4>Point the phone apps at the server</h4>
+        <div class="where">WHERE — two files in the repository, then a new build</div>
+        <pre><span class="c">ios/CaneiSubirats/Support/Config.swift — line 20</span>
+static let baseURL = URL(string: "https://178-105-10-156.sslip.io/")!
+
+<span class="c">android/app/src/main/kotlin/com/caneisubirats/app/MainActivity.kt — line 26</span>
+private val baseUrl = "https://178-105-10-156.sslip.io/"</pre>
+        <p class="note">
+          Both currently load <code>stefangruber001.github.io</code>, which is the static demo site
+          with no server behind it — the direct cause of the calendar not being shared. After
+          changing these, a new TestFlight and Play build is needed.
+          <b>Until then, use the address from step 5 in the phone's browser</b> — it is exactly the
+          same application.
+        </p>
+      </div>
+
+      <h3>The ten-second test, whenever something looks unshared</h3>
+      <table>
+        <tr>
+          <th style="width: 46%">What the address bar says</th>
+          <th>What that means</th>
+        </tr>
+        <tr>
+          <td><code>stefangruber001.github.io/…</code></td>
+          <td>
+            <span class="tag t-bad">LOCAL ONLY</span> Saved on that device. Nobody else will ever
+            see it, however convincingly it appears to save.
+          </td>
+        </tr>
+        <tr>
+          <td><code>178-105-10-156.sslip.io</code></td>
+          <td><span class="tag t-ok">THE SERVER</span> Shared, backed up, attributed to you.</td>
+        </tr>
+      </table>
+      <p class="note" style="font-size: 9pt">
+        <b
+          >If two people are looking at two different addresses, they are looking at two different
+          datasets.</b
+        >
+        This is the single rule that explains the calendar problem, and it will explain the next one
+        too.
+      </p>
+
+      <div class="foot"><span>What to do · steps 4–6</span><span>Page 5 of 6</span></div>
+    </div>
+
+    <!-- ══════════════════ PAGE 6 — WHAT WORKS, WHAT DOESN'T ══════════════════ -->
+    <div class="page">
+      <div class="kicker">Honest limits</div>
+      <h2>What you will and will not have</h2>
+
+      <div class="two">
+        <div>
+          <h3 style="margin-top: 4px; color: var(--ok)">✓ Works after these steps</h3>
+          <ul>
+            <li>
+              <b>Anyone you send the link and password to</b> signs in from any device — laptop,
+              tablet, iPhone — with no account to create.
+            </li>
+            <li>Your own team sign in by name; the audit trail says so.</li>
+            <li>
+              One shared dataset. A customer entered by one is visible to the other immediately.
+            </li>
+            <li>
+              Every change records <b>who</b> made it — verified with two separate sessions writing
+              to a real database.
+            </li>
+            <li>
+              Simultaneous edits are safe: the second save is refused with “somebody saved before
+              you”, never a silent overwrite.
+            </li>
+            <li>
+              Nightly encrypted backups continue; you can ship code without touching the server.
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="margin-top: 4px; color: var(--bad)">✕ Still missing</h3>
+          <ul>
+            <li>
+              <b>A full project from lead to close.</b> The server accepts twelve operations —
+              customers, money, progress, change orders, tasks, the quarterly archive. Not quotes,
+              contracts or invoices.
+            </li>
+            <li>
+              <b>A shared calendar screen.</b> The data and operations work; the screen itself still
+              saves into the browser.
+            </li>
+            <li><b>A rehearsed restore.</b> Backups are taken; restoring has never been tried.</li>
+            <li>
+              <b>Any limit on what a visitor may do.</b> The link and password do everything your
+              own team can, including deleting records. Read-only access does not exist yet.
+            </li>
+            <li>
+              <b>Password reset, lockout, two-factor.</b> Resetting one means editing
+              <code>.env</code>.
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>Four risks worth knowing about</h3>
+      <table>
+        <tr>
+          <th style="width: 30%">Risk</th>
+          <th>What it means, and what to do</th>
+        </tr>
+        <tr>
+          <td><b>The shared password reaches the live books</b></td>
+          <td>
+            Deliberate — you are showing the real system, not a sample. Anyone you send the link to
+            can change or delete real records and will see real customer names and figures. Two
+            habits: <b>before a session</b> take a backup (Actions → Ops → <code>backup-now</code>);
+            <b>after one</b> change <code>ERP_ACCESS_PASSWORD</code>. Worth deciding first: those
+            names are third parties' personal data, and showing them is a disclosure.
+          </td>
+        </tr>
+        <tr>
+          <td><b>No limit on password guessing</b></td>
+          <td>
+            Nothing yet slows an automated attempt at the login form, and a shared password gets
+            typed in front of people and written down — make it a long phrase. Rate limiting is a
+            small, known piece of work.
+          </td>
+        </tr>
+        <tr>
+          <td><b>The address depends on a free service</b></td>
+          <td>
+            <code>sslip.io</code> turns your IP into a name. If it stopped, the address would stop
+            resolving until it returned. <b>No data is at risk</b> — it is on your server and in
+            your backups. Moving to <code>caneisubirats.com</code> removes this entirely.
+          </td>
+        </tr>
+        <tr>
+          <td><b>A lost phone stays signed in</b></td>
+          <td>
+            Sessions last eight hours and cannot be cancelled individually. Changing
+            <code>ERP_ACCESS_PASSWORD</code> stops new sign-ins; changing
+            <code>SESSION_SECRET</code> too ends open ones immediately, yours included.
+          </td>
+        </tr>
+      </table>
+
+      <h3>What was actually tested, not assumed</h3>
+      <p style="font-size: 9.2pt">
+        Driven against a real build, a real PostgreSQL and the restricted database account: an
+        anonymous browser is redirected to sign in and an anonymous API call refused; a visitor
+        signed in with <b>only the shared password and no email</b> and worked on the live company;
+        a near-miss password was refused; staff signed in by name and saw the visitor's work, the
+        database recording <code>invitado-d31d → addParty</code>.
+      </p>
+      <p style="font-size: 9.2pt">
+        Those runs also found two genuine bugs: adding a task discarded the person's name; and a
+        server reached only through the shared link would have had its lock switched off entirely.
+        Both fixed, with tests.
+      </p>
+
+      <div class="callout">
+        <b>Full written detail</b> in the repository:
+        <code>docs/PILOT-WITHOUT-CLOUDFLARE.md</code> (these steps),
+        <code>docs/OPS-WITHOUT-A-LAPTOP.md</code> (running the server from a browser),
+        <code>docs/WHY-THE-CALENDAR-IS-NOT-SHARED.md</code> (the calendar).
+      </div>
+
+      <div class="foot">
+        <span>Honest limits · prepared 8 August 2026</span><span>Page 6 of 6</span>
+      </div>
+    </div>
+  </body>
+</html>

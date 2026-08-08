@@ -9,6 +9,11 @@ node_modules
 .env
 .env.*
 !.env.example
+# The template the runbooks tell you to copy. It contains no secrets — only
+# placeholders and the explanation of what each value is for — and being
+# swallowed by the rule above meant it never existed in a fresh clone, so the
+# one instruction everybody follows first pointed at a missing file.
+!.env.production.example
 
 # Testing / coverage
 coverage
@@ -43,3 +48,26 @@ pnpm-debug.log*
 !.vscode/extensions.json
 !.vscode/settings.json
 *.pem
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+
+ops/.provisioned/
+ops/provision.conf
+
+# Generated at build time by apps/web/scripts/sync-workspace.mjs: a copy of
+# site/ served same-origin with the ERP API. Never edit it — it is overwritten
+# on every build.
+#
+# Ignored as `public/*` rather than `public/` on purpose. Git will not descend
+# into an excluded DIRECTORY, so a negation below it never takes effect —
+# excluding the contents instead is what makes `!brand/` work at all.
+apps/web/public/*
+# …except the brand assets, which are source, not generated. They are the logo
+# and the link-preview card, they are referenced by absolute path from the app's
+# metadata, and being swallowed by the rule above meant they existed on the
+# machine that built them and nowhere else. A shared link would have shown no
+# thumbnail, with the image 404ing on the server.
+!apps/web/public/brand/

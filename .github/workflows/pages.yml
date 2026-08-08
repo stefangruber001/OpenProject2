@@ -15,7 +15,13 @@ on:
     # which dispatches THIS workflow on main; the deploy always rebuilds /preview
     # from the dev branch by name, so it picks up the latest dev content.
     branches: [main]
-    paths: ["site/**", ".github/workflows/pages.yml"]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+      # The warning stamped onto every published page, and the script that does
+      # it. Without these, editing the warning changes nothing that is served.
+      - ".github/pages-warning.html"
+      - ".github/scripts/stamp-pages-warning.py"
   workflow_dispatch:
 
 permissions:
@@ -61,20 +67,43 @@ jobs:
 
       - name: Assemble site (main at root, dev under /preview)
         env:
-          # Perl reads this via %ENV; keep the Perl script single-quoted below so
-          # bash (set -u) never tries to expand $ENV itself.
-          BANNER: '<div style="position:fixed;left:10px;bottom:10px;z-index:99999;font:600 11px/1 -apple-system,Segoe UI,Roboto,sans-serif;color:#fff;background:#b4531f;padding:6px 11px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.18);letter-spacing:.06em;text-transform:uppercase;pointer-events:none">Dev preview</div>'
+          # The only address where the company's data actually lives. Everything
+          # this job publishes is a read-only copy pointing back at it.
+          LIVE_URL: https://178-105-10-156.sslip.io
         run: |
           set -euo pipefail
           mkdir -p _site
           cp -R prod/site/. _site/
           mkdir -p _site/preview
           cp -R dev/site/. _site/preview/
-          # Stamp a small fixed "Dev preview" pill on every preview page so it's
-          # never mistaken for production. Non-intrusive (fixed, high z-index).
-          find _site/preview -name '*.html' -print0 | while IFS= read -r -d '' f; do
-            perl -0pi -e 's{</body>}{$ENV{BANNER}</body>}i' "$f"
-          done
+
+          # Mark EVERY published page as not-the-live-system. Both copies, not
+          # just the preview: the root is equally a static copy with no database
+          # behind it, and it is the one that looks most like the real thing.
+          #
+          # This replaces a `perl -0pi -e 's{</body>}{...}'` one-liner that
+          # missed three of eleven pages in silence and injected its banner into
+          # journey.html's generated emails instead of onto the page. See the
+          # header of the script for the full account.
+          # ORDER MATTERS. The script recurses, so `_site` also reaches
+          # `_site/preview`. Stamping the preview FIRST and relying on the
+          # script's idempotence (it skips a file that already carries the
+          # warning) is what gives each copy its own wording. Reversed, the
+          # root's pass would claim the preview is the public demo copy.
+          python3 prod/.github/scripts/stamp-pages-warning.py \
+            _site/preview "una vista previa de desarrollo" "a development preview" "$LIVE_URL"
+          python3 prod/.github/scripts/stamp-pages-warning.py \
+            _site "la copia pública de demostración" "the public demonstration copy" "$LIVE_URL"
+
+          # Assert rather than trust. The step above prints a count; this proves
+          # the warning is actually IN the files that will be uploaded, so a
+          # future refactor cannot quietly go back to publishing an unmarked
+          # copy of a customer's ERP.
+          total=$(find _site -name '*.html' | wc -l)
+          marked=$(grep -rl 'canei-not-live-bar' _site --include='*.html' | wc -l)
+          echo "warning present on ${marked}/${total} pages"
+          [ "$marked" = "$total" ] || { echo "::error::${total} pages published, only ${marked} carry the warning"; exit 1; }
+
           echo "Assembled root=$(ls _site | wc -l) entries; preview=$(ls _site/preview | wc -l) entries."
 
       - name: Configure Pages (enable if needed)

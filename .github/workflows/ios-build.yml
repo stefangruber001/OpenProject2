@@ -1,0 +1,55 @@
+name: iOS · compiles
+
+# Does the app still build?
+#
+# This exists because nothing asked that question automatically. Both other iOS
+# workflows are `workflow_dispatch`, so the first thing that ever compiled the
+# Swift was a release build somebody triggered by hand — and a release build is
+# a bad place to discover a missing brace. It happened twice in one afternoon:
+# once for a stored property in an extension, once for an iOS 17 API on a
+# project whose deployment target is 16. Both are compiler errors, both would
+# have been caught in three minutes here, and both instead cost a TestFlight
+# round trip and an operator waiting for a build that was never coming.
+#
+# Simulator build, no signing, no upload. It answers one question and answers it
+# fast, on every push that touches the app.
+
+on:
+  push:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compiles:
+    runs-on: macos-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # Same invocation the UI-test workflow uses to produce a simulator build,
+      # minus everything after it. CODE_SIGNING_ALLOWED=NO keeps this free of
+      # certificates, so it runs on any push without secrets.
+      - name: Build for the simulator (no code signing)
+        run: |
+          xcodebuild \
+            -project CaneiSubirats.xcodeproj \
+            -scheme CaneiSubirats \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build-sim \
+            CODE_SIGNING_ALLOWED=NO build

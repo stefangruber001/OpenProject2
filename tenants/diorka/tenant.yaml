@@ -26,8 +26,6 @@ capabilities:
     access,
     catalogue,
     suppliers,
-    extraction,
-    reconciliation,
   ]
 jurisdiction: es-ES@2026-07-17
 vertical: construction/reformas

@@ -1,0 +1,78 @@
+# Everything ops/provision.sh needs. Copy to ops/provision.conf (gitignored)
+# and fill in. Six values, two of which are API tokens you mint by hand.
+#
+#   cp ops/provision.conf.example ops/provision.conf
+#   $EDITOR ops/provision.conf
+#   ./ops/provision.sh
+
+# --- Hetzner ----------------------------------------------------------------
+# console.hetzner.cloud → your project → Security → API tokens → Generate
+# Permission: READ & WRITE
+HCLOUD_TOKEN=""
+
+# --- Cloudflare -------------------------------------------------------------
+# dash.cloudflare.com → My Profile → API Tokens → Create Token → Custom token
+# Permissions needed (add all six):
+#   Account · Cloudflare Tunnel        · Edit
+#   Account · Access: Apps and Policies· Edit
+#   Account · Workers R2 Storage       · Edit
+#   Zone    · DNS                      · Edit
+#   Zone    · Zone                     · Read
+# Zone resources: include the domain below.
+CF_API_TOKEN=""
+
+# dash.cloudflare.com → any domain → right sidebar → Account ID
+CF_ACCOUNT_ID=""
+
+# --- What to build ----------------------------------------------------------
+# The domain must already be in this Cloudflare account (nameservers pointed).
+DOMAIN="caneisubirats.com"
+
+# The ERP will live at ${HOSTNAME_PREFIX}.${DOMAIN}
+HOSTNAME_PREFIX="erp"
+
+# Who may log in: anyone with an email address at this domain.
+ACCESS_EMAIL_DOMAIN="caneisubirats.com"
+
+# owner/repo — used for the image names and the GitHub secrets. Lowercased
+# automatically for the image names, which may not contain capitals.
+GITHUB_REPO="stefangruber001/OpenProject2"
+
+# How the server downloads the application.
+#
+# A private repository publishes PRIVATE container images, and a brand new
+# server has no GitHub identity — an anonymous pull is simply refused, and the
+# stack never starts. So it needs a read-only token:
+#
+#   github.com/settings/tokens → Generate new token (classic)
+#     • Note:  canei-erp server pull
+#     • Scope: read:packages     (that one box, nothing else)
+#
+# Read-only and package-scoped: if the server is ever compromised, this token
+# cannot push code, read the repository, or touch anything else.
+GHCR_USERNAME="stefangruber001"
+GHCR_TOKEN=""
+
+# Set to 1 ONLY if the packages have deliberately been made public, in which
+# case the token above is unnecessary. Note that publishing them publishes the
+# built application — i.e. the private repository's code.
+# GHCR_PUBLIC=0
+
+# Who is using the ERP. Every change is stamped with this name in the audit
+# trail, so it must be a real person — not "admin" and not "system". There is
+# no login yet, so this is how a change becomes attributable at all; the API
+# refuses to write anything until it is set to something real.
+ERP_OPERATOR="CAMBIAR: nombre del operador"
+
+# --- R2 credentials ---------------------------------------------------------
+# Leave EMPTY on the first run. The script creates the bucket, then stops and
+# tells you to mint a token scoped to it — R2 tokens cannot be minted reliably
+# through the API. Paste the two values here and run the script again.
+R2_ACCESS_KEY_ID=""
+R2_SECRET_ACCESS_KEY=""
+
+# --- Optional ---------------------------------------------------------------
+# SERVER_NAME="canei-erp-prod"
+# SERVER_TYPE="cx32"      # 4 vCPU / 8 GB / 80 GB, x86
+# SERVER_LOCATION="fsn1"  # fsn1 Falkenstein · nbg1 Nuremberg · hel1 Helsinki
+# R2_BUCKET="canei-erp-backups"

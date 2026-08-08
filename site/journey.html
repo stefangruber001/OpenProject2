@@ -89,6 +89,17 @@
   .gbar>i>span.p{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(180deg,var(--greenLt),var(--green));opacity:.85}
   .gbar>i>span.t{position:relative;z-index:1;font-size:10px;font-weight:700;color:var(--greenDeep);padding:0 7px;white-space:nowrap}
   @media (max-width:600px){ .gantt .gt{grid-template-columns:84px 1fr} }
+  .gate{margin-top:12px;padding:12px 14px;border:1px solid #edd9c9;background:var(--warn-bg);border-radius:var(--r-sm);font-size:13px;color:var(--warn)}
+  .gate ul{margin:6px 0 0;padding-left:18px} .gate li{margin:2px 0}
+  .btn.locked{opacity:.45;cursor:not-allowed}
+  .field .req{font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--warn);margin-left:5px;vertical-align:1px}
+  .porow{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 104px 92px auto 30px;gap:6px;align-items:center;margin-bottom:7px}
+  .porow input,.porow select{font:inherit;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 8px;min-width:0;width:100%}
+  .porow .chk{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);white-space:nowrap}
+  .porow .chk input{width:auto;min-width:0}
+  .porow .x{border:1px solid var(--line);background:var(--paper);border-radius:7px;height:32px;color:var(--muted);font-size:15px}
+  .porow .x:hover{border-color:var(--crit);color:var(--crit)}
+  @media (max-width:760px){ .porow{grid-template-columns:1fr 1fr 28px} .porow .chk{grid-column:1/-1} }
   .corow{display:grid;grid-template-columns:1fr 100px 30px;gap:7px;align-items:center;margin-bottom:7px}
   .corow input{font:inherit;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 9px;min-width:0;width:100%}
   .corow .x{border:1px solid var(--line);background:var(--paper);border-radius:7px;height:34px;color:var(--muted);font-size:15px}
@@ -207,7 +218,6 @@
     .top .links{gap:2px;font-size:12px}
     .top .links a{padding:5px 7px}
   }
-
   /* ---------- Project selector (spec §2.3, Improvement #3) ---------- */
   .modebar{max-width:1220px;margin:0 auto;padding:14px 24px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .modebar .seg{display:flex;gap:4px;background:var(--panel);border-radius:13px;padding:4px}
@@ -237,6 +247,11 @@
 </style>
 <script src="i18n-dict.js"></script>
 <script src="i18n.js"></script>
+<!-- erp-sync.js must load BEFORE the stores: they register their
+     documents with it as soon as the first read comes back. Without it
+     the page still works, it just never notices a change made elsewhere. -->
+<script src="erp-sync.js"></script>
+<script src="erp-docs.js"></script>
 <!-- Real-project mode (§2.3, Improvement #3) reads the SAME tenant data
      erp.html does — same IndexedDB database, loaded read-only here. The
      journey's own "Crear nuevo proyecto" walkthrough above is untouched and
@@ -305,7 +320,13 @@
         <button class="linkbtn" id="editdata">✎ Edit project data</button>
         <button class="linkbtn" id="clearall">Start over</button>
       </div>
-      <div class="hint" style="margin-top:8px">Photos, documents, the quote &amp; invoice PDFs and every email are filed per step — saved on this device.</div>
+      <!-- "saved on this device" was true when this page kept everything in
+           IndexedDB and is now the opposite of true: the project document goes
+           to the company's server, which is what makes it visible on the phone
+           and on the laptop and what puts it in the nightly backup. A page that
+           tells the operator their work is device-local is a page that will one
+           day talk somebody out of trusting a record that was perfectly safe. -->
+      <div class="hint" style="margin-top:8px">Photos, documents, the quote &amp; invoice PDFs and every email are filed per step — saved on the company server.</div>
     </div>
     <div class="card">
       <h3>Activity log</h3>
@@ -374,12 +395,29 @@ const SAMPLE = {
     1:{areaM2:12.5, access:"Lift available · street parking · working hours 8:00–17:00"},
     3:{validityDays:30, clientNote:"Includes protection of adjacent areas and a daily clean-down."},
     4:{acceptanceMethod:"Signed", depositPct:40},
+    2:{estimator:"Jordi Canei", estimateBasis:"Measured on site; excludes structural work and asbestos removal."},
     5:{projectManager:"Jordi Canei"},
-    6:{supplier:"Ceràmiques del Vallès", poNumber:"PO-2026-014"},
-    7:{billNumber:"A-1042", progressPct:60},
+    // Real purchase orders and bills, not a flat percentage of budget — so the
+    // sample shows the per-chapter variance an operator is meant to act on.
+    6:{pos:[
+      {chapter:"Demolition & preliminary works", supplier:"Runes Baix Llobregat", poNumber:"PO-2026-011", amount:980, delivered:true},
+      {chapter:"Waterproofing", supplier:"Impermeabilitzacions Vidal", poNumber:"PO-2026-012", amount:310, delivered:true},
+      {chapter:"Plumbing", supplier:"Fontaneria Serra", poNumber:"PO-2026-013", amount:1150, delivered:true},
+      {chapter:"Heating & climate", supplier:"ClimaVallès", poNumber:"PO-2026-014", amount:1520, delivered:true},
+      {chapter:"Electrical", supplier:"Elèctrica Moragues", poNumber:"PO-2026-015", amount:720, delivered:true},
+      {chapter:"Coverings & finishes", supplier:"Ceràmiques del Vallès", poNumber:"PO-2026-016", amount:2090, delivered:true},
+    ]},
+    7:{progressPct:100, bills:[
+      {chapter:"Demolition & preliminary works", supplier:"Runes Baix Llobregat", billNumber:"A-1042", amount:1035},
+      {chapter:"Waterproofing", supplier:"Impermeabilitzacions Vidal", billNumber:"A-1043", amount:310},
+      {chapter:"Plumbing", supplier:"Fontaneria Serra", billNumber:"A-1044", amount:1150},
+      {chapter:"Heating & climate", supplier:"ClimaVallès", billNumber:"A-1045", amount:1520},
+      {chapter:"Electrical", supplier:"Elèctrica Moragues", billNumber:"A-1046", amount:845},
+      {chapter:"Coverings & finishes", supplier:"Ceràmiques del Vallès", billNumber:"A-1047", amount:2090},
+    ]},
     8:{invoiceType:"Full", irpfPct:0},
     9:{paymentMethod:"Transfer"},
-    10:{supPaymentMethod:"Transfer"},
+    10:{supPaymentMethod:"Transfer", paid:["A-1042","A-1043","A-1044","A-1045","A-1046","A-1047"]},
     11:{closeNotes:"Aerothermal commissioning smooth; add +5% on tiling labour next time."},
     12:{reviewPlatform:"Google"},
   },
@@ -403,14 +441,48 @@ function num(v){
   const n=parseFloat(s);
   return Number.isFinite(n)?n:0;
 }
+/* Strict sibling of num(): returns null instead of 0 when the text is not a
+   number at all. num() coercing "abc" to 0 is right for a running total and
+   wrong for a gate — a blank and a typo must not both read as zero. */
+function numOrNull(v){
+  if(typeof v==="number") return Number.isFinite(v)?v:null;
+  if(v==null) return null;
+  const raw=String(v).trim(); if(!raw) return null;
+  let s=raw.replace(/[^\d.,-]/g,"");
+  if(s.includes(",")&&s.includes(".")) s=s.replace(/\./g,"").replace(",",".");
+  else if(s.includes(",")) s=s.replace(",",".");
+  const n=parseFloat(s);
+  return Number.isFinite(n)?n:null;
+}
+/* Clamp a percentage the operator typed. Withholding above 100% used to make
+   the invoice total negative — the document billed the customer a refund. */
+const pct=(v,max)=>Math.max(0,Math.min(max==null?100:max,num(v)||0));
 /* Spanish NIF / NIE / CIF validation — a factura needs a valid tax id. */
 function validNifCif(v){
   v=String(v||"").toUpperCase().replace(/[^0-9A-Z]/g,"");
   const L="TRWAGMYFPDXBNJZSQVHLCKE";
   if(/^[0-9]{8}[A-Z]$/.test(v)) return L[parseInt(v.slice(0,8),10)%23]===v[8];           // DNI/NIF
   if(/^[XYZ][0-9]{7}[A-Z]$/.test(v)){ const n=({X:"0",Y:"1",Z:"2"}[v[0]])+v.slice(1,8); return L[parseInt(n,10)%23]===v[8]; } // NIE
-  if(/^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$/.test(v)) return true;                        // CIF (structure)
+  if(/^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$/.test(v)) return validCifControl(v);          // CIF
   return false;
+}
+/* CIF control character: odd positions doubled with their digits summed, even
+   positions added as-is; P/Q/R/S/N/W take a letter, A/B/E/H a digit, the rest
+   either. Structure alone used to pass, so a mistyped company tax id reached
+   the invoice. */
+function validCifControl(v){
+  const org=v[0], body=v.slice(1,8), ctrl=v[8];
+  let sum=0;
+  for(let i=0;i<7;i++){
+    const d=Number(body[i]);
+    if(i%2===0){ const x=d*2; sum+=Math.floor(x/10)+(x%10); }
+    else sum+=d;
+  }
+  const digit=(10-(sum%10))%10;
+  const letter="JABCDEFGHI"[digit];
+  if("PQRSNW".includes(org)) return ctrl===letter;
+  if("ABEH".includes(org)) return ctrl===String(digit);
+  return ctrl===letter||ctrl===String(digit);
 }
 const validEmail=v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||"").trim());
 
@@ -475,7 +547,10 @@ function buildS(p){
     lines, chapters,
     optional:{desc:(p.optional?.desc||"").trim()||"Optional works",
       amount:Math.round((num(p.optional?.amount)||0)*100), included:false},
-    committedPct:Math.min(1.3,(cost+2)/100), actualPct:cost/100,
+    // An expectation used only for the forecast before any real purchase order
+    // or bill exists. Committed and actual cost come from entered rows, never
+    // from this number.
+    expectedCostPct:cost/100,
     baseline:0, variations:0, revenue:0, collected:0, supplierPaid:0,
     vatBp:Math.round((num(p.vatPct)||0)*100),
     quoteNo:(p.quoteNo||"").trim()||"PRE-2026-0001", invoiceNo:(p.invoiceNo||"").trim()||"FAC-2026-0001",
@@ -486,12 +561,12 @@ function buildS(p){
 
 /* ---------- IndexedDB (project + files survive reloads) ---------- */
 const DB="caneiJourney", STORE="kv";
-function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);
-  r.onupgradeneeded=()=>r.result.createObjectStore(STORE);
-  r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);});}
-async function idbGet(k){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(STORE,"readonly").objectStore(STORE).get(k);t.onsuccess=()=>res(t.result);t.onerror=()=>rej(t.error);});}
-async function idbSet(k,v){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(STORE,"readwrite").objectStore(STORE).put(v,k);rq.onsuccess=()=>res();rq.onerror=()=>rej(rq.error);});}
-async function idbDel(k){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction(STORE,"readwrite").objectStore(STORE).delete(k);rq.onsuccess=()=>res();rq.onerror=()=>rej(rq.error);});}
+/* Storage moved behind ErpDocs: the server when this copy is served by it,
+   IndexedDB otherwise. Same three calls, same shapes — nothing above changes. */
+const _docs=ErpDocs.open(DB,STORE);
+async function idbGet(k){return _docs.get(k);}
+async function idbSet(k,v){return _docs.set(k,v);}
+async function idbDel(k){return _docs.del(k);}
 
 let PROJECT = { profile:null, folders:{}, stageData:{} };   // loaded at boot
 let S = buildS(SAMPLE);
@@ -501,14 +576,76 @@ const todayISO = ()=>new Date().toISOString().slice(0,10);
 const fmtDate = iso=>{ if(!iso) return today(); const p=String(iso).split("-"); return p.length===3?p[2]+"/"+p[1]+"/"+p[0]:iso; };
 const addDaysISO = (iso,n)=>{ const d=iso?new Date(iso):new Date(); d.setDate(d.getDate()+(Number(n)||0)); return d.toISOString().slice(0,10); };
 const sdOf = i => PROJECT.stageData[i] || (PROJECT.stageData[i]={});
-let saveT; function persistSoon(){clearTimeout(saveT);saveT=setTimeout(()=>idbSet("project",PROJECT).catch(()=>{}),120);}
+let saveT; function persistSoon(){clearTimeout(saveT);saveT=setTimeout(()=>idbSet("project",PROJECT).catch(saveFailed),120);}
+/* A swallowed write looked exactly like a successful one, so an operator whose
+   quota filled up with site photos drove home believing the evidence was saved. */
+function saveFailed(e){
+  const f=$("#feed"); if(!f) return;
+  f.innerHTML='<div style="color:var(--crit)"><b>Not saved.</b> This device refused to store the project — free some space and try again. '+esc(String(e&&e.name||e||""))+'</div>'+f.innerHTML;
+  f.dataset.clean="";
+}
+/* Where the journey is, not just what it produced. step/reached/ledger used to
+   be module variables, so a reload dropped you back on the intake with a zeroed
+   ledger and every document still in the tree. */
+function persistProgress(){ PROJECT.step=step; PROJECT.reached=reached; persistSoon(); }
 
 const committed = ()=>sum(S.chapters,c=>c.committed);
 const actual = ()=>sum(S.chapters,c=>c.actual);
 const margin = ()=>S.revenue - actual();
 const marginPct = ()=>S.revenue? Math.round(margin()/S.revenue*1000)/10 : 0;
 const cash = ()=>S.collected - S.supplierPaid;
-const forecast = ()=>{const b=(S.baseline||sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0))+(S.variations||0); return b - Math.max(actual(),committed());};
+const forecast = ()=>{
+  const b=(S.baseline||sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0))+(S.variations||0);
+  const known=Math.max(actual(),committed());
+  // Before anything is committed there is no measured cost, so fall back to the
+  // expected-cost percentage rather than reporting the whole contract as margin.
+  return b - (known>0?known:Math.round(b*(S.expectedCostPct||0)));
+};
+
+/* ---------- ledger derivations -------------------------------------------------
+   These used to be assignments buried inside the stage render functions, so
+   simply navigating back to a stage rewrote the ledger — including the baseline
+   the page calls immutable. They are pure recomputations now, and the baseline
+   is written exactly once. */
+function freezeBaseline(){
+  if(PROJECT.baselineCents==null){
+    PROJECT.baselineCents=sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0);
+    persistSoon();
+  }
+  S.baseline=PROJECT.baselineCents;
+}
+function recomputeRevenue(){ recalcVariations(); S.revenue=(S.baseline||0)+(S.variations||0); }
+/* Replay every derivation for the stages already reached — used on resume, so a
+   reload restores the ledger instead of showing zeros against a full folder. */
+function rebuildLedger(){
+  if(step>=4) S.optional.included=S.optional.amount>0;
+  if(step>=5) freezeBaseline();
+  if(step>=6) recalcCommitted();
+  if(step>=7) recalcActual();
+  if(step>=8) recomputeRevenue();
+  if(step>=9) recomputeCollected();
+  if(step>=10) recomputeSupplierPaid();
+}
+/* What the customer owes on the invoice as issued. */
+function invoiceTotal(){
+  const b=invoiceBase();
+  const vat=Math.round(b.cents*S.vatBp/10000);
+  const irpfAmt=Math.round(b.cents*pct(sdOf(8).irpfPct)/100);
+  return b.cents+vat-irpfAmt;
+}
+/* Collections: the amount the operator actually received. Blank means the full
+   invoice — the common case — but a part payment is now representable, which the
+   page promised long before it was true. */
+function recomputeCollected(){
+  const raw=sdOf(9).amountReceived;
+  const entered=numOrNull(raw);
+  S.collected = entered==null ? invoiceTotal() : Math.max(0,Math.round(entered*100));
+}
+const paidBillKeys = ()=>(sdOf(10).paid)||[];
+function recomputeSupplierPaid(){
+  const keys=paidBillKeys();
+  S.supplierPaid = keys.length ? sum(S.bills.filter(b=>keys.includes(b.n)),b=>b.amt) : 0;
+}
 
 /* ---------- project folder / files ---------- */
 function art(folder,name,mime,b64){
@@ -596,13 +733,6 @@ const MARK = `<svg width="34" height="34" viewBox="0 0 40 40" fill="none">
   <rect x="18" y="23.5" width="4" height="5" rx="1" fill="#fff"/>
   <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="${BRAND.spark}"/></svg>`;
 
-function quoteLines(){
-  const l=S.chapters.map(c=>({label:c.chapter,value:eurTxt(c.budget)}));
-  if(S.optional.amount>0) l.push({label:"Optional — "+S.optional.desc,value:eurTxt(S.optional.amount)});
-  const base=sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0);
-  l.push({label:"Accepted total (VAT excl.)",value:eurTxt(S.baseline||base)});
-  return l;
-}
 // Customer-facing emails are written in Spanish (es-ES) — the customer's
 // language — while the operator UI stays English.
 function emailContent(kind){
@@ -628,19 +758,32 @@ function emailContent(kind){
     paras:[`Le recordamos amablemente que la factura ${S.invoiceNo} (${eur(total)}) está pendiente de pago.`,
       `Si ya ha realizado el pago, disculpe este mensaje — y muchas gracias.`],
     cta:{label:"Pagar la factura"} };
-  if(kind==="review") return {
-    subject:"¿Qué le ha parecido? — un pequeño favor", title:"¿Qué le ha parecido?",
-    greeting:`Estimado/a ${S.customer}:`,
-    paras:[`Ha sido un placer reformar su hogar y esperamos que disfrute del resultado cada día.`,
-      `Si dispone de 30 segundos, una breve reseña significa muchísimo para una empresa familiar como la nuestra — y ayuda a sus vecinos a encontrar un equipo de confianza.`],
-    cta:{label:"★  Dejar una reseña en Google"} };
+  if(kind==="review"){
+    // The platform chosen at stage 13 used to change nothing: the label said
+    // Google whatever you picked, and the button linked to "#".
+    const p=REVIEW_PLATFORMS[sdOf(12).reviewPlatform]||REVIEW_PLATFORMS.Google;
+    return {
+      subject:"¿Qué le ha parecido? — un pequeño favor", title:"¿Qué le ha parecido?",
+      greeting:`Estimado/a ${S.customer}:`,
+      paras:[`Ha sido un placer reformar su hogar y esperamos que disfrute del resultado cada día.`,
+        `Si dispone de 30 segundos, una breve reseña significa muchísimo para una empresa familiar como la nuestra — y ayuda a sus vecinos a encontrar un equipo de confianza.`],
+      cta:{label:"★  Dejar una reseña en "+p.name, href:p.url} };
+  }
 }
+/* Where a review request actually points. Replace these with the company's own
+   listing URLs at setup; the placeholders are searches, never a wrong profile. */
+const REVIEW_PLATFORMS={
+  Google:{name:"Google", url:"https://search.google.com/local/writereview?placeid=YOUR_PLACE_ID"},
+  Trustpilot:{name:"Trustpilot", url:"https://www.trustpilot.com/evaluate/caneisubirats.com"},
+  Houzz:{name:"Houzz", url:"https://www.houzz.es/professionals/"},
+  Facebook:{name:"Facebook", url:"https://www.facebook.com/"},
+};
 function renderEmail(c){
   const B=BRAND;
   const paras=c.paras.map(p=>`<p style="margin:0 0 14px;font-size:15px;line-height:1.62;color:${B.body}">${p}</p>`).join("");
   const cta=c.cta?`<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 6px"><tr>
     <td style="border-radius:12px;background:${B.green};box-shadow:0 12px 22px -12px rgba(72,115,60,.6)">
-    <a href="#" style="display:inline-block;padding:13px 28px;color:#fff;font:600 14px Inter,Arial,sans-serif;text-decoration:none;letter-spacing:-.01em">${c.cta.label}</a>
+    <a href="${c.cta.href||"#"}" style="display:inline-block;padding:13px 28px;color:#fff;font:600 14px Inter,Arial,sans-serif;text-decoration:none;letter-spacing:-.01em">${c.cta.label}</a>
     </td></tr></table>`:"";
   const attach=c.attach?`<div style="margin:18px 0 2px;display:flex;align-items:center;gap:11px;border:1px solid ${B.line};border-radius:12px;padding:12px 14px;background:#fafaf7">
     <div style="width:34px;height:34px;border-radius:8px;background:${B.soft};display:flex;align-items:center;justify-content:center;font-size:15px">📄</div>
@@ -666,35 +809,6 @@ function renderEmail(c){
 function emailDoc(c){ return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${c.subject}</title></head><body style="margin:0">${renderEmail(c)}</body></html>`; }
 function emailText(c){ const strip=s=>s.replace(/<[^>]+>/g,""); return `${strip(c.greeting)}\n\n${c.paras.map(strip).join("\n\n")}\n\nUn cordial saludo,\nEl equipo de ${BRAND.name}\n\n${BRAND.legal} · ${BRAND.address}\n${BRAND.from} · ${BRAND.phone}`; }
 
-function buildPdf(o){
-  const G="0.282 0.451 0.235", INK="0.078 0.086 0.059", GREY="0.55 0.56 0.5", BODY="0.33 0.34 0.29";
-  const e=s=>String(s).replace(/€/g,"\x80").replace(/[–—]/g,"-").replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)").replace(/[^\x20-\x7e\x80\xa0-\xff]/g,"");
-  let c="";
-  c+=`${G} rg 0 792 595 50 re f\n`;
-  c+=`1 1 1 rg BT /F2 19 Tf 42 807 Td (${e(BRAND.name)}) Tj ET\n`;
-  c+=`0.93 0.86 0.62 rg BT /F1 10 Tf 42 795 Td (${e(BRAND.slogan)}) Tj ET\n`;
-  c+=`${INK} rg BT /F2 23 Tf 42 730 Td (${e(o.title)}) Tj ET\n`;
-  if(o.subtitle) c+=`${GREY} rg BT /F1 12 Tf 42 710 Td (${e(o.subtitle)}) Tj ET\n`;
-  let y=672;
-  o.lines.forEach((l,i)=>{ const bold=i===o.lines.length-1;
-    if(bold) c+=`${G} rg 42 ${y+15} 511 1.2 re f\n`;
-    c+=`${bold?INK:BODY} rg BT /${bold?"F2":"F1"} 12 Tf 42 ${y} Td (${e(l.label)}) Tj ET\n`;
-    c+=`${bold?INK:BODY} rg BT /${bold?"F2":"F1"} 12 Tf 430 ${y} Td (${e(l.value)}) Tj ET\n`; y-=24; });
-  c+=`${GREY} rg BT /F1 9.5 Tf 42 96 Td (${e(BRAND.legal+"  |  "+BRAND.address)}) Tj ET\n`;
-  c+=`${GREY} rg BT /F1 9.5 Tf 42 82 Td (${e(BRAND.from+"  |  "+BRAND.phone)}) Tj ET\n`;
-  c+=`${G} rg 42 64 511 3 re f\n`;
-  const objs=[
-    "<</Type/Catalog/Pages 2 0 R>>","<</Type/Pages/Kids[3 0 R]/Count 1>>",
-    "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R/F2 5 0 R>>>>/Contents 6 0 R>>",
-    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>","<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/WinAnsiEncoding>>",
-    "<</Length "+c.length+">>\nstream\n"+c+"\nendstream" ];
-  let pdf="%PDF-1.4\n"; const off=[];
-  objs.forEach((o2,i)=>{ off.push(pdf.length); pdf+=(i+1)+" 0 obj\n"+o2+"\nendobj\n"; });
-  const xref=pdf.length; pdf+="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n";
-  off.forEach(o2=>{ pdf+=String(o2).padStart(10,"0")+" 00000 n \n"; });
-  pdf+="trailer\n<</Size "+(objs.length+1)+"/Root 1 0 R>>\nstartxref\n"+xref+"\n%%EOF";
-  return btoa(pdf);
-}
 /* ---------- full best-practice invoice / quote PDF ---------- */
 // Keep Latin-1 (WinAnsi) text so Spanish accents/ñ/¿¡ render; map € to the
 // WinAnsi Euro byte (0x80); drop only characters outside the printable range.
@@ -794,19 +908,31 @@ function docGroups(includeOptional){
     groups.push({chapter:"Opcional (aparte)", rows:[{item:S.optional.desc, qtyLabel:"1", priceLabel:eurTxt(S.optional.amount), amount:eurTxt(S.optional.amount)}], subtotal:eurTxt(S.optional.amount)});
   return groups;
 }
+/* The billable base for this invoice. A deposit invoice bills the deposit
+   agreed at acceptance and a certification bills the progress recorded on
+   site — both used to change only the PDF title and still bill 100%. */
+function invoiceBase(){
+  const type=sdOf(8).invoiceType||"Full";
+  if(type==="Deposit"){ const d=pct(sdOf(4).depositPct); return d>0?{cents:Math.round(S.revenue*d/100),pct:d}:{cents:S.revenue,pct:100}; }
+  if(type==="Certification"){ const p=pct(sdOf(7).progressPct); return p>0?{cents:Math.round(S.revenue*p/100),pct:p}:{cents:S.revenue,pct:100}; }
+  return {cents:S.revenue,pct:100};
+}
 function invoiceDoc(){
   const sd=sdOf(8);
-  const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
-  const irpf=Math.max(0,num(sd.irpfPct)||0); const irpfAmt=Math.round(S.revenue*irpf/100);
+  const b=invoiceBase(); const baseCents=b.cents;
+  const vat=Math.round(baseCents*S.vatBp/10000); const vp=S.vatBp/100;
+  const irpf=pct(sd.irpfPct); const irpfAmt=Math.round(baseCents*irpf/100);
   const issueISO=sd.invoiceDate||todayISO();
   const type=sd.invoiceType||"Full";
   const docType=type==="Deposit"?"FACTURA ANTICIPO · DEPOSIT":type==="Certification"?"CERTIFICACION · PROGRESS":"FACTURA · INVOICE";
-  const itemized=S.lines&&S.lines.length;
-  const lines=S.chapters.map(c=>({desc:c.chapter,amount:eurTxt(c.budget)}));
-  if(S.optional.included) lines.push({desc:"Optional — "+S.optional.desc,amount:eurTxt(S.optional.amount)});
-  const totals=[["Base imponible",eurTxt(S.revenue)],["IVA "+vp+"%",eurTxt(vat)]];
+  const itemized=S.lines&&S.lines.length&&b.pct===100;
+  const lines=b.pct===100
+    ? S.chapters.map(c=>({desc:c.chapter,amount:eurTxt(c.budget)}))
+    : [{desc:(type==="Deposit"?"Anticipo ":"Certificación ")+b.pct+"% s/ "+eurTxt(S.revenue),amount:eurTxt(baseCents)}];
+  if(S.optional.included&&b.pct===100) lines.push({desc:"Optional — "+S.optional.desc,amount:eurTxt(S.optional.amount)});
+  const totals=[["Base imponible",eurTxt(baseCents)],["IVA "+vp+"%",eurTxt(vat)]];
   if(irpf>0) totals.push(["Retencion IRPF -"+irpf+"%","-"+eurTxt(irpfAmt)]);
-  totals.push(["Total a pagar",eurTxt(S.revenue+vat-irpfAmt)]);
+  totals.push(["Total a pagar",eurTxt(baseCents+vat-irpfAmt)]);
   return { docType, number:S.invoiceNo, dateLabel:"Fecha", dateIssued:fmtDate(issueISO),
     dueLabel:"Vencimiento", dueOrValid:fmtDate(addDaysISO(issueISO,S.termsDays)),
     buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
@@ -825,15 +951,20 @@ function quoteDoc(accepted){
   const totals=[["Base (IVA no incl.)",eurTxt(base)]];
   if(accepted&&S.optional.included) totals.push(["Aceptado (con opcional)",eurTxt(base+S.optional.amount)]);
   const sd3=sdOf(3); const validity=num(sd3.validityDays)||30;
+  // The note the operator types at stage 4 is labelled "shown on the quote";
+  // it used to reach details.txt and nothing else.
+  const clientNote=(sd3.clientNote||"").trim();
+  const notes=[
+    "Precios validos "+validity+" dias. Los trabajos se planifican al aceptar el presupuesto.",
+    "Este presupuesto se convierte en su proyecto con una linea base fija — sin re-introducir datos.",
+    "Garantía de 2 años sobre los trabajos. Un único punto de contacto durante todo el proyecto." ];
+  if(clientNote) notes.unshift(clientNote);
   return { docType:"PRESUPUESTO · QUOTE", number:S.quoteNo, dateLabel:"Fecha", dateIssued:today(),
     dueLabel:"Valido hasta", dueOrValid:addDays(validity),
     buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
     lines, groups: itemized?docGroups(hasOpt):undefined, totals,
     payment:["Los trabajos opcionales solo se incluyen si los acepta.","El IVA se aplica en la factura final segun la regla legal aplicable."],
-    notes:[
-      "Precios validos 30 dias. Los trabajos se planifican al aceptar el presupuesto.",
-      "Este presupuesto se convierte en su proyecto con una linea base fija — sin re-introducir datos.",
-      "Garantía de 2 años sobre los trabajos. Un único punto de contacto durante todo el proyecto." ] };
+    notes };
 }
 function chunk(s){ return s.replace(/.{1,76}/g,"$&\r\n").trimEnd(); }
 function buildEml(c){
@@ -883,8 +1014,12 @@ function renderRail(){
 }
 function goToStage(i){
   if(!PROJECT.profile || i<0 || i>reached) return;
-  if(i>step){ while(step<i) advance(); }
-  else { step=i; renderRail(); renderStage(); renderLedger(); window.scrollTo({top:0,behavior:"smooth"}); }
+  // step < 0 means the intake has not been committed. Walking forward from here
+  // used to run advance() past startJourney() entirely, so the journey could be
+  // entered with no customer name, no tax id and no email.
+  if(step<0) return;
+  if(i>step){ while(step<i){ if(!advance()) break; } }
+  else { step=i; persistProgress(); renderRail(); renderStage(); renderLedger(); window.scrollTo({top:0,behavior:"smooth"}); }
 }
 let treeUrls=[];
 function fileUrl(f){ const u=URL.createObjectURL(new Blob([b64ToBytes(f.b64)],{type:f.mime})); treeUrls.push(u); return u; }
@@ -936,43 +1071,57 @@ const FLOW = [
       <div class="did"><b>Accepted:</b> ${hasOpt?"base + optional = ":""}${eur(total)} (ex-VAT). Version frozen.</div>`; },
     done:()=>{ art("05 Acceptance",S.quoteNo+"-accepted.pdf","application/pdf",buildDocPdf(quoteDoc(true)));
       art("05 Acceptance","Acceptance-email.eml","message/rfc822",textToB64(buildEml(emailContent("acceptance")))); log("Quote accepted — version frozen"); } },
-  { cap:"projects", body:()=>{ S.baseline=sum(S.chapters,c=>c.budget)+(S.optional.included?S.optional.amount:0);
+  { cap:"projects", body:()=>{ freezeBaseline();
       return `<p>The accepted quote becomes a <b>project</b> with an <b>immutable baseline</b> — no re-entry. Chapter budgets are copied once and frozen; everything from here is measured against them.</p>
       <div class="did"><b>Project opened:</b> baseline ${eur(S.baseline)} across ${S.chapters.length} chapters. Status: active.</div>`; },
     done:()=>{ textArt("06 Project","baseline.txt","Project baseline for "+S.customer+"\nFrozen baseline: "+eurTxt(S.baseline)+"\nChapters: "+S.chapters.length); log("Project created — baseline "+eur(S.baseline)+" frozen"); } },
-  { cap:"procurement · sourcing", body:()=>{ S.chapters.forEach(c=>{c.committed=Math.round(c.budget*S.committedPct);});
-      const rows=S.chapters.map(c=>`<tr><td>${esc(c.chapter)}</td><td class="n">${eur(c.budget)}</td><td class="n">${eur(c.committed)}</td><td class="n">${c.committed<=c.budget?'✓ within':'⚠ over'}</td></tr>`).join("");
+  { cap:"procurement · sourcing", body:()=>{ recalcCommitted();
+      const any=committed()>0;
+      const rows=S.chapters.map(c=>`<tr><td>${esc(c.chapter)}</td><td class="n">${eur(c.budget)}</td><td class="n">${c.committed?eur(c.committed):"—"}</td><td class="n">${!c.committed?"—":c.committed<=c.budget?'✓ within':'⚠ over'}</td></tr>`).join("");
       return `<p><b>Purchase orders</b> are raised to the selected suppliers — this <b>commits</b> cost against each chapter's budget, visible immediately.</p>
+      ${any?"":'<div class="did">Nothing committed yet — add a purchase order below and the chapter figures fill in.</div>'}
       <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Committed</th><th class="n">vs budget</th></tr></thead><tbody>${rows}</tbody></table>`; },
-    done:()=>{ textArt("07 Purchasing","purchase-orders.txt","Committed cost by chapter:\n"+S.chapters.map(c=>"  "+c.chapter+": "+eurTxt(c.committed)).join("\n")+"\nTotal committed: "+eurTxt(committed())); log("POs raised — committed "+eur(committed())); } },
-  { cap:"execution · payables", body:()=>{ S.chapters.forEach(c=>{c.actual=Math.round(c.budget*S.actualPct);});
-      S.bills=S.chapters.filter(c=>c.actual>0).map((c,i)=>({s:"Supplier "+(i+1),n:"B-"+(1040+i),amt:c.actual}));
-      const rows=S.chapters.map(c=>{const v=c.actual-c.budget;return `<tr><td>${esc(c.chapter)}</td><td class="n">${eur(c.budget)}</td><td class="n">${eur(c.actual)}</td><td class="n" style="color:${v>0?'var(--crit)':'var(--good)'}">${v>0?'+':''}${eur(v)}</td></tr>`;}).join("");
-      return `<p>Work proceeds. Supplier <b>bills</b> are booked as <b>actual cost</b> (duplicates are rejected). Quoted-vs-actual per chapter updates live — the margin-leak early-warning.</p>
+    done:()=>{ recalcCommitted(); log("POs raised — committed "+eur(committed())); } },
+  { cap:"execution · payables", body:()=>{ recalcActual();
+      const any=actual()>0;
+      const rows=S.chapters.map(c=>{const v=c.actual-c.budget;return `<tr><td>${esc(c.chapter)}</td><td class="n">${eur(c.budget)}</td><td class="n">${c.actual?eur(c.actual):"—"}</td><td class="n" style="color:${c.actual?(v>0?'var(--crit)':'var(--good)'):'inherit'}">${c.actual?(v>0?'+':'')+eur(v):"—"}</td></tr>`;}).join("");
+      return `<p>Work proceeds. Supplier <b>bills</b> are booked as <b>actual cost</b> against the chapter they belong to. Quoted-vs-actual updates live — the margin-leak early-warning.</p>
+      ${any?"":'<div class="did">No bills booked yet — add them below and the variance fills in.</div>'}
       <table><thead><tr><th>Chapter</th><th class="n">Budget</th><th class="n">Actual</th><th class="n">Variance</th></tr></thead><tbody>${rows}</tbody></table>`; },
-    done:()=>{ textArt("08 Execution","supplier-bills.txt","Supplier bills booked:\n"+S.bills.map(b=>"  "+b.s+" ("+b.n+"): "+eurTxt(b.amt)).join("\n")+"\nTotal actual: "+eurTxt(actual())); log("Bills booked — actual "+eur(actual())+" ("+S.bills.length+" bills)"); } },
-  { cap:"billing", email:{kind:"invoice"}, body:()=>{ S.revenue=S.baseline+(S.variations||0); const vat=Math.round(S.revenue*S.vatBp/10000); const vp=S.vatBp/100;
+    done:()=>{ recalcActual(); log("Bills booked — actual "+eur(actual())+" ("+S.bills.length+" bills)"); } },
+  { cap:"billing", email:{kind:"invoice"}, body:()=>{ recomputeRevenue();
+      const b=invoiceBase(); const vat=Math.round(b.cents*S.vatBp/10000); const vp=S.vatBp/100;
+      const irpf=pct(sdOf(8).irpfPct); const irpfAmt=Math.round(b.cents*irpf/100);
+      const type=sdOf(8).invoiceType||"Full";
       return `<p>The <b>invoice</b> is issued from the accepted quote. The reduced VAT rate applies where the renovation conditions are met (art. 91.Uno.2.10º), and the reason is recorded on the document. Numbers are gap-free and each invoice is sealed against tampering.</p>
       <table><tbody>
         <tr><td>Invoice</td><td class="n"><b>${esc(S.invoiceNo)}</b></td></tr>
         <tr><td>Bill to</td><td class="n">${esc(S.customer)}${S.buyerNif?" · "+esc(S.buyerNif):""}</td></tr>
         <tr><td>Issue date · due (${S.termsDays}d)</td><td class="n">${today()} · ${addDays(S.termsDays)}</td></tr>
-        <tr><td>Base imponible</td><td class="n">${eur(S.revenue)}</td></tr>
+        ${b.pct<100?`<tr><td>${type==="Deposit"?"Anticipo":"Certificación"} ${b.pct}% s/ ${eur(S.revenue)}</td><td class="n">${eur(b.cents)}</td></tr>`:""}
+        <tr><td>Base imponible</td><td class="n">${eur(b.cents)}</td></tr>
         <tr><td>IVA ${vp}%</td><td class="n">${eur(vat)}</td></tr>
-        <tr><td><b>Total a pagar</b></td><td class="n"><b>${eur(S.revenue+vat)}</b></td></tr>
+        ${irpf>0?`<tr><td>Retención IRPF −${irpf}%</td><td class="n">−${eur(irpfAmt)}</td></tr>`:""}
+        <tr><td><b>Total a pagar</b></td><td class="n"><b>${eur(b.cents+vat-irpfAmt)}</b></td></tr>
       </tbody></table>
       <div class="did"><b>Full factura PDF filed into “09 Invoicing”</b> — parties (NIF/CIF), dates, line items, VAT breakdown, IBAN &amp; payment terms, and the legal notes.<br><span class="hint">Issued in Spanish (es-ES).</span></div>`; },
     done:()=>{ art("09 Invoicing",S.invoiceNo+".pdf","application/pdf",buildDocPdf(invoiceDoc()));
-      art("09 Invoicing","Invoice-email.eml","message/rfc822",textToB64(buildEml(emailContent("invoice")))); log("Invoice "+S.invoiceNo+" issued — revenue "+eur(S.revenue)); } },
-  { cap:"receivables", email:{kind:"reminder"}, body:()=>{ const vat=Math.round(S.revenue*S.vatBp/10000); const total=S.revenue+vat; S.collected=total;
-      return `<p><b>Collections:</b> a receipt is recorded and allocated to the invoice (partial payments are first-class). Overdue invoices raise a reminder — auto-drafted below.</p>
-      <div class="did"><b>Receipt:</b> ${eur(total)} received and allocated to ${esc(S.invoiceNo)}. Outstanding: ${eur(0)}. <span class="chip">paid</span></div>`; },
-    done:()=>{ const vat=Math.round(S.revenue*S.vatBp/10000); textArt("10 Collections","receipt.txt","Receipt allocated to "+S.invoiceNo+"\nAmount: "+eurTxt(S.revenue+vat)+"\nOutstanding: 0,00 EUR");
-      art("10 Collections","Reminder-email.eml","message/rfc822",textToB64(buildEml(emailContent("reminder")))); log("Receipt allocated — collected "+eur(S.collected)); } },
-  { cap:"payables", body:()=>{ S.supplierPaid=actual();
-      return `<p><b>Supplier payments:</b> the booked bills are paid on their due dates. Cash out is now visible against cash in.</p>
-      <div class="did"><b>Paid:</b> ${eur(S.supplierPaid)} across ${S.bills.length} supplier bills. Cash position: <b>${eur(cash())}</b>.</div>`; },
-    done:()=>{ textArt("11 Supplier payments","payments.txt","Supplier payments made:\n"+S.bills.map(b=>"  "+b.s+": "+eurTxt(b.amt)).join("\n")+"\nTotal paid: "+eurTxt(S.supplierPaid)+"\nCash position: "+eurTxt(cash())); log("Suppliers paid — "+eur(S.supplierPaid)); } },
+      art("09 Invoicing","Invoice-email.eml","message/rfc822",textToB64(buildEml(emailContent("invoice")))); log("Invoice "+S.invoiceNo+" issued — billed "+eur(invoiceBase().cents)); } },
+  { cap:"receivables", email:{kind:"reminder"}, body:()=>{ recomputeCollected();
+      const due=invoiceTotal(); const out=Math.max(0,due-S.collected);
+      return `<p><b>Collections:</b> a receipt is recorded and allocated to the invoice. Enter what actually arrived — a part payment is a part payment, and the outstanding balance follows it.</p>
+      <div class="did"><b>Invoice total:</b> ${eur(due)} · <b>Received:</b> ${eur(S.collected)} · <b>Outstanding:</b> ${eur(out)} <span class="chip">${out<=0?"paid":S.collected>0?"part paid":"unpaid"}</span></div>`; },
+    done:()=>{ recomputeCollected(); const due=invoiceTotal(); const out=Math.max(0,due-S.collected);
+      textArt("10 Collections","receipt.txt","Receipt allocated to "+S.invoiceNo+"\nInvoice total: "+eurTxt(due)+"\nReceived: "+eurTxt(S.collected)+"\nOutstanding: "+eurTxt(out));
+      if(out>0) art("10 Collections","Reminder-email.eml","message/rfc822",textToB64(buildEml(emailContent("reminder"))));
+      else delFile("10 Collections","Reminder-email.eml");
+      log("Receipt allocated — collected "+eur(S.collected)+(out>0?" · outstanding "+eur(out):" · settled")); } },
+  { cap:"payables", body:()=>{ recomputeSupplierPaid();
+      const unpaid=S.bills.filter(b=>!paidBillKeys().includes(b.n));
+      return `<p><b>Supplier payments:</b> tick the bills you have actually paid. Cash out is visible against cash in — an unpaid bill is still a cost and still a liability.</p>
+      <div class="did"><b>Paid:</b> ${eur(S.supplierPaid)} of ${eur(actual())} booked${unpaid.length?` · <b>${unpaid.length}</b> bill${unpaid.length>1?"s":""} still outstanding`:" · all settled"}. Cash position: <b>${eur(cash())}</b>.</div>`; },
+    done:()=>{ recomputeSupplierPaid();
+      textArt("11 Supplier payments","payments.txt","Supplier payments made:\n"+(S.bills.filter(b=>paidBillKeys().includes(b.n)).map(b=>"  "+b.n+" · "+b.s+": "+eurTxt(b.amt)).join("\n")||"  (none)")+"\nTotal paid: "+eurTxt(S.supplierPaid)+"\nStill outstanding: "+eurTxt(Math.max(0,actual()-S.supplierPaid))+"\nCash position: "+eurTxt(cash())); log("Suppliers paid — "+eur(S.supplierPaid)); } },
   { cap:"projects · FIN", body:()=>{
       const rows=S.chapters.map(c=>{const v=c.actual-c.budget;return `<tr><td>${esc(c.chapter)}</td><td class="n">${eur(c.budget)}</td><td class="n">${eur(c.actual)}</td><td class="n" style="color:${v>0?'var(--crit)':'var(--good)'}">${v>0?'+':''}${eur(v)} · ${c.budget?Math.round(v/c.budget*1000)/10:0}%</td></tr>`;}).join("");
       return `<p><b>Project close</b> with the truth the BRD asks for: not turnover — <b>profitability</b>. Revenue, actual cost, margin, and quoted-vs-actual per chapter.</p>
@@ -982,42 +1131,44 @@ const FLOW = [
       <div class="did"><b>Closed profitably.</b> Margin ${eur(margin())} (${marginPct()}%). Cash position ${eur(cash())}. Every euro traced from the first enquiry to the final profit.</div>`; },
     done:()=>{ textArt("12 Close","profit-summary.txt","Project close — "+S.customer+"\nRevenue (ex-VAT): "+eurTxt(S.revenue)+"\nActual cost: "+eurTxt(actual())+"\nMargin: "+eurTxt(margin())+" ("+marginPct()+"%)\nCash position: "+eurTxt(cash())); log("Project closed — margin "+eur(margin())+" ("+marginPct()+"%)"); } },
   { cap:"messaging · reputation", email:{kind:"review"}, body:()=>`<p>The final, often-forgotten step: <b>ask for a review while the goodwill is fresh</b>. The moment the project closes, a branded request is auto-drafted — one click sends it, or download it as an Outlook draft. This closes the loop from first enquiry to reputation.</p>
-      <div class="did"><b>Review request drafted</b> for ${esc(S.customer)}. Google review link embedded · filed into “13 Review request”.</div>`,
+      <div class="did"><b>Review request drafted</b> for ${esc(S.customer)}. ${esc((REVIEW_PLATFORMS[sdOf(12).reviewPlatform]||REVIEW_PLATFORMS.Google).name)} review link embedded · filed into “13 Review request”.</div>`,
     done:()=>{ art("13 Review request","Review-request.eml","message/rfc822",textToB64(buildEml(emailContent("review")))); log("Review request drafted — loop closed"); } },
 ];
 
 /* ---------- per-stage input fields (best-practice, every stage asks for data) ---------- */
+/* `req:true` makes the field a precondition for leaving the stage — see
+   canAdvance(). Required means "the next step is wrong without it", not
+   "nice to have": a document is produced from these values. */
 const FIELDS = {
-  0:[ {k:"source",label:"Lead source",type:"select",options:["Referral","Website","Phone","Repeat client","Social","Other"]},
-      {k:"enquiry",label:"Enquiry / scope",type:"text",ph:"What the customer wants"},
+  0:[ {k:"source",label:"Lead source",type:"select",options:["Referral","Website","Phone","Repeat client","Social","Other"],req:true},
+      {k:"enquiry",label:"Enquiry / scope",type:"text",ph:"What the customer wants",req:true},
       {k:"targetBudget",label:"Target budget (€)",type:"number",ph:"optional"} ],
-  1:[ {k:"visitDate",label:"Visit date",type:"date"},
-      {k:"areaM2",label:"Area (m²)",type:"number",ph:"e.g. 12.5"},
+  1:[ {k:"visitDate",label:"Visit date",type:"date",req:true},
+      {k:"areaM2",label:"Area (m²)",type:"number",ph:"e.g. 12.5",req:true,min:0.01},
       {k:"access",label:"Access / constraints",type:"text",ph:"lift, parking, working hours…"} ],
-  3:[ {k:"validityDays",label:"Quote valid (days)",type:"number",default:30},
+  2:[ {k:"estimator",label:"Prepared by",type:"text",ph:"who priced it",req:true},
+      {k:"estimateBasis",label:"Basis / assumptions",type:"text",ph:"what this figure assumes"} ],
+  3:[ {k:"validityDays",label:"Quote valid (days)",type:"number",default:30,req:true,min:1},
       {k:"clientNote",label:"Note to client",type:"text",ph:"shown on the quote"} ],
-  4:[ {k:"acceptanceDate",label:"Acceptance date",type:"date"},
-      {k:"acceptanceMethod",label:"Method",type:"select",options:["Signed","Email","Verbal"]},
-      {k:"depositPct",label:"Deposit agreed (%)",type:"number",ph:"e.g. 40"} ],
-  5:[ {k:"startDate",label:"Start date",type:"date"},
-      {k:"plannedEnd",label:"Planned end",type:"date"},
-      {k:"projectManager",label:"Project manager",type:"text",ph:"who runs the job"} ],
-  6:[ {k:"supplier",label:"Supplier",type:"text",ph:"chosen supplier"},
-      {k:"poNumber",label:"PO number",type:"text",ph:"PO-2026-001"},
-      {k:"deliveryDate",label:"Expected delivery",type:"date"} ],
-  7:[ {k:"billNumber",label:"Supplier bill no.",type:"text"},
-      {k:"billDate",label:"Bill date",type:"date"},
-      {k:"progressPct",label:"Site progress (%)",type:"number",ph:"0–100"} ],
-  8:[ {k:"invoiceDate",label:"Invoice date",type:"date"},
-      {k:"invoiceType",label:"Invoice type",type:"select",options:["Full","Deposit","Certification"]},
-      {k:"irpfPct",label:"IRPF retention (%)",type:"number",default:0,hint:"B2B withholding — leave 0 for private clients"} ],
-  9:[ {k:"paymentDate",label:"Payment received",type:"date"},
-      {k:"paymentMethod",label:"Method",type:"select",options:["Transfer","Card","Cash","Direct debit"]} ],
+  4:[ {k:"acceptanceDate",label:"Acceptance date",type:"date",req:true},
+      {k:"acceptanceMethod",label:"Method",type:"select",options:["Signed","Email","Verbal"],req:true},
+      {k:"depositPct",label:"Deposit agreed (%)",type:"number",ph:"e.g. 40",min:0,max:100} ],
+  5:[ {k:"startDate",label:"Start date",type:"date",req:true},
+      {k:"plannedEnd",label:"Planned end",type:"date",req:true},
+      {k:"projectManager",label:"Project manager",type:"text",ph:"who runs the job",req:true} ],
+  6:[ {k:"deliveryDate",label:"Expected delivery",type:"date"} ],
+  7:[ {k:"progressPct",label:"Site progress (%)",type:"number",ph:"0–100",req:true,min:0,max:100} ],
+  8:[ {k:"invoiceDate",label:"Invoice date",type:"date",req:true},
+      {k:"invoiceType",label:"Invoice type",type:"select",options:["Full","Deposit","Certification"],req:true},
+      {k:"irpfPct",label:"IRPF retention (%)",type:"number",default:0,min:0,max:100,hint:"B2B withholding — leave 0 for private clients"} ],
+  9:[ {k:"paymentDate",label:"Payment received",type:"date",req:true},
+      {k:"paymentMethod",label:"Method",type:"select",options:["Transfer","Card","Cash","Direct debit"],req:true},
+      {k:"amountReceived",label:"Amount received (€)",type:"number",min:0,ph:"blank = the full invoice",hint:"Enter less than the total to record a part payment."} ],
   10:[ {k:"supPaymentDate",label:"Supplier paid on",type:"date"},
        {k:"supPaymentMethod",label:"Method",type:"select",options:["Transfer","Card","Cash","Direct debit"]} ],
-  11:[ {k:"actualEnd",label:"Actual end date",type:"date"},
+  11:[ {k:"actualEnd",label:"Actual end date",type:"date",req:true},
        {k:"closeNotes",label:"Close notes / lessons",type:"text",ph:"what to price differently next time"} ],
-  12:[ {k:"reviewPlatform",label:"Review platform",type:"select",options:["Google","Trustpilot","Houzz","Facebook"]},
+  12:[ {k:"reviewPlatform",label:"Review platform",type:"select",options:["Google","Trustpilot","Houzz","Facebook"],req:true},
        {k:"sendDate",label:"Send on",type:"date"} ],
 };
 function fieldEl(fld,val){
@@ -1028,12 +1179,49 @@ function fieldEl(fld,val){
     ctrl=el("select"); fld.options.forEach(o=>{const op=el("option",null,o);op.value=o;if(o===val)op.selected=true;ctrl.append(op);});
   } else {
     ctrl=el("input"); ctrl.type=fld.type==="number"?"number":fld.type==="date"?"date":"text";
-    if(fld.type==="number")ctrl.step="any"; if(fld.ph)ctrl.placeholder=fld.ph; ctrl.value=val??"";
+    if(fld.type==="number"){ ctrl.step="any"; if(fld.min!=null)ctrl.min=fld.min; if(fld.max!=null)ctrl.max=fld.max; }
+    if(fld.ph)ctrl.placeholder=fld.ph; ctrl.value=val??"";
   }
   ctrl.dataset.k=fld.k;
-  f.innerHTML=`<label>${fld.label}</label>`; f.append(ctrl);
+  f.innerHTML=`<label>${fld.label}${fld.req?' <span class="req">required</span>':""}</label>`; f.append(ctrl);
   if(fld.hint) f.append(el("span","hint",fld.hint));
   return f;
+}
+/* ---------- the gate ----------------------------------------------------------
+   Advance used to be unconditional: 13 stages and a full set of documents could
+   be produced from an empty form. Each stage now states what the next one needs,
+   and says so rather than failing quietly. */
+function canAdvance(i){
+  const missing=[];
+  const sd=PROJECT.stageData[i]||{};
+  (FIELDS[i]||[]).forEach(fl=>{
+    const raw=sd[fl.k] ?? (fl.default!=null?String(fl.default):"");
+    const empty=raw==null||String(raw).trim()==="";
+    if(fl.req&&empty){ missing.push(fl.label); return; }
+    if(empty||fl.type!=="number") return;
+    const n=numOrNull(raw);
+    if(n==null){ missing.push(fl.label+" is not a number"); return; }
+    if(fl.min!=null&&n<fl.min) missing.push(fl.label+" must be at least "+fl.min);
+    if(fl.max!=null&&n>fl.max) missing.push(fl.label+" must be at most "+fl.max);
+  });
+  if(i===5&&sd.startDate&&sd.plannedEnd&&sd.plannedEnd<sd.startDate)
+    missing.push("Planned end is before the start date");
+  if(i===6){
+    const pos=(sd.pos||[]).filter(p=>(p.supplier||"").trim()&&(p.poNumber||"").trim()&&num(p.amount)>0);
+    if(!pos.length) missing.push("At least one purchase order with a supplier, a number and an amount");
+  }
+  if(i===7){
+    const bills=(sd.bills||[]).filter(b=>(b.billNumber||"").trim()&&num(b.amount)>0);
+    if(!bills.length) missing.push("At least one supplier bill with a number and an amount");
+    const dups=duplicateBillNumbers();
+    if(dups.length) missing.push("Duplicate bill number: "+dups.join(", "));
+  }
+  if(i===9&&S.revenue>0){
+    const entered=numOrNull(sd.amountReceived);
+    if(entered!=null&&Math.round(entered*100)>invoiceTotal())
+      missing.push("Amount received is more than the invoice total");
+  }
+  return {ok:missing.length===0, missing};
 }
 function saveStageDetails(i){
   const flds=FIELDS[i]||[]; if(!flds.length) return;
@@ -1046,13 +1234,28 @@ function renderFields(wrap){
   const flds=FIELDS[step]; if(!flds) return;
   const sd=sdOf(step);
   const fs=el("div","fsec"); fs.style.margin="18px 0 0";
-  fs.append(el("h4",null,"Details for this step — fill what applies"));
+  // "fill what applies" contradicted the required markers once stages gated.
+  const anyReq=flds.some(f=>f.req);
+  fs.append(el("h4",null,anyReq?"Details for this step — required fields are marked":"Details for this step"));
   const grid=el("div","frow");
-  flds.forEach(fld=>{ const val=sd[fld.k] ?? fld.default ?? (fld.type==="date"?todayISO():""); grid.append(fieldEl(fld,val)); });
+  // Commit the value the control actually shows. A date field rendered with
+  // today's date but left out of stageData would read as empty to the gate —
+  // the operator would see a filled field and be told it was missing.
+  flds.forEach(fld=>{
+    const val=sd[fld.k] ?? fld.default ?? (fld.type==="date"?todayISO():(fld.type==="select"?fld.options[0]:""));
+    if(sd[fld.k]==null&&val!=="") sd[fld.k]=String(val);
+    grid.append(fieldEl(fld,val));
+  });
+  // File them straight away. advance() saves the stage being LEFT, so the last
+  // stage's details reached no document unless the operator happened to edit a
+  // field — the review platform and send date were simply lost.
+  if(Object.keys(sd).length){ persistSoon(); saveStageDetails(step); }
   fs.append(grid); wrap.append(fs);
   fs.querySelectorAll("[data-k]").forEach(ctrl=>{
     const commit=()=>{ sd[ctrl.dataset.k]=ctrl.value; persistSoon(); saveStageDetails(step);
-      if(step===8){ regenInvoice(); } renderLedger(); };
+      if(step===8){ recomputeRevenue(); regenInvoice(); }
+      if(step===9) recomputeCollected();
+      renderLedger(); refreshBody(); refreshGate(); };
     ctrl.oninput=commit; ctrl.onchange=commit;
   });
 }
@@ -1198,9 +1401,20 @@ function renderScheduler(wrap){
     });
     gantt();
   };
+  /* The schedule is filed with the project. It previously lived only in
+     stageData, so it appeared in no export and the operator's plan was absent
+     from the folder they hand over. Rows the Gantt cannot draw are reported
+     rather than silently dropped. */
+  const fileSchedule=(drawable)=>{
+    const bad=sd.tasks.filter(t=>(t.name||"").trim()&&!drawable.some(x=>x.t===t));
+    textArt("06 Project","schedule.txt","Work schedule — "+S.customer+"\n"
+      +(sd.tasks.filter(t=>(t.name||"").trim()).map(t=>"  "+t.name+": "+(t.start||"?")+" → "+(t.end||"?")+"  ("+(Math.max(0,Math.min(100,Number(t.progress)||0)))+"%)").join("\n")||"  (no tasks)")
+      +(bad.length?"\n\nNot shown on the timeline (missing or inverted dates):\n"+bad.map(t=>"  "+t.name).join("\n"):""));
+  };
   const gantt=()=>{
     gant.innerHTML="";
     const ts=sd.tasks.map(t=>({t, s:Date.parse(t.start), e:Date.parse(t.end)})).filter(x=>!isNaN(x.s)&&!isNaN(x.e)&&x.e>=x.s);
+    fileSchedule(ts);
     if(!ts.length){ gant.innerHTML='<div class="hint">Add dates to see the timeline.</div>'; return; }
     const min=Math.min(...ts.map(x=>x.s)), max=Math.max(...ts.map(x=>x.e)); const span=Math.max(1,max-min);
     ts.forEach(({t,s,e})=>{
@@ -1225,7 +1439,11 @@ function renderChangeOrders(wrap){
   const addb=el("button","btn sm ghost","＋ Add change order"); addb.type="button"; box.append(addb);
   const tot=el("div"); tot.id="cotot"; tot.style.cssText="margin-top:10px;font-size:13.5px"; box.append(tot);
   wrap.append(box);
-  const total=()=>{ recalcVariations(); renderLedger();
+  const total=()=>{ recalcVariations();
+    // A variation added after the invoice stage has been reached must reach the
+    // invoice: revenue was previously only recomputed inside FLOW[8].body().
+    if(reached>=8){ recomputeRevenue(); regenInvoice(); }
+    renderLedger(); refreshBody();
     const cur=(S.baseline||sum(S.chapters,c=>c.budget))+S.variations;
     tot.innerHTML=`<b>Baseline:</b> ${eur(S.baseline||sum(S.chapters,c=>c.budget))} · <b>Variations:</b> ${S.variations>=0?"+":""}${eur(S.variations)} · <b>Current contract:</b> ${eur(cur)}`;
     textArt("08 Execution","change-orders.txt","Change orders (variations):\n"+(sd.changes.filter(c=>c.desc).map(c=>"  "+c.desc+": "+(num(c.amount)>=0?"+":"")+eurTxt(Math.round((num(c.amount)||0)*100))).join("\n")||"  (none)")+"\nBaseline preserved: "+eurTxt(S.baseline||sum(S.chapters,c=>c.budget))+"\nCurrent contract: "+eurTxt(cur)); };
@@ -1243,6 +1461,147 @@ function renderChangeOrders(wrap){
     total();
   };
   addb.onclick=()=>{ sd.changes.push({desc:"",amount:""}); persistSoon(); draw(); };
+  draw();
+}
+
+/* ---------- purchase orders + supplier bills ----------------------------------
+   Committed and actual cost used to be `budget × a percentage typed at intake`,
+   which made every chapter show an identical variance and made the supplier / PO
+   / bill-number fields decorative. Both now come from rows the operator enters,
+   so the variance table finally reports something that happened.
+   ------------------------------------------------------------------------- */
+const chapterNames = ()=>S.chapters.map(c=>c.chapter);
+function recalcCommitted(){
+  const rows=(sdOf(6).pos)||[];
+  S.chapters.forEach(c=>{ c.committed=0; });
+  rows.forEach(r=>{ const c=S.chapters.find(x=>x.chapter===r.chapter); if(c) c.committed+=Math.round((num(r.amount)||0)*100); });
+}
+function recalcActual(){
+  const rows=(sdOf(7).bills)||[];
+  S.chapters.forEach(c=>{ c.actual=0; });
+  rows.forEach(r=>{ const c=S.chapters.find(x=>x.chapter===r.chapter); if(c) c.actual+=Math.round((num(r.amount)||0)*100); });
+  S.bills=rows.filter(r=>r.billNumber||num(r.amount)>0)
+    .map(r=>({s:(r.supplier||"").trim()||"—", n:(r.billNumber||"").trim()||"—", amt:Math.round((num(r.amount)||0)*100), chapter:r.chapter}));
+}
+/* A supplier bill number may only appear once — the page claimed duplicates
+   were rejected long before anything checked. */
+function duplicateBillNumbers(){
+  const seen={}, dups=[];
+  ((sdOf(7).bills)||[]).forEach(r=>{
+    const k=((r.supplier||"").trim()+"|"+(r.billNumber||"").trim()).toLowerCase();
+    if(!(r.billNumber||"").trim()) return;
+    if(seen[k]) dups.push((r.billNumber||"").trim()); else seen[k]=1;
+  });
+  return [...new Set(dups)];
+}
+function chapterSelect(value){
+  return `<select data-f="chapter">${chapterNames().map(n=>`<option value="${esc(n)}"${n===value?" selected":""}>${esc(n)}</option>`).join("")}</select>`;
+}
+function renderPurchaseOrders(wrap){
+  const sd=sdOf(6); if(!sd.pos) sd.pos=[];
+  const box=el("div","fsec"); box.style.margin="18px 0 0";
+  box.append(el("h4",null,"Purchase orders — each one commits cost against its chapter"));
+  const list=el("div"); box.append(list);
+  const addb=el("button","btn sm ghost","＋ Add purchase order"); addb.type="button"; box.append(addb);
+  const tot=el("div"); tot.style.cssText="margin-top:10px;font-size:13.5px"; box.append(tot);
+  wrap.append(box);
+  const total=()=>{ recalcCommitted(); renderLedger(); refreshBody(); refreshGate();
+    const over=S.chapters.filter(c=>c.committed>c.budget);
+    tot.innerHTML=`<b>Committed:</b> ${eur(committed())} of ${eur(sum(S.chapters,c=>c.budget))} budget`
+      +(over.length?` · <span style="color:var(--crit)">⚠ over budget: ${over.map(c=>esc(c.chapter)).join(", ")}</span>`:"");
+    textArt("07 Purchasing","purchase-orders.txt","Purchase orders:\n"
+      +(sd.pos.filter(p=>p.supplier||p.poNumber).map(p=>"  "+(p.poNumber||"(no number)")+" · "+(p.supplier||"(no supplier)")+" · "+p.chapter+": "+eurTxt(Math.round((num(p.amount)||0)*100))+(p.delivered?" · delivered":" · awaiting delivery")).join("\n")||"  (none)")
+      +"\nTotal committed: "+eurTxt(committed()));
+  };
+  const draw=()=>{
+    list.innerHTML="";
+    sd.pos.forEach((p,i)=>{
+      const row=el("div","porow");
+      row.innerHTML=`${chapterSelect(p.chapter)}
+        <input data-f="supplier" placeholder="Supplier" value="${esc(p.supplier||"")}">
+        <input data-f="poNumber" placeholder="PO number" value="${esc(p.poNumber||"")}">
+        <input data-f="amount" type="number" step="any" min="0" placeholder="€" value="${p.amount??""}">
+        <label class="chk"><input data-f="delivered" type="checkbox"${p.delivered?" checked":""}> received</label>
+        <button class="x" data-x="${i}" type="button">×</button>`;
+      row.querySelectorAll("[data-f]").forEach(inp=>{
+        const commit=()=>{ p[inp.dataset.f]= inp.type==="checkbox"?inp.checked:inp.value; persistSoon(); total(); };
+        inp.oninput=commit; inp.onchange=commit;
+      });
+      row.querySelector("[data-x]").onclick=()=>{ sd.pos.splice(i,1); persistSoon(); draw(); };
+      list.append(row);
+    });
+    total();
+  };
+  addb.onclick=()=>{ sd.pos.push({chapter:chapterNames()[0]||"",supplier:"",poNumber:"",amount:"",delivered:false}); persistSoon(); draw(); };
+  draw();
+}
+function renderBills(wrap){
+  const sd=sdOf(7); if(!sd.bills) sd.bills=[];
+  const box=el("div","fsec"); box.style.margin="18px 0 0";
+  box.append(el("h4",null,"Supplier bills — booked as actual cost against the chapter"));
+  const list=el("div"); box.append(list);
+  const addb=el("button","btn sm ghost","＋ Add supplier bill"); addb.type="button"; box.append(addb);
+  const tot=el("div"); tot.style.cssText="margin-top:10px;font-size:13.5px"; box.append(tot);
+  wrap.append(box);
+  const total=()=>{ recalcActual(); renderLedger(); refreshBody(); refreshGate();
+    const dups=duplicateBillNumbers();
+    tot.innerHTML=`<b>Actual:</b> ${eur(actual())} · <b>Committed:</b> ${eur(committed())} · <b>Budget:</b> ${eur(sum(S.chapters,c=>c.budget))}`
+      +(dups.length?` · <span style="color:var(--crit)">⚠ duplicate bill number: ${esc(dups.join(", "))}</span>`:"");
+    textArt("08 Execution","supplier-bills.txt","Supplier bills booked:\n"
+      +(S.bills.map(b=>"  "+b.n+" · "+b.s+" · "+b.chapter+": "+eurTxt(b.amt)).join("\n")||"  (none)")
+      +"\nTotal actual: "+eurTxt(actual()));
+  };
+  const draw=()=>{
+    list.innerHTML="";
+    sd.bills.forEach((b,i)=>{
+      const row=el("div","porow");
+      row.innerHTML=`${chapterSelect(b.chapter)}
+        <input data-f="supplier" placeholder="Supplier" value="${esc(b.supplier||"")}">
+        <input data-f="billNumber" placeholder="Bill no." value="${esc(b.billNumber||"")}">
+        <input data-f="amount" type="number" step="any" min="0" placeholder="€" value="${b.amount??""}">
+        <input data-f="date" type="date" value="${esc(b.date||"")}">
+        <button class="x" data-x="${i}" type="button">×</button>`;
+      row.querySelectorAll("[data-f]").forEach(inp=>{
+        const commit=()=>{ b[inp.dataset.f]=inp.value; persistSoon(); total(); };
+        inp.oninput=commit; inp.onchange=commit;
+      });
+      row.querySelector("[data-x]").onclick=()=>{ sd.bills.splice(i,1); persistSoon(); draw(); };
+      list.append(row);
+    });
+    total();
+  };
+  addb.onclick=()=>{ sd.bills.push({chapter:chapterNames()[0]||"",supplier:"",billNumber:"",amount:"",date:todayISO()}); persistSoon(); draw(); };
+  draw();
+}
+/* Which supplier bills have actually been paid. "Paid everything" was previously
+   assumed; a half-paid supplier ledger is the normal state of a live job. */
+function renderSupplierPayments(wrap){
+  const sd=sdOf(10); if(!sd.paid) sd.paid=[];
+  const box=el("div","fsec"); box.style.margin="18px 0 0";
+  box.append(el("h4",null,"Which bills have you paid?"));
+  const list=el("div"); box.append(list);
+  const tot=el("div"); tot.style.cssText="margin-top:10px;font-size:13.5px"; box.append(tot);
+  wrap.append(box);
+  const total=()=>{ recomputeSupplierPaid(); renderLedger(); refreshBody();
+    tot.innerHTML=`<b>Paid:</b> ${eur(S.supplierPaid)} · <b>Outstanding to suppliers:</b> ${eur(Math.max(0,actual()-S.supplierPaid))}`; };
+  const draw=()=>{
+    list.innerHTML="";
+    if(!S.bills.length){ list.innerHTML='<div class="hint">No supplier bills booked at the Execution step yet.</div>'; total(); return; }
+    S.bills.forEach(b=>{
+      const row=el("div","porow"); row.style.gridTemplateColumns="auto 1fr auto";
+      const on=sd.paid.includes(b.n);
+      row.innerHTML=`<label class="chk"><input type="checkbox"${on?" checked":""}></label>
+        <span style="font-size:13px">${esc(b.n)} · ${esc(b.s)} <span class="hint">${esc(b.chapter||"")}</span></span>
+        <b style="font-size:13px;white-space:nowrap">${eur(b.amt)}</b>`;
+      row.querySelector("input").onchange=e=>{
+        if(e.target.checked){ if(!sd.paid.includes(b.n)) sd.paid.push(b.n); }
+        else sd.paid=sd.paid.filter(x=>x!==b.n);
+        sdOf(10).paid=sd.paid; persistSoon(); total();
+      };
+      list.append(row);
+    });
+    total();
+  };
   draw();
 }
 
@@ -1340,7 +1699,12 @@ function startJourney(){
   if(!validNifCif(draft.buyerNif)) return fail("Enter a valid NIF / CIF for the customer — it's required for a legal invoice.");
   if(!validEmail(draft.email)) return fail("Enter a valid customer email — documents are sent to this address.");
   PROJECT.profile=clone(draft); S=buildS(PROJECT.profile);
-  PROJECT.stageData = draft._stageData ? clone(draft._stageData) : {};
+  // Only seed stage data on a genuinely fresh start. Re-entering the intake on a
+  // project already under way used to overwrite it with the sample, wiping the
+  // operator's estimator lines, quote rows, schedule and change orders.
+  if(!PROJECT.stageData||!Object.keys(PROJECT.stageData).length)
+    PROJECT.stageData = draft._stageData ? clone(draft._stageData) : {};
+  PROJECT.baselineCents=null;   // a new intake re-opens the baseline
   persistSoon();
   const f=$("#feed"); f.innerHTML="<div>Project loaded — "+esc(S.customer)+".</div>"; f.dataset.clean="";
   step=-1; reached=-1; advance();   // → step 0
@@ -1372,14 +1736,16 @@ function renderStage(){
   wrap.append(el("div","eyebrow",`Step ${step+1} of ${STAGES.length}`));
   wrap.append(el("h2",null,STAGES[step]));
   wrap.append(el("div","cap",`capability: <b>${f.cap}</b> · folder: <b>${FOLDERS[step]}</b>`));
-  const bodyDiv=el("div",null,f.body());
+  const bodyDiv=el("div",null,f.body()); bodyDiv.id="stagebody";
   bodyDiv.querySelectorAll("table").forEach(t=>{ const w=el("div","tblwrap"); t.replaceWith(w); w.append(t); });
   wrap.append(bodyDiv);
 
   if(step===2) renderEstimator(wrap);
   if(step===3) renderQuoteBuilder(wrap);
   if(step===5) renderScheduler(wrap);
-  if(step===7) renderChangeOrders(wrap);
+  if(step===6) renderPurchaseOrders(wrap);
+  if(step===7){ renderBills(wrap); renderChangeOrders(wrap); }
+  if(step===10) renderSupplierPayments(wrap);
   renderFields(wrap);
 
   if(f.email){
@@ -1388,11 +1754,14 @@ function renderStage(){
     box.append(el("div","lbl",`Auto-drafted email · full CI · to ${esc(S.email)}`));
     box.append(el("div","mailframe",renderEmail(c)));
     const bar=el("div","mailbar");
-    const send=el("button","btn sm","✉ Send");
+    // No transport is wired yet (see INTEGRATIONS_PENDING.md). The button used
+    // to say "Sent", which is the one lie a system must never tell about a
+    // customer email — download the draft and send it from your mail client.
+    const send=el("button","btn sm","✓ Mark as sent");
     const dl=el("button","btn sm ghost",(c.attach?"⤓ Outlook draft + PDF (.eml)":"⤓ Outlook draft (.eml)"));
-    send.onclick=()=>{ send.textContent="✓ Sent"; send.disabled=true; log("Email sent → "+S.email); };
+    send.onclick=()=>{ send.textContent="✓ Marked sent"; send.disabled=true; log("Marked as sent by hand → "+S.email); };
     dl.onclick=()=>{ download("Canei-"+f.email.kind+".eml","message/rfc822",buildEml(c)); log("Outlook draft downloaded — "+f.email.kind); };
-    bar.append(send,dl,el("span","safe","Drafted for review — sent on your say-so")); box.append(bar);
+    bar.append(send,dl,el("span","safe","Drafted here · sent from your mail client")); box.append(bar);
     wrap.append(box);
   }
 
@@ -1415,24 +1784,53 @@ function renderStage(){
   if(!isLast) acts.lastChild.id="next"; else acts.lastChild.disabled=true;
   const restart=el("button","linkbtn","✎ Edit project data"); restart.style.marginLeft="4px"; restart.onclick=editData; acts.append(restart);
   wrap.append(acts);
+  const gate=el("div","gate"); gate.id="gate"; gate.hidden=true; wrap.append(gate);
 
   stageEl.innerHTML=""; stageEl.append(wrap);
   if(step===1){ renderThumbs(); const pi=$("#photoin"); if(pi) pi.onchange=e=>onFiles("02 Site visit",e.target.files,true); }
   const gi=$("#genin"); if(gi) gi.onchange=e=>onFiles(FOLDERS[step],e.target.files,false);
-  if(!isLast) $("#next").onclick=advance;
+  if(!isLast){ $("#next").onclick=advance; refreshGate(); }
+}
+/* Re-renders the narrative body of the current stage.
+   The body displays derived figures — the invoice table, the collection status,
+   the chapter variance. Editing a field updated the ledger and the filed
+   documents but left the body as first drawn, so the screen contradicted both:
+   entering a 5.000 € part payment left "Outstanding: 0,00 € · paid" on screen
+   while the ledger said 5.000. The body functions are pure recomputations, so
+   redrawing is safe; the operator's focus stays in the field below it. */
+function refreshBody(){
+  const bd=$("#stagebody"); if(!bd||step<0||!FLOW[step]) return;
+  bd.innerHTML=FLOW[step].body();
+  bd.querySelectorAll("table").forEach(t=>{ const w=el("div","tblwrap"); t.replaceWith(w); w.append(t); });
+}
+/* Reflects the gate into the Advance button. Called after every field commit so
+   the button unlocks as the operator types, rather than rejecting on click. */
+function refreshGate(){
+  const g=$("#gate"), btn=$("#next"); if(!g||!btn) return;
+  const {ok,missing}=canAdvance(step);
+  btn.disabled=!ok;
+  btn.classList.toggle("locked",!ok);
+  g.hidden=ok;
+  if(!ok) g.innerHTML=`<b>Before continuing:</b><ul>${missing.map(m=>`<li>${esc(m)}</li>`).join("")}</ul>`;
 }
 function advance(){
+  if(step>=0){
+    const {ok}=canAdvance(step);
+    if(!ok){ refreshGate(); $("#gate")?.scrollIntoView({block:"center",behavior:"smooth"}); return false; }
+    saveStageDetails(step);          // persist the stage we are leaving
+  }
   step++; if(step>reached) reached=step;
+  persistProgress();
   renderRail(); renderStage(); renderLedger();
   const f=FLOW[step]; f.done&&f.done();
-  saveStageDetails(step);
   window.scrollTo({top:0,behavior:"smooth"});
+  return true;
 }
 function editData(){ draft=clone(PROJECT.profile||SAMPLE); step=-1; renderRail(); renderStage(); }
 
 function clearAll(){
   if(!confirm("Start over? This clears the saved project and all its files on this device."))return;
-  PROJECT={profile:null,folders:{},stageData:{}}; idbDel("project").catch(()=>{});
+  PROJECT={profile:null,folders:{},stageData:{},baselineCents:null,step:-1,reached:0}; idbDel("project").catch(()=>{});
   draft=clone(SAMPLE); S=buildS(SAMPLE); step=-1; reached=0;
   const f=$("#feed"); f.innerHTML="<div>Cleared — enter your project to begin.</div>"; f.dataset.clean="";
   renderRail(); renderLedger(); renderTree(); renderStage();
@@ -1679,9 +2077,29 @@ $("#dlfolder").onclick=downloadFolder;
 $("#editdata").onclick=editData;
 $("#clearall").onclick=clearAll;
 (async()=>{
-  try{ const saved=await idbGet("project"); if(saved&&saved.folders){ PROJECT=saved; PROJECT.stageData=PROJECT.stageData||{}; if(PROJECT.profile){ draft=clone(PROJECT.profile); S=buildS(PROJECT.profile); } } }catch(e){}
+  let loadErr=null;
+  try{
+    const saved=await idbGet("project");
+    if(saved&&saved.folders){
+      PROJECT=saved; PROJECT.stageData=PROJECT.stageData||{};
+      if(PROJECT.profile){
+        draft=clone(PROJECT.profile); S=buildS(PROJECT.profile);
+        // Resume where the operator left off, ledger included. Previously step,
+        // reached and the whole of S were rebuilt from zero on every reload.
+        if(Number.isInteger(PROJECT.reached)) reached=PROJECT.reached;
+        if(Number.isInteger(PROJECT.step)&&PROJECT.step>=0){
+          step=Math.min(PROJECT.step,FLOW.length-1);
+          if(PROJECT.baselineCents!=null) S.baseline=PROJECT.baselineCents;
+          rebuildLedger();
+        }
+      }
+    }
+  }catch(e){ loadErr=e; }
   renderRail(); renderLedger(); renderTree(); renderStage();
-  if(PROJECT.profile){ const f=$("#feed"); f.innerHTML="<div>Saved project loaded — press “Start the journey”.</div>"; f.dataset.clean=""; }
+  const f=$("#feed");
+  if(loadErr){ f.innerHTML='<div style="color:var(--crit)"><b>Could not read the saved project.</b> '+esc(String(loadErr.name||loadErr))+'</div>'; f.dataset.clean=""; }
+  else if(PROJECT.profile&&step>=0){ f.innerHTML="<div>Resumed at step "+(step+1)+" — "+esc(STAGES[step])+".</div>"; f.dataset.clean=""; }
+  else if(PROJECT.profile){ f.innerHTML="<div>Saved project loaded — press “Start the journey”.</div>"; f.dataset.clean=""; }
   await loadRealErp(); // never blocks the demo above — best-effort, silent on failure
 })();
 </script>

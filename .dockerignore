@@ -1,0 +1,22 @@
+# Keep the build context small and, more importantly, keep secrets out of it.
+.git
+.env
+.env.*
+!.env.example
+
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+.turbo
+
+# Native app shells — not part of the server image.
+ios
+android
+
+# Test output and local scratch
+test-results
+playwright-report
+coverage
+*.log

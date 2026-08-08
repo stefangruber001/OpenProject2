@@ -34,6 +34,265 @@
 
   var LEGACY_MASTER_DB = "caneiMasterData";
 
+  /* ==================================================================== *
+   * WHERE THE DOCUMENT LIVES
+   *
+   * Two modes, decided once at load:
+   *
+   *   local   — IndexedDB in this browser. Opening the files directly, and the
+   *             published read-only copies, still work exactly as before.
+   *   remote  — the server, over /api/<tenant>/erp/state. The document is the
+   *             company's, so every device sees the same one.
+   *
+   * The switch is the PRESENCE of a <meta name="erp-api"> tag (or ?api=), which
+   * the server injects into the pages it serves and nothing else does. Presence,
+   * not value: an empty value means "same origin", which is the normal case
+   * because the server serves these pages and the API together — no CORS, and
+   * one session cookie covers both.
+   *
+   * This lives in the store rather than in each page on purpose. Every screen
+   * already reads and writes through ErpStore, so putting the decision here
+   * moves ALL of them onto the server at once, without a line changing in any
+   * page — which also means the UI cannot drift into talking to two different
+   * places depending on which screen you are on.
+   *
+   * Tenant is "~", not a name: the server resolves it from the session to the
+   * company that session is entitled to. A client that names its own tenant is
+   * a client that can ask for somebody else's.
+   * ==================================================================== */
+  var SELF_TENANT = "~";
+
+  function apiBase() {
+    try {
+      var params = new URLSearchParams(location.search);
+      if (params.has("api")) return (params.get("api") || "").replace(/\/$/, "");
+      var m = document.querySelector('meta[name="erp-api"]');
+      if (m) return (m.getAttribute("content") || "").replace(/\/$/, "");
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  var REMOTE = typeof document !== "undefined" ? apiBase() : null;
+
+  /* The version this browser last read. It is quoted on every save, and the
+     server refuses a save built on a stale one. That refusal is the entire
+     reason two people can use this at the same time. */
+  var remoteVersion = 0;
+
+  function stateUrl() {
+    return REMOTE + "/api/" + SELF_TENANT + "/erp/state";
+  }
+
+  /**
+   * Notice when somebody else changed the register.
+   *
+   * The page reads the document once and then shows it, which was fine while
+   * the document lived in this browser and only this browser could change it.
+   * With the document on the server and the same company using a phone and a
+   * laptop, a page that never re-reads is a page that is confidently wrong —
+   * which is exactly what the operator hit: data entered on the phone was not
+   * on the laptop until they reloaded by hand.
+   *
+   * Registered here rather than in each page, for the same reason the
+   * local/remote decision lives here: one place, and every screen gets it.
+   * `erp-sync.js` is optional — a page without it simply does not watch, and
+   * the published read-only copies have no server to watch anyway.
+   */
+  var watching = false;
+
+  function watchRemote() {
+    if (REMOTE === null || watching) return;
+    watching = true;
+    // Looked up by name and guarded: this module is also loaded under Node by
+    // the simulations, where there is no such global and no page to refresh.
+    var sync = typeof ErpSync !== "undefined" ? ErpSync : null;
+    if (!sync || typeof sync.watch !== "function") return;
+    sync.watch(
+      "state",
+      function () {
+        return remoteVersion;
+      },
+      function (serverVersion, info) {
+        sync.react(info);
+      },
+    );
+  }
+
+  /**
+   * Tell the operator when a save did not reach the server.
+   *
+   * `persist()` in the workspace is fire-and-forget (`.catch(() => {})`), which
+   * is correct for a local database that does not fail, and quietly wrong for a
+   * network that does. Without this, a lost connection or a conflicting save
+   * looks exactly like a successful one: the form closes, the row is on screen,
+   * and the record is nowhere. So the store raises it itself rather than hoping
+   * every call site remembers to.
+   */
+  function saveFailed(title, detail) {
+    try {
+      if (document.getElementById("canei-save-failed")) return;
+      var bar = document.createElement("div");
+      bar.id = "canei-save-failed";
+      bar.setAttribute(
+        "style",
+        "position:fixed;left:0;right:0;top:0;z-index:2147483000;background:#8f2d1b;color:#fff;" +
+          "font:600 13.5px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;" +
+          "padding:12px 16px;display:flex;gap:12px;align-items:center;justify-content:center;" +
+          "flex-wrap:wrap;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.25)",
+      );
+      var msg = document.createElement("span");
+      msg.innerHTML =
+        "⚠️ <b>" + title + "</b> " + (detail || "") + " Sus últimos cambios NO están guardados.";
+      bar.appendChild(msg);
+      var again = document.createElement("button");
+      again.textContent = "Recargar";
+      again.setAttribute(
+        "style",
+        "background:#fff;color:#8f2d1b;border:0;font-weight:800;padding:7px 14px;" +
+          "border-radius:999px;cursor:pointer",
+      );
+      again.onclick = function () {
+        location.reload();
+      };
+      bar.appendChild(again);
+      document.body.appendChild(bar);
+    } catch (e) {
+      /* never let the notifier be the thing that breaks the page */
+    }
+  }
+
+  function remoteLoadState() {
+    return fetch(stateUrl(), {
+      credentials: "same-origin",
+      headers: { accept: "application/json" },
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (body) {
+        remoteVersion = body.version || 0;
+        // Only after a successful read: watching before we know our own version
+        // would compare the server against zero and refresh immediately.
+        watchRemote();
+        // The server migrates on the way out, so the ladder does NOT run again
+        // here. It is pure and idempotent, but running it per client means
+        // running it a different number of times per person, which is not a
+        // property worth having in an invoice register.
+        //
+        // An empty company comes back as a valid empty document, not null.
+        // Returning null would make the workspace seed its demonstration data —
+        // onto the live server, into the real register. Empty and honest beats
+        // populated and fictional.
+        return { state: body.state || null, migration: null, remote: true };
+      });
+  }
+
+  function remoteSaveState(state) {
+    return fetch(stateUrl(), {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ state: state, expectedVersion: remoteVersion }),
+    })
+      .then(function (r) {
+        return r.json().then(function (body) {
+          return { ok: r.ok, status: r.status, body: body };
+        });
+      })
+      .then(function (res) {
+        if (res.ok) {
+          remoteVersion = res.body.version;
+          return res.body;
+        }
+        if (res.status === 409) {
+          saveFailed(
+            "Otra persona ha guardado antes que usted.",
+            "Recargue para ver sus cambios y vuelva a introducir los suyos.",
+          );
+        } else if (res.status === 401) {
+          saveFailed("Su sesión ha caducado.", "Vuelva a iniciar sesión.");
+        } else {
+          saveFailed(
+            "No se ha podido guardar en el servidor.",
+            (res.body && res.body.message) || "",
+          );
+        }
+        throw new Error("save refused: HTTP " + res.status);
+      })
+      .catch(function (e) {
+        // A network failure never reaches the branch above — it rejects before
+        // there is a response at all — so it is caught here rather than being
+        // mistaken for a successful save.
+        if (String(e && e.message).indexOf("save refused") !== 0) {
+          saveFailed("Sin conexión con el servidor.", "");
+        }
+        throw e;
+      });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Attachments (the site photographs)
+   *
+   * These were the last thing still living only in the browser, and the way
+   * they failed is worth remembering: the quote LINE referencing a photograph
+   * synced to every device perfectly, and the photograph did not. The laptop
+   * rendered "(imagen no disponible)" for a picture that plainly existed on the
+   * phone that took it. Nothing errored, because from each device's point of
+   * view nothing had gone wrong — the state blob held a `storageKey`, and the
+   * bytes behind it existed on exactly one machine, in a browser store no
+   * backup ever saw.
+   *
+   * Bytes on the wire rather than base64 in JSON: these go straight into an
+   * <img>, and base64 costs a third more storage plus a decode on every read.
+   * ------------------------------------------------------------------ */
+
+  function blobUrl(key) {
+    return REMOTE + "/api/" + SELF_TENANT + "/erp/blob/" + encodeURIComponent(key);
+  }
+
+  function remotePutBlob(key, blob) {
+    return fetch(blobUrl(key), {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "content-type": blob.type || "application/octet-stream" },
+      body: blob,
+    })
+      .then(function (r) {
+        if (r.ok) return r.json();
+        return r.json().then(
+          function (b) {
+            throw new Error((b && b.message) || "HTTP " + r.status);
+          },
+          function () {
+            throw new Error("HTTP " + r.status);
+          },
+        );
+      })
+      .catch(function (e) {
+        // Loud, because the alternative is a photograph the operator believes
+        // they filed. The line referencing it would still save.
+        saveFailed("No se ha podido subir la imagen.", (e && e.message) || "");
+        throw e;
+      });
+  }
+
+  function remoteGetBlob(key) {
+    return fetch(blobUrl(key), { credentials: "same-origin" }).then(function (r) {
+      if (r.status === 404) return null; // a missing picture is not an error
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.blob();
+    });
+  }
+
+  function remoteDeleteBlob(key) {
+    return fetch(blobUrl(key), { method: "DELETE", credentials: "same-origin" }).then(function (r) {
+      if (!r.ok && r.status !== 404) throw new Error("HTTP " + r.status);
+    });
+  }
+
   function open() {
     return new Promise(function (res, rej) {
       var r = indexedDB.open(DB, DB_VERSION);
@@ -95,6 +354,7 @@
    * a catastrophic migration bug into a support conversation.
    */
   function loadState() {
+    if (REMOTE !== null) return remoteLoadState();
     return get(KV, STATE_KEY).then(function (raw) {
       if (!raw) return { state: null, migration: null };
 
@@ -112,6 +372,7 @@
   }
 
   function saveState(state) {
+    if (REMOTE !== null) return remoteSaveState(state);
     return put(KV, STATE_KEY, state);
   }
 
@@ -120,12 +381,22 @@
    * ------------------------------------------------------------------ */
 
   function norm(s) {
-    return String(s || "")
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    return (
+      String(s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        // \u-escaped, not the literal combining marks. Written literally, this
+        // range is a run of non-ASCII bytes whose meaning depends on the encoding
+        // the script happens to be read as — and a <script src> with no charset
+        // of its own inherits the DOCUMENT's. Serve this file to a page that
+        // forgets <meta charset>, or through anything that re-encodes it, and the
+        // range becomes "Range out of order in character class": a hard
+        // SyntaxError that takes the whole module with it, on a line about
+        // accents. ASCII escapes cannot be mangled.
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+    );
   }
 
   /** Opens a legacy DB read-only WITHOUT creating or upgrading it. */
@@ -227,7 +498,12 @@
       var label = candidate.name || c.code || "(sin nombre)";
 
       if (!candidate.name) {
-        conflicts.push({ source: LEGACY_MASTER_DB, ref: c.code || "", label: label, reason: "sinNombre" });
+        conflicts.push({
+          source: LEGACY_MASTER_DB,
+          ref: c.code || "",
+          label: label,
+          reason: "sinNombre",
+        });
         return;
       }
       // Already present? Match the engine's own notion of duplicate.
@@ -293,17 +569,46 @@
     DB: DB,
     DB_VERSION: DB_VERSION,
     STATE_KEY: STATE_KEY,
+    /**
+     * True when the document lives on the server.
+     *
+     * Callers need this for one reason above all: what to do when loading
+     * FAILS. Locally, falling back to a fresh seeded document is right — there
+     * is nothing to lose and a blank page helps nobody. Remotely it is the
+     * worst possible move, because the next debounced save would PUT that
+     * demonstration data straight over the company's register. A dropped
+     * connection must not be able to erase an invoice register.
+     */
+    isRemote: function () {
+      return REMOTE !== null;
+    },
+    /** The version this browser last read; the server refuses a stale save. */
+    version: function () {
+      return remoteVersion;
+    },
     open: open,
     loadState: loadState,
     saveState: saveState,
     putBlob: function (k, blob) {
-      return put(BLOBS, k, blob);
+      return REMOTE !== null ? remotePutBlob(k, blob) : put(BLOBS, k, blob);
     },
     getBlob: function (k) {
-      return get(BLOBS, k);
+      return REMOTE !== null ? remoteGetBlob(k) : get(BLOBS, k);
     },
     deleteBlob: function (k) {
-      return del(BLOBS, k);
+      return REMOTE !== null ? remoteDeleteBlob(k) : del(BLOBS, k);
+    },
+    /**
+     * Where a stored attachment can be fetched from directly, or null when it
+     * lives in this browser and has no address.
+     *
+     * Worth having rather than always going through `getBlob`: an <img src>
+     * pointed at this streams and caches like any other image, whereas
+     * downloading the bytes to build an object URL holds every picture on the
+     * screen in memory for as long as the page is open.
+     */
+    blobUrl: function (k) {
+      return REMOTE !== null ? blobUrl(k) : null;
     },
     getMeta: function (k) {
       return get(META, k);

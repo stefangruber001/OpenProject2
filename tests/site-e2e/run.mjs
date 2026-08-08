@@ -144,6 +144,30 @@ async function testJourney(browser, base) {
   try {
     await page.goto(`${base}/journey.html`, { waitUntil: "networkidle" });
 
+    // ── Negative: an empty intake must not start the journey. The page is
+    // translated at runtime, so match on either language.
+    await page.locator("#clearform").click();
+    await page.waitForTimeout(150);
+    await page.locator("#startbtn").click();
+    await page.waitForTimeout(200);
+    const intakeErr = await page
+      .locator("#ierr")
+      .textContent()
+      .catch(() => "");
+    if (/customer name|nombre del cliente/i.test(intakeErr || "")) ok("blank intake is refused");
+    else bad("blank intake is refused", `#ierr = "${intakeErr}"`);
+
+    // ── Negative: the rail must not walk past the intake gate. Before this was
+    // closed, clicking "STEP 1" while step was -1 entered the journey with no
+    // customer name, no tax id and no email.
+    const afterRail = await page.evaluate(() => {
+      document.querySelector("#rail .st.nav")?.click();
+      return document.querySelector("#stage")?.innerText.slice(0, 80) || "";
+    });
+    if (/your project|su proyecto|proyecto/i.test(afterRail))
+      ok("rail cannot bypass the intake gate");
+    else bad("rail cannot bypass the intake gate", afterRail.replace(/\n/g, " "));
+
     // "Load sample data" pre-fills the intake form with the sample project.
     await page.locator("#loadsample").click();
     await page.waitForTimeout(300);
@@ -158,6 +182,32 @@ async function testJourney(browser, base) {
     // "Start the journey" commits the intake and begins at stage 0.
     await page.locator("#startbtn").click();
     await page.waitForTimeout(300);
+
+    // ── Negative: the gate must hold. Clearing a required field on the stage we
+    // are standing on has to disable Advance and say what is missing.
+    await page.evaluate(() => {
+      const el = document.querySelector('#stage [data-k="enquiry"]');
+      if (el) {
+        el.value = "";
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    await page.waitForTimeout(150);
+    const gated = await page.evaluate(() => ({
+      disabled: !!document.querySelector("#next")?.disabled,
+      gate: document.querySelector("#gate")?.innerText || "",
+    }));
+    if (gated.disabled && gated.gate.trim()) ok("a missing required field blocks Advance");
+    else bad("a missing required field blocks Advance", JSON.stringify(gated));
+    // put it back
+    await page.evaluate(() => {
+      const el = document.querySelector('#stage [data-k="enquiry"]');
+      if (el) {
+        el.value = "Full bathroom refit";
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    await page.waitForTimeout(150);
 
     // Walk the whole lifecycle with the Next control.
     let advanced = 0;
@@ -200,6 +250,55 @@ async function testJourney(browser, base) {
     if (pcount >= 12 && rendered >= 12)
       ok(`all lifecycle stages navigable & render (${rendered}/${pcount})`);
     else bad("stages navigable & render", `${rendered}/${pcount} reached-nav pills`);
+
+    // ── The narrative body shows derived figures (invoice table, collection
+    // status). A field edit must redraw it: it once updated the ledger and the
+    // filed PDF but left the screen as first drawn, so a 5.000 € part payment
+    // read "Outstanding: 0,00 € · paid" on screen while the ledger said 5.000.
+    await page.evaluate(() => {
+      [...document.querySelectorAll("#rail .st.nav")][9]?.click(); // Collections
+    });
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      const el = document.querySelector('#stage [data-k="amountReceived"]');
+      if (el) {
+        el.value = "5000";
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    await page.waitForTimeout(300);
+    const partial = await page.evaluate(() => ({
+      screen:
+        document.querySelector("#stagebody .did")?.innerText.replace(/\s+/g, " ").trim() || "",
+      collected: document.querySelector("#l-collected")?.textContent.trim() || "",
+    }));
+    if (/5\.?000/.test(partial.screen) && /5\.?000/.test(partial.collected))
+      ok("a part payment redraws the stage body, not just the ledger");
+    else bad("part payment redraws the stage body", JSON.stringify(partial));
+
+    // ── A reload must resume the journey, ledger included. step/reached and the
+    // whole ledger used to be module variables, so a refresh dropped the
+    // operator back on the intake with zeroes beside a full document folder.
+    const beforeReload = await page.evaluate(
+      () => document.querySelector("#l-revenue")?.textContent.trim() || "",
+    );
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForTimeout(400);
+    const afterReload = await page.evaluate(() => ({
+      revenue: document.querySelector("#l-revenue")?.textContent.trim() || "",
+      onIntake: !!document.querySelector("#startbtn"),
+    }));
+    if (
+      !afterReload.onIntake &&
+      afterReload.revenue === beforeReload &&
+      /\d/.test(afterReload.revenue)
+    )
+      ok(`reload resumes mid-journey with the ledger intact (${afterReload.revenue})`);
+    else
+      bad(
+        "reload resumes mid-journey",
+        `before=${beforeReload} after=${JSON.stringify(afterReload)}`,
+      );
 
     // Export the project folder as a real .zip and assert it's non-trivial.
     const dl = page.locator("#dlfolder");
