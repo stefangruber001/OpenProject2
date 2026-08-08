@@ -30,6 +30,7 @@ on:
         options:
           - status
           - deploy-now
+          - sync-server
           - backup-now
           - list-ssh-allowed
 
@@ -108,6 +109,15 @@ jobs:
       - name: deploy-now
         if: inputs.action == 'deploy-now'
         run: bash ops/deploy-now.sh
+
+      # The compose file, the Caddyfile and the ops scripts on the SERVER. These
+      # are NOT in the container image, so a release can update the application
+      # while the machine keeps running last month's stack definition — which is
+      # how `up -d` once reported "Running" with no web container at all. Rare,
+      # but when it is needed it is needed from wherever you happen to be.
+      - name: sync-server
+        if: inputs.action == 'sync-server'
+        run: bash ops/sync-server.sh
 
       - name: backup-now
         if: inputs.action == 'backup-now'
