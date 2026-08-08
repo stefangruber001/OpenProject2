@@ -39,7 +39,12 @@ function isPublic(pathname: string): boolean {
     // Health is how the machine checks itself, from inside, with no browser and
     // no cookie. It reports whether the process is up and the database is
     // reachable — it exposes no company data.
-    pathname === "/api/health"
+    pathname === "/api/health" ||
+    // The link preview. WhatsApp and Slack fetch the page and its image with no
+    // session at all, so an image behind the login produces a card with no
+    // thumbnail — the exact symptom this is here to avoid. Nothing under
+    // /brand/ is company data; it is a logo and a picture of a logo.
+    pathname.startsWith("/brand/")
   );
 }
 

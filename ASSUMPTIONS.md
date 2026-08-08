@@ -1000,3 +1000,27 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   redirect — and all of them passed while the one address a human actually types led nowhere
   useful. **Nothing tested the path a person takes from the URL they were given to the thing
   they came to use.** That path is now the first thing to check after any change to routing.
+- **#77 — A shared link showed the framework's logo, not the company's (2026-08-07).** The
+  operator sent the address to a colleague and WhatsApp rendered a black triangle with
+  "OpenProject2 — a new product built on a profe…". The metadata in `app/layout.tsx` was, like
+  the page under it, the scaffold's.
+  **Decision: brand the preview from the tenant's own tokens** — the green, the yellow and the
+  house mark already in `tenants/diorka/tenant.yaml` and `site/favicon.svg` — rather than
+  inventing a logo. A 1200×630 card is rendered from that and committed as
+  `apps/web/public/brand/og.png`.
+  Two things about link previews that are invisible from a browser and were the actual work:
+  **(1)** the crawler is anonymous, so it follows the redirect and reads the tags on `/login`
+  — which is why they live on the root layout rather than on a page behind the session; and
+  **(2)** the image must be fetchable with no session, or the card renders with no thumbnail
+  and looks like a missing file. `/brand/` is on the middleware's public list for that reason
+  and no other; it holds a logo and a picture of a logo, no company data.
+  `metadataBase` is computed per request from `PUBLIC_HOSTNAME` rather than fixed at build,
+  because the address is an sslip.io name today and the company's domain later — and a
+  hardcoded base would point the preview at an image on a host that no longer serves it.
+  `PUBLIC_HOSTNAME` had to be added to the **app** service in compose; it was only being passed
+  to Caddy, so the absolute image URL would have come out as `localhost`.
+  Verified as a crawler sees it: `curl -L` with a WhatsApp user agent and no cookie returns all
+  five tags with an absolute image URL, `/brand/og.png` returns 200 and `image/png`
+  anonymously, and `/workspace/erp.html` still returns 307.
+  Also set `robots: noindex` — a private system's login page in search results is a cost with
+  no benefit.
