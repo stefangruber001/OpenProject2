@@ -18,6 +18,13 @@ extension Notification.Name {
 
 final class WebViewStore: NSObject, ObservableObject {
 
+    /// True while this tab is displaying the sign-in page.
+    ///
+    /// Declared here rather than beside the navigation callbacks that maintain
+    /// it, because those live in the `WKNavigationDelegate` extension and Swift
+    /// does not allow stored properties in an extension.
+    private(set) var showingLogin = false
+
     // Published UI state
     @Published var isLoading = false
     @Published var estimatedProgress: Double = 0
@@ -300,9 +307,6 @@ extension WebViewStore: WKNavigationDelegate {
             NotificationCenter.default.post(name: .caneiSignedIn, object: nil)
         }
     }
-
-    /// True while this tab is displaying the sign-in page.
-    private(set) var showingLogin = false
 
     static func isLoginURL(_ url: URL?) -> Bool {
         guard let path = url?.path else { return false }

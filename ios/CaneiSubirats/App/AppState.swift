@@ -36,9 +36,11 @@ final class AppState: ObservableObject {
         }
     }
 
-    deinit {
-        if let o = signedInObserver { NotificationCenter.default.removeObserver(o) }
-    }
+    // No deinit removing the observer, deliberately. AppState is the app's
+    // root @StateObject and lives for the whole process, so a deinit here would
+    // never run — and reaching main-actor state from a nonisolated deinit is
+    // exactly the kind of thing that fails to compile on a CI toolchain I
+    // cannot exercise from here. Nothing to gain, a build to lose.
 
     /// Called when a tab is chosen. Covers the case the broadcast cannot: a
     /// session that expired while the app was in the background, where the tab
