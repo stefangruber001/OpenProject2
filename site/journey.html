@@ -310,7 +310,13 @@
         <button class="linkbtn" id="editdata">✎ Edit project data</button>
         <button class="linkbtn" id="clearall">Start over</button>
       </div>
-      <div class="hint" style="margin-top:8px">Photos, documents, the quote &amp; invoice PDFs and every email are filed per step — saved on this device.</div>
+      <!-- "saved on this device" was true when this page kept everything in
+           IndexedDB and is now the opposite of true: the project document goes
+           to the company's server, which is what makes it visible on the phone
+           and on the laptop and what puts it in the nightly backup. A page that
+           tells the operator their work is device-local is a page that will one
+           day talk somebody out of trusting a record that was perfectly safe. -->
+      <div class="hint" style="margin-top:8px">Photos, documents, the quote &amp; invoice PDFs and every email are filed per step — saved on the company server.</div>
     </div>
     <div class="card">
       <h3>Activity log</h3>

@@ -666,6 +666,12 @@ const DEMO_IMAGES={
   seed_img_interna:["#4f6b86","Detalle interno"],
 };
 async function ensureDemoImages(){
+  // Never against the server. These exist so the DEMONSTRATION budget has
+  // something to show on a clean machine; uploading four invented pictures into
+  // the company's real attachment store — where they would be backed up,
+  // restored, and indistinguishable from a photograph of an actual wall — is
+  // exactly the kind of fiction the remote guards elsewhere already refuse.
+  if(ErpStore.isRemote()) return;
   for(const key of Object.keys(DEMO_IMAGES)){
     const [color,label]=DEMO_IMAGES[key];
     try{
@@ -2775,6 +2781,13 @@ function bStatus(l){return l.pending?"pending":l.optionalLine?"optional":"normal
 const IMGURL=new Map();
 async function imageUrl(key){
   if(IMGURL.has(key)) return IMGURL.get(key);
+  // On the server a picture already HAS an address, so point the <img> at it
+  // and let the browser stream and cache it like any other image. Downloading
+  // the bytes to build an object URL would hold every thumbnail on screen in
+  // memory for as long as the page is open, and re-download them all on the
+  // next visit — the response is marked immutable precisely so it need not be.
+  const direct=ErpStore.blobUrl(key);
+  if(direct){ IMGURL.set(key,direct); return direct; }
   try{ const b=await ErpStore.getBlob(key); if(!b) return null;
     const u=URL.createObjectURL(b); IMGURL.set(key,u); return u; }catch(e){ return null; }
 }

@@ -114,6 +114,27 @@ export function isAuxDocument(name: string): boolean {
 }
 
 /**
+ * The store for binary attachments (site photographs).
+ *
+ * Same tenant assertion and same DATABASE_URL requirement as the documents: a
+ * photograph filed under a mistyped tenant is a photograph nobody will find
+ * again, and a missing database must fail loudly rather than pretend to store
+ * something.
+ */
+export async function blobStore(tenantId: string) {
+  assertKnownTenant(tenantId);
+  if (!process.env.DATABASE_URL) {
+    throw new FactoryError(
+      "CONFIG_INVALID",
+      "Attachments need a database: DATABASE_URL is not set. Without it there " +
+        "is nowhere durable to put the company's photographs.",
+    );
+  }
+  const db = await import("@repo/db");
+  return new db.PrismaErpBlobStore(db.prisma, tenantId);
+}
+
+/**
  * Every document's version, named the way the BROWSER names them.
  *
  * The client asks this on a timer and whenever its page comes back to the

@@ -233,6 +233,66 @@
       });
   }
 
+  /* ------------------------------------------------------------------ *
+   * Attachments (the site photographs)
+   *
+   * These were the last thing still living only in the browser, and the way
+   * they failed is worth remembering: the quote LINE referencing a photograph
+   * synced to every device perfectly, and the photograph did not. The laptop
+   * rendered "(imagen no disponible)" for a picture that plainly existed on the
+   * phone that took it. Nothing errored, because from each device's point of
+   * view nothing had gone wrong — the state blob held a `storageKey`, and the
+   * bytes behind it existed on exactly one machine, in a browser store no
+   * backup ever saw.
+   *
+   * Bytes on the wire rather than base64 in JSON: these go straight into an
+   * <img>, and base64 costs a third more storage plus a decode on every read.
+   * ------------------------------------------------------------------ */
+
+  function blobUrl(key) {
+    return REMOTE + "/api/" + SELF_TENANT + "/erp/blob/" + encodeURIComponent(key);
+  }
+
+  function remotePutBlob(key, blob) {
+    return fetch(blobUrl(key), {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "content-type": blob.type || "application/octet-stream" },
+      body: blob,
+    })
+      .then(function (r) {
+        if (r.ok) return r.json();
+        return r.json().then(
+          function (b) {
+            throw new Error((b && b.message) || "HTTP " + r.status);
+          },
+          function () {
+            throw new Error("HTTP " + r.status);
+          },
+        );
+      })
+      .catch(function (e) {
+        // Loud, because the alternative is a photograph the operator believes
+        // they filed. The line referencing it would still save.
+        saveFailed("No se ha podido subir la imagen.", (e && e.message) || "");
+        throw e;
+      });
+  }
+
+  function remoteGetBlob(key) {
+    return fetch(blobUrl(key), { credentials: "same-origin" }).then(function (r) {
+      if (r.status === 404) return null; // a missing picture is not an error
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.blob();
+    });
+  }
+
+  function remoteDeleteBlob(key) {
+    return fetch(blobUrl(key), { method: "DELETE", credentials: "same-origin" }).then(function (r) {
+      if (!r.ok && r.status !== 404) throw new Error("HTTP " + r.status);
+    });
+  }
+
   function open() {
     return new Promise(function (res, rej) {
       var r = indexedDB.open(DB, DB_VERSION);
@@ -321,12 +381,22 @@
    * ------------------------------------------------------------------ */
 
   function norm(s) {
-    return String(s || "")
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    return (
+      String(s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        // \u-escaped, not the literal combining marks. Written literally, this
+        // range is a run of non-ASCII bytes whose meaning depends on the encoding
+        // the script happens to be read as — and a <script src> with no charset
+        // of its own inherits the DOCUMENT's. Serve this file to a page that
+        // forgets <meta charset>, or through anything that re-encodes it, and the
+        // range becomes "Range out of order in character class": a hard
+        // SyntaxError that takes the whole module with it, on a line about
+        // accents. ASCII escapes cannot be mangled.
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+    );
   }
 
   /** Opens a legacy DB read-only WITHOUT creating or upgrading it. */
@@ -520,13 +590,25 @@
     loadState: loadState,
     saveState: saveState,
     putBlob: function (k, blob) {
-      return put(BLOBS, k, blob);
+      return REMOTE !== null ? remotePutBlob(k, blob) : put(BLOBS, k, blob);
     },
     getBlob: function (k) {
-      return get(BLOBS, k);
+      return REMOTE !== null ? remoteGetBlob(k) : get(BLOBS, k);
     },
     deleteBlob: function (k) {
-      return del(BLOBS, k);
+      return REMOTE !== null ? remoteDeleteBlob(k) : del(BLOBS, k);
+    },
+    /**
+     * Where a stored attachment can be fetched from directly, or null when it
+     * lives in this browser and has no address.
+     *
+     * Worth having rather than always going through `getBlob`: an <img src>
+     * pointed at this streams and caches like any other image, whereas
+     * downloading the bytes to build an object URL holds every picture on the
+     * screen in memory for as long as the page is open.
+     */
+    blobUrl: function (k) {
+      return REMOTE !== null ? blobUrl(k) : null;
     },
     getMeta: function (k) {
       return get(META, k);

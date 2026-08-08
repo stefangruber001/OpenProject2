@@ -1354,3 +1354,38 @@ SERVER_SSH_KEY`. The browser-ops path has never had its credentials, so it has n
   if locked, authenticate" re-presents the sheet the instant the operator taps Cancelar, forever.
   Launch and return-from-background are therefore separate entry points, and neither re-asks
   while the gate is already sitting locked in front of somebody.
+- **#90 — Audited where every byte lives; photographs were the last thing still
+  in a browser (2026-08-08).** The operator asked for the whole platform to be
+  checked, and for browser storage to stop. Result of the sweep across all 11
+  pages and the API:
+  - **the ERP register** (`erp-store.js`) — server, since the migration;
+  - **Master Data, Financial Data, the project folder** (`erp-docs.js`) — server;
+  - **journey photos and documents** — server, as base64 inside the project
+    document. Correct location, wrong shape: the document is rewritten on every
+    change, so a folder of photographs is re-encoded and re-sent each time. Not
+    a data-location defect and not fixed here; logged as the next thing.
+  - **site photographs on quote lines** — **were still IndexedDB, in every mode,
+    including on the server.** Now fixed: `erp_blob`, RLS-scoped like every
+    other table, bytes on the wire rather than base64.
+  - **UI preferences** (`ErpStore.getMeta`: chosen period, column order, page
+    size, favourites) and **the ES/EN choice** (`localStorage`) — deliberately
+    left in the browser. These are properties of a device, not of the company; a
+    phone and a laptop wanting different column widths is not a data-integrity
+    problem, and moving them would mean the operator's laptop layout changing
+    because they sorted a table on the phone.
+    **The photograph failure is worth remembering because of its SHAPE.** The
+    quote line referencing a picture went to the server and synced everywhere
+    perfectly. Only the bytes stayed behind. So the laptop showed the line and
+    rendered "(imagen no disponible)", and nothing anywhere reported an error,
+    because from each device's point of view nothing had gone wrong — the state
+    held a `storageKey`, and the bytes behind it existed on exactly one machine,
+    in a store no backup ever saw. **A reference that syncs and a referent that
+    does not is worse than neither syncing**, because the register looks complete.
+    **Found while hardening a test, not while writing the feature:** the harness
+    served JavaScript with no charset, and `norm()` in erp-store.js carried a
+    literal combining-diacritics range — non-ASCII bytes whose meaning depends on
+    the encoding the file is read as. It became "Range out of order in character
+    class", a hard SyntaxError taking the whole module with it, on a line about
+    accents. The real pages declare `<meta charset>` so production was never
+    affected; the range is now `\u`-escaped anyway, because correctness that
+    depends on every future page remembering a meta tag is not correctness.

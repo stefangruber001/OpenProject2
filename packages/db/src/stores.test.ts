@@ -16,10 +16,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   PrismaAppendOnlyStore,
   PrismaCounterStore,
+  PrismaErpBlobStore,
   PrismaErpStateStore,
   PrismaEventLog,
   PrismaKeyValueStore,
   PrismaRepository,
+  erpStateVersions,
 } from "./stores";
 
 const DB = process.env.DATABASE_URL;
@@ -89,6 +91,69 @@ if (!DB) {
       expect(a.seq).toBe(1);
       expect(b.seq).toBe(1);
       expect((await l1.list()).length).toBe(1);
+    });
+  });
+
+  describe("erpStateVersions (the cheap 'has anything changed?' probe)", () => {
+    it("reports each document's version, and omits ones never written", async () => {
+      const t = await freshTenant();
+      await new PrismaErpStateStore(prisma, t, "state").save({ a: 1 }, 0, "ana");
+      await new PrismaErpStateStore(prisma, t, "master-data").save({ b: 2 }, 0, "ana");
+      await new PrismaErpStateStore(prisma, t, "state").save({ a: 2 }, 1, "ana");
+
+      expect(await erpStateVersions(prisma, t)).toEqual({ state: 2, "master-data": 1 });
+    });
+
+    it("is scoped to one tenant", async () => {
+      const mine = await freshTenant();
+      const theirs = await freshTenant();
+      await new PrismaErpStateStore(prisma, theirs, "state").save({ secret: true }, 0, "them");
+      expect(await erpStateVersions(prisma, mine)).toEqual({});
+    });
+  });
+
+  describe("PrismaErpBlobStore (site photographs)", () => {
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+
+    it("stores bytes and gives them back unchanged", async () => {
+      const s = new PrismaErpBlobStore(prisma, await freshTenant());
+      expect(await s.get("img_missing")).toBeNull();
+
+      await s.put("img_a", jpeg, "image/jpeg", "ana");
+      const got = await s.get("img_a");
+      expect(got?.mime).toBe("image/jpeg");
+      expect(got?.size).toBe(jpeg.byteLength);
+      // Byte-for-byte. A photograph that survives a round trip "mostly" is a
+      // corrupt photograph.
+      expect(Array.from(got!.bytes)).toEqual(Array.from(jpeg));
+    });
+
+    it("writing the same key twice replaces rather than duplicates", async () => {
+      const s = new PrismaErpBlobStore(prisma, await freshTenant());
+      await s.put("img_a", jpeg, "image/jpeg", "ana");
+      const second = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+      await s.put("img_a", second, "image/png", "ana");
+
+      const got = await s.get("img_a");
+      expect(got?.mime).toBe("image/png");
+      expect(Array.from(got!.bytes)).toEqual(Array.from(second));
+    });
+
+    it("deleting is idempotent", async () => {
+      const s = new PrismaErpBlobStore(prisma, await freshTenant());
+      await s.put("img_a", jpeg, "image/jpeg");
+      await s.delete("img_a");
+      expect(await s.get("img_a")).toBeNull();
+      await expect(s.delete("img_a")).resolves.toBeUndefined();
+    });
+
+    it("one company cannot read another's photographs", async () => {
+      const mine = await freshTenant();
+      const theirs = await freshTenant();
+      await new PrismaErpBlobStore(prisma, theirs).put("img_a", jpeg, "image/jpeg");
+      // Same key, different tenant: must be invisible, not merely filtered by
+      // a WHERE the caller could forget.
+      expect(await new PrismaErpBlobStore(prisma, mine).get("img_a")).toBeNull();
     });
   });
 
