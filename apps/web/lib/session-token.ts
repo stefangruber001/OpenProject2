@@ -9,9 +9,16 @@
  * WHY THERE IS NO SESSION TABLE. A signed token needs no storage, which means no
  * migration, no cleanup job, and no lookup on every request. The cost is that
  * signing out cannot invalidate a token that has already been issued — the
- * server has nothing to delete. For two people on a pilot that is the right
- * trade; the mitigation is a short lifetime, and rotating SESSION_SECRET
- * invalidates every token everywhere, immediately.
+ * server has nothing to delete. For a handful of people on a pilot that is the
+ * right trade, and rotating SESSION_SECRET invalidates every token everywhere,
+ * immediately.
+ *
+ * That cost got LARGER when named sessions went from eight hours to thirty days
+ * (below), and it is worth being straight about rather than leaving the old
+ * "the mitigation is a short lifetime" standing next to a long one: a token
+ * taken from a lost phone stays good until it expires or the secret is rotated.
+ * Rotation is the lever, `ops/` is where it lives, and a real revocation list is
+ * the thing to build if this ever outgrows a pilot.
  *
  * Web Crypto rather than node:crypto on purpose: this runs in middleware as well
  * as in route handlers, and middleware does not always get the Node runtime.
