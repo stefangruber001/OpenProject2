@@ -233,6 +233,35 @@ export interface VersionedState<T = unknown> {
 }
 
 /**
+ * The version of every document this tenant has, and nothing else.
+ *
+ * This exists so a browser can ask "has anything changed?" cheaply and often.
+ * The obvious alternative — re-fetching the document and comparing — transfers
+ * the whole company register every time to answer a question whose answer is
+ * almost always "no", which is the sort of thing that works beautifully with
+ * one operator and one project and stops working exactly when the business
+ * grows. `select` is narrowed to two columns so the payload is never read off
+ * disk at all.
+ *
+ * Same tenant scoping as everything else here: RLS GUC inside the transaction,
+ * plus an explicit WHERE. Neither is trusted to be the only one.
+ */
+export async function erpStateVersions(
+  prisma: PrismaClient,
+  tenantId: string,
+): Promise<Record<string, number>> {
+  const rows = await withTenant(prisma, tenantId, (tx) =>
+    tx.erpState.findMany({
+      where: { tenantId },
+      select: { key: true, version: true },
+    }),
+  );
+  const out: Record<string, number> = {};
+  for (const row of rows) out[row.key] = row.version;
+  return out;
+}
+
+/**
  * Durable home for a whole-document state, with optimistic concurrency.
  *
  * The usage is deliberately read-modify-write across two transactions rather

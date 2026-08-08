@@ -86,6 +86,41 @@
   }
 
   /**
+   * Notice when somebody else changed the register.
+   *
+   * The page reads the document once and then shows it, which was fine while
+   * the document lived in this browser and only this browser could change it.
+   * With the document on the server and the same company using a phone and a
+   * laptop, a page that never re-reads is a page that is confidently wrong —
+   * which is exactly what the operator hit: data entered on the phone was not
+   * on the laptop until they reloaded by hand.
+   *
+   * Registered here rather than in each page, for the same reason the
+   * local/remote decision lives here: one place, and every screen gets it.
+   * `erp-sync.js` is optional — a page without it simply does not watch, and
+   * the published read-only copies have no server to watch anyway.
+   */
+  var watching = false;
+
+  function watchRemote() {
+    if (REMOTE === null || watching) return;
+    watching = true;
+    // Looked up by name and guarded: this module is also loaded under Node by
+    // the simulations, where there is no such global and no page to refresh.
+    var sync = typeof ErpSync !== "undefined" ? ErpSync : null;
+    if (!sync || typeof sync.watch !== "function") return;
+    sync.watch(
+      "state",
+      function () {
+        return remoteVersion;
+      },
+      function (serverVersion, info) {
+        sync.react(info);
+      },
+    );
+  }
+
+  /**
    * Tell the operator when a save did not reach the server.
    *
    * `persist()` in the workspace is fire-and-forget (`.catch(() => {})`), which
@@ -139,6 +174,9 @@
       })
       .then(function (body) {
         remoteVersion = body.version || 0;
+        // Only after a successful read: watching before we know our own version
+        // would compare the server against zero and refresh immediately.
+        watchRemote();
         // The server migrates on the way out, so the ladder does NOT run again
         // here. It is pure and idempotent, but running it per client means
         // running it a different number of times per person, which is not a

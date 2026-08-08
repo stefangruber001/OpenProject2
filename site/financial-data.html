@@ -148,6 +148,10 @@
 </style>
 <script src="i18n-dict.js"></script>
 <script src="i18n.js"></script>
+<!-- erp-sync.js must load BEFORE the stores: they register their
+     documents with it as soon as the first read comes back. Without it
+     the page still works, it just never notices a change made elsewhere. -->
+<script src="erp-sync.js"></script>
 <script src="erp-docs.js"></script>
 </head>
 <body>

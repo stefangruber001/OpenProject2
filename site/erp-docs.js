@@ -144,6 +144,7 @@
     var doc = null; // the whole document, once loaded
     var version = 0;
     var loading = null;
+    var watching = false;
 
     function load() {
       if (doc) return Promise.resolve(doc);
@@ -159,9 +160,38 @@
         .then(function (body) {
           version = body.version || 0;
           doc = body.doc && typeof body.doc === "object" ? body.doc : {};
+          watch();
           return doc;
         });
       return loading;
+    }
+
+    /**
+     * Notice when this document changed somewhere else.
+     *
+     * Master Data entered on the phone used to sit on the server unseen by a
+     * laptop whose page had already loaded — the same staleness as the main
+     * register, and worse here, because these screens are exactly the ones
+     * somebody fills in on one device and reads on another.
+     *
+     * Registered after the first successful read, so the comparison is against
+     * a version we actually hold rather than against zero. `erp-sync.js` is
+     * optional: without it the page behaves exactly as it did before.
+     */
+    function watch() {
+      if (watching) return;
+      var sync = typeof ErpSync !== "undefined" ? ErpSync : null;
+      if (!sync || typeof sync.watch !== "function") return;
+      watching = true;
+      sync.watch(
+        dbName,
+        function () {
+          return version;
+        },
+        function (serverVersion, info) {
+          sync.react(info);
+        },
+      );
     }
 
     function flush() {

@@ -20,7 +20,8 @@
     "db:seed": "pnpm --filter @repo/db seed",
     "factory": "tsx packages/factory/src/cli.ts",
     "boundaries": "tsx packages/boundary-lint/src/cli.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:sync": "node tests/site-sync/run.mjs"
   },
   "devDependencies": {
     "husky": "^9.1.7",

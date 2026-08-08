@@ -113,6 +113,42 @@ export function isAuxDocument(name: string): boolean {
   return Object.hasOwn(AUX_DOCUMENTS, name);
 }
 
+/**
+ * Every document's version, named the way the BROWSER names them.
+ *
+ * The client asks this on a timer and whenever its page comes back to the
+ * front, and refreshes only when a number it is watching has moved. That is the
+ * whole mechanism behind "a customer entered on the phone appears on the laptop
+ * without anyone pressing reload".
+ *
+ * The translation matters. Storage keys are `master-data`; the browser knows
+ * the document as `caneiMasterData`, because that is what the page's old
+ * IndexedDB database was called and the pages still say so. Publishing storage
+ * keys here would make the client depend on a name that exists only because of
+ * where the bytes happen to live.
+ *
+ * A document with no row yet is simply absent, not zero: absent means "never
+ * written", and the client already treats a missing number as "no news".
+ */
+export async function documentVersions(tenantId: string): Promise<Record<string, number>> {
+  assertKnownTenant(tenantId);
+  if (!process.env.DATABASE_URL) {
+    throw new FactoryError("CONFIG_INVALID", "The ERP needs a database: DATABASE_URL is not set.");
+  }
+  const db = await import("@repo/db");
+  const byStorageKey = await db.erpStateVersions(db.prisma, tenantId);
+
+  const clientName = new Map<string, string>([[STATE_KEY, "state"]]);
+  for (const [name, key] of Object.entries(AUX_DOCUMENTS)) clientName.set(key, name);
+
+  const out: Record<string, number> = {};
+  for (const [key, version] of Object.entries(byStorageKey)) {
+    const name = clientName.get(key);
+    if (name) out[name] = version;
+  }
+  return out;
+}
+
 export async function loadAuxDocument(
   tenantId: string,
   name: string,

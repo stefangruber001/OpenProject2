@@ -17,11 +17,13 @@ on:
     paths:
       - "site/**"
       - "tests/site-e2e/**"
+      - "tests/site-sync/**"
       - ".github/workflows/site-e2e.yml"
   pull_request:
     paths:
       - "site/**"
       - "tests/site-e2e/**"
+      - "tests/site-sync/**"
   workflow_dispatch:
 
 jobs:
@@ -51,3 +53,10 @@ jobs:
 
       - name: Run autonomous site E2E
         run: node tests/site-e2e/run.mjs
+
+      # Does an already-open page notice a change made somewhere else? This is
+      # the behaviour the operator reported missing ("I need to refresh 178-105
+      # every time"), and it decides whether to reload a page that may have
+      # half-typed work on it — so it is worth a browser, not a unit test.
+      - name: Run cross-device refresh tests
+        run: node tests/site-sync/run.mjs
