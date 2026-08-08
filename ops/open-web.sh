@@ -75,6 +75,8 @@ cd /opt/canei-erp || exit 0
 u="$(sed -n 's/^ERP_USERS=//p' .env | tr -d '"' | tr -d "'")"
 a="$(sed -n 's/^ERP_ACCESS_PASSWORD=//p' .env | tr -d '"' | tr -d "'")"
 s="$(sed -n 's/^SESSION_SECRET=//p' .env | tr -d '"' | tr -d "'")"
+h="$(sed -n 's/^PUBLIC_HOSTNAME=//p' .env | tr -d '"' | tr -d "'")"
+echo "HOST=$h"
 # Either named accounts or the shared password is a login. Requiring ERP_USERS
 # would refuse to publish a server reached only through the shared link, which
 # is a legitimate setup.
@@ -136,6 +138,8 @@ AFTER="$(hz GET "/firewalls?name=${FW_NAME}")"
 info "inbound now: $(jq -r '[.firewalls[0].rules[]? | select(.direction=="in") | .port] | join(", ")' <<<"$AFTER")"
 
 if [ "$CLOSING" = "0" ]; then
+  URL="https://$(val HOST)"
+  [ "$URL" = "https://" ] && URL="https://<PUBLIC_HOSTNAME is not set in the server's .env>"
   cat <<EOF
 
   The ERP is now reachable from the internet, behind its own login.
@@ -146,7 +150,7 @@ if [ "$CLOSING" = "0" ]; then
   Check from a phone, on mobile data rather than the office wifi, so you are
   testing the real path:
 
-      https://\${PUBLIC_HOSTNAME}
+      ${URL}
 
   To take it back off the internet at any time:
 
