@@ -3,229 +3,32 @@
 <head>
 <meta charset="utf-8" />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<meta name="robots" content="noindex" />
-<title>Canei Subirats — ERP System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta http-equiv="refresh" content="0; url=erp.html#torre" />
+<title>Canei Subirats — ERP</title>
+<script>
+  /* The system opens straight on Principal → Torre de control (spec §1): the
+     launchpad stops existing as an intermediate screen. This file survives only
+     because it is what the site root, every deployment and both native shells
+     resolve to; it forwards and holds no content of its own.
+     Everything it used to link to is reachable from the ERP shell — the
+     sections panel for the management areas, the profile menu for the guides
+     and the journey. */
+  location.replace("erp.html#torre");
+</script>
 <style>
-  :root{
-    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a; --greenSoft:#e7f0e1; --greenPale:#dce8d4; --spark:#f2c230;
-    --ink:#14160f; --body:#4f5347; --muted:#8b8f80; --faint:#aab0a0;
-    --line:#dde5d6; --hair:#e7eee1; --bg:#eef3ea; --paper:#fff;
-    --danger:#b4402f; --dangerSoft:#f6e3df; --amber:#8a6d12; --amberSoft:#fbf0cf;
-    --shadow:0 1px 2px rgba(24,32,16,.03), 0 18px 40px -24px rgba(24,32,16,.18);
-    --shadow-lg:0 2px 4px rgba(24,32,16,.04), 0 40px 80px -40px rgba(24,32,16,.3);
-    --serif:"Roboto Serif",Georgia,serif; --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
-    color-scheme:light;
-  }
-  *{box-sizing:border-box}
-  html{scroll-behavior:smooth;touch-action:manipulation;-webkit-text-size-adjust:100%;overflow-x:hidden}
-  body{margin:0;overflow-x:hidden;color:var(--body);font:15px/1.55 var(--sans);letter-spacing:-.004em;min-height:100vh;
-    background:radial-gradient(1300px 640px at 86% -12%, rgba(72,115,60,.17), transparent 58%),
-               radial-gradient(880px 500px at 0% 3%, rgba(242,194,48,.10), transparent 55%), var(--bg);
-    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-  h1,h2{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0;letter-spacing:-.02em}
-  a{text-decoration:none;color:inherit}
-  .wrap{max-width:1060px;margin:0 auto;padding:26px 22px 70px}
-  @media(max-width:560px){.wrap{padding:18px 14px 60px}}
-
-  /* top bar */
-  .top{display:flex;align-items:center;gap:12px;margin-bottom:26px;flex-wrap:wrap}
-  .logo{display:flex;align-items:center;gap:11px}
-  .logo svg{flex:none;filter:drop-shadow(0 5px 14px rgba(72,115,60,.3))}
-  .logo .name{font-family:var(--serif);font-weight:600;font-size:19px;color:var(--ink);line-height:1.05}
-  .logo .name small{display:block;font-family:var(--sans);font-weight:600;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--green);margin-top:3px}
-  .tsp{flex:1}
-  .today{font-size:12px;color:var(--muted)}
-  .cta-top{display:inline-flex;align-items:center;gap:7px;background:linear-gradient(120deg,var(--greenDeep),var(--green) 70%);
-    color:#fff;font:600 13px var(--sans);border-radius:11px;padding:10px 16px;box-shadow:0 12px 24px -12px rgba(49,83,42,.55);transition:.15s}
-  .cta-top:hover{transform:translateY(-1px)}
-
-  /* status strip (live) */
-  .status{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:30px}
-  @media(max-width:820px){.status{grid-template-columns:repeat(2,1fr)}}
-  .st{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:13px 15px;box-shadow:var(--shadow);transition:.13s;cursor:pointer}
-  .st:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--green) 36%,var(--line))}
-  .st .lab{font:600 10px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
-  .st .val{font-family:var(--serif);font-size:22px;color:var(--ink);margin-top:5px;line-height:1;font-variant-numeric:tabular-nums}
-  .st .sub{font-size:11px;color:var(--muted);margin-top:4px}
-  .st.hi{background:linear-gradient(125deg,var(--greenDeep),var(--green) 72%);border-color:transparent}
-  .st.hi .lab{color:rgba(255,255,255,.72)}.st.hi .val{color:#fff}.st.hi .sub{color:rgba(255,255,255,.8)}
-  .st.warn .val{color:var(--danger)}
-
-  .sh{display:flex;align-items:baseline;gap:12px;margin:0 0 14px}
-  .sh h2{font-size:clamp(18px,2.6vw,23px)}
-  .sh span{font-size:12px;color:var(--muted)}
-
-  /* module grid (DAS-01) */
-  .mods{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:34px}
-  @media(max-width:900px){.mods{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:420px){.mods{grid-template-columns:1fr 1fr;gap:9px}}
-  a.mod{position:relative;display:flex;flex-direction:column;gap:7px;background:var(--paper);border:1px solid var(--line);
-    border-radius:16px;padding:16px 15px 14px;box-shadow:var(--shadow);transition:transform .13s,box-shadow .2s,border-color .2s;overflow:hidden}
-  a.mod::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;transform:scaleX(0);transform-origin:left;
-    background:linear-gradient(90deg,var(--green),var(--greenLt) 60%,var(--spark));transition:transform .22s}
-  a.mod:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:color-mix(in srgb,var(--green) 34%,var(--line))}
-  a.mod:hover::before{transform:scaleX(1)}
-  a.mod .ic{width:38px;height:38px;border-radius:11px;background:var(--greenSoft);display:grid;place-items:center;font-size:18px}
-  a.mod b{font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-.01em}
-  a.mod span{font-size:11.5px;color:var(--muted);line-height:1.45;min-height:2.6em}
-  a.mod .live{font:600 11px var(--sans);color:var(--greenDeep);margin-top:auto}
-  a.mod .live.alert{color:var(--danger)}
-  a.mod.tower{grid-column:span 2;background:linear-gradient(120deg,var(--greenDeep),var(--green) 68%,#537f45);border-color:transparent}
-  a.mod.tower b{color:#fff;font-size:16px}
-  a.mod.tower span{color:rgba(255,255,255,.85);min-height:0}
-  a.mod.tower .ic{background:rgba(255,255,255,.16)}
-  a.mod.tower .live{color:var(--spark)}
-
-  /* day views */
-  .days{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:34px}
-  @media(max-width:760px){.days{grid-template-columns:1fr}}
-  a.day{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow);transition:.13s}
-  a.day:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
-  a.day b{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--ink)}
-  a.day .items{margin-top:10px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--body)}
-  a.day .items i{font-style:normal;font-weight:700;color:var(--greenDeep);font-variant-numeric:tabular-nums}
-
-  /* tools row */
-  .tools{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:30px}
-  @media(max-width:820px){.tools{grid-template-columns:1fr 1fr}}
-  a.tool{display:flex;gap:11px;align-items:flex-start;background:var(--paper);border:1px solid var(--line);border-radius:13px;padding:13px 14px;box-shadow:var(--shadow);transition:.13s}
-  a.tool:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--green) 30%,var(--line))}
-  a.tool .ic{font-size:17px;width:32px;height:32px;border-radius:9px;background:var(--greenSoft);display:grid;place-items:center;flex:none}
-  a.tool b{display:block;font-size:12.5px;color:var(--ink);font-weight:600}
-  a.tool span{font-size:11px;color:var(--muted);line-height:1.4}
-
-  .note{border-left:3px solid var(--green);background:var(--greenSoft);border-radius:0 12px 12px 0;padding:12px 16px;font-size:12.5px;color:var(--body)}
-  footer{font-size:11px;color:var(--muted);border-top:1px solid var(--hair);padding-top:14px;margin-top:26px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;
+    font:15px/1.6 Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:#4f5347;background:#eef3ea}
+  h1{font:600 19px "Roboto Serif",Georgia,serif;color:#14160f;margin:0 0 8px}
+  a{display:inline-block;margin-top:14px;color:#fff;background:#48733c;text-decoration:none;
+    font:600 13px Inter,system-ui,sans-serif;padding:9px 14px;border-radius:10px}
 </style>
-<script src="i18n-dict.js"></script>
-<script src="i18n.js"></script>
 </head>
 <body>
-<div class="wrap">
-  <div class="top">
-    <div class="logo">
-      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
-        <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c"/>
-        <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-        <rect x="18" y="23.5" width="4" height="5" rx="1" fill="#fff"/>
-        <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230"/>
-      </svg>
-      <span class="name">Canei Subirats<small>ERP System</small></span>
-    </div>
-    <span class="tsp"></span>
-    <span class="today" id="today"></span>
-    <a class="cta-top" href="erp.html#torre">Abrir torre de control →</a>
+  <div>
+    <h1>Canei Subirats · ERP</h1>
+    <p>El sistema abre directamente en la torre de control.</p>
+    <a href="erp.html#torre">Entrar en el ERP →</a>
   </div>
-
-  <!-- live status strip -->
-  <div class="status" id="status">
-    <a class="st hi" href="erp.html#proyectos"><div class="lab">Proyectos activos</div><div class="val" id="s-prj">—</div><div class="sub" id="s-prj2">obras en curso</div></a>
-    <a class="st" href="erp.html#facturacion"><div class="lab">Pendiente de cobro</div><div class="val" id="s-cobro">—</div><div class="sub" id="s-cobro2">facturas emitidas</div></a>
-    <a class="st" href="erp.html#banco"><div class="lab">Caja y bancos</div><div class="val" id="s-caja">—</div><div class="sub" id="s-caja2">posición actual</div></a>
-    <a class="st" href="erp.html#torre"><div class="lab">Alertas</div><div class="val" id="s-alert">—</div><div class="sub" id="s-alert2">requieren atención</div></a>
-  </div>
-
-  <!-- management areas (DAS-01) -->
-  <div class="sh"><h2>Áreas de gestión</h2><span>un único entorno — nada se escribe dos veces</span></div>
-  <div class="mods">
-    <a class="mod tower" href="erp.html#torre">
-      <div class="ic">📊</div><b>Torre de control</b>
-      <span>Toda la empresa de un vistazo: obras, avance, margen, facturado, cobrado, pagos, caja y alertas — cada indicador abre su detalle.</span>
-      <span class="live" id="m-torre">Indicadores en vivo</span>
-    </a>
-    <a class="mod" href="erp.html#clientes"><div class="ic">👥</div><b>Clientes</b><span>Registro único de terceros con datos fiscales validados.</span><span class="live" id="m-cli"></span></a>
-    <a class="mod" href="erp.html#proyectos"><div class="ic">🏗️</div><b>Proyectos</b><span>Línea base congelada, avance por capítulo, coste real y extras.</span><span class="live" id="m-prj"></span></a>
-    <a class="mod" href="erp.html#presupuestos"><div class="ic">📋</div><b>Presupuestos</b><span>Capítulos, partidas y sub-mediciones con control de versiones.</span><span class="live" id="m-pre"></span></a>
-    <a class="mod" href="erp.html#pagos"><div class="ic">🚚</div><b>Proveedores</b><span>Industriales y autónomos con IRPF correcto y vencimientos.</span><span class="live" id="m-prov"></span></a>
-    <a class="mod" href="erp.html#precios"><div class="ic">🏷️</div><b>Precios y costes</b><span>Base de precios por proveedor con origen, fecha y comparativa.</span><span class="live" id="m-pre2"></span></a>
-    <a class="mod" href="erp.html#facturacion"><div class="ic">🧾</div><b>Facturación y cobros</b><span>Facturas sin huecos, recibos, cobros parciales y reclamación.</span><span class="live" id="m-fac"></span></a>
-    <a class="mod" href="erp.html#banco"><div class="ic">🏦</div><b>Pagos, banco y caja</b><span>Asigna un movimiento a su obra tecleando el nº de proyecto.</span><span class="live" id="m-bank"></span></a>
-    <a class="mod" href="erp.html#contratos"><div class="ic">📜</div><b>Contratos</b><span>Hitos de pago, plazos, penalizaciones y garantías como datos.</span><span class="live" id="m-con"></span></a>
-    <a class="mod" href="erp.html#captura"><div class="ic">📸</div><b>Captura de documentos</b><span>Fotografía una factura o ticket y asígnala a su proyecto.</span><span class="live" id="m-cap"></span></a>
-    <a class="mod" href="erp.html#gestoria"><div class="ic">📦</div><b>Gestoría</b><span>Paquete trimestral, IVA e IRPF conciliados y excepciones.</span><span class="live" id="m-ges"></span></a>
-  </div>
-
-  <!-- role day views (DAS-04/05) -->
-  <div class="sh"><h2>Mi día</h2><span>la vista corta de cada perfil</span></div>
-  <div class="days">
-    <a class="day" href="erp.html#hoy"><b>🔨 Hoy en obra</b><div class="items" id="d-op"><span>Visitas, hitos, extras por valorar y horas por registrar.</span></div></a>
-    <a class="day" href="erp.html#hoy"><b>🗂️ Hoy en oficina</b><div class="items" id="d-bo"><span>Presupuestos, facturas, cobros, pagos y documentos pendientes.</span></div></a>
-  </div>
-
-  <!-- secondary tools -->
-  <div class="sh"><h2>Herramientas y guías</h2><span>análisis, simulación y documentación</span></div>
-  <div class="tools">
-    <a class="tool" href="clientes.html"><div class="ic">👥</div><div><b>Zona de clientes</b><span>Altas, ediciones y ficha completa del cliente (registro compartido).</span></div></a>
-    <a class="tool" href="journey.html"><div class="ic">▶️</div><div><b>Recorrido completo</b><span>Un proyecto de principio a fin, con documentos y correos.</span></div></a>
-    <a class="tool" href="dashboard.html"><div class="ic">📈</div><div><b>Panel clásico</b><span>Cartera, correos y alertas del panel anterior.</span></div></a>
-    <a class="tool" href="master-data.html"><div class="ic">🗂️</div><div><b>Datos maestros</b><span>Catálogo, numeración, IVA y configuración como datos.</span></div></a>
-    <a class="tool" href="financial-data.html"><div class="ic">💶</div><div><b>Datos financieros</b><span>P&amp;G, balance, tesorería y KPIs calculados.</span></div></a>
-    <a class="tool" href="frontend.html"><div class="ic">🧮</div><div><b>Constructor de presupuestos</b><span>Presupuesto por catálogo con opciones y comparativa.</span></div></a>
-    <a class="tool" href="setup-guide.html"><div class="ic">📘</div><div><b>Guía de operaciones</b><span>Puesta en marcha, proceso diario y RACI, con PDF.</span></div></a>
-  </div>
-
-  <div class="note">
-    Interfaz de trabajo en castellano; los documentos del cliente se emiten en castellano (catalán en preparación).
-    Nada sale del sistema sin revisión: los correos se redactan y se envían solo con su visto bueno.
-  </div>
-  <footer>
-    <span>Canei Subirats, S.L. · Carrer de la Creu, 74, 08960 Sant Just Desvern · 659 87 67 00 · hola@caneisubirats.com</span>
-    <span>Un único entorno · numeración controlada · datos exportables</span>
-  </footer>
-</div>
-
-<script src="erp-engine.js"></script>
-<script src="erp-seed.js"></script>
-<script src="erp-migrations.js"></script>
-<script src="erp-store.js"></script>
-<script src="erp-backend.js"></script>
-<script>
-/* Live indicators from the SAME dataset the workspace uses (IndexedDB "caneiERP"). */
-(async function(){
-  const $=s=>document.querySelector(s);
-  const eur0=c=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0,useGrouping:'always'}).format(Math.round((c||0)/100));
-  $('#today').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
-  let erp;
-  try{
-    // Read through ErpBackend so the launchpad shows whatever the workspace
-    // shows — this browser's copy, or the server's. Never by opening IndexedDB
-    // here: the database version is per-database, so a hardcoded version on
-    // this page would throw VersionError the moment erp.html upgraded the
-    // schema. Read-only — the launchpad shows indicators, it does not own the
-    // data.
-    const backend=ErpBackend.create(new URLSearchParams(location.search).get("tenant")||"diorka");
-    // In remote mode a failure must NOT fall back to the demo seed: showing
-    // fabricated figures on a page the owner reads as "the business right now"
-    // is worse than showing nothing.
-    try{ erp=(await backend.load()).erp; }
-    catch(e){ if(backend.isRemote()) return; throw e; }
-  }catch(e){ try{ erp=ErpSeed.build(); }catch(e2){ return; } }
-  try{
-    const ct=erp.controlTower(), op=erp.operationalDay(), bo=erp.backOfficeDay(), S=erp.state;
-    $('#s-prj').textContent=ct.activeCount; $('#s-prj2').textContent="margen previsto "+eur0(ct.totalForecastMarginCents);
-    $('#s-cobro').textContent=eur0(ct.outstandingCents); $('#s-cobro2').textContent="de "+eur0(ct.invoicedCents)+" facturados";
-    $('#s-caja').textContent=eur0(ct.cash.totalCents); $('#s-caja2').textContent=S.bankAccounts.map(a=>a.kind==="till"?"caja":"banco").length+" cuentas";
-    $('#s-alert').textContent=ct.alertCounts.critical+ct.alertCounts.high;
-    $('#s-alert2').textContent=ct.alertCounts.critical+" críticas · "+ct.alertCounts.high+" altas";
-    if(ct.alertCounts.critical>0)$('#s-alert').closest('.st').classList.add('warn');
-    const set=(id,txt,alert)=>{const n=$(id);if(n){n.textContent=txt;if(alert)n.classList.add('alert');}};
-    set('#m-cli',S.parties.filter(p=>p.active&&p.roles.includes("customer")).length+" clientes");
-    set('#m-prj',ct.activeCount+" activas · "+S.projects.filter(p=>p.closed).length+" cerradas");
-    set('#m-pre',ct.budgetsAwaiting.length+" en decisión · "+eur0(ct.awaitingValueCents));
-    set('#m-prov',S.parties.filter(p=>p.active&&p.roles.some(r=>["supplier","subcontractor"].includes(r))).length+" proveedores");
-    set('#m-pre2',S.prices.length+" precios con origen");
-    set('#m-fac',eur0(ct.outstandingCents)+" por cobrar",ct.outstandingCents>0);
-    const un=S.movements.filter(m=>m.status==="unallocated").length;
-    set('#m-bank',un?un+" movimientos sin asignar":"todo asignado",un>0);
-    set('#m-con',S.contracts.length+" contratos · "+S.contracts.filter(c=>!c.signature.customerSignedAt).length+" sin firmar");
-    set('#m-cap',ct.docsAwaitingReview?ct.docsAwaitingReview+" por validar":"al día",ct.docsAwaitingReview>0);
-    set('#m-ges',S.packagesSent.length+" paquetes enviados");
-    $('#d-op').innerHTML=`<span><i>${op.visitsDue.length}</i> visitas pendientes</span><span><i>${op.extrasToPrice}</i> extras por valorar</span><span><i>${op.hoursToReport}</i> obras con horas por registrar</span><span><i>${op.overdueTasks}</i> tareas vencidas</span>`;
-    $('#d-bo').innerHTML=`<span><i>${bo.budgetsToPrepare}</i> presupuestos por preparar</span><span><i>${bo.collectionsDue}</i> cobros por reclamar</span><span><i>${bo.billsToAllocate}</i> facturas sin asignar</span><span><i>${bo.docsMissing}</i> documentos por validar</span>`;
-  }catch(e){/* leave static labels */}
-})();
-</script>
 </body>
 </html>

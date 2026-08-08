@@ -23,8 +23,25 @@
     return d.toISOString().slice(0, 10);
   };
   const daysBetween = (a, b) => Math.round((new Date(a) - new Date(b)) / 86400000);
+  // Monday of the ISO week containing dateIso (§4.6's weekly grid, LAB-01).
+  const weekStartOf = (dateIso) => {
+    const d = new Date(dateIso + "T00:00:00Z");
+    const day = d.getUTCDay(); // 0=Sun..6=Sat
+    d.setUTCDate(d.getUTCDate() + (day === 0 ? -6 : 1 - day));
+    return d.toISOString().slice(0, 10);
+  };
   const quarterOf = (isoDate) =>
     isoDate.slice(0, 4) + "-Q" + (Math.floor((+isoDate.slice(5, 7) - 1) / 3) + 1);
+  // Inverse of quarterOf: the last calendar day of a "YYYY-Qn" label.
+  const quarterEndDate = (q) => {
+    const [y, qn] = q.split("-Q");
+    const endMonth = Number(qn) * 3; // Q1->3, Q2->6, Q3->9, Q4->12
+    const firstOfNext =
+      endMonth === 12
+        ? `${Number(y) + 1}-01-01`
+        : `${y}-${String(endMonth + 1).padStart(2, "0")}-01`;
+    return addDays(firstOfNext, -1);
+  };
   // deterministic light hash for the invoice event chain (VFU-01)
   const djb2 = (s) => {
     let h = 5381;
@@ -127,6 +144,8 @@
       "paymentProof",
       "creditNote",
     ], // CAP-02
+    // §4.2: mandatory documentation before a trade enters the site.
+    subcontractDocTypes: ["insurance", "prl", "socialSecurity"],
     docStatuses: ["captured", "extracted", "validated", "allocated", "sentToAccounting", "paid"], // CAP-09
     installmentTriggers: ["onSignature", "atWorksStart", "atStage", "onCompletion", "fixedDate"], // CON-04
     contractStatuses: ["draft", "sent", "signed", "inForce", "completed", "cancelled"], // CON-13
@@ -161,6 +180,94 @@
     vatRates: [2100, 1000, 500, 0], // NFR-11 (basis points)
     lossReasons: ["price", "timing", "scope", "competitor", "noResponse", "withdrew"], // CRM-05
     employmentKinds: ["employee", "selfEmployed", "subcontractorStaff"], // LAB-04
+    alertTypes: ["economica", "tecnica", "documental", "fiscal"], // DAS-06 grouping
+  };
+
+  /*
+   * DAS-06 — one entry per alert CONDITION alerts() can raise, keyed by a
+   * stable code. This is the single place that says what TYPE a condition
+   * belongs to (económica/técnica/documental/fiscal) and, for the conditions
+   * §2.1/§3.2 explicitly call "configurable", what its default threshold is.
+   * alerts() only adds a `code` at each push() site; everything else about
+   * the alert (type, label, whether a threshold applies) is looked up here,
+   * so a call site never has to repeat metadata that belongs in one place.
+   * A code with no `thresholdKind` has no adjustable number — its rule still
+   * exists (see ensureAlertRules) so it can be enabled/disabled and given a
+   * recipient/channel, just not a threshold that would not mean anything.
+   */
+  const ALERT_META = {
+    "AR-OVERDUE": { type: "economica", label: "Factura vencida" },
+    "CON-INSTALLMENT-OVERDUE": { type: "economica", label: "Hito de cobro vencido" },
+    "CASH-SHORTFALL": { type: "economica", label: "Caja no cubre los pagos previstos" },
+    "PROJ-MARGIN-NEG": { type: "economica", label: "Margen negativo" },
+    // Threshold intentionally NOT here: this condition already reads
+    // state.config.marginThresholdBp (ORG-01, set via configureEntity). This
+    // entry exists only so the alert can be enabled/disabled and grouped like
+    // every other one — a second, competing threshold store would be the bug.
+    "PROJ-MARGIN-LOW": { type: "economica", label: "Margen bajo el umbral configurado" },
+    "CON-UNSIGNED-STARTED": { type: "tecnica", label: "Obra iniciada sin contrato firmado" },
+    "CON-START-AT-RISK": {
+      type: "tecnica",
+      label: "Fecha de inicio comprometida en riesgo",
+      thresholdKind: "days",
+      defaultThreshold: 3,
+    },
+    "CON-DURATION-EXCEEDED": { type: "tecnica", label: "Duración contractual excedida" },
+    "QUO-PENDING-LINES": { type: "documental", label: "Presupuesto con líneas pendientes" },
+    "QUO-EXPIRING": {
+      type: "economica",
+      label: "Presupuesto por caducar",
+      thresholdKind: "days",
+      defaultThreshold: 7,
+    },
+    // §3.2: "alerta de oportunidad sin actividad durante X días (configurable)" —
+    // the one condition the spec names explicitly as needing a tunable X.
+    "OPP-STALE": {
+      type: "economica",
+      label: "Oportunidad sin avance",
+      thresholdKind: "days",
+      defaultThreshold: 14,
+    },
+    "PRICE-EXPIRED": { type: "documental", label: "Precio de proveedor caducado" },
+    "PROJ-CHAPTER-OVERCOST": { type: "economica", label: "Capítulo por encima de coste previsto" },
+    "CHG-UNAPPROVED-COST": { type: "economica", label: "Extra sin aprobar con coste incurrido" },
+    "PUR-ARRIVAL-DELAYED": { type: "tecnica", label: "Llegada de material retrasada" },
+    "PUR-RECONCILE-DIFF": {
+      type: "economica",
+      label: "Diferencias en la conciliación de una orden",
+    },
+    "SUB-DOC-EXPIRED": { type: "documental", label: "Documentación caducada de una subcontrata" },
+    "SUB-OVERCERTIFIED": { type: "economica", label: "Certificado por encima de lo adjudicado" },
+    "SUB-UNBILLED": {
+      type: "documental",
+      label: "Subcontrata sin factura",
+      thresholdKind: "days",
+      defaultThreshold: 60,
+    },
+    "SUB-RETENTION-DUE": { type: "economica", label: "Retención no liberada tras su plazo" },
+    "WORKER-DOC-EXPIRED": { type: "documental", label: "Documentación caducada de un trabajador" },
+    "LAB-MISSING-DAYS": { type: "tecnica", label: "Jornadas sin registrar" },
+    "AP-UNALLOCATED": { type: "documental", label: "Facturas de proveedor sin asignar" },
+    "BNK-UNALLOCATED": { type: "documental", label: "Movimientos bancarios sin asignar" },
+    "AP-DUPLICATE": { type: "documental", label: "Posible factura duplicada" },
+    "CON-WARRANTY-EXPIRING": {
+      type: "documental",
+      label: "Garantía próxima a vencer",
+      thresholdKind: "days",
+      defaultThreshold: 30,
+    },
+    "BNK-CASH-NODOC": { type: "documental", label: "Movimiento de caja sin justificante" },
+    // Advisory internal reminder, NOT a legal filing deadline — no AEAT date
+    // is asserted anywhere in this engine (see LEGAL_REVIEW.md §5). The
+    // threshold is "days after quarter-end this tenant wants the package
+    // sent by", entirely tenant-configurable and defaulting to a cushion
+    // ahead of typical quarterly filing windows.
+    "GES-PACKAGE-DUE": {
+      type: "fiscal",
+      label: "Paquete trimestral sin enviar a gestoría",
+      thresholdKind: "days",
+      defaultThreshold: 15,
+    },
   };
 
   // MDM-02: mandatory identification to invoice or contract
@@ -195,6 +302,7 @@
         clauseBlocks: [],
         projects: [],
         purchases: [],
+        subcontracts: [],
         captured: [],
         changes: [],
         invoices: [],
@@ -205,18 +313,19 @@
         bankAccounts: [],
         movements: [],
         merchantRules: [],
+        bankPeriods: [], // §5.3: closed/reopened reconciliation periods
+        commsTemplates: [], // §5.7
+        commsRules: [],
+        commsQueue: [],
+        gestoriaQueries: [], // §5.6: what the accountant asked, and the answer
         labour: [],
         workers: [],
         tasks: [],
         packagesSent: [],
         audit: [],
         invoiceEvents: [], // ORG-07 / VFU-01
-        // Declared here, not created on first write: a collection that only
-        // appears once used gives ERP.from(stored) an inconsistent shape.
-        feedback: [],
-        supplierPerf: [],
-        assignments: [],
-        recurring: [],
+        alertRules: [], // DAS-06: enabled/threshold/recipient/channel per alert code
+        alertOverrides: {}, // DAS-07: assign/due/snooze/resolve/task-link, keyed by alertKey()
         seq: { id: 1 },
       };
     }
@@ -229,7 +338,11 @@
       const fresh = e.state;
       e.state = json;
       // Backfill collections added after this blob was written, so restored
-      // state has the same shape as a new engine.
+      // state has the same shape as a new engine. Without it, a document stored
+      // by an older build is missing whatever arrays this build added, and the
+      // first `state.x.filter(...)` throws somewhere far from the cause — on
+      // the server that is a 500 on a page that has nothing to do with the new
+      // feature. Cheap here, very expensive to diagnose there.
       for (const k of Object.keys(fresh))
         if (Array.isArray(fresh[k]) && !Array.isArray(e.state[k])) e.state[k] = [];
       return e;
@@ -281,6 +394,7 @@
       mk("receipt", "REC-");
       mk("creditNote", "ABO-");
       mk("purchaseOrder", "OC-");
+      mk("subcontract", "SUB-");
       this._log("backoffice", "configureEntity", this.state.config.legalName);
       return this.state.config;
     }
@@ -340,7 +454,13 @@
           email: "",
           preferredChannel: "mobile", // MDM-04
           leadSource: "",
-          activityLine: "", // MDM-06 / ORG-02
+          // No activityLine here on purpose. A "línea de actividad" belongs to
+          // the WORK, not to the person paying for it — the same customer can
+          // have a bathroom, a damp survey and a shop fit-out — so it lives on
+          // budgets and projects (where profitability("activityLine") reads it)
+          // and was removed from the party model. Schema v9 drops it from
+          // stored records too.
+          createdAt: this.state.today, // MDM-01: when this record entered the file
           paymentMethod: "transfer",
           paymentTermsDays: 30,
           vatRegime: "standard",
@@ -357,32 +477,16 @@
       rec.accountingCode = rec.accountingCode || "43" + rec.code.replace(/\D/g, ""); // MDM-09 aligned pair
       if (rec.taxId && !validTaxId(rec.taxId))
         throw new Error("Invalid tax identifier: " + rec.taxId); // MDM-03
-      // Two separate things, deliberately not one.
-      //
-      // A shared tax id is a HARD rule (MDM-03): two active parties with the
-      // same identifier means one customer's invoices split across two records
-      // and a tax filing built from them that does not add up.
-      //
-      // findDuplicateParty is a SOFT signal — it matches on tax id OR name OR
-      // phone and returns the first hit. Asking it to enforce the hard rule
-      // let real duplicates through: if an unrelated party matched first on a
-      // shared phone number, its tax id differed and the check passed. Verified
-      // by admitting one before this was split.
-      if (rec.taxId && this._activeTaxIdHolder(rec.taxId, rec.id))
-        throw new Error("Duplicate active party for tax id " + rec.taxId); // MDM-03
       const dup = this.findDuplicateParty(rec);
+      if (dup && rec.taxId && dup.taxId === rec.taxId)
+        throw new Error("Duplicate active party for tax id " + rec.taxId); // MDM-03
       rec.duplicateSuspect = dup ? dup.id : null;
       this.state.parties.push(rec);
       this._log(user, "addParty", rec.code);
       return rec;
     }
-    /** The active party already holding this tax id, if any. MDM-03's hard rule. */
-    _activeTaxIdHolder(taxId, exceptId) {
-      return this.state.parties.find((x) => x.active && x.id !== exceptId && x.taxId === taxId);
-    }
     findDuplicateParty(rec) {
-      // A SOFT signal for review — matches on taxId, name OR phone and returns
-      // the first hit. Never use it to enforce the tax-id rule; see addParty.
+      // MDM-03: on taxId, name, phone
       const norm = (s) =>
         String(s || "")
           .toLowerCase()
@@ -402,11 +506,6 @@
     updateParty(id, patch, user) {
       const p = this.party(id);
       if (patch.taxId && !validTaxId(patch.taxId)) throw new Error("Invalid tax identifier");
-      // The same hard rule as addParty. Without it the rule was trivially
-      // sidestepped: create a party with any identifier, then edit it to
-      // whichever one is already in use.
-      if (patch.taxId && patch.taxId !== p.taxId && this._activeTaxIdHolder(patch.taxId, id))
-        throw new Error("Duplicate active party for tax id " + patch.taxId); // MDM-03
       if (patch.bank && patch.bank.iban && !validIban(patch.bank.iban))
         throw new Error("Invalid IBAN");
       if (patch.bank) this._log(user, "partyBankChange", p.code); // MDM-08 change-logged
@@ -418,6 +517,90 @@
       this.party(id).active = false;
       this._log(user, "deactivateParty", id);
     } // MDM-12
+    /**
+     * Everything that would be orphaned by deleting this party, as a list of
+     * human-readable references. Empty means the record is genuinely free.
+     */
+    partyEconomicRefs(id) {
+      const S = this.state;
+      const out = [];
+      const add = (label, arr, ref) => arr.forEach((x) => out.push(label + " " + ref(x)));
+      add(
+        "presupuesto",
+        S.budgets.filter((b) => b.partyId === id),
+        (b) => b.number,
+      );
+      add(
+        "contrato",
+        S.contracts.filter((c) => c.partyId === id),
+        (c) => c.number,
+      );
+      add(
+        "proyecto",
+        S.projects.filter((p) => p.partyId === id),
+        (p) => p.code,
+      );
+      add(
+        "factura",
+        S.invoices.filter((i) => i.partyId === id),
+        (i) => i.number,
+      );
+      add(
+        "recibo",
+        S.receipts.filter((r) => r.partyId === id),
+        (r) => r.number,
+      );
+      add(
+        "factura recibida",
+        S.bills.filter((b) => b.supplierId === id),
+        (b) => b.number,
+      );
+      add(
+        "cobro",
+        (S.collections || []).filter((c) => c.partyId === id),
+        (c) => c.id,
+      );
+      add(
+        "subcontrata",
+        (S.subcontracts || []).filter((s) => s.supplierId === id),
+        (s) => s.number,
+      );
+      add(
+        "orden de compra",
+        S.purchases.filter((p) => p.supplierId === id),
+        (p) => p.number,
+      );
+      return out;
+    }
+    /**
+     * Hard-delete a party (MDM-12 / §3.1).
+     *
+     * REFUSES while any economic document points at it — "no se permite
+     * eliminar un cliente con documentos económicos asociados: se desactiva y
+     * se conserva el histórico". Deleting the customer behind a issued invoice
+     * would leave that invoice pointing at nothing, and an issued document is
+     * immutable precisely so it can still be explained years later. The
+     * refusal names what is in the way so the caller can offer the honest
+     * alternative (deactivate) instead of guessing.
+     */
+    deleteParty(id, user) {
+      const p = this.party(id);
+      const refs = this.partyEconomicRefs(id);
+      if (refs.length)
+        throw new Error(
+          "No se puede eliminar: tiene " +
+            refs.length +
+            " documento(s) asociado(s) — " +
+            refs.slice(0, 4).join(", ") +
+            (refs.length > 4 ? "…" : "") +
+            ". Desactívalo para conservar el histórico.",
+        );
+      this.state.parties = this.state.parties.filter((x) => x.id !== id);
+      this.state.properties = this.state.properties.filter((x) => x.partyId !== id);
+      this.state.opportunities = this.state.opportunities.filter((x) => x.partyId !== id);
+      this._log(user, "deleteParty", p.code + " " + p.name);
+      return p;
+    }
     party(id) {
       const p = this.state.parties.find((x) => x.id === id);
       if (!p) throw new Error("Party not found");
@@ -510,6 +693,7 @@
       const o = this.state.opportunities.find((x) => x.id === id);
       o.status = "lost";
       o.lossReason = reason;
+      o.decidedAt = this.state.today; // DAS-01: "contratadas/perdidas últimos 12 meses"
       this._log(user, "loseOpportunity", id);
     }
     opportunityAges() {
@@ -699,6 +883,10 @@
           currentVersionId: null,
           acceptedVersionId: null,
           internalVariant: false, // PRE-13/QUO-06
+          // PRE-10: the graphic annex is a property of the budget, switchable
+          // per budget. Its layout is not computed here — see the annex
+          // composer the document preview calls; this is only the setting.
+          annex: { enabled: true, imagesPerPage: 2 },
         },
         b,
       );
@@ -810,6 +998,179 @@
         throw new Error("Current version is frozen — create a new version"); // QUO-02
       if (b.acceptedVersionId === v.id) throw new Error("Accepted version is immutable"); // QUO-04
       return v;
+    }
+
+    /* ---- the builder's edit surface (PRE-02/05, spec §3.3 "Disposición del
+       constructor"). Every one of these goes through _editableVersion, so a
+       frozen, issued or accepted version refuses the edit rather than silently
+       rewriting a document that was already sent.
+
+       NOTE the deliberate absence of updateLine/updateChapter/removeLine here:
+       this class already defines them further down, keyed by chapter AND line
+       reference. A second definition of the same name in a class body silently
+       replaces the first, so adding one here would break every existing
+       caller — which is exactly what a first draft of this block did, caught
+       by the site E2E rather than by reading. ---- */
+
+    /** The line with this id, wherever it sits, plus its chapter and version. */
+    findLine(budgetId, lineId, versionId) {
+      const v = versionId ? this.version(budgetId, versionId) : this.currentVersion(budgetId);
+      for (const c of v.chapters) {
+        const l = c.lines.find((x) => x.id === lineId);
+        if (l) return { version: v, chapter: c, line: l };
+      }
+      return null;
+    }
+
+    /**
+     * Write-through edit of one line, addressed by line id alone (updateLine
+     * needs the chapter too, which a spreadsheet grid does not have to hand).
+     *
+     * `audit` exists because of how a grid is used: the constructor writes on
+     * EVERY keystroke, so that the totals panel beside it is genuinely live
+     * rather than an optimistic copy. Logging each of those would record one
+     * audit entry per character typed and drown the trail that ORG-07 exists
+     * to keep readable. The view therefore writes silently while a field is
+     * being typed into and logs once when it is committed, which records the
+     * same fact — this person changed this line — at the granularity a person
+     * can actually read.
+     */
+    editLine(budgetId, lineId, patch, { audit = false, user } = {}) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      // Identity and images are not patchable here: an id must stay stable for
+      // the version diff to work, and images have their own guarded methods.
+      const { id, num, imageRefs, ...safe } = patch || {};
+      void id;
+      void num;
+      void imageRefs;
+      Object.assign(found.line, safe);
+      if (found.line.subLines.length) found.line.qtyMilli = this._aggSubLines(found.line.subLines);
+      if (audit) this._log(user, "editLine", this.budget(budgetId).number + " " + found.line.num);
+      return found.line;
+    }
+
+    /** Delete a line addressed by its id alone, renumbering what remains. */
+    deleteLine(budgetId, lineId, user) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      found.chapter.lines = found.chapter.lines.filter((l) => l.id !== lineId);
+      // Line numbers are the reader's index into the document — and into the
+      // graphic annex — so they are renumbered to stay contiguous.
+      found.chapter.lines.forEach((l, i) => (l.num = found.chapter.num + "." + (i + 1)));
+      this._log(user, "deleteLine", this.budget(budgetId).number + " " + found.line.num);
+      return found.chapter;
+    }
+
+    removeChapter(budgetId, chapterId) {
+      const v = this._editableVersion(budgetId);
+      v.chapters = v.chapters.filter((c) => c.id !== chapterId);
+      v.chapters.forEach((c, i) => {
+        const num = String(i + 1);
+        c.num = num;
+        c.order = i;
+        c.lines.forEach((l, j) => (l.num = num + "." + (j + 1)));
+      });
+      return v;
+    }
+
+    /* ---- PRE-10 / CAT-08 / DOC-02: images on a line.
+       The image is informative and NEVER touches quantities, prices or totals —
+       none of these methods so much as reads an amount. Bytes live in the blob
+       store under `storageKey`; only the reference and its caption are state,
+       which is what keeps the state blob small enough to re-serialise on every
+       keystroke. Because a version deep-copies its chapters, freezing a version
+       freezes its annex with it: an issued document can always be reproduced
+       exactly as it was sent, even if the catalogue image changes later. ---- */
+    attachLineImage(budgetId, lineId, img, user) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      if (!img || !img.storageKey) throw new Error("Image needs a storage key");
+      const rec = Object.assign(
+        {
+          id: this._id("img"),
+          storageKey: "",
+          caption: "",
+          source: "upload", // catalogue | visit | upload | camera
+          internal: false, // internal-only images never reach the customer doc
+          mime: "image/jpeg",
+          sizeBytes: 0,
+          width: 0,
+          height: 0,
+        },
+        img,
+      );
+      found.line.imageRefs.push(rec);
+      this._log(user, "attachLineImage", found.line.num);
+      return rec;
+    }
+    updateLineImage(budgetId, lineId, imageId, patch) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      const img = found.line.imageRefs.find((x) => x.id === imageId);
+      if (!img) throw new Error("Image not found");
+      const { id, storageKey, ...safe } = patch || {};
+      void id;
+      void storageKey; // replacing the bytes is attach + remove, not a patch
+      Object.assign(img, safe);
+      return img;
+    }
+    removeLineImage(budgetId, lineId, imageId) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      const img = found.line.imageRefs.find((x) => x.id === imageId);
+      found.line.imageRefs = found.line.imageRefs.filter((x) => x.id !== imageId);
+      // The blob itself is deliberately NOT deleted: an earlier frozen version
+      // may still reference it, and orphaning a sent document's picture to
+      // reclaim a few kilobytes is the wrong trade.
+      return img || null;
+    }
+    moveLineImage(budgetId, lineId, imageId, delta) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      const arr = found.line.imageRefs;
+      const i = arr.findIndex((x) => x.id === imageId);
+      if (i < 0) throw new Error("Image not found");
+      const j = Math.max(0, Math.min(arr.length - 1, i + delta));
+      if (i !== j) arr.splice(j, 0, arr.splice(i, 1)[0]);
+      return arr;
+    }
+    setAnnexOptions(budgetId, opts) {
+      const b = this.budget(budgetId);
+      if (!b.annex) b.annex = { enabled: true, imagesPerPage: 2 };
+      if (typeof opts.enabled === "boolean") b.annex.enabled = opts.enabled;
+      if (opts.imagesPerPage != null) {
+        const n = Math.round(Number(opts.imagesPerPage));
+        b.annex.imagesPerPage = Math.max(1, Math.min(12, isFinite(n) ? n : 2));
+      }
+      return b.annex;
+    }
+    /** Every image on a version, flattened with the line it belongs to. */
+    budgetImages(budgetId, versionId, { includeInternal = false } = {}) {
+      const v = versionId ? this.version(budgetId, versionId) : this.currentVersion(budgetId);
+      const out = [];
+      for (const c of v.chapters)
+        for (const l of c.lines)
+          (l.imageRefs || []).forEach((img, i) => {
+            if (!includeInternal && img.internal) return;
+            out.push({
+              image: img,
+              order: i,
+              lineId: l.id,
+              lineNum: l.num,
+              lineDesc: l.customerWording || l.desc,
+              chapterNum: c.num,
+              chapterName: c.name,
+              section: c.section,
+            });
+          });
+      return out;
     }
     budgetTotals(budgetId, versionId) {
       // PRE-06/07: the totals engine
@@ -924,6 +1285,12 @@
         throw new Error("Email required to send electronically (MDM-04)");
       v.issued = true;
       v.frozen = true;
+      // PRE-10: freezing a version freezes its annex. The images are already
+      // frozen (they live on this version's own copy of the chapters), but the
+      // annex SETTINGS live on the budget and would otherwise keep changing
+      // under an already-sent document. Snapshot them here so a reissued PDF is
+      // laid out exactly as the one the customer received.
+      v.annex = clone(b.annex || { enabled: true, imagesPerPage: 2 });
       v.sent = { date: this.state.today, channel: ch }; // QUO-09 + MDM-04
       v.docRef = this._docName("presupuesto", b, v); // DOC-04
       b.status = "issued";
@@ -982,9 +1349,18 @@
               subLines: l.subLines
                 .filter((s) => s.customerVisible)
                 .map((s) => ({ room: s.room, qty: s.qtyMilli / 1000 })), // PRE-03 optional visibility
-              imageRefs: l.imageRefs, // PRE-10 / CAT-08
+              // PRE-10 / CAT-08. Internal-only images are dropped at the
+              // document boundary for the same reason cost and margin are: a
+              // value that never enters the customer document cannot leak out
+              // of one.
+              imageRefs: (l.imageRefs || []).filter((img) => !img.internal),
             })),
         })),
+        // The annex SETTINGS as they apply to this version: an issued version
+        // carries its own frozen copy, a draft follows the budget's current
+        // ones. What goes on which page is not decided here — the annex
+        // composer in the capability layer does that from these images.
+        annex: clone(v.annex || b.annex || { enabled: true, imagesPerPage: 2 }),
         totals: {
           baseCents: t.baseCents,
           optionsCents: t.optionsCents,
@@ -1055,7 +1431,10 @@
       const o = this.state.opportunities.find(
         (x) => x.partyId === b.partyId && !["won", "lost"].includes(x.status),
       );
-      if (o) o.status = "won";
+      if (o) {
+        o.status = "won";
+        o.decidedAt = this.state.today; // DAS-01: "contratadas/perdidas últimos 12 meses"
+      }
       this._log(user, "acceptVersion", b.number + " v" + v.vNumber);
       return v;
     }
@@ -1221,6 +1600,7 @@
         permits: [],
         dependencies: [],
         closed: false,
+        priority: false, // DAS-01 "marcar un proyecto como prioritario"
       };
       this.state.projects.push(rec);
       this._log(user, "createProject", rec.code);
@@ -1253,6 +1633,7 @@
         permits: [],
         dependencies: [],
         closed: false,
+        priority: false, // DAS-01 "marcar un proyecto como prioritario"
       };
       this.state.projects.push(rec);
       this._log(user, "createQuickProject", rec.code);
@@ -1261,6 +1642,13 @@
     project(id) {
       const p = this.state.projects.find((x) => x.id === id || x.code === id);
       if (!p) throw new Error("Project not found: " + id);
+      return p;
+    }
+    setProjectPriority(id, flag, user) {
+      // DAS-01 "marcar un proyecto como prioritario" — a pin, not a status.
+      const p = this.project(id);
+      p.priority = !!flag;
+      this._log(user, "setProjectPriority", p.code);
       return p;
     }
     startWorks(projectId, user) {
@@ -1292,6 +1680,181 @@
       });
       this._log(user, "markProgress", p.code + " cap." + chapterNum + " → " + state_);
     }
+    /**
+     * Progress on ONE line, by percentage or by the quantity actually built
+     * (§4.3: "avance por cantidad ejecutada además de por porcentaje").
+     *
+     * Quantity is the honest input on site — nobody knows what 40 % of a wall
+     * is, everybody knows how many square metres went up — so it is converted
+     * here rather than asked for as a percentage the foreman had to invent.
+     * The chapter's own state is then rolled up from its lines, so the two can
+     * never contradict each other.
+     */
+    markLineProgress(projectId, lineId, { pct, qtyMilliDone }, user) {
+      const p = this.project(projectId);
+      if (!p.budgetId) throw new Error("Project has no budget to mark progress against");
+      const v = this.version(p.budgetId, p.acceptedVersionId);
+      for (const c of v.chapters) {
+        const l = c.lines.find((x) => x.id === lineId);
+        if (!l) continue;
+        let value = pct;
+        if (value == null && qtyMilliDone != null) {
+          const total = l.subLines.length ? this._aggSubLines(l.subLines) : l.qtyMilli;
+          value = total > 0 ? (qtyMilliDone / total) * 100 : 0;
+        }
+        l.progressPct = Math.max(0, Math.min(100, Math.round(value || 0)));
+        l.progress =
+          l.progressPct >= 100 ? "done" : l.progressPct > 0 ? "inProgress" : "notStarted";
+        const pcts = c.lines.map((x) => x.progressPct || 0);
+        c.progress = pcts.every((x) => x >= 100)
+          ? "done"
+          : pcts.some((x) => x > 0)
+            ? "inProgress"
+            : "notStarted";
+        this._log(user, "markLineProgress", p.code + " " + l.num + " → " + l.progressPct + "%");
+        return l;
+      }
+      throw new Error("Line not found: " + lineId);
+    }
+    /** Value-weighted progress per chapter, the input a cost forecast needs. */
+    chapterProgress(projectId) {
+      const p = this.project(projectId);
+      if (!p.budgetId) {
+        const pct = p.progressSimple ? p.progressSimple.pct : 0;
+        return p.baseline.chapters.map((c) => ({ num: c.num, progressPct: pct }));
+      }
+      const v = this.version(p.budgetId, p.acceptedVersionId);
+      return v.chapters
+        .filter((c) => c.section === "base")
+        .map((c) => {
+          let value = 0,
+            done = 0;
+          for (const l of c.lines) {
+            if (l.pending) continue;
+            const qty = l.subLines.length ? this._aggSubLines(l.subLines) : l.qtyMilli;
+            const amount = l.lumpSum ? l.priceCents : mul(qty, l.priceCents);
+            value += amount;
+            done += (amount * (l.progressPct || 0)) / 100;
+          }
+          return { num: c.num, progressPct: value ? Math.round((done / value) * 100) : 0 };
+        });
+    }
+    /** Committed cost per chapter — orders and awarded subcontracts, net of returns (FIN-02, §4.1). */
+    committedByChapter(projectId) {
+      const out = {};
+      for (const pu of this.state.purchases) {
+        if (pu.projectId !== projectId || !pu.chapterNum || pu.cancelledAt) continue;
+        out[pu.chapterNum] = (out[pu.chapterNum] || 0) + (pu.totalCents - pu.status.returnedCents);
+      }
+      for (const s of this.state.subcontracts || []) {
+        if (s.projectId !== projectId || !s.chapterNum) continue;
+        if (["draft", "cancelled", "rejected"].includes(s.status)) continue;
+        out[s.chapterNum] = (out[s.chapterNum] || 0) + this._subcontractCommittedValue(s);
+      }
+      return out;
+    }
+    /**
+     * What a subcontract counts as "comprometido": the full award, EXCEPT a
+     * terminated one, which is only as good as what was actually certified —
+     * the rest of the award was never going to be spent.
+     */
+    _subcontractCommittedValue(s) {
+      return s.status === "terminated"
+        ? sum(s.certifications, (c) => c.amountCents)
+        : s.awardedCents;
+    }
+    /**
+     * Material still to commit, by chapter (§4.1 block 1: "necesidades ...
+     * derivadas del presupuesto, con lo ya pedido y lo pendiente"). Reads the
+     * project's own frozen chapter budgets and compares them against
+     * committedByChapter — the same figures the economics screen shows, so
+     * the two can never disagree about how much of a chapter is still open.
+     */
+    purchaseNeeds(projectId) {
+      const p = this.project(projectId);
+      const committed = this.committedByChapter(projectId);
+      return (p.baseline.chapters || []).map((c) => {
+        const committedCents = committed[c.num] || 0;
+        return {
+          num: c.num,
+          name: c.name,
+          budgetCostCents: c.costCents,
+          committedCents,
+          pendingCents: Math.max(0, c.costCents - committedCents),
+        };
+      });
+    }
+    /**
+     * A human's replacement for a calculated cost-at-completion (§4.4
+     * "Proyección"). The reason is required and stored with it: an adjustment
+     * nobody can review later is indistinguishable from a typo, and the point
+     * of the figure is to start a conversation about why it moved.
+     */
+    setForecastOverride(projectId, chapterNum, { costCents, reason }, user) {
+      const p = this.project(projectId);
+      if (!reason || !String(reason).trim())
+        throw new Error("An adjusted projection needs a reason");
+      if (!p.forecastOverrides || typeof p.forecastOverrides !== "object") p.forecastOverrides = {};
+      p.forecastOverrides[chapterNum] = {
+        costCents: Math.round(costCents),
+        reason: String(reason).trim(),
+        at: this.state.today,
+        by: user || "backoffice",
+      };
+      this._log(user, "setForecastOverride", p.code + " cap." + chapterNum);
+      return p.forecastOverrides[chapterNum];
+    }
+    clearForecastOverride(projectId, chapterNum, user) {
+      const p = this.project(projectId);
+      if (p.forecastOverrides) delete p.forecastOverrides[chapterNum];
+      this._log(user, "clearForecastOverride", p.code + " cap." + chapterNum);
+    }
+    /**
+     * The fixed header of §4: everything the strip above every project
+     * subsection has to show, in one call, so six views cannot each assemble
+     * it slightly differently.
+     */
+    projectHeader(projectId) {
+      const p = this.project(projectId);
+      const e = this.projectEconomics(projectId);
+      const party = this.party(p.partyId);
+      const property = p.propertyId
+        ? this.state.properties.find((x) => x.id === p.propertyId)
+        : null;
+      const contract = p.contractId
+        ? this.state.contracts.find((c) => c.id === p.contractId)
+        : null;
+      // The next two dates that matter, whatever kind they are: a payment
+      // milestone, the committed finish, a permit expiry. A header that only
+      // knew about one kind would go quiet exactly when another is looming.
+      const dates = [];
+      if (p.dates.targetEnd) dates.push({ what: "Fin previsto", date: p.dates.targetEnd });
+      if (contract) {
+        for (const i of contract.installments || [])
+          if (i.expectedDate && i.status !== "invoiced")
+            dates.push({ what: "Hito de cobro", date: i.expectedDate });
+      }
+      for (const pm of p.permits || [])
+        if (pm.expiresOn) dates.push({ what: "Permiso " + (pm.kind || ""), date: pm.expiresOn });
+      dates.sort((a, b) => (a.date < b.date ? -1 : 1));
+      return {
+        id: p.id,
+        code: p.code,
+        partyId: p.partyId,
+        partyName: party.name,
+        address: property
+          ? `${property.street || ""}, ${property.postalCode || ""} ${property.city || ""}`.trim()
+          : "",
+        status: p.closed ? "closed" : p.status,
+        activityLine: p.activityLine,
+        progressPct: e.progressPct,
+        revenueCents: e.currentRevenueCents,
+        actualCents: e.actualCents,
+        marginCents: e.marginForecastCents,
+        marginPct: e.marginForecastPct,
+        nextDates: dates.slice(0, 2),
+      };
+    }
     projectProgressPct(projectId) {
       // value-weighted, feeds progress invoicing (PLN-03)
       const p = this.project(projectId);
@@ -1321,11 +1884,13 @@
           date: this.state.today,
           desc: "",
           reason: "",
+          chapterNum: null, // which chapter's cost/margin this extra affects
           priceCents: 0,
           costCents: 0,
           scheduleImpactDays: 0,
           photoRef: null,
           status: "identified",
+          sentAt: null,
           approvedAt: null,
           evidenceRef: null,
           invoiceId: null,
@@ -1337,17 +1902,35 @@
       this._log(user, "addChange", p.code + " " + rec.desc);
       return rec;
     }
-    priceChange(changeId, priceCents, costCents, user) {
+    priceChange(changeId, priceCents, costCents, scheduleImpactDays, user) {
+      // scheduleImpactDays sits before user (not after) so an existing 3-arg
+      // call — every caller before this session — keeps meaning exactly what
+      // it always meant, with the schedule effect simply left at its default.
       const c = this.state.changes.find((x) => x.id === changeId);
       c.priceCents = priceCents;
       c.costCents = costCents;
+      if (scheduleImpactDays != null) c.scheduleImpactDays = Math.round(scheduleImpactDays);
       c.status = "priced";
       this._log(user, "priceChange", changeId);
     }
-    approveChange(changeId, evidenceRef, user) {
-      // CHG-03/04 + CON-12
+    /** Send the valued extra to the client before asking for acceptance. */
+    sendChange(changeId, user) {
       const c = this.state.changes.find((x) => x.id === changeId);
-      if (c.status !== "priced") throw new Error("Change must be priced before approval");
+      if (!c) throw new Error("Change not found");
+      if (c.status !== "priced") throw new Error("Change must be priced before it can be sent");
+      c.status = "sent";
+      c.sentAt = this.state.today;
+      this._log(user, "sendChange", changeId);
+      return c;
+    }
+    approveChange(changeId, evidenceRef, user) {
+      // CHG-03/04 + CON-12. Accepts "priced" too — sending to the client first
+      // is a real step this spec adds, but skipping straight to acceptance
+      // (a verbal yes, a signature on the spot) is common enough on site that
+      // requiring the intermediate step would just get worked around.
+      const c = this.state.changes.find((x) => x.id === changeId);
+      if (!["priced", "sent"].includes(c.status))
+        throw new Error("Change must be priced before approval");
       c.status = "approved";
       c.approvedAt = this.state.today;
       c.evidenceRef = evidenceRef || null;
@@ -1373,15 +1956,17 @@
         items: list,
         identified: list.filter((c) => c.status === "identified").length,
         priced: list.filter((c) => c.status === "priced").length,
+        sent: list.filter((c) => c.status === "sent").length,
         approved: list.filter((c) => ["approved", "executed", "invoiced"].includes(c.status))
           .length,
         invoiced: list.filter((c) => c.status === "invoiced").length,
+        rejected: list.filter((c) => ["rejected", "cancelled"].includes(c.status)).length,
         approvedValueCents: sum(
           list.filter((c) => ["approved", "executed", "invoiced"].includes(c.status)),
           (c) => c.priceCents,
         ),
         unapprovedValueCents: sum(
-          list.filter((c) => ["identified", "priced"].includes(c.status)),
+          list.filter((c) => ["identified", "priced", "sent"].includes(c.status)),
           (c) => c.priceCents,
         ), // CHG-04 visible
       };
@@ -1404,6 +1989,12 @@
           vatBp: 2100,
           totalCents: 0,
           orderRef: "",
+          expectedArrival: null, // PUR-06: arrivals calendar
+          sentAt: null,
+          acceptedAt: null,
+          cancelledAt: null,
+          cancelReason: "",
+          receipts: [], // PUR-08: {date, qtyMilli, docRef, photoRef} — partial receiving accumulates
           status: {
             ordered: true,
             delivered: false,
@@ -1422,18 +2013,357 @@
       this._log(user, "addPurchase", rec.number);
       return rec;
     }
+    /**
+     * The lifecycle a purchase order visibly moves through (§4.1: "borrador,
+     * enviada, aceptada, recibida parcial, recibida, facturada, pagada").
+     * Derived from the underlying facts rather than stored as its own field —
+     * a status string that forgets to update when, say, a payment is voided
+     * is a worse bug than any of the booleans and dates it would replace.
+     */
+    purchaseStatus(pu) {
+      if (pu.cancelledAt) return "cancelled";
+      if (pu.status.paid) return "paid";
+      if (pu.status.invoicedBillId) return "invoiced";
+      if (pu.status.delivered) return "received";
+      if ((pu.receipts || []).length) return "partialReceived";
+      if (pu.acceptedAt) return "accepted";
+      if (pu.sentAt) return "sent";
+      return "draft";
+    }
+    /** Send the order to the supplier by email — PDF + template (PUR-...). */
+    sendPurchase(id, user) {
+      const pu = this.state.purchases.find((x) => x.id === id);
+      if (!pu) throw new Error("Purchase not found");
+      if (pu.cancelledAt) throw new Error("Purchase order is cancelled");
+      this._requireComplete(pu.supplierId, "purchase order"); // MDM-10
+      if (!validEmail(this.party(pu.supplierId).email))
+        throw new Error("Supplier email required to send the order");
+      pu.sentAt = this.state.today;
+      this._log(user, "sendPurchase", pu.number);
+      return pu;
+    }
+    acceptPurchase(id, { expectedArrival } = {}, user) {
+      // supplier's acceptance + confirmed arrival date
+      const pu = this.state.purchases.find((x) => x.id === id);
+      if (!pu) throw new Error("Purchase not found");
+      if (!pu.sentAt) throw new Error("Send the order before recording the supplier's acceptance");
+      pu.acceptedAt = this.state.today;
+      if (expectedArrival) pu.expectedArrival = expectedArrival;
+      this._log(user, "acceptPurchase", pu.number);
+      return pu;
+    }
+    cancelPurchase(id, reason, user) {
+      const pu = this.state.purchases.find((x) => x.id === id);
+      if (!pu) throw new Error("Purchase not found");
+      if (pu.status.invoicedBillId)
+        throw new Error("An invoiced order cannot be cancelled — register a return instead");
+      pu.cancelledAt = this.state.today;
+      pu.cancelReason = reason || "";
+      this._log(user, "cancelPurchase", pu.number);
+      return pu;
+    }
+    /**
+     * Receive against the order, in full or in part, with the delivery note
+     * and photo the spec asks for. Repeated partial receipts accumulate; the
+     * order becomes "recibida" on its own once the received quantity reaches
+     * what was ordered, so "recibida parcial" needs no separate close-out step.
+     */
+    receivePurchase(id, { qtyMilli, docRef, photoRef } = {}, user) {
+      const pu = this.state.purchases.find((x) => x.id === id);
+      if (!pu) throw new Error("Purchase not found");
+      if (pu.cancelledAt) throw new Error("Purchase order is cancelled");
+      const qty = Math.round(Number(qtyMilli) || 0);
+      if (qty <= 0) throw new Error("Received quantity must be positive");
+      pu.receipts = pu.receipts || [];
+      pu.receipts.push({
+        date: this.state.today,
+        qtyMilli: qty,
+        docRef: docRef || "",
+        photoRef: photoRef || null,
+      });
+      const receivedQty = sum(pu.receipts, (r) => r.qtyMilli);
+      if (receivedQty >= pu.qtyMilli) pu.status.delivered = true;
+      pu.deliveredDate = this.state.today;
+      this._log(user, "receivePurchase", pu.number + " " + qty / 1000);
+      return pu;
+    }
+    duplicatePurchase(id, user) {
+      const src = this.state.purchases.find((x) => x.id === id);
+      if (!src) throw new Error("Purchase not found");
+      return this.addPurchase(
+        {
+          supplierId: src.supplierId,
+          projectId: src.projectId,
+          chapterNum: src.chapterNum,
+          desc: src.desc,
+          qtyMilli: src.qtyMilli,
+          unitCents: src.unitCents,
+          vatBp: src.vatBp,
+          orderRef: src.orderRef,
+        },
+        user,
+      );
+    }
     recordReturn(purchaseId, amountCents, user) {
       // PUR-09
       const pu = this.state.purchases.find((x) => x.id === purchaseId);
       pu.status.returnedCents += amountCents;
       this._log(user, "recordReturn", pu.number);
     }
+    /** Order ↔ delivery note ↔ invoice, with the mismatches flagged (§4.1 "conciliación a tres bandas"). */
+    purchaseReconciliation(id) {
+      const pu = this.state.purchases.find((x) => x.id === id);
+      if (!pu) throw new Error("Purchase not found");
+      const receivedQty = sum(pu.receipts || [], (r) => r.qtyMilli);
+      const bill = pu.status.invoicedBillId
+        ? this.state.bills.find((b) => b.id === pu.status.invoicedBillId)
+        : null;
+      const qtyMismatch = pu.status.delivered && receivedQty !== pu.qtyMilli;
+      // 1€ tolerance: rounding on unit prices should never itself read as a mismatch.
+      const amountMismatch =
+        !!bill && Math.abs(bill.baseCents - (pu.totalCents - pu.status.returnedCents)) > 100;
+      return {
+        orderedQtyMilli: pu.qtyMilli,
+        receivedQtyMilli: receivedQty,
+        orderedCents: pu.totalCents,
+        invoicedCents: bill ? bill.baseCents : null,
+        qtyMismatch,
+        amountMismatch,
+        ok: !qtyMismatch && !amountMismatch,
+      };
+    }
+    /** Project-level committed cost: orders + awarded subcontracts, net of returns (FIN-02). */
     committedCostCents(projectId) {
-      // FIN-02: committed = orders net of returns
-      return sum(
-        this.state.purchases.filter((p) => p.projectId === projectId),
+      const purchases = sum(
+        this.state.purchases.filter((p) => p.projectId === projectId && !p.cancelledAt),
         (p) => p.totalCents - p.status.returnedCents,
       );
+      return purchases + this._committedSubcontractCents(projectId);
+    }
+    _committedSubcontractCents(projectId) {
+      return sum(
+        (this.state.subcontracts || []).filter(
+          (s) =>
+            s.projectId === projectId && !["draft", "cancelled", "rejected"].includes(s.status),
+        ),
+        (s) => this._subcontractCommittedValue(s),
+      );
+    }
+
+    /* =========================== SUB — subcontracts (§4.2) =========================== */
+    addSubcontract(projectId, s, user) {
+      // PUR-01/02 + SUP-01..24 + CON-04: awarded work by trade, versioned like a PO
+      const p = this.project(projectId);
+      const rec = Object.assign(
+        {
+          id: this._id("sub"),
+          number: this.nextNumber("subcontract"),
+          projectId: p.id,
+          supplierId: null,
+          trade: "",
+          chapterNum: null,
+          format: "workOrder", // "workOrder" | "contract"
+          awardedCents: 0,
+          status: "draft", // draft|sent|accepted|inExecution|completed|terminated|rejected
+          sentAt: null,
+          acceptedAt: null,
+          dates: { plannedStart: null, plannedEnd: null, actualStart: null, actualEnd: null },
+          scheduleTaskRef: null, // links to the Gantt task executing this trade
+          retentionPct: 0,
+          retentionReleaseDate: null,
+          retentionReleasedAt: null,
+          docs: [], // {kind, expiresOn, docRef}
+          certifications: [], // {date, amountCents, note}
+          rejectedWork: [], // {date, desc}
+          billIds: [],
+        },
+        s,
+      );
+      this.state.subcontracts.push(rec);
+      this._log(user, "addSubcontract", rec.number);
+      return rec;
+    }
+    sendSubcontract(id, user) {
+      const s = this._subcontract(id);
+      if (s.status !== "draft") throw new Error("Only a draft can be sent");
+      this._requireComplete(s.supplierId, "subcontract"); // MDM-10
+      if (!validEmail(this.party(s.supplierId).email))
+        throw new Error("Supplier email required to send the subcontract");
+      s.status = "sent";
+      s.sentAt = this.state.today;
+      this._log(user, "sendSubcontract", s.number);
+      return s;
+    }
+    acceptSubcontract(id, { plannedStart, plannedEnd } = {}, user) {
+      // PUR-...: registers acceptance with date; award value stands unless modifySubcontract changes it
+      const s = this._subcontract(id);
+      if (s.status !== "sent") throw new Error("Send the subcontract before recording acceptance");
+      s.status = "accepted";
+      s.acceptedAt = this.state.today;
+      if (plannedStart) s.dates.plannedStart = plannedStart;
+      if (plannedEnd) s.dates.plannedEnd = plannedEnd;
+      this._log(user, "acceptSubcontract", s.number);
+      return s;
+    }
+    /**
+     * Start work on site. Blocks — not just alerts — on expired mandatory
+     * documentation, per §4.2's "bloqueo ... si está vencida": the alert list
+     * can warn about a lot of things, but letting an uninsured trade start on
+     * site is the one that should not merely be visible, it should not happen.
+     */
+    markSubcontractStarted(id, user) {
+      const s = this._subcontract(id);
+      if (!["accepted", "inExecution"].includes(s.status))
+        throw new Error("Accept the subcontract before work can start");
+      const ds = this.subcontractDocStatus(s);
+      if (ds.worst === "r")
+        throw new Error("Mandatory documentation is missing or expired — cannot enter the site");
+      s.status = "inExecution";
+      if (!s.dates.actualStart) s.dates.actualStart = this.state.today;
+      this._log(user, "markSubcontractStarted", s.number);
+      return s;
+    }
+    markSubcontractCompleted(id, user) {
+      const s = this._subcontract(id);
+      if (s.status !== "inExecution") throw new Error("Only work in execution can be completed");
+      s.status = "completed";
+      s.dates.actualEnd = this.state.today;
+      this._log(user, "markSubcontractCompleted", s.number);
+      return s;
+    }
+    modifySubcontract(id, patch, user) {
+      const s = this._subcontract(id);
+      if (["completed", "terminated"].includes(s.status))
+        throw new Error("A completed or terminated subcontract cannot be modified");
+      const allowed = ["trade", "chapterNum", "format", "awardedCents", "retentionPct"];
+      for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      Object.assign(s, patch);
+      this._log(user, "modifySubcontract", s.number);
+      return s;
+    }
+    extendSubcontract(id, { plannedEnd }, user) {
+      const s = this._subcontract(id);
+      if (["completed", "terminated"].includes(s.status))
+        throw new Error("A completed or terminated subcontract cannot be extended");
+      s.dates.plannedEnd = plannedEnd;
+      this._log(user, "extendSubcontract", s.number);
+      return s;
+    }
+    terminateSubcontract(id, reason, user) {
+      const s = this._subcontract(id);
+      if (["completed", "terminated"].includes(s.status)) throw new Error("Already closed");
+      s.status = "terminated";
+      s.terminatedReason = reason || "";
+      s.dates.actualEnd = this.state.today;
+      this._log(user, "terminateSubcontract", s.number);
+      return s;
+    }
+    certifySubcontract(id, { amountCents, note }, user) {
+      // Valuation of executed work — the base for the subcontractor's invoice.
+      const s = this._subcontract(id);
+      if (!["accepted", "inExecution"].includes(s.status))
+        throw new Error("Certify only an accepted or in-execution subcontract");
+      if (!(amountCents > 0)) throw new Error("Certification amount must be positive");
+      s.certifications.push({
+        date: this.state.today,
+        amountCents: Math.round(amountCents),
+        note: note || "",
+      });
+      this._log(user, "certifySubcontract", s.number);
+      return s;
+    }
+    recordRejectedWork(id, desc, user) {
+      const s = this._subcontract(id);
+      s.rejectedWork.push({ date: this.state.today, desc: desc || "" });
+      this._log(user, "recordRejectedWork", s.number);
+      return s;
+    }
+    /** Approve the subcontractor's invoice: registers it as a supplier bill,
+        allocated to this subcontract's project and chapter (AP-01..07). */
+    approveSubcontractorInvoice(id, bill, user) {
+      const s = this._subcontract(id);
+      const rec = this.registerBill(
+        Object.assign({}, bill, {
+          supplierId: s.supplierId,
+          allocations: [
+            {
+              projectId: s.projectId,
+              chapterNum: s.chapterNum,
+              kind: "subcontract",
+              amountCents: bill.baseCents,
+            },
+          ],
+        }),
+        user,
+      );
+      s.billIds.push(rec.id);
+      this._log(user, "approveSubcontractorInvoice", s.number + " " + rec.number);
+      return rec;
+    }
+    releaseSubcontractRetention(id, user) {
+      const s = this._subcontract(id);
+      if (!(s.retentionPct > 0)) throw new Error("This subcontract has no retention to release");
+      if (s.retentionReleasedAt) throw new Error("Retention already released");
+      s.retentionReleasedAt = this.state.today;
+      this._log(user, "releaseSubcontractRetention", s.number);
+      return s;
+    }
+    /** Upsert one mandatory document by kind — a renewal replaces the prior expiry. */
+    renewSubcontractDoc(id, { kind, expiresOn, docRef }, user) {
+      const s = this._subcontract(id);
+      if (!LISTS.subcontractDocTypes.includes(kind)) throw new Error("Unknown document kind");
+      s.docs = s.docs.filter((d) => d.kind !== kind);
+      s.docs.push({ kind, expiresOn: expiresOn || null, docRef: docRef || "" });
+      this._log(user, "renewSubcontractDoc", s.number + " " + kind);
+      return s;
+    }
+    _subcontract(id) {
+      const s = this.state.subcontracts.find((x) => x.id === id);
+      if (!s) throw new Error("Subcontract not found");
+      return s;
+    }
+    /**
+     * Traffic light over the three mandatory documents (§4.2: insurance, PRL,
+     * Social Security registration). Missing counts the same as expired — an
+     * absent document cannot be assumed valid.
+     */
+    subcontractDocStatus(s) {
+      const t = this.state.today;
+      const byKind = {};
+      for (const d of s.docs || [])
+        if (!byKind[d.kind] || (d.expiresOn || "") > (byKind[d.kind].expiresOn || ""))
+          byKind[d.kind] = d;
+      let worst = "g";
+      const items = LISTS.subcontractDocTypes.map((kind) => {
+        const d = byKind[kind];
+        let sev = "g";
+        if (!d || !d.expiresOn) sev = "r";
+        else if (d.expiresOn < t) sev = "r";
+        else if (d.expiresOn <= addDays(t, 30)) sev = "y";
+        if (sev === "r") worst = "r";
+        else if (sev === "y" && worst !== "r") worst = "y";
+        return { kind, doc: d || null, sev };
+      });
+      return { items, worst };
+    }
+    /** The project's subcontracts with awarded/certified/invoiced/pending and doc status (§4.2 list). */
+    subcontractsForProject(projectId) {
+      return this.state.subcontracts
+        .filter((s) => s.projectId === projectId)
+        .map((s) => {
+          const certifiedCents = sum(s.certifications, (c) => c.amountCents);
+          const invoicedCents = sum(
+            this.state.bills.filter((b) => s.billIds.includes(b.id)),
+            (b) => b.baseCents,
+          );
+          return {
+            ...clone(s),
+            certifiedCents,
+            invoicedCents,
+            pendingCents: Math.max(0, s.awardedCents - certifiedCents),
+            docStatus: this.subcontractDocStatus(s),
+          };
+        });
     }
 
     /* =========================== CAP — document capture =========================== */
@@ -1642,8 +2572,8 @@
       );
       return inv.kind === "creditNote" ? 0 : inv.totalCents - collected - credited;
     }
-    invoiceRegister() {
-      // Every issued invoice, settled or not — the billing list.
+    receivables() {
+      // AR-08 follow-up list
       const t = this.state.today;
       return this.state.invoices
         .filter((i) => i.kind !== "creditNote")
@@ -1660,12 +2590,8 @@
             dueDate: i.dueDate,
             daysOverdue: out > 0 ? Math.max(0, daysBetween(t, i.dueDate)) : 0,
           };
-        });
-    }
-    receivables() {
-      // AR-08 follow-up list — what is still owed. A settled invoice is not a
-      // receivable; use invoiceRegister() for the full billing list.
-      return this.invoiceRegister().filter((x) => x.outstandingCents > 0);
+        })
+        .filter((x) => x.outstandingCents > 0.005 || true);
     }
     projectBilling(projectId) {
       // AR-09
@@ -1823,6 +2749,52 @@
       this._log(user, "addBankAccount", rec.name);
       return rec;
     }
+    /**
+     * Rows a statement import would ADD, and rows it would duplicate (§5.3
+     * "detección de duplicados y de solapamiento de periodos ya cargados").
+     *
+     * Read-only on purpose: the caller sees what an import would do before it
+     * does it. A statement re-uploaded because someone was not sure whether it
+     * had gone in is the single most common way a bank balance ends up wrong,
+     * and it is silent — every duplicated movement reconciles perfectly
+     * against a document that is now double-counted.
+     */
+    previewImport(accountId, rows) {
+      const existing = this.state.movements.filter((m) => m.accountId === accountId);
+      const key = (r) =>
+        [r.accountingDate, cents(r.amountCents), (r.concept || "").trim().toUpperCase()].join("|");
+      const seen = new Map();
+      for (const m of existing) seen.set(key(m), m.id);
+      const fresh = [];
+      const duplicates = [];
+      const withinBatch = new Set();
+      for (const r of rows) {
+        const k = key(r);
+        if (seen.has(k) || withinBatch.has(k))
+          duplicates.push({ row: r, existingId: seen.get(k) || null });
+        else {
+          withinBatch.add(k);
+          fresh.push(r);
+        }
+      }
+      const dates = rows
+        .map((r) => r.accountingDate)
+        .filter(Boolean)
+        .sort();
+      const overlaps = existing.some(
+        (m) =>
+          dates.length &&
+          m.accountingDate >= dates[0] &&
+          m.accountingDate <= dates[dates.length - 1],
+      );
+      return {
+        fresh,
+        duplicates,
+        overlapsExistingPeriod: overlaps,
+        from: dates[0] || null,
+        to: dates[dates.length - 1] || null,
+      };
+    }
     importMovements(accountId, rows, user) {
       // BNK-01: retain all export fields
       const out = rows.map((r) => {
@@ -1938,6 +2910,174 @@
       this.state.merchantRules.push({ match: match.toUpperCase(), ...mapping });
       this._log(user, "learnMerchantRule", match);
     }
+
+    /* ---- §5.3: reconciliation as its own discipline ----
+       The matching itself is @repo/capability-reconciliation's; everything
+       here is the part that owns state — undoing, locking a period, and the
+       candidate list the matcher scores against. */
+
+    /**
+     * Undo a reconciliation (§5.3 "deshacer una conciliación").
+     *
+     * Reversing the movement's own status is the easy half. The half that
+     * matters is the payment or collection `matchMovement` created: leaving
+     * that behind would show the bill as paid on one screen and the movement
+     * as unreconciled on another, which is precisely the state reconciliation
+     * exists to make impossible.
+     */
+    unmatchMovement(movId, user) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      if (this.bankPeriodClosed(m.accountingDate))
+        throw new Error("The period is closed — reopen it before undoing a reconciliation");
+      for (const p of this.state.payments.filter((x) => x.movementId === movId)) {
+        this.voidPayment(p.id, user);
+      }
+      for (const c of this.state.collections.filter((x) => x.movementId === movId)) {
+        this.voidCollection(c.id, user);
+      }
+      m.matched = null;
+      m.allocations = [];
+      m.class = null;
+      m.status = "unallocated";
+      this._log(user, "unmatchMovement", movId);
+      return m;
+    }
+
+    /** Every movement of a period that nothing yet explains (§5.3's health indicator). */
+    unreconciledMovements(from, to) {
+      return this.state.movements.filter(
+        (m) =>
+          m.status === "unallocated" &&
+          !m.excludedFromPL &&
+          (!from || m.accountingDate >= from) &&
+          (!to || m.accountingDate <= to),
+      );
+    }
+
+    /**
+     * The documents a movement could plausibly be, projected into the shape
+     * the matcher wants. Money out looks at supplier bills, money in at issued
+     * invoices — the direction is decided here, from the sign the bank wrote,
+     * because only this layer knows what an invoice and a bill ARE.
+     */
+    reconciliationCandidates(movId) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      const out = [];
+      if (m.amountCents < 0) {
+        for (const b of this.state.bills) {
+          const open = this.billOutstandingCents(b.id);
+          if (open <= 0) continue;
+          out.push({
+            id: b.id,
+            kind: "bill",
+            amountCents: b.totalCents,
+            outstandingCents: open,
+            direction: "out",
+            date: b.date,
+            reference: b.number,
+            counterparty: this.party(b.supplierId).name,
+          });
+        }
+      } else {
+        for (const i of this.state.invoices) {
+          if (i.kind === "creditNote") continue;
+          const open = this.invoiceOutstandingCents(i.id);
+          if (open <= 0) continue;
+          out.push({
+            id: i.id,
+            kind: "invoice",
+            amountCents: i.totalCents,
+            outstandingCents: open,
+            direction: "in",
+            date: i.date,
+            reference: i.number,
+            counterparty: this.party(i.partyId).name,
+          });
+        }
+      }
+      return out;
+    }
+
+    /** A movement as the matcher's input value. Text is everything a bank wrote. */
+    movementValue(m) {
+      return {
+        id: m.id,
+        amountCents: m.amountCents,
+        date: m.accountingDate,
+        text: [m.concept, m.counterparty, m.merchantText, m.reference, m.observations]
+          .filter(Boolean)
+          .join(" "),
+        accountRef: m.accountId,
+      };
+    }
+
+    /**
+     * Mark a movement as having no supporting document, and raise the task to
+     * go and get it (§5.3 "marcar «sin respaldo» y generar la tarea").
+     *
+     * The task is the point. A flag on a movement is a fact nobody is
+     * responsible for; a task has an owner and a date, and turns up in the
+     * day view until somebody deals with it.
+     */
+    flagMovementNoDoc(movId, user) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      m.needsDoc = true;
+      this.addTask(
+        {
+          title: "Reclamar justificante — " + (m.merchantText || m.concept || m.id),
+          owner: "backoffice",
+          due: addDays(this.state.today, 7),
+          relatedRef: "movimiento",
+        },
+        user,
+      );
+      this._log(user, "flagMovementNoDoc", movId);
+      return m;
+    }
+
+    /**
+     * Close a reconciled period (§5.3 "cerrar y bloquear el periodo").
+     *
+     * Refuses while anything in it is still unexplained. A closed period whose
+     * movements do not all reconcile is a lie told to whoever reads it next,
+     * and the exception panel exists precisely so that this refusal is never a
+     * surprise.
+     */
+    closeBankPeriod(from, to, user) {
+      const open = this.unreconciledMovements(from, to);
+      if (open.length)
+        throw new Error(open.length + " movimientos sin conciliar — no se puede cerrar el periodo");
+      this.state.bankPeriods.push({
+        from,
+        to,
+        closedAt: this.state.today,
+        closedBy: user || "backoffice",
+        reopenedAt: null,
+        reopenReason: "",
+      });
+      this._log(user, "closeBankPeriod", from + "→" + to);
+      return this.state.bankPeriods[this.state.bankPeriods.length - 1];
+    }
+    /** Reopening leaves a record — "sin reapertura registrada" is the rule (§5.3). */
+    reopenBankPeriod(from, reason, user) {
+      const p = (this.state.bankPeriods || []).find((x) => x.from === from && !x.reopenedAt);
+      if (!p) throw new Error("No closed period starting on " + from);
+      if (!reason || !String(reason).trim())
+        throw new Error("Reopening a closed period needs a reason");
+      p.reopenedAt = this.state.today;
+      p.reopenReason = String(reason).trim();
+      p.reopenedBy = user || "backoffice";
+      this._log(user, "reopenBankPeriod", from);
+      return p;
+    }
+    bankPeriodClosed(dateIso) {
+      return (this.state.bankPeriods || []).some(
+        (p) => !p.reopenedAt && p.from <= dateIso && dateIso <= p.to,
+      );
+    }
     recordCashMovement(tillId, mv, user) {
       // BNK-07: same discipline; flags when undocumented
       const rec = this.importMovements(tillId, [{ ...mv, opCode: "CASH" }], user)[0];
@@ -1967,6 +3107,23 @@
         })),
         totalCents: sum(this.state.bankAccounts, (a) => this.accountBalanceCents(a.id)),
       };
+    }
+    /**
+     * The consolidated balance as it stood at the end of a past date — for
+     * "saldo bancos: cierre mes anterior" (§2.1) and for reconstructing the
+     * control-tower sparklines, neither of which can use accountBalanceCents
+     * (which is always "as of right now").
+     */
+    cashPositionAsOf(dateIso) {
+      return sum(
+        this.state.bankAccounts,
+        (a) =>
+          a.openingCents +
+          sum(
+            this.state.movements.filter((m) => m.accountId === a.id && m.accountingDate <= dateIso),
+            (m) => m.amountCents,
+          ),
+      );
     }
     cashForecast(weeks = 13) {
       // FIN-06 / BNK-08: weekly expected in/out
@@ -2002,14 +3159,84 @@
       }
       return out;
     }
+    /**
+     * The same expected in/out as cashForecast(), but over a single rolling
+     * window of N days from today rather than N one-week buckets — what
+     * "proyección de caja: 7 días / 14 días / 30 días" (§2.1) actually needs.
+     */
+    cashForecastWindow(days) {
+      const t = this.state.today,
+        to = addDays(t, days - 1);
+      let inflow = 0,
+        outflow = 0;
+      for (const r of this.receivables())
+        if (r.outstandingCents > 0 && r.dueDate >= t && r.dueDate <= to)
+          inflow += r.outstandingCents;
+      for (const c of this.state.contracts)
+        for (const i of c.installments)
+          if (
+            i.status === "planned" &&
+            i.expectedDate &&
+            i.expectedDate >= t &&
+            i.expectedDate <= to
+          )
+            inflow += i.amountCents;
+      for (const b of this.payables())
+        if (b.outstandingCents > 0 && b.dueDate >= t && b.dueDate <= to)
+          outflow += b.outstandingCents;
+      return {
+        from: t,
+        to,
+        inflowCents: inflow,
+        outflowCents: outflow,
+        netCents: inflow - outflow,
+      };
+    }
+    /**
+     * "Resultado operativo del mes/trimestre en curso: Ingresos − Gastos"
+     * (§2.1) — issued revenue (net of credit notes) minus received-invoice
+     * cost, both on their document date (accrual, not cash), plus overhead/
+     * salary/financial bank movements that were classified directly rather
+     * than matched to a bill. Movements matched to a bill via matchMovement
+     * are deliberately excluded from "gastos": the bill already counted that
+     * cost, and the movement is only its payment settling — counting both
+     * would double the expense side of the same euro.
+     */
+    operatingResult(from, to) {
+      const inRange = (d) => d >= from && d <= to;
+      const revenueCents =
+        sum(
+          this.state.invoices.filter((i) => i.kind !== "creditNote" && inRange(i.date)),
+          (i) => i.baseCents,
+        ) -
+        sum(
+          this.state.invoices.filter((i) => i.kind === "creditNote" && inRange(i.date)),
+          (i) => i.baseCents,
+        );
+      const billsCents = sum(
+        this.state.bills.filter((b) => inRange(b.date)),
+        (b) => b.baseCents,
+      );
+      const unbilledCashCents = sum(
+        this.state.movements.filter(
+          (m) =>
+            inRange(m.accountingDate) &&
+            !m.matched &&
+            ["overhead", "salary", "financial"].includes(m.class),
+        ),
+        (m) => Math.abs(m.amountCents),
+      );
+      const expenseCents = billsCents + unbilledCashCents;
+      return { revenueCents, expenseCents, resultCents: revenueCents - expenseCents };
+    }
 
     /* =========================== LAB — labour hours =========================== */
     addWorker(w, user) {
       // LAB-04/05
       const rec = Object.assign(
-        { id: this._id("wkr"), name: "", kind: "employee", rateHistory: [] },
+        { id: this._id("wkr"), name: "", kind: "employee", rateHistory: [], docs: [] },
         w,
-      ); // rateHistory {from, rateCentsPerHour}
+      ); // rateHistory {from, rateCentsPerHour}; docs {kind, expiresOn, docRef}
       this.state.workers.push(rec);
       this._log(user, "addWorker", rec.name);
       return rec;
@@ -2023,8 +3250,26 @@
       if (!applicable.length) throw new Error("No rate effective for " + date);
       return applicable[0].rateCentsPerHour;
     }
+    /** A worker's own mandatory documentation (§4.6's "trabajador sin
+        documentación válida" — the alert, not a hard block: only subcontracted
+        TRADES are blocked from entering the site, per §4.2). */
+    addWorkerDoc(workerId, { kind, expiresOn, docRef }, user) {
+      const w = this.state.workers.find((x) => x.id === workerId);
+      if (!w) throw new Error("Worker not found");
+      w.docs = (w.docs || []).filter((d) => d.kind !== kind);
+      w.docs.push({ kind, expiresOn: expiresOn || null, docRef: docRef || "" });
+      this._log(user, "addWorkerDoc", w.name + " " + kind);
+      return w;
+    }
     recordHours(h, user) {
       // LAB-01/02/03 + LAB-07 (kind: normal|extra|festivo; optional extra-pay supplement)
+      if (h.projectId) {
+        const p = this.state.projects.find((x) => x.id === h.projectId);
+        // Refusing this outright is worth more than an alert: "horas imputadas
+        // a un proyecto cerrado" (§4.6) can then never actually happen going
+        // forward, rather than being merely visible after the fact.
+        if (p && p.closed) throw new Error("Cannot record hours against a closed project");
+      }
       const rec = Object.assign(
         {
           id: this._id("lab"),
@@ -2035,12 +3280,26 @@
           hoursMilli: 0,
           kind: "normal",
           extraPayCents: 0,
+          locked: false,
+          approvedAt: null,
+          approvedBy: null,
         },
         h,
       );
       rec.rateCents = this.workerRateCents(rec.workerId, rec.date);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);
       this.state.labour.push(rec);
+      return rec;
+    }
+    deleteHours(id, user) {
+      // "registrar, corregir y eliminar horas" (§4.6)
+      const idx = this.state.labour.findIndex((x) => x.id === id);
+      if (idx < 0) throw new Error("Hours entry not found");
+      if (this.state.labour[idx].locked)
+        throw new Error("Hours entry is in an approved week — reopen the week first");
+      const rec = this.state.labour[idx];
+      this.state.labour.splice(idx, 1);
+      this._log(user, "deleteHours", id);
       return rec;
     }
     labourCostCents(projectId) {
@@ -2059,6 +3318,118 @@
         hours: l.hoursMilli / 1000,
         costCents: l.costCents,
       }));
+    }
+    /**
+     * The weekly grid §4.6 asks for: worker × day, with totals. Rows are every
+     * worker who is either assigned to the project over the week or already
+     * has hours logged on it — an assigned worker with nothing logged yet is
+     * exactly the "jornada sin registrar" the alert list flags, and it has to
+     * appear as an empty row for that to be visible rather than invisible.
+     */
+    labourWeek(projectId, weekStart) {
+      const start = weekStartOf(weekStart);
+      const days = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(start, i));
+      const workerIds = new Set([
+        ...(this.state.assignments || [])
+          .filter(
+            (a) => a.projectId === projectId && a.workerId && a.from <= days[6] && a.to >= days[0],
+          )
+          .map((a) => a.workerId),
+        ...this.state.labour
+          .filter((l) => l.projectId === projectId && days.includes(l.date))
+          .map((l) => l.workerId),
+      ]);
+      const rows = [...workerIds].map((workerId) => {
+        const w = this.state.workers.find((x) => x.id === workerId);
+        const cells = days.map((date) => {
+          const entries = this.state.labour.filter(
+            (l) => l.workerId === workerId && l.projectId === projectId && l.date === date,
+          );
+          return {
+            date,
+            hoursMilli: sum(entries, (e) => e.hoursMilli),
+            locked: entries.length > 0 && entries.every((e) => e.locked),
+            entryIds: entries.map((e) => e.id),
+          };
+        });
+        return {
+          workerId,
+          name: w ? w.name : "?",
+          kind: w ? w.kind : "employee",
+          cells,
+          totalMilli: sum(cells, (c) => c.hoursMilli),
+        };
+      });
+      return {
+        weekStart: start,
+        days,
+        rows,
+        totalsByDayMilli: days.map((date, i) => sum(rows, (r) => r.cells[i].hoursMilli)),
+      };
+    }
+    /** Approve (lock) a worker's week — "aprobar ... partes semanales" (§4.6). */
+    approveLabourWeek(workerId, weekStart, user) {
+      const start = weekStartOf(weekStart);
+      const end = addDays(start, 6);
+      const rows = this.state.labour.filter(
+        (l) => l.workerId === workerId && l.date >= start && l.date <= end,
+      );
+      if (!rows.length) throw new Error("No hours recorded for that worker in that week");
+      rows.forEach((l) => {
+        l.locked = true;
+        l.approvedAt = this.state.today;
+        l.approvedBy = user || "backoffice";
+      });
+      this._log(user, "approveLabourWeek", workerId + " " + start);
+      return rows;
+    }
+    /** Reject/reopen — the counterpart of approveLabourWeek. */
+    unapproveLabourWeek(workerId, weekStart, user) {
+      const start = weekStartOf(weekStart);
+      const end = addDays(start, 6);
+      const rows = this.state.labour.filter(
+        (l) => l.workerId === workerId && l.date >= start && l.date <= end,
+      );
+      rows.forEach((l) => {
+        l.locked = false;
+        l.approvedAt = null;
+        l.approvedBy = null;
+      });
+      this._log(user, "unapproveLabourWeek", workerId + " " + start);
+      return rows;
+    }
+    /**
+     * "Posibilidad de repetir el parte del día anterior" (§4.6) — the one-step
+     * mobile flow the spec asks for. A worker already logged on `toDate` is
+     * left alone rather than duplicated, so pressing the button twice is safe.
+     */
+    repeatDay(projectId, fromDate, toDate, user) {
+      const src = this.state.labour.filter((l) => l.projectId === projectId && l.date === fromDate);
+      if (!src.length) throw new Error("No hours recorded on " + fromDate + " to repeat");
+      const already = new Set(
+        this.state.labour
+          .filter((l) => l.projectId === projectId && l.date === toDate)
+          .map((l) => l.workerId),
+      );
+      const created = [];
+      for (const l of src) {
+        if (already.has(l.workerId)) continue;
+        created.push(
+          this.recordHours(
+            {
+              workerId: l.workerId,
+              projectId: l.projectId,
+              chapterNum: l.chapterNum,
+              hoursMilli: l.hoursMilli,
+              kind: l.kind,
+              date: toDate,
+            },
+            user,
+          ),
+        );
+      }
+      this._log(user, "repeatDay", projectId + " " + fromDate + "→" + toDate);
+      return created;
     }
 
     /* =========================== FIN — project economics =========================== */
@@ -2312,8 +3683,257 @@
           .map((m) => m.id),
       };
     }
-    quarterlyPackage(quarter, user) {
-      // GES-01/02/06/08
+    /**
+     * The completeness traffic light of §5.6: each block of the package with
+     * its document count, its value, and how many things are wrong with it.
+     *
+     * Green/amber/red rather than a single "ready" flag, because the blocks
+     * fail differently and independently: an empty cash register in a quarter
+     * with no petty cash is fine, an empty issued-invoice register in a
+     * quarter that billed is not, and both would read the same as "0 items".
+     */
+    packageBlocks(quarter) {
+      const inQ = (d) => quarterOf(d) === quarter;
+      const ex = this.exceptionList(quarter);
+      const invoices = this.state.invoices.filter((i) => inQ(i.date));
+      const bills = this.state.bills.filter((b) => inQ(b.date));
+      const movements = this.state.movements.filter((m) => inQ(m.accountingDate));
+      const tillIds = new Set(
+        this.state.bankAccounts.filter((a) => a.kind === "till").map((a) => a.id),
+      );
+      const cash = movements.filter((m) => tillIds.has(m.accountId));
+      const late = this.lateDocuments(quarter);
+      const assets = this.fixedAssetRegister(quarter);
+      const sev = (n) => (n > 0 ? "r" : "g");
+      return [
+        {
+          key: "issued",
+          label: "Facturas emitidas",
+          count: invoices.length,
+          amountCents: sum(invoices, (i) =>
+            i.kind === "creditNote" ? -i.totalCents : i.totalCents,
+          ),
+          issues: ex.seriesGaps.invoice.length,
+          sev: sev(ex.seriesGaps.invoice.length),
+        },
+        {
+          key: "received",
+          label: "Facturas soportadas",
+          count: bills.length,
+          amountCents: sum(bills, (b) => b.totalCents),
+          issues: ex.billsWithoutDocument.length,
+          sev: sev(ex.billsWithoutDocument.length),
+        },
+        {
+          key: "bank",
+          label: "Movimientos bancarios",
+          count: movements.length - cash.length,
+          amountCents: sum(
+            movements.filter((m) => !tillIds.has(m.accountId)),
+            (m) => m.amountCents,
+          ),
+          issues: ex.unallocatedMovements.length,
+          sev: sev(ex.unallocatedMovements.length),
+        },
+        {
+          key: "cash",
+          label: "Caja",
+          count: cash.length,
+          amountCents: sum(cash, (m) => m.amountCents),
+          issues: ex.undocumentedCash.length,
+          sev: sev(ex.undocumentedCash.length),
+        },
+        {
+          key: "late",
+          label: "Extemporáneos",
+          count: late.length,
+          amountCents: sum(late, (l) => (l.confirmed && l.confirmed.totalCents) || 0),
+          // Amber, never red: a late document is a fact to declare in its own
+          // block, not an error to fix. The goal §5.6 states is that this
+          // block shrinks over time, which needs it visible rather than alarming.
+          issues: 0,
+          sev: late.length ? "y" : "g",
+        },
+        {
+          key: "assets",
+          label: "Activos, vehículos y renting",
+          count: assets.length,
+          amountCents: sum(assets, (a) => a.baseCents),
+          issues: 0,
+          sev: "g",
+        },
+        {
+          key: "summaries",
+          label: "Resúmenes fiscales",
+          count: 2,
+          amountCents: this.vatSummary(quarter).netCents,
+          issues: ex.partiesWithoutTaxId.length,
+          sev: sev(ex.partiesWithoutTaxId.length),
+        },
+      ];
+    }
+
+    /**
+     * Block 8 of the package: fixed assets, vehicles and renting, kept apart
+     * from direct site cost. They are the costs an accountant treats
+     * differently from everything else, and lumping them into project cost is
+     * both wrong for the accounts and flattering to the job's margin.
+     */
+    fixedAssetRegister(quarter) {
+      const inQ = (d) => quarterOf(d) === quarter;
+      const CATS = ["fixedAsset", "renting", "vehicles"];
+      const out = [];
+      for (const b of this.state.bills.filter((x) => inQ(x.date))) {
+        for (const a of b.allocations || []) {
+          if (!a.overheadCategory || !CATS.includes(a.overheadCategory)) continue;
+          out.push({
+            billId: b.id,
+            number: b.number,
+            date: b.date,
+            supplier: this.party(b.supplierId).name,
+            category: a.overheadCategory,
+            baseCents: a.amountCents,
+          });
+        }
+      }
+      return out;
+    }
+
+    /**
+     * Documents belonging to this quarter that only arrived after it closed
+     * (§5.6's "documentos extemporáneos"), with duplicate detection against
+     * what an earlier package already carried.
+     */
+    lateDocuments(quarter) {
+      const inQ = (d) => quarterOf(d) === quarter;
+      const alreadySent = new Set(
+        (this.state.packagesSent || [])
+          .filter((p) => p.quarter === quarter)
+          .flatMap((p) => p.lateRefs || []),
+      );
+      return this.state.captured
+        .filter((c) => c.confirmed && inQ(c.confirmed.date) && quarterOf(c.capturedAt) > quarter)
+        .map((c) => ({ ...c, alreadySent: alreadySent.has(c.id) }));
+    }
+
+    /**
+     * Every exception, flattened, each with whether a person has justified it.
+     *
+     * §5.6 makes this list blocking: "el envío se permite sólo cuando la lista
+     * está a cero o cuando el usuario justifica y acepta expresamente cada
+     * excepción". Flattening it here means the blocking check and the screen
+     * read the same list, so the two can never disagree about what is
+     * outstanding.
+     */
+    exceptionsWithStatus(quarter) {
+      const ex = this.exceptionList(quarter);
+      const accepted = this.state.exceptionsAccepted || {};
+      const rows = [];
+      const push = (kind, label, refs) => {
+        for (const ref of refs) {
+          const key = quarter + "|" + kind + "|" + ref;
+          rows.push({ kind, label, ref, key, accepted: accepted[key] || null });
+        }
+      };
+      push("billNoDoc", "Factura sin documento", ex.billsWithoutDocument);
+      push("partyNoTaxId", "Tercero sin NIF válido", ex.partiesWithoutTaxId);
+      push("movUnallocated", "Movimiento sin asignar", ex.unallocatedMovements);
+      push("receiptUnmatched", "Cobro sin emparejar", ex.unmatchedReceipts);
+      push("cashNoDoc", "Caja sin justificante", ex.undocumentedCash);
+      push("seriesGap", "Hueco en la numeración", [
+        ...ex.seriesGaps.invoice,
+        ...ex.seriesGaps.receipt,
+      ]);
+      return rows;
+    }
+    /** Justify one exception so the package may go out despite it (GES-07). */
+    acceptException(quarter, key, reason, user) {
+      if (!reason || !String(reason).trim())
+        throw new Error("Accepting an exception needs a justification");
+      if (!this.state.exceptionsAccepted || typeof this.state.exceptionsAccepted !== "object")
+        this.state.exceptionsAccepted = {};
+      this.state.exceptionsAccepted[key] = {
+        reason: String(reason).trim(),
+        at: this.state.today,
+        by: user || "backoffice",
+      };
+      this._log(user, "acceptException", key);
+      return this.state.exceptionsAccepted[key];
+    }
+    /** Record a query the accountant raised, and later its answer (§5.6). */
+    addGestoriaQuery(quarter, question, user) {
+      const rec = {
+        id: this._id("gq"),
+        quarter,
+        question: String(question || "").trim(),
+        raisedAt: this.state.today,
+        resolvedAt: null,
+        resolution: "",
+      };
+      this.state.gestoriaQueries.push(rec);
+      this._log(user, "addGestoriaQuery", quarter);
+      return rec;
+    }
+    resolveGestoriaQuery(id, resolution, user) {
+      const q = this.state.gestoriaQueries.find((x) => x.id === id);
+      if (!q) throw new Error("Query not found");
+      q.resolvedAt = this.state.today;
+      q.resolution = String(resolution || "").trim();
+      this._log(user, "resolveGestoriaQuery", id);
+      return q;
+    }
+    /** Reopen a quarter already sent, leaving the record §5.6 requires. */
+    reopenQuarter(quarter, reason, user) {
+      const sent = (this.state.packagesSent || []).filter((p) => p.quarter === quarter);
+      if (!sent.length) throw new Error("That quarter has not been sent");
+      if (!reason || !String(reason).trim())
+        throw new Error("Reopening a sent quarter needs a reason");
+      const rec = {
+        quarter,
+        reopenedAt: this.state.today,
+        reopenReason: String(reason).trim(),
+        by: user || "backoffice",
+      };
+      sent[sent.length - 1].reopened = rec;
+      this._log(user, "reopenQuarter", quarter);
+      return rec;
+    }
+
+    /**
+     * Generate the package (GES-01/02/06/08).
+     *
+     * BLOCKING, per §5.6: an exception must either not exist or have been
+     * justified by name. `opts.recipient` records who it went to, which is the
+     * other half of "marcar el periodo como enviado con fecha y destinatario".
+     *
+     * The refusal names the outstanding items rather than just counting them.
+     * A blocked send that says "8 exceptions" sends someone hunting; one that
+     * says which eight is a to-do list.
+     */
+    quarterlyPackage(quarter, opts, user) {
+      // Kept callable as quarterlyPackage(quarter, user): every caller before
+      // this session passed the user second, and a signature change that
+      // silently reinterprets an existing argument is the worst kind.
+      if (typeof opts === "string" || opts == null) {
+        user = opts;
+        opts = {};
+      }
+      // No override, deliberately. §5.6 allows exactly two ways past this —
+      // the list is empty, or every item on it has been justified by name —
+      // and a `force` flag would be a third that nobody would ever remove.
+      const outstanding = this.exceptionsWithStatus(quarter).filter((x) => !x.accepted);
+      if (outstanding.length) {
+        throw new Error(
+          "Excepciones sin justificar (" +
+            outstanding.length +
+            "): " +
+            outstanding
+              .slice(0, 4)
+              .map((x) => x.label + " " + x.ref)
+              .join("; ") +
+            (outstanding.length > 4 ? "…" : ""),
+        );
+      }
       const inQ = (d) => quarterOf(d) === quarter;
       const txFromInvoice = (i) => {
         const sg = i.kind === "creditNote" ? -1 : 1; // a rectificativa registers negative
@@ -2388,9 +4008,14 @@
       this.state.packagesSent.push({
         quarter,
         date: this.state.today,
+        recipient: (opts && opts.recipient) || "",
         invoices: pkg.issuedInvoices.length,
         bills: pkg.receivedBills.length,
         exceptions: Object.values(pkg.exceptions).flat(2).length,
+        acceptedExceptions: this.exceptionsWithStatus(quarter).filter((x) => x.accepted).length,
+        // What went out as extemporaneous, so the NEXT package can tell an
+        // already-declared late document from a genuinely new one.
+        lateRefs: pkg.lateItems.map((c) => c.id),
       }); // GES-08
       // mark captured docs as sent
       this.state.captured
@@ -2398,6 +4023,235 @@
         .forEach((c) => (c.status = "sentToAccounting"));
       this._log(user, "quarterlyPackage", quarter);
       return pkg;
+    }
+
+    /* =========================== COM — communications (§5.7) ===========================
+       Templates, rules and the queue they fill. Deliberately NOT a sender:
+       every state here is "drafted", "approved" or "cancelled", and the only
+       thing that could put a message on a wire is the messaging capability's
+       email-out port, whose sole bound adapter records and delivers nothing.
+       The mandate is explicit — no real emails — and this section is where
+       that would otherwise leak. */
+    addCommsTemplate(t, user) {
+      const rec = Object.assign(
+        {
+          id: this._id("tpl"),
+          key: "",
+          label: "",
+          family: "comercial", // comercial|contractual|obra|cobros|proveedores|posventa
+          lang: "es",
+          subject: "",
+          body: "",
+          attach: "", // which document rides along: budget|invoice|contract|""
+          version: 1,
+          active: true,
+        },
+        t,
+      );
+      if (!rec.key) throw new Error("A template needs a key");
+      this.state.commsTemplates.push(rec);
+      this._log(user, "addCommsTemplate", rec.key);
+      return rec;
+    }
+    /**
+     * Editing a template makes a NEW version and retires the old one, rather
+     * than overwriting it. A message already sent was rendered from some exact
+     * wording, and "which version did the customer actually receive" has to
+     * stay answerable after somebody improves the template.
+     */
+    updateCommsTemplate(id, patch, user) {
+      const cur = this.state.commsTemplates.find((x) => x.id === id);
+      if (!cur) throw new Error("Template not found");
+      const allowed = ["label", "family", "lang", "subject", "body", "attach"];
+      const next = Object.assign({}, cur, { id: this._id("tpl"), version: cur.version + 1 });
+      for (const k of Object.keys(patch)) if (allowed.includes(k)) next[k] = patch[k];
+      cur.active = false;
+      cur.supersededBy = next.id;
+      this.state.commsTemplates.push(next);
+      this._log(user, "updateCommsTemplate", next.key + " v" + next.version);
+      return next;
+    }
+    commsTemplate(key, lang) {
+      const all = this.state.commsTemplates.filter(
+        (t) => t.key === key && t.active && (!lang || t.lang === lang),
+      );
+      return all[all.length - 1] || null;
+    }
+    addCommsRule(r, user) {
+      const rec = Object.assign(
+        {
+          id: this._id("crl"),
+          label: "",
+          event: "",
+          template: "",
+          recipient: "customer",
+          afterDays: 0,
+          channel: "email",
+          mode: "draft", // see the capability: draft is the default, on purpose
+          requiresFlag: undefined,
+          active: true,
+        },
+        r,
+      );
+      if (!rec.event || !rec.template) throw new Error("A rule needs an event and a template");
+      this.state.commsRules.push(rec);
+      this._log(user, "addCommsRule", rec.event + " → " + rec.template);
+      return rec;
+    }
+    updateCommsRule(id, patch, user) {
+      const r = this.state.commsRules.find((x) => x.id === id);
+      if (!r) throw new Error("Rule not found");
+      const allowed = [
+        "label",
+        "event",
+        "template",
+        "recipient",
+        "afterDays",
+        "channel",
+        "mode",
+        "requiresFlag",
+        "active",
+      ];
+      for (const k of Object.keys(patch)) if (allowed.includes(k)) r[k] = patch[k];
+      this._log(user, "updateCommsRule", id);
+      return r;
+    }
+    /**
+     * The lifecycle facts the rules watch, projected out of engine state.
+     *
+     * A projection, not a log: recomputed from what is true now, so a rule
+     * added today still sees the invoice that went overdue last week. The
+     * alternative — appending events as they happen — means a new rule only
+     * ever applies to the future, which is exactly not what somebody adding
+     * "chase at 3 days" expects.
+     */
+    commsEvents() {
+      const t = this.state.today;
+      const ev = [];
+      const addr = (partyId) => {
+        const p = this.party(partyId);
+        return { customer: p.email || "", supplier: p.email || "" };
+      };
+      for (const b of this.state.budgets) {
+        const v = b.versions.find((x) => x.id === b.currentVersionId);
+        if (v && v.sent && !b.acceptedVersionId)
+          ev.push({
+            event: "quote-sent",
+            subjectRef: b.number,
+            date: v.sent.date,
+            recipients: addr(b.partyId),
+            vars: { number: b.number, cliente: this.party(b.partyId).name },
+          });
+      }
+      for (const r of this.receivables()) {
+        if (r.outstandingCents > 0 && r.daysOverdue > 0)
+          ev.push({
+            event: "invoice-overdue",
+            subjectRef: r.number,
+            date: r.dueDate,
+            recipients: addr(r.partyId),
+            vars: { number: r.number, importe: r.outstandingCents / 100, cliente: r.party },
+            flags: { unpaid: true },
+          });
+      }
+      for (const c of this.state.contracts)
+        if (c.signature && c.signature.customerSignedAt)
+          ev.push({
+            event: "contract-signed",
+            subjectRef: c.number,
+            date: c.signature.customerSignedAt,
+            recipients: addr(c.partyId),
+            vars: { number: c.number },
+          });
+      for (const p of this.state.projects)
+        if (p.closed && p.dates.actualEnd)
+          ev.push({
+            event: "works-finished",
+            subjectRef: p.code,
+            date: p.dates.actualEnd,
+            recipients: addr(p.partyId),
+            vars: { number: p.code },
+          });
+      for (const s of this.state.subcontracts || []) {
+        const ds = this.subcontractDocStatus(s);
+        if (ds.worst === "r" && !["draft", "cancelled", "rejected"].includes(s.status))
+          ev.push({
+            event: "subcontractor-docs-expired",
+            subjectRef: s.number,
+            date: t,
+            recipients: addr(s.supplierId),
+            vars: { number: s.number, oficio: s.trade },
+          });
+      }
+      return ev;
+    }
+    /**
+     * Put a planned message in the queue. NOTHING is sent — `mode:"auto"` only
+     * means it does not need a person to approve it before its due date.
+     */
+    queueCommunication(planned, user) {
+      const tpl = this.commsTemplate(planned.template);
+      const rec = {
+        id: this._id("cq"),
+        key: planned.ruleId + "|" + planned.subjectRef,
+        ruleId: planned.ruleId,
+        event: planned.event,
+        subjectRef: planned.subjectRef,
+        templateKey: planned.template,
+        templateId: tpl ? tpl.id : null,
+        to: planned.to,
+        channel: planned.channel,
+        dueDate: planned.dueDate,
+        vars: planned.vars || {},
+        status: planned.blocked ? "blocked" : "draft",
+        blocked: planned.blocked || null,
+        approvedAt: null,
+        approvedBy: null,
+        cancelledAt: null,
+        sentAt: null,
+      };
+      this.state.commsQueue.push(rec);
+      this._log(user, "queueCommunication", rec.key);
+      return rec;
+    }
+    /** A person says yes. Still not sent — see the section note. */
+    approveCommunication(id, user) {
+      const q = this.state.commsQueue.find((x) => x.id === id);
+      if (!q) throw new Error("Queued message not found");
+      if (q.status === "blocked") throw new Error("This message has no recipient address");
+      if (q.status !== "draft") throw new Error("Only a draft can be approved");
+      q.status = "approved";
+      q.approvedAt = this.state.today;
+      q.approvedBy = user || "backoffice";
+      this._log(user, "approveCommunication", q.key);
+      return q;
+    }
+    cancelCommunication(id, user) {
+      const q = this.state.commsQueue.find((x) => x.id === id);
+      if (!q) throw new Error("Queued message not found");
+      if (q.sentAt) throw new Error("A sent message cannot be cancelled");
+      q.status = "cancelled";
+      q.cancelledAt = this.state.today;
+      this._log(user, "cancelCommunication", q.key);
+      return q;
+    }
+    /**
+     * Hand an approved message to the outbox.
+     *
+     * The name says "record", not "send", because that is what it does: the
+     * only bound adapter is the log-only one, and this method exists so the
+     * queue can move on rather than to put anything on a wire. When a real
+     * provider is bound one day it goes behind `email-out@1` — never here.
+     */
+    recordCommunicationSent(id, user) {
+      const q = this.state.commsQueue.find((x) => x.id === id);
+      if (!q) throw new Error("Queued message not found");
+      if (q.status !== "approved")
+        throw new Error("Only an approved message can be marked as sent");
+      q.status = "sent";
+      q.sentAt = this.state.today;
+      this._log(user, "recordCommunicationSent", q.key);
+      return q;
     }
 
     /* =========================== DAS — alerts, tasks, control tower =========================== */
@@ -2414,108 +4268,619 @@
         },
         t,
       );
-      // Who created it, on the record and in the audit trail. This took the
-      // acting user and ignored it, so a task showed no author anywhere while
-      // completeTask and updateTask both recorded one — invisible with a single
-      // operator, and wrong the moment two people share a schedule: "who put
-      // this in the calendar?" had no answer.
+      // Who entered it. Every other mutation on this engine takes `user` and
+      // writes it to the audit trail; this one accepted the argument and threw
+      // it away, so a shared schedule recorded what changed and never who
+      // changed it. Found by signing in as two people and adding a task as
+      // each: the entries were indistinguishable.
       rec.createdBy = user || "system";
       this.state.tasks.push(rec);
-      this._log(user, "addTask", rec.title || rec.id);
+      this._log(user, "addTask", rec.id);
       return rec;
     }
     alerts() {
-      // 8.2 + DAS-06 — every alert carries a drill-down ref (DAS-03)
+      // 8.2 + DAS-06 — every alert carries a drill-down ref (DAS-03), a code
+      // that identifies WHICH condition raised it (see ALERT_META for its
+      // type and, where the spec calls for one, its configurable threshold),
+      // and is skipped outright when its rule has been disabled.
       const t = this.state.today,
         A = [];
-      const push = (sev, msg, ref) => A.push({ sev, msg, ref });
+      const push = (code, sev, msg, ref) => {
+        if (!this.alertRuleEnabled(code)) return;
+        const meta = ALERT_META[code] || { type: "tecnica" };
+        A.push({ code, type: meta.type, sev, msg, ref });
+      };
       for (const r of this.receivables())
         if (r.outstandingCents > 0 && r.daysOverdue > 0)
-          push("critical", `Factura ${r.number} vencida ${r.daysOverdue} días (${r.party})`, {
-            invoice: r.number,
-          });
+          push(
+            "AR-OVERDUE",
+            "critical",
+            `Factura ${r.number} vencida ${r.daysOverdue} días (${r.party})`,
+            {
+              invoice: r.number,
+            },
+          );
       for (const c of this.state.contracts)
         for (const i of c.installments)
           if (i.status === "planned" && i.expectedDate && i.expectedDate < t)
-            push("critical", `Hito de cobro vencido — ${c.number}`, { contract: c.number });
+            push("CON-INSTALLMENT-OVERDUE", "critical", `Hito de cobro vencido — ${c.number}`, {
+              contract: c.number,
+            });
       const cash7 = this.cashForecast(1)[0];
       if (cash7 && cash7.outflowCents > cash7.inflowCents + this.cashPosition().totalCents)
-        push("critical", "Pagos previstos superan cobros esperados + caja", {
+        push("CASH-SHORTFALL", "critical", "Pagos previstos superan cobros esperados + caja", {
           view: "cashForecast",
         });
       for (const p of this.state.projects.filter((x) => !x.closed)) {
         const ec = this.projectEconomics(p.id);
         if (ec.marginForecastCents < 0)
-          push("critical", `Margen negativo — ${p.code}`, { project: p.code });
+          push("PROJ-MARGIN-NEG", "critical", `Margen negativo — ${p.code}`, { project: p.code });
         else if (ec.marginForecastPct * 100 < this.state.config.marginThresholdBp / 100)
-          push("critical", `Margen bajo umbral — ${p.code} (${ec.marginForecastPct}%)`, {
-            project: p.code,
-          });
+          push(
+            "PROJ-MARGIN-LOW",
+            "critical",
+            `Margen bajo umbral — ${p.code} (${ec.marginForecastPct}%)`,
+            {
+              project: p.code,
+            },
+          );
         const con = p.contractId ? this.state.contracts.find((c) => c.id === p.contractId) : null;
         if (con) {
           if (!con.signature.customerSignedAt && p.dates.start)
-            push("critical", `Obra iniciada sin contrato firmado — ${p.code}`, {
-              contract: con.number,
-            });
+            push(
+              "CON-UNSIGNED-STARTED",
+              "critical",
+              `Obra iniciada sin contrato firmado — ${p.code}`,
+              {
+                contract: con.number,
+              },
+            );
           if (
             con.initiation.committedStartDate &&
             !con.duration.actualStart &&
-            con.initiation.committedStartDate <= addDays(t, 3)
+            con.initiation.committedStartDate <=
+              addDays(t, this.alertRuleThreshold("CON-START-AT-RISK", 3))
           )
-            push("critical", `Fecha de inicio comprometida en riesgo — ${p.code}`, {
-              contract: con.number,
-            });
+            push(
+              "CON-START-AT-RISK",
+              "critical",
+              `Fecha de inicio comprometida en riesgo — ${p.code}`,
+              {
+                contract: con.number,
+              },
+            );
           if (
             con.duration.actualStart &&
             con.duration.estimatedDays &&
             !con.duration.actualFinish &&
             daysBetween(t, con.duration.actualStart) > con.duration.estimatedDays
           )
-            push("critical", `Duración contractual excedida — ${p.code}`, { contract: con.number });
+            push("CON-DURATION-EXCEEDED", "critical", `Duración contractual excedida — ${p.code}`, {
+              contract: con.number,
+            });
         }
       }
       for (const b of this.state.budgets.filter((x) => x.status === "issued")) {
         const tt = this.budgetTotals(b.id, b.currentVersionId);
         if (tt.pendingCount > 0)
-          push("high", `Presupuesto ${b.number} emitido con ${tt.pendingCount} líneas pendientes`, {
+          push(
+            "QUO-PENDING-LINES",
+            "high",
+            `Presupuesto ${b.number} emitido con ${tt.pendingCount} líneas pendientes`,
+            { budget: b.number },
+          );
+        if (
+          b.validityDate <= addDays(t, this.alertRuleThreshold("QUO-EXPIRING", 7)) &&
+          !b.acceptedVersionId
+        )
+          push("QUO-EXPIRING", "high", `Presupuesto ${b.number} caduca el ${b.validityDate}`, {
             budget: b.number,
           });
-        if (b.validityDate <= addDays(t, 7) && !b.acceptedVersionId)
-          push("high", `Presupuesto ${b.number} caduca el ${b.validityDate}`, { budget: b.number });
       }
       for (const o of this.opportunityAges())
-        if (o.ageDays > 14 && ["awaitingBudget", "awaitingResponse"].includes(o.status))
-          push("high", `Oportunidad sin avance ${o.ageDays} días`, { opportunity: o.id });
+        if (
+          o.ageDays > this.alertRuleThreshold("OPP-STALE", 14) &&
+          ["awaitingBudget", "awaitingResponse"].includes(o.status)
+        )
+          push("OPP-STALE", "high", `Oportunidad sin avance ${o.ageDays} días`, {
+            opportunity: o.id,
+          });
       for (const pid of this.priceAlerts())
-        push("high", "Precio de proveedor caducado", { price: pid });
+        push("PRICE-EXPIRED", "high", "Precio de proveedor caducado", { price: pid });
       for (const p of this.state.projects.filter((x) => !x.closed && x.budgetId)) {
         for (const ch of this.chapterEconomics(p.id))
           if (ch.actualCents > ch.budgetCostCents && ch.budgetCostCents > 0)
-            push("high", `Capítulo ${ch.num} por encima de coste previsto — ${p.code}`, {
-              project: p.code,
-              chapter: ch.num,
-            });
+            push(
+              "PROJ-CHAPTER-OVERCOST",
+              "high",
+              `Capítulo ${ch.num} por encima de coste previsto — ${p.code}`,
+              { project: p.code, chapter: ch.num },
+            );
       }
       for (const c of this.state.changes.filter(
-        (x) => ["identified", "priced"].includes(x.status) && x.costCents > 0,
+        (x) => ["identified", "priced", "sent"].includes(x.status) && x.costCents > 0,
       ))
-        push("high", `Extra sin aprobar con coste incurrido — ${this.project(c.projectId).code}`, {
-          change: c.id,
-        });
+        push(
+          "CHG-UNAPPROVED-COST",
+          "high",
+          `Extra sin aprobar con coste incurrido — ${this.project(c.projectId).code}`,
+          { change: c.id },
+        );
+      // §4.1 — orders overdue on their confirmed arrival, and a three-way
+      // reconciliation that does not add up once an order has been invoiced.
+      for (const pu of this.state.purchases) {
+        if (pu.cancelledAt || pu.status.delivered) continue;
+        if (pu.expectedArrival && pu.expectedArrival < t)
+          push(
+            "PUR-ARRIVAL-DELAYED",
+            "medium",
+            `Llegada de material retrasada — orden ${pu.number}`,
+            {
+              purchase: pu.number,
+            },
+          );
+      }
+      for (const pu of this.state.purchases.filter((p) => p.status.invoicedBillId)) {
+        if (!this.purchaseReconciliation(pu.id).ok)
+          push(
+            "PUR-RECONCILE-DIFF",
+            "medium",
+            `Diferencias en la conciliación de la orden ${pu.number}`,
+            { purchase: pu.number },
+          );
+      }
+      // §4.2 — subcontracts: expired documentation, over-certification,
+      // an unbilled trade past a reasonable window, retention past its release.
+      for (const s of this.state.subcontracts || []) {
+        if (["draft", "cancelled", "rejected"].includes(s.status)) continue;
+        const proj = this.state.projects.find((x) => x.id === s.projectId);
+        if (!proj || proj.closed) continue;
+        if (this.subcontractDocStatus(s).worst === "r")
+          push(
+            "SUB-DOC-EXPIRED",
+            "high",
+            `Documentación caducada — subcontrata ${s.number} (${proj.code})`,
+            { subcontract: s.number },
+          );
+        const certifiedCents = sum(s.certifications, (c) => c.amountCents);
+        if (s.awardedCents > 0 && certifiedCents > s.awardedCents * 1.1)
+          push(
+            "SUB-OVERCERTIFIED",
+            "medium",
+            `Certificado por encima de lo adjudicado — subcontrata ${s.number}`,
+            { subcontract: s.number },
+          );
+        if (
+          ["accepted", "inExecution"].includes(s.status) &&
+          s.dates.actualStart &&
+          !s.billIds.length &&
+          daysBetween(t, s.dates.actualStart) > this.alertRuleThreshold("SUB-UNBILLED", 60)
+        )
+          push("SUB-UNBILLED", "medium", `Subcontrata sin factura tras varios días — ${s.number}`, {
+            subcontract: s.number,
+          });
+        if (
+          s.retentionPct > 0 &&
+          !s.retentionReleasedAt &&
+          s.retentionReleaseDate &&
+          s.retentionReleaseDate < t
+        )
+          push(
+            "SUB-RETENTION-DUE",
+            "medium",
+            `Retención no liberada tras el plazo de garantía — ${s.number}`,
+            { subcontract: s.number },
+          );
+      }
+      // §4.6 — a worker's own documentation has lapsed.
+      for (const w of this.state.workers)
+        for (const d of w.docs || [])
+          if (d.expiresOn && d.expiresOn < t) {
+            push("WORKER-DOC-EXPIRED", "medium", `Documentación caducada — ${w.name} (${d.kind})`, {
+              worker: w.id,
+            });
+            break;
+          }
+      // §4.6 — a worker assigned to an open project with a working day past
+      // and nothing logged for it. Counted, not itemised: one alert per
+      // project keeps this from drowning the list on a large crew.
+      for (const p of this.state.projects.filter((x) => !x.closed)) {
+        let missing = 0;
+        for (const a of (this.state.assignments || []).filter(
+          (x) => x.projectId === p.id && x.workerId,
+        )) {
+          const from = a.from > (p.dates.start || a.from) ? a.from : p.dates.start || a.from;
+          for (let d = from; d < t && d <= a.to; d = addDays(d, 1)) {
+            const wd = new Date(d + "T00:00:00Z").getUTCDay();
+            if (wd === 0 || wd === 6) continue; // weekends are not working days here
+            if (
+              !this.state.labour.some(
+                (l) => l.workerId === a.workerId && l.projectId === p.id && l.date === d,
+              )
+            )
+              missing++;
+          }
+        }
+        if (missing > 0)
+          push("LAB-MISSING-DAYS", "medium", `${missing} jornada(s) sin registrar — ${p.code}`, {
+            project: p.code,
+          });
+      }
       const un = this.unallocatedSummary();
       if (un.billsCount)
-        push("high", `${un.billsCount} facturas de proveedor sin asignar`, { view: "payables" });
+        push("AP-UNALLOCATED", "high", `${un.billsCount} facturas de proveedor sin asignar`, {
+          view: "payables",
+        });
       if (un.movementsCount)
-        push("high", `${un.movementsCount} movimientos bancarios sin asignar`, { view: "bank" });
+        push("BNK-UNALLOCATED", "high", `${un.movementsCount} movimientos bancarios sin asignar`, {
+          view: "bank",
+        });
       for (const b of this.state.bills.filter((x) => x.duplicateSuspect))
-        push("high", `Posible duplicado — ${b.number}`, { bill: b.number });
+        push("AP-DUPLICATE", "high", `Posible duplicado — ${b.number}`, { bill: b.number });
       for (const c of this.state.contracts)
         for (const g of c.guarantees)
-          if (g.expiryDate && g.expiryDate <= addDays(t, 30) && g.expiryDate >= t)
-            push("medium", `Garantía próxima a vencer — ${c.number}`, { contract: c.number });
+          if (
+            g.expiryDate &&
+            g.expiryDate <= addDays(t, this.alertRuleThreshold("CON-WARRANTY-EXPIRING", 30)) &&
+            g.expiryDate >= t
+          )
+            push("CON-WARRANTY-EXPIRING", "medium", `Garantía próxima a vencer — ${c.number}`, {
+              contract: c.number,
+            });
       for (const m of this.state.movements.filter((x) => x.needsDoc))
-        push("medium", "Movimiento de caja sin justificante", { movement: m.id });
+        push("BNK-CASH-NODOC", "medium", "Movimiento de caja sin justificante", { movement: m.id });
+      // §5.6 — an internal reminder (not a legal deadline, see ALERT_META) that
+      // the current quarter's package still has not gone out.
+      {
+        const q = quarterOf(t);
+        const sentQ = (this.state.packagesSent || []).some((p) => p.quarter === q && !p.reopened);
+        if (!sentQ) {
+          const target = this.alertRuleThreshold("GES-PACKAGE-DUE", 15);
+          const daysPast = daysBetween(t, quarterEndDate(q));
+          if (daysPast >= target)
+            push(
+              "GES-PACKAGE-DUE",
+              daysPast >= target * 2 ? "critical" : "medium",
+              `Paquete de ${q} sin enviar a gestoría — ${daysPast} días desde el cierre del trimestre`,
+              { quarter: q },
+            );
+        }
+      }
       return A;
+    }
+
+    /* ---- DAS-06/07 — alert rules and the management layer over alerts() ----
+       alerts() stays a pure projection recomputed from current state, exactly
+       like commsEvents() in §5.7: a rule enabled today must still see a
+       condition that has existed since last week. Everything a person DOES
+       to an alert — assign it, give it a deadline, snooze it, resolve it with
+       a note and evidence, or turn it into a task — is stored separately in
+       alertOverrides, keyed by a stable composite of the alert's code and its
+       ref, so an override survives from one day's recomputed alert to the
+       next as long as the underlying condition is still the same one. */
+    ensureAlertRules() {
+      if (!Array.isArray(this.state.alertRules)) this.state.alertRules = [];
+      for (const code of Object.keys(ALERT_META)) {
+        if (this.state.alertRules.some((r) => r.code === code)) continue;
+        const m = ALERT_META[code];
+        this.state.alertRules.push({
+          code,
+          label: m.label,
+          type: m.type,
+          enabled: true,
+          thresholdValue: m.defaultThreshold != null ? m.defaultThreshold : null,
+          recipient: "backoffice",
+          channel: "app",
+        });
+      }
+      return this.state.alertRules;
+    }
+    alertRule(code) {
+      return this.ensureAlertRules().find((r) => r.code === code) || null;
+    }
+    alertRuleEnabled(code) {
+      const r = this.alertRule(code);
+      return !r || r.enabled !== false; // an unconfigured code defaults to on
+    }
+    alertRuleThreshold(code, fallback) {
+      const r = this.alertRule(code);
+      return r && r.thresholdValue != null ? r.thresholdValue : fallback;
+    }
+    updateAlertRule(code, patch, user) {
+      const r = this.alertRule(code);
+      if (!r) throw new Error("Unknown alert rule: " + code);
+      const allowed = ["enabled", "thresholdValue", "recipient", "channel"];
+      for (const k of Object.keys(patch || {})) if (allowed.includes(k)) r[k] = patch[k];
+      this._log(user, "updateAlertRule", code);
+      return r;
+    }
+    alertKey(a) {
+      return a.code + "|" + JSON.stringify(a.ref || null);
+    }
+    /** Resolve a project code from an alert's ref, for the "por proyecto" grouping (DAS-06). */
+    alertProjectCode(ref) {
+      if (!ref) return null;
+      if (ref.project) return ref.project;
+      const find = (arr, pred) => (arr || []).find(pred);
+      if (ref.contract) {
+        const c = find(this.state.contracts, (x) => x.number === ref.contract);
+        const p = c && find(this.state.projects, (x) => x.contractId === c.id);
+        return p ? p.code : null;
+      }
+      if (ref.budget) {
+        const p = find(this.state.projects, (x) => x.budgetNumber === ref.budget);
+        return p ? p.code : null;
+      }
+      if (ref.purchase) {
+        const pu = find(this.state.purchases, (x) => x.number === ref.purchase);
+        const p = pu && find(this.state.projects, (x) => x.id === pu.projectId);
+        return p ? p.code : null;
+      }
+      if (ref.subcontract) {
+        const s = find(this.state.subcontracts, (x) => x.number === ref.subcontract);
+        const p = s && find(this.state.projects, (x) => x.id === s.projectId);
+        return p ? p.code : null;
+      }
+      if (ref.invoice) {
+        const i = find(this.state.invoices, (x) => x.number === ref.invoice);
+        const p = i && find(this.state.projects, (x) => x.id === i.projectId);
+        return p ? p.code : null;
+      }
+      if (ref.bill) {
+        const b = find(this.state.bills, (x) => x.number === ref.bill);
+        const a0 = b && (b.allocations || [])[0];
+        const p = a0 && a0.projectId && find(this.state.projects, (x) => x.id === a0.projectId);
+        return p ? p.code : null;
+      }
+      if (ref.change) {
+        const c = find(this.state.changes, (x) => x.id === ref.change);
+        const p = c && find(this.state.projects, (x) => x.id === c.projectId);
+        return p ? p.code : null;
+      }
+      return null;
+    }
+    /**
+     * alerts() with the management layer merged in, filtered to what is
+     * still actionable (DAS-07 "gestor, no aviso"). Pass includeResolved /
+     * includeSnoozed to see the full history instead.
+     */
+    managedAlerts(opts) {
+      opts = opts || {};
+      const overrides =
+        this.state.alertOverrides && typeof this.state.alertOverrides === "object"
+          ? this.state.alertOverrides
+          : {};
+      const t = this.state.today;
+      return this.alerts()
+        .map((a) => {
+          const key = this.alertKey(a);
+          const ov = overrides[key] || null;
+          return Object.assign({ key }, a, {
+            project: this.alertProjectCode(a.ref),
+            assignee: (ov && ov.assignee) || null,
+            dueDate: (ov && ov.dueDate) || null,
+            snoozedUntil: (ov && ov.snoozedUntil) || null,
+            snoozeReason: (ov && ov.snoozeReason) || "",
+            resolvedAt: (ov && ov.resolvedAt) || null,
+            resolutionNote: (ov && ov.resolutionNote) || "",
+            evidence: (ov && ov.evidence) || [],
+            resolvedBy: (ov && ov.resolvedBy) || null,
+            taskId: (ov && ov.taskId) || null,
+          });
+        })
+        .filter((a) => {
+          if (a.resolvedAt && !opts.includeResolved) return false;
+          if (a.snoozedUntil && a.snoozedUntil > t && !opts.includeSnoozed) return false;
+          return true;
+        });
+    }
+    _alertOverride(key) {
+      if (!this.state.alertOverrides || typeof this.state.alertOverrides !== "object")
+        this.state.alertOverrides = {};
+      if (!this.state.alertOverrides[key])
+        this.state.alertOverrides[key] = {
+          assignee: null,
+          dueDate: null,
+          snoozedUntil: null,
+          snoozeReason: "",
+          resolvedAt: null,
+          resolutionNote: "",
+          evidence: [],
+          resolvedBy: null,
+          taskId: null,
+        };
+      return this.state.alertOverrides[key];
+    }
+    assignAlert(key, assignee, user) {
+      const ov = this._alertOverride(key);
+      ov.assignee = assignee || null;
+      this._log(user, "assignAlert", key);
+      return ov;
+    }
+    setAlertDue(key, dueDate, user) {
+      const ov = this._alertOverride(key);
+      ov.dueDate = dueDate || null;
+      this._log(user, "setAlertDue", key);
+      return ov;
+    }
+    snoozeAlert(key, until, reason, user) {
+      if (!until) throw new Error("Snoozing an alert needs a date");
+      const ov = this._alertOverride(key);
+      ov.snoozedUntil = until;
+      ov.snoozeReason = String(reason || "").trim();
+      this._log(user, "snoozeAlert", key);
+      return ov;
+    }
+    resolveAlert(key, note, evidence, user) {
+      if (!note || !String(note).trim()) throw new Error("Resolving an alert needs a note");
+      const ov = this._alertOverride(key);
+      ov.resolvedAt = this.state.today;
+      ov.resolutionNote = String(note).trim();
+      ov.evidence = evidence || [];
+      ov.resolvedBy = user || "backoffice";
+      this._log(user, "resolveAlert", key);
+      return ov;
+    }
+    reopenAlert(key, user) {
+      const ov = this._alertOverride(key);
+      ov.resolvedAt = null;
+      ov.resolutionNote = "";
+      ov.resolvedBy = null;
+      this._log(user, "reopenAlert", key);
+      return ov;
+    }
+    /** Turn an alert into a real task the caller already has the wording for (DAS-07). */
+    convertAlertToTask(key, title, owner, due, user) {
+      const ov = this._alertOverride(key);
+      if (ov.taskId) throw new Error("Already converted to a task");
+      const task = this.addTask(
+        { title, owner: owner || "backoffice", due: due || this.state.today, relatedRef: key },
+        user,
+      );
+      ov.taskId = task.id;
+      this._log(user, "convertAlertToTask", key);
+      return task;
+    }
+    /**
+     * The eight-card grid §2.1 replaces the old indicator block with, each
+     * carrying exactly the big/small figures the spec names — nothing more,
+     * since a card that also tried to be a mini-report would defeat the
+     * point of a dashboard. Kept apart from the older ad-hoc fields on
+     * controlTower() below, which existing readers (year-sim, migrations-sim)
+     * still use and which this method leaves untouched.
+     */
+    controlTowerCards() {
+      const t = this.state.today;
+      const monthStart = t.slice(0, 7) + "-01";
+      const prevMonthEnd = addDays(monthStart, -1);
+      const [qy, qn] = quarterOf(t).split("-Q").map(Number);
+      const quarterStart = `${qy}-${String((qn - 1) * 3 + 1).padStart(2, "0")}-01`;
+      const opMonth = this.operatingResult(monthStart, t);
+      const opQuarter = this.operatingResult(quarterStart, t);
+      const activeProjects = this.state.projects.filter((p) => !p.closed);
+      const activeContractedCents = sum(activeProjects, (p) => {
+        const c = p.contractId ? this.state.contracts.find((x) => x.id === p.contractId) : null;
+        return c ? c.totalCents : p.baseline.revenueCents;
+      });
+      const wonLost12m = this.state.opportunities.filter(
+        (o) => ["won", "lost"].includes(o.status) && daysBetween(t, o.decidedAt || o.date) <= 365,
+      );
+      const week1 = this.cashForecastWindow(7),
+        week2Full = this.cashForecastWindow(14);
+      return {
+        activeProjects: { count: activeProjects.length, contractedCents: activeContractedCents },
+        monthResult: { ...opMonth, from: monthStart, to: t },
+        quarterResult: { ...opQuarter, from: quarterStart, to: t },
+        bankBalance: {
+          nowCents: this.cashPosition().totalCents,
+          prevMonthCloseCents: this.cashPositionAsOf(prevMonthEnd),
+        },
+        cashForecast: {
+          d7: this.cashForecastWindow(7),
+          d14: this.cashForecastWindow(14),
+          d30: this.cashForecastWindow(30),
+        },
+        supplierPayments: {
+          thisWeekCents: week1.outflowCents,
+          nextWeekCents: week2Full.outflowCents - week1.outflowCents,
+        },
+        opportunities: {
+          openCount: this.opportunityAges().length,
+          wonCount12m: wonLost12m.filter((o) => o.status === "won").length,
+          lostCount12m: wonLost12m.filter((o) => o.status === "lost").length,
+        },
+        visits: {
+          pendingCount: this.state.opportunities.filter((o) => o.status === "awaitingVisit").length,
+          done30dCount: this.state.visits.filter((v) => daysBetween(t, v.date) <= 30).length,
+        },
+      };
+    }
+    /**
+     * Twelve trailing points per card, each on its own natural cadence
+     * (monthly for month-scoped figures, quarterly for the quarter figure,
+     * weekly for the week-scoped supplier-payments figure) — "últimos 12
+     * periodos" (§2.1) means twelve of THAT card's period, not twelve of a
+     * single global one.
+     */
+    controlTowerSeries() {
+      const t = this.state.today;
+      const ty = Number(t.slice(0, 4)),
+        tm = Number(t.slice(5, 7));
+      // Oldest first, so a sparkline can render the array left-to-right as-is.
+      const trailingMonths = (n) => {
+        const out = [];
+        for (let i = n - 1; i >= 0; i--) {
+          let y = ty,
+            m = tm - i;
+          while (m <= 0) {
+            m += 12;
+            y -= 1;
+          }
+          const from = `${y}-${String(m).padStart(2, "0")}-01`;
+          const firstOfNext =
+            m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+          const to = i === 0 ? t : addDays(firstOfNext, -1); // the current month is truncated to "so far"
+          out.push({ from, to });
+        }
+        return out;
+      };
+      const trailingWeeks = (n) => {
+        const out = [];
+        for (let i = n - 1; i >= 0; i--)
+          out.push({ from: addDays(t, -7 * i - 6), to: addDays(t, -7 * i) });
+        return out;
+      };
+      const trailingQuarters = (n) => {
+        const rows = [];
+        let [qy, qn] = quarterOf(t).split("-Q").map(Number);
+        for (let i = 0; i < n; i++) {
+          rows.push({ y: qy, qn });
+          qn -= 1;
+          if (qn === 0) {
+            qn = 4;
+            qy -= 1;
+          }
+        }
+        rows.reverse();
+        return rows.map((r, idx) => {
+          const from = `${r.y}-${String((r.qn - 1) * 3 + 1).padStart(2, "0")}-01`;
+          const to = idx === rows.length - 1 ? t : quarterEndDate(`${r.y}-Q${r.qn}`);
+          return { from, to };
+        });
+      };
+      const months = trailingMonths(12);
+      const activeAsOf = (dateIso) =>
+        this.state.projects.filter(
+          (p) =>
+            p.dates.start &&
+            p.dates.start <= dateIso &&
+            (!p.closed || (p.dates.actualEnd || "9999") > dateIso),
+        ).length;
+      return {
+        activeProjects: months.map((m) => activeAsOf(m.to)),
+        monthResult: months.map((m) => this.operatingResult(m.from, m.to).resultCents),
+        quarterResult: trailingQuarters(12).map(
+          (q) => this.operatingResult(q.from, q.to).resultCents,
+        ),
+        bankBalance: months.map((m) => this.cashPositionAsOf(m.to)),
+        supplierPayments: trailingWeeks(12).map((w) =>
+          sum(
+            this.payables().filter(
+              (p) => p.outstandingCents > 0 && p.dueDate >= w.from && p.dueDate <= w.to,
+            ),
+            (p) => p.outstandingCents,
+          ),
+        ),
+        opportunities: months.map(
+          (m) =>
+            this.state.opportunities.filter(
+              (o) => o.date <= m.to && (!o.decidedAt || o.decidedAt > m.to),
+            ).length,
+        ),
+        visits: months.map(
+          (m) => this.state.visits.filter((v) => v.date >= m.from && v.date <= m.to).length,
+        ),
+      };
     }
     controlTower() {
       // DAS-02: consolidated, all drillable (DAS-03)
@@ -2532,8 +4897,11 @@
         this.payables().filter((p) => p.outstandingCents > 0),
         (p) => p.outstandingCents,
       );
-      const alerts = this.alerts();
+      const alerts = this.managedAlerts();
       return {
+        cards: this.controlTowerCards(),
+        series: this.controlTowerSeries(),
+        lastCalculatedAt: this.state.today,
         activeProjects: projects.map((p) => ({ code: p.code, ...this.projectEconomics(p.id) })),
         activeCount: projects.length,
         totalForecastMarginCents: sum(
@@ -2557,7 +4925,7 @@
           })
           .map((p) => p.code),
         unapprovedExtras: this.state.changes.filter((c) =>
-          ["identified", "priced"].includes(c.status),
+          ["identified", "priced", "sent"].includes(c.status),
         ).length,
         budgetsAwaiting: this.state.budgets
           .filter((b) => b.status === "issued" && !b.acceptedVersionId)
@@ -2620,6 +4988,85 @@
         docsMissing: this.state.captured.filter((c) => ["captured", "extracted"].includes(c.status))
           .length,
       };
+    }
+    /**
+     * The right-hand calendar of §2.2: every date type the spec names —
+     * "hitos de proyecto (inicio, fases, entrega)... vencimientos de
+     * contrato y de garantía, envío de documentación a la gestoría,
+     * presentación y pago de impuestos, caducidad de seguros y
+     * documentación obligatoria de subcontratas" — read from the records
+     * that already own each date, never a second copy of it. Visits are
+     * deliberately absent: they are logged AFTER they happen (VIS-01), so
+     * there is no future date to put on a calendar for one, and they already
+     * have their own place in operationalDay()'s "Hoy"/"Esta semana" list.
+     * "Fases" (per-chapter Gantt dates) is also left out — that level of
+     * detail already has a dedicated screen and duplicating it here would
+     * make the calendar a second, easier-to-drift copy of the Gantt.
+     */
+    upcomingMilestones(from, to) {
+      const out = [];
+      const push = (date, kind, label, ref) => {
+        if (date && date >= from && date <= to) out.push({ date, kind, label, ref });
+      };
+      for (const p of this.state.projects) {
+        push(p.dates.start, "projectStart", `Inicio de obra — ${p.code}`, { project: p.code });
+        push(p.dates.targetEnd, "projectEnd", `Entrega prevista — ${p.code}`, { project: p.code });
+      }
+      for (const c of this.state.contracts) {
+        for (const i of c.installments)
+          if (i.status === "planned")
+            push(i.expectedDate, "collectionMilestone", `Cobro previsto — ${c.number}`, {
+              contract: c.number,
+            });
+        push(
+          c.duration.plannedFinish,
+          "contractDeadline",
+          `Fin de obra contractual — ${c.number}`,
+          {
+            contract: c.number,
+          },
+        );
+        for (const g of c.guarantees)
+          push(g.expiryDate, "warrantyExpiry", `Vencimiento de garantía — ${c.number}`, {
+            contract: c.number,
+          });
+      }
+      for (const b of this.state.bills)
+        if (this.billOutstandingCents(b.id) > 0)
+          push(b.dueDate, "paymentMilestone", `Pago a proveedor — ${b.number}`, { bill: b.number });
+      for (const pu of this.state.purchases)
+        if (!pu.cancelledAt && !pu.status.delivered)
+          push(pu.expectedArrival, "materialDelivery", `Entrega de material — ${pu.number}`, {
+            purchase: pu.number,
+          });
+      for (const s of this.state.subcontracts || [])
+        for (const d of s.docs || [])
+          push(d.expiresOn, "subcontractDocExpiry", `Documentación (${d.kind}) — ${s.number}`, {
+            subcontract: s.number,
+          });
+      for (const w of this.state.workers)
+        for (const d of w.docs || [])
+          push(d.expiresOn, "workerDocExpiry", `Documentación (${d.kind}) — ${w.name}`, {
+            worker: w.id,
+          });
+      for (const task of this.state.tasks)
+        if (task.status === "open") push(task.due, "task", task.title, { task: task.id });
+      // One advisory fiscal date per quarter touching the window — the same
+      // non-legal reminder GES-PACKAGE-DUE raises as an alert once it's
+      // close, shown here regardless of proximity so the calendar can plan
+      // around it ahead of time. push() itself drops anything outside
+      // [from,to], so walking one quarter past the end is harmless.
+      let q = quarterOf(from);
+      const qTo = quarterOf(to);
+      for (let guard = 0; guard < 8; guard++) {
+        const deadline = addDays(quarterEndDate(q), this.alertRuleThreshold("GES-PACKAGE-DUE", 15));
+        push(deadline, "gestoriaDeadline", `Envío a gestoría — ${q}`, { quarter: q });
+        if (q === qTo) break;
+        const [qy, qn] = q.split("-Q").map(Number);
+        q = qn === 4 ? `${qy + 1}-Q1` : `${qy}-Q${qn + 1}`;
+      }
+      out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      return out;
     }
 
     /* =========================== gap-closure additions (BRD v2 audit) =========================== */
@@ -3099,7 +5546,7 @@
       const cur = this.currentVersion(id);
       if (b.acceptedVersionId || (cur && cur.issued))
         throw new Error("Budget is issued/accepted — create a new version instead");
-      const allowed = ["internalRef", "propertyId", "discountCents", "vatBp", "validityDate"];
+      const allowed = ["internalRef", "propertyId", "discountCents", "vatBp", "validityDays"];
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
       Object.assign(b, patch);
       this._log(user, "updateBudget", b.number);
@@ -3131,8 +5578,10 @@
       const ln = this._findLine(ch, lineRef);
       delete patch.num;
       Object.assign(ln, patch);
-      if (ln.subLines && ln.subLines.length)
-        ln.qtyMilli = ln.subLines.reduce((s, sl) => s + (sl.qtyMilli || 0), 0);
+      // _aggSubLines, not a plain sum: addLine, budgetTotals and editLine all
+      // apply the waste percentage, so a plain sum here made an edited line
+      // quietly disagree with the total it feeds.
+      if (ln.subLines && ln.subLines.length) ln.qtyMilli = this._aggSubLines(ln.subLines);
       this._log(user, "updateLine", this.budget(budgetId).number + " " + ln.num);
       return ln;
     }
@@ -3196,9 +5645,7 @@
     }
     resolveRequirement(projectId, reqId, status, user) {
       const p = this.project(projectId);
-      // addProjectRequirement files into permits or dependencies by type, never
-      // into a `requirements` array — look where the record actually lives.
-      const r = [...(p.permits || []), ...(p.dependencies || [])].find((x) => x.id === reqId);
+      const r = (p.requirements || []).find((x) => x.id === reqId);
       if (!r) throw new Error("Requirement not found");
       r.status = status || "resolved";
       r.resolvedAt = this.state.today;
@@ -3236,9 +5683,54 @@
       if (ch.status !== "approved")
         throw new Error("Only an approved extra can be marked executed");
       ch.executed = { date: this.state.today };
-      ch.status = "executed"; // otherwise LISTS.changeStatuses "executed" is unreachable
       this._log(user, "markChangeExecuted", id);
       return ch;
+    }
+    /** Annul a change that has not been invoiced yet — the effect it never
+        should have had unwinds because approved-only totals feed the economics. */
+    cancelChange(id, reason, user) {
+      const ch = this.state.changes.find((x) => x.id === id);
+      if (!ch) throw new Error("Change not found");
+      if (ch.invoiceId)
+        throw new Error("An invoiced extra cannot be cancelled — issue a credit note");
+      ch.status = "cancelled";
+      ch.cancelReason = reason || "";
+      this._log(user, "cancelChange", id);
+      return ch;
+    }
+    /**
+     * The adenda: a customer-facing document generated from the contract and
+     * the change, with a correlative number (§4.5). No cost or margin field —
+     * the same QUO-10 rule the budget document follows, for the same reason.
+     */
+    renderChangeDoc(changeId) {
+      const c = this.state.changes.find((x) => x.id === changeId);
+      if (!c) throw new Error("Change not found");
+      const p = this.project(c.projectId);
+      const con = p.contractId ? this.state.contracts.find((x) => x.id === p.contractId) : null;
+      const cfg = this.state.config;
+      return {
+        docType: "MODIFICACION",
+        number: c.annexNumber || null,
+        date: c.approvedAt || c.date,
+        contractNumber: con ? con.number : null,
+        issuer: {
+          legalName: cfg.legalName,
+          taxId: cfg.taxId,
+          address: `${cfg.street}, ${cfg.postalCode} ${cfg.city}`,
+        },
+        customer: (({ name, taxId, billStreet, billPostalCode, billCity }) => ({
+          name,
+          taxId,
+          address: `${billStreet}, ${billPostalCode} ${billCity}`,
+        }))(this.party(p.partyId)),
+        project: p.code,
+        chapterNum: c.chapterNum,
+        desc: c.desc,
+        reason: c.reason,
+        priceCents: c.priceCents,
+        scheduleImpactDays: c.scheduleImpactDays,
+      };
     }
     updatePurchase(id, patch, user) {
       const pu = this.state.purchases.find((x) => x.id === id);
@@ -3284,9 +5776,10 @@
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
       Object.assign(b, patch);
       b.vatCents = Math.round((b.baseCents * (b.vatBp || 0)) / 10000);
-      // Bills carry irpfBp; irpfRateBp is the party-level field and is undefined
-      // here, so reading it silently skipped the recalculation.
-      b.irpfCents = b.irpfBp ? Math.round((b.baseCents * b.irpfBp) / 10000) : b.irpfCents;
+      b.irpfCents =
+        b.irpfCents && b.irpfRateBp
+          ? Math.round((b.baseCents * b.irpfRateBp) / 10000)
+          : b.irpfCents;
       b.totalCents = b.baseCents + b.vatCents - (b.irpfCents || 0);
       this._log(user, "correctBill", b.number);
       return b;
@@ -3314,6 +5807,20 @@
       this._log(user, "voidPayment", id + " " + rec.amountCents + "c");
       return rec;
     }
+    /**
+     * The mirror of voidPayment, on the money-in side. Added for §5.3's
+     * "deshacer una conciliación": undoing a match that created a collection
+     * has to remove the collection too, or the invoice stays settled while the
+     * movement goes back to unexplained — two screens, two different truths.
+     */
+    voidCollection(id, user) {
+      const i = this.state.collections.findIndex((c) => c.id === id);
+      if (i < 0) throw new Error("Collection not found");
+      const rec = this.state.collections[i];
+      this.state.collections.splice(i, 1);
+      this._log(user, "voidCollection", id + " " + rec.amountCents + "c");
+      return rec;
+    }
     allocateCollection(id, allocations, user) {
       const c = this.state.collections.find((x) => x.id === id);
       if (!c) throw new Error("Collection not found");
@@ -3327,14 +5834,12 @@
     updateRecurring(id, patch, user) {
       const r = (this.state.recurring || []).find((x) => x.id === id);
       if (!r) throw new Error("Recurring template not found");
-      // Field names must match addRecurringInvoice's record, or the patch is a no-op.
       const allowed = [
         "baseCents",
         "vatBp",
-        "desc",
+        "concept",
         "active",
-        "cadenceMonths",
-        "nextDate",
+        "dayOfMonth",
         "partyId",
         "projectId",
       ];
@@ -3382,10 +5887,17 @@
       return w;
     }
     correctHours(id, patch, user) {
+      // Also how §4.6's "reimputar horas de un proyecto a otro" happens: pass
+      // a different projectId/chapterNum and the cost moves with it.
       const rec = this.state.labour.find((x) => x.id === id);
       if (!rec) throw new Error("Hours entry not found");
+      if (rec.locked) throw new Error("Hours entry is in an approved week — reopen the week first");
       const allowed = ["projectId", "chapterNum", "hoursMilli", "date", "kind", "extraPayCents"];
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      if (patch.projectId) {
+        const p = this.state.projects.find((x) => x.id === patch.projectId);
+        if (p && p.closed) throw new Error("Cannot reallocate hours onto a closed project");
+      }
       Object.assign(rec, patch);
       rec.rateCents = this.workerRateCents(rec.workerId, rec.date);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);
@@ -3432,7 +5944,7 @@
         workPackage: "packages",
         price: "prices",
         purchase: "purchases",
-        capture: "captured",
+        capture: "captures",
         task: "tasks",
         worker: "workers",
         bankAccount: "bankAccounts",

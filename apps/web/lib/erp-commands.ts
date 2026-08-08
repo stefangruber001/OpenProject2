@@ -66,9 +66,12 @@ export const COMMANDS = {
   completeTask: { method: "completeTask", arity: 1, describes: "complete a task" },
 
   // --- periodic --------------------------------------------------------
+  // (period, options). The engine grew an options argument and stayed callable
+  // with the old two-argument form, so the declared arity has to move with it
+  // or the whitelist test — which reads the real function's length — fails.
   quarterlyPackage: {
     method: "quarterlyPackage",
-    arity: 1,
+    arity: 2,
     describes: "generate the quarterly archive",
   },
 } as const satisfies Record<string, CommandSpec>;

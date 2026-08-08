@@ -1156,3 +1156,45 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   Google Play, which was true only while the app wrapped a static copy. The Android app now
   signs in to a server and sends the company's records to it, so that declaration is corrected
   in the same commit — a false statement on a compliance form is not a rounding error.
+- **#83 — One ERP, on the server, for the website and the app (2026-08-08).** The app and the
+  website were running two different products: the phone loaded a much richer ERP from GitHub
+  Pages, and the server ran an older one. **Decision: take the development `site/` wholesale as
+  the single UI, and move its persistence onto the server.**
+  **The seam is `ErpStore`, not the pages.** Every screen already reads and writes through it, so
+  the switch lives there and all of them move at once, with no line changing in any page — which
+  is also the only way they cannot drift into some screens using the server and others the
+  browser. The signal is the same `<meta name="erp-api">` tag the server injects, and
+  `sync-workspace.mjs` now stamps EVERY page rather than a hand-picked two, asserting the count.
+  A whole-document PUT with `expectedVersion`, not per-command calls: the workspace mutates the
+  engine at several hundred call sites, and routing each through the closed command whitelist is
+  the right destination but a large piece of work. This trusts the client's arithmetic and is
+  honest about it; what the server keeps is the version check, the migration ladder,
+  normalisation through `ERP.from().toJSON()`, and attribution from the session. A conflict is
+  REFUSED, which is the property that lets two people share a register at all.
+  **The three screens with their own databases** — Master Data, Financial Data, the project
+  folder — went onto the server too, through `site/erp-docs.js`, which keeps their exact
+  `idbGet`/`idbSet` shape so each page changed by three lines. `erp_state` is keyed
+  `(tenantId, key)` and always was, so they needed a key each and no new storage. The key is
+  checked against a closed list; taken from the URL it would let any caller create unbounded rows.
+  **Three ways this could have destroyed live data, all found by reading the code before running
+  it:**
+  1. `boot()` fell back to `ErpSeed.build()` on ANY load error and then persisted — so a dropped
+     connection or an expired session would have PUT demonstration data over the company's
+     register. In remote mode it now stops and says so, changing nothing.
+  2. The "reload demo data" button would have replaced the shared register for everyone from one
+     click, behind a confirm box whose wording ("en este dispositivo") was no longer true.
+     Refused outright when remote — there is no version of it that is safe against live data.
+  3. `ERP.from` in the development engine had lost the collection backfill, so a document written
+     by an older build would throw on the first `state.x.filter(...)` — a 500 on a page unrelated
+     to the change. Restored, with the reason written down.
+     Also re-applied: `addTask` recording its author, which this session added to the old engine and
+     the swap silently reverted. Found by the test that was written for it — the value of having
+     driven two signed-in sessions the first time.
+     **Verified by doing it**, not by reading: all 11 pages load in server mode with no script
+     errors; a customer entered in the workspace, Master Data and Financial Data entries, and a
+     project folder created through the journey UI all appear in PostgreSQL and are read back by a
+     BROWSER WITH NO LOCAL STORAGE AT ALL — confirmed by watching it fetch the documents over the
+     network and by `SELECT` against the database; a stale save is refused with 409.
+     **Still local, and deliberately:** per-device UI preferences (which are correctly per-device),
+     and photo blobs, which need an upload path rather than base64 in a JSON document. Recorded as
+     task #97 rather than left implied.

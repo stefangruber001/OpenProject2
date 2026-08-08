@@ -5,11 +5,14 @@
    ========================================================================== */
 (function (root, factory) {
   if (typeof module === "object" && module.exports)
-    module.exports = factory(require("./erp-engine.js"));
-  else root.ErpSeed = factory(root.ErpEngine);
-})(typeof globalThis !== "undefined" ? globalThis : this, function (E) {
+    module.exports = factory(require("./erp-engine.js"), require("./erp-history.js"));
+  else root.ErpSeed = factory(root.ErpEngine, root.ErpHistory);
+})(typeof globalThis !== "undefined" ? globalThis : this, function (E, History) {
   "use strict";
   const { ERP, addDays } = E;
+
+  /* Demo-dataset version. See the assignment at the end of build(). */
+  const SEED_VERSION = 2;
 
   function build(today) {
     const erp = new ERP("2026-03-02");
@@ -52,7 +55,6 @@
       mobile: "937000001",
       email: "ventas@matvalles.example",
       paymentTermsDays: 30,
-      activityLine: "other",
       leadSource: "other",
     });
     const supElec = erp.addParty({
@@ -67,7 +69,6 @@
       mobile: "936000002",
       email: "info@electrobaix.example",
       paymentTermsDays: 30,
-      activityLine: "other",
       leadSource: "other",
     });
     const supFont = erp.addParty({
@@ -84,7 +85,6 @@
       paymentTermsDays: 15,
       irpfApplies: false,
       irpfRateBp: 0,
-      activityLine: "other",
       leadSource: "other",
     });
     const supArch = erp.addParty({
@@ -101,7 +101,6 @@
       paymentTermsDays: 15,
       irpfApplies: true,
       irpfRateBp: 1500,
-      activityLine: "other",
       leadSource: "other",
     });
 
@@ -111,6 +110,8 @@
       partyType: "individual",
       name: "Marta Roca Puig",
       taxId: "12345678Z",
+      contactPerson: "Marta Roca Puig",
+      landline: "934771208",
       billStreet: "Av. Barcelona 10, 3º 2ª",
       billPostalCode: "08960",
       billCity: "Sant Just Desvern",
@@ -118,7 +119,6 @@
       mobile: "600111222",
       email: "marta.roca@example.com",
       leadSource: "referrer",
-      activityLine: "renovation",
       paymentMethod: "transfer",
       paymentTermsDays: 15,
     });
@@ -127,6 +127,7 @@
       partyType: "community",
       name: "Comunidad Prop. Balmes 120",
       taxId: "H08571730",
+      contactPerson: "Jordi Vives (administrador de fincas)",
       billStreet: "C/ Balmes 120",
       billPostalCode: "08008",
       billCity: "Barcelona",
@@ -135,7 +136,6 @@
       mobile: "634000000",
       email: "vives@fincasvives.example",
       leadSource: "propertyManager",
-      activityLine: "commercial",
       paymentMethod: "transfer30",
       paymentTermsDays: 30,
     });
@@ -144,6 +144,8 @@
       partyType: "company",
       name: "Nou Local Gràcia S.L.",
       taxId: "B66957286",
+      contactPerson: "Jordi Massana",
+      landline: "932184460",
       billStreet: "C/ Verdi 22",
       billPostalCode: "08012",
       billCity: "Barcelona",
@@ -151,7 +153,6 @@
       mobile: "620333444",
       email: "jordi@noulocal.example",
       leadSource: "website",
-      activityLine: "commercial",
       paymentMethod: "transfer60",
       paymentTermsDays: 60,
       registry: "R.M. Barcelona, T.48001, F.120",
@@ -161,6 +162,8 @@
       partyType: "individual",
       name: "Pau Ferrer Vila",
       taxId: "46027840X",
+      contactPerson: "Pau Ferrer Vila",
+      landline: "933726611",
       billStreet: "C/ Laurel 8",
       billPostalCode: "08950",
       billCity: "Esplugues de Llobregat",
@@ -168,7 +171,6 @@
       mobile: "655001122",
       email: "pau.ferrer@example.com",
       leadSource: "leadPlatform",
-      activityLine: "damp",
       paymentMethod: "transfer",
       paymentTermsDays: 15,
     });
@@ -178,7 +180,6 @@
       name: "Sra. García (pendiente de datos)",
       mobile: "688777666",
       leadSource: "wordOfMouth",
-      activityLine: "repairs",
     }); // no taxId/address — cleansing queue
 
     /* properties */
@@ -294,15 +295,28 @@
     });
 
     /* workers */
+    // Rate bands go back to 2024 because the history below books real hours
+    // there and workerRateCents() refuses to guess a rate that was never in
+    // force — effective dating doing its job. The 2026 figures are unchanged,
+    // so every 2026 labour cost is exactly what it always was; the earlier
+    // bands simply give two years of pay rises something to be read from.
     const w1 = erp.addWorker({
       name: "Oficial 1ª — Álvaro",
       kind: "employee",
-      rateHistory: [{ from: "2026-01-01", rateCentsPerHour: 1900 }],
+      rateHistory: [
+        { from: "2024-01-01", rateCentsPerHour: 1700 },
+        { from: "2025-01-01", rateCentsPerHour: 1800 },
+        { from: "2026-01-01", rateCentsPerHour: 1900 },
+      ],
     });
     const w2 = erp.addWorker({
       name: "Peó — Ibra",
       kind: "employee",
-      rateHistory: [{ from: "2026-01-01", rateCentsPerHour: 1400 }],
+      rateHistory: [
+        { from: "2024-01-01", rateCentsPerHour: 1250 },
+        { from: "2025-01-01", rateCentsPerHour: 1320 },
+        { from: "2026-01-01", rateCentsPerHour: 1400 },
+      ],
     });
 
     /* helper to build a budget quickly */
@@ -325,6 +339,24 @@
         for (const l of lines) erp.addLine(b.id, ch.id, l);
       }
       return b;
+    }
+
+    /* ---- Two years of trading history (2024-06 … 2025-12) ----------------
+       Runs BEFORE the 2026 story on purpose. Document series restart per
+       fiscal year, so history occupies the 2024/2025 series and every 2026
+       number the staged story below produces — and that ~147 browser checks
+       assert by name — is exactly what it always was. See erp-history.js.
+       Degrades silently if the module is absent so erp-seed.js keeps working
+       standalone (some Node probes require it directly). */
+    if (History && typeof History.apply === "function") {
+      History.apply(erp, {
+        items,
+        suppliers: { material: supMat, electrical: supElec, plumbing: supFont, adviser: supArch },
+        workers: [w1, w2],
+        bank,
+        till,
+        budgetWith,
+      });
     }
 
     /* ---- P1: Reforma Roca — accepted, in execution, extra approved, 50% invoiced ---- */
@@ -902,7 +934,6 @@
     const prjQ = erp.createQuickProject({
       partyId: cRoca.id,
       desc: "Reparación persiana y grifería",
-      activityLine: "repairs",
       valueCents: 32000,
     });
     erp.recordHours({ workerId: w2.id, projectId: prjQ.id, chapterNum: "1", hoursMilli: 4000 });
@@ -913,6 +944,117 @@
       desc: "Reparación realizada",
       vatBp: 2100,
     });
+
+    /* ---- P5: a budget still being written ----
+       Every other budget here has been issued or accepted, which freezes it.
+       A dataset in which nothing is editable makes the constructor of §3.3
+       impossible to see, and a real pipeline always has one budget in
+       preparation — so this one stays a draft. It is also the one that carries
+       the graphic annex: two of its lines have reference pictures, which is
+       exactly the case the annex exists for. */
+    erp.setToday("2026-05-01");
+    const oBorr = erp.addOpportunity({
+      partyId: cRoca.id,
+      propertyId: pRoca.id,
+      source: "referrer",
+      requestedWork: "Segunda fase: salón y pasillo",
+      expectedValue: 1850000,
+    });
+    erp.addVisit({
+      opportunityId: oBorr.id,
+      measurements: [
+        { what: "Salón", qty: 28, unit: "m2" },
+        { what: "Pasillo", qty: 9, unit: "m2" },
+      ],
+      photos: ["visita-salon-1.jpg", "visita-pasillo-1.jpg"],
+      notes: "Suelo original recuperable en el pasillo; el salón necesita nivelación.",
+    });
+    const bBorr = budgetWith(
+      cRoca,
+      pRoca,
+      "renovation",
+      [
+        [
+          "Pavimentos",
+          [
+            {
+              code: "P1",
+              itemId: items["ALB-010"].id,
+              desc: "Nivelación y pavimento cerámico salón",
+              customerWording: "Nivelación del suelo y pavimento cerámico en salón",
+              unit: "m2",
+              qtyMilli: 28000,
+              priceCents: 4200,
+              costCents: 2650,
+              imageRefs: [
+                {
+                  id: "img_seed_pav_1",
+                  storageKey: "seed_img_pavimento",
+                  caption: "Acabado de referencia acordado en la visita",
+                  source: "visit",
+                  internal: false,
+                  mime: "image/png",
+                  sizeBytes: 0,
+                  width: 0,
+                  height: 0,
+                },
+                {
+                  id: "img_seed_pav_2",
+                  storageKey: "seed_img_estado",
+                  caption: "Estado actual antes de la nivelación",
+                  source: "visit",
+                  internal: false,
+                  mime: "image/png",
+                  sizeBytes: 0,
+                  width: 0,
+                  height: 0,
+                },
+              ],
+            },
+          ],
+        ],
+        [
+          "Pintura",
+          [
+            {
+              code: "PI1",
+              itemId: items["PIN-001"].id,
+              desc: "Pintura plástica salón y pasillo",
+              unit: "m2",
+              qtyMilli: 96000,
+              priceCents: 780,
+              costCents: 430,
+              imageRefs: [
+                {
+                  id: "img_seed_pin_1",
+                  storageKey: "seed_img_pintura",
+                  caption: "Carta de color elegida",
+                  source: "catalogue",
+                  internal: false,
+                  mime: "image/png",
+                  sizeBytes: 0,
+                  width: 0,
+                  height: 0,
+                },
+                {
+                  id: "img_seed_pin_2",
+                  storageKey: "seed_img_interna",
+                  caption: "Detalle del encuentro con el rodapié (nota interna)",
+                  source: "upload",
+                  internal: true,
+                  mime: "image/png",
+                  sizeBytes: 0,
+                  width: 0,
+                  height: 0,
+                },
+              ],
+            },
+          ],
+        ],
+      ],
+      { vatBp: 2100, validityDate: "2026-06-30" },
+    );
+    void bBorr;
 
     /* ---- open items that feed the day views & exception lists ---- */
     erp.setToday("2026-05-02");
@@ -956,6 +1098,33 @@
       concept: "Compra pequeño material",
       amountCents: -4200,
     }); // cash without doc → flagged
+
+    /* ---- §5.3: statement lines the reconciliation screen has to explain ----
+       Three deliberate shapes, because a screen with nothing to match on is a
+       screen nobody can judge:
+         1. a customer transfer quoting its invoice number — the one-click case;
+         2. a supplier payment quoting its bill number — same, other direction;
+         3. an equal-and-opposite pair across two accounts — an internal
+            transfer, which counts as income AND expense until it is spotted.
+       All three arrive UNCLASSIFIED, exactly as a bank hands them over. */
+    erp.importMovements(bank.id, [
+      {
+        accountingDate: "2026-05-02",
+        concept: "TRANSFERENCIA RECIBIDA FAC-2026-0002",
+        counterparty: "COMUNIDAD BALMES 44",
+        amountCents: 98888,
+      },
+      {
+        accountingDate: "2026-05-04",
+        concept: "TRANSF /FRA EB-3301",
+        counterparty: "ELECTROBAIX SL",
+        amountCents: -179080,
+      },
+      { accountingDate: "2026-05-04", concept: "TRASPASO ENTRE CUENTAS", amountCents: -60000 },
+    ]);
+    erp.importMovements(till.id, [
+      { accountingDate: "2026-05-04", concept: "TRASPASO RECIBIDO", amountCents: 60000 },
+    ]);
     erp.registerBill({
       supplierId: supArch.id,
       number: "NC-88",
@@ -976,9 +1145,238 @@
       relatedRef: "factura",
     });
 
+    /* ---- §5.7: the starting template library and one rule per family ----
+       A communications screen with an empty library teaches nothing: the
+       question it has to answer is "what would go out, to whom, and when",
+       and that needs something to look at. Every rule below is mode:"draft"
+       — the shipped default — so the queue fills with things awaiting a
+       person, which is the behaviour §5.7 asks for and the mandate requires
+       (nothing is ever sent from here). */
+    [
+      {
+        key: "quote-followup",
+        label: "Seguimiento de presupuesto",
+        family: "comercial",
+        subject: "Su presupuesto {{number}}",
+        body: "Hola {{cliente}},\n\n¿Ha podido revisar el presupuesto {{number}}? Quedamos a su disposición para cualquier ajuste.\n\nUn saludo,\nCanei Subirats",
+        attach: "budget",
+      },
+      {
+        key: "invoice-reminder",
+        label: "Recordatorio de factura vencida",
+        family: "cobros",
+        subject: "Factura {{number}} pendiente",
+        body: "Hola {{cliente}},\n\nLa factura {{number}}, por importe de {{importe}} €, figura pendiente en nuestros registros. Si ya la ha abonado, indíquenoslo y la conciliamos.\n\nGracias,\nCanei Subirats",
+        attach: "invoice",
+      },
+      {
+        key: "works-start",
+        label: "Aviso de inicio de obra",
+        family: "obra",
+        subject: "Comenzamos su obra el {{fecha}}",
+        body: "Hola {{cliente}},\n\nConfirmamos el inicio de los trabajos. El equipo llegará a primera hora y le informaremos del avance semanalmente.\n\nUn saludo,\nCanei Subirats",
+      },
+      {
+        key: "docs-expired",
+        label: "Documentación caducada",
+        family: "proveedores",
+        subject: "Documentación pendiente — {{number}}",
+        body: "Buenos días,\n\nLa documentación asociada a {{number}} ({{oficio}}) figura caducada. Sin ella no es posible el acceso a obra.\n\nGracias,\nCanei Subirats",
+      },
+      {
+        key: "warranty-followup",
+        label: "Seguimiento posventa",
+        family: "posventa",
+        subject: "¿Todo correcto tras la obra?",
+        body: "Hola {{cliente}},\n\nHa pasado un tiempo desde que terminamos. ¿Está todo a su gusto? Cualquier detalle en garantía lo revisamos sin coste.\n\nUn saludo,\nCanei Subirats",
+      },
+    ].forEach((t) => erp.addCommsTemplate(t, "seed"));
+    [
+      {
+        label: "Seguir presupuesto a los 5 días",
+        event: "quote-sent",
+        template: "quote-followup",
+        afterDays: 5,
+      },
+      {
+        label: "Reclamar factura vencida a los 3 días",
+        event: "invoice-overdue",
+        template: "invoice-reminder",
+        afterDays: 3,
+      },
+      {
+        label: "Reclamar documentación a subcontrata",
+        event: "subcontractor-docs-expired",
+        template: "docs-expired",
+        recipient: "supplier",
+      },
+    ].forEach((r) => erp.addCommsRule(r, "seed"));
+
+    /* ---- A CURRENT project with the whole §4 chain on it ------------------
+       The §4 screens (Compras, Subcontratos, Modificaciones, Horas) are scoped
+       to the selected project, so a rich two-year history behind closed jobs
+       still leaves them looking empty on the project the app opens with.
+       Balmes carries the full chain instead: an order received, an awarded
+       trade with valid paperwork and a certification, an approved extra, and
+       four weeks of booked hours.
+
+       Deliberately NOT the default project. P-2026-0001 sorts first and is
+       what the browser suite drives, and several of those checks take "the
+       first purchase order" or "the first subcontract" on screen — seeding
+       records there would silently change which row they grab. Balmes is one
+       click away in the project selector and carries no such coupling. */
+    erp.setToday("2026-04-06");
+    erp.startWorks(prjB.id, "operations");
+    const puB = erp.addPurchase({
+      supplierId: supMat.id,
+      projectId: prjB.id,
+      chapterNum: "2",
+      desc: "Mortero monocapa y malla para fachada",
+      qtyMilli: 1000,
+      unitCents: 486000,
+      totalCents: 486000,
+    });
+    erp.sendPurchase(puB.id, "backoffice");
+    erp.setToday("2026-04-08");
+    erp.acceptPurchase(puB.id, { expectedArrival: "2026-04-14" }, "backoffice");
+    erp.setToday("2026-04-14");
+    erp.receivePurchase(puB.id, { qtyMilli: 1000, docRef: "ALB-MV-4471" }, "operations");
+
+    erp.setToday("2026-04-07");
+    const scB = erp.addSubcontract(
+      prjB.id,
+      {
+        supplierId: supElec.id,
+        trade: "Electricidad — iluminación de fachada",
+        chapterNum: "2",
+        awardedCents: 640000,
+        retentionPct: 5,
+        retentionReleaseDate: "2027-01-25",
+      },
+      "backoffice",
+    );
+    ["insurance", "prl", "socialSecurity"].forEach((kind) =>
+      erp.renewSubcontractDoc(
+        scB.id,
+        { kind, expiresOn: "2027-03-31", docRef: kind + "-electrobaix.pdf" },
+        "backoffice",
+      ),
+    );
+    erp.sendSubcontract(scB.id, "backoffice");
+    erp.acceptSubcontract(
+      scB.id,
+      { plannedStart: "2026-04-20", plannedEnd: "2026-07-10" },
+      "backoffice",
+    );
+    erp.setToday("2026-04-20");
+    erp.markSubcontractStarted(scB.id, "operations");
+    erp.setToday("2026-04-30");
+    erp.certifySubcontract(
+      scB.id,
+      { amountCents: 210000, note: "Primera certificación — planta baja" },
+      "backoffice",
+    );
+
+    erp.setToday("2026-04-21");
+    const chB = erp.addChange(
+      prjB.id,
+      {
+        desc: "Sustitución de bajantes vistas detectada al retirar el revestimiento",
+        chapterNum: "2",
+        origin: "siteFinding",
+      },
+      "operations",
+    );
+    erp.priceChange(chB.id, 384000, 246000, 4, "backoffice");
+    erp.sendChange(chB.id, "backoffice");
+    erp.setToday("2026-04-24");
+    erp.approveChange(chB.id, "adenda-balmes-01.pdf", "backoffice");
+
+    [w1, w2].forEach((w) =>
+      erp.assignResource(
+        prjB.id,
+        { workerId: w.id, from: "2026-04-06", to: "2026-07-25" },
+        "backoffice",
+      ),
+    );
+    // The last two land in the week the demo opens on: the weekly grid shows
+    // the CURRENT week, so hours booked only in April would leave it looking
+    // empty on a screen that is meant to show a crew at work.
+    ["2026-04-07", "2026-04-14", "2026-04-21", "2026-04-28", "2026-05-04", "2026-05-05"].forEach(
+      (d, i) => {
+        erp.setToday(d);
+        [w1, w2].forEach((w) =>
+          erp.recordHours(
+            {
+              workerId: w.id,
+              projectId: prjB.id,
+              chapterNum: i === 0 ? "1" : "2",
+              date: d,
+              hoursMilli: 8000,
+            },
+            "operations",
+          ),
+        );
+      },
+    );
+    erp.setToday("2026-04-30");
+    erp.markProgress(prjB.id, "1", "done", 100, "operations");
+    erp.markProgress(prjB.id, "2", "inProgress", 35, "operations");
+
+    /* ---- §2.1: a pinned project, and worker documentation with real dates ---- */
+    erp.setProjectPriority(prjB.id, true, "seed");
+    erp.addWorkerDoc(
+      w1.id,
+      { kind: "Carné de instalador eléctrico", expiresOn: "2026-04-28" },
+      "seed",
+    ); // already expired
+    erp.addWorkerDoc(w2.id, { kind: "Reconocimiento médico", expiresOn: "2026-05-24" }, "seed"); // upcoming
+
+    /* ---- §2.1: the alerts panel as a manager, not a read-only feed ----
+       One of each action, so the demo shows a person actually working the
+       list rather than just staring at it: assigned, snoozed with a reason,
+       resolved with a note and evidence, and turned into a task. */
+    {
+      const open = erp.managedAlerts();
+      const overdue = open.find((a) => a.code === "AR-OVERDUE");
+      if (overdue) erp.assignAlert(overdue.key, "backoffice", "seed");
+      const stale = open.find((a) => a.code === "OPP-STALE");
+      if (stale)
+        erp.snoozeAlert(
+          stale.key,
+          "2026-05-12",
+          "Cliente de vacaciones — retomar a la vuelta",
+          "seed",
+        );
+      const pending = open.find((a) => a.code === "QUO-PENDING-LINES");
+      if (pending)
+        erp.resolveAlert(
+          pending.key,
+          "La línea pendiente es un extra opcional que el cliente todavía está valorando; no bloquea el envío.",
+          ["Captura del email del cliente confirmando que lo decide la semana que viene"],
+          "seed",
+        );
+      const priceExpired = open.find((a) => a.code === "PRICE-EXPIRED");
+      if (priceExpired)
+        erp.convertAlertToTask(
+          priceExpired.key,
+          "Pedir tarifa actualizada al proveedor",
+          "backoffice",
+          "2026-05-08",
+          "seed",
+        );
+      erp.updateAlertRule("AR-OVERDUE", { recipient: "backoffice", channel: "email" }, "seed");
+    }
+
+    /* Bump whenever this file or erp-history.js changes what the demo
+       contains. The app compares it with what is stored and offers a reload
+       — it never reseeds on its own (see boot()), because doing that to real
+       records would be data loss. */
+    erp.state.seedVersion = SEED_VERSION;
+
     erp.setToday(today || "2026-05-05");
     return erp;
   }
 
-  return { build };
+  return { build, SEED_VERSION };
 });

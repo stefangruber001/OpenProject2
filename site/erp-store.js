@@ -34,6 +34,167 @@
 
   var LEGACY_MASTER_DB = "caneiMasterData";
 
+  /* ==================================================================== *
+   * WHERE THE DOCUMENT LIVES
+   *
+   * Two modes, decided once at load:
+   *
+   *   local   — IndexedDB in this browser. Opening the files directly, and the
+   *             published read-only copies, still work exactly as before.
+   *   remote  — the server, over /api/<tenant>/erp/state. The document is the
+   *             company's, so every device sees the same one.
+   *
+   * The switch is the PRESENCE of a <meta name="erp-api"> tag (or ?api=), which
+   * the server injects into the pages it serves and nothing else does. Presence,
+   * not value: an empty value means "same origin", which is the normal case
+   * because the server serves these pages and the API together — no CORS, and
+   * one session cookie covers both.
+   *
+   * This lives in the store rather than in each page on purpose. Every screen
+   * already reads and writes through ErpStore, so putting the decision here
+   * moves ALL of them onto the server at once, without a line changing in any
+   * page — which also means the UI cannot drift into talking to two different
+   * places depending on which screen you are on.
+   *
+   * Tenant is "~", not a name: the server resolves it from the session to the
+   * company that session is entitled to. A client that names its own tenant is
+   * a client that can ask for somebody else's.
+   * ==================================================================== */
+  var SELF_TENANT = "~";
+
+  function apiBase() {
+    try {
+      var params = new URLSearchParams(location.search);
+      if (params.has("api")) return (params.get("api") || "").replace(/\/$/, "");
+      var m = document.querySelector('meta[name="erp-api"]');
+      if (m) return (m.getAttribute("content") || "").replace(/\/$/, "");
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  var REMOTE = typeof document !== "undefined" ? apiBase() : null;
+
+  /* The version this browser last read. It is quoted on every save, and the
+     server refuses a save built on a stale one. That refusal is the entire
+     reason two people can use this at the same time. */
+  var remoteVersion = 0;
+
+  function stateUrl() {
+    return REMOTE + "/api/" + SELF_TENANT + "/erp/state";
+  }
+
+  /**
+   * Tell the operator when a save did not reach the server.
+   *
+   * `persist()` in the workspace is fire-and-forget (`.catch(() => {})`), which
+   * is correct for a local database that does not fail, and quietly wrong for a
+   * network that does. Without this, a lost connection or a conflicting save
+   * looks exactly like a successful one: the form closes, the row is on screen,
+   * and the record is nowhere. So the store raises it itself rather than hoping
+   * every call site remembers to.
+   */
+  function saveFailed(title, detail) {
+    try {
+      if (document.getElementById("canei-save-failed")) return;
+      var bar = document.createElement("div");
+      bar.id = "canei-save-failed";
+      bar.setAttribute(
+        "style",
+        "position:fixed;left:0;right:0;top:0;z-index:2147483000;background:#8f2d1b;color:#fff;" +
+          "font:600 13.5px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;" +
+          "padding:12px 16px;display:flex;gap:12px;align-items:center;justify-content:center;" +
+          "flex-wrap:wrap;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.25)",
+      );
+      var msg = document.createElement("span");
+      msg.innerHTML =
+        "⚠️ <b>" + title + "</b> " + (detail || "") + " Sus últimos cambios NO están guardados.";
+      bar.appendChild(msg);
+      var again = document.createElement("button");
+      again.textContent = "Recargar";
+      again.setAttribute(
+        "style",
+        "background:#fff;color:#8f2d1b;border:0;font-weight:800;padding:7px 14px;" +
+          "border-radius:999px;cursor:pointer",
+      );
+      again.onclick = function () {
+        location.reload();
+      };
+      bar.appendChild(again);
+      document.body.appendChild(bar);
+    } catch (e) {
+      /* never let the notifier be the thing that breaks the page */
+    }
+  }
+
+  function remoteLoadState() {
+    return fetch(stateUrl(), {
+      credentials: "same-origin",
+      headers: { accept: "application/json" },
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (body) {
+        remoteVersion = body.version || 0;
+        // The server migrates on the way out, so the ladder does NOT run again
+        // here. It is pure and idempotent, but running it per client means
+        // running it a different number of times per person, which is not a
+        // property worth having in an invoice register.
+        //
+        // An empty company comes back as a valid empty document, not null.
+        // Returning null would make the workspace seed its demonstration data —
+        // onto the live server, into the real register. Empty and honest beats
+        // populated and fictional.
+        return { state: body.state || null, migration: null, remote: true };
+      });
+  }
+
+  function remoteSaveState(state) {
+    return fetch(stateUrl(), {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ state: state, expectedVersion: remoteVersion }),
+    })
+      .then(function (r) {
+        return r.json().then(function (body) {
+          return { ok: r.ok, status: r.status, body: body };
+        });
+      })
+      .then(function (res) {
+        if (res.ok) {
+          remoteVersion = res.body.version;
+          return res.body;
+        }
+        if (res.status === 409) {
+          saveFailed(
+            "Otra persona ha guardado antes que usted.",
+            "Recargue para ver sus cambios y vuelva a introducir los suyos.",
+          );
+        } else if (res.status === 401) {
+          saveFailed("Su sesión ha caducado.", "Vuelva a iniciar sesión.");
+        } else {
+          saveFailed(
+            "No se ha podido guardar en el servidor.",
+            (res.body && res.body.message) || "",
+          );
+        }
+        throw new Error("save refused: HTTP " + res.status);
+      })
+      .catch(function (e) {
+        // A network failure never reaches the branch above — it rejects before
+        // there is a response at all — so it is caught here rather than being
+        // mistaken for a successful save.
+        if (String(e && e.message).indexOf("save refused") !== 0) {
+          saveFailed("Sin conexión con el servidor.", "");
+        }
+        throw e;
+      });
+  }
+
   function open() {
     return new Promise(function (res, rej) {
       var r = indexedDB.open(DB, DB_VERSION);
@@ -95,6 +256,7 @@
    * a catastrophic migration bug into a support conversation.
    */
   function loadState() {
+    if (REMOTE !== null) return remoteLoadState();
     return get(KV, STATE_KEY).then(function (raw) {
       if (!raw) return { state: null, migration: null };
 
@@ -112,6 +274,7 @@
   }
 
   function saveState(state) {
+    if (REMOTE !== null) return remoteSaveState(state);
     return put(KV, STATE_KEY, state);
   }
 
@@ -227,7 +390,12 @@
       var label = candidate.name || c.code || "(sin nombre)";
 
       if (!candidate.name) {
-        conflicts.push({ source: LEGACY_MASTER_DB, ref: c.code || "", label: label, reason: "sinNombre" });
+        conflicts.push({
+          source: LEGACY_MASTER_DB,
+          ref: c.code || "",
+          label: label,
+          reason: "sinNombre",
+        });
         return;
       }
       // Already present? Match the engine's own notion of duplicate.
@@ -293,6 +461,23 @@
     DB: DB,
     DB_VERSION: DB_VERSION,
     STATE_KEY: STATE_KEY,
+    /**
+     * True when the document lives on the server.
+     *
+     * Callers need this for one reason above all: what to do when loading
+     * FAILS. Locally, falling back to a fresh seeded document is right — there
+     * is nothing to lose and a blank page helps nobody. Remotely it is the
+     * worst possible move, because the next debounced save would PUT that
+     * demonstration data straight over the company's register. A dropped
+     * connection must not be able to erase an invoice register.
+     */
+    isRemote: function () {
+      return REMOTE !== null;
+    },
+    /** The version this browser last read; the server refuses a stale save. */
+    version: function () {
+      return remoteVersion;
+    },
     open: open,
     loadState: loadState,
     saveState: saveState,

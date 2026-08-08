@@ -57,6 +57,282 @@
         return s;
       },
     },
+    {
+      to: 3,
+      name: "per-project schedules",
+      /*
+       * `plans` holds one capability-owned Plan value per project, keyed by
+       * project id: tasks with durations, the dependency network, the working
+       * calendar and any frozen baselines.
+       *
+       * It lives in the same blob but is NOT engine state. erp-engine.js
+       * neither writes it nor knows it exists; site/erp-bridge.js puts it
+       * there and @repo/capability-scheduling owns its shape. That is the
+       * strangler seam working as intended — the engine keeps serialising the
+       * whole object, so a new area can persist alongside it without the old
+       * code learning anything about the new.
+       */
+      up: function (s) {
+        if (!s.plans || typeof s.plans !== "object" || Array.isArray(s.plans)) s.plans = {};
+        return s;
+      },
+    },
+    {
+      to: 4,
+      name: "graphic annex: settings per budget, image records per line",
+      /*
+       * Two shape changes the graphic annex needs, both additive.
+       *
+       * 1. `budget.annex` — the per-budget switch and images-per-page. Absent
+       *    on every blob written before this build.
+       * 2. `line.imageRefs` entries become RECORDS rather than bare strings.
+       *    The field has existed since the first build and has always been an
+       *    empty array in practice, but a bare string is what an early build
+       *    would plausibly have written, and a caption and an internal-only
+       *    flag have nowhere to live on a string.
+       *
+       * Rule 1 of this ladder says never retype an existing key — and this
+       * does exactly that, which is why it is done as a widening rather than a
+       * replacement: a string becomes {storageKey: <that string>}, so nothing
+       * is lost and running the migration twice is a no-op (a record is left
+       * alone). The readers were updated in the same commit.
+       */
+      up: function (s) {
+        var budgets = Array.isArray(s.budgets) ? s.budgets : [];
+        budgets.forEach(function (b) {
+          if (!b.annex || typeof b.annex !== "object")
+            b.annex = { enabled: true, imagesPerPage: 2 };
+          (Array.isArray(b.versions) ? b.versions : []).forEach(function (v) {
+            (Array.isArray(v.chapters) ? v.chapters : []).forEach(function (c) {
+              (Array.isArray(c.lines) ? c.lines : []).forEach(function (l) {
+                if (!Array.isArray(l.imageRefs)) {
+                  l.imageRefs = [];
+                  return;
+                }
+                l.imageRefs = l.imageRefs.map(function (img, i) {
+                  if (img && typeof img === "object") return img;
+                  return {
+                    id: "img_legacy_" + l.id + "_" + i,
+                    storageKey: String(img),
+                    caption: "",
+                    source: "upload",
+                    internal: false,
+                    mime: "image/jpeg",
+                    sizeBytes: 0,
+                    width: 0,
+                    height: 0,
+                  };
+                });
+              });
+            });
+          });
+        });
+        return s;
+      },
+    },
+    {
+      to: 5,
+      name: "per-project cost projections and their progress history",
+      /*
+       * Two additions, both belonging to the economic and technical tracking
+       * of a job in progress.
+       *
+       * `project.forecastOverrides` holds a human's replacement for a
+       * calculated cost at completion, keyed by chapter, each with the reason
+       * that justifies it. Absent means "nobody has overridden anything",
+       * which is the honest default and not the same as an override of zero.
+       *
+       * `plan.progressLog` is the append-only record of how far each task had
+       * got on a date. It is declared here rather than left to appear on first
+       * write because it is the only part of a plan that CANNOT be
+       * reconstructed afterwards: dates and the critical path recompute from
+       * the network at any time, but "how much was done by the end of March"
+       * exists only if somebody wrote it down in March. A reader that has to
+       * guess whether the key is missing or the history is genuinely empty
+       * cannot tell an unrecorded month from an idle one.
+       */
+      up: function (s) {
+        (Array.isArray(s.projects) ? s.projects : []).forEach(function (p) {
+          if (!p.forecastOverrides || typeof p.forecastOverrides !== "object")
+            p.forecastOverrides = {};
+        });
+        if (s.plans && typeof s.plans === "object" && !Array.isArray(s.plans)) {
+          Object.keys(s.plans).forEach(function (k) {
+            var plan = s.plans[k];
+            if (plan && typeof plan === "object" && !Array.isArray(plan.progressLog))
+              plan.progressLog = [];
+          });
+        }
+        return s;
+      },
+    },
+    {
+      to: 6,
+      name: "purchases lifecycle, subcontracts, and locked labour weeks",
+      /*
+       * Session 10b (§4.1 Compras, §4.2 Subcontratos, §4.6 Personal y Horas).
+       * Every addition here is a new, previously-absent field or collection —
+       * nothing existing is renamed, retyped or reinterpreted.
+       *
+       *   state.subcontracts   — new collection, one record per awarded trade.
+       *   purchase.receipts / .sentAt / .acceptedAt / .expectedArrival /
+       *     .cancelledAt       — the lifecycle purchaseStatus() derives from;
+       *     absent reads as "draft", exactly as it always implicitly did.
+       *   change.chapterNum / .sentAt — additive; a change with no chapterNum
+       *     already fell back to "1" wherever it was read (see erp-bridge.js's
+       *     projectValue), so leaving it null here changes no prior behaviour.
+       *   labour.locked / .approvedAt / .approvedBy — an existing entry reads
+       *     as unlocked, which is the only sane default for hours that were
+       *     recorded before "approving a week" existed as an action.
+       *   worker.docs          — new, empty array.
+       */
+      up: function (s) {
+        if (!Array.isArray(s.subcontracts)) s.subcontracts = [];
+        if (s.series && typeof s.series === "object" && !s.series.subcontract)
+          s.series.subcontract = { prefix: "SUB-", next: 1, issued: [] };
+        (Array.isArray(s.purchases) ? s.purchases : []).forEach(function (pu) {
+          if (!Array.isArray(pu.receipts)) pu.receipts = [];
+          if (!("sentAt" in pu)) pu.sentAt = null;
+          if (!("acceptedAt" in pu)) pu.acceptedAt = null;
+          if (!("expectedArrival" in pu)) pu.expectedArrival = null;
+          if (!("cancelledAt" in pu)) pu.cancelledAt = null;
+          if (!("cancelReason" in pu)) pu.cancelReason = "";
+        });
+        (Array.isArray(s.changes) ? s.changes : []).forEach(function (c) {
+          if (!("chapterNum" in c)) c.chapterNum = null;
+          if (!("sentAt" in c)) c.sentAt = null;
+        });
+        (Array.isArray(s.labour) ? s.labour : []).forEach(function (l) {
+          if (!("locked" in l)) l.locked = false;
+          if (!("approvedAt" in l)) l.approvedAt = null;
+          if (!("approvedBy" in l)) l.approvedBy = null;
+        });
+        (Array.isArray(s.workers) ? s.workers : []).forEach(function (w) {
+          if (!Array.isArray(w.docs)) w.docs = [];
+        });
+        return s;
+      },
+    },
+    {
+      to: 7,
+      name: "reconciliation periods, communications, gestoría follow-up",
+      /*
+       * Session 11 (§5.3 Conciliación, §5.6 Gestoría, §5.7 Comunicaciones).
+       * Five new top-level collections and one map, all additive.
+       *
+       *   bankPeriods         closed/reopened reconciliation windows. Empty
+       *                       means "nothing has been closed", which is the
+       *                       only honest reading of a blob written before
+       *                       closing a period was a thing you could do.
+       *   commsTemplates      the template library; versions are rows, not
+       *   commsRules          edits in place (see updateCommsTemplate).
+       *   commsQueue          drafted/approved/cancelled messages. NOTHING in
+       *                       here has ever been sent by this system.
+       *   gestoriaQueries     what the accountant asked, and the answer.
+       *   exceptionsAccepted  keyed justifications for GES-07 exceptions; a
+       *                       map rather than an array because the key is the
+       *                       identity and re-justifying should replace.
+       */
+      up: function (s) {
+        if (!Array.isArray(s.bankPeriods)) s.bankPeriods = [];
+        if (!Array.isArray(s.commsTemplates)) s.commsTemplates = [];
+        if (!Array.isArray(s.commsRules)) s.commsRules = [];
+        if (!Array.isArray(s.commsQueue)) s.commsQueue = [];
+        if (!Array.isArray(s.gestoriaQueries)) s.gestoriaQueries = [];
+        if (
+          !s.exceptionsAccepted ||
+          typeof s.exceptionsAccepted !== "object" ||
+          Array.isArray(s.exceptionsAccepted)
+        )
+          s.exceptionsAccepted = {};
+        return s;
+      },
+    },
+    {
+      to: 8,
+      name: "alert management, opportunity decisions, project priority",
+      /*
+       * Session 12 (§2.1 Torre de Control, §2.2 Mi Día). Three additions, all
+       * additive; nothing here is a new top-level collection erp-engine.js's
+       * constructor doesn't already declare, except the two the alert manager
+       * needs.
+       *
+       *   alertRules        one row per alert CONDITION (see ALERT_META in
+       *                     erp-engine.js), lazily filled in by
+       *                     ensureAlertRules() rather than by this migration —
+       *                     a code added in a later session should not need
+       *                     ANOTHER migration just to get a rule row. An
+       *                     absent array still reads as "everything enabled,
+       *                     no threshold overridden", which is exactly what a
+       *                     blob written before rules existed should mean.
+       *   alertOverrides    assign/due/snooze/resolve/task-link per alert,
+       *                     keyed by alertKey(). A map, not an array, for the
+       *                     same reason exceptionsAccepted (v7) is one: the
+       *                     key is the identity.
+       *   opportunity.decidedAt   when a won/lost decision was made — needed
+       *                     for "Contratadas/Perdidas últimos 12 meses" (§2.1)
+       *                     to mean something for an opportunity decided
+       *                     before this field existed. Backfilled to the
+       *                     opportunity's creation date, the only date an old
+       *                     record actually has; a decision recorded from now
+       *                     on gets its own, more accurate, real date.
+       *   project.priority  a pin, defaulting to false — an existing project
+       *                     was never marked priority because the feature
+       *                     did not exist, which is exactly what false means.
+       */
+      up: function (s) {
+        if (!Array.isArray(s.alertRules)) s.alertRules = [];
+        if (
+          !s.alertOverrides ||
+          typeof s.alertOverrides !== "object" ||
+          Array.isArray(s.alertOverrides)
+        )
+          s.alertOverrides = {};
+        (Array.isArray(s.opportunities) ? s.opportunities : []).forEach(function (o) {
+          if (!("decidedAt" in o)) o.decidedAt = ["won", "lost"].includes(o.status) ? o.date : null;
+        });
+        (Array.isArray(s.projects) ? s.projects : []).forEach(function (p) {
+          if (!("priority" in p)) p.priority = false;
+        });
+        return s;
+      },
+    },
+    {
+      to: 9,
+      name: "customer record: creation date in, activityLine out",
+      /*
+       * The ONLY migration in this ladder that REMOVES a key, and it does so
+       * deliberately rather than by accident — which is why migrations-sim's
+       * additive guard names this exact path as an allowed removal instead of
+       * being relaxed. Read that allowance as the change record.
+       *
+       *   party.activityLine   DROPPED. A línea de actividad describes the
+       *                        WORK, not the person paying for it: the same
+       *                        customer can have a bathroom, a damp survey and
+       *                        a shop fit-out. It stays on budgets and projects
+       *                        (profitability("activityLine") groups projects
+       *                        by it and is untouched); on the customer it was
+       *                        a second, weaker copy that could disagree with
+       *                        the job's own line. Nothing reads it any more.
+       *   party.createdAt      added — the "alta" date the customer list shows.
+       *                        Backfilled to null, not to today: a record
+       *                        migrated from an older blob genuinely has no
+       *                        known creation date, and inventing one would put
+       *                        a confident wrong date on every historic client.
+       *                        The UI renders null as "—".
+       *   party.contactPerson / .landline  declared as strings if absent, so
+       *                        the new columns never read undefined.
+       */
+      up: function (s) {
+        (Array.isArray(s.parties) ? s.parties : []).forEach(function (p) {
+          delete p.activityLine;
+          if (!("createdAt" in p)) p.createdAt = null;
+          if (typeof p.contactPerson !== "string") p.contactPerson = "";
+          if (typeof p.landline !== "string") p.landline = "";
+        });
+        return s;
+      },
+    },
   ];
 
   var CURRENT_VERSION = MIGRATIONS.reduce(function (max, m) {

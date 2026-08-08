@@ -53,7 +53,7 @@ function assertKnownTenant(tenantId: string): void {
   }
 }
 
-async function stateStore(tenantId: string): Promise<ErpStateStore> {
+async function stateStore(tenantId: string, key: string = STATE_KEY): Promise<ErpStateStore> {
   assertKnownTenant(tenantId);
   if (!process.env.DATABASE_URL) {
     throw new FactoryError(
@@ -63,7 +63,7 @@ async function stateStore(tenantId: string): Promise<ErpStateStore> {
     );
   }
   const db = await import("@repo/db");
-  return new db.PrismaErpStateStore(db.prisma, tenantId, STATE_KEY);
+  return new db.PrismaErpStateStore(db.prisma, tenantId, key);
 }
 
 /**
@@ -85,6 +85,145 @@ export async function loadErp(tenantId: string): Promise<LoadedErp> {
 
   const result = Migrations.migrate(state);
   return { erp: ERP.from(result.state), version, migrated: result.applied };
+}
+
+/**
+ * The auxiliary documents — the screens that keep their own dataset.
+ *
+ * Master Data, Financial Data and the project folder each hold a document that
+ * is theirs alone and is not part of the ERP register. They were written
+ * against IndexedDB, one database each, which is why a customer typed into
+ * Master Data on a laptop was on that laptop and nowhere else.
+ *
+ * The `erp_state` table is keyed `(tenantId, key)` and always was, so these need
+ * no new storage — only a key each. They are NOT run through the ERP engine:
+ * they are not the register and have no schema ladder. What they get is the
+ * part that matters, which is being the company's rather than the device's.
+ *
+ * Closed list. The key comes from the URL, and an open one would let any caller
+ * create unbounded rows under a tenant simply by asking.
+ */
+export const AUX_DOCUMENTS: Readonly<Record<string, string>> = {
+  caneiMasterData: "master-data",
+  caneiFinance: "financial-data",
+  caneiJourney: "journey",
+};
+
+export function isAuxDocument(name: string): boolean {
+  return Object.hasOwn(AUX_DOCUMENTS, name);
+}
+
+export async function loadAuxDocument(
+  tenantId: string,
+  name: string,
+): Promise<{ doc: unknown; version: number }> {
+  if (!isAuxDocument(name)) throw new FactoryError("NOT_FOUND", `No document "${name}".`);
+  const store = await stateStore(tenantId, AUX_DOCUMENTS[name]);
+  const { state, version } = await store.load<unknown>();
+  return { doc: state ?? null, version };
+}
+
+export async function saveAuxDocument(
+  tenantId: string,
+  name: string,
+  doc: unknown,
+  expectedVersion: unknown,
+  user: string,
+): Promise<{ version: number }> {
+  if (!isAuxDocument(name)) throw new FactoryError("NOT_FOUND", `No document "${name}".`);
+  if (typeof expectedVersion !== "number" || !Number.isInteger(expectedVersion)) {
+    throw new FactoryError("BAD_REQUEST", "expectedVersion is required.");
+  }
+  if (typeof doc !== "object" || doc === null) {
+    throw new FactoryError("BAD_REQUEST", "doc must be an object.");
+  }
+  if (!user) {
+    throw new FactoryError("BAD_REQUEST", "No acting user — every write must be attributable.");
+  }
+  const store = await stateStore(tenantId, AUX_DOCUMENTS[name]);
+  const { version } = await store.load<unknown>();
+  if (version !== expectedVersion) {
+    throw new FactoryError(
+      "STALE_WRITE",
+      `Somebody else saved while you were working (you had version ${expectedVersion}, ` +
+        `it is now ${version}). Reload before saving again.`,
+      { expectedVersion, currentVersion: version },
+    );
+  }
+  return { version: await store.save(doc, expectedVersion, user) };
+}
+
+export interface SavedDocument {
+  version: number;
+  migrated: number[];
+}
+
+/**
+ * Stores a whole ERP document sent by a client.
+ *
+ * The workspace applies a change with its own copy of the engine and then saves
+ * the resulting document, rather than asking the server to re-run the change.
+ * That is a weaker contract than `runCommand` and the difference is worth being
+ * honest about: this trusts the client's arithmetic, so the server cannot tell
+ * a legitimate edit from a wrong one — only that the document is well-formed
+ * and that nobody else has written since the client last read.
+ *
+ * It is nevertheless what makes the shared system real today. The workspace
+ * mutates the engine at several hundred call sites; routing every one through a
+ * whitelisted command is the right destination and a large piece of work, and
+ * until it is done the alternative is not a stricter server, it is data sitting
+ * on one person's laptop. A conflict here is REFUSED, not merged, which is the
+ * property that actually lets two people share a register.
+ *
+ * What the server still guarantees, and does not delegate:
+ *   • the version check, so a save built on a stale read is rejected
+ *   • the migration ladder, so a document from a newer build is refused rather
+ *     than quietly downgraded
+ *   • normalisation through `ERP.from(...).toJSON()`, so what lands in the
+ *     column has this build's shape
+ *   • attribution: `user` comes from the session and is written to the row by
+ *     the store, so who saved is recorded server-side and not claimable by the
+ *     body of the request
+ */
+export async function saveErpDocument(
+  tenantId: string,
+  state: unknown,
+  expectedVersion: unknown,
+  user: string,
+): Promise<SavedDocument> {
+  if (typeof expectedVersion !== "number" || !Number.isInteger(expectedVersion)) {
+    throw new FactoryError(
+      "BAD_REQUEST",
+      "expectedVersion is required: send the version you received from GET " +
+        "/erp/state, so a save cannot silently overwrite someone else's work.",
+    );
+  }
+  if (typeof state !== "object" || state === null || Array.isArray(state)) {
+    throw new FactoryError("BAD_REQUEST", "state must be the ERP document object.");
+  }
+  if (!user) {
+    throw new FactoryError("BAD_REQUEST", "No acting user — every write must be attributable.");
+  }
+
+  const store = await stateStore(tenantId);
+  const { version } = await store.load<ErpState>();
+  if (version !== expectedVersion) {
+    throw new FactoryError(
+      "STALE_WRITE",
+      `Somebody else saved while you were working (you had version ${expectedVersion}, ` +
+        `it is now ${version}). Reload before saving again.`,
+      { expectedVersion, currentVersion: version },
+    );
+  }
+
+  // Migrate the INCOMING document, not the stored one: an older client may
+  // still be open in a tab somewhere, and this is where its document is
+  // brought up to this build — or refused, if it comes from a newer one.
+  const result = Migrations.migrate(state as ErpState);
+  const erp = ERP.from(result.state);
+
+  const newVersion = await store.save(erp.toJSON(), expectedVersion, user);
+  return { version: newVersion, migrated: result.applied };
 }
 
 export interface CommandRequest {
