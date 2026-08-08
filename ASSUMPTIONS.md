@@ -1318,3 +1318,39 @@ SERVER_SSH_KEY`. The browser-ops path has never had its credentials, so it has n
   and so passed while the bug was present; another expected a literal filename where the page
   forwards itself to `erp.html#clientes`. A test that agrees with you for the wrong reason is
   worse than no test, and I nearly shipped on the strength of one.
+- **#89 — Face ID is a device gate in front of the app, not a way to sign in (2026-08-08).**
+  The operator asked for "this Face ID scan standard login like all premium app versions have",
+  and there is a fork in the road there worth naming, because the two readings look identical
+  from the outside and are not remotely the same thing.
+  **Reading A** — store the password in the Keychain and let Face ID replay it into the login
+  form. That is literally "logging in with your face", and it means the company's password now
+  lives on the phone. **Reading B** — the server session already lasts thirty days, so the phone
+  is already signed in; what is missing is any check that the person holding it is the operator.
+  Face ID answers exactly that, and stores nothing.
+  **Built B.** The password proves who you are to the server; Face ID proves the phone has not
+  changed hands since. Banking apps work this way for the same reason. It also means a lost phone
+  is a locked phone rather than a phone with a password on it, and nothing new has to be kept
+  secret.
+  **No lockout is possible**, which is the property that made this safe to ship without asking:
+  the policy is `deviceOwnerAuthentication`, not `…WithBiometrics`, so iOS falls back to the
+  device passcode by itself. A cracked camera, a mask, ten failed scans — every one still has a
+  way in. And on a phone with no passcode at all the gate disarms itself instead of standing
+  there refusing everybody.
+  **Armed only after a sign-in has actually succeeded.** Arming at install would put a Face ID
+  prompt in front of a login form: a lock on an empty room, and the first thing a new operator
+  would ever see.
+  **Sixty-second grace on returning from the background.** Zero would be correct and unusable —
+  stepping out to the camera to photograph a wall would cost a scan on the way back, several
+  times an hour.
+  **The confirmation frame was the explicit request** ("it shortly show that Face ID check was
+  done"). iOS shows its own tick inside the system sheet and removes it instantly, which leaves
+  an app that merely opened. A branded "Face ID verificado" held for 780ms is the difference
+  between a door that swung open and a door somebody unlocked for you.
+  **Lock-screen copy is Spanish** while the native tab bar is still English. Inconsistent, and
+  the lesser of two evils: this screen stands directly in front of the Spanish sign-in page and
+  is read by a Spanish operator. It joins the pile that task #72 (bilingual toggle) has to clear.
+  **One trap found by reading the lifecycle rather than by testing** (no macOS here to test on):
+  the system Face ID sheet makes the app `.inactive`, so a rule of the form "on becoming active,
+  if locked, authenticate" re-presents the sheet the instant the operator taps Cancelar, forever.
+  Launch and return-from-background are therefore separate entry points, and neither re-asks
+  while the gate is already sitting locked in front of somebody.

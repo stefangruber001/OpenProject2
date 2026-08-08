@@ -51,6 +51,11 @@
 	<string>UIStatusBarStyleDarkContent</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- Required. Without this key iOS does not show a "no permission" error,
+	     it refuses the Face ID request outright and the app would sit on its
+	     lock screen forever. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Canei uses Face ID to unlock the app, so the company's customers, quotes and figures are not visible to anyone who picks up the phone.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Canei uses the camera so you can photograph the work site during a visit and save the pictures straight into the project folder.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

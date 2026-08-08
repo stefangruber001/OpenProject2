@@ -288,18 +288,39 @@ export default async function LoginPage({
             Entrar
           </button>
 
-          <p
-            style={{
-              font: `400 12px/1.5 ${SANS}`,
-              color: MUTED,
-              textAlign: "center",
-              margin: "16px 0 0",
-            }}
-          >
-            La sesión se mantiene abierta en este dispositivo.
-            <br />
-            Guarde la contraseña para entrar con Face&nbsp;ID.
-          </p>
+          {/* The closing line says something different in the phone app, because
+              in the app it is a different promise. In a browser, Face ID means
+              the keychain filling this form for you — so the useful advice is
+              to save the password. In the app the native shell locks itself and
+              asks for Face ID on every launch, so the password is typed once,
+              here, and then not again. One CSS rule rather than a second page:
+              the shell tags the document `native-app` before first paint. */}
+          <style>{`
+            .canei-hint-app { display: none }
+            html.native-app .canei-hint-app { display: block }
+            html.native-app .canei-hint-web { display: none }
+          `}</style>
+          {(
+            [
+              ["canei-hint-web", "Guarde la contraseña para entrar con Face ID."],
+              ["canei-hint-app", "La próxima vez entrará con Face ID."],
+            ] as const
+          ).map(([cls, line]) => (
+            <p
+              key={cls}
+              className={cls}
+              style={{
+                font: `400 12px/1.5 ${SANS}`,
+                color: MUTED,
+                textAlign: "center",
+                margin: "16px 0 0",
+              }}
+            >
+              La sesión se mantiene abierta en este dispositivo.
+              <br />
+              {line}
+            </p>
+          ))}
         </form>
       </div>
     </main>

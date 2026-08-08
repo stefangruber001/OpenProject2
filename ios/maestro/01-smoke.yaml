@@ -7,6 +7,12 @@
 # web-content assertions live in the Playwright harness (tests/site-e2e), and
 # any web checks here are best-effort (optional).
 #
+# `clearState: true` is load-bearing now, not just hygiene: the Face ID gate
+# (Security/BiometricLock.swift) arms itself after the first successful sign-in
+# and stores that in UserDefaults. Clearing state means it is never armed, so no
+# lock screen stands between this flow and the tab bar — a simulator has no
+# biometrics to satisfy it with.
+#
 # Run locally:  maestro test ios/maestro/01-smoke.yaml
 appId: com.caneisubirats.erp
 ---

@@ -5,6 +5,11 @@ import SwiftUI
 /// share sheet host.
 struct RootView: View {
     @StateObject private var app = AppState()
+    /// The Face ID gate. Owned here rather than inside `AppState` because it is
+    /// about the device, not about the web content — and because the one thing
+    /// it must never do is depend on a page having loaded.
+    @StateObject private var lock = BiometricLock()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -49,8 +54,42 @@ struct RootView: View {
                     .transition(.opacity)
                     .zIndex(10)
             }
+
+            // Above the splash, because on a normal launch the operator should
+            // see one brand screen that turns into their work — not a splash
+            // that finishes and is then replaced by a lock.
+            if lock.isCovering {
+                LockView(kind: lock.kind, phase: lock.phase) {
+                    Task { await lock.authenticate() }
+                }
+                .transition(.opacity)
+                .zIndex(20)
+            } else if lock.shielded {
+                PrivacyShield()
+                    .transition(.opacity)
+                    .zIndex(19)
+            }
         }
         .onAppear { app.scheduleSplashDismiss() }
+        // The launch trigger. `onChange` does not fire for the value a view
+        // starts with, so without this the very first foreground — the cold
+        // launch, the one that matters most — would never ask.
+        .task { await lock.start() }
+        .onChange(of: scenePhase) { phase in
+            switch phase {
+            case .active:
+                Task { await lock.appDidBecomeActive() }
+            case .inactive:
+                // Covers the app-switcher snapshot, which iOS takes on the way
+                // out, while the app is still `.inactive` rather than
+                // `.background`. Waiting for `.background` photographs the data.
+                lock.appWillResignActive()
+            case .background:
+                lock.appDidEnterBackground()
+            @unknown default:
+                break
+            }
+        }
         .sheet(item: Binding(
             get: { app.shareURL.map { ShareItem(url: $0) } },
             set: { app.shareURL = $0?.url }
