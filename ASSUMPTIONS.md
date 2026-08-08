@@ -1116,3 +1116,43 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
      returned the row. The engine also rejected the first attempt because the tax identifier failed
      its checksum — worth recording as a pass, not a stumble: the validation is real, and the error
      surfaced in the UI instead of being written.
+- **#82 — The read-only copies now say so, and the publisher is what says it (2026-08-08).**
+  Following #81, the GitHub Pages copies needed to stop looking like the operational system.
+  **Decision: stamp the warning at PUBLISH time, not in `site/`.** Being a read-only copy is a
+  fact about where a page is _served from_, not about what it contains — the identical HTML is
+  also served by the real server out of `apps/web/public/workspace`, where the warning would be
+  a lie. Putting it in `.github/workflows/pages.yml` means it attaches to exactly the copies
+  that deserve it, survives any content edit, and — decisively — covers `/preview/`, which is
+  built from `claude/candi-programme-session-4-07amo8`, a branch this file does not live on and
+  which another session is actively committing to. A warning that required their cooperation
+  would not have arrived.
+  Both copies are marked, not just the preview: the root is equally a static copy with no
+  database, and it is the one that looks most like the real thing.
+  **This replaced a one-liner that was quietly wrong.** The step used
+  `perl -0pi -e 's{</body>}{$BANNER</body>}i'`, and `s///` without `/g` takes the FIRST match.
+  In `site/journey.html` the first `</body>` is inside a JavaScript template literal that builds
+  an email document — so the "Dev preview" pill was being injected into every generated EMAIL
+  and never onto the page, which is the page the phone app opens as "Project". `backend.html`
+  and `frontend.html` have no `</body>` at all and were silently skipped. Three of eleven pages
+  wrong, exit code 0 throughout. The replacement anchors on the LAST `</body>`, appends where
+  there is none, is idempotent, and the workflow now ASSERTS that every published page carries
+  the marker — a marking step that cannot fail loudly is not a marking step.
+  Ordering is load-bearing and commented as such: the stamper recurses, so `_site` also reaches
+  `_site/preview`; the preview is stamped first and idempotence preserves its wording.
+  **Not dismissible, and anchored to the bottom.** The failure being prevented is somebody
+  forgetting which copy they are in an hour after arriving — precisely when a dismissed banner
+  is gone. Bottom, because every screen has its own fixed top chrome and a top bar would work
+  by breaking the page, which invites its removal. A one-per-tab interstitial carries the
+  message; the strip carries the reminder.
+  **`DEV_BRANCH` deliberately NOT changed.** `/preview/` tracks another session's branch. That
+  is theirs to decide, and stamping at assembly time makes the warning correct either way.
+  Verified with a real browser over all 22 published pages at iPhone width: 93 assertions —
+  interstitial shown, strip present and linking to the live server, correct per-copy wording,
+  no page errors, dismissal keeps the strip, no re-prompt within a tab, a new tab warned again.
+  Also confirmed the old TestFlight build will hand that link to Safari (`WebViewStore.swift:242`
+  opens any host outside `internalHosts` externally), so the warning is actionable on the phone
+  that is already installed, with no new build.
+  **Consequence recorded:** `PLAY-SETUP.md` told the operator to declare "no data collected" to
+  Google Play, which was true only while the app wrapped a static copy. The Android app now
+  signs in to a server and sends the company's records to it, so that declaration is corrected
+  in the same commit — a false statement on a compliance form is not a rounding error.

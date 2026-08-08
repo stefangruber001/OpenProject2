@@ -1,0 +1,213 @@
+<!--
+  ============================================================================
+  "This is not the live system."
+
+  Stamped into EVERY page published to GitHub Pages by .github/workflows/pages.yml
+  — both the production copy at the root and the development copy under /preview/.
+
+  WHY THIS LIVES IN THE PUBLISHER AND NOT IN site/
+  Being a read-only copy is a fact about WHERE a page is served from, not about
+  what the page contains. The same HTML is also served by the real server out of
+  apps/web/public/workspace, where this warning would be a lie. Putting it in the
+  publisher means it attaches to exactly the copies that deserve it, cannot be
+  removed by an unrelated content edit, and — importantly — covers the /preview/
+  copy, which is built from a different branch that this file does not live on.
+
+  WHAT WENT WRONG WITHOUT IT
+  Someone entered a real customer into the Pages copy and went looking for it on
+  their phone. Nothing failed: the form saved, the row appeared, the record went
+  into browser storage and stayed there. A read-only copy of an ERP is
+  indistinguishable from the ERP until you try to find your data somewhere else.
+  That is the whole reason this is loud rather than tasteful.
+
+  Tokens replaced at publish time by .github/scripts/stamp-pages-warning.py:
+    __WHICH_ES__ / __WHICH_EN__   what this copy is
+    __LIVE_URL__                  where the real system lives
+  ============================================================================
+-->
+<noscript
+  ><div
+    style="
+      position: fixed;
+      inset: 0 0 auto 0;
+      z-index: 2147483001;
+      background: #8f2d1b;
+      color: #fff;
+      font:
+        600 15px/1.45 -apple-system,
+        BlinkMacSystemFont,
+        &quot;Segoe UI&quot;,
+        Roboto,
+        sans-serif;
+      padding: 14px 18px;
+      text-align: center;
+    "
+  >
+    Esta NO es la aplicación real de Canei Subirats. No introduzca datos aquí.<br />This is NOT the
+    live Canei Subirats system. Do not enter data here.
+  </div></noscript
+>
+
+<script>
+  (function () {
+    "use strict";
+
+    var LIVE = "__LIVE_URL__";
+    var WHICH_ES = "__WHICH_ES__";
+    var WHICH_EN = "__WHICH_EN__";
+    var SEEN = "canei.not-live.acknowledged";
+
+    // Above everything the app itself uses. The workspace's drawer sits at
+    // z-index 70 and its toast at 90; a warning that a drawer can cover is not
+    // a warning.
+    var TOP = 2147483000;
+
+    function el(tag, css, html) {
+      var e = document.createElement(tag);
+      if (css) e.setAttribute("style", css);
+      if (html != null) e.innerHTML = html;
+      return e;
+    }
+
+    var FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+    /* ---------------------------------------------------------------- *
+     * The permanent mark: a red frame drawn around the viewport, and a warning
+     * in the tab title. Both are always there, neither can be dismissed, and
+     * crucially NEITHER CAN COVER ANYTHING.
+     *
+     * This started as a fixed bar across the bottom, which read better — until
+     * it was measured. Driving all eleven pages at three widths found it
+     * burying real controls on six of them: the ES/EN language toggle sits in a
+     * `position: fixed` element at the bottom of EVERY page, and on
+     * financial-data.html it also covered Guardar / Cancelar / Eliminar. A
+     * warning that hides the Save button teaches people to get rid of the
+     * warning. The top edge is no better — every screen has its own fixed
+     * header there.
+     *
+     * So the permanent layer stops trying to occupy space the pages are already
+     * using. `pointer-events: none` means it cannot intercept a tap either; the
+     * frame is paint and nothing else. The message and the way out live in the
+     * interstitial below, which is modal precisely because it is temporary.
+     * ---------------------------------------------------------------- */
+    function frame() {
+      var f = el(
+        "div",
+        "position:fixed;inset:0;z-index:" +
+          TOP +
+          ";border:5px solid #8f2d1b;box-sizing:border-box;pointer-events:none",
+      );
+      f.id = "canei-not-live-bar";
+      document.body.appendChild(f);
+
+      // The tab title carries the warning where the frame cannot: in a list of
+      // twenty open tabs, and in the phone's tab switcher.
+      var mark = "⚠ COPIA — ";
+      if (document.title.indexOf(mark) !== 0) document.title = mark + document.title;
+    }
+
+    /* ---------------------------------------------------------------- *
+     * The interstitial. Once per tab — often enough that nobody starts work
+     * without seeing it, rarely enough that moving between screens is not a
+     * fight. This is where the message and the link live, because it is the one
+     * layer allowed to cover the page: it is temporary and the user closes it.
+     * ---------------------------------------------------------------- */
+    function interstitial() {
+      var scrim = el(
+        "div",
+        "position:fixed;inset:0;z-index:" +
+          (TOP + 1) +
+          ";background:rgba(12,14,10,.86);display:flex;align-items:center;" +
+          "justify-content:center;padding:24px;overflow:auto;font:" +
+          FONT,
+      );
+      var card = el(
+        "div",
+        "background:#fff;max-width:520px;width:100%;border-radius:18px;padding:28px 26px;" +
+          "box-shadow:0 26px 70px rgba(0,0,0,.4);text-align:center",
+      );
+      card.appendChild(el("div", "font-size:40px;line-height:1;margin-bottom:14px", "⚠️"));
+      card.appendChild(
+        el(
+          "h2",
+          "margin:0 0 10px;font:800 22px/1.25 " + FONT + ";color:#8f2d1b",
+          "Esta no es la aplicación real",
+        ),
+      );
+      card.appendChild(
+        el(
+          "p",
+          "margin:0 0 8px;font:400 15px/1.5 " + FONT + ";color:#2a2e24",
+          "Está viendo " +
+            WHICH_ES +
+            ". <b>Nada de lo que escriba aquí se guarda</b> y nadie más lo verá.",
+        ),
+      );
+      card.appendChild(
+        el(
+          "p",
+          "margin:0 0 20px;font:400 13.5px/1.5 " + FONT + ";color:#63685a",
+          "This is " +
+            WHICH_EN +
+            ". Nothing you enter here is saved, and nobody else will see it. " +
+            "Use the live system for real work.",
+        ),
+      );
+      var go = el(
+        "a",
+        "display:block;background:#2f5d3a;color:#fff;text-decoration:none;font:800 16px/1 " +
+          FONT +
+          ";padding:16px;border-radius:12px;margin-bottom:10px",
+        "Ir al sistema real →",
+      );
+      go.href = LIVE;
+      card.appendChild(go);
+      card.appendChild(
+        el(
+          "div",
+          "font:600 12px/1.4 " + FONT + ";color:#8b8f80;word-break:break-all;margin-bottom:18px",
+          LIVE.replace(/^https?:\/\//, ""),
+        ),
+      );
+      var stay = el(
+        "button",
+        "background:none;border:0;color:#63685a;font:600 13px/1 " +
+          FONT +
+          ";text-decoration:underline;cursor:pointer;padding:6px",
+        "Seguir viendo esta copia · Continue viewing this copy",
+      );
+      stay.onclick = function () {
+        try {
+          sessionStorage.setItem(SEEN, "1");
+        } catch (e) {
+          /* private mode — it will simply ask again, which is the safe way to fail */
+        }
+        scrim.remove();
+      };
+      card.appendChild(stay);
+      scrim.appendChild(card);
+      document.body.appendChild(scrim);
+    }
+
+    function start() {
+      // Pages with no <body> of their own still get one from the parser, but be
+      // certain before appending to it.
+      if (!document.body) return;
+      if (document.getElementById("canei-not-live-bar")) return;
+      frame();
+      var seen = false;
+      try {
+        seen = sessionStorage.getItem(SEEN) === "1";
+      } catch (e) {
+        /* ignore */
+      }
+      if (!seen) interstitial();
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", start);
+    } else {
+      start();
+    }
+  })();
+</script>
