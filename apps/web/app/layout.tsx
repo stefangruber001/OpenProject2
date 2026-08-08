@@ -42,7 +42,7 @@ function siteUrl(): URL {
 }
 
 export function generateMetadata(): Metadata {
-  const title = "Canei Subirats — Plataforma de gestión";
+  const title = "Canei Subirats — ERP System";
   const description =
     "Presupuestos, obras, facturación y tesorería en un solo sitio. " +
     "Acceso privado para el equipo de Canei Subirats.";
@@ -50,15 +50,17 @@ export function generateMetadata(): Metadata {
     metadataBase: siteUrl(),
     title,
     description,
-    applicationName: "Canei Subirats",
+    applicationName: "Canei Subirats ERP",
     icons: { icon: "/brand/icon.svg", apple: "/brand/icon.svg" },
     openGraph: {
       type: "website",
-      siteName: "Canei Subirats",
+      siteName: "Canei Subirats ERP",
       title,
       description,
       locale: "es_ES",
-      images: [{ url: "/brand/og.png", width: 1200, height: 630, alt: "Canei Subirats" }],
+      images: [
+        { url: "/brand/og.png", width: 1200, height: 630, alt: "Canei Subirats ERP System" },
+      ],
     },
     twitter: { card: "summary_large_image", title, description, images: ["/brand/og.png"] },
     // A private system. Being indexed would put the login page — and the

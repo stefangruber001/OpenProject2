@@ -60,4 +60,14 @@ ops/provision.conf
 # Generated at build time by apps/web/scripts/sync-workspace.mjs: a copy of
 # site/ served same-origin with the ERP API. Never edit it — it is overwritten
 # on every build.
-apps/web/public/
+#
+# Ignored as `public/*` rather than `public/` on purpose. Git will not descend
+# into an excluded DIRECTORY, so a negation below it never takes effect —
+# excluding the contents instead is what makes `!brand/` work at all.
+apps/web/public/*
+# …except the brand assets, which are source, not generated. They are the logo
+# and the link-preview card, they are referenced by absolute path from the app's
+# metadata, and being swallowed by the rule above meant they existed on the
+# machine that built them and nowhere else. A shared link would have shown no
+# thumbnail, with the image 404ing on the server.
+!apps/web/public/brand/

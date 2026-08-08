@@ -1024,3 +1024,23 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   anonymously, and `/workspace/erp.html` still returns 307.
   Also set `robots: noindex` — a private system's login page in search results is a cost with
   no benefit.
+- **#78 — The brand assets were gitignored, so the preview image existed only on my machine
+  (2026-08-07).** Caught by noticing `git status` did not list `og.png` after I regenerated it.
+  `apps/web/public/` is ignored wholesale, correctly — `sync-workspace.mjs` rebuilds it from
+  `site/` on every build. But the logo and the link-preview card are **source**, not generated,
+  and they were swallowed by the same rule. Every check I ran passed against a file that would
+  never have reached the server: the metadata pointed at `/brand/og.png`, and the server would
+  have returned 404, producing a card with no thumbnail — the exact symptom the work was meant
+  to fix.
+  **Decision: ignore `apps/web/public/*` rather than `apps/web/public/`, then negate
+  `!apps/web/public/brand/`.** Git does not descend into an excluded _directory_, so a negation
+  under `public/` could never have taken effect; excluding the contents instead is what makes
+  the negation work at all. Verified both directions afterwards — `brand/og.png` tracked,
+  `workspace/erp.html` still ignored — rather than assuming the pattern did what I intended.
+  Checked two adjacent things while here: `sync-workspace.mjs` deletes `public/workspace`, not
+  `public/`, so a build does not wipe the assets; and the Dockerfile copies all of `public/`,
+  so they reach the image.
+  Third time this shape has bitten in two days — `.env.production.example`, the server's stale
+  compose file, and now this. **A file being correct on the machine that made it says nothing
+  about whether it reaches the machine that serves it.** Worth checking `git status` after
+  generating any artifact that something else is expected to fetch.
