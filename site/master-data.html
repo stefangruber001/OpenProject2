@@ -175,10 +175,19 @@
         </div>
       </div>
 
-      <div class="banner">
-        <div class="bi">🤖</div>
-        <div><b>One source of truth, built for automation.</b>
-        <span>&nbsp;Every record has a stable code and typed fields. Quoting, purchasing, invoicing, collections, scheduling and the reminder/review flows all read from here — nothing is entered twice. <b>Export JSON</b> hands the whole dataset to any downstream automation.</span></div>
+      <!-- This warning is not decoration. The page below writes to IndexedDB in
+           whichever browser is showing it — see the persistence block at the
+           foot of the file — so a record entered here is on THIS device and
+           nowhere else. It is indistinguishable from a saved record: the form
+           closes, the row appears, no error is shown. Somebody adding a
+           customer on a laptop and looking for it on a phone finds nothing and
+           reasonably concludes the system is broken. It is not; the record
+           never left the laptop. Until this screen is wired to the server, say
+           so on the screen. -->
+      <div class="banner" style="background:linear-gradient(120deg,#FDF3D7,#fff 90%);border-color:#E8CE86">
+        <div class="bi">⚠️</div>
+        <div><b>This screen is stored in this browser only.</b>
+        <span>&nbsp;Records added here stay on this device — they are not sent to the server, so nobody else and no other device will see them. For customers everyone shares, use <b><a href="erp.html#clientes" style="color:inherit">the ERP workspace → Clientes → ＋&nbsp;Nuevo tercero</a></b>, which saves to the server. Use this screen for reference lists you are still drafting, and <b>Export JSON</b> to carry them out.</span></div>
       </div>
 
       <div class="mobsel"><select id="mnav"></select></div>

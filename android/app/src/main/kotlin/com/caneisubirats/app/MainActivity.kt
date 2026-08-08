@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -22,11 +23,29 @@ import com.google.android.material.tabs.TabLayout
  */
 class MainActivity : AppCompatActivity() {
 
-    /** Single switch between the dev preview and production (mirrors ios Config.swift). */
-    private val baseUrl = "https://stefangruber001.github.io/OpenProject2/preview/"
-    // Production: "https://stefangruber001.github.io/OpenProject2/"
+    /**
+     * Where the app points (mirrors ios Config.swift).
+     *
+     * The SERVER, which is the only address where the company's data lives.
+     * This used to be GitHub Pages — a static copy of the same screens with no
+     * database behind it — so the app rendered and saved perfectly while
+     * writing to storage inside the phone, and a record entered on a laptop
+     * simply was not there. Nothing reported an error, because from the app's
+     * side nothing had failed.
+     *
+     * The trailing `/workspace/` matters: the server serves its API at the root
+     * and the screens beneath that path.
+     */
+    private val baseUrl = "https://178-105-10-156.sslip.io/workspace/"
 
-    private val internalHosts = setOf("stefangruber001.github.io")
+    /**
+     * Hosts that stay inside the web view; everything else goes to the system
+     * browser. DERIVED from [baseUrl] — as two independent constants, moving
+     * the app meant editing both, and forgetting the second one throws every
+     * tab out to Chrome, which looks like a broken app rather than a stale
+     * line.
+     */
+    private val internalHosts = setOfNotNull(Uri.parse(baseUrl).host)
     private val userAgentMarker = "CaneiApp/1.0 (Android; native-shell)"
 
     /** The tabs of the app — same pages as the iOS shell. */
@@ -50,9 +69,14 @@ class MainActivity : AppCompatActivity() {
 
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
+        // The server asks for a sign-in and answers with a session cookie. Without
+        // accepting and flushing it, the app would present the login screen on
+        // every single launch — the app would work, and feel broken.
+        CookieManager.getInstance().setAcceptCookie(true)
+
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true   // IndexedDB — the ERP dataset lives here
+            settings.domStorageEnabled = true   // localStorage / IndexedDB for browser-local screens
             settings.databaseEnabled = true
             settings.setSupportZoom(false)
             settings.userAgentString = settings.userAgentString + " " + userAgentMarker
@@ -116,6 +140,17 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(root)
         webView.loadUrl(baseUrl + tabs[0].path)
+    }
+
+    /**
+     * Write the session cookie to disk before the app goes to the background.
+     * Android flushes on its own schedule, so without this a cookie set minutes
+     * before the app is killed can be lost — an intermittent "why am I signed
+     * out again?" that is unpleasant to chase after the fact.
+     */
+    override fun onPause() {
+        CookieManager.getInstance().flush()
+        super.onPause()
     }
 
     @Deprecated("Deprecated in Java")

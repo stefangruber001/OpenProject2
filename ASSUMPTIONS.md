@@ -1084,3 +1084,35 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   `ERP_USERS` line at all, and an existing double-quoted value rewritten single-quoted. Checked
   in every case that the database password survived untouched and that the hashes came through
   byte-for-byte.
+- **#81 — The phone was never looking at the server (2026-08-08).** A customer entered in the
+  browser on a laptop could not be found in the iPhone app. Two independent causes, either of
+  which alone is enough, and neither of which reports an error:
+  1. **The apps pointed at GitHub Pages, not the server.** `Config.swift` and `MainActivity.kt`
+     both carried `https://stefangruber001.github.io/OpenProject2/preview/` — a static copy of
+     the same screens with no database behind it. Every screen rendered, every form saved, and
+     the data went into storage inside the phone. A shell around the wrong address is
+     indistinguishable from a shell around the right one until somebody tries to share a record.
+  2. **`site/master-data.html` writes to IndexedDB in whichever browser is showing it.** It does
+     not load `erp-backend.js` at all — only `erp.html` and `index.html` do, and only those two
+     get the `<meta name="erp-api">` marker from `sync-workspace.mjs`. So the record never left
+     the laptop either. It was never on the server for the phone to fail to find.
+     **Decision, part one: point both apps at the server** (`https://178-105-10-156.sslip.io/workspace/`),
+     and DERIVE the internal-host allow-list from that one constant instead of repeating it.
+     As two independent constants, moving the app meant editing both, and missing the second throws
+     every tab out to Safari/Chrome — which reads as a broken app rather than a stale line. Android
+     additionally needs `CookieManager.setAcceptCookie(true)` and a `flush()` in `onPause`, because
+     the server now asks for a sign-in and an unflushed cookie means logging in on every launch.
+     **Decision, part two: make `master-data.html` say what it does.** Its banner claimed "One
+     source of truth, built for automation" while writing to one browser. Wiring all twenty of its
+     entities to the server is real work and doing one of them would leave the repo half-migrated,
+     which the mandate forbids — so for now the page states plainly that it is local to this device
+     and links to the ERP workspace's Clientes screen, which is genuinely shared. An honest screen
+     beats a half-migrated one. Full migration is task #96.
+     **Verified rather than assumed**, since the whole defect is "it looks like it worked":
+     a real Chromium drove the sign-in and the Nuevo tercero form against the built app and a real
+     PostgreSQL; the workspace reported remote mode, the document version advanced 0→1, a SECOND
+     BROWSER CONTEXT WITH NO STORAGE AT ALL listed the customer, the audit entry named the
+     signed-in account rather than anything the browser sent, and `SELECT` against the database
+     returned the row. The engine also rejected the first attempt because the tax identifier failed
+     its checksum — worth recording as a pass, not a stumble: the validation is real, and the error
+     surfaced in the UI instead of being written.
