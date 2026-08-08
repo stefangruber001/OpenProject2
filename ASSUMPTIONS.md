@@ -1198,3 +1198,23 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
      **Still local, and deliberately:** per-device UI preferences (which are correctly per-device),
      and photo blobs, which need an upload path rather than base64 in a JSON document. Recorded as
      task #97 rather than left implied.
+- **#84 — Two scripts that should have existed, and one I invented (2026-08-08).** Twice I told
+  the operator to run `./ops/set-ghcr-token.sh`. That script did not exist — I had described a
+  fix without building it, which is worse than not offering one, because it costs them the
+  attempt before they find out. Written now, along with `ops/deploy-now.sh`.
+  Both are shaped by the same recurring failure: **every part of this pipeline reports success
+  while serving an old version.** Actions goes green, the image publishes, the update timer runs
+  on schedule, the container is healthy — and the machine answers with code from days ago. So
+  neither script trusts its own commands. `set-ghcr-token.sh` logs in and PULLS with the token
+  before claiming it works, because a stored token that cannot pull is indistinguishable from a
+  working one until a release quietly fails to arrive. `deploy-now.sh` finishes by comparing the
+  running image's `org.opencontainers.image.revision` against the local commit AND fetching
+  `erp-docs.js` over the public address — a file that only exists from the release that put every
+  screen on the server, so its absence is a precise statement about which build is live rather
+  than a guess.
+  **The app cannot be fixed from the server side.** The installed build has
+  `internalHosts = ["stefangruber001.github.io"]` compiled in, and `WebViewStore.swift:242` hands
+  any other host to Safari and cancels the in-app load. So publishing a redirect from the Pages
+  copy would not move the app onto the server, it would turn every tab into a Safari launch. The
+  address the app points at is part of the binary; changing it needs a build, and one was
+  triggered rather than described.
