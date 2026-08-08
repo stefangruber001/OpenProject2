@@ -1066,3 +1066,21 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   the truth and this one was stale within the hour. And: a partially-working preview is a
   strong signal. Literals worked, computed values did not, and that split named the bug before
   I looked at anything.
+- **#80 — Adding a person is one command (2026-08-07).** Adding an account meant: run the hash
+  tool, ssh in, open `.env` in nano, find a single line hundreds of characters long, append a
+  comma and paste, save, restart. Every step is a chance to break the line that also holds the
+  database passwords, and the operator would do this every time somebody joins.
+  **Decision: `ops/add-user.sh <email>`.** Asks for the password, hashes it locally so it never
+  leaves the operator's machine, updates the server, restarts, prints where to sign in.
+  Re-running for the same address REPLACES that entry, so the same command is also how a
+  password is changed — including the operator's own.
+  The edit is Python, not `sed`. A scrypt hash contains `$`, `/` and `+`, all of which mean
+  something to `sed`, and the file being edited holds the database passwords — a mangled
+  substitution there breaks considerably more than a login. The entry is passed as an argument
+  rather than interpolated into the script, so nothing inside a hash can be read as code, and
+  the file is written once at the end rather than progressively.
+  Tested against fixtures before it went near the server: a third person added, the same person
+  re-added (replaced, not duplicated), a differently-cased address matched, a file with no
+  `ERP_USERS` line at all, and an existing double-quoted value rewritten single-quoted. Checked
+  in every case that the database password survived untouched and that the hashes came through
+  byte-for-byte.
