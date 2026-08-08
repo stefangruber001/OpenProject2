@@ -76,41 +76,42 @@ is gap 13, scheduled in S11.
 
 ---
 
-## 2. The 26 screens — doc vs. built
+## 2. The screens — doc vs. built
 
 Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, reshape to the doc) ·
 **SPLIT/MERGE** · **BUILD** (does not exist) · **STRIP** (built exceeds the doc; reduce).
 
-| Doc    | Screen                  | Built today                                                          | Verdict                                                                         |
-| ------ | ----------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| TC-01  | Torre de Control        | `#torre` — 8 cards, sparklines, customisation, CSV, alert management | **STRIP** to 4 indicators + project status + max 5 alerts                       |
-| COM-01 | Leads                   | inside `#oportunidades`                                              | **SPLIT**                                                                       |
-| COM-02 | Visita                  | inside `#oportunidades`                                              | **SPLIT** — own two-block screen                                                |
-| COM-03 | Presupuesto             | `#presupuestos` + builder                                            | **ADAPT** — sections/mediciones/versions exist                                  |
-| COM-04 | Contrato                | `#contratos` — installments exist                                    | **ADAPT** — add PDF viewer + anexos                                             |
-| PRY-01 | Avance Físico           | `#proyectos` + `#seguimiento` + Gantt                                | **KEEP** (decision 1) + merge, add 2 recalc chains                              |
-| PRY-02 | Avance Económico        | `#economia`                                                          | **ADAPT** — add cost-to-partida panel                                           |
-| PRY-03 | Adicionales             | `#modificaciones`                                                    | **ADAPT** — add photo capture + approval evidence                               |
-| ADM-01 | Facturación             | `#facturacion`                                                       | **ADAPT**                                                                       |
-| ADM-02 | Compras y Pedidos       | `#compras`                                                           | **ADAPT** — 3 states only, no goods receipt                                     |
-| ADM-03 | Facturas de proveedores | `#pagos` + `#captura`                                                | **MERGE** + OCR (S6)                                                            |
-| ADM-04 | Horas                   | `#horas`                                                             | **ADAPT** — add monthly reconciliation                                          |
-| ADM-05 | Consolidación Bancaria  | `#banco` + `#conciliacion`                                           | **MERGE**                                                                       |
-| ADM-06 | Caja Chica              | — (`till` exists in the model)                                       | **BUILD**                                                                       |
-| ADM-07 | Reporte a Gestoría      | `#gestoria`                                                          | **ADAPT** — 3-step wizard                                                       |
-| ADM-08 | Flujo de Caja           | — (`cashForecast()` exists)                                          | **BUILD**                                                                       |
-| ADM-09 | Datos Financieros       | `financial-data.html`, 14 panels                                     | **KEEP** (decision 1) — feed + ledger import                                    |
-| DMT-01 | Clientes                | `#clientes` (customers-only)                                         | **ADAPT**                                                                       |
-| DMT-02 | Proveedores             | —                                                                    | **BUILD**                                                                       |
-| DMT-03 | Subcontratos            | `#subcontratos` (lifecycle)                                          | **BUILD** as master data; lifecycle data retained, screens dropped (decision 5) |
-| DMT-04 | Personal Interno        | inside `#horas`                                                      | **BUILD**                                                                       |
-| DMC-01 | Partidas / Subpartidas  | `master-data.html`                                                   | **ADAPT** into the shell                                                        |
-| DMC-02 | Lista de Precios        | `#precios`                                                           | **ADAPT** — add comparison strip                                                |
-| DMC-03 | Unidades de Medida      | hardcoded `LISTS.units`                                              | **BUILD** — make maintainable                                                   |
-| DMC-04 | Fuentes de Leads        | hardcoded `LISTS.leadSources`                                        | **BUILD** — make maintainable                                                   |
-| DMC-05 | Formas de Pago          | hardcoded `LISTS.paymentMethods`                                     | **BUILD** — make maintainable                                                   |
+| Doc    | Screen                   | Built today                                                          | Verdict                                                                                  |
+| ------ | ------------------------ | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| TC-01  | Torre de Control         | `#torre` — 8 cards, sparklines, customisation, CSV, alert management | **STRIP** to 4 indicators + project status + max 5 alerts                                |
+| COM-01 | Leads                    | inside `#oportunidades`                                              | **SPLIT**                                                                                |
+| COM-02 | Visita                   | inside `#oportunidades`                                              | **SPLIT** — own two-block screen                                                         |
+| COM-03 | Presupuesto              | `#presupuestos` + builder                                            | **ADAPT** — sections/mediciones/versions exist                                           |
+| COM-04 | Contrato                 | `#contratos` — installments exist                                    | **ADAPT** — add PDF viewer + anexos                                                      |
+| PRY-01 | Avance Físico            | `#proyectos` + `#seguimiento` + Gantt                                | **KEEP** (decision 1) + merge, add 2 recalc chains                                       |
+| PRY-02 | Avance Económico         | `#economia`                                                          | **ADAPT** — add cost-to-partida panel                                                    |
+| PRY-03 | Adicionales              | `#modificaciones`                                                    | **ADAPT** — add photo capture + approval evidence                                        |
+| ADM-01 | Facturación              | `#facturacion`                                                       | **ADAPT**                                                                                |
+| ADM-02 | Compras y Pedidos        | `#compras`                                                           | **ADAPT** — 3 states only, no goods receipt                                              |
+| ADM-03 | Facturas de proveedores  | `#pagos` + `#captura`                                                | **MERGE** + OCR (S6)                                                                     |
+| ADM-04 | Horas                    | `#horas`                                                             | **ADAPT** — add monthly reconciliation                                                   |
+| ADM-05 | Consolidación Bancaria   | `#banco` + `#conciliacion`                                           | **MERGE**                                                                                |
+| ADM-06 | Caja Chica               | — (`till` exists in the model)                                       | **BUILD**                                                                                |
+| ADM-07 | Reporte a Gestoría       | `#gestoria`                                                          | **ADAPT** — 3-step wizard                                                                |
+| ADM-08 | Flujo de Caja            | — (`cashForecast()` exists)                                          | **BUILD**                                                                                |
+| ADM-09 | Datos Financieros        | `financial-data.html`, 14 panels                                     | **KEEP** (decision 1) — feed + ledger import                                             |
+| DMT-01 | Clientes                 | `#clientes` (customers-only)                                         | **ADAPT**                                                                                |
+| DMT-02 | Proveedores              | —                                                                    | **BUILD**                                                                                |
+| DMT-03 | Subcontratos             | `#subcontratos` (lifecycle)                                          | **BUILD** as master data; lifecycle data retained, screens dropped (decision 5)          |
+| DMT-04 | Personal Interno         | inside `#horas`                                                      | **BUILD**                                                                                |
+| DMC-01 | Partidas / Subpartidas   | `master-data.html`                                                   | **ADAPT** into the shell                                                                 |
+| DMC-02 | Lista de Precios         | `#precios`                                                           | **ADAPT** — add comparison strip                                                         |
+| DMC-03 | Unidades de Medida       | hardcoded `LISTS.units`                                              | **BUILD** — make maintainable                                                            |
+| DMC-04 | Fuentes de Leads         | hardcoded `LISTS.leadSources`                                        | **BUILD** — make maintainable                                                            |
+| DMC-05 | Formas de Pago           | hardcoded `LISTS.paymentMethods`                                     | **BUILD** — make maintainable                                                            |
+| DMC-06 | Comunicaciones _(added)_ | `#comunicaciones` — templates, rules, queue                          | **RE-HOME** to Configuración (plan decision 18) — three tabs: Plantillas · Reglas · Cola |
 
-**Not in the doc's 26, therefore removed** (plan decision 1): Mi Día · Comunicaciones · Reportes ·
+**Not in the doc's 26, therefore removed** (plan decision 1): Mi Día · Reportes ·
 Torre extras · alert management · subcontract screens. **`journey.html` (Recorrido) is retained**
 pending review — it was substantially rewritten and tested on `main` after the plan was written.
 
