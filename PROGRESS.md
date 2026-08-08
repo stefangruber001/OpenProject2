@@ -553,3 +553,12 @@ Work lands on the branch designated for the session — `claude/orin-project-
 status-1q50dt` for sessions 1-3, `claude/candi-programme-session-4-07amo8` for
 sessions 4-12. Small conventional commits, every commit green, no force-push, no
 history rewrite.
+
+- **S0 — CANEI v4 mapping (2026-08-08)**: `docs/CANEI-V4-MAPPING.md`. Answers the doc's six
+  open questions (Q1 stack fixed by the code · Q2 no data loaded, variables covered · Q3 nine
+  types stand · Q4 the money chain validated structurally · Q5 gestoría rules once imported,
+  recommend a logged reopen rather than a hard lock · Q6 the Plan de Cuentas already exists in
+  `financial-data.html`, only the wiring is missing). Maps all 26 screens doc-vs-built and all
+  100 green-sheet columns to model fields: **~85 covered, 13 new fields, the rest derived or
+  discarded**. Q4 verdict: the chain closes for every job-costed euro; the one break is the
+  non-job branch (rule 07's "or to an account"), scheduled S11. No code changed.
