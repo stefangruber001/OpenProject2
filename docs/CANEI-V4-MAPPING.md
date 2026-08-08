@@ -53,7 +53,7 @@ and the rest cost nothing but an enum entry.
 
 ### Q4 · The proyecto ↔ compra ↔ factura ↔ cobro ↔ pago interrelation
 
-Validated structurally in **§5** below. **Verdict: the chain closes, with one gap** — a cost can
+Validated structurally in **§6** below. **Verdict: the chain closes, with one gap** — a cost can
 reach an account instead of a project, and that path does not exist in the engine today (gap 13,
 `accountCode`). Everything else in the chain has a field to carry it.
 
@@ -116,7 +116,95 @@ pending review — it was substantially rewritten and tested on `main` after the
 
 ---
 
-## 3. Field dictionary — 100 workbook columns
+## 3. Screen specifications
+
+The doc describes every subsección in three blocks — **Screen · Flow · Rules** — and states the
+binding principle for this section: _"what cannot change is the structure — what zones exist and
+what each button does — not the exact number."_ **Structure is binding; the pixel values are a
+starting proposal against a 1,440 × 900 reference window** and are recalculated proportionally.
+
+### 3.1 Global conventions (chapter 5 — hold for all 26 screens)
+
+| Element          | Specification                                                                                                                                                                                                           |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reference window | 1,440 × 900 desktop · **390 wide on mobile**                                                                                                                                                                            |
+| Top bar          | fixed **56**; logo left, section + subsection centre, global search + avatar right                                                                                                                                      |
+| Left side menu   | fixed **240**, collapsible to **64**; six sections, chosen one unfolds its subsections; active subsection carries a **3 px rule in its section colour**                                                                 |
+| Work area        | remaining **1,200** with 24 inner margin each side = **1,152 usable**; usable height below top bar + screen header = **772**                                                                                            |
+| Screen header    | **72**; title left, primary actions right                                                                                                                                                                               |
+| Toolbar          | **48**, immediately above every table; **320 search box** left, filters beside it, buttons right (primary in section colour, rest grey border). Modify/Delete active only with a row selected                           |
+| Table            | full width; **40 header, 44 rows**, very light alternating background; status column always a **coloured pill**; last column a **42 three-dot menu**                                                                    |
+| Pagination       | **40 bar at the foot** — left «1–25 of 137», right prev · page numbers · next. **25 default, configurable to 10 or 50. No infinite scrolling. Identical on all 26** — this is what makes them feel like one application |
+| Side panel       | **480**, slides in from the right over the dimmed list; where records are created and edited; **the list never disappears**                                                                                             |
+| Centre panel     | **780**, for proyecto detail; the list compresses to **372** on its left; on close the list returns to its width, page and scroll position                                                                              |
+| Modal            | **560**, centred; only confirmations and short actions — never a long form                                                                                                                                              |
+| Full screen      | reserved for exactly four: **presupuestador · Gantt · contrato viewer · supplier-document validation**. The side menu is hidden in all four                                                                             |
+| Buttons          | primary filled in the section colour; secondary grey border; destructive red and always confirmed                                                                                                                       |
+| Notices          | short message bottom right, 3 s. Validation errors sit next to the field, in red, and **do not disappear on their own**                                                                                                 |
+| Mobile           | side menu → **bottom bar of five icons**; tables → **two-line cards** with the same pagination; side panel → **full-screen bottom sheet**; floating button for frequent site actions                                    |
+
+**Interaction rules.** Every table paginates — the **only exception is the presupuestador line
+table**, which scrolls continuously because a presupuesto is worked through whole. Listing and
+editing never change screen. A modal appears only for something short or destructive. Everything
+saves on the spot and says so — **there is no end-of-form Save that can be forgotten**. Every
+aggregate figure links to its detail. **Colour only carries state, and a pill always carries text
+too.** Site actions never take more than three taps.
+
+**Status colours** (identical on every screen): **grey** not started/draft · **blue** in
+progress/sent/waiting on the other party · **green** done/accepted/collected/reconciled · **amber**
+needs attention (unallocated, awaiting price, no supporting document, not broken down, due soon) ·
+**red** overdue/rejected/outside the presupuesto/negative margin/projected date beyond committed.
+
+**Profiles**: Site (minimum typing, predefined lists, big buttons) · Back-office · Gestoría (later:
+read-and-export only, **no access to margins or commercial prices**).
+
+### 3.2 Per-screen layout
+
+Only what is particular to each screen; everything else inherits from 3.1.
+
+| Screen                    | Layout that must be built                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **TC-01** Torre           | Three blocks, fits whole on one screen and on mobile without scrolling. ① four **276 × 120** cards, 24 apart, 32 px figure — margin, receivables (overdue below in red), payables, cash. ② proyecto status, the main indicator, **48 per active proyecto**: code, client, 120 progress bar, margin pill, committed + projected dates (projected red if beyond). ③ **max five 40 rows**, ordered by importance not age; a «ver todos» link if more                                                                                                                                              |
+| **COM-01** Leads          | Standard list. Columns: checkbox 40 · Date 90 · Client 200 · Inmueble 220 · Description 280 · Source 120 · Visita status 110 (pill) · Status 90 (pill) · Days 60 · ⋯ 42. **25 per page**                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **COM-02** Visita         | **Split in two**: two equal fixed blocks **1,152 × 366**, 24 apart, each with its own toolbar and pagination, **six rows per page**. Top = programadas (Date/time 130 · Client 200 · Address 280 · Owner 140 · Status 110). Bottom = realizadas (Completion 130 · Client 200 · Address 280 · Photos 70 · Report 90 · Presupuesto 110). An overdue programada shows red. On mobile the blocks stack with a tab                                                                                                                                                                                  |
+| **COM-03** Presupuesto    | List: rows **grouped by status** with a 32 group header (Borradores, Enviados, Aceptados, Rechazados, Caducados). **Presupuestador full screen**, own 56 bar (number + version left, total large centre, Guardar/Vista previa/Enviar right). Three areas: **260 collapsible tree** left · line table centre (Number 70 · Description flexible · Unit 70 · Qty 90 · Sale 100 · Total 110 · **Cost 100 · Margin 80 on grey**, visibly not in the PDF) · **300 totals panel** right with a second **Visita tab** (report + photos, reference only). Conditions bar below. 16 drag handle per line |
+| **COM-04** Contrato       | Active/inactive as two **32 tabs** above the toolbar. Columns incl. Original amount + **Current amount amber when they differ** (means annexes exist). Opening → **full-screen viewer**: PDF **760 wide, full height** left; fixed **392 panel** right with three tabs — Datos, Hitos de pago (trigger, %/amount, expected date, factura; sum vs contracted at the foot), Anexos                                                                                                                                                                                                               |
+| **PRY-01** Físico         | List → **centre panel 780**, list compressed to **372** showing code + client only. Panel: fixed **88 header** (code, client, address, total progress, three dates) then three tabs — **Avance** (tree, 44 rows, three-state control as **three contiguous 90 buttons** + a **60 percentage field active only on «en ejecución»**), **Programación** (Gantt), **Ficha**. Mobile: one tap cycles the three states                                                                                                                                                                               |
+| **PRY-02** Económico      | Same list/centre mechanics. Panel opens with two **372 × 130** cards (Revenue, Cost) + a third margin card. Then the per-capítulo table (Budgeted · Accrued · Variance € · Variance % · Margin; negative margin red). At the end the **pending-assignment block**, each row with origin, document, date, amount and an amber «sin repartir» pill. **480 assignment panel** — the only place cost is split by capítulo                                                                                                                                                                          |
+| **PRY-03** Adicionales    | **Five 216 counters** (identificado, valorado, aprobado, ejecutado, facturado) with count + amount; pressing one filters. Table rows **56 — taller than normal** to carry a **40 × 40 photo thumbnail**. Unapproved: amber pill **and a 3 px amber rule down the left of the row**, visible from a distance                                                                                                                                                                                                                                                                                    |
+| **ADM-01** Facturación    | **Four 270 counters** (Issued, Collected, Outstanding, Overdue — red when non-zero). Table incl. Balance and Days; **days overdue painted red from day one**                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **ADM-02** Compras        | **Three 360 counters** (Oferta, Pedido, Facturado). Detail = two zones: quote PDF **620 with zoom** left, **480** record right (header + line table; base/IVA/total at the foot)                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **ADM-03** Facturas prov. | Two zones: **inbox 372** left with **96 cards** (thumbnail, detected supplier, detected amount); **756** validated list right. Validation screen: image **620 with zoom** left, **480 form** right — **green dot on every captured field, amber on every empty or doubtful one, focus on the first amber**                                                                                                                                                                                                                                                                                     |
+| **ADM-04** Horas          | Two **32 tabs**: Daily sheet — **372 weekly calendar** left (seven days + daily totals), **756 grid** right (44 per worker: Worker 180 · Type 110 · Project 200 · Hours 80). Summary — per proyecto/capítulo, with the **monthly reconciliation block** below                                                                                                                                                                                                                                                                                                                                  |
+| **ADM-05** Banco          | Header + account selector; **56 strip** (selected balance, total balance, unmatched count); table with **classification and assignment edited inline in the row**; unmatched carries an amber left bar and shows age on hover                                                                                                                                                                                                                                                                                                                                                                  |
+| **ADM-06** Caja           | The simplest screen. 72 header with **Entrada / Salida**; **56 strip** with the balance in large type + count awaiting a receipt; table; **cash count at the foot** (opening, in, out, closing)                                                                                                                                                                                                                                                                                                                                                                                                |
+| **ADM-07** Gestoría       | **Three-step wizard**, 48 step indicator. ① quarter selector + **five 216 cards**. ② exceptions grouped by type, 44 rows, each linking to the record; **Export disabled while blocking exceptions remain**. ③ IVA and IRPF summaries + export. Submission history below                                                                                                                                                                                                                                                                                                                        |
+| **ADM-08** Flujo          | No list. Week/month switch + horizon. **96 strip** with three figures. Forecast grid: **one 96 column per period**, grouped rows (money in / money out), **fixed 240 row-label column** on the left, cumulative balance at the foot **red when negative**. Selector for whole company or one proyecto                                                                                                                                                                                                                                                                                          |
+| **ADM-09** Datos Fin.     | **The only screen with internal navigation, and it is justified.** **240 left column inside the work area**, four groups (Resumen · Estados financieros · Capital circulante · Libros), active panel right with breadcrumb. Already built — integrate, do not rebuild                                                                                                                                                                                                                                                                                                                          |
+| **DMT-01…04**             | One screen, four filters. Common columns: checkbox · Code 90 · Name 220 · NIF 110 · Contact 150 · Phone 120 · Town 130 · **Completeness 90 (20 px progress ring, amber when incomplete)** · Status 80, then each subsection's own. Panel **480, four tabs**: Identification · Contact and terms · **Inmuebles (Clientes only, 432 inline table)** · History. Proveedores adds Precios/Compras/Documentos tabs; Personal adds Tarifas                                                                                                                                                           |
+| **DMC-01** Partidas       | Two zones: **300 tree** left (partida count per branch, own search) · **828 table** right. Tree reordered by dragging, same as the presupuestador                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **DMC-02** Precios        | Partida filter always visible at the top. When filtered to one partida, a **comparison strip** appears: one **216 card per supplier** with its net price, **cheapest highlighted green**, and a supplier without a price shown **grey with «sin precio» — never a zero**                                                                                                                                                                                                                                                                                                                       |
+| **DMC-03/04/05**          | One shared screen, no side panel: **720 centred table**, and a **396 help column** to its right explaining where the list is used. **«Añadir» inserts an editable row inline; Enter or click-away saves.** Fuentes de Leads shows **two 564 tables side by side** (sources · loss reasons)                                                                                                                                                                                                                                                                                                     |
+
+### 3.3 Consequences for the build
+
+- **Pagination is already correct** — 25 default with 10/20/50 was shipped on Clientes; the doc says
+  10/25/50. **Align the selector to the doc (10 · 25 · 50) and apply it to all 26 screens** as a
+  shared helper, not per screen.
+- **The 480 side panel is the universal create/edit surface.** The current drawer already behaves
+  this way; it needs standardising to the width and the "list never disappears" rule.
+- **The 780 centre panel with a 372 compressed list is not built** — PRY-01 and PRY-02 both need it.
+- **Four full-screen surfaces** must hide the side menu: presupuestador, Gantt, contrato viewer,
+  document validation. Only the Gantt does today.
+- **Two-zone document screens** (ADM-02, ADM-03, DMC-01) are a new layout primitive; build it once.
+- **Counter strips** (TC/PRY-03/ADM-01/ADM-02/ADM-07) are a second shared primitive.
+- **The status colour code is global** and must be a single token set, not per-screen colours.
+- Mobile: **tables become two-line cards and the menu becomes a five-icon bottom bar** — the
+  current app scrolls tables horizontally instead, which the doc replaces.
+
+---
+
+## 4. Field dictionary — 100 workbook columns
 
 Status: **✓** covered by an existing model field · **NEW** field to add (numbered per the plan) ·
 **⊘ derived** (the system computes it; no storage) · **✗ discarded** (plan decision 9).
@@ -217,7 +305,7 @@ workbook column, and is listed with the others in the plan.
 
 ---
 
-## 4. Entity relationship model
+## 5. Entity relationship model
 
 ```
 party ──< property                      a tercero has many inmuebles
@@ -254,7 +342,7 @@ party ──< property                      a tercero has many inmuebles
 
 ---
 
-## 5. Q4 validation — the money chain, end to end
+## 6. Q4 validation — the money chain, end to end
 
 Traced structurally against a real project shape (BAC DE RODA: two presupuesto versions, supplier
 offers, supplier invoices, payments). No row data is used or loaded.
@@ -286,7 +374,7 @@ already exists. S8 confirms or builds it.
 
 ---
 
-## 6. Open items carried forward
+## 7. Open items carried forward
 
 | Item                                                                        | Owner           | Where                                         |
 | --------------------------------------------------------------------------- | --------------- | --------------------------------------------- |
