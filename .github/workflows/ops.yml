@@ -29,6 +29,7 @@ on:
         type: choice
         options:
           - status
+          - deploy-now
           - backup-now
           - list-ssh-allowed
 
@@ -44,7 +45,11 @@ jobs:
     timeout-minutes: 15
     environment: production
     steps:
+      # Full history: deploy-now works out the newest commit that actually
+      # builds an image, and a depth-1 clone cannot answer that.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Check the secrets this needs are present
         env:
@@ -95,6 +100,14 @@ jobs:
       - name: list-ssh-allowed
         if: inputs.action == 'list-ssh-allowed'
         run: bash ops/ssh-allow.sh list
+
+      # Pull the current release onto the server and prove it arrived. Exactly
+      # what ops/deploy-now.sh does from a laptop — the point of having it here
+      # is that the operator does not need one, and that the person who wrote
+      # the change can finish it rather than handing over a command.
+      - name: deploy-now
+        if: inputs.action == 'deploy-now'
+        run: bash ops/deploy-now.sh
 
       - name: backup-now
         if: inputs.action == 'backup-now'

@@ -39,8 +39,27 @@ fi
 SERVER_NAME="${SERVER_NAME:-canei-erp-prod}"
 KEY="${KEY:-ops/.provisioned/id_ed25519}"
 
-WANT="$(git rev-parse HEAD)"
+HEAD_SHA="$(git rev-parse HEAD)"
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+# The commit the server can ACTUALLY be running.
+#
+# Not HEAD. `deploy.yml` only builds an image when a push touches apps/,
+# packages/, site/, tenants/ or ops/ — so a commit that changes only the iOS app
+# or a document produces no image at all, and the server rightly stays where it
+# is. Comparing against HEAD in that case reports a failed deploy over a server
+# that is perfectly up to date, which is precisely the false alarm this script
+# already learned once not to raise.
+#
+# So: the newest commit that touches something the image is built from.
+IMAGE_PATHS=(apps packages site tenants ops)
+WANT="$(git log -1 --format=%H -- "${IMAGE_PATHS[@]}" 2>/dev/null || true)"
+if [ -z "$WANT" ]; then
+  # A shallow clone cannot answer the question. Fall back to HEAD and say so,
+  # rather than quietly comparing against something meaningless.
+  WANT="$HEAD_SHA"
+  SHALLOW=1
+fi
 
 IP="$(curl -sS -H "Authorization: Bearer $HCLOUD_TOKEN" \
   "https://api.hetzner.cloud/v1/servers?name=${SERVER_NAME}" |
@@ -49,7 +68,12 @@ IP="$(curl -sS -H "Authorization: Bearer $HCLOUD_TOKEN" \
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -i "$KEY")
 
 say "Local checkout"
-info "branch ${BRANCH} at ${WANT:0:8}"
+info "branch ${BRANCH} at ${HEAD_SHA:0:8}"
+if [ "$WANT" != "$HEAD_SHA" ]; then
+  info "newest commit that builds an image: ${WANT:0:8}"
+  info "(later commits touch only things the server does not run)"
+fi
+[ "${SHALLOW:-0}" = "1" ] && warn "Shallow clone — comparing against HEAD, which may not have built an image."
 if [ -n "$(git status --porcelain)" ]; then
   warn "You have uncommitted changes. Only what is PUSHED can be deployed."
 fi
