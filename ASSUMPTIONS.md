@@ -957,3 +957,29 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   edit `.env` will not have read it; the script had to stop being brittle.
   Worth generalising: this whole class — a config file that is data to one reader and shell to
   another — has now cost a silent failure twice (the `#` in a zsh paste, and this).
+- **#75 — The server's stack definition never updated, and the symptom was a lie
+  (2026-08-07).** The operator followed the setup, `.env` was correct, and
+  `docker compose up -d` reported "Running" with no Caddy container. `open-web.sh`
+  then correctly refused to publish, because the running application served the
+  workspace to a request with no session. Everything looked configured and nothing
+  was.
+  The cause: `docker-compose.prod.yml` and the `ops/` scripts reached the machine
+  **once**, through `provision.sh`'s embed-and-splice at creation time. Nothing
+  updates them afterwards — `canei-deploy.service` pulls _images_ and runs
+  `up -d`, so application code flows to the server continuously while the stack
+  definition is frozen at the day the machine was born. The compose file there had
+  no `web` service and no lines passing `ERP_USERS` or `SESSION_SECRET` to the
+  app, so the settings sat in `.env` and were never handed to the process.
+  **Decision: add `ops/sync-server.sh`** — copies the compose file, Caddyfile and
+  ops scripts up, keeps the previous compose file as `.bak`, decides on the
+  `pilot` profile by reading whether `PUBLIC_HOSTNAME` is actually set, and
+  restarts. One command, run whenever the stack changes.
+  This is a patch, not the cure. The cure is for the definition to travel with
+  the image — ship it inside the container and have the deploy service extract it
+  before `up -d` — so a stack change deploys itself like everything else. Recorded
+  as the next piece of ops work rather than done now, because the operator is
+  mid-setup and a manual sync unblocks them today.
+  Worth naming the pattern: **"configured" and "running what you configured" are
+  different claims, and only the second one matters.** `open-web.sh` refusing to
+  publish is the only reason this was caught before the ERP went on the internet
+  with no login at all.
