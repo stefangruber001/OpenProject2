@@ -59,15 +59,15 @@ write_files:
       #                   node apps/web/scripts/hash-password.mjs someone@example.com
       #   SESSION_SECRET  head -c 48 /dev/urandom | base64
       #
-      # QUOTED for the same reason as ERP_OPERATOR: ops/backup.sh sources this
-      # file, and base64 output can contain characters the shell would act on.
-      ERP_USERS=""
-      SESSION_SECRET=""
+      # SINGLE quotes: a hash contains "$16384", and inside double quotes the
+      # shell reads that as a variable rather than text.
+      ERP_USERS=''
+      SESSION_SECRET=''
       # SHARED ACCESS — one link and one password, no account needed, for
       # letting an owner or operator try the system on their own device.
       # THIS REACHES THE LIVE DATA: back up before a session, change the
       # password after one. Empty means shared access is off.
-      ERP_ACCESS_PASSWORD=""
+      ERP_ACCESS_PASSWORD=''
       # What the workspace's "~" resolves to.
       ERP_DEFAULT_TENANT="diorka"
       # Reachability for the pilot ingress (docker compose --profile pilot).

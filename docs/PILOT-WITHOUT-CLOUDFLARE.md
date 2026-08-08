@@ -61,11 +61,12 @@ expensive to attack offline.
 In `/opt/canei-erp/.env`:
 
 ```
-ERP_USERS="stefan@caneisubirats.com:scrypt$...,ignacio@caneisubirats.com:scrypt$..."
-SESSION_SECRET="<output of: head -c 48 /dev/urandom | base64>"
+ERP_USERS='stefan@caneisubirats.com:scrypt$...,ignacio@caneisubirats.com:scrypt$...'
+SESSION_SECRET='<output of: head -c 48 /dev/urandom | base64>'
+
 
 # The one you hand out with the link. No account, no email — just this.
-ERP_ACCESS_PASSWORD="Obras-2026-Barcelona"
+ERP_ACCESS_PASSWORD='Obras-2026-Barcelona'
 ERP_DEFAULT_TENANT="diorka"
 
 PUBLIC_HOSTNAME="178-105-10-156.sslip.io"
@@ -79,6 +80,10 @@ in the audit trail; a shared session is recorded as `invitado-XXXX`.
 
 Use your server's real address in `PUBLIC_HOSTNAME`, with the dots replaced by
 dashes.
+
+**Use single quotes, not double.** A hash contains `$16384`, and inside double
+quotes the shell reads that as a variable — which silently truncates the value
+and, in `ops/backup.sh`, used to stop the nightly backup outright.
 
 `SESSION_SECRET` is what signs session cookies. Changing it signs everybody out
 everywhere, immediately — which is how you cut off a lost phone.

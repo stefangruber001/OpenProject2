@@ -16,7 +16,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 [ -f .env ] || { echo "FATAL: no .env next to docker-compose.prod.yml" >&2; exit 1; }
-set -a; . ./.env; set +a
+# `set +u` around the source, deliberately. This file holds human-entered
+# values, and a password hash legitimately contains "$16384" — which the shell
+# reads as positional parameter $1 followed by "6384", and under `set -u` that
+# is an unbound variable and this script exits before taking a backup. The
+# nightly job would simply stop, with nothing in the log but a dead timer.
+# Quoting guidance alone does not survive the next person editing .env.
+set -a; set +u; . ./.env; set -u; set +a
 : "${POSTGRES_USER:?}" "${POSTGRES_DB:?}" "${R2_ACCOUNT_ID:?}" "${R2_BUCKET:?}"
 
 AGE_KEY_FILE="${AGE_KEY_FILE:-./age-key.txt}"

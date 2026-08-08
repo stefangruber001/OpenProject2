@@ -70,7 +70,10 @@ const key = await new Promise((resolve, reject) =>
 
 const entry = `${email}:scrypt$${N}$${R}$${P}$${salt.toString("base64")}$${key.toString("base64")}`;
 
-console.log("\nAdd this to ERP_USERS in the server's .env (comma-separated for several people):\n");
+console.log(
+  "\nAdd this to ERP_USERS in the server's .env, in SINGLE quotes " +
+    "(comma-separated for several people):\n",
+);
 console.log(entry);
 console.log(
   "\nThe hash is not a secret in the way the password is, but it is worth guessing\n" +

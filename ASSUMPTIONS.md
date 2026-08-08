@@ -941,3 +941,19 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   deployment reached only through the shared link — no named accounts — would have switched
   the lock off entirely and served every page to anyone who found the address. `ops/open-web.sh`
   had the same assumption and would have refused to publish that deployment at all.
+- **#74 — A password hash in `.env` would have killed the nightly backup (2026-08-07).** Found
+  while walking the operator through setup, not by reading. `ops/backup.sh` and
+  `ops/restore.sh` do `set -euo pipefail` and then `set -a; . ./.env; set +a`. A scrypt hash
+  legitimately contains `$16384`, and inside the double quotes the documentation told people
+  to use, the shell reads that as positional parameter `$1` followed by `6384` — which under
+  `set -u` is an unbound variable, so the script exits **before taking a backup**. The nightly
+  job would simply have stopped, leaving nothing behind but a timer that fires and a directory
+  that never grows. Reproduced both ways before fixing.
+  **Decision: fix the script, not only the guidance.** `set +u` now brackets the source in both
+  scripts, so no value anyone ever puts in `.env` can stop a backup. Guidance changed to single
+  quotes as well — in `.env.production.example`, `ops/cloud-init.yaml`, the runbook, and the
+  hash tool's own output — because the value is also silently truncated under double quotes
+  even where it does not abort. But quoting advice is a note in a file, and the next person to
+  edit `.env` will not have read it; the script had to stop being brittle.
+  Worth generalising: this whole class — a config file that is data to one reader and shell to
+  another — has now cost a silent failure twice (the `#` in a zsh paste, and this).
