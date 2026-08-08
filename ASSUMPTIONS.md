@@ -983,3 +983,20 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   different claims, and only the second one matters.** `open-web.sh` refusing to
   publish is the only reason this was caught before the ERP went on the internet
   with no login at all.
+- **#76 — The front door still showed the scaffold from day one (2026-08-07).** The operator
+  published the ERP, signed in, and landed on "A solid foundation, ready to build on" — a list
+  of engineering practices, version control and CI — then asked why the ERP was not there. It
+  was, and had been for months, at `/workspace/…`. Nothing anywhere pointed at it.
+  `apps/web/app/page.tsx` was still the Next.js starter page the repository was born with:
+  accurate on the first day, and by the time there was a real system it was actively telling
+  the operator their product did not exist.
+  **Decision: `/` redirects to `/workspace/index.html`**, the launchpad — a signpost rather
+  than a page, since the workspace is static HTML already served from `public/`.
+  Verified the actual click-path rather than the build output: anonymous `/` → `/login?next=/`,
+  sign in with the shared password, `/` → `/workspace/index.html`, launchpad returns 200 with
+  the title "Canei Subirats — Plataforma de gestión".
+  The lesson is not about a redirect. Every check ever run against this deployment asked
+  whether a _known_ address behaved correctly — health, tenant routes, the workspace, the login
+  redirect — and all of them passed while the one address a human actually types led nowhere
+  useful. **Nothing tested the path a person takes from the URL they were given to the thing
+  they came to use.** That path is now the first thing to check after any change to routing.

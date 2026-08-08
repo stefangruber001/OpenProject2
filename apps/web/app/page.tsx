@@ -1,76 +1,22 @@
-import Link from "next/link";
+/**
+ * The front door.
+ *
+ * This used to be the scaffold page the repository was born with — "A solid
+ * foundation, ready to build on", a list of engineering practices. Accurate on
+ * day one and badly wrong now: the ERP has existed for months at
+ * `/workspace/…`, and nothing anywhere pointed at it. Somebody signing in
+ * landed on a page about version control and reasonably concluded the system
+ * was not there.
+ *
+ * So `/` is not a page, it is a signpost. The workspace itself is static HTML
+ * served from `public/workspace`, which is why this is a redirect rather than a
+ * component: there is nothing to render here that is not already there.
+ */
+import { redirect } from "next/navigation";
 
-const pillars = [
-  "Version control & protected main with PR review",
-  "Documented architecture & decisions (ADRs)",
-  "Consistent monorepo structure & conventions",
-  "Automated quality gates (lint, types, tests) in CI",
-  "Testing setup (unit + end-to-end)",
-  "Type-safe data layer (Prisma + PostgreSQL)",
-  "Environment config & secrets kept out of code",
-  "Dependency & security automation",
-];
+/** The launchpad — "Canei Subirats — Plataforma de gestión". */
+const WORKSPACE = "/workspace/index.html";
 
 export default function Home() {
-  return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-12 px-6 py-16">
-      <header className="flex flex-col gap-3">
-        <span className="text-sm font-medium uppercase tracking-widest text-neutral-500">
-          OpenProject2
-        </span>
-        <h1 className="text-4xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-          A solid foundation, ready to build on.
-        </h1>
-        <p className="text-lg text-neutral-600 dark:text-neutral-400">
-          The engineering foundation is in place. The product isn&apos;t defined yet — when it is,
-          it gets built here, on top of the pillars below.
-        </p>
-      </header>
-
-      <section className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-          What&apos;s already in place
-        </h2>
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {pillars.map((pillar) => (
-            <li
-              key={pillar}
-              className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300"
-            >
-              <span aria-hidden className="mt-0.5 text-green-600">
-                ✓
-              </span>
-              {pillar}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-          Tenant workspaces
-        </h2>
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          <Link className="underline underline-offset-2" href="/reformas-demo">
-            reformas-demo
-          </Link>{" "}
-          ·{" "}
-          <Link className="underline underline-offset-2" href="/azulejos-lopez">
-            azulejos-lopez
-          </Link>
-        </p>
-      </section>
-
-      <footer className="mt-auto text-sm text-neutral-500">
-        Start with the{" "}
-        <a
-          className="underline underline-offset-2"
-          href="https://github.com/stefangruber001/OpenProject2/blob/main/docs/architecture.md"
-        >
-          architecture docs
-        </a>
-        . Health check at <code className="font-mono text-xs">/api/health</code>.
-      </footer>
-    </main>
-  );
+  redirect(WORKSPACE);
 }
