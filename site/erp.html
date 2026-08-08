@@ -1003,6 +1003,12 @@ const IMPORT_CONFLICT_ES={yaExiste:"ya existe en el sistema",rechazado:"datos no
 let seedBarHidden=false;
 function renderSeedBar(){
   const host=$('#seedbar'); if(!host) return;
+  // Never on the server. resetData() already refuses there, so the button was
+  // safe — but offering "load two years of demonstration data" on a company's
+  // live register and then refusing the click is the wrong way round. Do not
+  // advertise what will not be honoured; on a shared register the whole idea is
+  // out of place.
+  if(typeof ErpStore!=="undefined"&&ErpStore.isRemote()){ host.innerHTML=""; return; }
   const shipped=(typeof ErpSeed!=="undefined"&&ErpSeed.SEED_VERSION)||0;
   const have=(erp&&erp.state&&erp.state.seedVersion)||0;
   if(seedBarHidden||!shipped||have>=shipped){ host.innerHTML=""; return; }

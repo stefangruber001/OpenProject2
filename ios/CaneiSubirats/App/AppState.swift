@@ -11,6 +11,7 @@ final class AppState: ObservableObject {
     @Published var showSplash = true
 
     private(set) var stores: [String: WebViewStore] = [:]
+    private var signedInObserver: NSObjectProtocol?
 
     init() {
         self.selection = Config.tabs.first?.id ?? "home"
@@ -19,6 +20,31 @@ final class AppState: ObservableObject {
                 self?.shareURL = url
             }
         }
+
+        // Sign in once, not once per tab. Every tab shares the cookie store, so
+        // the session was never per-tab — but a tab that loaded BEFORE sign-in
+        // keeps showing its own login page until something reloads it, and
+        // nothing did. Whichever tab completes the sign-in says so, and the rest
+        // refresh themselves. Each ignores this unless it is itself sitting on
+        // the login page, so a tab holding real work is never disturbed.
+        signedInObserver = NotificationCenter.default.addObserver(
+            forName: .caneiSignedIn, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.stores.values.forEach { $0.reloadIfShowingLogin() }
+            }
+        }
+    }
+
+    deinit {
+        if let o = signedInObserver { NotificationCenter.default.removeObserver(o) }
+    }
+
+    /// Called when a tab is chosen. Covers the case the broadcast cannot: a
+    /// session that expired while the app was in the background, where the tab
+    /// being opened is stale but no sign-in has happened to announce.
+    func didSelect(_ id: String) {
+        store(for: id).reloadIfShowingLogin()
     }
 
     func store(for id: String) -> WebViewStore {

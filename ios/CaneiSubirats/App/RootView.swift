@@ -33,6 +33,11 @@ struct RootView: View {
                 }
             }
             .ignoresSafeArea(.keyboard, edges: .bottom)
+            // Every tab is loaded up front for instant switching (see above),
+            // which means they all load BEFORE anyone has signed in. Opening one
+            // that is still showing the login page refreshes it; a tab holding
+            // real work is left alone.
+            .onChange(of: app.selection) { _, id in app.didSelect(id) }
 
             if app.showSplash {
                 SplashView()

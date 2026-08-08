@@ -17,8 +17,28 @@
  * as in route handlers, and middleware does not always get the Node runtime.
  */
 
-/** Eight hours: a working day, so nobody is asked to sign in mid-job. */
-export const SESSION_TTL_SECONDS = 8 * 60 * 60;
+/**
+ * How long a session lasts, by how it was obtained.
+ *
+ * A named account gets thirty days, and the cookie is re-issued whenever it is
+ * more than halfway through (see the middleware), so somebody who uses the
+ * system regularly is never asked again. Eight hours sounded prudent and was
+ * not: it meant signing in most mornings, on a phone, on a building site, which
+ * is how people end up choosing a password short enough to type one-handed.
+ * Length here buys a stronger password there.
+ *
+ * The shared link-and-password is deliberately much shorter. That credential is
+ * handed to people outside the company to look at a real register; it should
+ * stop working on its own, and a prospect being asked again the next day is the
+ * point rather than a cost.
+ */
+export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+export const SHARED_TTL_SECONDS = 12 * 60 * 60;
+
+/** The lifetime for a session of this kind. */
+export function ttlFor(role: SessionRole): number {
+  return role === "shared" ? SHARED_TTL_SECONDS : SESSION_TTL_SECONDS;
+}
 
 export const SESSION_COOKIE = "canei_session";
 
@@ -44,6 +64,8 @@ interface Payload {
 export interface SessionClaims {
   sub: string;
   role: SessionRole;
+  /** Unix seconds. Exposed so a caller can renew a session before it lapses. */
+  exp: number;
 }
 
 const enc = new TextEncoder();
@@ -83,7 +105,7 @@ export async function signSession(
   nowSeconds: number,
   role: SessionRole = "staff",
 ): Promise<string> {
-  const payload: Payload = { sub: email, exp: nowSeconds + SESSION_TTL_SECONDS, role };
+  const payload: Payload = { sub: email, exp: nowSeconds + ttlFor(role), role };
   const body = b64url(enc.encode(JSON.stringify(payload)));
   const sig = await crypto.subtle.sign("HMAC", await key(secret), enc.encode(body));
   return `${body}.${b64url(new Uint8Array(sig))}`;
@@ -129,7 +151,7 @@ export async function readSession(
   // value nobody wrote is how a typo becomes an authorisation decision.
   const role = payload.role === undefined ? "staff" : payload.role;
   if (role !== "staff" && role !== "shared") return null;
-  return { sub: payload.sub, role };
+  return { sub: payload.sub, role, exp: payload.exp };
 }
 
 /**
@@ -140,14 +162,17 @@ export async function readSession(
  * — a Secure cookie is silently dropped over http://localhost:3000 and the
  * resulting "login does nothing" is unpleasant to diagnose.
  */
-export function sessionCookie(token: string, secure: boolean): string {
+export function sessionCookie(token: string, secure: boolean, role: SessionRole = "staff"): string {
   return [
     `${SESSION_COOKIE}=${token}`,
     "Path=/",
     "HttpOnly",
     "SameSite=Lax",
     secure ? "Secure" : "",
-    `Max-Age=${SESSION_TTL_SECONDS}`,
+    // Must match the token's own expiry. If the cookie outlives the token the
+    // browser keeps sending something the server already rejects, and the user
+    // sees the login page with no explanation of why they were signed out.
+    `Max-Age=${ttlFor(role)}`,
   ]
     .filter(Boolean)
     .join("; ");

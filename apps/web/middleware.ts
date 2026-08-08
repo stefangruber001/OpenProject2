@@ -18,7 +18,13 @@
  * identity, in every mode.
  */
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE, readSession } from "@/lib/session-token";
+import {
+  SESSION_COOKIE,
+  readSession,
+  sessionCookie,
+  signSession,
+  ttlFor,
+} from "@/lib/session-token";
 
 // Node rather than Edge: this reads process.env, and the rest of the app is
 // Node anyway. Web Crypto is available in both, so the token check itself would
@@ -63,15 +69,29 @@ export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
   if (isPublic(pathname)) return NextResponse.next();
 
-  const claims = await readSession(
-    req.cookies.get(SESSION_COOKIE)?.value,
-    secret,
-    Math.floor(Date.now() / 1000),
-  );
+  const now = Math.floor(Date.now() / 1000);
+  const claims = await readSession(req.cookies.get(SESSION_COOKIE)?.value, secret, now);
   // Signed in, by either route. Both reach the same live data — the difference
   // between a named account and the shared password is recorded in the audit
   // trail, not enforced here.
-  if (claims) return NextResponse.next();
+  if (claims) {
+    const res = NextResponse.next();
+    // Sliding renewal: past the halfway mark, mint a fresh token. Someone who
+    // keeps using the system is therefore never signed out, while somebody who
+    // stops still expires on schedule. Without this a fixed expiry logs people
+    // out mid-job on a fixed date no matter how active they are — and being
+    // logged out while standing on a building site is what makes people pick a
+    // password they can type one-handed.
+    const remaining = claims.exp - now;
+    if (remaining > 0 && remaining < ttlFor(claims.role) / 2) {
+      const fresh = await signSession(claims.sub, secret, now, claims.role);
+      res.headers.append(
+        "Set-Cookie",
+        sessionCookie(fresh, req.nextUrl.protocol === "https:", claims.role),
+      );
+    }
+    return res;
+  }
 
   // An API caller gets a status code it can act on. Redirecting one to an HTML
   // login page produces the classic "unexpected token < in JSON" instead of

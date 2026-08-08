@@ -1234,3 +1234,37 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   there is nothing to protect here; making it public is what makes it get used.
   The lesson generalises past this script: **an unauthenticated probe of an authenticated
   surface measures the lock, not the thing behind it.**
+- **#86 — Sign in once, on a screen that looks like the company (2026-08-08).** Four related
+  complaints, one root each.
+  **The login was teal (#1F4E5F) while every other screen is Canei green.** On a phone the login
+  is the whole screen and arrives before anything else, so the one moment the brand has full
+  attention was the one place it was absent. Now the green/deep-green/spark palette from
+  `site/*.html`, the serif wordmark, and the house mark from `/brand/` — which is already on the
+  middleware's public list, so it loads before there is a session.
+  **Face ID.** There is no web API for it and nothing here calls one. What makes iOS offer it is
+  recognising a login form and unlocking the saved password: a real `<form>` that POSTs, one
+  field `autocomplete="username"`, one `autocomplete="current-password"`, and stable `id`/`name`
+  pairs so the saved entry keeps matching. Those attributes are load-bearing — drop one and the
+  QuickType bar silently stops offering, which reads as "Face ID broke". Passkeys would be the
+  real thing and are a separate piece of work.
+  **Eight hours was the wrong number.** It meant signing in most mornings, on a phone, on a site
+  — which is how people end up choosing a password short enough to type one-handed. Named
+  accounts now last 30 days AND the middleware re-issues the cookie past the halfway mark, so an
+  active person is never asked again while somebody who stops still expires. The shared
+  link-and-password stays at 12 hours on purpose: it is handed to people outside the company to
+  look at a real register, and it should lapse on its own.
+  **"Each tab needs its own login" was never about sessions.** All tabs share one cookie store.
+  What is per-tab is the STALE PAGE: the app loads every tab up front for instant switching — so
+  all seven load BEFORE anyone signs in — and `loadInitial()` will not reload a view that already
+  has a URL. Six tabs sat on their own login page forever. Whichever tab completes a sign-in now
+  posts `.caneiSignedIn`, and each other tab reloads ONLY if it is itself on the login page, so a
+  tab holding real work is never disturbed. Selecting a tab re-checks too, which covers the case
+  the broadcast cannot: a session that lapsed while the app was backgrounded.
+  **Found while verifying, not reported:** the Control Tower still offered "Hay datos de
+  demostración más recientes — Recargar" on the live server. `resetData()` already refused it, so
+  it was safe, but offering to load two years of fiction over a company's register and then
+  refusing the click is the wrong way round. The banner is now hidden when the data is remote.
+  **A test had quietly stopped testing its subject.** "refuses an expired cookie" signed a token
+  100000 seconds old — comfortably past eight hours, comfortably inside thirty days. Lengthening
+  the session turned it into an assertion that a valid token is valid, and it went on passing.
+  Now derived from the real TTL. A test that stops testing without failing is the worst kind.

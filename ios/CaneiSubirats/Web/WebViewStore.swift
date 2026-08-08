@@ -10,6 +10,12 @@ import Network
 /// in-page state and IndexedDB all survive tab switches, exactly like a
 /// best-in-class native app.
 @MainActor
+extension Notification.Name {
+    /// Posted by whichever tab completed a sign-in, so the rest stop showing
+    /// their own stale copy of the login page.
+    static let caneiSignedIn = Notification.Name("caneiSignedIn")
+}
+
 final class WebViewStore: NSObject, ObservableObject {
 
     // Published UI state
@@ -274,6 +280,39 @@ extension WebViewStore: WKNavigationDelegate {
             didFinishFirstLoad = true
             Haptics.soft()
         }
+
+        // ONE SIGN-IN FOR THE WHOLE APP.
+        //
+        // Each tab owns a long-lived web view so its page keeps state, and they
+        // all share one cookie store — so the session was never actually
+        // per-tab. What was per-tab was the STALE PAGE: every tab loads once,
+        // and the ones that loaded before sign-in were left displaying their
+        // own copy of the login screen forever, because `loadInitial()` will not
+        // reload a view that already has a URL. The operator read that,
+        // reasonably, as being asked to sign in seven times.
+        //
+        // So the moment any tab leaves the login page, the others are told. Each
+        // reloads only if it is itself sitting on the login page, which makes
+        // this cheap and idempotent: it cannot disturb a tab holding real work.
+        let wasLogin = showingLogin
+        showingLogin = Self.isLoginURL(webView.url)
+        if wasLogin && !showingLogin {
+            NotificationCenter.default.post(name: .caneiSignedIn, object: nil)
+        }
+    }
+
+    /// True while this tab is displaying the sign-in page.
+    private(set) var showingLogin = false
+
+    static func isLoginURL(_ url: URL?) -> Bool {
+        guard let path = url?.path else { return false }
+        return path == "/login" || path.hasSuffix("/login")
+    }
+
+    /// Reload only if this tab is stuck on the sign-in page.
+    func reloadIfShowingLogin() {
+        guard showingLogin || webView.url == nil else { return }
+        reload()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

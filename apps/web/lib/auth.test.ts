@@ -18,6 +18,7 @@ import {
 } from "./auth";
 import {
   SESSION_TTL_SECONDS,
+  SHARED_TTL_SECONDS,
   clearedCookie,
   readSession,
   sessionCookie,
@@ -154,6 +155,7 @@ describe("session tokens", () => {
     await expect(readSession(t, SECRET, NOW + 60)).resolves.toEqual({
       sub: "invitado-4f2a",
       role: "shared",
+      exp: NOW + SHARED_TTL_SECONDS,
     });
   });
 
@@ -162,6 +164,7 @@ describe("session tokens", () => {
     await expect(readSession(t, SECRET, NOW + 60)).resolves.toEqual({
       sub: "ana@example.com",
       role: "staff",
+      exp: NOW + SESSION_TTL_SECONDS,
     });
   });
 
@@ -207,6 +210,34 @@ describe("session tokens", () => {
 
   it("expires the cookie on sign-out", () => {
     expect(clearedCookie(true)).toContain("Max-Age=0");
+  });
+
+  it("keeps the cookie's lifetime equal to the token's, for each kind", () => {
+    // If the cookie outlives the token, the browser keeps sending something the
+    // server already refuses and the operator is bounced to the login page with
+    // no explanation. If it dies first, they are signed out early. Same number,
+    // both times, derived rather than typed twice.
+    expect(sessionCookie("tok", true, "staff")).toContain(`Max-Age=${SESSION_TTL_SECONDS}`);
+    expect(sessionCookie("tok", true, "shared")).toContain(`Max-Age=${SHARED_TTL_SECONDS}`);
+  });
+
+  it("gives the shared link a much shorter life than a named account", () => {
+    // The shared password is handed to people outside the company to look at a
+    // real register. It should lapse on its own; a named operator should not be
+    // asked again while they are still using the system.
+    expect(SHARED_TTL_SECONDS).toBeLessThan(SESSION_TTL_SECONDS);
+    expect(SESSION_TTL_SECONDS).toBeGreaterThanOrEqual(7 * 24 * 60 * 60);
+  });
+
+  it("stamps each kind of session with its own expiry", async () => {
+    const staff = await readSession(await signSession("ana@x.com", SECRET, NOW), SECRET, NOW + 1);
+    const guest = await readSession(
+      await signSession("invitado-1", SECRET, NOW, "shared"),
+      SECRET,
+      NOW + 1,
+    );
+    expect(staff?.exp).toBe(NOW + SESSION_TTL_SECONDS);
+    expect(guest?.exp).toBe(NOW + SHARED_TTL_SECONDS);
   });
 });
 

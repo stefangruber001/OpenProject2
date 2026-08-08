@@ -144,10 +144,16 @@ describe("requireUser", () => {
     });
 
     it("refuses an expired cookie", async () => {
+      // Derived from the real lifetime, not a fixed 100000 seconds. That number
+      // was comfortably past the old eight-hour expiry and comfortably INSIDE
+      // the thirty-day one, so when the session was lengthened this test went on
+      // passing a live token and asserting nothing. A test that stops testing
+      // its subject without failing is the worst kind.
+      const { SESSION_TTL_SECONDS } = await import("./session-token");
       const t = await signSession(
         "ana@example.com",
         SECRET,
-        Math.floor(Date.now() / 1000) - 100000,
+        Math.floor(Date.now() / 1000) - SESSION_TTL_SECONDS - 60,
       );
       await expectRejected(await withSession(t));
     });

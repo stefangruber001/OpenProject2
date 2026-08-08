@@ -91,7 +91,7 @@ export async function POST(req: Request): Promise<Response> {
       Math.floor(Date.now() / 1000),
       "shared",
     );
-    return redirect(next, [["Set-Cookie", sessionCookie(token, isSecureRequest(req))]]);
+    return redirect(next, [["Set-Cookie", sessionCookie(token, isSecureRequest(req), "shared")]]);
   }
 
   const who = await authenticate(email, password);
@@ -107,5 +107,5 @@ export async function POST(req: Request): Promise<Response> {
     Math.floor(Date.now() / 1000),
     "staff",
   );
-  return redirect(next, [["Set-Cookie", sessionCookie(token, isSecureRequest(req))]]);
+  return redirect(next, [["Set-Cookie", sessionCookie(token, isSecureRequest(req), "staff")]]);
 }
