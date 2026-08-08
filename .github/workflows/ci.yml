@@ -134,6 +134,13 @@ jobs:
           node tests/simulation/migrations-sim.mjs
           node tests/simulation/import-sim.mjs
 
+      # Drives the COMMITTED site/erp-factory bundle, not the TypeScript source:
+      # the scheduling capability reaches the browser only through that artifact,
+      # so a bundle that was not rebuilt after a source change fails here rather
+      # than in front of an operator looking at a Gantt chart.
+      - name: Scheduling capability simulation (committed bundle)
+        run: node tests/simulation/scheduling-sim.mjs
+
       - name: Ownership file guard (strangler-fig migration state)
         run: node tests/parity/ownership-guard.mjs
 
