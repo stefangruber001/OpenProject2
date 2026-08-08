@@ -1044,3 +1044,25 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   compose file, and now this. **A file being correct on the machine that made it says nothing
   about whether it reaches the machine that serves it.** Worth checking `git status` after
   generating any artifact that something else is expected to fetch.
+- **#79 — The preview image URL pointed at the server's own localhost (2026-08-07).** Second
+  round on the same symptom, and a different cause each time. The title and description
+  rendered correctly in WhatsApp and no thumbnail appeared. Title and description are string
+  literals, so they shipped; the image URL was _computed_ from `PUBLIC_HOSTNAME`, which I had
+  added to the `app` service in compose — and the server was still running the compose file
+  from before that change, because the operator ran `canei-deploy` (which pulls an image) and
+  not `sync-server.sh` (which updates the stack definition). So the variable was absent, the
+  fallback used `NEXT_PUBLIC_APP_URL` — set to `https://localhost:3000` on that machine — and
+  every crawler was politely told to fetch the image from its own computer.
+  **Decision: derive `metadataBase` from the request instead of from configuration.**
+  `x-forwarded-host` / `x-forwarded-proto`, falling back to `host`. The host that just served
+  the page is the one host guaranteed to be reachable by whoever fetched it; it needs no
+  configuration, cannot drift out of step with the deployment, and survives the eventual move
+  to the company's domain with no change at all.
+  Verified in the failing configuration deliberately — `PUBLIC_HOSTNAME` unset, `APP_URL`
+  localhost — that a request carrying Caddy's forwarding headers still produces
+  `https://178-105-10-156.sslip.io/brand/og.png`, and that a different host produces that host.
+  Two lessons, both about the same thing. **A value that must match the deployment should be
+  read from the deployment, not configured alongside it** — configuration is a second copy of
+  the truth and this one was stale within the hour. And: a partially-working preview is a
+  strong signal. Literals worked, computed values did not, and that split named the bug before
+  I looked at anything.

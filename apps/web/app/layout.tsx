@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -27,27 +28,44 @@ const geistMono = localFont({
  *      `/brand/` is on the public list in `middleware.ts` for exactly this
  *      reason, and for no other.
  *
- * `metadataBase` is computed per request rather than fixed at build time,
- * because the address changes: an sslip.io name today, the company's own domain
- * when it transfers. A hardcoded one would produce a preview pointing at an
- * image on a host that no longer serves it.
+ * `metadataBase` comes from the REQUEST, not from configuration. The image URL
+ * in a preview has to be absolute, and the first version of this built it from
+ * an environment variable — which was not passed to the application container,
+ * so it fell back to `https://localhost:3000/brand/og.png`. The tags all looked
+ * present, the title and description rendered correctly, and no thumbnail ever
+ * appeared, because the only reader that matters was being told to fetch the
+ * image from its own machine.
+ *
+ * The host that served the page is the one host guaranteed to be reachable by
+ * whoever just fetched it. It also needs no configuration, survives the move
+ * from an sslip.io name to the company's own domain, and cannot drift out of
+ * step with reality — which an environment variable did, immediately.
  */
-function siteUrl(): URL {
-  const host = process.env.PUBLIC_HOSTNAME?.trim();
-  if (host) return new URL(`https://${host}`);
-  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  // Last resort. Relative image paths still work in most crawlers, so an
-  // imperfect base is better than throwing during metadata generation.
-  return new URL(configured || "http://localhost:3000");
+async function siteUrl(): Promise<URL> {
+  const h = await headers();
+  // x-forwarded-* first: TLS is terminated by Caddy, so the application itself
+  // only ever sees plain HTTP against an internal name.
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+  if (host) {
+    try {
+      return new URL(`${proto}://${host}`);
+    } catch {
+      // A malformed Host header is not worth failing metadata generation over.
+    }
+  }
+  const configured = process.env.PUBLIC_HOSTNAME?.trim();
+  if (configured) return new URL(`https://${configured}`);
+  return new URL(process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000");
 }
 
-export function generateMetadata(): Metadata {
+export async function generateMetadata(): Promise<Metadata> {
   const title = "Canei Subirats — ERP System";
   const description =
     "Presupuestos, obras, facturación y tesorería en un solo sitio. " +
     "Acceso privado para el equipo de Canei Subirats.";
   return {
-    metadataBase: siteUrl(),
+    metadataBase: await siteUrl(),
     title,
     description,
     applicationName: "Canei Subirats ERP",
