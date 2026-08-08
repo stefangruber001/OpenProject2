@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Vertical pack construction/reformas: mediciones math, trade terminology, quote conventions. Country-agnostic.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./rates": "./src/rates.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
