@@ -20,15 +20,20 @@
  */
 import { loadErp, runCommand } from "@/lib/erp-runtime";
 import { requireUser } from "@/lib/session";
+import { tenantFor } from "@/lib/access";
 import { guarded, json } from "@/lib/api";
 import { FactoryError } from "@repo/kernel";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request, ctx: { params: Promise<{ tenant: string }> }) {
-  const { tenant } = await ctx.params;
+  const { tenant: param } = await ctx.params;
   return guarded(async () => {
     const user = await requireUser(req);
+    // Resolved from the session, never taken from the URL: this is the write
+    // path, so a guest reaching the real company here would be editing a real
+    // invoice register.
+    const tenant = await tenantFor(req, param);
 
     let body: unknown;
     try {

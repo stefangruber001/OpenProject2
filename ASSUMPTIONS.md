@@ -916,3 +916,28 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   because every document already refers to it by that name. The pilot variables were also
   added to the `.env` that `ops/cloud-init.yaml` writes, so a newly provisioned server has
   them present and empty instead of absent.
+- **#73 — Shared access reaches the live data, on the operator's instruction (2026-08-07).** The
+  ask was a link and a password that anyone can use, so owners and operators of a company
+  evaluating the ERP can try it on their own laptop, tablet or phone. I began building the
+  cautious version — a `guest` role confined to a separate demonstration tenant — and the
+  operator stopped me: **"No demo data anymore to be added, from now on it should be live."**
+  **Decision: implement exactly that.** `ERP_ACCESS_PASSWORD` opens a session with the same
+  reach as a named account, on the live company. The confinement code was removed rather than
+  left switched off, because dead authorisation paths are read later as protection that
+  exists.
+  The concern was stated once and is recorded here rather than argued twice: anybody holding
+  the link and the password can change or delete real records, and will see real customer
+  names, addresses and figures — third parties' personal data, disclosed to a prospect. That
+  is the operator's company and the operator's call. What the code does instead of preventing
+  it is make it recoverable and attributable: backups already run nightly and `backup-now`
+  takes one on demand, changing `ERP_ACCESS_PASSWORD` closes the door, changing
+  `SESSION_SECRET` ends sessions already open, and every change a shared session makes is
+  stamped `invitado-XXXX` in the audit trail so it can be told from a colleague's work
+  afterwards.
+  Two things kept from the confined design because they are right regardless: the session
+  carries a role (named vs shared), and the workspace asks the server for the `~` tenant
+  rather than naming a company in a file served to everybody.
+  Bug caught on the way: the middleware treated "has a login" as `ERP_USERS` alone, so a
+  deployment reached only through the shared link — no named accounts — would have switched
+  the lock off entirely and served every page to anyone who found the address. `ops/open-web.sh`
+  had the same assumption and would have refused to publish that deployment at all.

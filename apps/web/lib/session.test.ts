@@ -172,6 +172,22 @@ describe("requireUser", () => {
       await expectRejected(await withSession(), "CONFIG_INVALID");
     });
 
+    it("names a shared session distinctly, so the audit trail shows how they got in", async () => {
+      const t = await signSession("invitado-4f2a", SECRET, Math.floor(Date.now() / 1000), "shared");
+      await expect(requireUser(await withSession(t))).resolves.toBe("invitado-4f2a");
+    });
+
+    it("refuses a token claiming a role nobody issues", async () => {
+      // Roles are an authorisation input. A value nobody wrote must not be
+      // guessed at — least of all promoted to the privileged one.
+      const now = Math.floor(Date.now() / 1000);
+      const body = Buffer.from(
+        JSON.stringify({ sub: "x@example.com", exp: now + 3600, role: "admin" }),
+      ).toString("base64url");
+      const real = await signSession("x@example.com", SECRET, now, "staff");
+      await expectRejected(await withSession(`${body}.${real.split(".")[1]}`));
+    });
+
     it("yields to the identity provider when both are configured", async () => {
       // One deployment, one source of truth. If a provider sits in front, its
       // signed assertion decides — a cookie this app minted must not be an

@@ -6,8 +6,10 @@
  * needed, which keeps the login page working in the phone app's web view even
  * if something else on the page fails to load.
  */
-import { authenticate, loginConfigured } from "@/lib/auth";
+import { authenticate, isSharedPassword, loginConfigured } from "@/lib/auth";
+import { sharedAccessEnabled } from "@/lib/access";
 import { sessionCookie, signSession } from "@/lib/session-token";
+import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +76,24 @@ export async function POST(req: Request): Promise<Response> {
   const password = String(form.get("password") ?? "");
   const next = safeNext(String(form.get("next") ?? "/"));
 
+  // The shared password, with no address at all — that is the whole point: a
+  // link and a password, nothing to set up per person. Reachable only when no
+  // address was typed, so somebody with a named account never falls into a
+  // shared session by mistyping their own password.
+  if (!email.trim() && sharedAccessEnabled() && isSharedPassword(password)) {
+    // A short random label per session. Several people use one password, and an
+    // audit trail reading "invitado" twelve times cannot be followed;
+    // "invitado-4f2a" at least tells one tester's changes from another's.
+    const label = `invitado-${randomUUID().slice(0, 4)}`;
+    const token = await signSession(
+      label,
+      process.env.SESSION_SECRET!.trim(),
+      Math.floor(Date.now() / 1000),
+      "shared",
+    );
+    return redirect(next, [["Set-Cookie", sessionCookie(token, isSecureRequest(req))]]);
+  }
+
   const who = await authenticate(email, password);
   if (!who) {
     // One message for both "no such account" and "wrong password". Which one it
@@ -85,6 +105,7 @@ export async function POST(req: Request): Promise<Response> {
     who,
     process.env.SESSION_SECRET!.trim(),
     Math.floor(Date.now() / 1000),
+    "staff",
   );
   return redirect(next, [["Set-Cookie", sessionCookie(token, isSecureRequest(req))]]);
 }

@@ -10,6 +10,7 @@
  * the stylesheet is unreachable.
  */
 import { loginConfigured } from "@/lib/auth";
+import { sharedAccessEnabled } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function LoginPage({
   const nextRaw = typeof params.next === "string" ? params.next : "/";
   // Same rule as the route handler: only ever a path on this site.
   const next = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/";
+  const shared = sharedAccessEnabled();
 
   if (!loginConfigured()) {
     return (
@@ -89,16 +91,27 @@ export default async function LoginPage({
         <input type="hidden" name="next" value={next} />
 
         <label style={{ display: "block", fontSize: 13, color: "#344", marginBottom: 6 }}>
-          Correo electrónico
+          Correo electrónico{" "}
+          {shared && (
+            // The shared password needs no address. Saying so here is what makes
+            // a link plus a password enough — otherwise the first thing somebody
+            // evaluating the system does is invent an email address, and the
+            // sign-in fails for a reason the screen never explains.
+            <span style={{ color: "#8a979d", fontWeight: 400 }}>
+              — déjelo vacío si tiene solo la contraseña
+            </span>
+          )}
         </label>
         <input
           name="email"
           type="email"
           autoComplete="username"
+          // `required` only when there is no shared password to fall back on;
+          // with one, an empty address is the normal way in.
+          {...(shared ? {} : { required: true })}
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
-          required
           autoFocus
           style={{
             width: "100%",

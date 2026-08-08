@@ -14,6 +14,7 @@
  */
 import { loadErp } from "@/lib/erp-runtime";
 import { requireUser } from "@/lib/session";
+import { tenantFor } from "@/lib/access";
 import { guarded, json } from "@/lib/api";
 import { ERP, Migrations } from "@/lib/erp-engine";
 import { listTenants } from "@/lib/tenant-runtime";
@@ -47,9 +48,12 @@ function asState(body: unknown): ErpState {
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ tenant: string }> }) {
-  const { tenant } = await ctx.params;
+  const { tenant: param } = await ctx.params;
   return guarded(async () => {
     const user = await requireUser(req);
+    // Import REPLACES a company's entire document. A guest must never reach a
+    // tenant other than the demonstration one through this route.
+    const tenant = await tenantFor(req, param);
     if (!listTenants().includes(tenant)) {
       throw new FactoryError("NOT_FOUND", `No tenant "${tenant}".`);
     }

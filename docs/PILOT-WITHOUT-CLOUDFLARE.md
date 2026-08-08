@@ -1,8 +1,12 @@
 # The pilot: two people, one server, no Cloudflare and no domain
 
-The goal is narrow and worth stating plainly: **you and one colleague open the
-ERP on your own devices, and you are both looking at the same data.** No VPN, no
-laptop, no domain transfer, no third-party account.
+The goal is narrow and worth stating plainly: **anyone you give the link and the
+password to can open the live ERP on their own laptop, tablet or phone.** Your
+own team, and the owners and operators of a company evaluating the system. No
+VPN, no domain transfer, no third-party account, no account to create per person.
+
+There is no separate demonstration dataset. What people see is the live system,
+which is the point — and also the thing to be careful about, see "Honest risks".
 
 Everything below is already built. What remains is running it.
 
@@ -59,9 +63,19 @@ In `/opt/canei-erp/.env`:
 ```
 ERP_USERS="stefan@caneisubirats.com:scrypt$...,ignacio@caneisubirats.com:scrypt$..."
 SESSION_SECRET="<output of: head -c 48 /dev/urandom | base64>"
+
+# The one you hand out with the link. No account, no email — just this.
+ERP_ACCESS_PASSWORD="Obras-2026-Barcelona"
+ERP_DEFAULT_TENANT="diorka"
+
 PUBLIC_HOSTNAME="178-105-10-156.sslip.io"
 ACME_EMAIL="you@example.com"
 ```
+
+`ERP_ACCESS_PASSWORD` is what makes "here is a link and a password" work. Whoever
+has it signs in by leaving the email box **empty** and typing only the password.
+Named accounts in `ERP_USERS` are for your own team, and are what put a real name
+in the audit trail; a shared session is recorded as `invitado-XXXX`.
 
 Use your server's real address in `PUBLIC_HOSTNAME`, with the dots replaced by
 dashes.
@@ -103,6 +117,16 @@ https://178-105-10-156.sslip.io
 ```
 
 Mobile data rather than the office wifi, so you are testing the real path in.
+Try both ways in: your own address and password, and then the shared password
+with the email box left empty — that second one is what you will be sending to
+people, so it is the one worth proving works.
+
+### What to send somebody
+
+> Aquí tiene el acceso al sistema:
+> **https://178-105-10-156.sslip.io**
+> Contraseña: **Obras-2026-Barcelona**
+> Deje el campo de correo vacío. Funciona en portátil, tablet y móvil.
 
 ### 6. Point the apps at it
 
@@ -152,16 +176,34 @@ it, so a task had no author anywhere. Fixed, with tests.
   is shared, but the calendar UI still lives in `journey.html` writing to browser
   storage. See `docs/WHY-THE-CALENDAR-IS-NOT-SHARED.md`.
 - **A tested restore.** The drill has still never run against real data.
-- **Password reset, lockout, or two-factor.** For two people who can edit
-  `.env`, resetting a password is editing `.env`. This is a pilot arrangement and
-  should not survive the third person joining.
+- **Password reset, lockout, or two-factor.** Resetting a password means editing
+  `.env`. Fine while the people who can do that are the people who own the
+  company; wrong once the team is bigger.
+- **Any restriction on what a shared session may do.** Somebody with the link and
+  the password can do everything a named account can, including deleting
+  records. Read-only access does not exist yet.
 
 ## Honest risks
 
+**A shared password reaches the live books.** This is the deliberate design —
+what is being shown is the real system, not a sample of it — and it means anybody
+you send the link to can change or delete real records, and will see real
+customer names and figures. Two habits make that manageable:
+
+- **Before a session:** take a backup. GitHub → Actions → Ops → `backup-now`.
+- **After a session:** change `ERP_ACCESS_PASSWORD` and restart. Old sessions
+  stay valid for up to eight hours; changing `SESSION_SECRET` as well ends them
+  immediately.
+
+Consider also who is in the data. Real customer names, addresses and invoice
+figures are personal data belonging to third parties, and showing them to a
+prospect is a disclosure — a point worth taking a view on before the first
+session rather than after it.
+
 **The application is on the internet.** It is behind a login with hashed
 passwords, HTTPS, HttpOnly cookies and a default-deny rule, but there is no
-rate limiting on the login form yet, so a long password matters. Use the
-password manager.
+rate limiting on the login form yet, so a long password matters — and a shared
+one gets typed in front of people and written down. Use a long phrase.
 
 **sslip.io is a third-party DNS service.** If it stops resolving, the address
 stops working until it returns or `PUBLIC_HOSTNAME` points elsewhere. No data is

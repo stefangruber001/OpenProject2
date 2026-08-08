@@ -63,6 +63,13 @@ write_files:
       # file, and base64 output can contain characters the shell would act on.
       ERP_USERS=""
       SESSION_SECRET=""
+      # SHARED ACCESS — one link and one password, no account needed, for
+      # letting an owner or operator try the system on their own device.
+      # THIS REACHES THE LIVE DATA: back up before a session, change the
+      # password after one. Empty means shared access is off.
+      ERP_ACCESS_PASSWORD=""
+      # What the workspace's "~" resolves to.
+      ERP_DEFAULT_TENANT="diorka"
       # Reachability for the pilot ingress (docker compose --profile pilot).
       # PUBLIC_HOSTNAME is this server's IPv4 with dashes plus .sslip.io, e.g.
       # 203-0-113-7.sslip.io — see docs/PILOT-WITHOUT-CLOUDFLARE.md.

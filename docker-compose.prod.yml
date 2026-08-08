@@ -112,6 +112,12 @@ services:
       # Same both-or-neither rule as above.
       ERP_USERS: ${ERP_USERS:-}
       SESSION_SECRET: ${SESSION_SECRET:-}
+      # SHARED ACCESS — one link and one password, no account needed, so somebody
+      # evaluating the system can sign in on their own device. It reaches the
+      # LIVE data: back up before a session, change the password after one.
+      ERP_ACCESS_PASSWORD: ${ERP_ACCESS_PASSWORD:-}
+      # What the workspace's "~" resolves to.
+      ERP_DEFAULT_TENANT: ${ERP_DEFAULT_TENANT:-}
     # Loopback only. See the note at the top of this file before touching it.
     ports:
       - "127.0.0.1:3000:3000"
@@ -123,18 +129,6 @@ services:
       db-role:
         condition: service_completed_successfully
 
-  # Ingress, when Cloudflare is in use. Dials out and forwards to app:3000; no
-  # inbound firewall rule exists for it, by design.
-  #
-  # It sits behind a PROFILE, so the default `up -d` starts a completely private
-  # stack with no way in from the internet at all:
-  #
-  #   docker compose -f docker-compose.prod.yml up -d                      → private
-  #   docker compose -f docker-compose.prod.yml --profile cloudflare up -d → published
-  #
-  # Private mode is the correct default while Cloudflare is undecided: the app
-  # has NO authentication of its own, so anything that publishes it also
-  # publishes the customer's data.
   # Ingress for the PILOT: real HTTPS on a name nobody had to buy.
   #
   #   docker compose -f docker-compose.prod.yml --profile pilot up -d
@@ -142,10 +136,10 @@ services:
   # See ops/Caddyfile for how a certificate is obtained without owning a domain.
   #
   # THIS PUBLISHES THE APPLICATION TO THE INTERNET. Only start it once sign-in
-  # is configured — ERP_USERS and SESSION_SECRET above — because without them
-  # the middleware has nothing to enforce and this opens a company's invoice
-  # register to anyone who scans the address. ops/open-web.sh checks for exactly
-  # that before it will open the firewall.
+  # is configured — SESSION_SECRET plus ERP_USERS and/or ERP_ACCESS_PASSWORD —
+  # because without them the middleware has nothing to enforce and this opens a
+  # company's invoice register to anyone who scans the address. ops/open-web.sh
+  # checks for exactly that before it will open the firewall.
   web:
     profiles: ["pilot"]
     image: caddy:2-alpine
@@ -167,6 +161,18 @@ services:
     depends_on:
       - app
 
+  # Ingress, when Cloudflare is in use. Dials out and forwards to app:3000; no
+  # inbound firewall rule exists for it, by design.
+  #
+  # It sits behind a PROFILE, so the default `up -d` starts a completely private
+  # stack with no way in from the internet at all:
+  #
+  #   docker compose -f docker-compose.prod.yml up -d                      → private
+  #   docker compose -f docker-compose.prod.yml --profile cloudflare up -d → published
+  #
+  # Private mode is the correct default while Cloudflare is undecided: the app
+  # has NO authentication of its own, so anything that publishes it also
+  # publishes the customer's data.
   tunnel:
     profiles: ["cloudflare"]
     image: cloudflare/cloudflared:latest

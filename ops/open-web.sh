@@ -8,7 +8,8 @@
 # THIS IS THE ONE SCRIPT THAT EXPOSES THE COMPANY'S DATA TO THE INTERNET, so it
 # checks first, on the machine, that:
 #
-#   • ERP_USERS and SESSION_SECRET are both set in the server's .env, and
+#   • a way to sign in exists in the server's .env — named accounts and/or the
+#     shared password, plus SESSION_SECRET — and
 #   • the running application actually redirects an anonymous request to a
 #     login page rather than serving the workspace.
 #
@@ -72,8 +73,12 @@ if [ "$CLOSING" = "0" ]; then
   CFG="$(ssh "${SSH_OPTS[@]}" "root@${IP}" bash -s <<'EOS' 2>/dev/null
 cd /opt/canei-erp || exit 0
 u="$(sed -n 's/^ERP_USERS=//p' .env | tr -d '"' | tr -d "'")"
+a="$(sed -n 's/^ERP_ACCESS_PASSWORD=//p' .env | tr -d '"' | tr -d "'")"
 s="$(sed -n 's/^SESSION_SECRET=//p' .env | tr -d '"' | tr -d "'")"
-[ -n "$u" ] && echo "USERS=yes" || echo "USERS=no"
+# Either named accounts or the shared password is a login. Requiring ERP_USERS
+# would refuse to publish a server reached only through the shared link, which
+# is a legitimate setup.
+{ [ -n "$u" ] || [ -n "$a" ]; } && echo "USERS=yes" || echo "USERS=no"
 [ -n "$s" ] && echo "SECRET=yes" || echo "SECRET=no"
 # What an anonymous browser actually gets. -o /dev/null -w '%{http_code}' with
 # no -L so a redirect is visible as a redirect rather than followed silently.
@@ -85,9 +90,9 @@ EOS
   )"
   val() { printf '%s\n' "$CFG" | sed -n "s/^$1=//p" | head -1; }
 
-  [ "$(val USERS)" = "yes" ] || die "ERP_USERS is not set in the server's .env — there are no accounts, so there is no login. See docs/PILOT-WITHOUT-CLOUDFLARE.md"
+  [ "$(val USERS)" = "yes" ] || die "Neither ERP_USERS nor ERP_ACCESS_PASSWORD is set in the server's .env — there is no way to sign in, so there is no login. See docs/PILOT-WITHOUT-CLOUDFLARE.md"
   [ "$(val SECRET)" = "yes" ] || die "SESSION_SECRET is not set in the server's .env — sessions cannot be signed. See docs/PILOT-WITHOUT-CLOUDFLARE.md"
-  info "sign-in is configured (ERP_USERS + SESSION_SECRET present)"
+  info "sign-in is configured (accounts and/or shared password, plus SESSION_SECRET)"
 
   ANON="$(val ANON)"
   case "$ANON" in

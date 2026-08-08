@@ -238,20 +238,24 @@ export async function requireUser(req: Request): Promise<string> {
   // stamps a name onto a stored record. A future route excluded from the
   // matcher by accident must not become a way to write anonymously.
   const secret = process.env.SESSION_SECRET?.trim();
-  const usersConfigured = Boolean(process.env.ERP_USERS?.trim());
+  // Either named accounts or the shared password counts as "sign-in is
+  // configured" — a deployment reached only through the shared link has no
+  // named accounts at all, and must still refuse anonymous writes.
+  const usersConfigured =
+    Boolean(process.env.ERP_USERS?.trim()) || Boolean(process.env.ERP_ACCESS_PASSWORD?.trim());
   if (Boolean(secret) !== usersConfigured) {
     throw new FactoryError(
       "CONFIG_INVALID",
-      "Sign-in is half-configured: ERP_USERS and SESSION_SECRET must both be set, " +
-        "or neither. Refusing to fall back to a single shared operator name while " +
-        "one of them is present.",
+      "Sign-in is half-configured: SESSION_SECRET must be set alongside ERP_USERS " +
+        "or ERP_ACCESS_PASSWORD, and vice versa. Refusing to fall back to a single " +
+        "shared operator name while one of them is present.",
     );
   }
   if (secret && usersConfigured) {
     const cookie = readCookie(req.headers.get("cookie"), SESSION_COOKIE);
-    const email = await readSession(cookie, secret, Math.floor(Date.now() / 1000));
-    if (!email) throw unauthenticated("no valid session cookie");
-    return email;
+    const claims = await readSession(cookie, secret, Math.floor(Date.now() / 1000));
+    if (!claims) throw unauthenticated("no valid session cookie");
+    return claims.sub;
   }
 
   const operator = process.env.ERP_OPERATOR?.trim();

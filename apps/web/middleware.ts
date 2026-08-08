@@ -45,20 +45,28 @@ function isPublic(pathname: string): boolean {
 
 export async function middleware(req: NextRequest) {
   const secret = process.env.SESSION_SECRET?.trim();
-  const usersConfigured = Boolean(process.env.ERP_USERS?.trim());
+  // Either named accounts or the shared password means this deployment has a
+  // login. Checking only ERP_USERS would have left a server reached purely
+  // through the shared link — no named accounts, password set — with the lock
+  // switched off entirely and every page served to anyone who found the address.
+  const anyLogin =
+    Boolean(process.env.ERP_USERS?.trim()) || Boolean(process.env.ERP_ACCESS_PASSWORD?.trim());
 
   // Not a login-protected deployment. Nothing to enforce.
-  if (!secret || !usersConfigured) return NextResponse.next();
+  if (!secret || !anyLogin) return NextResponse.next();
 
   const { pathname, search } = req.nextUrl;
   if (isPublic(pathname)) return NextResponse.next();
 
-  const email = await readSession(
+  const claims = await readSession(
     req.cookies.get(SESSION_COOKIE)?.value,
     secret,
     Math.floor(Date.now() / 1000),
   );
-  if (email) return NextResponse.next();
+  // Signed in, by either route. Both reach the same live data — the difference
+  // between a named account and the shared password is recorded in the audit
+  // trail, not enforced here.
+  if (claims) return NextResponse.next();
 
   // An API caller gets a status code it can act on. Redirecting one to an HTML
   // login page produces the classic "unexpected token < in JSON" instead of

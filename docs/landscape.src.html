@@ -36,6 +36,10 @@
         page-break-after: always;
         position: relative;
         min-height: 262mm;
+        /* The footer is absolutely positioned at the bottom, so without this the
+           last paragraph of a full page prints underneath it. Reserving the
+           footer's own height keeps text clear of it. */
+        padding-bottom: 26px;
       }
       .page:last-child {
         page-break-after: auto;
@@ -169,8 +173,8 @@
         border: 1px solid var(--line);
         border-left: 4px solid var(--canei);
         border-radius: 5px;
-        padding: 10px 13px;
-        margin-bottom: 10px;
+        padding: 9px 13px;
+        margin-bottom: 7px;
         background: #fff;
         page-break-inside: avoid;
       }
@@ -268,15 +272,16 @@
       <h1>The ERP landscape,<br />and exactly what to do next</h1>
       <div class="rule"></div>
       <p class="lede">
-        Where the system stands today, why you and Ignacio are not yet seeing the same data, and the
-        six steps that fix it. No Cloudflare. No domain transfer. No laptop.
+        Where the system stands, why nobody yet sees the same data, and the six steps that fix it —
+        ending with a link and a password anyone can use. No Cloudflare, no domain, no laptop.
       </p>
 
       <div class="cover-badge">
         <div class="big">The one sentence that explains everything</div>
         <div class="sm">
           Your server works. The app on your phone has never been connected to it — it loads a
-          static website that saves everything into that phone's own storage.
+          static website that saves everything into that phone's own storage. Six steps connect
+          them, and hand you a link and a password anyone can use.
         </div>
       </div>
 
@@ -303,9 +308,14 @@
           <td>Both of you can ship. Tests now gate the release.</td>
         </tr>
         <tr>
-          <td><b>Login</b> — accounts for you and Ignacio</td>
+          <td><b>Login</b> — named accounts for your team</td>
           <td><span class="tag t-ok">BUILT</span></td>
           <td>Tested end to end. Needs switching on (steps 1–4).</td>
+        </tr>
+        <tr>
+          <td><b>Shared access</b> — one link, one password</td>
+          <td><span class="tag t-ok">BUILT</span></td>
+          <td>Anyone you send it to signs in with no account. Live data.</td>
         </tr>
         <tr>
           <td><b>Reachable from a phone</b></td>
@@ -323,6 +333,11 @@
           <td>Data and commands work; the screen still saves locally.</td>
         </tr>
         <tr>
+          <td><b>Limits on what a visitor may do</b></td>
+          <td><span class="tag t-bad">NONE</span></td>
+          <td>Shared access can change and delete live records. See page 6.</td>
+        </tr>
+        <tr>
           <td><b>Restore from backup</b></td>
           <td><span class="tag t-warn">UNTESTED</span></td>
           <td>Backups are taken. Restoring has never been rehearsed.</td>
@@ -330,13 +345,13 @@
       </table>
 
       <div class="callout">
-        <b>Read this before the steps.</b> Steps 1 to 5 are done once and take about half an hour.
-        Step 4 is the only one that exposes the server to the internet, and it refuses to run until
-        the login is genuinely working — so the order matters and the system enforces it.
+        <b>Read this before the steps.</b> Steps 1–5 are done once, in about half an hour. Step 4 is
+        the only one that exposes the server, and it refuses to run until the login genuinely works
+        — the order matters, and the system enforces it.
       </div>
 
       <h2 style="margin-top: 16px">The six steps, at a glance</h2>
-      <svg viewBox="0 0 760 96" width="100%">
+      <svg viewBox="0 12 760 72" width="100%">
         <defs>
           <marker id="a3" markerWidth="8" markerHeight="8" refX="7" refY="2.6" orient="auto">
             <path d="M0,0 L0,5.2 L7,2.6 z" fill="#9fb3bb" />
@@ -402,10 +417,6 @@
           <text x="701" y="40" font-size="9" font-weight="700" fill="#16232a">Apps</text>
           <text x="676" y="59" font-size="7.6" fill="#56666e">2 files + build</text>
           <text x="676" y="70" font-size="7.6" fill="#8a979d">later</text>
-          <text x="2" y="10" font-size="7.6" fill="#8a979d">
-            Steps 1–5 make it work today. Step 6 is polish — the browser on your phone is the same
-            application.
-          </text>
         </g>
       </svg>
 
@@ -781,9 +792,12 @@
           <td>GitHub → Actions → Ops → <code>status</code>. No key needed.</td>
         </tr>
         <tr>
-          <td>Add or remove a person</td>
+          <td>Add a colleague, or change the shared password</td>
           <td><b>You</b></td>
-          <td>Edit <code>ERP_USERS</code> in the server's <code>.env</code>, then restart.</td>
+          <td>
+            Edit <code>ERP_USERS</code> or <code>ERP_ACCESS_PASSWORD</code> in the server's
+            <code>.env</code>, then restart.
+          </td>
         </tr>
         <tr>
           <td>Open or close internet access</td>
@@ -822,10 +836,9 @@
 node apps/web/scripts/hash-password.mjs stefan@caneisubirats.com
 node apps/web/scripts/hash-password.mjs ignacio@caneisubirats.com</pre>
         <p class="note">
-          It asks for the password twice without showing it, then prints one long line per person.
-          Copy both lines. Nothing is sent anywhere — this runs entirely on your machine. Use at
-          least 12 characters, from the password manager; the ERP will be on the internet and there
-          is no lockout after repeated guesses yet.
+          Asks twice without showing it, then prints one long line per person. Copy both. Nothing is
+          sent anywhere. Use at least 12 characters from the password manager — the ERP will be on
+          the internet and there is no lockout after repeated guesses yet.
         </p>
       </div>
 
@@ -836,9 +849,8 @@ node apps/web/scripts/hash-password.mjs ignacio@caneisubirats.com</pre>
           WHERE — on the server, in the file <span class="mono">/opt/canei-erp/.env</span>
         </div>
         <p class="note" style="margin-bottom: 6px">
-          Get there with <code>ssh -i ops/.provisioned/id_ed25519 root@178.105.10.156</code>, then
-          <code>nano /opt/canei-erp/.env</code>. Or use Hetzner's web console if you prefer not to
-          use a terminal.
+          <code>ssh -i ops/.provisioned/id_ed25519 root@178.105.10.156</code> then
+          <code>nano /opt/canei-erp/.env</code> — or Hetzner's web console.
         </p>
         <pre><span class="c"># the two lines you copied in step 1, comma-separated, all on one line</span>
 ERP_USERS="stefan@caneisubirats.com:scrypt$...,ignacio@caneisubirats.com:scrypt$..."
@@ -846,14 +858,19 @@ ERP_USERS="stefan@caneisubirats.com:scrypt$...,ignacio@caneisubirats.com:scrypt$
 <span class="c"># run: head -c 48 /dev/urandom | base64   and paste the result here</span>
 SESSION_SECRET="..."
 
+<span class="c"># THE ONE YOU HAND OUT. No account, no email — just this.</span>
+ERP_ACCESS_PASSWORD="Obras-2026-Barcelona"
+ERP_DEFAULT_TENANT="diorka"
+
 <span class="c"># your server's address with dots replaced by dashes</span>
 PUBLIC_HOSTNAME="178-105-10-156.sslip.io"
 ACME_EMAIL="stefan@caneisubirats.com"</pre>
         <p class="note">
-          <b>Set <code>ERP_USERS</code> and <code>SESSION_SECRET</code> both or neither.</b> With
-          only one of them the application refuses to start, on purpose — the alternative is that it
-          keeps working while quietly recording everybody's work under a single name, which looks
-          completely normal and is very hard to notice later.
+          <code>ERP_ACCESS_PASSWORD</code> is what makes "a link and a password" work: whoever has
+          it signs in by leaving the email box <b>empty</b>. Named accounts put a real name in the
+          audit trail; a shared session is recorded as <code>invitado-XXXX</code>.
+          <b><code>SESSION_SECRET</code> must be set alongside them</b> — without it the application
+          refuses to start rather than recording everyone's work under one name.
         </p>
       </div>
 
@@ -865,19 +882,17 @@ ACME_EMAIL="stefan@caneisubirats.com"</pre>
 cd /opt/canei-erp
 docker compose -f docker-compose.prod.yml --profile pilot up -d</pre>
         <p class="note">
-          This starts Caddy, which obtains a real certificate automatically. The certificate is
-          issued for <code>178-105-10-156.sslip.io</code> — a free public naming service that turns
-          your IP address into a proper name. That matters because iPhones refuse a self-signed
-          certificate outright, so without a real name the app could never work. When your own
-          domain transfers, you change <code>PUBLIC_HOSTNAME</code> and nothing else.
+          Starts Caddy, which obtains a real certificate for
+          <code>178-105-10-156.sslip.io</code> — a free naming service turning your IP into a proper
+          name. It matters because iPhones refuse a self-signed certificate outright. When your
+          domain transfers you change <code>PUBLIC_HOSTNAME</code>, nothing else.
         </p>
       </div>
 
       <div class="callout bad">
-        <b>Do not skip ahead to step 4.</b> It is the step that opens the server to the world. It
-        checks first, on the machine, that a request with no login is actually turned away — not
-        merely that you configured one. If the running application is older than the login, it
-        refuses and opens nothing.
+        <b>Do not skip ahead to step 4.</b> It opens the server to the world, and checks first — on
+        the machine — that a request with no login is actually turned away, not merely that you
+        configured one. If the running application predates the login it refuses and opens nothing.
       </div>
 
       <div class="foot"><span>What to do · steps 1–3</span><span>Page 4 of 6</span></div>
@@ -896,8 +911,8 @@ docker compose -f docker-compose.prod.yml --profile pilot up -d</pre>
         </div>
         <pre>./ops/open-web.sh</pre>
         <p class="note">
-          Opens ports 80 and 443 on the Hetzner firewall — but only after confirming the login is
-          real. Wait about a minute afterwards: the certificate is obtained on the first request.
+          Opens ports 80 and 443 — but only after confirming the login is real. Wait a minute: the
+          certificate is obtained on the first request.
         </p>
         <p class="note">
           <b>To take it back off the internet at any time:</b>
@@ -912,11 +927,18 @@ docker compose -f docker-compose.prod.yml --profile pilot up -d</pre>
         <div class="where">WHERE — the browser on your phone, wifi turned off</div>
         <pre>https://178-105-10-156.sslip.io</pre>
         <p class="note">
-          Turn wifi off so you are testing the real path in from outside, not the office network.
-          You should get the Canei sign-in screen. Sign in, then have Ignacio do the same on his
-          phone. Enter a customer on one and look for it on the other — that is the whole pilot,
-          proven.
+          Wifi off, so you are testing the real path in. You should get the Canei sign-in screen.
+          Try <b>both</b> ways: your own address and password, then the shared password with the
+          email box left empty — that second one is what you will be sending out.
         </p>
+        <p class="note" style="margin-top: 8px">
+          <b>What to send somebody:</b>
+        </p>
+        <pre>
+Aquí tiene el acceso al sistema:
+https://178-105-10-156.sslip.io
+Contraseña: Obras-2026-Barcelona
+Deje el campo de correo vacío. Funciona en portátil, tablet y móvil.</pre>
       </div>
 
       <div class="step">
@@ -976,7 +998,11 @@ private val baseUrl = "https://178-105-10-156.sslip.io/"</pre>
         <div>
           <h3 style="margin-top: 4px; color: var(--ok)">✓ Works after these steps</h3>
           <ul>
-            <li>Both of you sign in from any device, anywhere.</li>
+            <li>
+              <b>Anyone you send the link and password to</b> signs in from any device — laptop,
+              tablet, iPhone — with no account to create.
+            </li>
+            <li>Your own team sign in by name; the audit trail says so.</li>
             <li>
               One shared dataset. A customer entered by one is visible to the other immediately.
             </li>
@@ -988,8 +1014,9 @@ private val baseUrl = "https://178-105-10-156.sslip.io/"</pre>
               Simultaneous edits are safe: the second save is refused with “somebody saved before
               you”, never a silent overwrite.
             </li>
-            <li>Nightly encrypted backups continue.</li>
-            <li>Either of you can ship code changes without touching the server.</li>
+            <li>
+              Nightly encrypted backups continue; you can ship code without touching the server.
+            </li>
           </ul>
         </div>
         <div>
@@ -997,33 +1024,48 @@ private val baseUrl = "https://178-105-10-156.sslip.io/"</pre>
           <ul>
             <li>
               <b>A full project from lead to close.</b> The server accepts twelve operations —
-              customers, money in and out, progress, change orders, tasks, the quarterly archive.
-              Quotes, contracts and invoices are not among them.
+              customers, money, progress, change orders, tasks, the quarterly archive. Not quotes,
+              contracts or invoices.
             </li>
             <li>
-              <b>A shared calendar screen.</b> The data and the operations now work; the screen
-              itself still saves into the browser. Next piece of work.
+              <b>A shared calendar screen.</b> The data and operations work; the screen itself still
+              saves into the browser.
             </li>
             <li><b>A rehearsed restore.</b> Backups are taken; restoring has never been tried.</li>
             <li>
-              <b>Password reset, lockout, two-factor.</b> Resetting a password means editing the
-              server's <code>.env</code>. Fine for two people, wrong for a third.
+              <b>Any limit on what a visitor may do.</b> The link and password do everything your
+              own team can, including deleting records. Read-only access does not exist yet.
+            </li>
+            <li>
+              <b>Password reset, lockout, two-factor.</b> Resetting one means editing
+              <code>.env</code>.
             </li>
           </ul>
         </div>
       </div>
 
-      <h3>Three risks worth knowing about</h3>
+      <h3>Four risks worth knowing about</h3>
       <table>
         <tr>
           <th style="width: 30%">Risk</th>
           <th>What it means, and what to do</th>
         </tr>
         <tr>
+          <td><b>The shared password reaches the live books</b></td>
+          <td>
+            Deliberate — you are showing the real system, not a sample. Anyone you send the link to
+            can change or delete real records and will see real customer names and figures. Two
+            habits: <b>before a session</b> take a backup (Actions → Ops → <code>backup-now</code>);
+            <b>after one</b> change <code>ERP_ACCESS_PASSWORD</code>. Worth deciding first: those
+            names are third parties' personal data, and showing them is a disclosure.
+          </td>
+        </tr>
+        <tr>
           <td><b>No limit on password guessing</b></td>
           <td>
-            Nothing yet slows an automated attempt at the login form. Use long passwords from the
-            manager. Adding rate limiting is a small, known piece of work.
+            Nothing yet slows an automated attempt at the login form, and a shared password gets
+            typed in front of people and written down — make it a long phrase. Rate limiting is a
+            small, known piece of work.
           </td>
         </tr>
         <tr>
@@ -1037,34 +1079,32 @@ private val baseUrl = "https://178-105-10-156.sslip.io/"</pre>
         <tr>
           <td><b>A lost phone stays signed in</b></td>
           <td>
-            Sessions last eight hours and cannot be cancelled one at a time. To cut everyone off
-            immediately, change <code>SESSION_SECRET</code> in the server's <code>.env</code> and
-            restart — everybody signs in again.
+            Sessions last eight hours and cannot be cancelled individually. Changing
+            <code>ERP_ACCESS_PASSWORD</code> stops new sign-ins; changing
+            <code>SESSION_SECRET</code> too ends open ones immediately, yours included.
           </td>
         </tr>
       </table>
 
       <h3>What was actually tested, not assumed</h3>
       <p style="font-size: 9.2pt">
-        Everything above was driven against a real build, a real PostgreSQL and the restricted
-        database account the server uses: an anonymous browser is redirected to sign in and an
-        anonymous API call is refused; a wrong password sets no session and never reveals which half
-        was wrong; Stefan added a customer, Ignacio signed in separately and added a calendar task,
-        and Stefan's session then saw Ignacio's task. The database recorded
-        <code>stefan@… → addParty</code> and <code>ignacio@… → addTask</code>. Signing out closed it
-        again.
+        Driven against a real build, a real PostgreSQL and the restricted database account: an
+        anonymous browser is redirected to sign in and an anonymous API call refused; a visitor
+        signed in with <b>only the shared password and no email</b> and worked on the live company;
+        a near-miss password was refused; staff signed in by name and saw the visitor's work, the
+        database recording <code>invitado-d31d → addParty</code>.
       </p>
       <p style="font-size: 9.2pt">
-        That run also found a genuine bug worth mentioning: adding a task accepted the person's name
-        and silently discarded it, so a task had no author anywhere — invisible with one operator,
-        wrong the moment two people share a schedule. Fixed, with tests.
+        Those runs also found two genuine bugs: adding a task discarded the person's name; and a
+        server reached only through the shared link would have had its lock switched off entirely.
+        Both fixed, with tests.
       </p>
 
       <div class="callout">
-        <b>Full written detail</b> lives in the repository:
-        <code>docs/PILOT-WITHOUT-CLOUDFLARE.md</code> for these steps,
-        <code>docs/OPS-WITHOUT-A-LAPTOP.md</code> for running the server from a browser, and
-        <code>docs/WHY-THE-CALENDAR-IS-NOT-SHARED.md</code> for the calendar diagnosis.
+        <b>Full written detail</b> in the repository:
+        <code>docs/PILOT-WITHOUT-CLOUDFLARE.md</code> (these steps),
+        <code>docs/OPS-WITHOUT-A-LAPTOP.md</code> (running the server from a browser),
+        <code>docs/WHY-THE-CALENDAR-IS-NOT-SHARED.md</code> (the calendar).
       </div>
 
       <div class="foot">

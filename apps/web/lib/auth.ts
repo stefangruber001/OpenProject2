@@ -141,5 +141,52 @@ export async function authenticate(email: string, password: string): Promise<str
 
 /** True when sign-in is configured at all. */
 export function loginConfigured(): boolean {
-  return accounts().length > 0 && Boolean(process.env.SESSION_SECRET?.trim());
+  return (
+    (accounts().length > 0 || Boolean(process.env.ERP_ACCESS_PASSWORD?.trim())) &&
+    Boolean(process.env.SESSION_SECRET?.trim())
+  );
+}
+
+/**
+ * The shared access password.
+ *
+ * One password, handed out with the link, so an owner or operator evaluating
+ * the system can sign in on their own laptop, tablet or phone without anybody
+ * creating them an account first.
+ *
+ * It is deliberately stored as plain text rather than a hash, and that is a
+ * considered trade rather than an oversight. A hash would protect it from
+ * somebody who has already read `.env` — but that person also has the database
+ * password sitting three lines above. What it would cost is the ability to
+ * answer "what was the password again?" in the middle of a meeting, which is
+ * the situation this exists for. Named accounts, which protect a person's own
+ * reused password, are hashed.
+ *
+ * THIS OPENS THE LIVE DATA. A session signed in this way can change and delete
+ * real records. What limits the damage is operational: take a backup before a
+ * session, and change this password afterwards.
+ */
+export function sharedPassword(): string | null {
+  return process.env.ERP_ACCESS_PASSWORD?.trim() || null;
+}
+
+/**
+ * Is this the shared password?
+ *
+ * Compared in constant time. A sloppy comparison leaks the password a character
+ * at a time to somebody patient, and "it is only for demonstrations" is exactly
+ * the reasoning that leaves a real hole somewhere else later.
+ */
+export function isSharedPassword(candidate: string): boolean {
+  const expected = sharedPassword();
+  if (!expected) return false;
+  const a = Buffer.from(candidate);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) {
+    // timingSafeEqual throws on a length mismatch, so compare against itself to
+    // burn a comparable amount of time before saying no.
+    timingSafeEqual(b, b);
+    return false;
+  }
+  return timingSafeEqual(a, b);
 }

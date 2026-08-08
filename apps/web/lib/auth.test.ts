@@ -7,7 +7,15 @@
  * with a different secret, a redirect that leaves the site.
  */
 import { describe, expect, it } from "vitest";
-import { accounts, authenticate, hashPassword, loginConfigured, verifyPassword } from "./auth";
+import {
+  accounts,
+  authenticate,
+  hashPassword,
+  isSharedPassword,
+  loginConfigured,
+  sharedPassword,
+  verifyPassword,
+} from "./auth";
 import {
   SESSION_TTL_SECONDS,
   clearedCookie,
@@ -141,9 +149,20 @@ describe("the account list", () => {
 });
 
 describe("session tokens", () => {
+  it("carries the role, so a shared session is distinguishable afterwards", async () => {
+    const t = await signSession("invitado-4f2a", SECRET, NOW, "shared");
+    await expect(readSession(t, SECRET, NOW + 60)).resolves.toEqual({
+      sub: "invitado-4f2a",
+      role: "shared",
+    });
+  });
+
   it("round-trips the signed-in email", async () => {
     const t = await signSession("ana@example.com", SECRET, NOW);
-    await expect(readSession(t, SECRET, NOW + 60)).resolves.toBe("ana@example.com");
+    await expect(readSession(t, SECRET, NOW + 60)).resolves.toEqual({
+      sub: "ana@example.com",
+      role: "staff",
+    });
   });
 
   it("rejects a token signed with a different secret", async () => {
@@ -188,5 +207,71 @@ describe("session tokens", () => {
 
   it("expires the cookie on sign-out", () => {
     expect(clearedCookie(true)).toContain("Max-Age=0");
+  });
+});
+
+/**
+ * The shared password — one link, one password, handed to somebody evaluating
+ * the system on their own laptop.
+ *
+ * It reaches the LIVE data, so these are not conveniences: each is a way a
+ * session could be created by somebody who does not have the password.
+ */
+describe("the shared access password", () => {
+  const withShared = async (value: string | undefined, fn: () => Promise<void> | void) => {
+    const old = process.env.ERP_ACCESS_PASSWORD;
+    if (value === undefined) delete process.env.ERP_ACCESS_PASSWORD;
+    else process.env.ERP_ACCESS_PASSWORD = value;
+    try {
+      await fn();
+    } finally {
+      if (old === undefined) delete process.env.ERP_ACCESS_PASSWORD;
+      else process.env.ERP_ACCESS_PASSWORD = old;
+    }
+  };
+
+  it("is off unless configured, so nothing has a shared way in by default", async () => {
+    await withShared(undefined, () => {
+      expect(sharedPassword()).toBeNull();
+      expect(isSharedPassword("")).toBe(false);
+      expect(isSharedPassword("anything")).toBe(false);
+    });
+  });
+
+  it("accepts the exact password and nothing else", async () => {
+    await withShared("Obras-2026-Barcelona", () => {
+      expect(isSharedPassword("Obras-2026-Barcelona")).toBe(true);
+      expect(isSharedPassword("obras-2026-barcelona")).toBe(false);
+      expect(isSharedPassword("Obras-2026-Barcelon")).toBe(false);
+      expect(isSharedPassword("Obras-2026-Barcelona ")).toBe(false);
+      expect(isSharedPassword("")).toBe(false);
+    });
+  });
+
+  it("does not accept a prefix — the comparison is not a startsWith", async () => {
+    await withShared("Obras-2026-Barcelona", () => {
+      expect(isSharedPassword("Obras")).toBe(false);
+      expect(isSharedPassword("O")).toBe(false);
+    });
+  });
+
+  it("counts as a configured login even with no named accounts", async () => {
+    // A deployment reached only through the shared link has no ERP_USERS at all.
+    // If that did not count as "sign-in is configured", the middleware would
+    // switch itself off and serve every page to anyone who found the address.
+    const oldUsers = process.env.ERP_USERS;
+    const oldSecret = process.env.SESSION_SECRET;
+    delete process.env.ERP_USERS;
+    process.env.SESSION_SECRET = "a-secret";
+    await withShared("Obras-2026-Barcelona", () => {
+      expect(loginConfigured()).toBe(true);
+    });
+    await withShared(undefined, () => {
+      expect(loginConfigured()).toBe(false);
+    });
+    if (oldUsers === undefined) delete process.env.ERP_USERS;
+    else process.env.ERP_USERS = oldUsers;
+    if (oldSecret === undefined) delete process.env.SESSION_SECRET;
+    else process.env.SESSION_SECRET = oldSecret;
   });
 });

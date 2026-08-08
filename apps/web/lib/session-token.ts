@@ -22,11 +22,28 @@ export const SESSION_TTL_SECONDS = 8 * 60 * 60;
 
 export const SESSION_COOKIE = "canei_session";
 
+/**
+ * How this session proved who it is.
+ *
+ * "staff" is a named account in ERP_USERS. "shared" is somebody who used the one
+ * password handed out with the link. Both reach the same live data — the role
+ * exists so the audit trail can say which of the two a change came from, which
+ * is worth recording even when the permissions are identical.
+ */
+export type SessionRole = "staff" | "shared";
+
 interface Payload {
-  /** Who. The email they signed in with. */
+  /** Who. The email they signed in with, or a shared-session label. */
   sub: string;
   /** When this stops being true, seconds since the epoch. */
   exp: number;
+  /** Absent in tokens minted before roles existed — read as "staff". */
+  role?: SessionRole;
+}
+
+export interface SessionClaims {
+  sub: string;
+  role: SessionRole;
 }
 
 const enc = new TextEncoder();
@@ -64,8 +81,9 @@ export async function signSession(
   email: string,
   secret: string,
   nowSeconds: number,
+  role: SessionRole = "staff",
 ): Promise<string> {
-  const payload: Payload = { sub: email, exp: nowSeconds + SESSION_TTL_SECONDS };
+  const payload: Payload = { sub: email, exp: nowSeconds + SESSION_TTL_SECONDS, role };
   const body = b64url(enc.encode(JSON.stringify(payload)));
   const sig = await crypto.subtle.sign("HMAC", await key(secret), enc.encode(body));
   return `${body}.${b64url(new Uint8Array(sig))}`;
@@ -83,7 +101,7 @@ export async function readSession(
   token: string | undefined,
   secret: string,
   nowSeconds: number,
-): Promise<string | null> {
+): Promise<SessionClaims | null> {
   if (!token) return null;
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
@@ -106,7 +124,12 @@ export async function readSession(
   }
   if (typeof payload?.sub !== "string" || !payload.sub) return null;
   if (typeof payload?.exp !== "number" || payload.exp <= nowSeconds) return null;
-  return payload.sub;
+  // Absent means a token minted before roles existed, which was always a named
+  // account. An unknown role is refused rather than assumed — guessing at a
+  // value nobody wrote is how a typo becomes an authorisation decision.
+  const role = payload.role === undefined ? "staff" : payload.role;
+  if (role !== "staff" && role !== "shared") return null;
+  return { sub: payload.sub, role };
 }
 
 /**

@@ -192,12 +192,20 @@
   };
 
   return {
-    /** `tenant` is only consulted in remote mode. */
+    /**
+     * `tenant` is only consulted in remote mode.
+     *
+     * The default is "~", meaning "whichever company this session is entitled
+     * to", which the server resolves. This file is served identically to
+     * everybody — a member of staff and a customer trying the demonstration —
+     * so naming a company in it would hand the real books to whoever opened the
+     * page.
+     */
     create: function (tenant) {
       var base = apiBase();
       // `base === ""` is remote-on-this-origin, which is the normal deployment;
       // only `null` means local. Hence the explicit null check.
-      return base === null ? new LocalBackend() : new RemoteBackend(base, tenant || "diorka");
+      return base === null ? new LocalBackend() : new RemoteBackend(base, tenant || "~");
     },
     LOCAL_USER: LOCAL_USER,
     _internals: { apiBase: apiBase, LocalBackend: LocalBackend, RemoteBackend: RemoteBackend },
