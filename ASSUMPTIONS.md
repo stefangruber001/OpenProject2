@@ -1218,3 +1218,19 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   copy would not move the app onto the server, it would turn every tab into a Safari launch. The
   address the app points at is part of the binary; changing it needs a build, and one was
   triggered rather than described.
+- **#85 — The verification cried wolf over a working deploy (2026-08-08).** `deploy-now.sh`
+  checked whether the new build was live by fetching `/workspace/erp-docs.js` and treating
+  anything but 200 as missing. Every page is behind the login, so an unauthenticated request is
+  answered **307 to /login** — the lock working exactly as designed. The script read that as "the
+  file is not there" and announced a failed deploy over one that had succeeded, on the same run
+  where the image comparison correctly reported `running revision 1b2b8879 — matches`.
+  A check that cries wolf is worse than no check: it teaches the operator to ignore the one
+  signal that will one day be true.
+  **Decision: the running commit is reported by `/api/health`,** which is the one path that is
+  public by design. `BUILD_REVISION` is passed as a build argument in `deploy.yml`, baked into
+  the image, and returned by the health route. There was already an OCI `revision` label, but
+  reading it needs SSH and Docker — so it did not get read, and the question kept being guessed
+  at instead. A commit hash of a private repository identifies a build, not its contents, so
+  there is nothing to protect here; making it public is what makes it get used.
+  The lesson generalises past this script: **an unauthenticated probe of an authenticated
+  surface measures the lock, not the thing behind it.**

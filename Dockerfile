@@ -67,6 +67,14 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+# The commit this image was built from, readable from OUTSIDE the machine via
+# /api/health. There is already an OCI revision label, but reading it requires
+# SSH and Docker; the question "is the code I just pushed the code that is
+# answering?" needs to be answerable from a laptop, over the public address, in
+# one request. Every time that has been guessed at instead, the guess was wrong.
+ARG BUILD_REVISION="unknown"
+ENV BUILD_REVISION=${BUILD_REVISION}
+
 # Never run the server as root.
 RUN groupadd --system --gid 1001 nodejs \
  && useradd  --system --uid 1001 --gid nodejs nextjs

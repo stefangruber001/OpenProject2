@@ -102,24 +102,35 @@ HOST="$(ssh "${SSH_OPTS[@]}" "root@${IP}" \
 HOST="$(printf '%s' "$HOST" | tr -d '[:space:]')"
 
 if [ -n "$HOST" ]; then
-  say "What the public address actually serves"
-  for f in erp-store.js erp-docs.js erp-engine.js; do
-    CODE="$(curl -s -o /dev/null -m 20 -w '%{http_code}' "https://${HOST}/workspace/${f}" || echo 000)"
-    if [ "$CODE" = "200" ]; then
-      info "${f}  ${CODE}"
-    else
-      warn "${f}  ${CODE}  ← this file is part of the current build and is not being served"
-    fi
-  done
-  # erp-docs.js only exists from the release that put every screen on the server,
-  # so its absence is a precise signal: the server is on an older build.
-  CODE="$(curl -s -o /dev/null -m 20 -w '%{http_code}' "https://${HOST}/workspace/erp-docs.js" || echo 000)"
+  say "What the public address reports"
+  # /api/health is the ONE path that is public by design and says which commit
+  # built the running image.
+  #
+  # This used to fetch workspace files and treat anything but 200 as missing —
+  # which was wrong in a way worth keeping a note about. Every page is behind
+  # the login, so an unauthenticated request is answered 307 to /login. The
+  # script read the lock working correctly as "the file is not there" and
+  # announced a failed deploy over a deploy that had in fact succeeded. A check
+  # that cries wolf is worse than no check: it trains you to ignore it.
+  HEALTH="$(curl -s -m 20 "https://${HOST}/api/health" || true)"
+  SERVED="$(printf '%s' "$HEALTH" | jq -r '.revision // empty' 2>/dev/null || true)"
+  DB="$(printf '%s' "$HEALTH" | jq -r '.database // empty' 2>/dev/null || true)"
+
+  [ "$DB" = "connected" ] && info "database: connected" || warn "database: ${DB:-unreachable}"
+
   echo
-  if [ "$CODE" = "200" ]; then
-    printf '  \033[1;32mThe server is serving the current build.\033[0m\n'
+  if [ -z "$SERVED" ]; then
+    warn "This build predates the revision stamp in /api/health, so the public"
+    warn "address cannot confirm its own version yet. The image comparison above"
+    warn "is the answer until the next release lands."
+  elif [ "$SERVED" = "unknown" ]; then
+    warn "The running image reports revision 'unknown' — it was built without"
+    warn "BUILD_REVISION. Rebuild from main once and this becomes exact."
+  elif [ "$SERVED" = "$WANT" ]; then
+    printf '  \033[1;32mThe public address is serving %s — your latest commit.\033[0m\n' "${SERVED:0:8}"
     printf '  Open https://%s and sign in.\n\n' "$HOST"
   else
-    printf '  \033[1;31mThe server is still serving an older build.\033[0m\n'
+    printf '  \033[1;31mThe public address is serving %s, you have %s.\033[0m\n' "${SERVED:0:8}" "${WANT:0:8}"
     printf '  Work through the three causes listed above, then run this again.\n\n'
     exit 1
   fi

@@ -82,6 +82,7 @@ jobs:
           # known here rather than at run time.
           build-args: |
             NEXT_PUBLIC_APP_URL=${{ vars.APP_URL }}
+            BUILD_REVISION=${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.target }}
           cache-to: type=gha,scope=${{ matrix.target }},mode=max
 
