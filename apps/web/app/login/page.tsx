@@ -22,8 +22,11 @@
  * not decoration — drop them and the QuickType bar silently stops offering to
  * fill, which reads to the operator as "Face ID broke".
  */
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { loginConfigured } from "@/lib/auth";
 import { sharedAccessEnabled } from "@/lib/access";
+import { SESSION_COOKIE, readSession } from "@/lib/session-token";
 
 export const dynamic = "force-dynamic";
 
@@ -71,8 +74,33 @@ export default async function LoginPage({
   const failed = params.error !== undefined;
   const nextRaw = typeof params.next === "string" ? params.next : "/";
   // Same rule as the route handler: only ever a path on this site.
-  const next = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/";
+  const nextPath = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/";
+  // Never send somebody from the login page back to the login page.
+  const next = nextPath.startsWith("/login") ? "/" : nextPath;
   const shared = sharedAccessEnabled();
+
+  // ALREADY SIGNED IN? Then this page is not a login, it is a door standing
+  // open, and the right thing is to walk through it.
+  //
+  // This is what made the phone app ask for a password on every tab. Each tab
+  // is its own web view and they all load at launch — before anyone has signed
+  // in — so six of them land on /login and stay there. Signing in on one tab
+  // sets a cookie all of them share, and the app then reloads the stale ones…
+  // straight back onto /login, which happily rendered the form again, because
+  // nothing here ever looked at whether the visitor was already known. The tab
+  // reloaded, the form reappeared, and it read as "log in again".
+  //
+  // Fixing it here rather than in the app fixes it everywhere: a bookmarked
+  // /login in a browser now lands you in the workspace too, and the app needs
+  // no new build to benefit.
+  const secret = process.env.SESSION_SECRET?.trim();
+  if (secret) {
+    const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    const claims = await readSession(token, secret, Math.floor(Date.now() / 1000));
+    // Outside any try/catch on purpose: redirect() works by throwing, and
+    // swallowing that turns a redirect into a blank page.
+    if (claims) redirect(next);
+  }
 
   if (!loginConfigured()) {
     return (

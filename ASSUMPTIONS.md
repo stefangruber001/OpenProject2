@@ -1294,3 +1294,27 @@ SERVER_SSH_KEY`. The browser-ops path has never had its credentials, so it has n
   compares against the newest commit that actually builds an image. Same lesson as #85, second
   disguise in one day: **a check must model what the system really does, not what the commit log
   looks like.**
+- **#88 — The per-tab login was a server bug, not an app bug (2026-08-08).** Build 4 shipped the
+  app-side fix and the operator still saw a login screen on every tab but Home. The app was doing
+  what I told it to; what I had not checked was what the server does when an already-signed-in
+  visitor asks for `/login`.
+  It served the form. `/login` is on the middleware's public list — correctly, or nobody could
+  ever sign in — but nothing there ever looked at whether the caller was already known. So the
+  sequence was: every tab opens at launch, before anyone has signed in, and lands on
+  `/login?next=<its own page>`; you sign in on Home, setting a cookie all tabs share; opening
+  another tab reloads it; the reload asks for `/login` again; the server renders the form.
+  Reloading a page whose URL _is_ the login page cannot escape the login page.
+  **Fixed on the server: signed in, `/login` redirects to `next`.** That fixes it everywhere at
+  once — the app needs no new build to benefit, and a bookmarked `/login` in a browser now lands
+  in the workspace instead of asking for a password you have already given.
+  The iOS half was corrected too, because it was independently wrong: `reloadIfShowingLogin()`
+  called `reload()`, which re-requests the current URL — the login page. It now loads the tab's
+  OWN url. Either fix alone is sufficient; both are right.
+  **Reproduced before fixing, which is the part that made this quick.** Six browser pages sharing
+  one cookie jar stand in for six tabs: 4/11 assertions passed against the old build, with every
+  tab stuck on `/login?next=…`, exactly as reported. 11/11 after.
+  **Two of my own assertions were wrong and had to be fixed first**, both in the flattering
+  direction: one matched "clientes.html" inside the query string `?next=%2F…%2Fclientes.html`
+  and so passed while the bug was present; another expected a literal filename where the page
+  forwards itself to `erp.html#clientes`. A test that agrees with you for the wrong reason is
+  worse than no test, and I nearly shipped on the strength of one.

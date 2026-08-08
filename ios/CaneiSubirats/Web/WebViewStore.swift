@@ -314,9 +314,19 @@ extension WebViewStore: WKNavigationDelegate {
     }
 
     /// Reload only if this tab is stuck on the sign-in page.
+    ///
+    /// `load(tab.url)`, not `reload()`. A tab sitting on the login page has
+    /// `/login?next=…` as its current URL, so reloading asks for the login page
+    /// again — which is precisely what it was already showing. The tab has to be
+    /// sent back to its OWN page; the session cookie then carries it through.
+    ///
+    /// The server-side half of this matters more (an authenticated visitor to
+    /// /login is now redirected onward), and either fix alone is enough. Both
+    /// are here because they are each correct on their own terms, and because
+    /// this one also covers a tab whose `next` was lost.
     func reloadIfShowingLogin() {
         guard showingLogin || webView.url == nil else { return }
-        reload()
+        load(tab.url)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
