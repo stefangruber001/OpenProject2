@@ -326,6 +326,18 @@
         invoiceEvents: [], // ORG-07 / VFU-01
         alertRules: [], // DAS-06: enabled/threshold/recipient/channel per alert code
         alertOverrides: {}, // DAS-07: assign/due/snooze/resolve/task-link, keyed by alertKey()
+        // Declared here, not created lazily on first write. The migration
+        // ladder already promises these to a restored blob, so leaving them out
+        // of a NEW engine made the two shapes disagree — and it defeated the
+        // backfill in from(), which can only restore collections it can see on
+        // a fresh instance.
+        feedback: [],
+        supplierPerf: [],
+        assignments: [],
+        recurring: [],
+        importConflicts: [],
+        imports: {},
+        plans: {},
         seq: { id: 1 },
       };
     }
@@ -477,14 +489,34 @@
       rec.accountingCode = rec.accountingCode || "43" + rec.code.replace(/\D/g, ""); // MDM-09 aligned pair
       if (rec.taxId && !validTaxId(rec.taxId))
         throw new Error("Invalid tax identifier: " + rec.taxId); // MDM-03
+      this._assertTaxIdFree(rec.taxId, rec.id); // MDM-03, hard rule
       const dup = this.findDuplicateParty(rec);
-      if (dup && rec.taxId && dup.taxId === rec.taxId)
-        throw new Error("Duplicate active party for tax id " + rec.taxId); // MDM-03
       rec.duplicateSuspect = dup ? dup.id : null;
       this.state.parties.push(rec);
       this._log(user, "addParty", rec.code);
       return rec;
     }
+    /**
+     * MDM-03 as a hard rule: no two ACTIVE parties may share a tax identifier.
+     *
+     * This cannot be expressed through findDuplicateParty, which matches on tax
+     * id OR name OR phone and returns the FIRST hit — so a genuine duplicate
+     * slipped through whenever an unrelated party matched first on a shared
+     * phone number. On a system holding tax records that splits one customer's
+     * invoices across two records and makes the filing built from them wrong.
+     *
+     * Deliberately scoped to active parties: deactivation is how this system
+     * retires a record, and a retired holder must not block a legitimate
+     * re-registration under the same identifier.
+     */
+    _assertTaxIdFree(taxId, selfId) {
+      if (!taxId) return;
+      const clash = this.state.parties.find(
+        (x) => x.active && x.id !== selfId && x.taxId === taxId,
+      );
+      if (clash) throw new Error("Duplicate active party for tax id " + taxId);
+    }
+    /** Soft warning at capture time — a suspect, not a refusal. */
     findDuplicateParty(rec) {
       // MDM-03: on taxId, name, phone
       const norm = (s) =>
@@ -506,6 +538,7 @@
     updateParty(id, patch, user) {
       const p = this.party(id);
       if (patch.taxId && !validTaxId(patch.taxId)) throw new Error("Invalid tax identifier");
+      if (patch.taxId) this._assertTaxIdFree(patch.taxId, p.id); // MDM-03 on edit too
       if (patch.bank && patch.bank.iban && !validIban(patch.bank.iban))
         throw new Error("Invalid IBAN");
       if (patch.bank) this._log(user, "partyBankChange", p.code); // MDM-08 change-logged
@@ -2572,8 +2605,17 @@
       );
       return inv.kind === "creditNote" ? 0 : inv.totalCents - collected - credited;
     }
-    receivables() {
-      // AR-08 follow-up list
+    /**
+     * Every issued invoice with its settlement state — the register a screen
+     * lists, including the ones already collected.
+     *
+     * This used to be what receivables() returned, because its final filter
+     * ended in `|| true` and so filtered nothing. The two lists answer
+     * different questions and one of them was missing, so callers asking
+     * "what is still owed" had to re-filter and the ones that forgot chased
+     * paid invoices.
+     */
+    invoiceRegister() {
       const t = this.state.today;
       return this.state.invoices
         .filter((i) => i.kind !== "creditNote")
@@ -2590,8 +2632,12 @@
             dueDate: i.dueDate,
             daysOverdue: out > 0 ? Math.max(0, daysBetween(t, i.dueDate)) : 0,
           };
-        })
-        .filter((x) => x.outstandingCents > 0.005 || true);
+        });
+    }
+    /** AR-08 follow-up list: what is still owed. A settled invoice belongs in
+        the register, not in the chase list. */
+    receivables() {
+      return this.invoiceRegister().filter((x) => x.outstandingCents > 0);
     }
     projectBilling(projectId) {
       // AR-09
@@ -5546,7 +5592,10 @@
       const cur = this.currentVersion(id);
       if (b.acceptedVersionId || (cur && cur.issued))
         throw new Error("Budget is issued/accepted — create a new version instead");
-      const allowed = ["internalRef", "propertyId", "discountCents", "vatBp", "validityDays"];
+      // validityDate, not validityDays — the budget record has never held a
+      // day count, so the old name silently dropped every edit to the one
+      // header field an owner most often corrects.
+      const allowed = ["internalRef", "propertyId", "discountCents", "vatBp", "validityDate"];
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
       Object.assign(b, patch);
       this._log(user, "updateBudget", b.number);
@@ -5645,7 +5694,13 @@
     }
     resolveRequirement(projectId, reqId, status, user) {
       const p = this.project(projectId);
-      const r = (p.requirements || []).find((x) => x.id === reqId);
+      // addProjectRequirement files by type: permits and safety documents go to
+      // p.permits, everything else to p.dependencies. Nothing ever wrote a
+      // p.requirements collection, so looking only there meant this method
+      // could never resolve anything it had itself created.
+      const r = [...(p.permits || []), ...(p.dependencies || []), ...(p.requirements || [])].find(
+        (x) => x.id === reqId,
+      );
       if (!r) throw new Error("Requirement not found");
       r.status = status || "resolved";
       r.resolvedAt = this.state.today;
@@ -5683,6 +5738,10 @@
       if (ch.status !== "approved")
         throw new Error("Only an approved extra can be marked executed");
       ch.executed = { date: this.state.today };
+      // Without this the "executed" status in LISTS.changeStatuses was
+      // unreachable: the date was stamped but the record still read "approved",
+      // so every screen filtering on status showed executed work as pending.
+      ch.status = "executed";
       this._log(user, "markChangeExecuted", id);
       return ch;
     }
@@ -5776,10 +5835,12 @@
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
       Object.assign(b, patch);
       b.vatCents = Math.round((b.baseCents * (b.vatBp || 0)) / 10000);
-      b.irpfCents =
-        b.irpfCents && b.irpfRateBp
-          ? Math.round((b.baseCents * b.irpfRateBp) / 10000)
-          : b.irpfCents;
+      // The rate lives on the bill as irpfBp — registerBill copies it from the
+      // supplier profile. Reading irpfRateBp (the field name on the PARTY) made
+      // this condition permanently false, so correcting the base recomputed the
+      // tax and left the withholding stale, and the total was wrong by the
+      // difference.
+      b.irpfCents = b.irpfBp ? Math.round((b.baseCents * b.irpfBp) / 10000) : b.irpfCents;
       b.totalCents = b.baseCents + b.vatCents - (b.irpfCents || 0);
       this._log(user, "correctBill", b.number);
       return b;
@@ -5834,12 +5895,16 @@
     updateRecurring(id, patch, user) {
       const r = (this.state.recurring || []).find((x) => x.id === id);
       if (!r) throw new Error("Recurring template not found");
+      // Named after the record addRecurringInvoice actually builds: desc,
+      // cadenceMonths and nextDate. "concept" and "dayOfMonth" exist nowhere,
+      // so editing the description or the cadence did nothing at all.
       const allowed = [
         "baseCents",
         "vatBp",
-        "concept",
+        "desc",
         "active",
-        "dayOfMonth",
+        "cadenceMonths",
+        "nextDate",
         "partyId",
         "projectId",
       ];
@@ -5944,7 +6009,7 @@
         workPackage: "packages",
         price: "prices",
         purchase: "purchases",
-        capture: "captures",
+        capture: "captured",
         task: "tasks",
         worker: "workers",
         bankAccount: "bankAccounts",

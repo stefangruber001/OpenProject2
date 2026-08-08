@@ -762,7 +762,20 @@ for (const m of MONTHS) {
   if (+m.slice(5) % 3 === 0) {
     erp.setToday(m + "-30");
     const q = quarterOf(m + "-15");
-    const pkg = erp.quarterlyPackage(q);
+    // GES-07 is BLOCKING: the package refuses to generate while anything on
+    // the exception list is unjustified. A real quarter-end is exactly this —
+    // work the list down, then justify whatever genuinely cannot be fixed —
+    // so the simulation does the same rather than reaching for a back door.
+    // (There is no back door: see quarterlyPackage.)
+    const blocked = erp.exceptionsWithStatus(q).filter((x) => !x.accepted);
+    for (const x of blocked)
+      erp.acceptException(q, x.key, "revisado en el cierre trimestral", "bo");
+    assert(
+      erp.exceptionsWithStatus(q).every((x) => x.accepted),
+      "package " + q + ": every exception justified before sending",
+      "",
+    );
+    const pkg = erp.quarterlyPackage(q, { recipient: "gestoria@example.com" });
     assert(
       pkg.issuedInvoices.length > 0 && pkg.receivedBills.length > 0,
       "package " + q + " has registers",

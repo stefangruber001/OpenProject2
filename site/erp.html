@@ -3438,7 +3438,7 @@ const VIEWS={
  /* ---------- Facturación y cobros (AR) ---------- */
  facturacion(v){
   $('#sub').textContent="Facturas generadas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos; las emitidas son inmutables.";
-  const all=erp.receivables();
+  const all=erp.invoiceRegister();
   const issued={}; erp.state.invoices.forEach(i=>{issued[i.number]=i.date;});
   const rows=all.filter(r=>inPeriod(issued[r.number]));
   v.innerHTML=`${periodNote(rows.length,all.length)}<div class="card"><div class="ch"><h3>Facturas</h3><span class="tag">pendiente total ${eur0(rows.reduce((s,r)=>s+r.outstandingCents,0))}</span></div>
