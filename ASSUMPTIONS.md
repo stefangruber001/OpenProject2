@@ -1268,3 +1268,29 @@ committedPct` and actual cost `× actualPct`, so every chapter reported an ident
   100000 seconds old — comfortably past eight hours, comfortably inside thirty days. Lengthening
   the session turned it into an assertion that a valid token is valid, and it went on passing.
   Now derived from the real TTL. A test that stops testing without failing is the worst kind.
+- **#87 — "Do it for me" ran into a credential wall, and that is the correct behaviour
+  (2026-08-08).** Asked to perform the deploy on the operator's behalf, I checked what I could
+  actually reach: no `ops/provision.conf`, no SSH key, no `HCLOUD_TOKEN`, and no network route to
+  the server (`curl` to the public address returns nothing from this sandbox). That is by design
+  and worth keeping — an agent holding a production SSH key is a worse trade than an operator
+  running two commands.
+  **What I could do was remove the reason a laptop was needed at all.** `.github/workflows/ops.yml`
+  already existed to run ops tasks from a browser, holding the key in repository secrets, opening
+  the firewall for its runner and closing it again in an `always()` step. It had `status`,
+  `backup-now` and `list-ssh-allowed` — everything except the one action anybody has actually
+  needed today. It now has `deploy-now`.
+  **It failed on first use, correctly and loudly:** `Missing repository secret(s): HCLOUD_TOKEN
+SERVER_SSH_KEY`. The browser-ops path has never had its credentials, so it has never been
+  usable — a facility documented in `docs/OPS-WITHOUT-A-LAPTOP.md` and quietly inert since it was
+  written. Better to have found that with a named error than to keep pointing people at it.
+  **Not resolved by me on purpose.** Those two values are the operator's; I must not hold them,
+  and they must not be pasted into a chat — the same rule that applied to `.env` earlier. The
+  workflow's own header is honest that adding them widens access to everyone with push rights,
+  which is a real trade for the operator to make, not a default to assume on their behalf.
+  **A second false alarm caught before it fired.** `deploy-now.sh` compared the server against
+  HEAD, but `deploy.yml` only builds an image for pushes touching apps/, packages/, site/,
+  tenants/ or ops/. The last two commits were iOS-only, so no image existed for them and the
+  server was right to stay put — the script would have called a healthy server stale. It now
+  compares against the newest commit that actually builds an image. Same lesson as #85, second
+  disguise in one day: **a check must model what the system really does, not what the commit log
+  looks like.**
