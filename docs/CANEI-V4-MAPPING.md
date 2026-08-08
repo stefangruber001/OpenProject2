@@ -111,9 +111,14 @@ Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, resh
 | DMC-05 | Formas de Pago           | hardcoded `LISTS.paymentMethods`                                     | **BUILD** — make maintainable                                                            |
 | DMC-06 | Comunicaciones _(added)_ | `#comunicaciones` — templates, rules, queue                          | **RE-HOME** to Configuración (plan decision 18) — three tabs: Plantillas · Reglas · Cola |
 
-**Not in the doc's 26, therefore removed** (plan decision 1): Mi Día · Reportes ·
-Torre extras · alert management · subcontract screens. **`journey.html` (Recorrido) is retained**
-pending review — it was substantially rewritten and tested on `main` after the plan was written.
+**Removed** (plan decision 1, operator-reviewed): **Reportes** (a placeholder — no screen exists
+behind it) · **subcontract screens** (UI only; all 69 engine references stay, decision 5) ·
+**Torre extras** (8 cards → 4, sparklines, reorder/hide, CSV) · **Mi Día** (the only person-level
+view; Torre is company-level).
+
+**Reprieved:** `journey.html` (Recorrido), pending review after S1a · **Comunicaciones** → DMC-06 ·
+**Alert management** → DMC-07. `clientes.html`, `dashboard.html`, `frontend.html` are already
+32–35-line redirects and stay unchanged.
 
 ---
 
