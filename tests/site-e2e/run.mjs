@@ -74,6 +74,7 @@ async function main() {
     await testPresupuestador(browser, base);
     await testCapture(browser, base);
     await testProjectTracking(browser, base);
+    await testContract(browser, base);
     await testProcurement(browser, base);
     await testAdmin(browser, base);
     await testControlTowerAndDay(browser, base);
@@ -2069,6 +2070,127 @@ async function testProjectTracking(browser, base) {
   }
 }
 
+// ── COM-04 Contrato (§3.2) — the last of the four full-screen surfaces, and
+//    the one column that earns the screen: «Importe vigente» goes amber the
+//    moment annexes exist, so nobody has to open a contract to find out.
+async function testContract(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#contracts`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(800);
+
+    const tabs = await pg.locator("#view .tabstrip [data-ctab]").allInnerTexts();
+    const activeRows = await pg.locator("#view table.mlist tr.click").count();
+    await pg.locator('[data-ctab="inactive"]').click();
+    await pg.waitForTimeout(500);
+    const inactiveRows = await pg.locator("#view table.mlist tr.click").count();
+    await pg.locator('[data-ctab="active"]').click();
+    await pg.waitForTimeout(500);
+    if (tabs.length === 2 && activeRows > 0 && activeRows !== inactiveRows)
+      ok(
+        `COM-04: two tabs split the register (${activeRows} vigentes / ${inactiveRows} históricos)`,
+      );
+    else bad("COM-04: tabs", `${tabs.join("/")} · ${activeRows}/${inactiveRows}`);
+
+    // The amber column, checked against the engine rather than against a
+    // colour: a pill appears exactly where annexes exist.
+    const amber = await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("#view table.mlist tr.click")];
+      const view = erp.contractsView();
+      return rows.map((tr) => {
+        const c = view.find((x) => x.id === tr.dataset.id);
+        const cells = [...tr.querySelectorAll("td")];
+        return { differs: !!(c && c.differs), pill: !!cells[4].querySelector(".pill") };
+      });
+    });
+    if (amber.length && amber.every((r) => r.pill === r.differs))
+      ok(
+        `COM-04: the current amount is amber exactly where annexes exist (${amber.filter((r) => r.differs).length} of ${amber.length})`,
+      );
+    else bad("COM-04: amber current amount", JSON.stringify(amber.slice(0, 4)));
+
+    // Open one that HAS annexes, so the viewer has something to show on its
+    // third tab — opening the first row would test the sample again.
+    const wanted = await pg.evaluate(() => {
+      const c =
+        erp.contractsView().find((x) => x.active && x.differs) ||
+        erp.contractsView().find((x) => x.active);
+      return c ? c.number : null;
+    });
+    await pg.fill("#conQ", wanted);
+    await pg.waitForTimeout(500);
+    await pg.locator("#view table.mlist tr.click").first().click();
+    await pg.waitForTimeout(600);
+
+    const viewer = await pg.evaluate(() => {
+      const grid = document.querySelector(".con2");
+      return {
+        full: document.body.classList.contains("fs"),
+        zones: grid ? grid.children.length : 0,
+        cols: grid ? getComputedStyle(grid).gridTemplateColumns : "",
+        docTranslateOff: document.querySelector(".cdoc")?.getAttribute("translate") === "no",
+        tabs: [...document.querySelectorAll("[data-contab]")].map((b) => b.textContent),
+      };
+    });
+    if (
+      viewer.full &&
+      viewer.zones === 2 &&
+      /392px$/.test(viewer.cols) &&
+      viewer.docTranslateOff &&
+      viewer.tabs.length === 3
+    )
+      ok(`COM-04: full screen, document 760 + panel 392, three tabs (${viewer.cols})`);
+    else bad("COM-04: full-screen viewer", JSON.stringify(viewer));
+
+    // The document is built from data — it names the customer and totals its
+    // own milestones, which no uploaded PDF in this system could do.
+    const docText = await pg.locator(".cdoc").innerText();
+    const named = await pg.evaluate(() => erp.renderContractDoc(conWork.id).customer.name);
+    if (new RegExp(named.slice(0, 12).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(docText))
+      ok("COM-04: the document is rendered from data, customer and all");
+    else bad("COM-04: document from data", docText.replace(/\n/g, " ").slice(0, 120));
+
+    // Hitos de pago: the sum against the contracted amount, and S8's source.
+    await pg.locator('[data-contab="hitos"]').click();
+    await pg.waitForTimeout(400);
+    const hitos = await pg.locator("#conBody").innerText();
+    if (/Suma de hitos/i.test(hitos) && /(cuadra|sobre el contratado)/i.test(hitos))
+      ok("COM-04: the milestones foot against the contracted amount");
+    else bad("COM-04: milestones foot", hitos.replace(/\n/g, " ").slice(0, 140));
+
+    await pg.locator('[data-contab="anexos"]').click();
+    await pg.waitForTimeout(400);
+    const anexos = await pg.evaluate(() => ({
+      text: document.querySelector("#conBody").innerText,
+      count: erp.contractValue(conWork.id).annexes,
+    }));
+    if (
+      (anexos.count > 0 && /Total anexos/i.test(anexos.text)) ||
+      (anexos.count === 0 && /Sin anexos/i.test(anexos.text))
+    )
+      ok(`COM-04: the Anexos tab agrees with the record (${anexos.count})`);
+    else bad("COM-04: anexos tab", JSON.stringify(anexos).slice(0, 160));
+
+    await pg.locator("#conBack").click();
+    await pg.waitForTimeout(400);
+    const back = await pg.evaluate(() => ({
+      full: document.body.classList.contains("fs"),
+      rows: document.querySelectorAll("#view table.mlist tr.click").length,
+    }));
+    if (!back.full && back.rows > 0) ok("COM-04: leaving the viewer restores the list");
+    else bad("COM-04: back to the list", JSON.stringify(back));
+
+    if (errs.length === 0) ok("COM-04: no console errors");
+    else bad("COM-04: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("contract viewer", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
 // ── Compras (§4.1), Subcontratos (§4.2), Modificaciones (§4.5) and Horas
 //    (§4.6) — session 10b. Every screen here is project-scoped through the
 //    same gProject context session 10a introduced; the checks drive real
@@ -2194,10 +2316,91 @@ async function testProcurement(browser, base) {
       ok("subcontratos: the retired route redirects to the DMT-03 fichero");
     else bad("subcontratos: retired route", `${subHash} · ${subText.slice(0, 70)}`);
 
+    // ---- PRY-03 (S9): five counters, 56 px rows, the amber rule ----
+    await pg.evaluate(() => (location.hash = "variations"));
+    await pg.waitForTimeout(700);
+    const counters = await pg.locator("#view .counter .lab").allInnerTexts();
+    const counterWidth = await pg.evaluate(() =>
+      Math.round(document.querySelector("#view .counter").getBoundingClientRect().width),
+    );
+    if (
+      counters.length === 5 &&
+      /Identificado/i.test(counters[0]) &&
+      /Facturado/i.test(counters[4]) &&
+      counterWidth === 216
+    )
+      ok(`PRY-03: five 216 px counters, identificado → facturado`);
+    else bad("PRY-03: counter strip", `${counters.join("/")} @${counterWidth}px`);
+
+    // A row is 56 tall because it carries a photograph, and an unapproved one
+    // is marked twice — the pill and a 3 px amber rule down its left edge.
+    //
+    // The unapproved row is SEEDED here rather than hoped for. The sample's
+    // extras are all approved, so measuring "the first unapproved row" measured
+    // nothing at all and reported a passing shape — the same trap S8 hit by
+    // clicking the first row of a list.
+    await pg.evaluate(() => {
+      erp.addChange(gProject, { desc: "Extra sin aprobar E2E" }, "ops");
+      persist();
+      render();
+    });
+    await pg.waitForTimeout(400);
+    const rowShape = await pg.evaluate(() => {
+      const tr = document.querySelector("#view tr.xrow");
+      if (!tr) return null;
+      const td = tr.querySelector("td");
+      const un = document.querySelector("#view tr.xrow.unapproved");
+      return {
+        unapprovedRows: document.querySelectorAll("#view tr.xrow.unapproved").length,
+        height: Math.round(td.getBoundingClientRect().height),
+        thumb: !!tr.querySelector(".xthumb"),
+        thumbBox: (() => {
+          const t = tr.querySelector(".xthumb");
+          const r = t.getBoundingClientRect();
+          return `${Math.round(r.width)}x${Math.round(r.height)}`;
+        })(),
+        rule: un ? getComputedStyle(un.querySelector("td")).borderLeftWidth : "0px",
+        unapprovedMatchesEngine: [...document.querySelectorAll("#view tr.xrow")].every((r) => {
+          const marked = r.classList.contains("unapproved");
+          const pill = /Sin aprobar/i.test(r.innerText);
+          return marked === pill;
+        }),
+      };
+    });
+    if (
+      rowShape &&
+      rowShape.unapprovedRows > 0 &&
+      rowShape.height === 56 &&
+      rowShape.thumbBox === "40x40" &&
+      rowShape.rule === "3px" &&
+      rowShape.unapprovedMatchesEngine
+    )
+      ok(`PRY-03: 56 px rows, 40×40 photo, and the amber rule on every unapproved one`);
+    else bad("PRY-03: row treatment", JSON.stringify(rowShape));
+
+    // Pressing a counter filters, pressing it again clears.
+    const allRows = await pg.locator("#view tr.xrow").count();
+    await pg.locator('#view [data-cstage="approved"]').click();
+    await pg.waitForTimeout(400);
+    const approvedRows = await pg.locator("#view tr.xrow").count();
+    const engineApproved = await pg.evaluate(() => erp.changeStageSummary(gProject).approved.count);
+    await pg.locator("#view .counter.on").first().click();
+    await pg.waitForTimeout(400);
+    const clearedRows = await pg.locator("#view tr.xrow").count();
+    if (approvedRows === engineApproved && clearedRows === allRows)
+      ok(`PRY-03: a counter filters to exactly its own stage (${approvedRows} aprobados)`);
+    else
+      bad(
+        "PRY-03: counter filter",
+        `${allRows}/${approvedRows}/${clearedRows} vs ${engineApproved}`,
+      );
+
     // ---- Modificaciones: detect → value → send → approve → adenda ----
     await pg.evaluate(() => (location.hash = "variations"));
     await pg.waitForTimeout(700);
-    const kpisBefore = await pg.locator("#view .kpi .val").allInnerTexts();
+    // S9 replaced this screen's three KPIs with the doc's five counters, so
+    // the figure that must move on approval is the aprobado counter.
+    const kpisBefore = await pg.locator("#view .counter .val").allInnerTexts();
     await pg.click("#mNew");
     await pg.waitForTimeout(300);
     await pg.fill("#c_desc", "Extra E2E");
@@ -2217,10 +2420,10 @@ async function testProcurement(browser, base) {
     await pg.waitForTimeout(400);
     await pg.locator("[data-approve]").first().click();
     await pg.waitForTimeout(500);
-    const kpisAfter = await pg.locator("#view .kpi .val").allInnerTexts();
+    const kpisAfter = await pg.locator("#view .counter .val").allInnerTexts();
     if (JSON.stringify(kpisAfter) !== JSON.stringify(kpisBefore))
-      ok("modificaciones: approving an extra moves the contract-value header");
-    else bad("modificaciones: header updates on approval", kpisAfter.join(" | "));
+      ok("modificaciones: approving an extra moves the stage counters");
+    else bad("modificaciones: counters update on approval", kpisAfter.join(" | "));
 
     await pg.locator("[data-doc]").first().click();
     await pg.waitForTimeout(300);
@@ -3540,6 +3743,54 @@ async function testI18n(browser, base) {
       ok("i18n: CA translates the PRY-02 panel");
     else bad("i18n: CA PRY-02", ecoCaText.replace(/\n/g, " ").slice(0, 160));
 
+    // S9's two screens, in Catalan. COM-04's viewer is checked twice over:
+    // the INTERFACE must follow the toggle while the DOCUMENT must not — its
+    // language is a field on the contract, chosen for the customer.
+    await pg.evaluate(() => (location.hash = "variations"));
+    await pg.waitForTimeout(700);
+    const chgCaText = await pg.locator("#view").innerText();
+    if (
+      /Identificat/i.test(chgCaText) &&
+      /Modificacions/i.test(chgCaText) &&
+      !/Sin aprobar/.test(chgCaText)
+    )
+      ok("i18n: CA translates the PRY-03 counters and rows");
+    else bad("i18n: CA PRY-03", chgCaText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "contracts"));
+    await pg.waitForTimeout(700);
+    const conCaText = await pg.locator("#view").innerText();
+    if (
+      /Vigents/i.test(conCaText) &&
+      /Import vigent/i.test(conCaText) &&
+      !/Importe vigente/.test(conCaText)
+    )
+      ok("i18n: CA translates the COM-04 register");
+    else bad("i18n: CA COM-04", conCaText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.locator("#view table.mlist tr.click").first().click();
+    await pg.waitForTimeout(600);
+    const conDoc = await pg.evaluate(() => ({
+      // The tab LABELS live in the strip, not in the body the tab renders —
+      // reading the body for them tested the wrong element, not the wrong
+      // translation.
+      tabs: [...document.querySelectorAll("[data-contab]")].map((b) => b.textContent).join(" "),
+      panel: document.querySelector("#conBody").innerText,
+      doc: document.querySelector(".cdoc").innerText,
+      lang: erp.renderContractDoc(conWork.id).language,
+    }));
+    if (
+      /Fites de pagament/i.test(conDoc.tabs) &&
+      /Import vigent/i.test(conDoc.panel) &&
+      (conDoc.lang === "ca" ? /CONTRACTE/i.test(conDoc.doc) : /CONTRATO DE OBRA/i.test(conDoc.doc))
+    )
+      ok(
+        `i18n: CA translates the viewer's interface, and the document keeps its own language (${conDoc.lang})`,
+      );
+    else bad("i18n: CA COM-04 viewer", JSON.stringify(conDoc).slice(0, 200));
+    await pg.locator("#conBack").click();
+    await pg.waitForTimeout(300);
+
     // And the same two screens under EN, so both new-string additions are
     // proven in both directions, not just the CA one that happened to be
     // built last.
@@ -3616,6 +3867,28 @@ async function testI18n(browser, base) {
     )
       ok("i18n: EN translates the PRY-02 panel");
     else bad("i18n: EN PRY-02", ecoEnText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "variations"));
+    await pg.waitForTimeout(700);
+    const chgEnText = await pg.locator("#view").innerText();
+    if (
+      /Identified/i.test(chgEnText) &&
+      /Unapproved/i.test(chgEnText) &&
+      !/Sin aprobar/.test(chgEnText)
+    )
+      ok("i18n: EN translates the PRY-03 counters and rows");
+    else bad("i18n: EN PRY-03", chgEnText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "contracts"));
+    await pg.waitForTimeout(700);
+    const conEnText = await pg.locator("#view").innerText();
+    if (
+      /In force/i.test(conEnText) &&
+      /Current amount/i.test(conEnText) &&
+      !/Importe vigente/.test(conEnText)
+    )
+      ok("i18n: EN translates the COM-04 register");
+    else bad("i18n: EN COM-04", conEnText.replace(/\n/g, " ").slice(0, 160));
 
     // COM-03 (S5). Two separate things are checked here, because they pull in
     // opposite directions: the presupuestador's INTERFACE must follow the
