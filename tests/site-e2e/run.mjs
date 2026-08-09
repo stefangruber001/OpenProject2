@@ -2294,8 +2294,8 @@ async function testI18n(browser, base) {
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(600);
     const pill = await pg.locator("#canei-lang-pill button").count();
-    if (pill === 2) ok("i18n: language toggle present on the workspace");
-    else bad("i18n: toggle present", `buttons=${pill}`);
+    if (pill === 3) ok("i18n: the toggle offers all three languages (ES · CA · EN)");
+    else bad("i18n: toggle present", `buttons=${pill}, expected 3`);
     const esText = await pg.locator("body").innerText();
     if (esText.includes("Torre de control")) ok("i18n: workspace defaults to Spanish");
     else bad("i18n: workspace defaults to Spanish", esText.slice(0, 60));
@@ -2312,6 +2312,44 @@ async function testI18n(browser, base) {
     if (erpLang === "en" && /Control tower/i.test(erpText) && !/Torre de control/.test(erpText))
       ok("i18n: EN toggle translates the ERP workspace");
     else bad("i18n: erp translated", `lang=${erpLang} ${erpText.slice(0, 80)}`);
+
+    // Catalan (S3, decision 20). The navigation is the surface a Catalan user
+    // hits first, so it is the one asserted: the six secciones must actually
+    // read as Catalan, not fall back to Spanish.
+    await pg.evaluate(() => localStorage.setItem("caneiLang", "ca"));
+    // reload(), not goto(): the page is already at erp.html#tower after the EN
+    // toggle, and navigating to the identical URL+hash is a no-op that would
+    // leave the previous language in place and quietly pass nothing.
+    await pg.reload({ waitUntil: "networkidle" });
+    await pg.waitForTimeout(700);
+    const caLang = await pg.evaluate(() => document.documentElement.lang);
+    const caText = await pg.locator("body").innerText();
+    // The rail shows the SHORT section labels, so those are what a Catalan
+    // user actually reads there — asserting on the long ones would have
+    // passed while "Maestros" sat untranslated in front of them, which is
+    // precisely how this check earns its keep.
+    if (
+      caLang === "ca" &&
+      /Projectes/.test(caText) &&
+      /Mestres/.test(caText) &&
+      !/Maestros/.test(caText) &&
+      !/Proyectos/.test(caText)
+    )
+      ok("i18n: CA translates the navigation, and Spanish does not leak through");
+    else bad("i18n: CA workspace", `lang=${caLang} ${caText.replace(/\n/g, " ").slice(0, 160)}`);
+
+    // The three languages must be genuinely distinct on the same label. A
+    // Catalan that silently equals the Spanish everywhere would pass a
+    // "did anything change" check while being no translation at all.
+    const trio = await pg.evaluate(() => {
+      const D = window.CANEI_DICT;
+      const probe = "Datos maestros";
+      const pair = D.pairs.find((p) => p[0] === probe);
+      return { es: probe, en: pair && pair[1], ca: D.ca[probe] };
+    });
+    if (trio.en === "Master data" && trio.ca === "Dades mestres")
+      ok("i18n: a label resolves to three genuinely different forms");
+    else bad("i18n: three forms", JSON.stringify(trio));
 
     // English-base page flips to Spanish when ES is chosen
     await pg.evaluate(() => localStorage.setItem("caneiLang", "es"));

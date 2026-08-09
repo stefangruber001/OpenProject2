@@ -1,4 +1,4 @@
-/* Canei Subirats — bilingual layer (ES ⇄ EN).
+/* Canei Subirats — trilingual layer (ES · CA · EN).
  *
  * Every page declares its base language in <html lang="…">. The visitor's
  * choice is stored in localStorage ("caneiLang", default "es"). When the
@@ -9,11 +9,25 @@
  *   - a MutationObserver keeps dynamically rendered content translated
  *   - window.CANEI_I18N.translateNode(root) lets generated documents
  *     (print windows, previews) opt in with one call
- * A floating ES | EN toggle is injected on every page.
+ * A floating ES | CA | EN toggle is injected on every page.
+ *
+ * WHY SPANISH IS THE HUB (S3, decision 20). The dictionary is a set of
+ * TRIPLES keyed on the Spanish string: `pairs` carries [es, en] and `ca`
+ * carries es → ca. Any direction is then one lookup — including EN → CA,
+ * which is the pairing that has no dictionary of its own and would otherwise
+ * have to translate twice, through Spanish, and lose everything the first
+ * hop failed to match. Spanish is the language the application is written
+ * in, so it is the only key every string is guaranteed to have.
+ *
+ * A missing Catalan entry falls back to Spanish rather than to the raw key.
+ * That is a deliberate degradation and not a licence: `tests/i18n/coverage.mjs`
+ * fails the build on a string that has no Catalan, precisely because a silent
+ * fallback is invisible to the person who introduced it.
  */
 (function () {
   "use strict";
 
+  var LANGS = ["es", "ca", "en"];
   var LS_KEY = "caneiLang";
   var target = "es";
   try {
@@ -21,26 +35,45 @@
   } catch (e) {
     /* storage unavailable → stay on base */
   }
-  if (target !== "es" && target !== "en") target = "es";
+  if (LANGS.indexOf(target) < 0) target = "es";
 
   var base = (document.documentElement.getAttribute("lang") || "en").slice(0, 2);
+  if (LANGS.indexOf(base) < 0) base = "en";
   var active = target !== base; // do we need to translate this page?
 
   /* ---------- dictionary ---------- */
   var D = (typeof window !== "undefined" && window.CANEI_DICT) || {
     pairs: [],
+    ca: {},
     rxEs2En: [],
     rxEn2Es: [],
+    rxEs2Ca: [],
   };
+  var CA = D.ca || {};
   var map = new Map();
   var rx = [];
   if (active) {
+    // One pass over the triples, building a direct base → target map. The
+    // Spanish form of each entry is the join key; `pairs` supplies English
+    // and `ca` supplies Catalan, each falling back to Spanish when absent so
+    // a partial entry degrades to a readable interface rather than a blank.
     for (var i = 0; i < D.pairs.length; i++) {
-      var p = D.pairs[i];
-      if (target === "en") map.set(p[0], p[1]);
-      else map.set(p[1], p[0]);
+      var es = D.pairs[i][0];
+      var forms = { es: es, en: D.pairs[i][1] || es, ca: CA[es] || es };
+      var from = forms[base];
+      var to = forms[target];
+      // Never map a string onto itself, and never let a language that has no
+      // entry of its own overwrite a real one already in the map.
+      if (from && to && from !== to && !map.has(from)) map.set(from, to);
     }
-    rx = target === "en" ? D.rxEs2En || [] : D.rxEn2Es || [];
+    rx =
+      base === "es"
+        ? target === "en"
+          ? D.rxEs2En || []
+          : D.rxEs2Ca || []
+        : target === "es"
+          ? D.rxEn2Es || []
+          : []; // EN → CA has no interpolation rules of its own; exact matches only
   }
 
   function tr(text) {
@@ -192,8 +225,8 @@
     var pill = document.createElement("div");
     pill.id = "canei-lang-pill";
     pill.setAttribute("role", "group");
-    pill.setAttribute("aria-label", "Idioma / Language");
-    ["es", "en"].forEach(function (lang) {
+    pill.setAttribute("aria-label", "Idioma / Idioma / Language");
+    LANGS.forEach(function (lang) {
       var b = document.createElement("button");
       b.type = "button";
       b.textContent = lang.toUpperCase();

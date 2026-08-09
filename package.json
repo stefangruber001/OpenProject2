@@ -21,7 +21,8 @@
     "factory": "tsx packages/factory/src/cli.ts",
     "boundaries": "tsx packages/boundary-lint/src/cli.ts",
     "prepare": "husky",
-    "test:sync": "node tests/site-sync/run.mjs"
+    "test:sync": "node tests/site-sync/run.mjs",
+    "test:i18n": "node tests/i18n/coverage.mjs"
   },
   "devDependencies": {
     "husky": "^9.1.7",

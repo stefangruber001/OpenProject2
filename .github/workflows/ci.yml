@@ -144,6 +144,14 @@ jobs:
       - name: Ownership file guard (strangler-fig migration state)
         run: node tests/parity/ownership-guard.mjs
 
+      # The interface is trilingual (ES · CA · EN) and the dictionary is
+      # hand-maintained, so nothing but a check stops a new Spanish string
+      # shipping with no translation — it renders correctly for whoever wrote
+      # it and silently falls back for everybody else. Fails on a missing
+      # English form, and on any growth in the Catalan backlog.
+      - name: i18n coverage (no untranslated user-visible string)
+        run: node tests/i18n/coverage.mjs
+
   persistence:
     name: Durable adapters (Postgres + RLS contract tests)
     runs-on: ubuntu-latest
