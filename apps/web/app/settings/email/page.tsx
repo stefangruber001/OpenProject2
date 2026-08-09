@@ -117,7 +117,7 @@ export default async function MailSettingsPage({
               marginTop: 4,
             }}
           >
-            Buzón para borradores
+            Draft mailbox
           </div>
         </div>
 
@@ -145,33 +145,32 @@ export default async function MailSettingsPage({
 
           {status === "ok" && (
             <Banner tone="good">
-              Conectado. Se ha dejado un borrador de prueba en{" "}
-              <b>{detail || "la carpeta de borradores"}</b>.
+              Connected. A test draft was left in <b>{detail || "your drafts folder"}</b>.
             </Banner>
           )}
           {status === "failed" && (
             <Banner tone="bad">
-              El servidor de correo no aceptó estos datos, así que no se ha guardado nada.
+              The mail server did not accept these details, so nothing was saved.
               {detail ? ` (${detail})` : ""}
             </Banner>
           )}
-          {status === "bad" && <Banner tone="bad">{detail || "Revise los datos."}</Banner>}
+          {status === "bad" && <Banner tone="bad">{detail || "Check the details."}</Banner>}
 
           {connected && !status && (
             <Banner tone="info">
-              Buzón actual: <b>{currentAddress}</b>
+              Current mailbox: <b>{currentAddress}</b>
               {currentHost ? ` · ${currentHost}` : ""}
-              {fromEnv ? " (fijado en el servidor)" : ""}
+              {fromEnv ? " (fixed on the server)" : ""}
             </Banner>
           )}
 
           <p style={{ font: `400 13px/1.55 ${SANS}`, color: BODY, margin: "0 0 18px" }}>
-            El ERP dejará sus emails como <b>borradores</b> en este buzón. Nunca envía nada: usted
-            los revisa y los envía desde su propio correo.
+            The ERP will leave its emails as <b>drafts</b> in this mailbox. It never sends anything
+            — you review them and send from your own mail app.
           </p>
 
           <label htmlFor="address" style={LABEL}>
-            Dirección de correo
+            Email address
           </label>
           <input
             id="address"
@@ -189,7 +188,7 @@ export default async function MailSettingsPage({
           />
 
           <label htmlFor="password" style={LABEL}>
-            Contraseña del buzón
+            Mailbox password
           </label>
           <input
             id="password"
@@ -200,16 +199,16 @@ export default async function MailSettingsPage({
             style={{ ...FIELD, marginBottom: 6 }}
           />
           <p style={{ font: `400 12px/1.5 ${SANS}`, color: MUTED, margin: "0 0 16px" }}>
-            Se guarda cifrada en el servidor. No se muestra nunca más.
+            Stored encrypted on the server. Never shown again.
           </p>
 
           <details style={{ marginBottom: 18 }}>
             <summary style={{ font: `600 12.5px ${SANS}`, color: GREEN, cursor: "pointer" }}>
-              Ajustes avanzados
+              Advanced settings
             </summary>
             <div style={{ paddingTop: 12 }}>
               <label htmlFor="host" style={LABEL}>
-                Servidor IMAP
+                IMAP server
               </label>
               <input
                 id="host"
@@ -223,7 +222,7 @@ export default async function MailSettingsPage({
                 style={{ ...FIELD, marginBottom: 12 }}
               />
               <label htmlFor="drafts" style={LABEL}>
-                Carpeta de borradores
+                Drafts folder
               </label>
               <input
                 id="drafts"
@@ -232,7 +231,7 @@ export default async function MailSettingsPage({
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder="(se detecta sola)"
+                placeholder="(detected automatically)"
                 style={FIELD}
               />
             </div>
@@ -252,7 +251,7 @@ export default async function MailSettingsPage({
               boxShadow: "0 10px 22px -12px rgba(49,83,42,.9)",
             }}
           >
-            Guardar y probar
+            Save and test
           </button>
 
           <p
@@ -263,12 +262,12 @@ export default async function MailSettingsPage({
               margin: "16px 0 0",
             }}
           >
-            Se comprueba con el servidor de correo antes de guardar.
+            Checked against the mail server before saving.
           </p>
         </form>
 
         <p style={{ font: `400 12px/1.5 ${SANS}`, color: MUTED, margin: "14px 2px 0" }}>
-          Enviando desde {mailFrom() || currentAddress || "—"}
+          Sending from {mailFrom() || currentAddress || "—"}
         </p>
       </div>
     </main>
