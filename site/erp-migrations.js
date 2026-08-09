@@ -421,6 +421,44 @@
         return s;
       },
     },
+    {
+      to: 12,
+      name: "visits get a lifecycle: scheduled vs. done (S4, COM-02)",
+      /*
+       * Every visit that reached this blob was created by the OLD addVisit —
+       * an already-completed capture in one step, because there was no
+       * screen that could schedule one first. COM-02 needs to tell a
+       * scheduled visit from a done one, so every existing visit is
+       * backfilled as "done" (the true state of every visit written before
+       * this session) rather than left ambiguous.
+       *
+       *   status        "done" — never "scheduled": nothing before this
+       *                 session could produce a scheduled-but-not-yet-done
+       *                 visit, since the concept did not exist.
+       *   scheduledAt   backfilled to `date`. It is the closest honest
+       *   completedAt   answer — the visit's own record IS when it was
+       *                 captured, and stamping both to that day is a fact,
+       *                 not a guess, for a visit that was always same-day.
+       *   owner         "operations" — every existing visit's actual owner
+       *                 by convention (site staff go on visits); not
+       *                 recorded per-visit until this session.
+       *   propertyId    null — was never captured on the visit itself
+       *                 before now (only on the opportunity).
+       *   budgetId      null — no visit has ever been linked to the budget
+       *                 it produced; that link is new in this session.
+       */
+      up: function (s) {
+        (Array.isArray(s.visits) ? s.visits : []).forEach(function (v) {
+          if (typeof v.status !== "string") v.status = "done";
+          if (typeof v.scheduledAt !== "string") v.scheduledAt = v.date || null;
+          if (typeof v.completedAt !== "string") v.completedAt = v.date || null;
+          if (typeof v.owner !== "string") v.owner = "operations";
+          if (!("propertyId" in v)) v.propertyId = null;
+          if (!("budgetId" in v)) v.budgetId = null;
+        });
+        return s;
+      },
+    },
   ];
 
   /**

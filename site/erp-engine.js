@@ -1029,27 +1029,107 @@
         .map((o) => ({ ...o, ageDays: daysBetween(t, o.date) }));
     }
     addVisit(v, user) {
-      // VIS-01/02/03/06
+      // VIS-01/02/03/06. Creates an already-COMPLETED visit in one step —
+      // kept exactly as it was (seed/history call it this way six times) for
+      // backfilling historical captures where scheduling was never a real
+      // event. COM-02's own screen uses scheduleVisit/completeVisit below,
+      // which is the two-step path a person actually lives through.
       const rec = Object.assign(
         {
           id: this._id("vis"),
           opportunityId: null,
+          propertyId: null,
           date: this.state.today,
+          status: "done",
+          scheduledAt: this.state.today,
+          completedAt: this.state.today,
+          owner: "operations",
           measurements: [],
           photos: [],
           notes: "",
           assumptions: [],
           exclusions: [],
           handwrittenEstimateRef: null,
+          budgetId: null,
           lines: [], // lines → budget without retype (VIS-06)
         },
         v,
       );
+      // date is still the field callers pass; keep the derived stamps
+      // aligned with it unless the caller overrode them explicitly.
+      if (!("scheduledAt" in v)) rec.scheduledAt = rec.date;
+      if (!("completedAt" in v)) rec.completedAt = rec.date;
       this.state.visits.push(rec);
       const o = this.state.opportunities.find((x) => x.id === rec.opportunityId);
       if (o && o.status === "awaitingVisit") o.status = "awaitingBudget";
       this._log(user, "addVisit", rec.id);
       return rec;
+    }
+    /**
+     * COM-02's "programada" half. A visit that has not happened yet — no
+     * measurements, no photos, just when and for whom. Kept as its own
+     * record (not a field on the opportunity) because a visit has its own
+     * lifecycle: it can be rescheduled, and once it happens it is completed
+     * with a full capture, exactly like a visit created directly ever was.
+     */
+    scheduleVisit(v, user) {
+      // VIS-01: date/time, client, address and who is going.
+      if (!v || !v.opportunityId) throw new Error("A visit needs an opportunity");
+      if (!v.scheduledAt) throw new Error("A visit needs a date");
+      const rec = Object.assign(
+        {
+          id: this._id("vis"),
+          opportunityId: null,
+          propertyId: null,
+          scheduledAt: this.state.today,
+          scheduledTime: "",
+          owner: "operations",
+          status: "scheduled",
+          date: null, // set by completeVisit — this visit has not happened
+          completedAt: null,
+          measurements: [],
+          photos: [],
+          notes: "",
+          assumptions: [],
+          exclusions: [],
+          handwrittenEstimateRef: null,
+          budgetId: null,
+          lines: [],
+        },
+        v,
+      );
+      this.state.visits.push(rec);
+      this._log(user, "scheduleVisit", rec.id);
+      return rec;
+    }
+    /**
+     * The capture step. Refuses on an already-completed visit — a finished
+     * visit is corrected through `validateVisit` (VIS-08, back office), not
+     * re-completed, so there is exactly one place a capture is first
+     * recorded and exactly one place it is amended afterward.
+     */
+    completeVisit(id, patch, user) {
+      const v = this.state.visits.find((x) => x.id === id);
+      if (!v) throw new Error("Visit not found");
+      if (v.status === "done")
+        throw new Error("Visit is already completed — use validateVisit to correct it");
+      const CAPTURE = [
+        "measurements",
+        "photos",
+        "notes",
+        "assumptions",
+        "exclusions",
+        "handwrittenEstimateRef",
+        "lines",
+      ];
+      for (const k of CAPTURE) if (patch && k in patch) v[k] = patch[k];
+      v.status = "done";
+      v.date = this.state.today;
+      v.completedAt = this.state.today;
+      const o = this.state.opportunities.find((x) => x.id === v.opportunityId);
+      if (o && o.status === "awaitingVisit") o.status = "awaitingBudget";
+      this._log(user, "completeVisit", v.id);
+      return v;
     }
 
     /* =========================== CAT — catalogue & packages =========================== */

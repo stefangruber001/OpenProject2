@@ -735,6 +735,104 @@ assert(
   );
 }
 
+// -----------------------------------------------------------------------------
+// S4: COM-01/02 — the visit lifecycle (scheduled → done) and lead management.
+// -----------------------------------------------------------------------------
+{
+  const cust = erp.addParty(
+    { roles: ["customer"], name: "Cliente Visita", mobile: "699888777" },
+    "bo",
+  );
+  const opp = erp.addOpportunity(
+    { partyId: cust.id, requestedWork: "Reforma cocina", source: "referrer" },
+    "bo",
+  );
+  assert(opp.status === "awaitingVisit", "sanity: a new opportunity awaits a visit");
+
+  throws(() => erp.scheduleVisit({}, "bo"), "scheduleVisit refuses without an opportunity");
+  throws(
+    () => erp.scheduleVisit({ opportunityId: opp.id }, "bo"),
+    "scheduleVisit refuses without a date",
+  );
+
+  const v = erp.scheduleVisit(
+    {
+      opportunityId: opp.id,
+      scheduledAt: "2026-06-01",
+      scheduledTime: "10:00",
+      owner: "operations",
+    },
+    "bo",
+  );
+  assert(v.status === "scheduled", "scheduleVisit creates a scheduled, not-yet-done visit");
+  assert(v.date === null, "a scheduled visit has no completion date yet");
+  assert(
+    erp.state.opportunities.find((o) => o.id === opp.id).status === "awaitingVisit",
+    "scheduling a visit does not by itself advance the opportunity",
+  );
+
+  const completed = erp.completeVisit(
+    v.id,
+    { measurements: [{ what: "cocina", qty: 8, unit: "m2" }], notes: "medido" },
+    "bo",
+  );
+  assert(completed.status === "done", "completeVisit marks the visit done");
+  assert(completed.measurements.length === 1, "completeVisit records the capture");
+  assert(
+    erp.state.opportunities.find((o) => o.id === opp.id).status === "awaitingBudget",
+    "completing a visit advances the opportunity to awaitingBudget",
+  );
+  throws(
+    () => erp.completeVisit(v.id, {}, "bo"),
+    "completeVisit refuses on an already-completed visit",
+  );
+
+  erp.validateVisit(v.id, { budgetId: "bud_test", notes: "corregida" }, "bo");
+  assert(
+    erp.state.visits.find((x) => x.id === v.id).budgetId === "bud_test",
+    "validateVisit links a budget to the visit after the fact",
+  );
+
+  // addVisit (the one-step, backward-compatible path used by seed/history)
+  // still produces a visit that reads as done under the new lifecycle.
+  const direct = erp.addVisit({ opportunityId: opp.id, notes: "captura directa" }, "bo");
+  assert(
+    direct.status === "done",
+    "addVisit still produces an already-done visit (backward compat)",
+  );
+  assert(
+    direct.scheduledAt === direct.date,
+    "addVisit's scheduledAt matches its date when not overridden",
+  );
+
+  // loseOpportunity — the other way an opportunity leaves the open list.
+  const opp2 = erp.addOpportunity(
+    { partyId: cust.id, requestedWork: "Baño", source: "website" },
+    "bo",
+  );
+  erp.loseOpportunity(opp2.id, "price", "bo");
+  const lost = erp.state.opportunities.find((o) => o.id === opp2.id);
+  assert(
+    lost.status === "lost" && lost.lossReason === "price",
+    "loseOpportunity records status and reason",
+  );
+  assert(
+    !erp.opportunityAges().some((o) => o.id === opp2.id),
+    "a lost opportunity drops out of opportunityAges (the open list)",
+  );
+
+  // updateOpportunity's one hard rule: a won deal cannot be silently reopened.
+  const opp3 = erp.addOpportunity(
+    { partyId: cust.id, requestedWork: "Terraza", source: "website" },
+    "bo",
+  );
+  erp.updateOpportunity(opp3.id, { status: "won" }, "bo");
+  throws(
+    () => erp.updateOpportunity(opp3.id, { status: "open" }, "bo"),
+    "updateOpportunity refuses to reopen a won opportunity",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);
