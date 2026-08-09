@@ -1463,3 +1463,45 @@ SERVER_SSH_KEY`. The browser-ops path has never had its credentials, so it has n
   (said once per session, not on every draft) and a failed append. Silence was
   not one of the options: a draft the operator believes is in their mailbox and
   is not has a customer on the other end of it.
+
+- **#93 — Sending was switched from impossible to possible, and the guarantee
+  that replaced "there is no code for it" is four rails, not one flag.**
+  Operator asked twice how to activate SMTP. #91 recorded the opposite decision
+  — drafts only, no send path anywhere — and the strength of that decision was
+  structural: the guarantee "this cannot email a customer" held because no
+  sending code existed to misconfigure. That guarantee is spent now, permanently,
+  and it cannot be won back by deleting the feature later; a reviewer will always
+  have to read the config instead of the dependency list.
+  **The credential question the operator kept asking has no new answer, and that
+  is the point.** SMTP reuses the mailbox credential already sealed in
+  `erp_state` — same address, same password, port 465 instead of 993. Nothing is
+  hand-edited on the server, nothing travels through chat or a side-channel, and
+  the submission host is derived from the IMAP host (`imap.X` → `smtp.X`, with
+  the handful of providers that break the pattern named). Turning sending on
+  introduces no second secret and no second place to keep one.
+  **What replaces the structural guarantee, in `lib/mail-send.ts`:**
+  1. _Off by default._ `enabled === true` and nothing else, so a stored `"yes"`,
+     `1` or `"false"` cannot enable it by being truthy. Deploying does not turn
+     it on; a person does, on a screen that says what it means.
+  2. _An allowlist, where empty means nobody._ The safe reading of "I did not
+     say" is "you may not". An operator who enables sending and does not think
+     about recipients has a system that can write to its own mailbox and no one
+     else. Entries are a whole address or `@domain`; the `@` anchor is what stops
+     `@cliente.es` matching `bob@evilcliente.es`, and there is a test for it.
+  3. _A rate limit (20/hour)._ The failure that costs a company its mail
+     reputation is never one wrong email, it is four hundred, and that is always
+     a loop.
+  4. _An explicit act per message._ `POST …/erp/send?confirm=yes`. The parameter
+     has no purpose except to be typed on purpose, so no code path can drift into
+     sending while meaning to save. `/draft` is unchanged and remains the default.
+     **Every attempt is logged, refusals included** — who, when, to whom, which
+     subject, and why not — bounded to the last 500 so an audit trail cannot grow a
+     settings row without limit. `by` is the fact nobody can reconstruct afterwards.
+     **Refusals get distinct HTTP statuses** (403 off, 422 recipient, 429 rate,
+     400 no recipient). One 400 for all of them would make a safety rail look like a
+     programming mistake, which is how rails get routed around.
+     **The honest ceiling:** this makes a bad send hard, not impossible. Anyone who
+     can sign in can enable sending and add a recipient. The rails are against
+     accident and against loops, not against a person with credentials deciding to
+     email someone. Ranking that risk against the customer's own inbox is the
+     owner's call, and they made it.

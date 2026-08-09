@@ -24,7 +24,7 @@ import {
   isAuthFailure,
   type MailboxConfig,
 } from "@/lib/draft-mailbox";
-import { saveMailSettings } from "@/lib/erp-runtime";
+import { loadMailSettings, saveMailSettings } from "@/lib/erp-runtime";
 import { seal } from "@/lib/secret-box";
 import { requireUser } from "@/lib/session";
 import { tenantFor } from "@/lib/access";
@@ -49,6 +49,16 @@ export async function POST(req: Request) {
   const password = String(form.get("password") || "");
   const hostRaw = String(form.get("host") || "").trim();
   const drafts = String(form.get("drafts") || "").trim();
+
+  // An unchecked checkbox is ABSENT from the form, not "off" — so the default
+  // when the field is missing has to be the safe one, and here that is not
+  // sending. Getting this backwards is the classic way a safety switch ends up
+  // on by default.
+  const sendEnabled = form.get("sendEnabled") === "yes";
+  const allowlist = String(form.get("allowlist") || "")
+    .split(/[\s,;]+/)
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.startsWith("@") || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(entry));
 
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) back("bad", "That is not an email address.");
   if (!password) back("bad", "Enter the mailbox password.");
@@ -114,9 +124,23 @@ export async function POST(req: Request) {
     );
   }
 
+  // Merged, not replaced. The send log is an audit trail that happens to live
+  // in this document, and rewriting the document wholesale would erase it every
+  // time somebody re-saved their password.
+  const existing = (await loadMailSettings(tenant).catch(() => null)) || {};
+
   await saveMailSettings(
     tenant,
-    { from: address, host, port: 993, user: address, sealedPassword: seal(password), drafts },
+    {
+      ...existing,
+      from: address,
+      host,
+      port: 993,
+      user: address,
+      sealedPassword: seal(password),
+      drafts,
+      send: { enabled: sendEnabled, allowlist, hourlyLimit: 20 },
+    },
     user,
   );
 

@@ -325,6 +325,282 @@ check(
   );
 }
 
+// ── Sending: the rules, which matter more than the socket ───────────────────
+//
+// A draft in the wrong folder is an inconvenience. A sent email is in somebody
+// else's inbox and cannot be recalled, so every one of these is a case where
+// being wrong costs the company something it cannot get back.
+{
+  const {
+    isAllowed,
+    policyFrom,
+    recipientsOf,
+    refuseToSend,
+    smtpHostFor,
+    SEND_OFF,
+  } = await import("../../apps/web/lib/mail-send.ts");
+
+  const letter = (to: string, extra = "") =>
+    [`From: Canei <if@2iberia.com>`, `To: ${to}`, extra, "Subject: Presupuesto", "", "Hola.", ""]
+      .filter((l) => l !== "")
+      .join("\r\n");
+
+  // Where SMTP lives, derived from the mailbox we already have.
+  check("smtp host derived from the imap host", smtpHostFor("imap.hostinger.com") === "smtp.hostinger.com");
+  check("gmail derives correctly", smtpHostFor("imap.gmail.com") === "smtp.gmail.com");
+  check(
+    "office365 is not imap.-prefixed and is handled by name",
+    smtpHostFor("outlook.office365.com") === "smtp.office365.com",
+  );
+
+  // Recipient extraction. An allowlist that misses a recipient is not an
+  // allowlist.
+  check(
+    "recipients are read from To, Cc and Bcc",
+    JSON.stringify(
+      recipientsOf(
+        "From: a@b.com\r\nTo: One <one@x.com>, two@x.com\r\nCc: three@y.com\r\nBcc: four@z.com\r\nSubject: s\r\n\r\nbody five@nope.com\r\n",
+      ).sort(),
+    ) === JSON.stringify(["four@z.com", "one@x.com", "three@y.com", "two@x.com"]),
+  );
+  check(
+    "a recipient list folded across lines is still read",
+    recipientsOf("To: one@x.com,\r\n three@y.com\r\nSubject: s\r\n\r\nbody\r\n").length === 2,
+  );
+
+  // The default, and the meaning of "I did not say".
+  check("the default policy is off", SEND_OFF.enabled === false);
+  check("an absent policy is off", policyFrom(undefined).enabled === false);
+  check("a truthy-but-not-true stored value does not enable sending", policyFrom({ enabled: "yes" }).enabled === false);
+  check(
+    "an empty allowlist does not mean everyone",
+    !isAllowed("stranger@example.com", policyFrom({ enabled: true }), "if@2iberia.com"),
+  );
+  check(
+    "the mailbox may always write to itself",
+    isAllowed("if@2iberia.com", policyFrom({ enabled: true }), "if@2iberia.com"),
+  );
+  check(
+    "an @domain entry covers that domain",
+    isAllowed("bob@cliente.es", policyFrom({ enabled: true, allowlist: ["@cliente.es"] }), "if@2iberia.com"),
+  );
+  check(
+    "an @domain entry does NOT cover a lookalike domain",
+    !isAllowed(
+      "bob@notcliente.es.evil.com",
+      policyFrom({ enabled: true, allowlist: ["@cliente.es"] }),
+      "if@2iberia.com",
+    ),
+  );
+
+  // The decision, end to end.
+  const on = policyFrom({ enabled: true, allowlist: ["cliente@example.com"], hourlyLimit: 3 });
+  check(
+    "with sending off, an otherwise perfect message is refused",
+    refuseToSend(letter("cliente@example.com"), policyFrom({}), "if@2iberia.com", [], 0)?.code ===
+      "DISABLED",
+  );
+  check(
+    "an allowed recipient passes",
+    refuseToSend(letter("cliente@example.com"), on, "if@2iberia.com", [], 0) === null,
+  );
+  check(
+    "an unapproved recipient is refused by name",
+    refuseToSend(letter("stranger@example.com"), on, "if@2iberia.com", [], 0)?.code ===
+      "NOT_ALLOWED",
+  );
+  check(
+    "one bad recipient among good ones blocks the whole message",
+    refuseToSend(
+      letter("cliente@example.com", "Bcc: stranger@example.com"),
+      on,
+      "if@2iberia.com",
+      [],
+      0,
+    )?.code === "NOT_ALLOWED",
+  );
+  check(
+    "a message with no recipient is refused",
+    refuseToSend("From: a@b.com\r\nSubject: s\r\n\r\nhi\r\n", on, "if@2iberia.com", [], 0)?.code ===
+      "NO_RECIPIENTS",
+  );
+
+  // The rate limit is the rail that catches a loop, which is the failure that
+  // actually costs a company its mail reputation.
+  const now = 1_000_000_000_000;
+  const threeJustNow = [now - 1000, now - 2000, now - 3000];
+  check(
+    "the hourly limit refuses the message after it",
+    refuseToSend(letter("cliente@example.com"), on, "if@2iberia.com", threeJustNow, now)?.code ===
+      "RATE_LIMITED",
+  );
+  check(
+    "sends older than an hour do not count against it",
+    refuseToSend(
+      letter("cliente@example.com"),
+      on,
+      "if@2iberia.com",
+      threeJustNow.map((t) => t - 60 * 60 * 1000),
+      now,
+    ) === null,
+  );
+}
+
+// ── Sending: what actually goes on the wire ─────────────────────────────────
+//
+// The rules above are pure functions and easy to get right. This is the part
+// that talks to a mail server, and the failure it hides is the worst kind: a
+// message that is accepted but is not the message the operator reviewed.
+{
+  const { sendViaSmtp } = await import("../../apps/web/lib/mail-send.ts");
+
+  const smtp = {
+    mailFrom: "",
+    rcptTo: [] as string[],
+    /** After un-stuffing — what the recipient would read. */
+    data: "",
+    /** Before un-stuffing — the literal bytes on the wire. Kept separately
+     *  because an assertion made against `data` cannot tell a stuffed line from
+     *  an unstuffed one: both arrive as `.signature` once we have undone it.
+     *  Checking only `data` would pass whether or not the client escaped
+     *  anything, which is a test that agrees with us for no reason. */
+    wire: "",
+    authenticated: false,
+  };
+
+  const smtpStub = createServer((socket: Socket) => {
+    let buf = "";
+    let inData = false;
+    let expectAuth = false;
+    const send = (line: string) => socket.write(line + "\r\n");
+    send("220 stub ESMTP ready");
+
+    socket.on("data", (chunk) => {
+      buf += chunk.toString("utf8");
+      for (;;) {
+        const nl = buf.indexOf("\r\n");
+        if (nl < 0) return;
+        const line = buf.slice(0, nl);
+        buf = buf.slice(nl + 2);
+
+        if (inData) {
+          if (line === ".") {
+            inData = false;
+            send("250 2.0.0 Ok: queued as STUB1");
+            continue;
+          }
+          smtp.wire += line + "\r\n";
+          // Undo dot-stuffing, exactly as a real server must.
+          smtp.data += (line.startsWith("..") ? line.slice(1) : line) + "\r\n";
+          continue;
+        }
+        if (expectAuth) {
+          expectAuth = false;
+          smtp.authenticated = true;
+          send("235 2.7.0 Authentication successful");
+          continue;
+        }
+
+        const verb = line.split(" ")[0]!.toUpperCase();
+        if (verb === "EHLO" || verb === "HELO") {
+          send("250-stub");
+          send("250-AUTH PLAIN LOGIN");
+          send("250 8BITMIME");
+        } else if (verb === "AUTH") {
+          if (line.trim().split(/\s+/).length > 2) {
+            smtp.authenticated = true;
+            send("235 2.7.0 Authentication successful");
+          } else {
+            expectAuth = true;
+            send("334 ");
+          }
+        } else if (verb === "MAIL") {
+          smtp.mailFrom = /<([^>]*)>/.exec(line)?.[1] ?? "";
+          send("250 2.1.0 Ok");
+        } else if (verb === "RCPT") {
+          smtp.rcptTo.push(/<([^>]*)>/.exec(line)?.[1] ?? "");
+          send("250 2.1.5 Ok");
+        } else if (verb === "DATA") {
+          inData = true;
+          send("354 End data with <CR><LF>.<CR><LF>");
+        } else if (verb === "QUIT") {
+          send("221 2.0.0 Bye");
+          socket.end();
+        } else {
+          send("250 2.0.0 Ok");
+        }
+      }
+    });
+    socket.on("error", () => {});
+  });
+  smtpStub.listen(0, "127.0.0.1");
+  await once(smtpStub, "listening");
+  const smtpPort = (smtpStub.address() as { port: number }).port;
+
+  const outgoing = [
+    "From: Canei Subirats <if@2iberia.com>",
+    "To: Cliente <cliente@example.com>",
+    "Subject: Presupuesto P-2026-0001",
+    'Content-Type: text/plain; charset="utf-8"',
+    "",
+    "Adjunto el presupuesto.",
+    ".signature line that must survive dot-stuffing",
+    "",
+  ].join("\r\n");
+
+  let sendError: unknown = null;
+  try {
+    await sendViaSmtp(
+      {
+        from: "if@2iberia.com",
+        host: "imap.example.com",
+        port: 993,
+        user: "if@2iberia.com",
+        password: "stub-password-not-a-real-one",
+        drafts: "",
+      },
+      outgoing,
+      ["cliente@example.com"],
+      { host: "127.0.0.1", port: smtpPort },
+    );
+  } catch (e) {
+    sendError = e;
+  }
+
+  check("the send completed", sendError === null, (sendError as Error)?.message?.slice(0, 90));
+  check("it authenticated before sending", smtp.authenticated);
+  check(
+    "the envelope sender is the company mailbox",
+    smtp.mailFrom === "if@2iberia.com",
+    smtp.mailFrom,
+  );
+  check(
+    "the envelope recipient is the one we approved, and only that one",
+    JSON.stringify(smtp.rcptTo) === JSON.stringify(["cliente@example.com"]),
+    smtp.rcptTo.join(", "),
+  );
+  check(
+    "the message that arrived is the message we composed",
+    smtp.data.includes("Subject: Presupuesto P-2026-0001") &&
+      smtp.data.includes("Adjunto el presupuesto."),
+  );
+  // Two halves of one fact: the client escaped the line on the wire, AND the
+  // server got the original back. Either alone is satisfied by doing nothing.
+  check(
+    "a leading dot is escaped on the wire, so it cannot end the message early",
+    smtp.wire.includes("\r\n..signature line that must survive dot-stuffing\r\n"),
+  );
+  check(
+    "and un-escaping yields exactly what was composed",
+    smtp.data.includes("\r\n.signature line that must survive dot-stuffing\r\n"),
+  );
+  check(
+    "no password reached the message body",
+    !smtp.data.includes("stub-password-not-a-real-one"),
+  );
+  smtpStub.close();
+}
+
 // ── Not configured must be loud, not a quiet success ────────────────────────
 {
   delete process.env.ERP_MAIL_PASSWORD;

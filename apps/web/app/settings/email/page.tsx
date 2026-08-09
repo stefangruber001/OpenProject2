@@ -26,6 +26,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { mailFrom, mailboxFromEnv } from "@/lib/draft-mailbox";
 import { loadMailSettings } from "@/lib/erp-runtime";
+import { policyFrom } from "@/lib/mail-send";
 import { defaultTenant } from "@/lib/access";
 import { SESSION_COOKIE, readSession } from "@/lib/session-token";
 
@@ -96,12 +97,15 @@ export default async function MailSettingsPage({
   }
 
   const fromEnv = mailboxFromEnv();
-  const stored = fromEnv
-    ? null
-    : ((await loadMailSettings(defaultTenant()).catch(() => null)) as {
-        user?: string;
-        host?: string;
-      } | null);
+  // Loaded even when the environment supplies the mailbox: the sending policy
+  // lives in the stored settings either way, and reading it only in one of the
+  // two cases would make the screen lie about the state of a switch.
+  const stored = (await loadMailSettings(defaultTenant()).catch(() => null)) as {
+    user?: string;
+    host?: string;
+    send?: unknown;
+  } | null;
+  const sending = policyFrom(stored?.send);
 
   const currentAddress = fromEnv ? fromEnv.user : stored?.user || "";
   const currentHost = fromEnv ? fromEnv.host : stored?.host || "";
@@ -268,6 +272,72 @@ export default async function MailSettingsPage({
                 placeholder="(detected automatically)"
                 style={FIELD}
               />
+            </div>
+          </details>
+
+          {/* SENDING. Off unless someone deliberately turns it on, and the
+              screen says what turning it on means rather than presenting it as
+              another checkbox. A draft is an edit; a sent email is a
+              conversation with a customer. */}
+          <details style={{ marginBottom: 18 }} open={sending.enabled}>
+            <summary style={{ font: `600 12.5px ${SANS}`, color: GREEN, cursor: "pointer" }}>
+              Sending · Envío {sending.enabled ? "— ON · ACTIVADO" : "— off · desactivado"}
+            </summary>
+            <div style={{ paddingTop: 12 }}>
+              <p style={{ font: `400 12.5px/1.5 ${SANS}`, color: BODY, margin: "0 0 12px" }}>
+                Normally the ERP only files drafts and you press send yourself. Switch this on and
+                it can send directly — which cannot be undone.
+                <br />
+                <span style={{ opacity: 0.75 }}>
+                  Normalmente el ERP solo deja borradores y usted los envía. Si lo activa, podrá
+                  enviar directamente, y eso no se puede deshacer.
+                </span>
+              </p>
+
+              <label
+                htmlFor="sendEnabled"
+                style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 14 }}
+              >
+                <input
+                  id="sendEnabled"
+                  name="sendEnabled"
+                  type="checkbox"
+                  value="yes"
+                  defaultChecked={sending.enabled}
+                  style={{ width: 20, height: 20, marginTop: 1, accentColor: GREEN }}
+                />
+                <span style={{ font: `600 13px/1.4 ${SANS}`, color: INK }}>
+                  Allow the ERP to send email
+                  <br />
+                  <span style={{ font: `400 12.5px ${SANS}`, color: MUTED }}>
+                    Permitir que el ERP envíe correos
+                  </span>
+                </span>
+              </label>
+
+              <Bi
+                htmlFor="allowlist"
+                en="Approved recipients — one per line"
+                es="Destinatarios permitidos — uno por línea"
+              />
+              <textarea
+                id="allowlist"
+                name="allowlist"
+                rows={3}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                defaultValue={sending.allowlist.join("\n")}
+                placeholder={"cliente@example.com\n@caneisubirats.com"}
+                style={{ ...FIELD, resize: "vertical" }}
+              />
+              <p style={{ font: `400 12px/1.5 ${SANS}`, color: MUTED, margin: "6px 0 0" }}>
+                An address, or <b>@domain</b> for everyone there. Empty means the ERP may only write
+                to this mailbox itself — never to a customer.
+                <br />
+                Una dirección, o <b>@dominio</b> para todos. Vacío significa que el ERP solo puede
+                escribirse a sí mismo, nunca a un cliente.
+              </p>
             </div>
           </details>
 
