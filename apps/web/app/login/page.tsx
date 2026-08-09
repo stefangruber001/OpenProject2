@@ -72,6 +72,13 @@ export default async function LoginPage({
 }) {
   const params = await searchParams;
   const failed = params.error !== undefined;
+  // Being told to wait is a different situation from getting the password
+  // wrong, and saying so is not a leak: whoever is locked out already knows
+  // they have been trying. Telling them "incorrect password" while silently
+  // refusing to check it is the version that wastes an honest person's evening.
+  const rateLimited = params.error === "rate";
+  const retryAfter = Number(typeof params.retry === "string" ? params.retry : 0) || 0;
+  const retryMinutes = Math.max(1, Math.ceil(retryAfter / 60));
   const nextRaw = typeof params.next === "string" ? params.next : "/";
   // Same rule as the route handler: only ever a path on this site.
   const nextPath = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/";
@@ -225,7 +232,11 @@ export default async function LoginPage({
                 marginBottom: 18,
               }}
             >
-              Correo o contraseña incorrectos.
+              {rateLimited
+                ? `Demasiados intentos. Vuelva a probar en ${retryMinutes} ${
+                    retryMinutes === 1 ? "minuto" : "minutos"
+                  }.`
+                : "Correo o contraseña incorrectos."}
             </div>
           )}
 

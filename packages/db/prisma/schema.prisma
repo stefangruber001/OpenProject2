@@ -121,3 +121,62 @@ model Event {
   @@id([tenantId, seq])
   @@map("events")
 }
+
+/// People who may sign in, and what they may do.
+///
+/// Accounts used to be `ERP_USERS` in the server's `.env` — a file that also
+/// holds the database password, so adding a colleague meant handing over the
+/// keys. Here they are rows, which is what makes a screen possible.
+///
+/// `hash` is empty until the person activates: the admin creates the account,
+/// the INVITED person chooses the password, and nobody else ever knows it.
+///
+/// `sessionsValidFrom` is how disabling somebody actually ends their sessions.
+/// Session tokens are signed and stateless, so there is nothing to delete —
+/// instead every token carries when it was issued, and a token older than this
+/// stamp is refused. Moving it forward logs that person out everywhere without
+/// touching anybody else, which rotating SESSION_SECRET could not do.
+///
+/// Deactivate, never delete: the audit trail has to keep resolving who did
+/// what, and a row that vanishes turns every entry it authored into a mystery.
+model ErpUser {
+  tenantId          String   @map("tenant_id")
+  /// Lower-cased. The identity the audit trail carries.
+  email             String
+  name              String   @default("")
+  /// admin · backoffice · site · gestoria
+  role              String   @default("backoffice")
+  /// invited · active · disabled
+  state             String   @default("invited")
+  /// scrypt, with a per-user salt. Empty while the invitation is outstanding.
+  hash              String   @default("")
+  sessionsValidFrom DateTime @default(now()) @map("sessions_valid_from")
+  createdAt         DateTime @default(now()) @map("created_at")
+  createdBy         String   @default("") @map("created_by")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  disabledAt        DateTime? @map("disabled_at")
+
+  @@id([tenantId, email])
+  @@map("erp_users")
+}
+
+/// Single-use, time-limited invitations and password resets.
+///
+/// The raw token is in the link and NEVER stored — only its SHA-256. A stolen
+/// database therefore yields no usable link, which is the whole point of
+/// hashing something that grants access.
+model ErpUserToken {
+  tenantId  String    @map("tenant_id")
+  /// SHA-256 of the raw token, hex.
+  tokenHash String    @map("token_hash")
+  email     String
+  /// activation · reset
+  purpose   String    @default("activation")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String    @default("") @map("created_by")
+
+  @@id([tenantId, tokenHash])
+  @@map("erp_user_tokens")
+}
