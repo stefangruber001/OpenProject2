@@ -14,9 +14,10 @@
    If you find yourself writing a domain rule here, it belongs one layer down.
    ========================================================================== */
 
-import { ExtractionService, extractionConfigSchema } from "@repo/capability-extraction";
+import { ExtractionService } from "@repo/capability-extraction";
 import type {
   ExtractedField,
+  ExtractionConfig,
   ExtractionResult,
   FieldKey,
   FieldVerdict,
@@ -304,12 +305,27 @@ export function createComms() {
  * The Spanish profile is bound here because this bundle serves tenant #1. A
  * second jurisdiction is a second binding, not a change to the capability.
  */
-export function createExtraction(config?: { reviewThreshold?: number } | null) {
+export function createExtraction(config?: Partial<ExtractionConfig> | null) {
   const ports = new PortRegistry();
   ports.bind(EXTRACTION_PROFILE_PORT, ES_EXTRACTION_PROFILE, "pack/jurisdiction-es-es");
+  /* The defaults are written out rather than taken from
+     `extractionConfigSchema.parse({})`, and that is not laziness.
+     Calling into the zod schema at runtime drags zod itself into the browser
+     bundle — CI asserts it does not, because validating a config is a
+     RESOLVE-time concern (the factory does it when it composes a tenant) and
+     a browser has no configs to validate; it is handed one.
+
+     These three numbers must therefore match the schema, and a test in the
+     capability asserts exactly that, so changing one there fails loudly here
+     rather than drifting quietly. */
   const svc = new ExtractionService({
     ports,
-    config: extractionConfigSchema.parse(config ?? {}),
+    config: {
+      reviewThreshold: 0.75,
+      totalsToleranceCents: 2,
+      maxAlternatives: 3,
+      ...(config ?? {}),
+    },
   });
 
   return {

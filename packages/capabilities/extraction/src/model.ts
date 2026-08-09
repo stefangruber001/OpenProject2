@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type { Cents } from "@repo/kernel";
 
 /**
@@ -150,16 +149,3 @@ export interface ExtractionResult {
    */
   confirmed: false;
 }
-
-export const extractionConfigSchema = z
-  .object({
-    /** Below this, a field is sent for review. */
-    reviewThreshold: z.number().min(0).max(1).default(0.75),
-    /** Cents of slack allowed when checking net + tax − withholding = total. */
-    totalsToleranceCents: z.number().int().min(0).default(2),
-    /** Alternatives kept per field. */
-    maxAlternatives: z.number().int().min(0).max(10).default(3),
-  })
-  .default({});
-
-export type ExtractionConfig = z.infer<typeof extractionConfigSchema>;

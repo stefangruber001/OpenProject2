@@ -6,12 +6,12 @@ import {
   type Candidate,
   type ConsistencyCheck,
   type ExtractedField,
-  type ExtractionConfig,
   type ExtractionResult,
   type FieldKey,
   type SourceSpan,
   type TaxBreakdownRow,
 } from "./model";
+import type { ExtractionConfig } from "./config";
 import { EXTRACTION_PROFILE_PORT, type ExtractionProfile } from "./ports";
 
 export interface ExtractionDeps {

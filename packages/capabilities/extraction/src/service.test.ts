@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PortRegistry, isFactoryError } from "@repo/kernel";
-import { extractionConfigSchema, type ExtractedField, type FieldKey } from "./model";
+import { type ExtractedField, type FieldKey } from "./model";
+import { extractionConfigSchema } from "./config";
 import { EXTRACTION_PROFILE_PORT, type ExtractionProfile } from "./ports";
 import { ExtractionService } from "./service";
 
@@ -325,6 +326,19 @@ describe("ExtractionService", () => {
           expect(f.verdict).toBe("green");
         }
       }
+    });
+  });
+
+  /* The browser bundle cannot call this schema — doing so drags zod into
+     site/erp-factory.js, which CI refuses — so `createExtraction` writes the
+     same three numbers out by hand. This is the test that keeps the two
+     copies honest: change a default here and this fails, pointing at the
+     literal that has to move with it. */
+  it("keeps its config defaults where the browser bundle can copy them", () => {
+    expect(extractionConfigSchema.parse({})).toEqual({
+      reviewThreshold: 0.75,
+      totalsToleranceCents: 2,
+      maxAlternatives: 3,
     });
   });
 

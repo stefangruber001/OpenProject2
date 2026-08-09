@@ -1,5 +1,5 @@
 import type { CapabilityManifest } from "@repo/kernel";
-import { extractionConfigSchema } from "./model";
+import { extractionConfigSchema } from "./config";
 import { EXTRACTION_PROFILE_PORT } from "./ports";
 
 export const extractionManifest: CapabilityManifest = {
