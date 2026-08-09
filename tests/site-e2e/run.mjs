@@ -1580,6 +1580,24 @@ async function testControlTowerAndDay(browser, base) {
     await pg.click("#dClose");
     await pg.waitForTimeout(300);
 
+    // ---- DMC-08 Usuarios ----
+    // This copy has no server, so the screen must say there are no accounts to
+    // manage rather than showing an empty table that reads as "nobody works
+    // here". Accounts live where the data lives; an offline copy has neither.
+    await pg.evaluate(() => (location.hash = "users"));
+    await pg.waitForTimeout(500);
+    const usersText = await pg.locator("#view").innerText();
+    if (/Sólo en el servidor/.test(usersText))
+      ok("usuarios: local mode says there are no accounts here, rather than showing none");
+    else bad("usuarios: local mode", usersText.replace(/\n/g, " ").slice(0, 120));
+
+    // The four roles are described ON THE SCREEN, not merely enforced on the
+    // server. Somebody choosing one has to see what it means, and "gestoría
+    // never sees margins" is the reason that role exists at all.
+    if (/Gestoría/.test(usersText) && /márgenes/.test(usersText))
+      ok("usuarios: each permission says what it can do, gestoría's limit included");
+    else bad("usuarios: roles explained", usersText.replace(/\n/g, " ").slice(0, 120));
+
     // Mi Día was removed with the Torre extras: it was the only person-level
     // view, and the doc has no slot for it. Assert it is really gone rather
     // than leaving a check that silently stopped testing anything.

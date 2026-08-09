@@ -255,6 +255,27 @@ export async function requireUser(req: Request): Promise<string> {
     const cookie = readCookie(req.headers.get("cookie"), SESSION_COOKIE);
     const claims = await readSession(cookie, secret, Math.floor(Date.now() / 1000));
     if (!claims) throw unauthenticated("no valid session cookie");
+
+    // A valid signature is not the whole question. Somebody disabled an hour
+    // ago still holds a perfectly well-signed token — for a named account, for
+    // up to thirty days. Being able to disable them has to mean something while
+    // they are already signed in, or it only stops them signing in AGAIN, which
+    // is not what anybody means by the word.
+    //
+    // Shared sessions have no account behind them, so there is nothing to check
+    // and they are left alone; ERP_ACCESS_PASSWORD is the lever for those.
+    if (claims.role === "staff") {
+      const { sessionStillValid } = await import("./user-admin");
+      const { defaultTenant } = await import("./access");
+      const ok = await sessionStillValid(defaultTenant(), claims.sub, claims.iat).catch(
+        // A database that cannot be reached must not lock everybody out of a
+        // system that worked five minutes ago. The signature was still valid;
+        // fall back to trusting it, and let the outage be an outage rather than
+        // a lockout.
+        () => true,
+      );
+      if (!ok) throw unauthenticated("this account is no longer active");
+    }
     return claims.sub;
   }
 

@@ -42,6 +42,12 @@ function isPublic(pathname: string): boolean {
     pathname === "/login" ||
     pathname === "/api/auth/login" ||
     pathname === "/api/auth/logout" ||
+    // Accepting an invitation. The whole point is that the person following the
+    // link has no account yet — putting this behind the login would mean you
+    // must sign in to be able to sign in. The link itself is the credential:
+    // 32 random bytes, single use, seven days.
+    pathname === "/activate" ||
+    pathname === "/api/auth/activate" ||
     // Health is how the machine checks itself, from inside, with no browser and
     // no cookie. It reports whether the process is up and the database is
     // reachable — it exposes no company data.
@@ -75,6 +81,27 @@ export async function middleware(req: NextRequest) {
   // between a named account and the shared password is recorded in the audit
   // trail, not enforced here.
   if (claims) {
+    // A valid signature is not the whole question. Somebody disabled an hour
+    // ago still holds a perfectly well-signed token — for a named account, up
+    // to thirty days of it. The check has to be HERE rather than in
+    // requireUser, because half the API routes never call requireUser: they
+    // only read, so they take the middleware's word that the caller is signed
+    // in. Half a rule is not a rule, and the half that was missing is the one
+    // that lets a disabled colleague keep reading the register.
+    //
+    // Shared sessions have no account behind them, so there is nothing to look
+    // up; ERP_ACCESS_PASSWORD is the lever for those.
+    if (claims.role === "staff") {
+      const { sessionStillValid } = await import("@/lib/user-admin");
+      const { defaultTenant } = await import("@/lib/access");
+      const ok = await sessionStillValid(defaultTenant(), claims.sub, claims.iat).catch(
+        // A database that cannot be reached must not lock out a company whose
+        // system worked five minutes ago. The signature was still valid; let
+        // the outage be an outage rather than a lockout.
+        () => true,
+      );
+      if (!ok) return refuse(req, pathname, search);
+    }
     const res = NextResponse.next();
     // Sliding renewal: past the halfway mark, mint a fresh token. Someone who
     // keeps using the system is therefore never signed out, while somebody who
@@ -93,6 +120,14 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
+  return refuse(req, pathname, search);
+}
+
+/**
+ * Turn somebody away — as a status code for an API caller, as the login page
+ * for a browser.
+ */
+function refuse(req: NextRequest, pathname: string, search: string) {
   // An API caller gets a status code it can act on. Redirecting one to an HTML
   // login page produces the classic "unexpected token < in JSON" instead of
   // something a client can recognise as "sign in again".

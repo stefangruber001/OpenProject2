@@ -6,8 +6,9 @@
  * needed, which keeps the login page working in the phone app's web view even
  * if something else on the page fails to load.
  */
-import { authenticate, isSharedPassword, loginConfigured } from "@/lib/auth";
-import { sharedAccessEnabled } from "@/lib/access";
+import { isSharedPassword, loginConfigured } from "@/lib/auth";
+import { defaultTenant, sharedAccessEnabled } from "@/lib/access";
+import { authenticateUser } from "@/lib/user-admin";
 import { sessionCookie, signSession } from "@/lib/session-token";
 import { check, clientKey, recordFailure, recordSuccess } from "@/lib/rate-limit";
 import { randomUUID } from "node:crypto";
@@ -112,7 +113,9 @@ export async function POST(req: Request): Promise<Response> {
     return redirect(next, [["Set-Cookie", sessionCookie(token, isSecureRequest(req), "shared")]]);
   }
 
-  const who = await authenticate(email, password);
+  // Rows first, environment second — otherwise an account created through the
+  // screen can be invited, can set a password, and still cannot sign in.
+  const who = await authenticateUser(defaultTenant(), email, password);
   if (!who) {
     recordFailure(keys);
     // One message for both "no such account" and "wrong password". Which one it

@@ -126,8 +126,20 @@ describe("requireUser", () => {
     });
 
     it("finds the cookie among others", async () => {
+      // The point of this one is the cookie header parsing, so it uses an
+      // address that really has an account: a validly signed token for somebody
+      // with no account is now refused (see below), which would otherwise make
+      // this fail for a reason that has nothing to do with cookies.
+      const t = await signSession("ana@example.com", SECRET, Math.floor(Date.now() / 1000));
+      await expect(requireUser(await withSession(t))).resolves.toBe("ana@example.com");
+    });
+
+    it("refuses a validly signed token for somebody who has no account", async () => {
+      // A correct signature is not the whole question. Removing somebody's
+      // account has to stop their existing token working, or it only stops them
+      // signing in AGAIN — and a named session lasts thirty days.
       const t = await signSession("luis@example.com", SECRET, Math.floor(Date.now() / 1000));
-      await expect(requireUser(await withSession(t))).resolves.toBe("luis@example.com");
+      await expectRejected(await withSession(t));
     });
 
     it("refuses a request with no cookie", async () => {

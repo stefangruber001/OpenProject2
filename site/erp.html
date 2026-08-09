@@ -832,8 +832,6 @@ const PLACEHOLDERS={
    body:"Igual que las unidades: la lista funciona pero no es editable por quien la usa.",goto:null},
  "payment-methods":{sub:"DMC-05 · formas de pago.",
    body:"Igual que las unidades: la lista funciona pero no es editable por quien la usa.",goto:null},
- users:{sub:"DMC-08 · altas, bajas y permisos.",
-   body:"Hoy las cuentas viven en la configuración del servidor, junto a las contraseñas de la base de datos. Esta pantalla las saca de ahí: crear, desactivar, cambiar permisos y restablecer contraseña.",goto:null},
 };
 function placeholderView(k,v){
   const p=PLACEHOLDERS[k]||{sub:"",body:"Sin contenido."};
@@ -3616,6 +3614,137 @@ VIEWS.alerts=v=>{
   v.innerHTML=alertsPanel(erp.managedAlerts());
   wireAlertsPanel();
 };
+
+/* DMC-08 · Usuarios — who may sign in, and what each may do.
+   The screen that takes accounts out of the server's `.env`. Everything here
+   goes through the API rather than the engine: users are not tenant business
+   data, they are who is allowed to touch it, and putting them in the state
+   document would mean the register carried its own access list.
+   Local mode has no server and therefore no accounts, and says so rather than
+   showing an empty table that looks like "nobody works here". */
+const USER_ROLES=[["admin","Administrador","Todo, incluida esta pantalla."],
+ ["backoffice","Oficina","Presupuestos, facturas, cobros y pagos. No gestiona usuarios."],
+ ["site","Obra","Registrar avance, partes y fotos. Sin importes ni márgenes."],
+ ["gestoria","Gestoría","Sólo lectura y exportación. Nunca ve márgenes ni precios de venta."]];
+const USER_STATE={invited:["y","Invitado"],active:["g","Activo"],disabled:["","Desactivado"]};
+let uList=[], uErr="";
+
+async function usersApi(path,opts){
+  const base=ErpStore.apiBase()||"";
+  const res=await fetch(base+"/api/~/users"+(path||""),Object.assign({headers:{"content-type":"application/json"}},opts||{}));
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.message||data.error||("HTTP "+res.status));
+  return data;
+}
+
+async function loadUsers(){
+  try{ uList=(await usersApi("")).users||[]; uErr=""; }
+  catch(e){ uList=[]; uErr=String(e.message||e); }
+  render();
+}
+
+VIEWS.users=v=>{
+  $('#sub').textContent="Altas, bajas y permisos. Al crear una cuenta, la persona elige su propia contraseña: nadie más la conoce.";
+  // The legend is documentation, not data, so it renders with or without a
+  // server: what the four permissions mean is worth being able to read while
+  // deciding which one somebody should get.
+  const legend=`<div class="card"><div class="ch"><h3>Qué puede hacer cada permiso</h3></div><div class="daylist">
+    ${USER_ROLES.map(([,n,d])=>`<div class="it"><b>${esc(n)}</b> — ${esc(d)}</div>`).join("")}
+    <div class="it" style="color:var(--muted)">Una cuenta se desactiva, nunca se borra: el registro de actividad tiene que seguir diciendo quién hizo qué. Al desactivar, sus sesiones abiertas terminan de inmediato.</div>
+   </div></div>`;
+  if(!ErpStore.isRemote()){
+    v.innerHTML=`<div class="card"><div class="ch"><h3>Sólo en el servidor</h3></div>
+     <div class="daylist"><div class="it">Esta copia funciona en modo local, sin servidor, así que no hay cuentas que gestionar. Las cuentas viven donde viven los datos.</div></div></div>${legend}`;
+    return;
+  }
+  const rows=uList.map(u=>{
+    const [cls,lab]=USER_STATE[u.state]||["","—"];
+    const role=(USER_ROLES.find(r=>r[0]===u.role)||[,u.role])[1];
+    return `<tr><td class="k">${esc(u.email)}</td><td>${esc(u.name||"—")}</td>
+     <td>${esc(role)}</td>
+     <td><span class="pill ${cls}">${esc(lab)}</span>${u.invitePending?' <span class="pill y">invitación pendiente</span>':''}</td>
+     <td>${u.createdBy==="env"?'<span class="tag">en el servidor</span>':esc(u.createdBy||"—")}</td>
+     <td><button class="btn sm" data-edit="${esc(u.email)}">Editar</button>
+         <button class="btn sm" data-invite="${esc(u.email)}">${u.state==="invited"?"Reenviar invitación":"Restablecer contraseña"}</button></td></tr>`;}).join("");
+  v.innerHTML=`${uErr?`<div class="card"><div class="ch"><h3>No se ha podido leer la lista</h3></div><div class="daylist"><div class="it">${esc(uErr)}</div></div></div>`:""}
+   <div class="card"><div class="ch"><h3>Usuarios</h3><span class="tag">${uList.length}</span>
+     <span style="flex:1"></span><button class="btn sm primary" id="uNew">＋ Nuevo usuario</button></div>
+    <div class="scroll"><table><thead><tr><th>Correo</th><th>Nombre</th><th>Permiso</th><th>Estado</th><th>Dado de alta por</th><th></th></tr></thead>
+     <tbody>${rows||'<tr><td colspan="6"><div class="empty">Sin usuarios todavía.</div></td></tr>'}</tbody></table></div></div>
+   ${legend}`;
+  $('#uNew').onclick=()=>newUserDrawer();
+  v.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editUserDrawer(b.dataset.edit));
+  v.querySelectorAll('[data-invite]').forEach(b=>b.onclick=()=>inviteUser(b.dataset.invite));
+  if(!uList.length&&!uErr) loadUsers();
+};
+
+/* The invitation, shown rather than claimed. `delivered` is false whenever no
+   mail actually left — the screen then hands the admin the link instead of a
+   success message for a message nobody will receive. */
+function showInvitation(inv,email){
+  const db=openDrawer("Invitación para "+email);
+  db.innerHTML=`<div class="form">
+   <div class="field full">${inv.delivered
+     ? `<div class="pill g">Correo enviado a ${esc(email)}</div>`
+     : `<div class="pill y">No se ha enviado ningún correo</div>
+        <p style="font-size:12.5px;color:var(--body);margin:8px 0 0">Este servidor todavía no tiene correo configurado, así que hay que hacerle llegar este enlace a mano — por WhatsApp o en persona. La persona elige su contraseña; usted no llega a conocerla.</p>`}</div>
+   <div class="field full"><label>Enlace de activación (caduca ${fmtD(inv.expiresAt.slice(0,10))})</label>
+    <input id="uLink" value="${esc(inv.link)}" readonly style="font-family:ui-monospace,monospace;font-size:12px"></div>
+   <div class="field full"><button class="btn primary" id="uCopy">Copiar enlace</button></div></div>`;
+  $('#uCopy').onclick=async()=>{
+    try{ await navigator.clipboard.writeText(inv.link); toast("Enlace copiado"); }
+    catch(e){ $('#uLink').select(); toast("Seleccionado — copie con Ctrl+C"); }
+  };
+}
+
+function newUserDrawer(){
+  const db=openDrawer("Nuevo usuario");
+  db.innerHTML=`<div class="form">
+   <div class="field full"><label>Correo electrónico</label><input id="u_email" type="email" placeholder="nombre@empresa.es"></div>
+   <div class="field full"><label>Nombre</label><input id="u_name" placeholder="Cómo aparecerá en el registro de actividad"></div>
+   <div class="field full"><label>Permiso</label><select id="u_role">${USER_ROLES.map(([k,n])=>`<option value="${k}">${n}</option>`).join("")}</select></div>
+   <div class="field full" style="font-size:12.5px;color:var(--body)">Se creará la cuenta y se generará un enlace de activación. La persona elige su propia contraseña.</div>
+   <div class="field full"><button class="btn primary" id="u_save">Crear e invitar</button></div></div>`;
+  $('#u_save').onclick=async()=>{
+    try{
+      const r=await usersApi("",{method:"POST",body:JSON.stringify({
+        email:$('#u_email').value.trim(),name:$('#u_name').value.trim(),role:$('#u_role').value})});
+      closeDrawer(); await loadUsers(); showInvitation(r.invitation,r.user);
+    }catch(e){ toast("⚠ "+e.message); }
+  };
+}
+
+function editUserDrawer(email){
+  const u=uList.find(x=>x.email===email); if(!u)return;
+  const db=openDrawer(email);
+  const fromEnv=u.createdBy==="env";
+  db.innerHTML=`<div class="form">
+   ${fromEnv?`<div class="field full"><div class="pill y">Configurado en el servidor</div>
+     <p style="font-size:12.5px;color:var(--body);margin:8px 0 0">Esta cuenta está en el archivo de configuración del servidor, no en esta pantalla. Créela aquí y después retire la línea de ERP_USERS.</p></div>`:""}
+   <div class="field full"><label>Nombre</label><input id="e_name" value="${esc(u.name||"")}" ${fromEnv?"disabled":""}></div>
+   <div class="field full"><label>Permiso</label><select id="e_role" ${fromEnv?"disabled":""}>${USER_ROLES.map(([k,n])=>`<option value="${k}"${k===u.role?" selected":""}>${n}</option>`).join("")}</select></div>
+   <div class="field full"><label>Estado</label><select id="e_state" ${fromEnv?"disabled":""}>
+     <option value="active"${u.state!=="disabled"?" selected":""}>Activo</option>
+     <option value="disabled"${u.state==="disabled"?" selected":""}>Desactivado</option></select></div>
+   ${fromEnv?"":`<div class="field full"><button class="btn primary" id="e_save">Guardar</button></div>`}</div>`;
+  if(fromEnv)return;
+  $('#e_save').onclick=async()=>{
+    try{
+      await usersApi("/"+encodeURIComponent(email),{method:"PATCH",body:JSON.stringify({
+        name:$('#e_name').value.trim(),role:$('#e_role').value,state:$('#e_state').value})});
+      closeDrawer(); toast("Usuario actualizado"); await loadUsers();
+    }catch(e){ toast("⚠ "+e.message); }
+  };
+}
+
+async function inviteUser(email){
+  const u=uList.find(x=>x.email===email);
+  try{
+    const r=await usersApi("/"+encodeURIComponent(email),{method:"POST",
+      body:JSON.stringify({purpose:u&&u.state==="invited"?"activation":"reset"})});
+    await loadUsers(); showInvitation(r.invitation,email);
+  }catch(e){ toast("⚠ "+e.message); }
+}
 
 const TABBED={
   progress:[["Avance","_projectList"],["Programación","_projectSchedule"]],

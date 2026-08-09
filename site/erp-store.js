@@ -582,6 +582,20 @@
     isRemote: function () {
       return REMOTE !== null;
     },
+    /**
+     * Where the server is, for the few screens that call an endpoint this
+     * store does not wrap — DMC-08 Usuarios, whose records are not part of the
+     * company document.
+     *
+     * Exposed rather than letting those screens read the <meta> tag
+     * themselves. sync-workspace.mjs decides a page is already marked by
+     * looking for that exact string, so a page that merely MENTIONS it gets
+     * skipped and ends up served without the marker — which silently drops it
+     * to browser storage. Asked for once, here, that cannot happen.
+     */
+    apiBase: function () {
+      return REMOTE;
+    },
     /** The version this browser last read; the server refuses a stale save. */
     version: function () {
       return remoteVersion;
