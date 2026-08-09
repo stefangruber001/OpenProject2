@@ -544,6 +544,54 @@
   .counter .val{font-family:var(--serif);font-size:21px;color:var(--ink);margin-top:5px;line-height:1;font-variant-numeric:tabular-nums}
   .counter .sub{font-size:11px;color:var(--muted);margin-top:4px}
 
+  /* ---------- Centre panel (S8) ----------
+     §3.1's third surface, and the one both PRY screens are built on: opening
+     a record compresses the list to 372 and puts a 780 panel beside it. The
+     list NEVER disappears — that is the rule the whole layout exists for, and
+     it is why this is a grid change rather than a screen change. On close the
+     list returns to its width, its page and its scroll position. */
+  .ctr{display:grid;gap:16px;align-items:start}
+  .ctr.on{grid-template-columns:372px minmax(0,780px)}
+  .ctrlist{min-width:0}
+  .ctr.on .ctrlist{max-height:calc(100vh - var(--top,59px) - 120px);overflow:auto}
+  .ctrpanel{background:var(--paper);border:1px solid var(--line);border-radius:12px;
+    box-shadow:var(--shadow);min-width:0;overflow:hidden}
+  /* Fixed 88 header: code, client, address, total progress, the three dates. */
+  .ctrhd{height:88px;display:flex;align-items:center;gap:14px;padding:0 16px;
+    border-bottom:1px solid var(--line);background:var(--paper)}
+  .ctrhd .who{min-width:0;flex:1}
+  .ctrhd .who b{display:block;font:600 15px var(--sans);color:var(--ink)}
+  .ctrhd .who span{display:block;font-size:12px;color:var(--muted);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .ctrhd .dates{font-size:11.5px;color:var(--muted);text-align:right;white-space:nowrap}
+  .ctrbody{padding:12px 14px 16px}
+  .ctrrow{font-size:12.5px}
+  .ctrrow b{color:var(--ink)}
+
+  /* Three contiguous buttons and a percentage that is only live in the middle
+     state — §3.2. A percentage on a chapter nobody has started is a number
+     with nothing behind it, and one on a finished chapter is always 100. */
+  .pstate{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .pstate button{width:90px;height:28px;font:12px var(--sans);border:0;background:var(--paper);
+    color:var(--body);cursor:pointer;border-right:1px solid var(--line)}
+  .pstate button:last-child{border-right:0}
+  .pstate button.on{background:var(--green);color:#fff}
+  .pstate button:hover:not(.on){background:var(--hair)}
+  .pctbox{width:60px;height:28px;margin-left:8px;font:12px var(--sans);text-align:right;
+    border:1px solid var(--line);border-radius:8px;padding:0 6px;background:var(--paper);color:var(--ink)}
+  .pctbox:disabled{background:var(--hair);color:var(--faint)}
+  .provrow{display:flex;align-items:center;gap:10px;height:44px;border-bottom:1px solid var(--hair);
+    padding:0 2px}
+  .provrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+  @media(max-width:860px){
+    .ctr.on{grid-template-columns:minmax(0,1fr)}
+    .ctr.on .ctrlist{max-height:none;overflow:visible}
+    /* Mobile: one tap cycles the three states, so the strip collapses to the
+       single button that says where the row is now (§3.2). */
+    .pstate button{display:none;width:auto;padding:0 14px}
+    .pstate button.on{display:block}
+  }
+
   .inbox2{display:grid;grid-template-columns:372px minmax(0,1fr);gap:16px;align-items:start}
   .inbox{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden}
   .inbox .ih{display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
@@ -1233,7 +1281,12 @@ function searchAll(term){
   add("Subcontratas",S.parties.filter(p=>p.roles.includes("subcontractor")&&hit(p.name,p.code,p.taxId))
     .map(p=>({lab:p.name,sub:`${p.code}${p.billCity?" · "+p.billCity:""}`,k:"subcontractors",open:()=>partyDrawer(p.id)})));
   add("Proyectos",S.projects.filter(p=>hit(p.code,partyName(p.partyId),p.activityLine))
-    .map(p=>({lab:`${p.code} — ${partyName(p.partyId)}`,sub:p.closed?"cerrado":"activo",k:"progress",open:()=>projectDrawer(p.id)})));
+    .map(p=>({lab:`${p.code} — ${partyName(p.partyId)}`,sub:p.closed?"cerrado":"activo",k:"progress",
+      // Opens the job ON PRY-01, in the centre panel, rather than in a drawer
+      // over whatever screen the search was used from. A search result that
+      // lands you somewhere you can keep working is worth more than one that
+      // shows you a card you have to close.
+      open:()=>{ setProject(p.id); centreState.progress={openId:p.id,scroll:0}; go("progress"); }})));
   add("Presupuestos",S.budgets.filter(b=>hit(b.number,partyName(b.partyId)))
     .map(b=>({lab:`${b.number} — ${partyName(b.partyId)}`,sub:b.acceptedVersionId?"aceptado":b.status,k:"quotes",open:()=>budgetDrawer(b.id)})));
   add("Facturas",S.invoices.filter(i=>hit(i.number,partyName(i.partyId)))
@@ -3315,6 +3368,58 @@ const CLI_COLS=[
    into two-line-ish cards at the phone breakpoint (verified in full in S14) —
    the same table markup serves both, so there is exactly one row template to
    keep correct. */
+/* ================= Centre panel (S8) ==================================
+   The specification's third shared surface, after the 480 side panel and the
+   full screen: opening a record compresses the list to 372 and puts a 780
+   panel beside it, and **the list never disappears**.
+
+   Two things it owns that a screen would otherwise get wrong:
+
+   · The list's PAGE survives, because the list keeps rendering through
+     `renderMasterList` and that primitive already holds page state per id.
+     Closing the panel is a grid change, not a navigation.
+   · The list's SCROLL survives, which page state does not cover. Opening a
+     record on row 40 and closing it back at row 1 is the small, constant
+     annoyance the doc's "the list returns to its width, page and scroll
+     position" sentence is about.
+
+   `openId` is deliberately NOT persisted: which record somebody last looked
+   at is not company data, the same call S1b made for the tab strips. */
+const centreState={};
+function centreOpen(id,rowId){
+  const st=centreState[id]||(centreState[id]={openId:null,scroll:0});
+  const host=document.querySelector('#view .ctrlist');
+  st.scroll=host?host.scrollTop:window.scrollY;
+  st.openId=rowId;
+  render();
+}
+function centreClose(id){
+  const st=centreState[id]; if(!st) return;
+  st.openId=null;
+  render();
+  // After the panel goes, the list is wide again and its own scroller no
+  // longer exists — the position belongs to the window.
+  window.scrollTo(0,st.scroll||0);
+}
+function renderCentre(v,cfg){
+  const st=centreState[cfg.id]||(centreState[cfg.id]={openId:null,scroll:0});
+  // A record that has gone (closed, deleted, filtered away) must not leave the
+  // list compressed against an empty panel.
+  const open=st.openId&&cfg.exists(st.openId)?st.openId:null;
+  if(st.openId&&!open) st.openId=null;
+  const wrap=el('div','ctr'+(open?' on':''));
+  const listHost=el('div','ctrlist');
+  wrap.appendChild(listHost);
+  v.innerHTML=''; v.appendChild(wrap);
+  cfg.renderList(listHost,open);
+  if(open){
+    const panel=el('div','ctrpanel');
+    wrap.appendChild(panel);
+    cfg.renderPanel(panel,open);
+    listHost.scrollTop=st.scroll||0;
+  }
+}
+
 const LIST_PAGE_SIZES=[10,25,50];
 const listState={};
 function getListState(id,defSize){
@@ -4961,51 +5066,48 @@ const VIEWS={
     as comfortable and says nothing, while "spent 40 to get a quarter of the way,
     so heading for 160" is the sentence somebody can act on. It is computed by
     @repo/capability-projects, never here. */
+ /* ---------- PRY-02 Avance económico (S8) ----------
+    Same list and centre mechanics as PRY-01, because the doc gives them the
+    same ones and because two adjacent screens that behave differently is a
+    tax the operator pays every day.
+
+    Three things the panel says that no screen said before: the margin as its
+    own card rather than a column somebody has to find; the per-capítulo table
+    in the doc's own terms (presupuestado, acumulado, desviación en € y en %,
+    margen); and — the point of the whole screen — the money that reached this
+    job and stopped, because nobody said which capítulo pays for it. */
  economics(v){
-  $('#sub').textContent="Presupuestado, comprometido, real y proyectado a fin de obra por capítulo, con la desviación y el margen que resultan. La proyección se calcula del avance real y del coste unitario observado, y puede ajustarse a mano justificando el motivo.";
-  const P=erp.state.projects;
-  if(!P.length){ v.innerHTML='<div class="card"><div class="empty">Todavía no hay proyectos.</div></div>'; return; }
-  const pid=gProject;
-  const f=(typeof ErpBridge!=="undefined"&&ErpBridge.projects)?ErpBridge.projects.forecast(erp,pid):null;
-  if(!f){ v.innerHTML='<div class="card"><div class="empty">El seguimiento económico necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>'; return; }
-  const names={};
-  try{ (erp.project(pid).baseline.chapters||[]).forEach(c=>{names[c.num]=c.name;}); }catch(e){}
-  const over=new Set(f.overrunChapters);
-
-  v.innerHTML=`
-   <div class="kpis">
-    <div class="kpi"><div class="lab">Venta actual</div><div class="val">${eur0(f.revenueCents)}</div><div class="sub">contratada + extras aprobados</div></div>
-    <div class="kpi"><div class="lab">Coste real</div><div class="val">${eur0(f.actualCents)}</div><div class="sub">comprometido ${eur0(f.committedCents)}</div></div>
-    <div class="kpi ${f.varianceCents>0?'warn':''}"><div class="lab">Coste proyectado</div><div class="val">${eur0(f.forecastCents)}</div><div class="sub">presupuestado ${eur0(f.budgetCents)} · ${f.varianceCents>0?"+":""}${eur0(f.varianceCents)}</div></div>
-    <div class="kpi ${f.marginForecastCents<0?'warn':'hi'}"><div class="lab">Margen proyectado</div><div class="val">${eur0(f.marginForecastCents)}</div><div class="sub">${(f.marginForecastBp/100).toFixed(1)}% sobre la venta actual</div></div>
-   </div>
-   <div class="card"><div class="ch"><h3>Por capítulo</h3>
-     ${over.size?`<span class="pill r">${over.size} capítulo(s) por encima del umbral</span>`:'<span class="tag">ninguno supera el umbral de desviación</span>'}</div>
-    <div class="scroll"><table><thead><tr>
-      <th>Capítulo</th><th class="num">Avance</th><th class="num">Presupuestado</th><th class="num">Comprometido</th>
-      <th class="num">Real</th><th class="num">Proyectado</th><th class="num">Desviación</th><th class="num">%</th><th></th>
-    </tr></thead><tbody>
-    ${f.byChapter.map(c=>`<tr>
-      <td class="k">${c.chapter}. ${esc(names[c.chapter]||"—")}${c.adjustedCents!=null?`<span class="adj" title="${esc(c.adjustmentReason||"")}">ajustada</span>`:""}${c.provisional?'<span class="adj" title="Muy poco avance para extrapolar con sentido">provisional</span>':""}</td>
-      <td class="num">${c.progressPct}%</td>
-      <td class="num">${eur0(c.budgetCents)}</td>
-      <td class="num">${c.committedCents?eur0(c.committedCents):"—"}</td>
-      <td class="num">${eur0(c.actualCents)}</td>
-      <td class="num k">${eur0(c.forecastCents)}${c.adjustedCents!=null?`<br><span style="font-size:10.5px;color:var(--muted)">calculada ${eur0(c.calculatedCents)}</span>`:""}</td>
-      <td class="num ${c.varianceCents>0?"warn":c.varianceCents<0?"good":""}">${c.varianceCents>0?"+":""}${eur0(c.varianceCents)}</td>
-      <td class="num ${over.has(c.chapter)?"warn":""}">${(c.varianceBp/100).toFixed(1)}%</td>
-      <td><button class="btn sm" data-adj="${c.chapter}">Ajustar</button></td></tr>`).join("")}
-    <tr class="tot"><td>Total</td><td></td><td class="num">${eur0(f.budgetCents)}</td><td class="num">${eur0(f.committedCents)}</td>
-      <td class="num">${eur0(f.actualCents)}</td><td class="num">${eur0(f.forecastCents)}</td>
-      <td class="num">${f.varianceCents>0?"+":""}${eur0(f.varianceCents)}</td><td class="num">${(f.varianceBp/100).toFixed(1)}%</td><td></td></tr>
-    </tbody></table></div></div>
-   <div class="card"><div class="ch"><h3>Cómo se calcula</h3><span class="tag">FIN-01 a FIN-18</span></div><div class="daylist">
-     <div class="it">La proyección de cada capítulo parte del coste real y del avance registrado: gastar 40 para llegar al 25% proyecta 160. Nunca queda por debajo de lo ya gastado o comprometido, y mientras no haya coste imputado se mantiene el presupuesto — un capítulo terminado sin factura casi siempre significa que la factura no ha llegado, no que fuese gratis.</div>
-     <div class="it">Proyección total calculada <b>${eur0(f.calculatedCents)}</b>${f.calculatedCents!==f.forecastCents?` · con los ajustes manuales <b>${eur0(f.forecastCents)}</b>`:""}. Se muestran ambas cifras siempre que difieran.</div>
-   </div></div>`;
-
-  v.querySelectorAll('[data-adj]').forEach(b=>b.onclick=()=>forecastDrawer(pid,b.dataset.adj,names[b.dataset.adj]||"",
-    f.byChapter.find(c=>c.chapter===b.dataset.adj)));
+  $('#sub').textContent="Venta, coste y margen de la obra, capítulo a capítulo, y el coste que ha llegado a la obra sin capítulo asignado. Repartirlo aquí es lo que hace que la tabla cuadre con el proyecto.";
+  if(!erp.state.projects.length) return noProjectsCard(v);
+  renderCentre(v,{
+    id:"economics",
+    exists:id=>erp.state.projects.some(p=>p.id===id),
+    renderList:(host,open)=>renderMasterList(host,{
+      id:"projects-economics", noNew:true,
+      ids:{q:"ecoQ",size:"ecoSize",prev:"ecoPrev",next:"ecoNext",exp:"ecoExp",
+        expMenu:"ecoExpMenu",expXlsx:"ecoExpXlsx",expCsv:"ecoExpCsv"},
+      nounSingular:"obra", nounPlural:"obras",
+      searchPlaceholder:"Buscar por código o cliente…",
+      emptyText:"Ninguna obra coincide con la búsqueda.",
+      baseRows:erp.state.projects.slice().reverse(),
+      matches:(p,q)=>(p.code+" "+erp.party(p.partyId).name).toLowerCase().includes(q),
+      columns:open?[
+        {label:"Código",primary:true,get:p=>p.code},
+        {label:"Cliente",get:p=>erp.party(p.partyId).name},
+      ]:[
+        {label:"Código",primary:true,get:p=>p.code},
+        {label:"Cliente",get:p=>erp.party(p.partyId).name},
+        {label:"Venta actual",html:p=>eur0(erp.projectEconomics(p.id).currentRevenueCents)},
+        {label:"Coste real",html:p=>eur0(erp.projectEconomics(p.id).actualCents)},
+        {label:"Margen prev.",html:p=>{const e=erp.projectEconomics(p.id);
+          return `<span style="color:${e.marginForecastCents<0?'var(--danger)':'var(--greenDeep)'}">${eur0(e.marginForecastCents)}</span>`;}},
+        {label:"Sin repartir",html:p=>{const n=erp.unassignedChapterCosts(p.id).length;
+          return n?`<span class="pill y">${n}</span>`:'<span class="pill g">0</span>';}},
+      ],
+      onRowClick:id=>{ setProject(id); centreOpen("economics",id); },
+    }),
+    renderPanel:(panel,id)=>economicsPanel(panel,id),
+  });
  },
 
  /* ---------- Contratos (CON-13) ---------- */
@@ -5022,28 +5124,65 @@ const VIEWS={
    </tbody></table></div></div>`;
  },
 
- /* ---------- Proyectos (PRJ/FIN/CHG/PRE-11) ---------- */
- _projectList(v){
-  $('#sub').textContent="Cada proyecto conserva su línea base aceptada y muestra venta, coste comprometido, coste real y margen por capítulo. Marca partidas hechas para certificar.";
+ /* ---------- PRY-01 Avance físico (S8) ----------
+    The doc's shape: a list that compresses to 372 when a job is opened, a 780
+    panel beside it with a fixed 88 header and three tabs. What used to be two
+    routes behind a tab strip (Avance · Programación) is one screen.
+
+    The Gantt is NOT squeezed into the 780 panel. §3.1 names it as one of
+    exactly four full-screen surfaces, so the Programación tab states the plan
+    in figures and opens the chart outside the shell — which is both what the
+    document says and the version that does not spend a session shrinking a
+    drag-and-drop timeline into half a panel. */
+ progress(v){
+  $('#sub').textContent="Cada obra conserva su línea base aceptada. Marca el estado de cada capítulo — sin empezar, en ejecución o terminado — y el porcentaje sólo cuando esté en ejecución.";
   const arg=window._arg; window._arg=null;
-  const rows=erp.state.projects;
-  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Código</th><th>Cliente</th><th>Línea</th><th>Avance</th><th class="num">Venta actual</th><th class="num">Comprometido</th><th class="num">Real</th><th class="num">Margen prev.</th><th>Estado</th></tr></thead><tbody>
-   ${rows.map(p=>{const e=erp.projectEconomics(p.id);return `<tr class="click" data-id="${p.id}"><td class="k">${p.code}</td><td>${esc(erp.party(p.partyId).name)}</td>
-    <td>${({renovation:"Reforma",repairs:"Reparación",damp:"Humedades",commercial:"Comercial"})[p.activityLine]||p.activityLine}</td>
-    <td><div class="bar"><i style="width:${e.progressPct}%"></i></div></td>
-    <td class="num">${eur0(e.currentRevenueCents)}</td><td class="num">${eur0(e.committedCents)}</td><td class="num">${eur0(e.actualCents)}</td>
-    <td class="num" style="color:${e.marginForecastCents<0?'var(--danger)':'var(--greenDeep)'}">${eur0(e.marginForecastCents)}</td>
-    <td>${p.closed?'<span class="pill g">Cerrado</span>':'<span class="pill b">Activo</span>'}</td></tr>`;}).join("")}
-   </tbody></table></div></div>`;
-  // Choosing a row also makes it the section's active project: picking a job
-  // from a list and then finding another one selected above is the surprise
-  // this avoids.
-  v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>{setProject(tr.dataset.id);projectDrawer(tr.dataset.id);});
-  if(arg){const p=rows.find(x=>x.code===arg); if(p){setProject(p.id);projectDrawer(p.id);}}
+  if(!erp.state.projects.length) return noProjectsCard(v);
+  if(ganttFull) return ganttScreen(v);
+  if(arg){ const p=erp.state.projects.find(x=>x.code===arg); if(p){ setProject(p.id); centreState.progress={openId:p.id,scroll:0}; } }
+  renderCentre(v,{
+    id:"progress",
+    exists:id=>erp.state.projects.some(p=>p.id===id),
+    renderList:(host,open)=>renderMasterList(host,{
+      id:"projects-progress", noNew:true,
+      ids:{q:"prgQ",size:"prgSize",prev:"prgPrev",next:"prgNext",exp:"prgExp",
+        expMenu:"prgExpMenu",expXlsx:"prgExpXlsx",expCsv:"prgExpCsv"},
+      nounSingular:"obra", nounPlural:"obras",
+      searchPlaceholder:"Buscar por código o cliente…",
+      emptyText:"Ninguna obra coincide con la búsqueda.",
+      baseRows:erp.state.projects.slice().reverse(),
+      matches:(p,q)=>(p.code+" "+erp.party(p.partyId).name).toLowerCase().includes(q),
+      // Compressed: code and client only, exactly as §3.2 asks. The columns
+      // are not hidden with CSS — they are not built, so the 372 column has no
+      // horizontal scrollbar hiding six columns nobody can reach.
+      columns:open?[
+        {label:"Código",primary:true,get:p=>p.code},
+        {label:"Cliente",get:p=>erp.party(p.partyId).name},
+      ]:[
+        {label:"Código",primary:true,get:p=>p.code},
+        {label:"Cliente",get:p=>erp.party(p.partyId).name},
+        {label:"Línea",get:p=>({renovation:"Reforma",repairs:"Reparación",damp:"Humedades",commercial:"Comercial"})[p.activityLine]||p.activityLine},
+        {label:"Avance",html:p=>`<div class="bar"><i style="width:${erp.projectEconomics(p.id).progressPct}%"></i></div>`},
+        {label:"Venta actual",html:p=>eur0(erp.projectEconomics(p.id).currentRevenueCents)},
+        {label:"Margen prev.",html:p=>{const e=erp.projectEconomics(p.id);
+          return `<span style="color:${e.marginForecastCents<0?'var(--danger)':'var(--greenDeep)'}">${eur0(e.marginForecastCents)}</span>`;}},
+        {label:"Estado",html:p=>p.closed?'<span class="pill g">Cerrado</span>':'<span class="pill b">Activo</span>'},
+      ],
+      // Choosing a row also makes it the section's active project: picking a
+      // job from a list and then finding another one selected above is the
+      // surprise this avoids.
+      onRowClick:id=>{ setProject(id); centreOpen("progress",id); },
+    }),
+    renderPanel:(panel,id)=>projectPanel(panel,id,"progress"),
+  });
  },
 
- /* ---------- Seguimiento técnico: la carta Gantt (§3.3 · §4.3) ---------- */
- _projectSchedule(v){
+ /* ---------- Seguimiento técnico: la carta Gantt (§3.3 · §4.3) ----------
+    No longer a route of its own. §3.1 reserves full screen for exactly four
+    surfaces and names the Gantt as one of them, so since S8 this is the body
+    of `ganttScreen` — reached from PRY-01's Programación tab, drawn outside
+    the shell, and unchanged in every other respect. */
+ _ganttBody(v){
   $('#sub').textContent="Carta Gantt derivada del presupuesto aceptado, avance por partida o por cantidad ejecutada, y desviación frente a la línea base. Arrastra una barra para moverla, tira del borde para alargarla y une dos barras para crear una dependencia.";
   const P=erp.state.projects;
   if(!P.length){ v.innerHTML='<div class="card"><div class="empty">Todavía no hay proyectos que planificar.</div></div>'; return; }
@@ -5812,7 +5951,11 @@ async function inviteUser(email){
 }
 
 const TABBED={
-  progress:[["Avance","_projectList"],["Programación","_projectSchedule"]],
+  // `progress` left this table in S8. S1b wrapped Avance and Programación in a
+  // tab strip as a holding measure and said the rewrite was S8's; the route is
+  // now one screen with the centre panel, and Programación is a TAB OF THE
+  // PANEL rather than a sibling route — which is what the doc describes and
+  // what makes the two share a selected job instead of each keeping its own.
   // ADM-03's first tab IS the doc's screen — bandeja and registro side by side
   // since S7. The second is the payables ledger: partial supplier payments and
   // one payment across several invoices have no screen in the v4 document, and
@@ -6330,35 +6473,350 @@ function forecastDrawer(pid,chapterNum,name,row){
   if(cl) cl.onclick=()=>mutate(()=>{erp.clearForecastOverride(pid,chapterNum,"backoffice");closeDrawer();},"Ajuste retirado");
 }
 
-function projectDrawer(id){
-  const p=erp.project(id); const e=erp.projectEconomics(id); const bill=erp.projectBilling(id); const ex=erp.extrasRegister(id);
-  const db=openDrawer(p.code+" — "+erp.party(p.partyId).name);
-  const chapters=p.budgetId?erp.version(p.budgetId,p.acceptedVersionId).chapters.filter(c=>c.section==="base"):[];
-  const chEc=p.budgetId?erp.chapterEconomics(id):[];
-  db.innerHTML=`
-   <div class="kpis" style="grid-template-columns:1fr 1fr">
-    <div class="kpi"><div class="lab">Venta actual</div><div class="val">${eur0(e.currentRevenueCents)}</div><div class="sub">base ${eur0(e.baselineRevenueCents)} + extras ${eur0(e.approvedChangesCents)}</div></div>
-    <div class="kpi ${e.marginForecastCents<0?'warn':''}"><div class="lab">Margen previsto</div><div class="val">${eur0(e.marginForecastCents)}</div><div class="sub">${e.marginForecastPct}% · real ${eur0(e.actualCents)} de ${eur0(e.forecastCostCents)}</div></div>
-   </div>
-   <div class="card"><div class="ch"><h3>Avance por capítulo</h3><span class="tag">marca lo hecho — alimenta la certificación</span></div><div class="daylist">
-    ${chapters.map(c=>`<div class="it" style="align-items:center;gap:10px">${pillProg(c.progress)} <span style="flex:1">${c.num}. ${esc(c.name)}</span>
-      ${!p.closed?`<button class="btn sm" data-prog="${c.num}" data-st="inProgress">En curso</button><button class="btn sm" data-prog="${c.num}" data-st="done">✓ Hecho</button>`:""}</div>`).join("")||`<div class="it">Avance: ${e.progressPct}%</div>`}
-   </div></div>
-   ${chEc.length?`<div class="card"><div class="ch"><h3>Coste por capítulo</h3><span class="tag">previsto vs. real</span></div><div class="scroll"><table><thead><tr><th>Capítulo</th><th class="num">Venta</th><th class="num">Coste prev.</th><th class="num">Coste real</th><th></th></tr></thead><tbody>
-    ${chEc.map(c=>`<tr><td>${c.num}. ${esc(c.name)}</td><td class="num">${eur0(c.saleCents)}</td><td class="num">${eur0(c.budgetCostCents)}</td><td class="num">${eur0(c.actualCents)}</td><td>${c.overrun?'<span class="pill r">Desvío</span>':''}</td></tr>`).join("")}
-   </tbody></table></div></div>`:""}
-   <div class="card"><div class="ch"><h3>Extras</h3><span class="tag">${ex.approved} aprobados · ${eur0(ex.unapprovedValueCents)} sin aprobar</span></div><div class="daylist">
-    ${ex.items.map(c=>`<div class="it" style="align-items:center;gap:8px"><span class="pill ${({identified:"y",priced:"y",approved:"b",executed:"b",invoiced:"g",rejected:"r"})[c.status]}">${({identified:"Detectado",priced:"Valorado",approved:"Aprobado",executed:"Ejecutado",invoiced:"Facturado",rejected:"Rechazado"})[c.status]}</span>
-      <span style="flex:1">${esc(c.desc)} — venta ${eur(c.priceCents)} · coste ${eur(c.costCents)}</span>
-      ${c.status==="priced"?`<button class="btn sm" data-approve="${c.id}">Aprobar</button>`:""}</div>`).join("")||'<div class="it">Sin extras registrados.</div>'}
-   </div></div>
-   <div class="card"><div class="ch"><h3>Facturación del proyecto</h3></div><div class="daylist">
-    <div class="it">Facturado <b>${eur(bill.invoicedCents)}</b> · Cobrado <b>${eur(bill.collectedCents)}</b> · Pendiente <b>${eur(bill.outstandingCents)}</b> · Por facturar <b>${eur(bill.remainingToInvoiceCents)}</b></div>
-   </div></div>`;
-  db.querySelectorAll('[data-prog]').forEach(b2=>b2.onclick=()=>mutate(()=>erp.markProgress(id,b2.dataset.prog,b2.dataset.st,null,"operations"),"Avance actualizado"));
-  db.querySelectorAll('[data-approve]').forEach(b2=>b2.onclick=()=>mutate(()=>erp.approveChange(b2.dataset.approve,"aprobación-cliente.png","backoffice"),"Extra aprobado — anexo generado"));
+/* ================= PRY-01/PRY-02 · the centre panel's contents (S8) =======
+   One header for both screens, because the doc gives them the same one and
+   because a job that reads differently depending on which of two adjacent
+   screens you opened it from is a job somebody will mis-read once. */
+let ganttFull=false;
+const projTab={};
+
+/** The fixed 88 header: code, client, address, total progress, three dates. */
+function projectPanelHead(p){
+  const e=erp.projectEconomics(p.id);
+  const addr=(erp.state.properties.find(x=>x.id===p.propertyId)||{}).street||"";
+  const d=p.dates||{};
+  return `<div class="ctrhd">
+    <div class="who">
+      <b>${esc(p.code)}</b>
+      <span>${esc(erp.party(p.partyId).name)}${addr?" · "+esc(addr):""}</span>
+      <div class="bar" style="margin-top:6px"><i style="width:${e.progressPct}%"></i></div>
+    </div>
+    <div class="dates">
+      <div><span>Inicio</span> <b>${d.start?fmtD(d.start):"—"}</b></div>
+      <div><span>Fin comprometido</span> <b>${d.targetEnd?fmtD(d.targetEnd):"—"}</b></div>
+      <div><span>Fin real</span> <b>${d.actualEnd?fmtD(d.actualEnd):"—"}</b></div>
+    </div>
+    <button class="btn sm" data-ctrclose="1" title="Cerrar">✕</button>
+   </div>`;
 }
 
+/** PRY-01's panel: Avance · Programación · Ficha. */
+function projectPanel(panel,id,route){
+  const p=erp.project(id);
+  const tab=projTab[route]||"avance";
+  const TABS=[["avance","Avance"],["plan","Programación"],["ficha","Ficha"]];
+  panel.innerHTML=`${projectPanelHead(p)}
+   <div class="tabstrip" style="margin:0;padding:0 12px">
+     ${TABS.map(([k,l])=>`<button class="tab${k===tab?" on":""}" data-ptab="${k}">${l}</button>`).join("")}
+   </div>
+   <div class="ctrbody" id="pnlBody"></div>`;
+  panel.querySelector('[data-ctrclose]').onclick=()=>centreClose(route);
+  panel.querySelectorAll('[data-ptab]').forEach(b=>b.onclick=()=>{ projTab[route]=b.dataset.ptab; render(); });
+  const body=panel.querySelector('#pnlBody');
+  if(tab==="avance") panelAvance(body,p);
+  else if(tab==="plan") panelPlan(body,p);
+  else panelFicha(body,p);
+}
+
+/* The three-state control. §3.2 is precise about it and the precision earns
+   its keep: three contiguous buttons say the whole vocabulary at a glance,
+   and the percentage box is live ONLY in the middle state — a percentage on a
+   chapter nobody has started is a number with nothing behind it, and one on a
+   finished chapter is always 100 and always ignored. */
+function panelAvance(body,p){
+  let chapters=[];
+  try{ chapters=p.budgetId?erp.version(p.budgetId,p.acceptedVersionId).chapters.filter(c=>c.section==="base"):[]; }catch(e){}
+  if(!chapters.length){
+    body.innerHTML='<div class="empty">Esta obra no tiene capítulos aceptados: el avance se registra sobre las tareas del gráfico.</div>';
+    return;
+  }
+  const ST=[["notStarted","Sin empezar"],["inProgress","En ejecución"],["done","Terminado"]];
+  // A chapter stores no percentage of its own — `markProgress` writes the
+  // figure onto its lines — so the number in the box is read back from them
+  // rather than from a field that does not exist. Rounding once, here, keeps
+  // the box and the progress bar in the header telling the same story.
+  const chapPct=c=>{
+    const ls=c.lines||[];
+    if(!ls.length) return c.progress==="done"?100:0;
+    return Math.round(ls.reduce((s,l)=>s+(l.progressPct||0),0)/ls.length);
+  };
+  body.innerHTML=chapters.map(c=>{
+    const st=c.progress||"notStarted";
+    return `<div class="provrow">
+      <span class="nm">${c.num}. ${esc(c.name)}</span>
+      <span class="pstate" data-chap="${c.num}">
+        ${ST.map(([k,l])=>`<button data-st="${k}"${k===st?' class="on"':""}>${l}</button>`).join("")}
+      </span>
+      <input class="pctbox" type="number" min="0" max="100" step="1" data-pct="${c.num}"
+        value="${st==="done"?100:chapPct(c)}"${st==="inProgress"?"":" disabled"}>
+     </div>`;}).join("");
+
+  body.querySelectorAll('.pstate').forEach(strip=>{
+    strip.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+      const num=strip.dataset.chap;
+      // Mobile shows only the button for the state the row is IN, so a tap on
+      // it means "next state", not "this state" — §3.2's one-tap cycle. The
+      // same handler serves both because the question is only ever which
+      // button was pressed and whether the others are on screen.
+      const cycling=!strip.querySelector('button:not(.on)')||getComputedStyle(strip.querySelector('button:not(.on)')).display==="none";
+      let next=b.dataset.st;
+      if(cycling&&b.classList.contains("on")){
+        const order=ST.map(x=>x[0]);
+        next=order[(order.indexOf(b.dataset.st)+1)%order.length];
+      }
+      mutate(()=>erp.markProgress(p.id,num,next,next==="done"?100:next==="notStarted"?0:null,"operations"),"Avance actualizado");
+    });
+  });
+  body.querySelectorAll('[data-pct]').forEach(inp=>inp.onchange=()=>mutate(()=>{
+    const pct=Math.max(0,Math.min(100,+inp.value||0));
+    erp.markProgress(p.id,inp.dataset.pct,pct>=100?"done":pct>0?"inProgress":"notStarted",pct,"operations");
+  },"Avance registrado"));
+}
+
+/** Programación: the plan in figures, and the chart where §3.1 puts it. */
+function panelPlan(body,p){
+  const B=ganttApi();
+  if(!B){ body.innerHTML='<div class="empty">La planificación necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div>'; return; }
+  const plan=B.get(erp.state,p.id), sch=plan.tasks.length?B.schedule(plan):null;
+  const cmp=(plan.baselines&&plan.baselines.length)?B.compareToBaseline(plan):null;
+  const risk=plan.tasks.length?B.risk(plan,{asOf:erp.today,thresholdDays:5}):null;
+  body.innerHTML=`<div class="daylist">
+    <div class="it"><span>Tareas</span><span style="flex:1"></span><b>${plan.tasks.length}</b></div>
+    <div class="it"><span>Fin de obra previsto</span><span style="flex:1"></span><b>${sch?fmtD(sch.finish):"—"}</b></div>
+    <div class="it"><span>Ruta crítica</span><span style="flex:1"></span><b>${sch?sch.criticalPath.length:0}</b></div>
+    ${cmp?`<div class="it"><span>Desvío sobre línea base</span><span style="flex:1"></span>
+      <b style="color:${cmp.finishDriftDays>0?'var(--danger)':'var(--greenDeep)'}">${cmp.finishDriftDays>0?"+":""}${cmp.finishDriftDays} d</b></div>`:""}
+    ${risk?`<div class="it"><span>Tareas fuera de plazo</span><span style="flex:1"></span><b>${risk.items.length}</b></div>`:""}
+   </div>
+   <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+     <button class="btn primary sm" id="pnlGantt">Abrir la carta Gantt</button>
+     <button class="btn sm" id="pnlResched">Recalcular los cobros previstos</button>
+   </div>
+   <div class="daylist" style="margin-top:10px"><div class="it" style="color:var(--muted)">La carta Gantt se abre a pantalla completa: arrastrar una barra, alargarla o unir dos tareas necesita la anchura entera.</div></div>`;
+  $('#pnlGantt').onclick=()=>{ setProject(p.id); ganttFull=true; render(); };
+  $('#pnlResched').onclick=()=>rescheduleCashDrawer(p.id);
+}
+
+/** Ficha: what the old project drawer said, in the panel that replaced it. */
+function panelFicha(body,p){
+  const e=erp.projectEconomics(p.id), bill=erp.projectBilling(p.id), ex=erp.extrasRegister(p.id);
+  body.innerHTML=`<div class="daylist">
+    <div class="it"><span>Presupuesto</span><span style="flex:1"></span><b>${esc(p.budgetNumber||"—")}</b></div>
+    <div class="it"><span>Línea de negocio</span><span style="flex:1"></span><b>${esc(({renovation:"Reforma",repairs:"Reparación",damp:"Humedades",commercial:"Comercial"})[p.activityLine]||p.activityLine||"—")}</b></div>
+    <div class="it"><span>Venta actual</span><span style="flex:1"></span><b>${eur0(e.currentRevenueCents)}</b></div>
+    <div class="it"><span>Facturado</span><span style="flex:1"></span><b>${eur0(bill.invoicedCents)}</b></div>
+    <div class="it"><span>Cobrado</span><span style="flex:1"></span><b>${eur0(bill.collectedCents)}</b></div>
+    <div class="it"><span>Por facturar</span><span style="flex:1"></span><b>${eur0(bill.remainingToInvoiceCents)}</b></div>
+    <div class="it"><span>Extras aprobados</span><span style="flex:1"></span><b>${ex.approved}</b></div>
+    <div class="it"><span>Estado</span><span style="flex:1"></span>${p.closed?'<span class="pill g">Cerrado</span>':'<span class="pill b">Activo</span>'}</div>
+   </div>`;
+}
+
+/** PRY-02's panel: three cards, the per-capítulo table, what is unassigned. */
+function economicsPanel(panel,id){
+  const p=erp.project(id);
+  const e=erp.projectEconomics(id);
+  const f=(typeof ErpBridge!=="undefined"&&ErpBridge.projects)?ErpBridge.projects.forecast(erp,id):null;
+  const names={};
+  try{ (p.baseline.chapters||[]).forEach(c=>{names[c.num]=c.name;}); }catch(err){}
+  const pend=erp.unassignedChapterCosts(id);
+  const marginCents=e.currentRevenueCents-e.actualCents;
+  const marginPct=e.currentRevenueCents?Math.round((marginCents/e.currentRevenueCents)*1000)/10:0;
+  const SRC={bill:"Factura",labour:"Horas",capture:"Documento"};
+
+  panel.innerHTML=`${projectPanelHead(p)}
+   <div class="ctrbody">
+    <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi"><div class="lab">Venta</div><div class="val">${eur0(e.currentRevenueCents)}</div>
+        <div class="sub"><span>contratada más extras aprobados</span></div></div>
+      <div class="kpi"><div class="lab">Coste</div><div class="val">${eur0(e.actualCents)}</div>
+        <div class="sub"><span>comprometido</span> <span>${eur0(e.committedCents)}</span></div></div>
+      <div class="kpi ${marginCents<0?'warn':'hi'}"><div class="lab">Margen</div><div class="val">${eur0(marginCents)}</div>
+        <div class="sub"><span>${marginPct}%</span> <span>sobre la venta</span></div></div>
+    </div>
+
+    <div class="card" style="margin-top:12px"><div class="ch"><h3>Por capítulo</h3></div>
+     <div class="scroll"><table><thead><tr>
+       <th>Capítulo</th><th class="num">Presupuestado</th><th class="num">Acumulado</th>
+       <th class="num">Desviación</th><th class="num">%</th><th class="num">Margen</th><th></th></tr></thead><tbody>
+     ${(f?f.byChapter:erp.chapterEconomics(id).map(c=>({chapter:c.num,budgetCents:c.budgetCostCents,actualCents:c.actualCents,varianceCents:c.actualCents-c.budgetCostCents,varianceBp:0})))
+       .map(c=>{
+        const base=(p.baseline.chapters||[]).find(x=>String(x.num)===String(c.chapter))||{};
+        const mg=(base.saleCents||0)-(c.actualCents||0);
+        return `<tr><td class="k">${c.chapter}. ${esc(names[c.chapter]||"—")}</td>
+        <td class="num">${eur0(c.budgetCents)}</td>
+        <td class="num">${eur0(c.actualCents)}</td>
+        <td class="num ${c.varianceCents>0?"warn":""}">${c.varianceCents>0?"+":""}${eur0(c.varianceCents)}</td>
+        <td class="num">${((c.varianceBp||0)/100).toFixed(1)}%</td>
+        <td class="num" style="color:${mg<0?'var(--danger)':'var(--greenDeep)'}">${eur0(mg)}</td>
+        <td>${f?`<button class="btn sm" data-adj="${c.chapter}">Ajustar</button>`:""}</td></tr>`;}).join("")
+       ||'<tr><td colspan="7"><div class="empty">Esta obra no tiene capítulos en su línea base.</div></td></tr>'}
+     </tbody></table></div>
+     ${f?`<div class="daylist"><div class="it" style="color:var(--muted)">La proyección de cada capítulo parte del coste real y del avance registrado. «Ajustar» la sustituye a mano, y la cifra calculada se sigue mostrando junto a la ajustada.</div></div>`:""}
+    </div>
+
+    <div class="card" style="margin-top:12px"><div class="ch"><h3>Pendiente de repartir</h3>
+      ${pend.length?`<span class="pill y">${pend.length}</span>`:'<span class="pill g">nada</span>'}</div>
+     ${pend.length?`<div class="scroll"><table><thead><tr>
+       <th>Origen</th><th>Documento</th><th>Fecha</th><th class="num">Importe</th><th></th></tr></thead><tbody>
+      ${pend.map(r=>`<tr><td>${esc(SRC[r.source]||r.source)}</td>
+        <td class="k">${esc(r.ref||"—")}${r.party?`<br><span style="font-size:11px;color:var(--muted)">${esc(r.party)}</span>`:""}</td>
+        <td>${r.date?fmtD(r.date):"—"}</td>
+        <td class="num">${eur(r.amountCents)}</td>
+        <td><span class="pill y">Sin repartir</span> <button class="btn sm" data-assign="${esc(r.id)}">Repartir</button></td></tr>`).join("")}
+     </tbody></table></div>`
+      :'<div class="daylist"><div class="it">Todo el coste de esta obra tiene capítulo. La tabla de arriba cuadra con el proyecto.</div></div>'}
+    </div>
+   </div>`;
+
+  panel.querySelector('[data-ctrclose]').onclick=()=>centreClose("economics");
+  panel.querySelectorAll('[data-assign]').forEach(b=>b.onclick=()=>
+    assignChapterDrawer(id,pend.find(r=>r.id===b.dataset.assign)));
+  // The manual forecast override kept its button. The doc's table does not
+  // mention one, but `setForecastOverride` is a real engine rule with a real
+  // reason ("the tiler quoted a fixed price, stop extrapolating") and this is
+  // its only interface — dropping it would un-cover it, which is the mistake
+  // S1b named when the subcontract screens went.
+  panel.querySelectorAll('[data-adj]').forEach(b=>b.onclick=()=>forecastDrawer(id,b.dataset.adj,
+    names[b.dataset.adj]||"",f&&f.byChapter.find(c=>String(c.chapter)===String(b.dataset.adj))));
+}
+
+/* The 480 panel §3.2 calls "the only place cost is split by capítulo", and it
+   is exactly that: no other screen in the product writes `chapterNum` onto a
+   cost. Splitting is offered because one supplier invoice routinely covers
+   three chapters — refusing to split it is how a chapter ends up carrying a
+   bathroom's tiles and a kitchen's. */
+let chapSplit=[];
+function assignChapterDrawer(pid,row){
+  if(!row) return;
+  const p=erp.project(pid);
+  const chapters=(p.baseline.chapters||[]);
+  const db=openDrawer("Repartir · "+(row.ref||""));
+  const single=row.source==="labour";
+  chapSplit=[{chapterNum:chapters.length?String(chapters[0].num):"",amountCents:row.amountCents}];
+  db.innerHTML=`
+   <div class="card"><div class="daylist">
+     <div class="it"><span>Origen</span><span style="flex:1"></span><b>${esc(row.ref||"—")}</b></div>
+     <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${row.date?fmtD(row.date):"—"}</b></div>
+     <div class="it"><span>Importe</span><span style="flex:1"></span><b>${eur(row.amountCents)}</b></div>
+   </div></div>
+   <div class="card"><div class="ch"><h3>Capítulos</h3><span class="tag" id="as_rest"></span></div>
+    <div id="as_rows" style="padding:6px 12px 12px"></div>
+    <div style="display:flex;gap:8px;padding:0 12px 12px">
+      ${single?'':'<button class="btn sm" id="as_add">＋ Otro capítulo</button>'}
+      <span style="flex:1"></span>
+      <button class="btn primary" id="as_go">Repartir</button>
+    </div>
+    ${single?'<div class="daylist"><div class="it" style="color:var(--muted)">Un parte de horas va a un solo capítulo: son las horas de una persona en un día, y partirlas aquí sería inventar un segundo parte.</div></div>':''}
+   </div>`;
+  const add=$('#as_add');
+  if(add) add.onclick=()=>{ chapSplit.push({chapterNum:chapters.length?String(chapters[0].num):"",amountCents:0}); chapSplitRows(pid,row,chapters); };
+  $('#as_go').onclick=()=>mutate(()=>{
+    erp.assignChapterSplit(pid,row.id,chapSplit.map(s=>({chapterNum:s.chapterNum,amountCents:s.amountCents})),"backoffice");
+    closeDrawer();
+  },"Coste repartido por capítulo");
+  chapSplitRows(pid,row,chapters);
+}
+function chapSplitRows(pid,row,chapters){
+  const host=$('#as_rows'); if(!host) return;
+  host.innerHTML=chapSplit.map((s,i)=>`
+   <div class="fgrid" style="border-top:${i?"1px solid var(--hair)":"0"};padding-top:${i?"8px":"0"}">
+    <div class="field"><label>Capítulo</label><select data-si="${i}" data-k="chapterNum">
+      ${chapters.map(c=>`<option value="${c.num}"${String(c.num)===String(s.chapterNum)?" selected":""}>${c.num}. ${esc(c.name)}</option>`).join("")}
+    </select></div>
+    <div class="field"><label>Importe (€)</label><input data-si="${i}" data-k="amountCents" type="number" step="0.01" value="${(s.amountCents/100).toFixed(2)}"></div>
+    ${chapSplit.length>1?`<div class="field" style="display:flex;align-items:flex-end"><button class="btn sm danger" data-srm="${i}">Quitar</button></div>`:""}
+   </div>`).join("");
+  const rest=$('#as_rest');
+  if(rest){
+    const diff=Math.abs(row.amountCents)-chapSplit.reduce((a,s)=>a+(s.amountCents||0),0);
+    rest.innerHTML=Math.abs(diff)<=1
+      ?'<span>Cuadra con el coste</span>'
+      :`<span>Sin repartir</span> <b>${eur(diff)}</b>`;
+  }
+  host.querySelectorAll('[data-si]').forEach(inp=>inp.onchange=()=>{
+    const s=chapSplit[+inp.dataset.si];
+    if(inp.dataset.k==="amountCents") s.amountCents=Math.round(Number(String(inp.value).replace(",","."))*100)||0;
+    else s.chapterNum=inp.value;
+    chapSplitRows(pid,row,chapters);
+  });
+  host.querySelectorAll('[data-srm]').forEach(b=>b.onclick=()=>{ chapSplit.splice(+b.dataset.srm,1); chapSplitRows(pid,row,chapters); });
+}
+
+/** The Gantt, outside the shell — the fourth of §3.1's full-screen surfaces. */
+function ganttScreen(v){
+  document.body.classList.add('fs');
+  const p=erp.project(gProject);
+  v.innerHTML=`<div class="pb">
+    <div class="pbbar">
+      <button class="btn sm" id="gBack" title="Volver a la obra">←</button>
+      <div class="who"><b>${esc(p.code)}</b><span>${esc(erp.party(p.partyId).name)}</span></div>
+      <span style="flex:1"></span>
+      <div class="acts"><span class="tag">Programación</span></div>
+    </div>
+    <div id="gBody" style="flex:1;min-height:0;overflow:auto;padding:12px 14px"></div>
+   </div>`;
+  $('#gBack').onclick=()=>{ ganttFull=false; render(); };
+  VIEWS._ganttBody($('#gBody'));
+}
+
+/* ---------- Money chain, item 14 (S8) ----------
+   The doc asks whether moving a payment milestone's date moves the expected
+   cash. It did not: `cashForecast` has always read `installment.expectedDate`
+   and nothing has ever written it after the contract was drawn up, so a job
+   whose plan slipped three weeks kept forecasting the same money in the same
+   week — wrong in the optimistic direction, with nothing on screen admitting
+   it.
+
+   It is a button rather than an automatic write, because a cash forecast that
+   changes on its own while somebody is reading it is a forecast they stop
+   trusting. The panel states every move before it happens. */
+function rescheduleCashDrawer(pid){
+  const p=erp.project(pid);
+  const db=openDrawer("Cobros previstos · "+p.code);
+  const c=p.contractId?erp.state.contracts.find(x=>x.id===p.contractId):null;
+  if(!c){
+    db.innerHTML='<div class="card"><div class="empty">Esta obra no tiene contrato, así que no hay hitos de cobro que recalcular.</div></div>';
+    return;
+  }
+  const props=(typeof ErpBridge!=="undefined"&&ErpBridge.scheduling)
+    ?ErpBridge.scheduling.installmentDatesFromPlan(erp,pid):{};
+  const TRIG={onSignature:"A la firma",atWorksStart:"Al inicio de obra",atStage:"Al llegar a una fase",
+    onCompletion:"A la finalización",fixedDate:"Fecha fija"};
+  const rows=c.installments.map((i,idx)=>{
+    const to=props[idx]||null;
+    const blocked=i.status!=="planned"?"facturado":i.trigger==="fixedDate"?"fecha fija":null;
+    const moves=!!to&&!blocked&&to!==i.expectedDate;
+    return {idx,i,to,blocked,moves};
+  });
+  const moving=rows.filter(r=>r.moves);
+  db.innerHTML=`
+   <div class="card"><div class="ch"><h3>Lo que dice la planificación</h3>
+     <span class="tag"><b>${moving.length}</b> <span>${moving.length===1?"hito se mueve":"hitos se mueven"}</span></span></div>
+    <div class="scroll"><table><thead><tr><th>Hito</th><th>Disparador</th><th class="num">Importe</th><th>Prevista</th><th>Pasaría a</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td class="k">${r.idx+1}</td>
+      <td>${esc(TRIG[r.i.trigger]||r.i.trigger)}</td>
+      <td class="num">${eur(r.i.amountCents)}</td>
+      <td>${r.i.expectedDate?fmtD(r.i.expectedDate):"—"}</td>
+      <td>${r.moves?`<b>${fmtD(r.to)}</b>`:r.blocked?`<span class="pill">${esc(r.blocked)}</span>`:'<span class="pill">sin cambio</span>'}</td></tr>`).join("")}
+    </tbody></table></div></div>
+   <div class="card"><div class="daylist"><div class="it" style="color:var(--muted)">Un hito ya facturado no se mueve, y una fecha fija tampoco: es lo que el cliente firmó. El resto sigue a la planificación, y la previsión de caja lo nota en cuanto se guarda.</div></div></div>
+   <div style="display:flex;gap:8px;margin-top:10px">
+     <button class="btn primary" id="rs_go"${moving.length?"":" disabled"}>Aplicar a la previsión</button>
+   </div>`;
+  const go=$('#rs_go');
+  if(go) go.onclick=()=>mutate(()=>{
+    const r=erp.setInstallmentDates(c.id,props,"backoffice","schedule");
+    if(!r.moved.length) throw new Error("No hay ningún hito que mover");
+    closeDrawer();
+  },"Cobros previstos actualizados");
+}
+
+/* `projectDrawer` retired in S8. Its economics went to PRY-02's panel, its
+   per-chapter progress buttons became the three-state control on PRY-01, and
+   its Ficha content is that panel's third tab. Approving an extra, the one
+   action it carried that nothing else did on this screen, has always also
+   lived on Modificaciones, which is where the e2e drives it. */
 /* =============================== data actions (profile menu) =============================== */
 function exportData(){
   const blob=new Blob([JSON.stringify({_meta:{app:"Canei ERP",exportedAt:erp.today},data:erp.toJSON()},null,1)],{type:'application/json'});
