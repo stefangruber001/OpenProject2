@@ -1,8 +1,8 @@
 # S6 · The machine reads, and says what it could not check
 
 > Context pack. Where recognition ends and meaning begins, why a green dot is
-> a type rather than a screen convention, the three browser-only bugs this
-> session had to find, and what S7 inherits.
+> a type rather than a screen convention, the four bugs this session had to
+> find (three of them only a browser could), and what S7 inherits.
 
 ## What was wrong
 
@@ -25,7 +25,7 @@ the seed could create.
 Recognition is host infrastructure: ~7 MB of pdf.js and tesseract.js with no
 business meaning at all. Meaning is domain code, and stays testable against a
 jurisdiction that does not exist. That is the whole reason the split is worth
-having — the capability's 22 tests never open a browser, and this file's tests
+having — the capability's 23 tests never open a browser, and this file's tests
 never mention an invoice.
 
 `ErpBridge.extraction` is the seam (bundle surface **v7**).
@@ -95,6 +95,30 @@ hanging rather than loud, and none would have been caught by reading:
 3. **`logger: undefined`** throws once per progress tick, because tesseract
    calls it unchecked — which the site E2E's zero-console-errors rule would
    have failed on.
+
+## The fourth bug, which CI found and the gates should have
+
+`createExtraction` called `extractionConfigSchema.parse()`, which dragged
+**zod into the browser bundle** — 90 KB to 217 KB, to validate a config the
+browser is handed and never parses. Validating a config is a resolve-time job
+the factory does.
+
+Two changes were needed, because the obvious one was not enough: the surface
+now writes its defaults out literally, **and** the schema moved out of
+`model.ts` into `config.ts`. `model.ts` carries runtime constants the service
+needs, so a bundler must include that module, and a top-level `z.object(...)`
+sitting beside them cannot be proven side-effect-free — so it was kept anyway.
+Alone in its own module it is unreachable and drops out. A capability test
+asserts the schema still parses to the three numbers the browser writes by
+hand, so the two copies cannot drift.
+
+**The part worth carrying forward is not the fix.** This repository has now hit
+this same wall three times — see ASSUMPTIONS on the `rates` subpath and on the
+earlier 23 KB → 152 KB regression. It was written down twice and happened
+again. The reason is structural: the assertion lived as inline bash in
+`ci.yml`, where no local gate run could execute it, so `make gates` passed and
+the push went out. It is now `tests/parity/bundle-safety.mjs`, run by **both**
+CI and `make gates`, and it explains both causes when it fires.
 
 ## Decisions worth knowing
 

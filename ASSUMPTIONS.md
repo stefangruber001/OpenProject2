@@ -2129,4 +2129,17 @@ different decisions, so these ten arrived colliding. They are renumbered from
   per progress tick because tesseract calls it unchecked. **Reversible:** the
   vendored runtime is inert until a file is handed over, and deleting
   `site/erp-ocr.js` leaves the capture screen offering manual entry, which it
-  already does when the reader is unavailable.
+  already does when the reader is unavailable. (h) **A fourth defect was found
+  by CI rather than by the local gates, and the guard moved because of it.**
+  `createExtraction` called `extractionConfigSchema.parse()` and pulled zod
+  into the browser bundle — 90 KB to 217 KB, to validate a config the browser
+  never parses. Fixing it took two changes: literal defaults on the surface,
+  AND moving the schema out of `model.ts`, whose runtime constants force that
+  module into the bundle where a top-level `z.object(...)` cannot be proven
+  side-effect-free. **This repository has hit that wall three times now** (the
+  `rates` subpath, the earlier 23 KB → 152 KB regression, and this one), and
+  writing it down twice did not prevent the third — because the assertion was
+  inline bash in `ci.yml` that no local gate run could execute. It is now
+  `tests/parity/bundle-safety.mjs`, run by CI **and** `make gates`, and it
+  names both causes when it fires. The lesson is general: a rule that only
+  exists on the server is one you learn about after pushing.

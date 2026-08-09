@@ -64,18 +64,12 @@ jobs:
       - name: Build capability bundle
         run: pnpm --filter @repo/erp-browser build
 
+      # One copy of this rule, in a script `make gates` runs too. It lived
+      # here as inline bash and that is precisely how it failed to help: a
+      # local gate run cannot execute a workflow step, so the regression was
+      # found after the push instead of before it.
       - name: Assert the bundle is browser-safe
-        run: |
-          test -s site/erp-factory.js  || { echo "erp-factory.js missing/empty";  exit 1; }
-          test -s site/erp-factory.cjs || { echo "erp-factory.cjs missing/empty"; exit 1; }
-          # The IIFE must expose the global site/erp-bridge.js reaches for.
-          grep -q "ErpFactory" site/erp-factory.js || { echo "global ErpFactory not found"; exit 1; }
-          # zod is a resolve-time concern and must tree-shake out of the browser
-          # bundle ("sideEffects": false on every capability enables that).
-          if grep -q "ZodError" site/erp-factory.js; then
-            echo "zod leaked into the browser bundle — check tree-shaking"; exit 1
-          fi
-          ls -l site/erp-factory.js site/erp-factory.cjs
+        run: node tests/parity/bundle-safety.mjs
 
       # The artifacts are committed (pages.yml publishes site/** from a bare
       # checkout with no Node). This proves the committed copies still match

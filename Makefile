@@ -10,4 +10,4 @@ demo:
 	pnpm factory demo tenants/reformas-demo/tenant.yaml
 
 gates:
-	pnpm lint && pnpm check-types && pnpm test && pnpm build && pnpm boundaries
+	pnpm lint && pnpm check-types && pnpm test && pnpm build && pnpm boundaries && node tests/parity/bundle-safety.mjs
