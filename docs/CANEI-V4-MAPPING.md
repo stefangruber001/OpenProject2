@@ -92,8 +92,8 @@ Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, resh
 | PRY-02 | Avance Económico         | `#economia`                                                          | **ADAPT** — add cost-to-partida panel                                                    |
 | PRY-03 | Adicionales              | `#modificaciones`                                                    | **ADAPT** — add photo capture + approval evidence                                        |
 | ADM-01 | Facturación              | `#facturacion`                                                       | **ADAPT**                                                                                |
-| ADM-02 | Compras y Pedidos        | `#compras`                                                           | **ADAPT** — 3 states only, no goods receipt                                              |
-| ADM-03 | Facturas de proveedores  | `#supplier-invoices`                                                 | **OCR + validation BUILT (S6)** — inbox cards and validated list remain (S7)             |
+| ADM-02 | Compras y Pedidos        | `#compras`                                                           | **BUILT (S7)** — three counters, full-screen order beside the supplier's quote           |
+| ADM-03 | Facturas de proveedores  | `#supplier-invoices`                                                 | **BUILT (S6+S7)** — OCR and validation, then the two zones and allocation                |
 | ADM-04 | Horas                    | `#horas`                                                             | **ADAPT** — add monthly reconciliation                                                   |
 | ADM-05 | Consolidación Bancaria   | `#banco` + `#conciliacion`                                           | **MERGE**                                                                                |
 | ADM-06 | Caja Chica               | — (`till` exists in the model)                                       | **BUILD**                                                                                |
@@ -137,10 +137,13 @@ Six secciones, twenty-nine subsecciones, addressed in English. Every retired has
 | `master-data` Datos maestros | `customers` · `suppliers` · `subcontractors` · `staff`                                                                             |
 | `settings` Configuración     | `items` · `price-list` · `units` · `lead-sources` · `payment-methods` · `messaging` · `alerts` · `users`                           |
 
-Three routes are **tab strips over screens that already existed**, because the doc merges six built
-screens into three and rewriting them to its layouts is S7/S8/S11's work:
-`progress` = Avance + Programación · `supplier-invoices` = Bandeja + Registradas ·
-`banking` = Cuentas y saldos + Conciliación.
+Two routes are still **tab strips over screens that already existed**, because the doc merges six
+built screens into three and rewriting them to its layouts is S8/S11's work:
+`progress` = Avance + Programación · `banking` = Cuentas y saldos + Conciliación.
+
+`supplier-invoices` was the third. Since S7 its **first tab IS the doc's screen** — bandeja and
+registro side by side — and the strip survives only to hold _Facturas registradas_, the payables
+ledger the v4 document has no screen for (plan decision 110).
 
 Ten subsecciones are **placeholders** that say what will live there and where the data sits today:
 `visits` (S4) · `suppliers`, `subcontractors`, `staff` (S2) · `units`, `lead-sources`,
@@ -227,9 +230,13 @@ Only what is particular to each screen; everything else inherits from 3.1.
   this way; it needs standardising to the width and the "list never disappears" rule.
 - **The 780 centre panel with a 372 compressed list is not built** — PRY-01 and PRY-02 both need it.
 - **Four full-screen surfaces** must hide the side menu: presupuestador, Gantt, contrato viewer,
-  document validation. Only the Gantt does today.
-- **Two-zone document screens** (ADM-02, ADM-03, DMC-01) are a new layout primitive; build it once.
-- **Counter strips** (TC/PRY-03/ADM-01/ADM-02/ADM-07) are a second shared primitive.
+  document validation. Three of the four are built — the Gantt, the presupuestador (S5) and both
+  document surfaces (S6's validation screen and S7's ADM-02 order); the contrato viewer is S9's.
+- **Two-zone document screens** (ADM-02, ADM-03, DMC-01) are a new layout primitive; built once as
+  `.cap2` in S6 and reused unchanged by ADM-02 in S7.
+- **Counter strips** (TC/PRY-03/ADM-01/ADM-02/ADM-07) are a second shared primitive — built in S7
+  as `.counters`, with the per-screen width passed in through `--cw` because the doc gives a
+  different one to each of the five.
 - **The status colour code is global** and must be a single token set, not per-screen colours.
 - Mobile: **tables become two-line cards and the menu becomes a five-icon bottom bar** — the
   current app scrolls tables horizontally instead, which the doc replaces.
@@ -320,16 +327,16 @@ Status: **✓** covered by an existing model field · **NEW** field to add (numb
 
 ### Documentos → `captured`
 
-| Column                                             | Model                     | Status     |
-| -------------------------------------------------- | ------------------------- | ---------- |
-| Archivo                                            | `imageRef`                | ✓          |
-| Proyecto                                           | `allocations`             | ✓          |
-| Tipo                                               | `docType`                 | ✓          |
-| Emisor / Origen · Cliente                          | `confirmed.issuerName`    | ✓          |
-| Nº doc · Fecha · Base imp. · IVA % · IVA € · Total | `keyFields` / `confirmed` | ✓          |
-| Referencia · Notas                                 | `reference` · `notes`     | **NEW 11** |
-| Ruta completa                                      | `sourcePath`              | **NEW 10** |
-| Nº líneas                                          | —                         | ⊘ derived  |
+| Column                                             | Model                     | Status                 |
+| -------------------------------------------------- | ------------------------- | ---------------------- |
+| Archivo                                            | `imageRef`                | ✓                      |
+| Proyecto                                           | `allocations`             | ✓                      |
+| Tipo                                               | `docType`                 | ✓                      |
+| Emisor / Origen · Cliente                          | `confirmed.issuerName`    | ✓                      |
+| Nº doc · Fecha · Base imp. · IVA % · IVA € · Total | `keyFields` / `confirmed` | ✓                      |
+| Referencia · Notas                                 | `reference` · `notes`     | **NEW 11 — closed S7** |
+| Ruta completa                                      | `sourcePath`              | **NEW 10 — closed S7** |
+| Nº líneas                                          | —                         | ⊘ derived              |
 
 **Totals: 100 columns — ~85 covered, 13 new fields, the remainder derived or discarded.**
 Gap 13 (`accountCode` on bills/movements/cash) is required by the doc's rule 07 rather than by a

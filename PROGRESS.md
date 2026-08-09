@@ -967,6 +967,62 @@ tests, build, `make demo`.
 
 **Next:** S7 — ADM-03 Facturas de proveedores + ADM-02 Compras (+ gaps 10-11).
 
+## S7 — the document finds out who pays for it (2026-08-09)
+
+S6 built the reading and left the filing. `erp.allocateCapture` had **zero
+callers**: a document could be photographed, read, checked and confirmed, and
+then nothing in the application could say which obra paid for it.
+
+- **ADM-03 is two zones now** — a 372 column of 96 px cards (thumbnail,
+  detected supplier, detected amount) beside the register. What puts a
+  document on the left is that it is **unallocated**, not that it is
+  unvalidated: S6 confirms at capture time, so a split on status would leave
+  the inbox permanently empty. Newest first, because the document somebody has
+  just photographed is the one they are about to file.
+- **Allocation exists.** One obra, a split across several, or an overhead
+  category — offered as a single destination select, because the engine
+  refuses a line naming both and a screen that lets you tick two boxes and
+  then says no asked the question badly. The split must total a **confirmed**
+  document; an unconfirmed one has no total to check against and says so
+  rather than inventing one from the split itself.
+- **Gaps 10 and 11 are closed.** `sourcePath`, `reference` and `notes` are
+  stored, searchable and editable, and `updateCapture` is deliberately
+  separate from `confirmCapture` — a filed invoice that renames itself because
+  somebody typed a note is a lost document.
+- **ADM-02 has the doc's three counters** — Oferta · Pedido · Facturado, count
+  and amount, each filtering the list. Derived from the same facts as the
+  seven statuses rather than stored beside them. A cancelled order is counted
+  in none of the three.
+- **"No goods receipt" was read as "receipt is not a stage."** The engine keeps
+  `receivePurchase` and its reconciliation; a received order reads _Pedido ·
+  Recibida_, stage and status, both true. Retiring a stage is not the same as
+  un-testing an engine — the same distinction S1b drew over the subcontract
+  screens, and the e2e now asserts both readings together.
+- **An order opens full screen beside the supplier's quote**, 620 with zoom on
+  the left and the 480 record on the right, footing base, IVA and total. The
+  quote is a **captured** document linked to the order, not a second upload,
+  so the reading and the file's origin are the same object on both screens.
+- **The Catalan ratchet came down for the first time**: eight entries that had
+  sat on the ES/EN spine with no Catalan are on S7's panels and are now
+  translated. `CA_BACKLOG` 1326 → 1318.
+
+- **The shared list primitive's chrome had never been translated.** Driving
+  the two new screens under CA and EN found `⬇ Exportar`, `Filas por
+pantalla`, `‹ Anterior`, `Siguiente ›` and `＋ Nuevo` sitting in Spanish on
+  every list screen shipped since S2, and ADM-02's own `Necesidades` and
+  `Calendario de llegadas` in Spanish since session 10b. Fixed here because
+  they are on this session's screens. The dictionary guard could not have
+  found any of it; the render check did.
+
+Verified: site E2E 249/249 (23 new checks) · manageability 155/155 (24 new
+engine checks) · migrations 48/48 (ladder now v14) · year 149/149 · import
+25/25 · scheduling 30/30 · i18n coverage (EN 100%, CA ceiling 1326 → 1316
+across 97 new triples) · site-sync 17/17 · ownership guard · lint, boundaries,
+types, unit tests 118/118, build, `make gates`, `make demo`.
+
+**Next:** S8 — PRY-01 integration + PRY-02 Avance Económico (the 780 centre
+panel with a 372 compressed list, and the money chain's item 14).
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

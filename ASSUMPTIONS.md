@@ -2143,3 +2143,78 @@ different decisions, so these ten arrived colliding. They are renumbered from
   `tests/parity/bundle-safety.mjs`, run by CI **and** `make gates`, and it
   names both causes when it fires. The lesson is general: a rule that only
   exists on the server is one you learn about after pushing.
+
+- **#108 — S7: what puts a document on the left of ADM-03, and what a counter
+  counts (2026-08-09).** The v4 document specifies ADM-03 as two zones — a 372
+  column of 96 px cards beside a 756 validated list — and ADM-02 as three
+  counters over a list, with the order opening full screen beside the
+  supplier's quote. **Decisions:** (a) **The left column is what still needs a
+  person, and "needs a person" means UNALLOCATED, not "unvalidated".** S6
+  confirms a document at capture time, so a split on status would leave the
+  inbox permanently empty and the screen would be two zones in name only. The
+  question somebody opens this screen to answer is "what have I not filed
+  yet", and the answer is: nobody has said who pays for it. (b) **Newest
+  first.** A worklist that appends to the bottom asks the person who has just
+  photographed a delivery note to scroll past everything they already dealt
+  with to reach it. (c) **Allocation offers ONE destination select holding
+  both kinds of answer** — a project or an overhead category. The engine
+  refuses a line naming both (rule 4 of the mapping's entity model: every cost
+  lands on a project _or_ an account), and a screen that lets somebody tick
+  two boxes and then says no is a screen that asked the question badly.
+  (d) **The split arithmetic is asserted only against a CONFIRMED total.** An
+  unconfirmed document has no total to check against, and deriving one from
+  the split itself would make the check agree with whatever it was handed — so
+  filing an unread photograph stays possible and stays honest. (e) **The
+  three ADM-02 stages are derived from `purchaseStatus`, not stored beside
+  it.** The seven-state lifecycle is what the record knows; oferta/pedido/
+  facturado is the coarser reading the screen is organised around. Two stored
+  fields that must agree about one order is exactly how they stop agreeing.
+  A **cancelled order is in none of the three** — shown in the list, counted
+  nowhere, because a counter that includes work nobody will do has to be
+  explained every time it is read. (f) **"No goods receipt" is read as "receipt
+  is not a STAGE", not "delete the receipt".** The engine keeps
+  `receivePurchase` and `purchaseReconciliation`; the action moved into the
+  480 record pane and the order reads _Pedido · Recibida_ — stage and status,
+  both true. Deleting the evidence a delivery note gives because a screen
+  stopped counting by it would be the mistake S1b named when the subcontract
+  screens went. (g) **ADM-02's left zone links an already-CAPTURED document
+  rather than uploading a second copy**, so the reading, the date and the
+  file's origin are the same object on both screens. (h) **`updateCapture` is
+  separate from `confirmCapture`.** The three archive fields say nothing about
+  what the document contains, so adding a note must not re-derive the standard
+  name or re-run duplicate detection — a filed invoice that renames itself
+  because somebody typed a note is a lost document. **Reversible:** every one
+  of these is a derived reading or an additive field; the stored shape gains
+  three strings (v14) and nothing was renamed or dropped.
+
+- **#109 — S7: purchase orders stay single-line, deliberately (2026-08-09).**
+  §3.2 gives ADM-02's record pane a _line table_, and the pane renders one —
+  over the single description, quantity and unit price a purchase order
+  actually stores. **Multi-line orders were not built.** The reason is not the
+  table: it is that `receivePurchase` completes an order when the received
+  quantity reaches the ordered quantity, and there is no honest single
+  quantity for an order whose lines are in different units. Making the table
+  multi-line without answering that would leave receiving quietly wrong on
+  exactly the orders it was extended for. The pane is written to render
+  however many rows it is handed, so adding lines later is data and an engine
+  decision about completion, not a second rewrite of the screen. **Reversible:
+  yes — nothing was removed to make this true.**
+
+- **#110 — S7: ADM-03 keeps a second tab for the payables register
+  (2026-08-09).** S1b left `supplier-invoices` as a tab strip and said S7 would
+  rewrite it. The first tab is now the doc's screen — bandeja and registro side
+  by side — and the tab strip stays, holding _Facturas registradas_: partial
+  supplier payments and one payment across several invoices are engine rules
+  with no screen in the v4 document, and retiring the only interface that
+  exercises them would un-cover them. Same reasoning as decision 5 over the
+  subcontract screens, and the same remedy is available if the tab ever does
+  go: move the checks down into `manageability-sim` first. **Reversible: yes.**
+
+- **#111 — S7: Necesidades and the arrivals calendar survive the ADM-02
+  rewrite (2026-08-09).** The v4 document describes ADM-02 as counters plus a
+  list and could be read as removing both blocks. They are kept, below the
+  list: Necesidades is the only place the budget's committed-versus-pending
+  figure per capítulo is visible, and an order created from an open need
+  arrives already knowing its capítulo. Removing them would move real work back
+  into somebody's head to satisfy a document that never argued against them.
+  **Reversible: yes — they are two blocks in one view function.**

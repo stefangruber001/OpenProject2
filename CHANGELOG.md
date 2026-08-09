@@ -7,6 +7,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Facturas de proveedores (ADM-03) is one screen with two zones: the capture
+  inbox on the left, one card per document still waiting for a person, and the
+  register of everything already filed on the right. A document is allocated
+  from a side panel to one obra, a split across several, or an overhead
+  category — a split has to total the confirmed document, and a line goes to a
+  project or to an account, never both. Documents also keep where the file came
+  from, the reference the supplier's paperwork carries and a free note, all
+  searchable (schema v14).
+- Compras y pedidos (ADM-02) is organised around three counters — Oferta,
+  Pedido, Facturado — each carrying a count and an amount, and each filtering
+  the list when pressed. An order opens full screen with the supplier's own
+  quote at 620 with zoom on the left and the record on the right, footing base,
+  IVA and total. The quote is a document already captured elsewhere, linked to
+  the order rather than uploaded a second time.
+
 - Document-reading capability (`@repo/capability-extraction`): turns recognised
   text into candidate invoice fields with a confidence, the place on the page
   each value came from, runners-up for one-tap correction, and arithmetic and

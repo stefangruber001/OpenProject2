@@ -139,8 +139,8 @@ BRD's own §11 phasing (justification given per item). MISSING: none remain.
 | ID     | Status      | Evidence / justification                                                                                                                                                                                       |
 | ------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | DOC-01 | PARTIAL     | renderBudgetDoc() issuer block with logoRef+fiscal data (shown in budgetDrawer); no rendered invoice/receipt/contract doc with logo                                                                            |
-| DOC-02 | PARTIAL     | captured docs allocate to project/overhead, capId on bills, partyHistory(); no cross-retrieval from property/contract/payment                                                                                  |
-| DOC-03 | PARTIAL     | docTypes list + imageRef/photos/handwrittenEstimateRef modeled, but all are string refs — no actual file upload/storage of PDFs/scans                                                                          |
+| DOC-02 | PARTIAL     | ADM-03 allocates a captured doc to obra(s) and/or overhead from a 480 panel; sourcePath/reference/notes searchable; capId on bills, partyHistory(); no cross-retrieval from property/contract/payment          |
+| DOC-03 | IMPLEMENTED | imageRef is a real blob key since S6 (ErpStore.putBlob); ADM-03 renders the picture as an inbox thumbnail and ADM-02 renders the linked PDF/image at 620 with zoom                                             |
 | DOC-04 | IMPLEMENTED | confirmCapture() builds stdName; _docName() standardizes issued-doc names; original imageRef kept unaltered                                                                                                    |
 | DOC-05 | IMPLEMENTED | newVersion() marks prev.superseded/frozen, currentVersionId/acceptedVersionId identify latest; versions never deleted                                                                                          |
 | DOC-06 | PARTIAL     | acceptVersion customerResponse{date,evidenceRef}, v.sent{date,channel}, approveChange approvedAt; channel+responsible person not on decision record                                                            |
@@ -311,7 +311,7 @@ BRD's own §11 phasing (justification given per item). MISSING: none remain.
 | PUR-02 | IMPLEMENTED | addPurchase(): supplierId, projectId, date, desc, qtyMilli, unitCents, vatBp, totalCents, chapterNum link                                              |
 | PUR-03 | PARTIAL     | purchase.status{ordered,delivered,returnedCents,invoicedBillId,paid}; 'requested'/'credited' absent, no setter ever flips delivered/paid               |
 | PUR-04 | IMPLEMENTED | purchase.orderRef; registerBill matches by orderRef→invoicedBillId; matchMovement links bank/card movement to the bill                                 |
-| PUR-05 | PARTIAL     | purchase.docRefs field only (never used); captured delivery notes/receipts attach to bills via capId, not to purchases; no attach UI                   |
+| PUR-05 | IMPLEMENTED | attachPurchaseDocument()/detachPurchaseDocument() write purchase.docRefs; ADM-02 shows the linked captured document at 620 with zoom beside the record |
 | PUR-06 | IMPLEMENTED | committedCostCents()+actualCostCents() move with real prices while frozen project.baseline stays intact; proven in year-sim                            |
 | PUR-07 | PARTIAL     | multi-project/overhead splits with sum check on registerBill/allocateCapture/splitMovement; bill allocations irreversible, purchase.allocations unused |
 | PUR-08 | PARTIAL     | engine: minimal addPurchase with urgent flag + ticket captureDocument then reconcile; no quick site-entry UI exists                                    |
