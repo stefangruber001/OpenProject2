@@ -1721,6 +1721,99 @@ async function testControlTowerAndDay(browser, base) {
       ok("DMC-05: payment terms are listed and maintainable");
     else bad("DMC-05", payText.replace(/\n/g, " ").slice(0, 140));
 
+    // ---- DMC-02: the comparison strip, and the rule it exists to protect ----
+    await pg.evaluate(() => (location.hash = "price-list"));
+    await pg.waitForTimeout(450);
+    // The strip is deliberately absent until one partida is chosen: comparing
+    // suppliers across different items is not a comparison.
+    const stripBefore = await pg.locator(".pstrip").count();
+    if (stripBefore === 0) ok("DMC-02: no comparison strip until a partida is chosen");
+    else bad("DMC-02 strip gating", `strip present with no filter (${stripBefore})`);
+
+    // Pick the partida the seed prices most suppliers against, so the strip
+    // has both a cheapest and a "sin precio" card to draw.
+    const pickable = await pg.evaluate(() => {
+      const counts = {};
+      for (const p of erp.state.prices) counts[p.itemId] = (counts[p.itemId] || 0) + 1;
+      const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+      return best ? best[0] : null;
+    });
+    if (!pickable) {
+      bad("DMC-02 strip", "the seed carries no prices at all");
+    } else {
+      await pg.locator("#prcItem").selectOption(pickable);
+      await pg.waitForTimeout(400);
+      const strip = await pg.evaluate(() => ({
+        cards: document.querySelectorAll(".pcard").length,
+        best: document.querySelectorAll(".pcard.best").length,
+        none: document.querySelectorAll(".pcard.none").length,
+        zeros: [...document.querySelectorAll(".pcard.none .net")].map((n) => n.textContent.trim()),
+      }));
+      if (strip.cards > 0 && strip.best === 1)
+        ok(`DMC-02: the strip marks exactly one cheapest supplier (${strip.cards} cards)`);
+      else bad("DMC-02 cheapest", JSON.stringify(strip));
+
+      // The rule the doc is explicit about: a supplier with no price is never
+      // rendered as a zero, which would make them look like the cheapest.
+      if (strip.none === 0 || strip.zeros.every((z) => /sin precio/i.test(z)))
+        ok("DMC-02: a supplier without a price reads «sin precio», never 0,00 €");
+      else bad("DMC-02 missing-as-zero", JSON.stringify(strip.zeros));
+    }
+
+    // Gaps 6-9 are capturable from the screen, not just present in the model.
+    await pg.locator("#prcNew").click();
+    await pg.waitForTimeout(300);
+    await pg.locator("#pr_list").fill("100");
+    await pg.locator("#pr_disc").fill("10");
+    await pg.waitForTimeout(150);
+    const derivedNet = await pg.locator("#pr_net").inputValue();
+    await pg.locator("#pr_ref").fill("SUP-REF-9");
+    await pg.locator("#pr_tax").fill("21");
+    await pg.locator("#pr_waste").fill("3.5");
+    await pg.locator("#pr_min").fill("25");
+    await pg.locator("#pr_proj").fill("OBRA-E2E");
+    await pg.locator("#pr_notes").fill("nota e2e");
+    await pg.locator("#pr_save").click();
+    await pg.waitForTimeout(400);
+    const saved = await pg.evaluate(() => {
+      const p = erp.state.prices[erp.state.prices.length - 1];
+      return {
+        net: p.netCents,
+        tax: p.taxRateBp,
+        ref: p.supplierRef,
+        waste: p.wasteCents,
+        min: p.minOrder,
+        proj: p.projectRef,
+        notes: p.notes,
+      };
+    });
+    if (
+      derivedNet === "90.00" &&
+      saved.net === 9000 &&
+      saved.tax === 2100 &&
+      saved.ref === "SUP-REF-9" &&
+      saved.waste === 350 &&
+      saved.min === 25 &&
+      saved.proj === "OBRA-E2E" &&
+      saved.notes === "nota e2e"
+    )
+      ok(
+        "DMC-02: gaps 6-9 (IVA, código art., residuos, mínimo, proyecto, notas) capture and persist",
+      );
+    else bad("DMC-02 gap fields", `derived=${derivedNet} ${JSON.stringify(saved)}`);
+
+    // An unstated IVA stays unstated. Storing 0 would assert a rate nobody gave.
+    await pg.locator("#prcNew").click();
+    await pg.waitForTimeout(300);
+    await pg.locator("#pr_list").fill("50");
+    await pg.locator("#pr_save").click();
+    await pg.waitForTimeout(400);
+    const blankTax = await pg.evaluate(
+      () => erp.state.prices[erp.state.prices.length - 1].taxRateBp,
+    );
+    if (blankTax === null) ok("DMC-02: an unrecorded IVA stays null, it does not become 0%");
+    else bad("DMC-02 null tax", `taxRateBp=${blankTax}`);
+
     if (errs.length === 0) ok("torre/alertas: no console errors");
     else bad("torre/alertas: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

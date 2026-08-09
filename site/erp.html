@@ -466,6 +466,21 @@
     background:var(--ink);color:#fff;font:600 12.5px var(--sans);padding:10px 16px;border-radius:11px;max-width:88vw}
   .toast.on{opacity:1;transform:translate(-50%,0)}
 
+  /* DMC-02 — the supplier comparison strip (S3). It appears only when the
+     screen is filtered to ONE partida, because comparing suppliers across
+     different items is not a comparison. A supplier with no price is drawn
+     grey and says «sin precio»: the doc is explicit that a missing price is
+     never to be rendered as a zero, which would make the cheapest supplier
+     the one nobody has quoted. */
+  .pstrip{display:grid;grid-template-columns:repeat(auto-fill,minmax(216px,1fr));gap:11px;margin:2px 0 4px}
+  .pcard{background:var(--paper);border:1px solid var(--line);border-radius:13px;padding:11px 13px;box-shadow:var(--shadow)}
+  .pcard.best{border-color:var(--green);box-shadow:0 0 0 2px var(--greenSoft),var(--shadow)}
+  .pcard.none{background:var(--bg);border-style:dashed}
+  .pcard .sup{font:600 12.5px var(--sans);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pcard .net{font:700 21px var(--sans);letter-spacing:-.02em;margin:4px 0 2px}
+  .pcard.none .net{color:var(--muted);font-size:15px;font-weight:600}
+  .pcard .meta{font-size:11px;color:var(--muted);line-height:1.5}
+
   /* DMC-03/04/05 — the three list-configuration screens (S3). The doc asks
      for a centred table with a help column beside it explaining where the
      list is used, and no side panel: these screens are short enough that a
@@ -2061,6 +2076,105 @@ function workerDocDrawer(workerId){
    overhead here rather than structure. Tarifas is append-only history
    (addWorkerRate), shown inline; Documentos reuses the existing
    workerDocDrawer rather than duplicating its add/renew form. */
+/* ---------- DMC-02 · capturing a price (S3) ----------
+   Prices are append-only (SUP-05): a new quote from the same supplier is a
+   NEW row, never an edit of the old one, because the old one is what a
+   budget written last month was priced from. So there is a "new" drawer and
+   a read-only detail drawer, and no edit path at all — the absence is the
+   feature.
+
+   Net is derived from list × discount the moment either changes, but stays
+   overridable: a supplier who quotes a flat net that does not divide evenly
+   is common, and forcing the operator to invent a discount percentage that
+   reproduces it would put a fiction in the record. */
+function newPriceDrawer(itemId){
+  const items=erp.state.catalogue.slice().sort((a,b)=>String(a.code).localeCompare(String(b.code)));
+  const sups=erp.state.parties.filter(p=>p.active&&p.roles.some(r=>["supplier","subcontractor","selfEmployed"].includes(r)));
+  if(!items.length) return toast("⚠ Primero hay que dar de alta alguna partida");
+  if(!sups.length) return toast("⚠ Primero hay que dar de alta algún proveedor");
+  const db=openDrawer("Nuevo precio");
+  const SRC=[["priceList","Tarifa"],["supplierPortal","Portal del proveedor"],["supplierOffer","Oferta"],
+    ["valuedDeliveryNote","Albarán valorado"],["purchaseInvoice","Factura de compra"],["manualConfirmation","Confirmación manual"]];
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Partida *</label><select id="pr_item">${items.map(i=>`<option value="${i.id}"${i.id===itemId?" selected":""}>${esc(i.code)} · ${esc(i.desc)}</option>`).join("")}</select></div>
+   <div class="field full"><label>Proveedor *</label><select id="pr_sup">${sups.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select></div>
+   <div class="field"><label>Fecha *</label><input id="pr_date" type="date" value="${erp.today}"></div>
+   <div class="field"><label>Código del artículo en el proveedor</label><input id="pr_ref" placeholder="el suyo, no el nuestro"></div>
+   <div class="field"><label>Precio de lista (€) *</label><input id="pr_list" type="number" min="0" step="0.01"></div>
+   <div class="field"><label>Descuento (%)</label><input id="pr_disc" type="number" min="0" max="100" step="0.1" value="0"></div>
+   <div class="field"><label>Precio neto (€)</label><input id="pr_net" type="number" min="0" step="0.01" placeholder="se calcula solo"></div>
+   <div class="field"><label>IVA (%)</label><input id="pr_tax" type="number" min="0" max="100" step="0.5" placeholder="sin dato"></div>
+   <div class="field"><label>Transporte (€)</label><input id="pr_trans" type="number" min="0" step="0.01" value="0"></div>
+   <div class="field"><label>Gestión de residuos (€)</label><input id="pr_waste" type="number" min="0" step="0.01" value="0"></div>
+   <div class="field"><label>Pedido mínimo</label><input id="pr_min" type="number" min="0" step="0.01" placeholder="sin mínimo"></div>
+   <div class="field"><label>Vigente hasta</label><input id="pr_until" type="date"></div>
+   <div class="field"><label>Origen *</label><select id="pr_src">${SRC.map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select></div>
+   <div class="field"><label>Documento de origen</label><input id="pr_doc" placeholder="nº de oferta, albarán o factura"></div>
+   <div class="field full"><label>Proyecto para el que se pidió</label><input id="pr_proj" placeholder="código de obra, si el precio es específico"></div>
+   <div class="field full"><label>Notas</label><input id="pr_notes"></div>
+   <div class="field full" style="font-size:11.5px;color:var(--muted);margin-top:-2px">
+     Los precios no se editan: cada cotización nueva se añade como una fila más, porque lo que se
+     presupuestó el mes pasado tiene que seguir explicándose con el precio que había entonces.</div>
+   <div class="field full" style="margin-top:8px"><button class="btn primary" id="pr_save">Guardar precio</button></div></div>`;
+  const money=el=>{const n=Number(String($(el).value).replace(",","."));return Number.isFinite(n)?Math.round(n*100):0;};
+  // Net follows list × discount until somebody types a net of their own.
+  const recalc=()=>{
+    if($('#pr_net').dataset.touched) return;
+    const list=money('#pr_list'), disc=+$('#pr_disc').value||0;
+    $('#pr_net').value=list?((Math.round(list*(1-disc/100))/100).toFixed(2)):"";
+  };
+  $('#pr_list').oninput=recalc; $('#pr_disc').oninput=recalc;
+  $('#pr_net').oninput=()=>{ $('#pr_net').dataset.touched="1"; };
+  $('#pr_save').onclick=()=>mutate(()=>{
+    const listCents=money('#pr_list');
+    if(listCents<=0) throw new Error("El precio de lista debe ser mayor que cero");
+    const taxRaw=$('#pr_tax').value.trim(), minRaw=$('#pr_min').value.trim();
+    erp.addPrice({
+      itemId:$('#pr_item').value, supplierId:$('#pr_sup').value,
+      date:$('#pr_date').value||erp.today,
+      listCents, discountPct:+$('#pr_disc').value||0,
+      netCents:money('#pr_net')||0,          // 0 lets the engine derive it
+      // Empty stays null rather than becoming 0: "nobody recorded the rate"
+      // and "the rate is 0%" are different facts about a supplier price.
+      taxRateBp:taxRaw===""?null:Math.round(parseFloat(taxRaw)*100),
+      supplierRef:$('#pr_ref').value.trim(),
+      transportCents:money('#pr_trans'), wasteCents:money('#pr_waste'),
+      minOrder:minRaw===""?null:parseFloat(minRaw),
+      source:$('#pr_src').value, sourceDocRef:$('#pr_doc').value.trim(),
+      projectRef:$('#pr_proj').value.trim(), notes:$('#pr_notes').value.trim(),
+      validUntil:$('#pr_until').value||null,
+    },"backoffice");
+    closeDrawer();
+  },"Precio registrado");
+}
+function priceDrawer(id){
+  const p=erp.state.prices.find(x=>x.id===id); if(!p) return;
+  const it=erp.state.catalogue.find(i=>i.id===p.itemId);
+  const SRC={priceList:"Tarifa",supplierPortal:"Portal del proveedor",supplierOffer:"Oferta",
+    valuedDeliveryNote:"Albarán valorado",purchaseInvoice:"Factura de compra",manualConfirmation:"Confirmación manual"};
+  const db=openDrawer(`${it?it.code:"Precio"} · ${erp.party(p.supplierId).name}`);
+  const expired=p.validUntil&&p.validUntil<erp.today;
+  db.innerHTML=`<div class="card"><div class="ch"><h3>El precio</h3>
+     <span class="tag">${expired?"caducado":"vigente"}</span></div><div class="daylist">
+    <div class="it">Partida: <b>${esc(it?it.code+" · "+it.desc:"—")}</b>${it?` · por ${esc(it.unit)}`:""}</div>
+    <div class="it">Proveedor: <b>${esc(erp.party(p.supplierId).name)}</b>${p.supplierRef?` · su código <b>${esc(p.supplierRef)}</b>`:""}</div>
+    <div class="it">Lista ${eur(p.listCents)} · descuento ${p.discountPct}% → <b>neto ${eur(p.netCents)}</b></div>
+    <div class="it">IVA: ${p.taxRateBp==null?'<span class="pill y">sin dato</span>':`<b>${p.taxRateBp/100}%</b>`}</div>
+    <div class="it">Transporte ${p.transportCents?eur(p.transportCents):"—"} · residuos ${p.wasteCents?eur(p.wasteCents):"—"} · pedido mínimo ${p.minOrder==null?"—":p.minOrder}</div>
+    <div class="it">Fecha ${fmtD(p.date)} · vigencia ${p.validUntil?fmtD(p.validUntil):"sin límite"}</div>
+    <div class="it">Origen: <b>${esc(SRC[p.source]||p.source)}</b>${p.sourceDocRef?" · "+esc(p.sourceDocRef):" · <span class=\"pill y\">sin documento</span>"}</div>
+    ${p.projectRef?`<div class="it">Pedido para la obra <b>${esc(p.projectRef)}</b></div>`:""}
+    ${p.notes?`<div class="it">${esc(p.notes)}</div>`:""}
+   </div></div>
+   <div class="card"><div class="ch"><h3>Por qué no se puede editar</h3></div><div class="daylist">
+    <div class="it">Un precio es lo que un proveedor dijo un día concreto, y los presupuestos escritos
+      con él tienen que poder seguir explicándose. Una cotización nueva se registra como una fila
+      más — el histórico completo queda en la pantalla anterior.</div>
+    <div class="it"><button class="btn primary" id="pr_again">＋ Registrar un precio nuevo de esta partida</button></div>
+   </div></div>`;
+  $('#pr_again').onclick=()=>newPriceDrawer(p.itemId);
+}
+
 function newWorkerDrawer(){
   const db=openDrawer("Nuevo trabajador");
   db.innerHTML=`<div class="fgrid">
@@ -3284,6 +3398,8 @@ const LIST_META={
 };
 /** New-row drafts, keyed by list kind, so a half-typed entry survives re-render. */
 const listDraft={};
+/** DMC-02's partida filter. A view concern, so it lives here, not in state. */
+let priceItem="";
 
 /**
  * A picker over one of the owner-maintained lists.
@@ -3869,29 +3985,91 @@ const VIEWS={
   $('#bToRec').onclick=()=>goTab("banking","_reconcile");
  },
 
- /* ---------- Precios y costes (SUP/CAT) ---------- */
+ /* ---------- Lista de precios (DMC-02, spec §DMC-02) ----------
+    The doc puts a partida filter at the top and makes it permanent, because
+    the comparison the screen exists for is "who is cheapest for THIS item" —
+    a grid of every partida against every supplier is a spreadsheet, not an
+    answer. Choosing one partida is what makes the strip appear.
+
+    The rule that outranks the layout: a supplier with no price is drawn as
+    having no price. Rendering a blank as 0,00 € would make the supplier who
+    never quoted the cheapest one on screen, which is how a purchase order
+    goes to the wrong company. `comparePrices` already returns `missing`
+    rather than a zero; this screen keeps that distinction visible. */
  "price-list"(v){
-  $('#sub').textContent="Catálogo de partidas y precios por proveedor con fecha y documento de origen. Un precio ausente se ve ausente — nunca cuenta como cero.";
-  const sups=erp.state.parties.filter(p=>p.roles.some(r=>["supplier","subcontractor"].includes(r)));
-  const cmp=erp.comparePrices(erp.state.catalogue.map(i=>i.id),sups.map(s=>s.id));
-  v.innerHTML=`<div class="card"><div class="ch"><h3>Comparativa de precios por partida</h3><span class="tag">neto por proveedor</span></div>
-   <div class="scroll"><table><thead><tr><th>Partida</th>${sups.map(s=>`<th class="num">${esc(s.name.split(" ")[0])}</th>`).join("")}<th class="num">Mejor</th></tr></thead><tbody>
-   ${cmp.map(row=>{const it=erp.state.catalogue.find(i=>i.id===row.itemId);
-    return `<tr><td class="k">${esc(it.code)} · ${esc(it.desc)}</td>
-     ${row.perSupplier.map(ps=>`<td class="num">${ps.missing?'<span class="pill y">Sin precio</span>':eur(ps.netCents)}</td>`).join("")}
-     <td class="num k">${row.bestCents!=null?eur(row.bestCents):"—"}</td></tr>`;}).join("")}
-   </tbody></table></div></div>
-   <div class="card"><div class="ch"><h3>Histórico de precios</h3><span class="tag">con origen y vigencia (nunca se sobrescribe)</span></div>
-   <div class="scroll"><table><thead><tr><th>Partida</th><th>Proveedor</th><th>Fecha</th><th class="num">Lista</th><th class="num">Dto.</th><th class="num">Neto</th><th>Origen</th><th>Vigencia</th></tr></thead><tbody>
-   ${erp.state.prices.map(p=>{const it=erp.state.catalogue.find(i=>i.id===p.itemId);const expired=p.validUntil&&p.validUntil<erp.today;
-    return `<tr><td class="k">${esc(it.code)}</td><td>${esc(erp.party(p.supplierId).name)}</td><td>${fmtD(p.date)}</td>
+  $('#sub').textContent="Precios por proveedor con su fecha, su documento de origen y su vigencia. Filtra por partida para comparar proveedores; un precio ausente se ve ausente y nunca cuenta como cero.";
+  const sups=erp.state.parties.filter(p=>p.active&&p.roles.some(r=>["supplier","subcontractor","selfEmployed"].includes(r)));
+  const items=erp.state.catalogue.slice().sort((a,b)=>String(a.code).localeCompare(String(b.code)));
+  if(priceItem&&!items.some(i=>i.id===priceItem)) priceItem="";
+  const one=priceItem?items.find(i=>i.id===priceItem):null;
+  const SRC={priceList:"Tarifa",supplierPortal:"Portal",supplierOffer:"Oferta",valuedDeliveryNote:"Albarán valorado",purchaseInvoice:"Factura",manualConfirmation:"Confirmación"};
+
+  const rows=erp.state.prices.filter(p=>!one||p.itemId===one.id)
+    .slice().sort((a,b)=>b.date.localeCompare(a.date));
+
+  // The strip, only when the screen is filtered to a single partida.
+  let strip="";
+  if(one){
+    const cmp=erp.comparePrices([one.id],sups.map(s=>s.id))[0];
+    strip=`<div class="card"><div class="ch"><h3>Comparativa para ${esc(one.code)} · ${esc(one.desc)}</h3>
+      <span class="tag">${cmp.bestCents!=null?`mejor precio ${eur(cmp.bestCents)} / ${esc(one.unit)}`:"todavía sin ningún precio"}</span></div>
+     <div style="padding:12px 14px 14px"><div class="pstrip">
+     ${cmp.perSupplier.map(ps=>{
+       const s=erp.party(ps.supplierId);
+       if(ps.missing) return `<div class="pcard none"><div class="sup">${esc(s.name)}</div>
+         <div class="net">Sin precio</div><div class="meta">nunca ha cotizado esta partida</div></div>`;
+       const best=cmp.bestCents!=null&&ps.netCents===cmp.bestCents;
+       const last=rows.find(p=>p.supplierId===ps.supplierId&&p.itemId===one.id);
+       const over=cmp.bestCents?Math.round(((ps.netCents-cmp.bestCents)/cmp.bestCents)*1000)/10:0;
+       return `<div class="pcard${best?" best":""}"><div class="sup">${esc(s.name)}</div>
+        <div class="net">${eur(ps.netCents)}</div>
+        <div class="meta">${best?"<b>el más barato</b>":`+${over}% sobre el mejor`}
+         ${last?`<br>${fmtD(last.date)} · ${esc(SRC[last.source]||last.source)}`:""}
+         ${last&&last.validUntil?`<br>vigente hasta ${fmtD(last.validUntil)}`:""}</div></div>`;}).join("")
+      ||'<div class="empty">No hay proveedores dados de alta todavía.</div>'}
+     </div></div></div>`;
+  }
+
+  v.innerHTML=`<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+    <button class="btn primary sm" id="prcNew">＋ Nuevo precio</button>
+    <label style="font-size:12px;color:var(--dim)">Partida
+      <select id="prcItem" style="font:inherit;font-size:12.5px;margin-left:6px;padding:6px 8px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink);max-width:340px">
+        <option value="">Todas las partidas</option>
+        ${items.map(i=>`<option value="${i.id}"${i.id===priceItem?" selected":""}>${esc(i.code)} · ${esc(i.desc)}</option>`).join("")}
+      </select></label>
+    <span class="tag">${rows.length} precio${rows.length===1?"":"s"}${one?" de esta partida":""}</span>
+    ${one?'<button class="btn sm" id="prcAll">Ver todas</button>':""}</div>
+   ${strip}
+   <div class="card"><div class="ch"><h3>Histórico de precios</h3><span class="tag">se añade, nunca se sobrescribe</span></div>
+   <div class="scroll"><table><thead><tr>
+     <th>Partida</th><th>Proveedor</th><th>Cód. art.</th><th>Fecha</th>
+     <th class="num">Lista</th><th class="num">Dto.</th><th class="num">Neto</th><th class="num">IVA</th>
+     <th class="num">Transporte</th><th class="num">Residuos</th><th class="num">Mín.</th>
+     <th>Origen</th><th>Proyecto</th><th>Vigencia</th><th>Notas</th></tr></thead><tbody>
+   ${rows.map(p=>{const it=erp.state.catalogue.find(i=>i.id===p.itemId);const expired=p.validUntil&&p.validUntil<erp.today;
+    return `<tr class="click" data-price="${p.id}"><td class="k">${esc(it?it.code:"—")}</td>
+     <td>${esc(erp.party(p.supplierId).name)}</td>
+     <td>${esc(p.supplierRef||"—")}</td>
+     <td>${fmtD(p.date)}</td>
      <td class="num">${eur(p.listCents)}</td><td class="num">${p.discountPct}%</td><td class="num k">${eur(p.netCents)}</td>
-     <td>${({priceList:"Tarifa",supplierPortal:"Portal",supplierOffer:"Oferta",valuedDeliveryNote:"Albarán valorado",purchaseInvoice:"Factura",manualConfirmation:"Confirmación"})[p.source]} · ${esc(p.sourceDocRef)}</td>
-     <td>${p.validUntil?(expired?`<span class="pill r">Caducado ${fmtD(p.validUntil)}</span>`:fmtD(p.validUntil)):"—"}</td></tr>`;}).join("")}
+     <td class="num">${p.taxRateBp==null?"—":(p.taxRateBp/100)+"%"}</td>
+     <td class="num">${p.transportCents?eur(p.transportCents):"—"}</td>
+     <td class="num">${p.wasteCents?eur(p.wasteCents):"—"}</td>
+     <td class="num">${p.minOrder==null?"—":p.minOrder}</td>
+     <td>${esc(SRC[p.source]||p.source)}${p.sourceDocRef?" · "+esc(p.sourceDocRef):""}</td>
+     <td>${esc(p.projectRef||"—")}</td>
+     <td>${p.validUntil?(expired?`<span class="pill r">Caducado ${fmtD(p.validUntil)}</span>`:fmtD(p.validUntil)):"—"}</td>
+     <td>${esc(p.notes||"—")}</td></tr>`;}).join("")
+    ||'<tr><td colspan="15"><div class="empty">Sin precios registrados para este filtro.</div></td></tr>'}
    </tbody></table></div></div>
    <div class="card"><div class="ch"><h3>Paquetes de trabajo</h3><span class="tag">rendimiento · compra mínima · envase</span></div><div class="scroll"><table><tbody>
-   ${erp.state.packages.map(w=>`<tr><td class="k">${esc(w.code)} · ${esc(w.name)}</td><td>por ${w.unit}</td><td>merma ${w.wastePct}%</td><td>mín. ${w.minPurchaseQty||"—"}</td><td>envase ${w.containerSize||"—"}</td><td class="num">coste 10 ${w.unit}: ${eur(erp.packageCostCents(w.id,10000))}</td></tr>`).join("")}
+   ${erp.state.packages.map(w=>`<tr><td class="k">${esc(w.code)} · ${esc(w.name)}</td><td>por ${esc(w.unit)}</td><td>merma ${w.wastePct}%</td><td>mín. ${w.minPurchaseQty||"—"}</td><td>envase ${w.containerSize||"—"}</td><td class="num">coste 10 ${esc(w.unit)}: ${eur(erp.packageCostCents(w.id,10000))}</td></tr>`).join("")
+    ||'<tr><td><div class="empty">Sin paquetes definidos.</div></td></tr>'}
    </tbody></table></div></div>`;
+  $('#prcItem').onchange=e=>{ priceItem=e.target.value; render(); };
+  const all=$('#prcAll'); if(all) all.onclick=()=>{ priceItem=""; render(); };
+  $('#prcNew').onclick=()=>newPriceDrawer(priceItem||null);
+  v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>priceDrawer(tr.dataset.price));
  },
 
  /* ---------- Gestoría (GES, spec §5.6) ----------
