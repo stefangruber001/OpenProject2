@@ -1185,19 +1185,20 @@ async function testProcurement(browser, base) {
       await pg.waitForTimeout(200);
     }
 
-    // ---- Subcontratos: the screen is gone, the rules are not ----
+    // ---- Subcontratos: the lifecycle screen is gone, the rules are not ----
     // The v4 specification has no subcontract-management screen, so S1b removed
-    // it. Everything this block used to walk in a browser — send, accept, the
-    // documentation block on starting work, certification, retention — is now
+    // it. Everything that screen used to walk in a browser — send, accept, the
+    // documentation block on starting work, certification, retention — is
     // asserted directly against the engine in manageability-sim.mjs, which is
-    // where it survives the UI. What is checked HERE is only that the retired
-    // route lands somewhere honest rather than on a blank panel.
+    // where it survives the UI. What is checked HERE is that the retired route
+    // lands on DMT-03 (S2), the master-data fichero that replaced it, rather
+    // than on a blank panel.
     await pg.evaluate(() => (location.hash = "subcontratos"));
     await pg.waitForTimeout(500);
     const subHash = await pg.evaluate(() => location.hash);
     const subText = await pg.locator("#view").innerText();
-    if (subHash === "#subcontractors" && /En preparación/.test(subText))
-      ok("subcontratos: the retired route redirects and explains where the data went");
+    if (subHash === "#subcontractors" && /industrial/i.test(subText))
+      ok("subcontratos: the retired route redirects to the DMT-03 fichero");
     else bad("subcontratos: retired route", `${subHash} · ${subText.slice(0, 70)}`);
 
     // ---- Modificaciones: detect → value → send → approve → adenda ----
@@ -1789,24 +1790,26 @@ async function testErp(browser, base) {
     await pg.locator("#dClose").click();
     await pg.waitForTimeout(200);
 
-    // Clientes: the list pages at 10 by default, the size selector changes it,
-    // and "Siguiente" actually moves to different clients.
+    // Clientes: the list defaults to 25 rows per screen (10/25/50 — corrects
+    // the 10/20/50 shipped originally), so the 17-customer demo dataset shows
+    // in one page by default. Selecting 10 pages it, and "Siguiente" actually
+    // moves to different clients.
     await pg.evaluate(() => (location.hash = "customers"));
     await pg.waitForTimeout(350);
-    const pageOne = await pg.locator("tbody tr.click").count();
+    const pageDefault = await pg.locator("tbody tr.click").count();
+    await pg.locator("#cliSize").selectOption("10");
+    await pg.waitForTimeout(300);
+    const pageTen = await pg.locator("tbody tr.click").count();
     const firstCode = await pg.locator("tbody tr.click").first().innerText();
     await pg.locator("#cliNext").click();
     await pg.waitForTimeout(300);
     const secondCode = await pg.locator("tbody tr.click").first().innerText();
-    await pg.locator("#cliSize").selectOption("20");
-    await pg.waitForTimeout(300);
-    const pageTwenty = await pg.locator("tbody tr.click").count();
-    if (pageOne === 10 && firstCode !== secondCode && pageTwenty > 10)
-      ok("erp: clientes paginate at 10 by default and honour the size selector");
+    if (pageDefault > 10 && pageTen === 10 && firstCode !== secondCode)
+      ok("erp: clientes default to 25 rows and the size selector pages at 10");
     else
       bad(
         "erp: clientes pagination",
-        `page1=${pageOne} sizeChange=${pageTwenty} moved=${firstCode !== secondCode}`,
+        `default=${pageDefault} size10=${pageTen} moved=${firstCode !== secondCode}`,
       );
 
     // Export: the menu offers both formats, and the .xlsx writer really emits a
@@ -1827,6 +1830,113 @@ async function testErp(browser, base) {
       ok("erp: clientes export offers .xlsx/.csv and writes a real workbook");
     else
       bad("erp: clientes export", `${menuTxt.replace(/\n/g, " ")} · ${JSON.stringify(zipMagic)}`);
+
+    // DMT-02/03: Proveedores and Subcontratas are the same party file, filtered
+    // by role, on the shared list primitive built for S2. Creating a supplier
+    // must not leak into the Subcontratas list, and vice versa.
+    await pg.evaluate(() => (location.hash = "suppliers"));
+    await pg.waitForTimeout(350);
+    await pg.locator("#supNew").click();
+    await pg.waitForTimeout(250);
+    const supName = "E2E Proveedor " + String(Date.now()).slice(-5);
+    await pg.locator("#f_name").fill(supName);
+    await pg.locator("#f_tax").fill("B10000008");
+    await pg.locator("#f_mob").fill("600111222");
+    await pg.locator("#f_street").fill("Calle Test 1");
+    await pg.locator("#f_cp").fill("08960");
+    await pg.locator("#f_city").fill("Sant Just");
+    await pg.locator("#f_save").click();
+    await pg.waitForTimeout(350);
+    await pg.locator("#supQ").fill(supName);
+    await pg.waitForTimeout(300);
+    const supRows = await pg.locator("tbody tr.click").count();
+    if (supRows === 1) ok("erp: DMT-02 proveedores — created and listed by role");
+    else bad("erp: DMT-02 proveedores", `rows=${supRows}`);
+
+    await pg.evaluate(() => (location.hash = "subcontractors"));
+    await pg.waitForTimeout(350);
+    await pg.locator("#subQ").fill(supName);
+    await pg.waitForTimeout(300);
+    const supInSub = await pg.locator("tbody tr.click").count();
+    if (supInSub === 0) ok("erp: DMT-02/03 — a supplier does not leak into Subcontratas");
+    else bad("erp: DMT-02/03 role separation", `subcontratas rows=${supInSub}`);
+
+    await pg.locator("#subNew").click();
+    await pg.waitForTimeout(250);
+    const subName = "E2E Industrial " + String(Date.now()).slice(-5);
+    await pg.locator("#f_name").fill(subName);
+    await pg.locator("#f_tax").fill("B20000006");
+    await pg.locator("#f_mob").fill("600222333");
+    await pg.locator("#f_street").fill("Calle Test 2");
+    await pg.locator("#f_cp").fill("08960");
+    await pg.locator("#f_city").fill("Sant Just");
+    await pg.locator("#f_save").click();
+    await pg.waitForTimeout(350);
+    await pg.locator("#subQ").fill(subName);
+    await pg.waitForTimeout(300);
+    const subRows = await pg.locator("tbody tr.click").count();
+    if (subRows === 1) ok("erp: DMT-03 subcontratas — created and listed by role");
+    else bad("erp: DMT-03 subcontratas", `rows=${subRows}`);
+
+    // Universal search must route a supplier/subcontractor hit to their own
+    // screen (DMT-02/03), not into Clientes — the bug this session fixed.
+    await pg.locator("#q").fill(subName);
+    await pg.waitForTimeout(300);
+    const subSearchTxt = await pg.locator("#sres.on").innerText();
+    if (/subcontratas/i.test(subSearchTxt)) {
+      await pg.locator("#sres .si").first().click();
+      await pg.waitForTimeout(400);
+      const afterHash = await pg.evaluate(() => location.hash);
+      if (afterHash === "#subcontractors")
+        ok("erp: universal search routes a subcontrata hit to Subcontratas, not Clientes");
+      else bad("erp: search routing (subcontratas)", afterHash);
+    } else bad("erp: search grouping (subcontratas)", subSearchTxt.slice(0, 80));
+    await pg.locator("#dClose").click();
+    await pg.waitForTimeout(200);
+    await pg.locator("#q").fill("");
+
+    // DMT-04: Personal interno lives on state.workers, not parties — create,
+    // add a second rate, and deactivate (never delete).
+    await pg.evaluate(() => (location.hash = "staff"));
+    await pg.waitForTimeout(350);
+    const staffBefore = await pg.locator("tbody tr.click").count();
+    await pg.locator("#stfNew").click();
+    await pg.waitForTimeout(250);
+    const workerName = "E2E Trabajador " + String(Date.now()).slice(-5);
+    await pg.locator("#w_name").fill(workerName);
+    await pg.locator("#w_rate").fill("18");
+    await pg.locator("#w_save").click();
+    await pg.waitForTimeout(350);
+    const staffAfter = await pg.locator("tbody tr.click").count();
+    if (staffAfter === staffBefore + 1) ok("erp: DMT-04 personal — worker created and listed");
+    else bad("erp: DMT-04 personal create", `before=${staffBefore} after=${staffAfter}`);
+
+    await pg.locator("#stfQ").fill(workerName);
+    await pg.waitForTimeout(300);
+    await pg.locator("tbody tr.click").first().click();
+    await pg.waitForTimeout(300);
+    // A distinct future date, not "today": two rates dated the same day are an
+    // inherent tie the engine breaks by array order, not by which was added
+    // last — asserting on "today" would make this check depend on that tie
+    // rather than on the feature (a second history row) actually working.
+    await pg.locator("#w_newfrom").fill("2027-01-01");
+    await pg.locator("#w_newrate").fill("20");
+    await pg.locator("#w_addrate").click();
+    await pg.waitForTimeout(350);
+    const rateTxt = await pg.locator("#drawer .card").first().innerText();
+    const rateLines = (rateTxt.match(/^desde /gm) || []).length;
+    if (rateLines === 2) ok("erp: DMT-04 tarifas — a second rate is added to the history");
+    else bad("erp: DMT-04 tarifas", rateTxt.slice(0, 160));
+    await pg.locator("#w_act").click();
+    await pg.waitForTimeout(350);
+    // The list is still filtered to this one worker's name; deactivating
+    // drops it from the (active-only) list without touching any other row.
+    const staffAfterDeactivate = await pg.locator("tbody tr.click").count();
+    if (staffAfterDeactivate === 0)
+      ok(
+        "erp: DMT-04 personal — deactivating drops the worker from the active list, not the record",
+      );
+    else bad("erp: DMT-04 deactivate", `count=${staffAfterDeactivate} expected=0`);
 
     // Gestoría: exception list + VAT summary render
     await pg.evaluate(() => (location.hash = "accountant"));

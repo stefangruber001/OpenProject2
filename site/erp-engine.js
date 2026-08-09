@@ -3346,9 +3346,32 @@
         },
         w,
       ); // rateHistory {from, rateCentsPerHour}; docs {kind, expiresOn, docRef}
+      if (rec.taxId && !validTaxId(rec.taxId))
+        throw new Error("Invalid tax identifier: " + rec.taxId);
       this.state.workers.push(rec);
       this._log(user, "addWorker", rec.name);
       return rec;
+    }
+    /** DMT-04: the fields a registry screen edits after creation. Rates and
+        documents are append-only history, not patchable here — addWorkerRate
+        and addWorkerDoc own those. */
+    updateWorker(id, patch, user) {
+      const w = this.state.workers.find((x) => x.id === id);
+      if (!w) throw new Error("Worker not found");
+      if (patch.taxId && !validTaxId(patch.taxId))
+        throw new Error("Invalid tax identifier: " + patch.taxId);
+      Object.assign(w, patch);
+      this._log(user, "updateWorker", w.name);
+      return w;
+    }
+    /** Deactivate, never delete (system-wide invariant) — a worker's recorded
+        hours and rate history must stay explainable after they leave. */
+    deactivateWorker(id, user) {
+      const w = this.state.workers.find((x) => x.id === id);
+      if (!w) throw new Error("Worker not found");
+      w.active = false;
+      this._log(user, "deactivateWorker", w.name);
+      return w;
     }
     workerRateCents(workerId, date) {
       // LAB-05 with history

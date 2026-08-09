@@ -451,7 +451,7 @@
 
   .scrim{position:fixed;inset:0;background:rgba(20,26,14,.34);opacity:0;pointer-events:none;transition:.2s;z-index:60}
   .scrim.on{opacity:1;pointer-events:auto}
-  .drawer{position:fixed;top:0;right:0;height:100%;width:min(540px,94vw);background:var(--bg);z-index:70;
+  .drawer{position:fixed;top:0;right:0;height:100%;width:min(480px,94vw);background:var(--bg);z-index:70;
     box-shadow:-30px 0 80px -40px rgba(20,26,14,.5);transform:translateX(102%);transition:transform .22s;display:flex;flex-direction:column}
   .drawer.on{transform:none}
   .drawer .dh2{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--paper)}
@@ -465,6 +465,21 @@
   .toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;pointer-events:none;transition:.2s;z-index:90;
     background:var(--ink);color:#fff;font:600 12.5px var(--sans);padding:10px 16px;border-radius:11px;max-width:88vw}
   .toast.on{opacity:1;transform:translate(-50%,0)}
+
+  /* Shared master-data list primitive (S2, decision 15): one row template
+     for both table (desktop) and card (phone) — the phone rule below turns
+     each row into a labelled card via the td[data-th] the primitive already
+     emits, so there is nothing bespoke per screen to keep in sync. Full
+     verification against every DMT screen is S14; this is the base case. */
+  @media(max-width:700px){
+    table.mlist thead{display:none}
+    table.mlist,table.mlist tbody,table.mlist tr,table.mlist td{display:block;width:100%}
+    table.mlist tr{border:1px solid var(--line);border-radius:11px;margin-bottom:8px;padding:9px 11px}
+    table.mlist td{border:0;padding:2px 0;display:flex;justify-content:space-between;gap:10px;font-size:13px}
+    table.mlist td:before{content:attr(data-th);color:var(--muted);font:600 10.5px var(--sans);flex:0 0 auto}
+    table.mlist td.k{font-size:14px}
+    table.mlist td.k:before{display:none}
+  }
 
   /* Phones: panel 1 becomes a bottom bar and panel 2 a sheet above it (spec §1). */
   @media(max-width:860px){
@@ -650,10 +665,19 @@ async function boot(){
   try{ const prefs=await ErpStore.getMeta("ui.prefs"); if(prefs&&prefs.period) PERIOD={...PERIOD,...prefs.period}; }catch(e){}
   try{ const pp=await ErpStore.getMeta("ui.projects");
        if(pp){ projFavs=pp.favs||[]; projRecents=pp.recents||[]; } }catch(e){}
-  // The key follows the screen's v4 name. The old one is still read once so a
-  // page size somebody already chose is carried over rather than reset.
-  try{ const cp=await ErpStore.getMeta("ui.customers")||await ErpStore.getMeta("ui.clientes");
-       if(cp&&CLI_PAGE_SIZES.includes(cp.pageSize)) cliPageSize=cp.pageSize; }catch(e){}
+  // Customers kept its pre-S2 storage key (ui.customers / the older
+  // ui.clientes) so a page size somebody already chose is carried over
+  // rather than reset; the three screens built in S2 use the shared
+  // ui.list.<id> key from the start.
+  try{
+    const cp=await ErpStore.getMeta("ui.customers")||await ErpStore.getMeta("ui.clientes");
+    const st=getListState("customers",25);
+    if(cp&&LIST_PAGE_SIZES.includes(cp.pageSize)) st.pageSize=cp.pageSize;
+    for(const id of ["suppliers","subcontractors","staff"]){
+      const sz=await loadListPageSize(id);
+      if(sz) getListState(id,25).pageSize=sz;
+    }
+  }catch(e){}
 
   const rawHash=location.hash.slice(1), hashKey=resolveRoute(rawHash);
   if(hashKey&&SUBMAP[hashKey]){
@@ -820,12 +844,6 @@ const PLACEHOLDERS={
    body:"El modelo ya guarda la caja; falta la pantalla. Los movimientos en efectivo se ven de momento en Consolidación bancaria.",goto:["banking","Ir a Consolidación bancaria"]},
  "cash-flow":{sub:"ADM-08 · previsión semanal y mensual.",
    body:"La previsión ya se calcula en el motor y se muestra en la Torre; esta pantalla la abre por periodos y por proyecto.",goto:["tower","Ir a la Torre"]},
- suppliers:{sub:"DMT-02 · el fichero de proveedores.",
-   body:"Los proveedores ya existen en el fichero de terceros y se usan en compras y pagos; les falta su propia pantalla.",goto:["supplier-invoices","Ir a Facturas de proveedores"]},
- subcontractors:{sub:"DMT-03 · subcontratas como dato maestro.",
-   body:"Los subcontratos siguen registrados en el motor — documentos, certificaciones, retención y avisos de caducidad — y nada se ha borrado. Lo que se retira es la pantalla de ciclo de vida; aquí vivirá la ficha.",goto:null},
- staff:{sub:"DMT-04 · el personal propio.",
-   body:"Los trabajadores y sus tarifas por fecha se mantienen hoy dentro de Horas.",goto:["labour","Ir a Horas"]},
  units:{sub:"DMC-03 · unidades de medida.",
    body:"La lista existe pero está escrita en el código, así que no se puede mantener. Esta pantalla la pasa a datos.",goto:null},
  "lead-sources":{sub:"DMC-04 · fuentes de leads y motivos de pérdida.",
@@ -988,8 +1006,10 @@ function searchAll(term){
   const partyName=id=>{try{return erp.party(id).name;}catch(e){return "—";}};
   add("Clientes",S.parties.filter(p=>p.roles.includes("customer")&&hit(p.name,p.code,p.taxId,p.billCity))
     .map(p=>({lab:p.name,sub:`${p.code}${p.taxId?" · "+p.taxId:""}${p.billCity?" · "+p.billCity:""}`,k:"customers",open:()=>partyDrawer(p.id)})));
-  add("Proveedores",S.parties.filter(p=>p.roles.some(r=>["supplier","subcontractor","selfEmployed"].includes(r))&&hit(p.name,p.code,p.taxId))
-    .map(p=>({lab:p.name,sub:`${p.code}${p.billCity?" · "+p.billCity:""}`,k:"customers",open:()=>partyDrawer(p.id)})));
+  add("Proveedores",S.parties.filter(p=>p.roles.some(r=>["supplier","selfEmployed"].includes(r))&&hit(p.name,p.code,p.taxId))
+    .map(p=>({lab:p.name,sub:`${p.code}${p.billCity?" · "+p.billCity:""}`,k:"suppliers",open:()=>partyDrawer(p.id)})));
+  add("Subcontratas",S.parties.filter(p=>p.roles.includes("subcontractor")&&hit(p.name,p.code,p.taxId))
+    .map(p=>({lab:p.name,sub:`${p.code}${p.billCity?" · "+p.billCity:""}`,k:"subcontractors",open:()=>partyDrawer(p.id)})));
   add("Proyectos",S.projects.filter(p=>hit(p.code,partyName(p.partyId),p.activityLine))
     .map(p=>({lab:`${p.code} — ${partyName(p.partyId)}`,sub:p.closed?"cerrado":"activo",k:"progress",open:()=>projectDrawer(p.id)})));
   add("Presupuestos",S.budgets.filter(b=>hit(b.number,partyName(b.partyId)))
@@ -2011,6 +2031,80 @@ function workerDocDrawer(workerId){
   },"Documento guardado");
 }
 
+/* ---------- Personal interno (DMT-04, spec §3.4) ----------
+   One drawer, editable in place — a worker has far fewer fields than a
+   tercero, so the two-step ver/editar split Clientes uses would be
+   overhead here rather than structure. Tarifas is append-only history
+   (addWorkerRate), shown inline; Documentos reuses the existing
+   workerDocDrawer rather than duplicating its add/renew form. */
+function newWorkerDrawer(){
+  const db=openDrawer("Nuevo trabajador");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Nombre *</label><input id="w_name"></div>
+   <div class="field"><label>Tipo</label><select id="w_kind"><option value="employee">Empleado</option><option value="selfEmployed">Autónomo</option></select></div>
+   <div class="field"><label>NIF / NIE</label><input id="w_tax"></div>
+   <div class="field"><label>Teléfono</label><input id="w_phone"></div>
+   <div class="field"><label>Email</label><input id="w_mail"></div>
+   <div class="field"><label>Tarifa inicial (€/hora) *</label><input id="w_rate" type="number" min="0" step="0.5"></div>
+   <div class="field full" style="margin-top:8px"><button class="btn primary" id="w_save">Guardar trabajador</button></div></div>`;
+  $('#w_save').onclick=()=>mutate(()=>{
+    const name=$('#w_name').value.trim(); if(!name) throw new Error("El nombre es obligatorio");
+    const rate=Math.round((+$('#w_rate').value||0)*100);
+    if(rate<=0) throw new Error("Indica la tarifa inicial");
+    const rec=erp.addWorker({name,kind:$('#w_kind').value,taxId:$('#w_tax').value.trim(),
+      phone:$('#w_phone').value.trim(),email:$('#w_mail').value.trim()},"backoffice");
+    erp.addWorkerRate(rec.id,{from:erp.today,rateCentsPerHour:rate},"backoffice");
+    closeDrawer();
+  },"Trabajador creado");
+}
+function workerDrawer(id){
+  const w=erp.state.workers.find(x=>x.id===id);
+  const db=openDrawer(w.name);
+  let rate=null; try{ rate=erp.workerRateCents(id,erp.today); }catch(e){}
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Nombre *</label><input id="w_name" value="${esc(w.name)}"></div>
+   <div class="field"><label>Tipo</label><select id="w_kind"><option value="employee"${w.kind!=="selfEmployed"?" selected":""}>Empleado</option><option value="selfEmployed"${w.kind==="selfEmployed"?" selected":""}>Autónomo</option></select></div>
+   <div class="field"><label>NIF / NIE</label><input id="w_tax" value="${esc(w.taxId||"")}"></div>
+   <div class="field"><label>Teléfono</label><input id="w_phone" value="${esc(w.phone||"")}"></div>
+   <div class="field full"><label>Email</label><input id="w_mail" value="${esc(w.email||"")}"></div>
+   <div class="field full" style="margin-top:4px;display:flex;gap:8px;align-items:center">
+     <button class="btn primary" id="w_save">Guardar cambios</button>
+     <span style="flex:1"></span>
+     <button class="btn" id="w_act">${w.active!==false?"Desactivar":"Reactivar"}</button></div></div>
+   <div class="card"><div class="ch"><h3>Tarifas</h3><span class="tag">${rate!=null?esc(eur(rate))+"/hora vigente":"sin tarifa vigente"}</span></div>
+    <div class="daylist">
+     ${w.rateHistory.slice().sort((a,b)=>b.from.localeCompare(a.from)).map(r=>`<div class="it">desde ${fmtD(r.from)} · ${esc(eur(r.rateCentsPerHour))}/hora</div>`).join("")||'<div class="it">Sin tarifas registradas.</div>'}
+    </div>
+    <div class="fgrid" style="padding:0 16px 14px">
+     <div class="field"><label>Nueva tarifa (€/hora)</label><input id="w_newrate" type="number" min="0" step="0.5"></div>
+     <div class="field"><label>Vigente desde</label><input id="w_newfrom" type="date" value="${erp.today}"></div>
+     <div class="field full"><button class="btn sm" id="w_addrate">＋ Añadir tarifa</button></div>
+    </div></div>
+   <div class="card"><div class="ch"><h3>Documentación</h3><span class="tag">${(w.docs||[]).length} registrados</span></div>
+    <div class="daylist">
+     ${(w.docs||[]).map(d=>`<div class="it"><span class="dot ${d.expiresOn&&d.expiresOn<erp.today?'r':'g'}"></span> ${esc(d.kind)} — vence ${d.expiresOn?fmtD(d.expiresOn):"—"}</div>`).join("")||'<div class="it">Sin documentación registrada.</div>'}
+     <div class="it"><button class="btn sm" id="w_docs">🪪 Añadir / renovar documento</button></div>
+    </div></div>`;
+  $('#w_save').onclick=()=>mutate(()=>{
+    const name=$('#w_name').value.trim(); if(!name) throw new Error("El nombre es obligatorio");
+    erp.updateWorker(id,{name,kind:$('#w_kind').value,taxId:$('#w_tax').value.trim(),
+      phone:$('#w_phone').value.trim(),email:$('#w_mail').value.trim()},"backoffice");
+    closeDrawer();
+  },"Datos actualizados");
+  $('#w_act').onclick=()=>mutate(()=>{
+    if(w.active===false) erp.updateWorker(id,{active:true},"backoffice");
+    else erp.deactivateWorker(id,"backoffice");
+    closeDrawer();
+  },w.active===false?"Trabajador reactivado":"Trabajador desactivado");
+  $('#w_addrate').onclick=()=>mutate(()=>{
+    const rc=Math.round((+$('#w_newrate').value||0)*100);
+    if(rc<=0) throw new Error("Indica la tarifa");
+    erp.addWorkerRate(id,{from:$('#w_newfrom').value||erp.today,rateCentsPerHour:rc},"backoffice");
+    workerDrawer(id);
+  },"Tarifa añadida");
+  $('#w_docs').onclick=()=>workerDocDrawer(id);
+}
+
 /* ===================== Conciliación bancaria (spec §5.3) ===========================
    Statement on the left, candidate documents on the right, the proposed match
    and its REASONS in between. Every score and every reason comes from
@@ -2621,31 +2715,112 @@ function alertRulesDrawer(){
    its screen retired; the rest moved to their v4 names. */
 const PROJECT_SUBS=["progress","economics","variations","purchasing","labour"];
 let projFilter="", projStatus="open";
-let cliQuery="";   // Clientes name/code search (spec §3.1 buscador)
-/* Paging is a view concern, so it lives here and not in the state blob. The
-   page number is deliberately NOT persisted — coming back to Clientes should
-   start at the top — while the chosen page size is, because that is a habit. */
-let cliPage=1, cliPageSize=10;
-const CLI_PAGE_SIZES=[10,20,50];
-function saveCliPrefs(){ try{ ErpStore.setMeta("ui.customers",{pageSize:cliPageSize}); }catch(e){} }
 /* One list drives the table head AND the export, so a column can never be
    added to the screen and quietly missing from the file. The accessor returns
    plain text: the table renders pills, a spreadsheet cell cannot. */
 const CLI_COLS=[
-  ["Código", p=>p.code],
-  ["Nombre / Razón social", p=>p.name],
-  ["NIF/CIF", p=>p.taxId||""],
-  ["Contacto", p=>p.contactPerson||""],
-  ["Teléfono", p=>p.landline||""],
-  ["Móvil", p=>p.mobile||""],
-  ["Email", p=>p.email||""],
-  ["Dirección", p=>p.billStreet||""],
-  ["Ciudad", p=>p.billCity||""],
-  ["Provincia", p=>p.billProvince||""],
-  ["C.P.", p=>p.billPostalCode||""],
-  ["Alta", p=>p.createdAt||""],
-  ["Datos", p=>{const c=erp.partyCompleteness(p.id); return c.ok?"Completo":`${c.pct}% · falta ${c.missing.length}`;}],
+  {label:"Código", primary:true, get:p=>p.code},
+  {label:"Nombre / Razón social", primary:true, get:p=>p.name},
+  {label:"NIF/CIF", get:p=>p.taxId||"", html:p=>p.taxId?esc(p.taxId):'<span class="pill r">Falta</span>'},
+  {label:"Contacto", get:p=>p.contactPerson||"", html:p=>esc(p.contactPerson||"—")},
+  {label:"Teléfono", get:p=>p.landline||"", html:p=>esc(p.landline||"—")},
+  {label:"Móvil", get:p=>p.mobile||"", html:p=>esc(p.mobile||"—")},
+  {label:"Email", get:p=>p.email||"", html:p=>esc(p.email||"—")},
+  {label:"Dirección", get:p=>p.billStreet||"", html:p=>esc(p.billStreet||"—")},
+  {label:"Ciudad", get:p=>p.billCity||"", html:p=>esc(p.billCity||"—")},
+  {label:"Provincia", get:p=>p.billProvince||"", html:p=>esc(p.billProvince||"—")},
+  {label:"C.P.", get:p=>p.billPostalCode||"", html:p=>esc(p.billPostalCode||"—")},
+  {label:"Alta", get:p=>p.createdAt||"", html:p=>p.createdAt?fmtD(p.createdAt):"—"},
+  {label:"Datos", get:p=>{const c=erp.partyCompleteness(p.id); return c.ok?"Completo":`${c.pct}% · falta ${c.missing.length}`;},
+    html:p=>{const c=erp.partyCompleteness(p.id); return c.ok?'<span class="pill g">Completo</span>':`<span class="pill r">${c.pct}% · falta ${c.missing.length}</span>`;}},
 ];
+
+/* =============================== Shared master-data list primitive (S2) ==============
+   Toolbar + table + pagination + export, written once so DMT-01..04 (Clientes,
+   Proveedores, Subcontratas, Personal) inherit the same behaviour instead of
+   each retyping it (decision 15). Page sizes are 10/25/50 per the doc —
+   Clientes shipped with 10/20/50, which this corrects.
+
+   `ids` lets a screen keep pre-existing element ids (Clientes' #cliQ etc. are
+   already asserted on by site-e2e); a screen with no history gets fresh
+   generic ids. Mobile: every <td> carries data-th, and CSS turns the table
+   into two-line-ish cards at the phone breakpoint (verified in full in S14) —
+   the same table markup serves both, so there is exactly one row template to
+   keep correct. */
+const LIST_PAGE_SIZES=[10,25,50];
+const listState={};
+function getListState(id,defSize){
+  if(!listState[id]) listState[id]={q:"",page:1,pageSize:defSize||25};
+  return listState[id];
+}
+async function loadListPageSize(id){ try{ const m=await ErpStore.getMeta("ui.list."+id); return m&&LIST_PAGE_SIZES.includes(m.pageSize)?m.pageSize:null; }catch(e){ return null; } }
+function saveListPageSize(id,size){ try{ ErpStore.setMeta("ui.list."+id,{pageSize:size}); }catch(e){} }
+
+/**
+ * cfg: { id, ids?, newLabel, onNew, searchPlaceholder, nounSingular, nounPlural,
+ *        baseRows, matches(row,q), columns:[{label,get,primary?,html?,sheet?}],
+ *        onRowClick(id), exportFile, exportSheetName, emptyText }
+ */
+function renderMasterList(v,cfg){
+  const st=getListState(cfg.id,cfg.defSize);
+  const ids=Object.assign({q:"mlQ",size:"mlSize",prev:"mlPrev",next:"mlNext",newBtn:"mlNew",
+    exp:"mlExp",expMenu:"mlExpMenu",expXlsx:"mlExpXlsx",expCsv:"mlExpCsv"},cfg.ids||{});
+  const q=st.q.trim().toLowerCase();
+  const base=cfg.baseRows;
+  const rows=q?base.filter(r=>cfg.matches(r,q)):base;
+  const pages=Math.max(1,Math.ceil(rows.length/st.pageSize));
+  if(st.page>pages) st.page=pages;
+  const start=(st.page-1)*st.pageSize, page=rows.slice(start,start+st.pageSize);
+  const cols=cfg.columns;
+  const sing=cfg.nounSingular||"registro", plur=cfg.nounPlural||"registros";
+  v.innerHTML=`<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+    <button class="btn primary sm" id="${ids.newBtn}">${cfg.newLabel||"＋ Nuevo"}</button>
+    <input id="${ids.q}" placeholder="${esc(cfg.searchPlaceholder||"Buscar…")}" value="${esc(st.q)}"
+      style="flex:0 1 280px;min-width:190px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)">
+    <span style="position:relative">
+      <button class="btn sm" id="${ids.exp}">⬇ Exportar</button>
+      <span id="${ids.expMenu}" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:40;min-width:160px;
+        background:var(--paper);border:1px solid var(--line);border-radius:9px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:4px;flex-direction:column">
+        <button class="btn sm" id="${ids.expXlsx}" style="justify-content:flex-start;border:0;background:none">Excel (.xlsx)</button>
+        <button class="btn sm" id="${ids.expCsv}" style="justify-content:flex-start;border:0;background:none">CSV (.csv)</button>
+      </span></span>
+    <span class="tag">${rows.length}${q?` de ${base.length}`:""} ${rows.length===1?sing:plur}</span></div>
+   <div class="card"><div class="scroll"><table class="mlist"><thead><tr>
+     ${cols.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>
+   ${page.map(r=>`<tr class="click" data-id="${r.id}">${cols.map(c=>
+      `<td data-th="${esc(c.label)}"${c.primary?' class="k"':""}>${c.html?c.html(r):esc(String((c.get?c.get(r):"")??""))}</td>`).join("")}</tr>`).join("")
+    ||`<tr><td colspan="${cols.length}"><div class="empty">${esc(cfg.emptyText||"Ningún registro coincide con la búsqueda.")}</div></td></tr>`}
+   </tbody></table></div>
+   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line)">
+     <label style="font-size:12px;color:var(--dim)">Filas por pantalla
+       <select id="${ids.size}" style="font:inherit;font-size:12px;margin-left:6px;padding:4px 6px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink)">
+         ${LIST_PAGE_SIZES.map(n=>`<option value="${n}"${n===st.pageSize?" selected":""}>${n}</option>`).join("")}
+       </select></label>
+     <span style="flex:1"></span>
+     <span style="font-size:12px;color:var(--dim)">${rows.length?`${start+1}–${Math.min(start+st.pageSize,rows.length)} de ${rows.length}`:"0 de 0"} · página ${st.page} de ${pages}</span>
+     <button class="btn sm" id="${ids.prev}"${st.page<=1?" disabled":""}>‹ Anterior</button>
+     <button class="btn sm" id="${ids.next}"${st.page>=pages?" disabled":""}>Siguiente ›</button>
+   </div></div>`;
+  v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>cfg.onRowClick(tr.dataset.id));
+  $('#'+ids.newBtn).onclick=cfg.onNew;
+  const qi=$('#'+ids.q);
+  qi.oninput=()=>{ st.q=qi.value; st.page=1; const at=qi.selectionStart; render();
+    const n=$('#'+ids.q); if(n){n.focus(); n.setSelectionRange(at,at);} };
+  $('#'+ids.size).onchange=e=>{ st.pageSize=Number(e.target.value)||st.pageSize; st.page=1; saveListPageSize(cfg.id,st.pageSize); render(); };
+  $('#'+ids.prev).onclick=()=>{ if(st.page>1){ st.page--; render(); } };
+  $('#'+ids.next).onclick=()=>{ if(st.page<pages){ st.page++; render(); } };
+  const menu=$('#'+ids.expMenu);
+  const closeMenu=()=>{ menu.style.display="none"; };
+  $('#'+ids.exp).onclick=ev=>{ ev.stopPropagation();
+    const open=menu.style.display==="none";
+    menu.style.display=open?"flex":"none";
+    if(open) document.addEventListener('click',closeMenu,{once:true}); };
+  menu.onclick=ev=>ev.stopPropagation();
+  const sheet=()=>[cols.map(c=>c.label)].concat(rows.map(r=>cols.map(c=>c.sheet?c.sheet(r):String((c.get?c.get(r):"")??""))));
+  const exportFile=cfg.exportFile||cfg.id, exportSheet=cfg.exportSheetName||plur;
+  $('#'+ids.expXlsx).onclick=()=>{ closeMenu(); downloadBlob(xlsxBlob(exportSheet,sheet()),`${exportFile}-${erp.today}.xlsx`); toast("Exportado a Excel"); };
+  $('#'+ids.expCsv).onclick=()=>{ closeMenu(); downloadCsv(sheet(),`${exportFile}-${erp.today}.csv`); toast("Exportado a CSV"); };
+}
 let projFavs=[], projRecents=[];
 function saveProjPrefs(){ try{ ErpStore.setMeta("ui.projects",{favs:projFavs,recents:projRecents}); }catch(e){} }
 function projectOptions(){
@@ -3073,80 +3248,119 @@ const VIEWS={
     transact with them (Precios, Compras, Subcontratos, Pagos). */
  customers(v){
   $('#sub').textContent="Registro de clientes. Los datos obligatorios se validan antes de facturar o contratar.";
-  const q=cliQuery.trim().toLowerCase();
-  const rows=erp.state.parties
-    .filter(p=>p.active&&p.roles.includes("customer"))
-    .filter(p=>!q||p.name.toLowerCase().includes(q)||String(p.code).toLowerCase().includes(q));
-  // Deleting or filtering can leave the current page past the end; clamp
-  // rather than showing an empty table on page 4 of 2.
-  const pages=Math.max(1,Math.ceil(rows.length/cliPageSize));
-  if(cliPage>pages) cliPage=pages;
-  const start=(cliPage-1)*cliPageSize, page=rows.slice(start,start+cliPageSize);
-  v.innerHTML=`<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-    <button class="btn primary sm" id="bNew">＋ Nuevo</button>
-    <input id="cliQ" placeholder="Buscar cliente por nombre" value="${esc(cliQuery)}"
-      style="flex:0 1 280px;min-width:190px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)">
-    <span style="position:relative">
-      <button class="btn sm" id="bExp">⬇ Exportar</button>
-      <span id="expMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:40;min-width:160px;
-        background:var(--paper);border:1px solid var(--line);border-radius:9px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:4px;flex-direction:column">
-        <button class="btn sm" id="expXlsx" style="justify-content:flex-start;border:0;background:none">Excel (.xlsx)</button>
-        <button class="btn sm" id="expCsv" style="justify-content:flex-start;border:0;background:none">CSV (.csv)</button>
-      </span></span>
-    <span class="tag">${(()=>{const tot=erp.state.parties.filter(p=>p.active&&p.roles.includes("customer")).length;
-      const n=q?tot:rows.length; // when filtering, the noun agrees with the total ("1 de 17 clientes")
-      return `${rows.length}${q?` de ${tot}`:""} cliente${n===1?"":"s"}`;})()}</span></div>
-   <div class="card"><div class="scroll"><table><thead><tr>
-     ${CLI_COLS.map(c=>`<th>${c[0]}</th>`).join("")}</tr></thead><tbody>
-   ${page.map(p=>{const c=erp.partyCompleteness(p.id);return `<tr class="click" data-id="${p.id}">
-     <td class="k">${p.code}</td><td class="k">${esc(p.name)}</td>
-     <td>${p.taxId?esc(p.taxId):'<span class="pill r">Falta</span>'}</td>
-     <td>${esc(p.contactPerson||"—")}</td>
-     <td>${esc(p.landline||"—")}</td><td>${esc(p.mobile||"—")}</td>
-     <td>${esc(p.email||"—")}</td>
-     <td>${esc(p.billStreet||"—")}</td><td>${esc(p.billCity||"—")}</td>
-     <td>${esc(p.billProvince||"—")}</td><td>${esc(p.billPostalCode||"—")}</td>
-     <td>${p.createdAt?fmtD(p.createdAt):"—"}</td>
-     <td>${c.ok?'<span class="pill g">Completo</span>':`<span class="pill r">${c.pct}% · falta ${c.missing.length}</span>`}</td></tr>`;}).join("")
-    ||`<tr><td colspan="${CLI_COLS.length}"><div class="empty">Ningún cliente coincide con la búsqueda.</div></td></tr>`}
-   </tbody></table></div>
-   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line)">
-     <label style="font-size:12px;color:var(--dim)">Filas por pantalla
-       <select id="cliSize" style="font:inherit;font-size:12px;margin-left:6px;padding:4px 6px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink)">
-         ${CLI_PAGE_SIZES.map(n=>`<option value="${n}"${n===cliPageSize?" selected":""}>${n}</option>`).join("")}
-       </select></label>
-     <span style="flex:1"></span>
-     <span style="font-size:12px;color:var(--dim)">${rows.length?`${start+1}–${Math.min(start+cliPageSize,rows.length)} de ${rows.length}`:"0 de 0"} · página ${cliPage} de ${pages}</span>
-     <button class="btn sm" id="cliPrev"${cliPage<=1?" disabled":""}>‹ Anterior</button>
-     <button class="btn sm" id="cliNext"${cliPage>=pages?" disabled":""}>Siguiente ›</button>
-   </div></div>`;
-  v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>partyDrawer(tr.dataset.id));
-  $('#bNew').onclick=()=>newPartyDrawer("customer");
-  // Re-render on input would lose focus mid-word, so the field filters in
-  // place and only the table body is rebuilt by the next render() call.
-  const qi=$('#cliQ');
-  qi.oninput=()=>{ cliQuery=qi.value; cliPage=1; const at=qi.selectionStart; render(); const n=$('#cliQ'); if(n){n.focus(); n.setSelectionRange(at,at);} };
-  $('#cliSize').onchange=e=>{ cliPageSize=Number(e.target.value)||10; cliPage=1; saveCliPrefs(); render(); };
-  $('#cliPrev').onclick=()=>{ if(cliPage>1){ cliPage--; render(); } };
-  $('#cliNext').onclick=()=>{ if(cliPage<pages){ cliPage++; render(); } };
-  // The menu exports what the user is looking at — every row the filter
-  // matched, not just the page on screen. Exporting one page of ten would be
-  // a surprise the moment anyone uses the result for anything.
-  // Visibility is toggled through style.display, not the `hidden` attribute:
-  // the popup needs an inline `display` for its layout, and any inline display
-  // silently overrides what `hidden` does, leaving the menu permanently open.
-  const menu=$('#expMenu');
-  const closeMenu=()=>{ menu.style.display="none"; };
-  $('#bExp').onclick=ev=>{ ev.stopPropagation();
-    const open=menu.style.display==="none";
-    menu.style.display=open?"flex":"none";
-    // The opening click never reaches document (stopPropagation above), so the
-    // next click anywhere else is what dismisses the menu.
-    if(open) document.addEventListener('click',closeMenu,{once:true}); };
-  menu.onclick=ev=>ev.stopPropagation();
-  const sheet=()=>[CLI_COLS.map(c=>c[0])].concat(rows.map(p=>CLI_COLS.map(c=>c[1](p))));
-  $('#expXlsx').onclick=()=>{ closeMenu(); downloadBlob(xlsxBlob("Clientes",sheet()),`clientes-${erp.today}.xlsx`); toast("Exportado a Excel"); };
-  $('#expCsv').onclick=()=>{ closeMenu(); downloadCsv(sheet(),`clientes-${erp.today}.csv`); toast("Exportado a CSV"); };
+  renderMasterList(v,{
+    id:"customers",
+    ids:{q:"cliQ",size:"cliSize",prev:"cliPrev",next:"cliNext",newBtn:"bNew",exp:"bExp",expMenu:"expMenu",expXlsx:"expXlsx",expCsv:"expCsv"},
+    newLabel:"＋ Nuevo", onNew:()=>newPartyDrawer("customer"),
+    searchPlaceholder:"Buscar cliente por nombre",
+    nounSingular:"cliente", nounPlural:"clientes",
+    baseRows:erp.state.parties.filter(p=>p.active&&p.roles.includes("customer")),
+    matches:(p,q)=>p.name.toLowerCase().includes(q)||String(p.code).toLowerCase().includes(q),
+    columns:CLI_COLS,
+    onRowClick:id=>partyDrawer(id),
+    exportFile:"clientes", exportSheetName:"Clientes",
+    emptyText:"Ningún cliente coincide con la búsqueda.",
+  });
+ },
+
+ /* ---------- Proveedores (spec DMT-02) ----------
+    The supplier slice of the same party file. `category` (gap 2) is its own
+    column here because the doc requires it, unlike Clientes which has no use
+    for it. Autónomos are filed here too — they invoice like any supplier. */
+ suppliers(v){
+  $('#sub').textContent="Fichero de proveedores. La categoría clasifica el proveedor; los precios y compras se gestionan en sus propias pantallas.";
+  renderMasterList(v,{
+    id:"suppliers",
+    ids:{q:"supQ",size:"supSize",prev:"supPrev",next:"supNext",newBtn:"supNew",exp:"supExp",expMenu:"supExpMenu",expXlsx:"supExpXlsx",expCsv:"supExpCsv"},
+    newLabel:"＋ Nuevo", onNew:()=>newPartyDrawer("supplier"),
+    searchPlaceholder:"Buscar proveedor por nombre",
+    nounSingular:"proveedor", nounPlural:"proveedores",
+    baseRows:erp.state.parties.filter(p=>p.active&&p.roles.some(r=>["supplier","selfEmployed"].includes(r))),
+    matches:(p,q)=>p.name.toLowerCase().includes(q)||String(p.code).toLowerCase().includes(q)||(p.category||"").toLowerCase().includes(q),
+    columns:[
+      {label:"Código", primary:true, get:p=>p.code},
+      {label:"Nombre / Razón social", primary:true, get:p=>p.name},
+      {label:"NIF/CIF", get:p=>p.taxId||"", html:p=>p.taxId?esc(p.taxId):'<span class="pill r">Falta</span>'},
+      {label:"Categoría", get:p=>p.category||"", html:p=>esc(p.category||"—")},
+      {label:"Contacto", get:p=>p.contactPerson||"", html:p=>esc(p.contactPerson||"—")},
+      {label:"Teléfono", get:p=>p.landline||p.mobile||"", html:p=>esc(p.landline||p.mobile||"—")},
+      {label:"Email", get:p=>p.email||"", html:p=>esc(p.email||"—")},
+      {label:"Ciudad", get:p=>p.billCity||"", html:p=>esc(p.billCity||"—")},
+      {label:"Alta", get:p=>p.createdAt||"", html:p=>p.createdAt?fmtD(p.createdAt):"—"},
+      {label:"Datos", get:p=>{const c=erp.partyCompleteness(p.id); return c.ok?"Completo":`${c.pct}% · falta ${c.missing.length}`;},
+        html:p=>{const c=erp.partyCompleteness(p.id); return c.ok?'<span class="pill g">Completo</span>':`<span class="pill r">${c.pct}% · falta ${c.missing.length}</span>`;}},
+    ],
+    onRowClick:id=>partyDrawer(id),
+    exportFile:"proveedores", exportSheetName:"Proveedores",
+    emptyText:"Ningún proveedor coincide con la búsqueda.",
+  });
+ },
+
+ /* ---------- Subcontratas (spec DMT-03) ----------
+    The lifecycle screens (docs, certifications, retention) retired by
+    decision 5 — the 69 engine references that ran them did not, and this is
+    the master-data screen the doc still asks for: the fichero, nothing more.
+    Reachable again from Compras/Subcontratos flows via the party record. */
+ subcontractors(v){
+  $('#sub').textContent="Fichero de subcontratas (industriales). El ciclo de documentos y certificaciones sigue en el motor; esta pantalla es su ficha.";
+  renderMasterList(v,{
+    id:"subcontractors",
+    ids:{q:"subQ",size:"subSize",prev:"subPrev",next:"subNext",newBtn:"subNew",exp:"subExp",expMenu:"subExpMenu",expXlsx:"subExpXlsx",expCsv:"subExpCsv"},
+    newLabel:"＋ Nuevo", onNew:()=>newPartyDrawer("subcontractor"),
+    searchPlaceholder:"Buscar industrial por nombre",
+    nounSingular:"industrial", nounPlural:"industriales",
+    baseRows:erp.state.parties.filter(p=>p.active&&p.roles.includes("subcontractor")),
+    matches:(p,q)=>p.name.toLowerCase().includes(q)||String(p.code).toLowerCase().includes(q),
+    columns:[
+      {label:"Código", primary:true, get:p=>p.code},
+      {label:"Nombre / Razón social", primary:true, get:p=>p.name},
+      {label:"NIF/CIF", get:p=>p.taxId||"", html:p=>p.taxId?esc(p.taxId):'<span class="pill r">Falta</span>'},
+      {label:"Contacto", get:p=>p.contactPerson||"", html:p=>esc(p.contactPerson||"—")},
+      {label:"Teléfono", get:p=>p.landline||p.mobile||"", html:p=>esc(p.landline||p.mobile||"—")},
+      {label:"Email", get:p=>p.email||"", html:p=>esc(p.email||"—")},
+      {label:"Ciudad", get:p=>p.billCity||"", html:p=>esc(p.billCity||"—")},
+      {label:"Alta", get:p=>p.createdAt||"", html:p=>p.createdAt?fmtD(p.createdAt):"—"},
+      {label:"Datos", get:p=>{const c=erp.partyCompleteness(p.id); return c.ok?"Completo":`${c.pct}% · falta ${c.missing.length}`;},
+        html:p=>{const c=erp.partyCompleteness(p.id); return c.ok?'<span class="pill g">Completo</span>':`<span class="pill r">${c.pct}% · falta ${c.missing.length}</span>`;}},
+    ],
+    onRowClick:id=>partyDrawer(id),
+    exportFile:"subcontratas", exportSheetName:"Subcontratas",
+    emptyText:"Ninguna subcontrata coincide con la búsqueda.",
+  });
+ },
+
+ /* ---------- Personal interno (spec DMT-04) ----------
+    Workers are their own collection (state.workers), not parties — they are
+    never a customer or a fiscal counterparty, they are paid through nóminas
+    or their own autónomo invoices. Tarifa and documentación were already
+    real engine concepts (used from Horas); this is their registry screen. */
+ staff(v){
+  $('#sub').textContent="Fichero de personal interno. La tarifa vigente y la documentación (PRL, alta S.S.) se gestionan desde la ficha de cada persona.";
+  renderMasterList(v,{
+    id:"staff",
+    ids:{q:"stfQ",size:"stfSize",prev:"stfPrev",next:"stfNext",newBtn:"stfNew",exp:"stfExp",expMenu:"stfExpMenu",expXlsx:"stfExpXlsx",expCsv:"stfExpCsv"},
+    newLabel:"＋ Nuevo", onNew:()=>newWorkerDrawer(),
+    searchPlaceholder:"Buscar por nombre",
+    nounSingular:"trabajador", nounPlural:"trabajadores",
+    baseRows:erp.state.workers.filter(w=>w.active!==false),
+    matches:(w,q)=>w.name.toLowerCase().includes(q)||String(w.code).toLowerCase().includes(q),
+    columns:[
+      {label:"Código", primary:true, get:w=>w.code},
+      {label:"Nombre", primary:true, get:w=>w.name},
+      {label:"Tipo", get:w=>w.kind==="selfEmployed"?"Autónomo":"Empleado"},
+      {label:"NIF", get:w=>w.taxId||"", html:w=>w.taxId?esc(w.taxId):"—"},
+      {label:"Teléfono", get:w=>w.phone||"", html:w=>esc(w.phone||"—")},
+      {label:"Email", get:w=>w.email||"", html:w=>esc(w.email||"—")},
+      {label:"Tarifa", get:w=>{try{return String(erp.workerRateCents(w.id,erp.today)/100);}catch(e){return "";}},
+        html:w=>{try{return esc(eur(erp.workerRateCents(w.id,erp.today)))+"/h";}catch(e){return '<span class="pill y">Sin tarifa</span>';}}},
+      {label:"Documentos", get:w=>String((w.docs||[]).length),
+        html:w=>{const docs=w.docs||[]; const exp=docs.some(d=>d.expiresOn&&d.expiresOn<erp.today);
+          return docs.length?(exp?`<span class="pill r">${docs.length} · caducado</span>`:`<span class="pill g">${docs.length}</span>`):'<span class="pill y">Sin docs</span>';}},
+    ],
+    onRowClick:id=>workerDrawer(id),
+    exportFile:"personal", exportSheetName:"Personal",
+    emptyText:"Ningún trabajador coincide con la búsqueda.",
+  });
  },
 
  /* ---------- Oportunidades ---------- */
@@ -3827,6 +4041,9 @@ function editPartyDrawer(id){
    <div class="field"><label>Fijo</label><input id="e_land" value="${esc(p.landline||"")}"></div>
    <div class="field full"><label>Email</label><input id="e_mail" value="${esc(p.email||"")}"></div>
    <div class="field"><label>Origen del contacto</label><select id="e_src">${ErpEngine.LISTS.leadSources.map(s=>`<option${p.leadSource===s?" selected":""}>${s}</option>`).join("")}</select></div>
+   <div class="field"><label>Línea de negocio</label><input id="e_bl" value="${esc(p.businessLine||"")}" placeholder="p. ej. Reformas"></div>
+   <div class="field"><label>Categoría (proveedores)</label><input id="e_cat" value="${esc(p.category||"")}" placeholder="p. ej. Materiales"></div>
+   <div class="field full"><label>Nombres originales / alias (separados por coma)</label><input id="e_alias" value="${esc((p.aliases||[]).join(", "))}"></div>
    <div class="field"><label>IRPF <span class="pill y">A revisar</span></label><select id="e_irpf">${[[0,"No aplica"],[1,"Aplica"]].map(([v,l])=>`<option value="${v}"${(p.irpfApplies?1:0)===v?" selected":""}>${l}</option>`).join("")}</select></div>
    <div class="field"><label>IRPF % (si aplica) <span class="pill y">A revisar</span></label><input id="e_irpfr" type="number" min="0" max="47" step="0.5" value="${(p.irpfRateBp||0)/100}"></div>
    <div class="field full" style="font-size:11.5px;color:var(--muted);margin-top:-2px">
@@ -3837,7 +4054,7 @@ function editPartyDrawer(id){
    <div class="field full" style="margin-top:8px;display:flex;gap:8px;align-items:center">
      <button class="btn primary" id="e_save">Guardar cambios</button>
      <span style="flex:1"></span>
-     <button class="btn danger" id="e_del">🗑 Eliminar cliente</button></div></div>`;
+     <button class="btn danger" id="e_del">🗑 Eliminar</button></div></div>`;
   /* §3.1: a party carrying economic documents is never deleted, it is
      deactivated — an issued invoice must still be explainable years later,
      and it cannot be if the customer behind it is gone. The engine refuses
@@ -3859,7 +4076,8 @@ function editPartyDrawer(id){
     const patch={name:$('#e_name').value.trim(),taxId:$('#e_tax').value.trim(),partyType:$('#e_type').value,roles,
       billStreet:$('#e_street').value.trim(),billPostalCode:$('#e_cp').value.trim(),billCity:$('#e_city').value.trim(),billProvince:$('#e_prov').value.trim(),
       contactPerson:$('#e_contact').value.trim(),mobile:$('#e_mob').value.trim(),landline:$('#e_land').value.trim(),email:$('#e_mail').value.trim(),
-      leadSource:$('#e_src').value,
+      leadSource:$('#e_src').value, businessLine:$('#e_bl').value.trim(), category:$('#e_cat').value.trim(),
+      aliases:$('#e_alias').value.split(",").map(s=>s.trim()).filter(Boolean),
       irpfApplies:$('#e_irpf').value==="1",irpfRateBp:Math.round((+$('#e_irpfr').value||0)*100),notes:$('#e_notes').value.trim()};
     const iban=$('#e_iban').value.trim().replace(/\s+/g,"");
     if(iban) patch.bank=Object.assign({},p.bank||{},{iban,holder:(p.bank&&p.bank.holder)||patch.name});
@@ -3897,14 +4115,28 @@ function newPartyDrawer(role){
    <div class="field"><label>Provincia</label><input id="f_prov" value="Barcelona"></div>
    <div class="field"><label>Origen del contacto *</label><select id="f_src">${ErpEngine.LISTS.leadSources.map(s=>`<option>${s}</option>`).join("")}</select></div>
    <div class="field full" style="margin-top:8px"><button class="btn primary" id="f_save">${cta}</button></div></div>`;
-  $('#f_save').onclick=()=>mutate(()=>{
-    erp.addParty({roles:[role||$('#f_role').value],name:$('#f_name').value.trim(),taxId:$('#f_tax').value.trim(),
-      contactPerson:$('#f_contact').value.trim(),landline:$('#f_land').value.trim(),
-      billStreet:$('#f_street').value.trim(),billPostalCode:$('#f_cp').value.trim(),billCity:$('#f_city').value.trim(),
-      billProvince:$('#f_prov').value.trim()||"Barcelona",
-      mobile:$('#f_mob').value.trim(),email:$('#f_mail').value.trim(),leadSource:$('#f_src').value},"backoffice");
-    closeDrawer();
-  },done);
+  $('#f_save').onclick=()=>{
+    // A duplicate suspect is a soft warning (findDuplicateParty), never a
+    // refusal — the record is still created, but the toast that would
+    // otherwise say "creado" instead names what it may collide with, so it
+    // is caught while the operator is still on the screen, not weeks later
+    // when a factura chain gets confused between two records of one tercero.
+    let rec;
+    mutate(()=>{
+      rec=erp.addParty({roles:[role||$('#f_role').value],name:$('#f_name').value.trim(),taxId:$('#f_tax').value.trim(),
+        contactPerson:$('#f_contact').value.trim(),landline:$('#f_land').value.trim(),
+        billStreet:$('#f_street').value.trim(),billPostalCode:$('#f_cp').value.trim(),billCity:$('#f_city').value.trim(),
+        billProvince:$('#f_prov').value.trim()||"Barcelona",
+        mobile:$('#f_mob').value.trim(),email:$('#f_mail').value.trim(),leadSource:$('#f_src').value},"backoffice");
+      closeDrawer();
+    });
+    if(rec&&rec.duplicateSuspect){
+      const other=erp.state.parties.find(x=>x.id===rec.duplicateSuspect);
+      toast(`⚠ Posible duplicado de ${other?other.name:"un registro existente"} — revíselo`);
+    } else if(rec){
+      toast(done);
+    }
+  };
 }
 /* The three creations the global "+ Crear" offers. They call the engine's own
    entry points, so every validation (complete tax data before a project, a

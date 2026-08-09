@@ -689,6 +689,51 @@ assert(
     "a deactivated worker stays on record",
   );
 }
+{
+  // updateWorker/deactivateWorker: the dedicated DMT-04 screen entry points
+  // (adminPatch above is the generic escape hatch every screen used before
+  // this session; the screen itself calls these).
+  const w = erp.addWorker({ name: "Ana Ferrer", kind: "employee" }, "bo");
+  erp.updateWorker(w.id, { phone: "600555666" }, "bo");
+  assert(
+    erp.state.workers.find((x) => x.id === w.id).phone === "600555666",
+    "updateWorker patches a worker's fields",
+  );
+  throws(
+    () => erp.addWorker({ name: "NIF Roto", taxId: "46000000A" }, "bo"),
+    "addWorker rejects a tax id with the wrong check digit",
+  );
+  throws(
+    () => erp.updateWorker(w.id, { taxId: "46000000A" }, "bo"),
+    "updateWorker rejects a tax id with the wrong check digit",
+  );
+  erp.deactivateWorker(w.id, "bo");
+  assert(
+    erp.state.workers.find((x) => x.id === w.id).active === false,
+    "deactivateWorker sets active false and keeps the record",
+  );
+  throws(() => erp.updateWorker("wkr-missing", {}, "bo"), "updateWorker refuses an unknown id");
+  throws(() => erp.deactivateWorker("wkr-missing", "bo"), "deactivateWorker refuses an unknown id");
+}
+{
+  // MDM: findDuplicateParty is a soft warning surfaced on the record itself
+  // (duplicateSuspect), not a refusal — the UI reads this to warn at the
+  // point of creation (DMT-01/02/03) rather than leaving it to be
+  // discovered only when a factura chain gets confused between two records.
+  const first = erp.addParty(
+    { roles: ["customer"], name: "Duplicado Uno", mobile: "600777888" },
+    "bo",
+  );
+  assert(first.duplicateSuspect == null, "the first party of its kind has no duplicate suspect");
+  const second = erp.addParty(
+    { roles: ["customer"], name: "Otro Nombre", mobile: "600777888" },
+    "bo",
+  );
+  assert(
+    second.duplicateSuspect === first.id,
+    "a matching phone number surfaces the earlier party as a duplicate suspect",
+  );
+}
 
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
