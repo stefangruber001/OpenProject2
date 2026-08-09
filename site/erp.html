@@ -607,6 +607,14 @@ function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clea
 let saveT;function persist(){clearTimeout(saveT);saveT=setTimeout(()=>ErpStore.saveState(erp.toJSON()).catch(()=>{}),140);}
 
 let erp, cur="tower", bootNotice="";
+/* Who is signed in and what they may see — client-side only, fetched once at
+   boot from GET /api/~/session (S2). This is masking, not the security
+   boundary: every write still goes through the server's own permission
+   check (require_), which this only anticipates so a gestoría account is
+   not shown a field it could never save anyway. Defaults permissive because
+   local IndexedDB mode has no server-side identity to ask in the first
+   place — everything on that single machine is already fully visible. */
+let SESSION={email:"",role:"admin",bankRead:true};
 async function boot(){
   let migration=null, fresh=false;
   try{
@@ -694,6 +702,13 @@ async function boot(){
   if(qsProject && erp.state.projects.some(p=>p.code===qsProject)){
     gProject=erp.state.projects.find(p=>p.code===qsProject).id;
     history.replaceState(null,'',location.pathname+location.hash);
+  }
+  if(ErpStore.isRemote()){
+    try{
+      const base=ErpStore.apiBase()||"";
+      const res=await fetch(base+"/api/~/session",{headers:{"content-type":"application/json"}});
+      if(res.ok) SESSION=await res.json();
+    }catch(e){ /* keep the permissive default — masking only, see SESSION above */ }
   }
   measureTopbar(); buildPeriodControls(); buildUserMenu(); render();
   if(bootNotice) toast(bootNotice);
@@ -4049,7 +4064,9 @@ function editPartyDrawer(id){
    <div class="field full" style="font-size:11.5px;color:var(--muted);margin-top:-2px">
      La retención de IRPF depende del perfil del tercero (profesional, empresarial o módulos) y no está confirmada.
      Se conserva tal cual hasta que la gestoría la revise — ver <b>LEGAL_REVIEW.md §3</b>.</div>
-   <div class="field full"><label>IBAN (opcional — el cambio queda registrado)</label><input id="e_iban" value="${esc((p.bank&&p.bank.iban)||"")}" placeholder="ES.."></div>
+   ${SESSION.bankRead
+     ?`<div class="field full"><label>IBAN (opcional — el cambio queda registrado)</label><input id="e_iban" value="${esc((p.bank&&p.bank.iban)||"")}" placeholder="ES.."></div>`
+     :`<div class="field full"><label>IBAN</label><div class="pill y" style="width:fit-content">Oculto — su perfil no tiene permiso para ver datos bancarios</div></div>`}
    <div class="field full"><label>Notas</label><input id="e_notes" value="${esc(p.notes||"")}"></div>
    <div class="field full" style="margin-top:8px;display:flex;gap:8px;align-items:center">
      <button class="btn primary" id="e_save">Guardar cambios</button>
@@ -4079,8 +4096,12 @@ function editPartyDrawer(id){
       leadSource:$('#e_src').value, businessLine:$('#e_bl').value.trim(), category:$('#e_cat').value.trim(),
       aliases:$('#e_alias').value.split(",").map(s=>s.trim()).filter(Boolean),
       irpfApplies:$('#e_irpf').value==="1",irpfRateBp:Math.round((+$('#e_irpfr').value||0)*100),notes:$('#e_notes').value.trim()};
-    const iban=$('#e_iban').value.trim().replace(/\s+/g,"");
-    if(iban) patch.bank=Object.assign({},p.bank||{},{iban,holder:(p.bank&&p.bank.holder)||patch.name});
+    // No #e_iban element exists when the field was masked — nothing to read,
+    // and nothing this save could change even if it tried.
+    if(SESSION.bankRead){
+      const iban=$('#e_iban').value.trim().replace(/\s+/g,"");
+      if(iban) patch.bank=Object.assign({},p.bank||{},{iban,holder:(p.bank&&p.bank.holder)||patch.name});
+    }
     erp.updateParty(id,patch,"backoffice");
     closeDrawer();
   },"Datos actualizados");

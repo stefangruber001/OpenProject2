@@ -1787,6 +1787,14 @@ async function testErp(browser, base) {
     if (readBack === newContact)
       ok("erp: party edit drawer updates and persists (MDM manageability)");
     else bad("erp: party edit drawer", `read back "${readBack}"`);
+    // S2: bank details are gated behind GET /api/~/session's bankRead. Local
+    // demo mode never calls that endpoint (no server, no identity to ask) and
+    // SESSION defaults permissive, so the field is visible here — the masked
+    // path is exercised by tests/server-e2e/run.mjs against a real session.
+    const ibanVisible = (await pg.locator("#e_iban").count()) === 1;
+    if (ibanVisible)
+      ok("erp: IBAN field visible by default (local mode has no session to mask against)");
+    else bad("erp: IBAN field visibility", `#e_iban count=${await pg.locator("#e_iban").count()}`);
     await pg.locator("#dClose").click();
     await pg.waitForTimeout(200);
 

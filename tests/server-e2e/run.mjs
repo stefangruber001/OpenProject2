@@ -129,6 +129,22 @@ async function main() {
     );
   }
 
+  // --- the workspace's permission lookup (S2: client-side bank-details gate)
+  {
+    const res = await api(`/api/${TENANT}/session`);
+    const body = await json(res);
+    check(
+      "GET /api/~/session identifies the acting user",
+      res.ok && typeof body.email === "string" && body.email.length > 0,
+      `HTTP ${res.status} ${JSON.stringify(body).slice(0, 120)}`,
+    );
+    check(
+      "and reports a role and a bank-details permission",
+      typeof body.role === "string" && typeof body.bankRead === "boolean",
+      JSON.stringify(body).slice(0, 120),
+    );
+  }
+
   // --- the command whitelist is closed ------------------------------------
   for (const name of ["constructor", "__proto__", "issueInvoice", "toJSON"]) {
     const res = await command({ command: name, args: [], expectedVersion: version });
