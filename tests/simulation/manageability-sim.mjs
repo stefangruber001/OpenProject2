@@ -1583,6 +1583,114 @@ assert(
   );
 }
 
+/* ---------------------------------------------------------------------------
+   S12 · ADM-08 forecast grid, ADM-04 summary and the monthly reconciliation.
+--------------------------------------------------------------------------- */
+{
+  const g = erp.cashFlowGrid({ mode: "week", periods: 13 });
+  assert(g.periods.length === 13, "cashFlowGrid returns one bucket per requested week");
+  assert(
+    g.periods[0].from === erp.today && g.periods[12].to === addDaysISO(erp.today, 13 * 7 - 1),
+    "…starting today and running to the end of the last week",
+    JSON.stringify([g.periods[0], g.periods[12]]),
+  );
+
+  // The cumulative row is the running total, opened from real money.
+  let run = g.openingCents;
+  const want = g.netCents.map((n) => (run += n));
+  assert(
+    JSON.stringify(want) === JSON.stringify(g.cumulativeCents),
+    "the cumulative balance is the running total of the period nets",
+  );
+  assert(
+    g.openingCents === erp.cashPositionAsOf(addDaysISO(erp.today, -1)),
+    "…and it opens from the money that is actually in the accounts, not from zero",
+    `${g.openingCents} vs ${erp.cashPositionAsOf(addDaysISO(erp.today, -1))}`,
+  );
+  assert(
+    g.netCents.every((n, i) => n === g.groups[0].totals[i] - g.groups[1].totals[i]),
+    "each period's net is its money in minus its money out, with no third source",
+  );
+
+  // Nothing already due is dropped for being in the past. A bill that fell due
+  // last week is still owed; a forecast that discards it gets rosier the later
+  // you are, which is the one direction a forecast must never drift.
+  const supplierId = erp.state.parties.find((p) => p.roles.includes("supplier")).id;
+  const beforeFirst = erp.cashFlowGrid({ mode: "week", periods: 4 }).groups[1].totals[0];
+  erp.registerBill(
+    {
+      supplierId,
+      number: "SIM-OVERDUE-1",
+      baseCents: 500000,
+      date: addDaysISO(erp.today, -40),
+      dueDate: addDaysISO(erp.today, -20),
+    },
+    "backoffice",
+  );
+  const afterFirst = erp.cashFlowGrid({ mode: "week", periods: 4 }).groups[1].totals[0];
+  assert(
+    afterFirst > beforeFirst,
+    "a bill that fell due three weeks ago lands in the FIRST bucket, not nowhere",
+    `${beforeFirst} → ${afterFirst}`,
+  );
+
+  // Month buckets: the first is a stub from today, the rest are whole months.
+  const m = erp.cashFlowGrid({ mode: "month", periods: 3 });
+  assert(
+    m.periods[0].from === erp.today && m.periods[1].from.endsWith("-01"),
+    "month mode opens at today and then runs on calendar months",
+    JSON.stringify(m.periods),
+  );
+
+  // Scoping to one job can only ever narrow the company figure.
+  const pid = erp.state.projects[0].id;
+  const one = erp.cashFlowGrid({ mode: "week", periods: 13, projectId: pid });
+  const tot = (x) => x.groups[0].totals.reduce((a, b) => a + b, 0);
+  assert(
+    tot(one) <= tot(erp.cashFlowGrid({ mode: "week", periods: 13 })),
+    "a per-project forecast is a subset of the company one",
+    `${tot(one)} vs ${tot(g)}`,
+  );
+}
+
+{
+  // ADM-04's Resumen: every hour lands under a chapter, including the ones
+  // nobody assigned — those are the whole reason the roll-up exists.
+  const s = erp.hoursSummary(null, null, null);
+  assert(
+    s.totalHoursMilli ===
+      s.projects.reduce((a, p) => a + p.chapters.reduce((x, c) => x + c.hoursMilli, 0), 0),
+    "hoursSummary's total is the sum of its chapters, with nothing lost between the two",
+  );
+  assert(
+    s.totalCostCents === erp.state.labour.reduce((a, l) => a + l.costCents, 0),
+    "…and its cost is every labour entry's cost, unfiltered",
+  );
+  const scoped = erp.hoursSummary(null, null, erp.state.projects[0].id);
+  assert(
+    scoped.projects.length <= 1 && scoped.totalHoursMilli <= s.totalHoursMilli,
+    "scoping the summary to one project can only narrow it",
+  );
+
+  // The reconciliation states a difference rather than demanding a zero.
+  const rec = erp.labourReconciliation(erp.today);
+  assert(
+    rec.unbookedCents === rec.wagesCents - rec.bookedCents,
+    "the month's unbooked labour is wages paid minus hours booked, and nothing else",
+    JSON.stringify(rec),
+  );
+  assert(
+    rec.approvedHoursMilli + rec.openHoursMilli === rec.bookedHoursMilli,
+    "…and every hour in the month is either approved or still open, never both or neither",
+    JSON.stringify(rec),
+  );
+  assert(
+    rec.from.endsWith("-01") && rec.to >= rec.from && rec.month === rec.from.slice(0, 7),
+    "…over the whole calendar month it names",
+    JSON.stringify([rec.month, rec.from, rec.to]),
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

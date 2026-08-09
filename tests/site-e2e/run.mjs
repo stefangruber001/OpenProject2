@@ -75,6 +75,7 @@ async function main() {
     await testCapture(browser, base);
     await testProjectTracking(browser, base);
     await testInvoicing(browser, base);
+    await testCashFlow(browser, base);
     await testBankAndCash(browser, base);
     await testContract(browser, base);
     await testProcurement(browser, base);
@@ -689,18 +690,25 @@ async function testShell(browser, base) {
     if ((await pg.locator("#p2.on").count()) === 0) ok("shell: outside click collapses the panel");
     else bad("shell: outside click collapses", "still open");
 
-    // Unbuilt subsections say what will live there instead of rendering blank.
-    // The probe has moved three times as its subject got built: Reportes
-    // (removed outright), `units` (DMC-03, S3), `visits` (COM-02, S4).
-    // `petty-cash` is the current real not-yet-built subsección — ADM-06,
-    // scheduled for S11.
-    // The probe moves as screens get built. `petty-cash` was it until S11
-    // built ADM-06; `cash-flow` (ADM-08, S12) is the last one left.
-    await pg.evaluate(() => (location.hash = "cash-flow"));
-    await pg.waitForTimeout(300);
-    const ph = await pg.locator("#view").innerText();
-    if (/En preparación/.test(ph)) ok("shell: unbuilt subsection explains itself");
-    else bad("shell: unbuilt subsection", ph.slice(0, 80));
+    // This probe used to open the one subsección that was not built yet and
+    // assert it explained itself. It moved four times as its subject got
+    // built — Reportes, `units` (S3), `visits` (S4), `petty-cash` (S11) — and
+    // S12 built the last one, `cash-flow`. So it inverts: walk EVERY entry in
+    // the menu and fail if any of them lands on the dead-link fallback. That
+    // is what the old probe was really protecting, and it now scales.
+    const routes = await pg.evaluate(() =>
+      SECTIONS.flatMap((s) => s.subs.filter((x) => !x.href).map((x) => x.k)),
+    );
+    const dead = [];
+    for (const k of routes) {
+      await pg.evaluate((r) => (location.hash = r), k);
+      await pg.waitForTimeout(180);
+      const txt = await pg.locator("#view").innerText();
+      if (/Ruta desconocida/.test(txt)) dead.push(k);
+    }
+    if (routes.length >= 25 && dead.length === 0)
+      ok(`shell: all ${routes.length} menu subsections render a real screen`);
+    else bad("shell: every subsection is built", `${routes.length} routes, dead: ${dead.join()}`);
 
     // Universal search: grouped results, and picking one opens the record.
     await pg.locator("#q").fill("Marta");
@@ -2212,6 +2220,115 @@ async function testBankAndCash(browser, base) {
 
 // ── ADM-01 Facturación (§3.2) — four counters over the register, and the one
 //    row treatment the doc is explicit about: days overdue red FROM DAY ONE.
+async function testCashFlow(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#cash-flow`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(600);
+
+    // §3.2's geometry: a fixed 240 label column, 96 per period column.
+    const shape = await pg.evaluate(() => {
+      const th = [...document.querySelectorAll("#cfGrid thead th")];
+      const cum = document.querySelector("#cfGrid tr.cum");
+      return {
+        cols: th.length,
+        lab: th[0] ? Math.round(th[0].getBoundingClientRect().width) : 0,
+        per: th[1] ? Math.round(th[1].getBoundingClientRect().width) : 0,
+        cum: !!cum,
+        sticky: th[0] ? getComputedStyle(th[0]).position : null,
+      };
+    });
+    if (shape.lab === 240 && shape.per === 96 && shape.cols === 14 && shape.cum)
+      ok("ADM-08: 240 label column, 96 per period, cumulative balance at the foot");
+    else bad("ADM-08: grid geometry", JSON.stringify(shape));
+    if (shape.sticky === "sticky") ok("ADM-08: the label column stays put while the grid scrolls");
+    else bad("ADM-08: sticky label column", String(shape.sticky));
+
+    // The cumulative row is the running balance from real money, not from zero.
+    const maths = await pg.evaluate(() => {
+      const g = erp.cashFlowGrid({ mode: "week", periods: 13 });
+      let run = g.openingCents;
+      const want = g.netCents.map((n) => (run += n));
+      return {
+        runs: JSON.stringify(want) === JSON.stringify(g.cumulativeCents),
+        net0: g.netCents[0] === g.groups[0].totals[0] - g.groups[1].totals[0],
+      };
+    });
+    if (maths.runs && maths.net0)
+      ok("ADM-08: the cumulative row is the running total of the period nets");
+    else bad("ADM-08: cumulative maths", JSON.stringify(maths));
+
+    // Nothing already due is dropped for being in the past.
+    const absorbed = await pg.evaluate(() => {
+      const g = erp.cashFlowGrid({ mode: "week", periods: 13 });
+      const overdue = erp
+        .receivables()
+        .filter((r) => r.outstandingCents > 0 && r.dueDate < g.periods[0].from);
+      const owed = overdue.reduce((s, r) => s + r.outstandingCents, 0);
+      const first = g.groups[0].rows.find((r) => r.key === "invoices").cells[0];
+      return { overdue: overdue.length, owed, first, holds: owed === 0 || first >= owed };
+    });
+    if (absorbed.holds)
+      ok(`ADM-08: money already overdue lands in the first bucket (${absorbed.overdue})`);
+    else bad("ADM-08: overdue absorbed", JSON.stringify(absorbed));
+
+    // A red cumulative cell is the point of the screen — seed a trough and
+    // check it paints, rather than hoping the sample data happens to dip.
+    const red = await pg.evaluate(() => {
+      const acc = erp.state.bankAccounts.find((a) => a.kind !== "till");
+      erp.registerBill(
+        {
+          supplierId: erp.state.parties.find((p) => p.roles.includes("supplier")).id,
+          number: "E2E-CF-1",
+          baseCents: 90000000,
+          dueDate: erp.today,
+        },
+        "backoffice",
+      );
+      render();
+      return {
+        acc: !!acc,
+        neg: document.querySelectorAll("#cfGrid tr.cum td.neg").length,
+      };
+    });
+    await pg.waitForTimeout(300);
+    if (red.neg > 0) ok(`ADM-08: the cumulative balance goes red once it turns negative`);
+    else bad("ADM-08: negative balance painted red", JSON.stringify(red));
+
+    // Month buckets, and one job rather than the whole company.
+    await pg.locator("#cfMonth").click();
+    await pg.waitForTimeout(500);
+    const months = await pg.evaluate(() => ({
+      cols: document.querySelectorAll("#cfGrid thead th").length,
+      mode: erp.cashFlowGrid({ mode: "month", periods: 6 }).periods.length,
+    }));
+    if (months.cols === 7) ok("ADM-08: the week/month switch rebuilds the columns");
+    else bad("ADM-08: month switch", JSON.stringify(months));
+
+    await pg.selectOption("#cfProj", { index: 1 });
+    await pg.waitForTimeout(500);
+    const scoped = await pg.evaluate(() => {
+      const all = erp.cashFlowGrid({ mode: "month", periods: 6 });
+      const one = erp.cashFlowGrid({ mode: "month", periods: 6, projectId: cfProject });
+      const t = (g) => g.groups[0].totals.reduce((a, b) => a + b, 0);
+      return { scoped: !!cfProject, le: t(one) <= t(all) };
+    });
+    if (scoped.scoped && scoped.le)
+      ok("ADM-08: scoping to one job can only narrow what the company forecast shows");
+    else bad("ADM-08: project scope", JSON.stringify(scoped));
+
+    if (errs.length === 0) ok("ADM-08: no console errors");
+    else bad("ADM-08: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("ADM-08 flujo de caja", String(e).slice(0, 220));
+  } finally {
+    await pg.close();
+  }
+}
+
 async function testInvoicing(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
   const errs = [];
@@ -2705,38 +2822,99 @@ async function testProcurement(browser, base) {
     await pg.click("#dClose");
     await pg.waitForTimeout(200);
 
-    // ---- Horas: assign → enter → approve locks → repeat day ----
+    // ---- ADM-04 Horas (S12): day sheet + week calendar, then the Resumen ----
     await pg.evaluate(() => (location.hash = "labour"));
     await pg.waitForTimeout(700);
+    // The four widths §3.2 fixes for the day sheet, and the calendar beside it.
+    const sheetShape = await pg.evaluate(() => {
+      const cal = document.querySelectorAll(".hcal .hday").length;
+      const zone = document.querySelector(".inbox2");
+      const w = zone ? getComputedStyle(zone).gridTemplateColumns.split(" ")[0] : null;
+      const th = [...document.querySelectorAll(".hsheet thead th")].map((x) =>
+        Math.round(x.getBoundingClientRect().width),
+      );
+      return { cal, w, th };
+    });
+    if (sheetShape.cal === 7 && sheetShape.w === "372px")
+      ok("ADM-04: seven day cells in a 372 calendar beside the day sheet");
+    else bad("ADM-04: day sheet shape", JSON.stringify(sheetShape));
+
     await pg.click("#hAssign");
     await pg.waitForTimeout(300);
     await pg.selectOption("#as_w", { index: 0 });
     await pg.click("#as_save");
     await pg.waitForTimeout(500);
-    const hin = pg.locator(".wgrid input.hin").first();
+    const hin = pg.locator(".hsheet input.hin").first();
     if ((await hin.count()) === 0) {
-      bad("horas: the grid shows an editable cell after assigning a worker", "no input.hin");
+      bad("ADM-04: the day sheet offers an editable row after assigning", "no input.hin");
     } else {
+      // The calendar cell counts the whole day across every job, so the check
+      // is the DELTA — reading "6 h" would only pass on a day nobody worked.
+      const hoursOnDay = () =>
+        pg.evaluate(
+          () =>
+            erp.state.labour.filter((l) => l.date === hDay).reduce((s, l) => s + l.hoursMilli, 0) /
+            1000,
+        );
+      const beforeH = await hoursOnDay();
+      // The first row may already carry hours, in which case typing 6 CORRECTS
+      // it rather than adding to the day. Either way the arithmetic is known.
+      const prev = Number((await hin.inputValue()).replace(",", ".")) || 0;
       await hin.fill("6");
       await hin.blur();
-      await pg.waitForTimeout(500);
-      const totalCell = await pg.locator(".wgrid td.wtot.num").first().innerText();
-      if (totalCell.trim() === "6")
-        ok("horas: hours entered in the grid update the worker's total");
-      else bad("horas: grid total after entry", totalCell);
+      await pg.waitForTimeout(600);
+      const afterH = await hoursOnDay();
+      const dayTotal = await pg.locator(".hcal .hday.on .h").innerText();
+      const shown = Number(dayTotal.replace(/[^\d,.]/g, "").replace(",", "."));
+      if (afterH === beforeH - prev + 6 && shown === afterH)
+        ok("ADM-04: hours entered on the sheet show in the day's calendar cell");
+      else
+        bad(
+          "ADM-04: calendar total after entry",
+          `${beforeH}-${prev}+6 → ${afterH}, shown ${dayTotal}`,
+        );
 
       await pg.locator("[data-approve]").first().click();
-      await pg.waitForTimeout(500);
-      const disabledCount = await pg.locator(".wgrid input.hin[disabled]").count();
-      if (disabledCount > 0) ok("horas: approving the week locks its entered cell");
-      else bad("horas: approve locks the cell", `disabled=${disabledCount}`);
+      await pg.waitForTimeout(600);
+      const lockedRows = await pg.evaluate(
+        () =>
+          [...document.querySelectorAll(".hsheet tbody tr")].filter(
+            (tr) => tr.querySelector("[data-unapprove]") && !tr.querySelector("input.hin"),
+          ).length,
+      );
+      if (lockedRows > 0) ok("ADM-04: approving the week turns its row into a locked figure");
+      else bad("ADM-04: approve locks the row", `locked=${lockedRows}`);
 
-      await pg.click("#hRepeat");
+      // Repeat copies the PREVIOUS day, so move on one day first — otherwise
+      // the button is being asked to copy a day that has nothing on it.
+      await pg.evaluate(() => {
+        const cells = [...document.querySelectorAll(".hcal .hday")];
+        const i = cells.findIndex((c) => c.classList.contains("on"));
+        cells[Math.min(i + 1, cells.length - 1)].click();
+      });
       await pg.waitForTimeout(500);
+      await pg.click("#hRepeat");
+      await pg.waitForTimeout(600);
       const repeatToast = await pg.locator("#toast").innerText();
-      if (/repetid/i.test(repeatToast)) ok("horas: repeating yesterday's day reports success");
-      else bad("horas: repeat day", repeatToast);
+      if (/repetid/i.test(repeatToast)) ok("ADM-04: repeating the previous day reports success");
+      else bad("ADM-04: repeat day", repeatToast);
     }
+
+    // The Resumen tab: per project and chapter, and the month's reconciliation.
+    await pg.locator('[data-htab="summary"]').click();
+    await pg.waitForTimeout(600);
+    const summary = await pg.evaluate(() => {
+      const rec = erp.labourReconciliation(erp.today);
+      return {
+        table: !!document.querySelector("#hSum"),
+        recBlock: !!document.querySelector("#hRec"),
+        text: document.querySelector("#view").innerText,
+        agrees: rec.wagesCents - rec.bookedCents === rec.unbookedCents,
+      };
+    });
+    if (summary.table && summary.recBlock && summary.agrees && /Conciliación/.test(summary.text))
+      ok("ADM-04: the Resumen tab rolls up per chapter and reconciles the month");
+    else bad("ADM-04: resumen tab", JSON.stringify(summary).slice(0, 200));
 
     if (errs.length === 0) ok("procurement: no console errors");
     else bad("procurement: no console errors", errs.slice(0, 3).join(" | "));
@@ -2884,10 +3062,23 @@ async function testAdmin(browser, base) {
     if (blocks >= 7) ok(`gestoría: the package completeness blocks are shown (${blocks})`);
     else bad("gestoría: completeness blocks", `${blocks} blocks`);
 
+    // S12: three steps behind a 48 indicator, and step three is unreachable
+    // while a blocking exception is open — the gate the Export button already
+    // enforced, now visible one screen earlier.
+    const wizard = await pg.evaluate(() => {
+      const stp = [...document.querySelectorAll(".steps .stp")];
+      return { n: stp.length, h: stp[0] ? Math.round(stp[0].getBoundingClientRect().height) : 0 };
+    });
+    if (wizard.n === 3 && wizard.h === 48)
+      ok("gestoría: a three-step wizard behind a 48 step indicator");
+    else bad("gestoría: wizard shape", JSON.stringify(wizard));
+
+    await pg.locator('[data-step="2"]').first().click();
+    await pg.waitForTimeout(600);
     const openEx = await pg.locator("[data-acc]").count();
-    if (openEx > 0 && (await pg.locator("#bSend").isDisabled()))
-      ok(`gestoría: sending is blocked while exceptions are unjustified (${openEx})`);
-    else bad("gestoría: send blocked by exceptions", `open=${openEx}`);
+    if (openEx > 0 && (await pg.locator('.steps [data-step="3"]').isDisabled()))
+      ok(`gestoría: step 3 is unreachable while exceptions are unjustified (${openEx})`);
+    else bad("gestoría: step 3 blocked by exceptions", `open=${openEx}`);
 
     let guard = 0;
     while ((await pg.locator("[data-acc]").count()) > 0 && guard++ < 15) {
@@ -2896,11 +3087,13 @@ async function testAdmin(browser, base) {
     }
     if (
       (await pg.locator("[data-acc]").count()) === 0 &&
-      !(await pg.locator("#bSend").isDisabled())
+      !(await pg.locator('.steps [data-step="3"]').isDisabled())
     )
-      ok("gestoría: justifying every exception unblocks the send");
-    else bad("gestoría: justification unblocks send", `remaining=${guard}`);
+      ok("gestoría: justifying every exception unlocks the last step");
+    else bad("gestoría: justification unblocks step 3", `remaining=${guard}`);
 
+    await pg.locator('.steps [data-step="3"]').click();
+    await pg.waitForTimeout(600);
     await pg.click("#bSend");
     await pg.waitForTimeout(800);
     const gesText = await pg.locator("#view").innerText();
@@ -4035,6 +4228,41 @@ async function testI18n(browser, base) {
     if (/a caixa|Entrades|Sortides/i.test(cashCaText) && !/Saldo final\nSaldo/.test(cashCaText))
       ok("i18n: CA translates the ADM-06 cash screen");
     else bad("i18n: CA ADM-06", cashCaText.replace(/\n/g, " ").slice(0, 160));
+
+    // S12's three surfaces. Every string on them shipped with Catalan in the
+    // same commit, and this is what proves it rather than the dictionary
+    // counting itself.
+    await pg.evaluate(() => (location.hash = "cash-flow"));
+    await pg.waitForTimeout(700);
+    const cfCaText = await pg.locator("#view").innerText();
+    if (
+      /Saldo acumulat/i.test(cfCaText) &&
+      /Previsi[oó]/i.test(cfCaText) &&
+      !/Saldo acumulado/.test(cfCaText)
+    )
+      ok("i18n: CA translates the ADM-08 forecast grid");
+    else bad("i18n: CA ADM-08", cfCaText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "labour"));
+    await pg.waitForTimeout(700);
+    const labCaText = await pg.locator("#view").innerText();
+    if (/Part diari/i.test(labCaText) && !/Parte diario/.test(labCaText))
+      ok("i18n: CA translates the ADM-04 day sheet and its tabs");
+    else bad("i18n: CA ADM-04", labCaText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.locator('[data-htab="summary"]').click();
+    await pg.waitForTimeout(600);
+    const labSumCa = await pg.locator("#view").innerText();
+    if (/Conciliaci[oó] del mes/i.test(labSumCa) && !/Conciliación del mes/.test(labSumCa))
+      ok("i18n: CA translates the ADM-04 monthly reconciliation");
+    else bad("i18n: CA ADM-04 resumen", labSumCa.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "accountant"));
+    await pg.waitForTimeout(800);
+    const gesCaText = await pg.locator("#view").innerText();
+    if (/Trimestre i contingut/i.test(gesCaText) && !/Trimestre y contenido/.test(gesCaText))
+      ok("i18n: CA translates the ADM-07 wizard steps");
+    else bad("i18n: CA ADM-07", gesCaText.replace(/\n/g, " ").slice(0, 160));
 
     await pg.evaluate(() => (location.hash = "invoicing"));
     await pg.waitForTimeout(700);
