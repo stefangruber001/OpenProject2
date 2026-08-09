@@ -40,37 +40,40 @@ enum Config {
 
     /// The tabs of the app. Each maps to a page of the web app.
     /// Reordering / renaming here restyles the whole app without touching views.
+    ///
+    /// These now address the ERP shell's own sections by hash rather than the
+    /// four standalone pages the app was born with. Those pages are redirect
+    /// stubs today, so the old paths still worked — but through two hops, and
+    /// landing on whichever screen the stub happened to point at rather than
+    /// the one the tab is named after. The hashes are the v4 route keys.
     static let tabs: [WebTab] = [
-        WebTab(id: "home",
-               title: "Home",
-               systemImage: "house.fill",
-               path: "index.html"),
-        WebTab(id: "project",
-               title: "Project",
-               systemImage: "square.stack.3d.up.fill",
-               path: "journey.html"),
-        WebTab(id: "clients",
-               title: "Clients",
-               systemImage: "person.2.fill",
-               path: "clientes.html"),
         WebTab(id: "tower",
-               title: "Control Tower",
+               title: "Tower",
                systemImage: "chart.bar.xaxis.ascending",
-               path: "dashboard.html"),
-        WebTab(id: "master",
-               title: "Master",
-               systemImage: "square.grid.2x2.fill",
-               path: "master-data.html"),
-        WebTab(id: "finance",
-               title: "Finance",
+               path: "erp.html#tower"),
+        WebTab(id: "project",
+               title: "Projects",
+               systemImage: "square.stack.3d.up.fill",
+               path: "erp.html#progress"),
+        WebTab(id: "sales",
+               title: "Sales",
+               systemImage: "person.2.fill",
+               path: "erp.html#leads"),
+        WebTab(id: "admin",
+               title: "Admin",
                systemImage: "eurosign.circle.fill",
-               path: "financial-data.html"),
+               path: "erp.html#invoicing"),
+        WebTab(id: "master",
+               title: "Master data",
+               systemImage: "square.grid.2x2.fill",
+               path: "erp.html#customers"),
         WebTab(id: "guide",
                title: "Guide",
                systemImage: "book.closed.fill",
                path: "setup-guide.html")
     ]
 
+    /// Hosts that should open inside
     /// Hosts that should open inside the app's web views. Everything else
     /// (mailto, tel, external websites) is handed to the system.
     ///

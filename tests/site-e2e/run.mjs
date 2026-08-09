@@ -376,6 +376,35 @@ async function testNoOverflow(browser, base) {
       bad(`no horizontal overflow @390px — ${p}`, String(e).slice(0, 120));
     }
   }
+
+  // The doc asks for a bottom bar of FIVE icons. There are six secciones, so
+  // one has to leave the bar — and it has to STAY left: the failure this
+  // guards against is a seventh section quietly making the bar scroll again,
+  // which is what it did before.
+  try {
+    await page.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
+    await page.waitForTimeout(700);
+    const bar = await page.evaluate(() => {
+      const items = [...document.querySelectorAll("#p1 .secitem")];
+      const rail = document.querySelector("#p1");
+      return {
+        visible: items.filter((n) => n.offsetParent !== null).map((n) => n.dataset.sec),
+        scrolls: rail.scrollWidth > rail.clientWidth + 1,
+      };
+    });
+    if (bar.visible.length === 5 && !bar.scrolls)
+      ok(`mobile: bottom bar is five icons and does not scroll (${bar.visible.join(",")})`);
+    else bad("mobile: five-icon bottom bar", JSON.stringify(bar));
+
+    // …and the one that left is still reachable, or it is simply missing.
+    await page.click("#btnUser");
+    await page.waitForTimeout(250);
+    if (await page.locator("#uSettings").isVisible())
+      ok("mobile: Configuración is reachable from the profile menu");
+    else bad("mobile: settings reachable", "#uSettings not visible at 390px");
+  } catch (e) {
+    bad("mobile: bottom bar", String(e).slice(0, 140));
+  }
   await page.close();
 }
 

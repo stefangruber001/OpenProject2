@@ -51,12 +51,16 @@ class MainActivity : AppCompatActivity() {
     /** The tabs of the app — same pages as the iOS shell. */
     private data class Tab(val title: String, val path: String)
     private val tabs = listOf(
-        Tab("Inicio", "index.html"),
-        Tab("Proyecto", "journey.html"),
-        Tab("Clientes", "clientes.html"),
-        Tab("Torre", "dashboard.html"),
-        Tab("Maestros", "master-data.html"),
-        Tab("Finanzas", "financial-data.html"),
+        // The ERP shell's own sections, addressed by their v4 route keys. These
+        // used to be the four standalone pages the app was born with, which are
+        // redirect stubs today: they still resolved, but through two hops and
+        // onto whichever screen the stub pointed at rather than the one the tab
+        // is named after.
+        Tab("Torre", "erp.html#tower"),
+        Tab("Proyectos", "erp.html#progress"),
+        Tab("Comercial", "erp.html#leads"),
+        Tab("Admin.", "erp.html#invoicing"),
+        Tab("Maestros", "erp.html#customers"),
         Tab("Guía", "setup-guide.html"),
     )
 

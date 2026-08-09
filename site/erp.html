@@ -470,10 +470,17 @@
   @media(max-width:860px){
     .shell{grid-template-columns:minmax(0,1fr)}
     .rail{position:fixed;top:auto;left:0;right:0;bottom:0;height:auto;z-index:55}
-    .p1{flex-direction:row;height:auto;overflow-x:auto;overflow-y:hidden;border-right:0;border-top:1px solid var(--line);
+    /* Five icons, and they FIT — no horizontal scroll. There are six
+       secciones, so one has to leave the bar: Configuración, because it is
+       the one nobody reaches for on a phone on site. It is a tap away in the
+       profile menu, which is where the guides and the recorrido already live. */
+    .p1{flex-direction:row;height:auto;overflow:hidden;border-right:0;border-top:1px solid var(--line);
       background:rgba(255,255,255,.96);backdrop-filter:saturate(1.4) blur(12px);
-      padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
-    .secitem{flex:none;min-width:66px}
+      padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+    .secitem{flex:1 1 0;min-width:0}
+    .secitem[data-sec="settings"]{display:none}
+    .secitem .lb{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .mobonly{display:block}
     .p2{top:auto;bottom:100%;left:0;right:0;width:auto;height:auto;max-height:58vh;border-right:0;
       border-top:1px solid var(--line);border-radius:14px 14px 0 0;transform:translateY(12px);
       box-shadow:0 -22px 46px -34px rgba(20,26,14,.5)}
@@ -482,6 +489,7 @@
     .fgrid{grid-template-columns:1fr}
     .kpis{grid-template-columns:repeat(2,1fr)}
   }
+  .mobonly{display:none}
   @media(max-width:560px){
     .brand .nm small{display:none}
     .topbar{padding:9px 12px}
@@ -642,7 +650,9 @@ async function boot(){
   try{ const prefs=await ErpStore.getMeta("ui.prefs"); if(prefs&&prefs.period) PERIOD={...PERIOD,...prefs.period}; }catch(e){}
   try{ const pp=await ErpStore.getMeta("ui.projects");
        if(pp){ projFavs=pp.favs||[]; projRecents=pp.recents||[]; } }catch(e){}
-  try{ const cp=await ErpStore.getMeta("ui.clientes");
+  // The key follows the screen's v4 name. The old one is still read once so a
+  // page size somebody already chose is carried over rather than reset.
+  try{ const cp=await ErpStore.getMeta("ui.customers")||await ErpStore.getMeta("ui.clientes");
        if(cp&&CLI_PAGE_SIZES.includes(cp.pageSize)) cliPageSize=cp.pageSize; }catch(e){}
 
   const rawHash=location.hash.slice(1), hashKey=resolveRoute(rawHash);
@@ -1069,9 +1079,11 @@ function buildUserMenu(){
   m.innerHTML=`<a href="setup-guide.html">📘 Guía de operaciones</a>
     <a href="ios-beta-guide.html">📱 Guía de la beta</a>
     <a href="journey.html">▶️ Recorrido completo</a>
+    <button id="uSettings" class="mobonly">⚙️ Configuración</button>
     <div class="sep"></div>
     <button id="uExport">⤓ Exportar datos</button>
     <button id="uReset">↻ Recargar datos de demostración</button>`;
+  $('#uSettings').onclick=()=>{closeMenus();toggleSection("settings");};
   $('#uExport').onclick=()=>{closeMenus();exportData();};
   $('#uReset').onclick=()=>{closeMenus();resetData();};
 }
@@ -2617,7 +2629,7 @@ let cliQuery="";   // Clientes name/code search (spec §3.1 buscador)
    start at the top — while the chosen page size is, because that is a habit. */
 let cliPage=1, cliPageSize=10;
 const CLI_PAGE_SIZES=[10,20,50];
-function saveCliPrefs(){ try{ ErpStore.setMeta("ui.clientes",{pageSize:cliPageSize}); }catch(e){} }
+function saveCliPrefs(){ try{ ErpStore.setMeta("ui.customers",{pageSize:cliPageSize}); }catch(e){} }
 /* One list drives the table head AND the export, so a column can never be
    added to the screen and quietly missing from the file. The accessor returns
    plain text: the table renders pills, a spreadsheet cell cannot. */
