@@ -11,6 +11,12 @@
  * the same reason: this is a screen that asks for a password, and it must work
  * even if nothing else on the page does.
  *
+ * BOTH LANGUAGES, SIDE BY SIDE, and deliberately NOT through the site's ES/EN
+ * machinery. Two people set this up between them and they do not read the same
+ * language; a toggle would mean one of them arrives to find the wrong one
+ * chosen. It is one short screen, used once, so showing both costs a few lines
+ * and removes a step. Nothing here reads or writes the language preference.
+ *
  * IT IS DELIBERATELY NOT IN THE ERP's NAVIGATION. Mailbox setup is something
  * done once and then forgotten; putting it in the tab bar would spend permanent
  * space on it, and the operator was explicit that the workspace UI should not
@@ -49,14 +55,27 @@ const FIELD: React.CSSProperties = {
   outlineColor: GREEN,
 };
 
-const LABEL: React.CSSProperties = {
-  display: "block",
-  font: `600 11.5px ${SANS}`,
-  letterSpacing: ".08em",
-  textTransform: "uppercase",
-  color: MUTED,
-  marginBottom: 7,
-};
+/** English on the label line, Spanish beneath it in the muted weight. */
+function Bi({ en, es, htmlFor }: { en: string; es: string; htmlFor: string }) {
+  return (
+    <label htmlFor={htmlFor} style={{ display: "block", marginBottom: 7 }}>
+      <span
+        style={{
+          display: "block",
+          font: `600 11.5px ${SANS}`,
+          letterSpacing: ".08em",
+          textTransform: "uppercase",
+          color: MUTED,
+        }}
+      >
+        {en}
+      </span>
+      <span style={{ display: "block", font: `400 12px ${SANS}`, color: MUTED, marginTop: 2 }}>
+        {es}
+      </span>
+    </label>
+  );
+}
 
 export default async function MailSettingsPage({
   searchParams,
@@ -117,7 +136,7 @@ export default async function MailSettingsPage({
               marginTop: 4,
             }}
           >
-            Draft mailbox
+            Draft mailbox · Buzón para borradores
           </div>
         </div>
 
@@ -146,12 +165,21 @@ export default async function MailSettingsPage({
           {status === "ok" && (
             <Banner tone="good">
               Connected. A test draft was left in <b>{detail || "your drafts folder"}</b>.
+              <br />
+              <span style={{ opacity: 0.75 }}>
+                Conectado. Se ha dejado un borrador de prueba en{" "}
+                {detail || "la carpeta de borradores"}.
+              </span>
             </Banner>
           )}
           {status === "failed" && (
             <Banner tone="bad">
               The mail server did not accept these details, so nothing was saved.
               {detail ? ` (${detail})` : ""}
+              <br />
+              <span style={{ opacity: 0.75 }}>
+                El servidor de correo no aceptó estos datos, así que no se ha guardado nada.
+              </span>
             </Banner>
           )}
           {status === "bad" && <Banner tone="bad">{detail || "Check the details."}</Banner>}
@@ -168,10 +196,12 @@ export default async function MailSettingsPage({
             The ERP will leave its emails as <b>drafts</b> in this mailbox. It never sends anything
             — you review them and send from your own mail app.
           </p>
+          <p style={{ font: `400 12.5px/1.55 ${SANS}`, color: MUTED, margin: "-10px 0 18px" }}>
+            El ERP dejará sus emails como <b>borradores</b> en este buzón. Nunca envía nada: usted
+            los revisa y los envía desde su propio correo.
+          </p>
 
-          <label htmlFor="address" style={LABEL}>
-            Email address
-          </label>
+          <Bi htmlFor="address" en="Email address" es="Dirección de correo" />
           <input
             id="address"
             name="address"
@@ -187,9 +217,7 @@ export default async function MailSettingsPage({
             style={{ ...FIELD, marginBottom: 16 }}
           />
 
-          <label htmlFor="password" style={LABEL}>
-            Mailbox password
-          </label>
+          <Bi htmlFor="password" en="Mailbox password" es="Contraseña del buzón" />
           <input
             id="password"
             name="password"
@@ -200,16 +228,16 @@ export default async function MailSettingsPage({
           />
           <p style={{ font: `400 12px/1.5 ${SANS}`, color: MUTED, margin: "0 0 16px" }}>
             Stored encrypted on the server. Never shown again.
+            <br />
+            Se guarda cifrada en el servidor. No se muestra nunca más.
           </p>
 
           <details style={{ marginBottom: 18 }}>
             <summary style={{ font: `600 12.5px ${SANS}`, color: GREEN, cursor: "pointer" }}>
-              Advanced settings
+              Advanced settings · Ajustes avanzados
             </summary>
             <div style={{ paddingTop: 12 }}>
-              <label htmlFor="host" style={LABEL}>
-                IMAP server
-              </label>
+              <Bi htmlFor="host" en="IMAP server" es="Servidor IMAP" />
               <input
                 id="host"
                 name="host"
@@ -221,9 +249,7 @@ export default async function MailSettingsPage({
                 placeholder="imap.hostinger.com"
                 style={{ ...FIELD, marginBottom: 12 }}
               />
-              <label htmlFor="drafts" style={LABEL}>
-                Drafts folder
-              </label>
+              <Bi htmlFor="drafts" en="Drafts folder" es="Carpeta de borradores" />
               <input
                 id="drafts"
                 name="drafts"
@@ -251,7 +277,7 @@ export default async function MailSettingsPage({
               boxShadow: "0 10px 22px -12px rgba(49,83,42,.9)",
             }}
           >
-            Save and test
+            Save and test · Guardar y probar
           </button>
 
           <p
@@ -263,6 +289,8 @@ export default async function MailSettingsPage({
             }}
           >
             Checked against the mail server before saving.
+            <br />
+            Se comprueba con el servidor de correo antes de guardar.
           </p>
         </form>
 
