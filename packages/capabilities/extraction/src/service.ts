@@ -100,9 +100,16 @@ export class ExtractionService {
       }
     }
 
+    this.applyVerdicts(fields, checks);
+
+    // Amber IS the review list. Before the verdicts existed this was a
+    // confidence threshold, which let a well-read but unchecked value — the
+    // spike's wrong NIF, read cleanly and scored high — stay off the list of
+    // things a person has to look at. Threshold still applies: a low-confidence
+    // read is worth a look even where a validator happened to pass.
     const threshold = this.deps.config.reviewThreshold;
     const needsReview = fields
-      .filter((f) => f.value === null || f.confidence < threshold)
+      .filter((f) => f.verdict === "amber" || f.confidence < threshold)
       .map((f) => f.key);
 
     return {
@@ -128,29 +135,70 @@ export class ExtractionService {
     corrections: Partial<Record<FieldKey, string | number | null>>,
   ): ExtractionResult {
     const profile = this.profile();
-    const fields = result.fields.map((f) =>
-      Object.prototype.hasOwnProperty.call(corrections, f.key)
-        ? {
-            ...f,
-            value: corrections[f.key] ?? null,
-            raw: corrections[f.key] === null ? null : String(corrections[f.key]),
-            confidence: 1,
-            reasons: ["corrected by hand"],
-          }
-        : f,
-    );
+    const fields = result.fields.map((f) => {
+      if (!Object.prototype.hasOwnProperty.call(corrections, f.key)) return { ...f };
+      const value = corrections[f.key] ?? null;
+      // A typed value is re-CHECKED, not merely trusted. Typing is exactly
+      // where a NIF acquires a transposed digit, and the whole reason the
+      // check digit is worth computing is that it does not care who produced
+      // the number. So confidence goes to 1 — a person is certain of what
+      // they typed — while the dot still has to be earned.
+      const revalidated = this.validateValue(f.key, value, profile);
+      return {
+        ...f,
+        value,
+        raw: value === null ? null : String(value),
+        confidence: 1,
+        reasons: revalidated.reasons.length
+          ? ["corrected by hand", ...revalidated.reasons]
+          : ["corrected by hand"],
+        validated: revalidated.validated,
+        verdict: "amber" as const, // finalised below
+      };
+    });
     const issueDate = fields.find((f) => f.key === "issueDate")?.value as string | undefined;
     const checks = this.check(fields, result.taxBreakdown, issueDate, profile);
+    this.applyVerdicts(fields, checks);
     const threshold = this.deps.config.reviewThreshold;
     return {
       ...result,
       fields,
       checks,
       needsReview: fields
-        .filter((f) => f.value === null || f.confidence < threshold)
+        .filter((f) => f.verdict === "amber" || f.confidence < threshold)
         .map((f) => f.key),
       confirmed: false,
     };
+  }
+
+  /**
+   * Run whatever validator this field's kind has against a value that did not
+   * come off the page. Amounts return false here and are decided by the
+   * arithmetic in `applyVerdicts`, exactly as read values are.
+   */
+  private validateValue(
+    key: FieldKey,
+    value: string | number | null,
+    profile: ExtractionProfile,
+  ): { validated: boolean; reasons: string[] } {
+    if (value === null || value === "") return { validated: false, reasons: [] };
+    const kind = FIELD_TOKEN[key];
+    if (kind === "taxId") {
+      const c = profile.checkTaxId(String(value));
+      if (c?.valid) return { validated: true, reasons: ["passes its check digit"] };
+      return { validated: false, reasons: ["fails its check digit — read it again"] };
+    }
+    if (kind === "account") {
+      const c = profile.checkAccountNumber?.(String(value));
+      if (c?.valid) return { validated: true, reasons: ["passes its check digit"] };
+      return { validated: false, reasons: ["fails its check digit — read it again"] };
+    }
+    if (kind === "date") {
+      const iso = isRealDate(String(value)) ? String(value) : profile.parseDate(String(value));
+      if (iso && isRealDate(iso)) return { validated: true, reasons: ["is a real calendar date"] };
+      return { validated: false, reasons: ["is not a real calendar date"] };
+    }
+    return { validated: false, reasons: [] };
   }
 
   /* ------------------------------------------------------------------ */
@@ -193,6 +241,10 @@ export class ExtractionService {
         score += kind === "text" ? 0.15 : 0.3;
         reasons.push(`matched a ${kind} token`);
 
+        // Whether anything CHECKED this value, as opposed to liking the look
+        // of it. Only a real check may turn a dot green — see FieldVerdict.
+        let validated = false;
+
         if (kind === "taxId" || kind === "account") {
           const check =
             kind === "taxId"
@@ -200,11 +252,20 @@ export class ExtractionService {
               : profile.checkAccountNumber?.(span.text);
           if (check?.valid) {
             score += 0.2;
+            validated = true;
             reasons.push("passes its check digit");
           } else if (check) {
             failedCheckDigit = true;
             reasons.push("fails its check digit — read it again");
           }
+        }
+
+        // A date is validated by being a real day: the profile knows how this
+        // locale writes one, but "is 31 February a date" is arithmetic, not
+        // locale knowledge, so it is checked here.
+        if (kind === "date" && typeof value === "string" && isRealDate(value)) {
+          validated = true;
+          reasons.push("is a real calendar date");
         }
 
         // Totals sit at the foot of a document; identifiers at the head.
@@ -235,6 +296,7 @@ export class ExtractionService {
           source: span,
           reasons,
           labelled,
+          validated,
         });
       }
     });
@@ -446,6 +508,8 @@ export class ExtractionService {
           source: null,
           alternatives: unlabelled,
           reasons: ["found amounts, but none of them was labelled as this field"],
+          validated: false,
+          verdict: "amber",
         };
       }
     }
@@ -458,6 +522,8 @@ export class ExtractionService {
         source: null,
         alternatives: [],
         reasons: ["not found"],
+        validated: false,
+        verdict: "amber",
       };
     }
     // Two candidates that agree are worth more than either alone.
@@ -475,8 +541,52 @@ export class ExtractionService {
       source: top.source,
       alternatives,
       reasons: agreeing > 1 ? [...top.reasons, `read ${agreeing} times`] : top.reasons,
+      validated: top.validated,
+      verdict: "amber", // finalised by applyVerdicts, once the checks are known
     };
   }
+
+  /**
+   * Colour the dots, after the consistency checks — which is the only moment
+   * the answer is knowable, because an amount is validated by its arithmetic
+   * rather than by anything about the amount itself.
+   *
+   * Mutates in place, deliberately: it runs on freshly built field objects
+   * inside `extract` and `recheck`, and copying them again to set two
+   * properties would only make the ordering harder to follow.
+   */
+  private applyVerdicts(fields: ExtractedField[], checks: ConsistencyCheck[]): void {
+    const totals = checks.find((c) => c.id === "totals");
+    const contradicted = new Set<FieldKey>();
+    for (const c of checks)
+      if (c.status === "mismatch") for (const k of c.fields) contradicted.add(k);
+
+    for (const f of fields) {
+      // Nothing read is nothing to be confident about; a contradiction is a
+      // reason to look, whatever vouched for the value in isolation.
+      if (f.value === null || contradicted.has(f.key)) {
+        f.verdict = "amber";
+        continue;
+      }
+      // An amount has no check digit. What vouches for it is the arithmetic it
+      // takes part in — and if that arithmetic could not be done at all, the
+      // amount has not been checked by anything.
+      if (isAmountField(f.key)) {
+        const ok = totals?.status === "ok";
+        f.validated = ok;
+        f.verdict = ok ? "green" : "amber";
+        continue;
+      }
+      f.verdict = f.validated ? "green" : "amber";
+    }
+  }
+}
+
+/** A real day in a real month, not merely something shaped like a date. */
+function isRealDate(iso: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const d = new Date(iso + "T00:00:00Z");
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso;
 }
 
 /** Amount fields carry cents; everything else carries text. */

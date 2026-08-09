@@ -41,6 +41,7 @@
   var rates = available && F.createRates ? F.createRates() : null;
   var recon = available && F.createReconciliation ? F.createReconciliation() : null;
   var comms = available && F.createComms ? F.createComms() : null;
+  var extraction = available && F.createExtraction ? F.createExtraction() : null;
 
   /* ------------------------------------------------------------------ *
    * Projections: engine state -> capability values
@@ -410,6 +411,33 @@
 
     /** Surface version of the bundle, or null. Lets callers detect a stale artifact. */
     surfaceVersion: available ? F.SURFACE_VERSION : null,
+
+    /* ---------------------------------------------------------------- *
+     * Document capture — the INTERPRETATION half.
+     *
+     * `site/erp-ocr.js` turns a file into text; this turns that text into
+     * candidate fields with a dot each. The split is deliberate: recognition
+     * is 7 MB of browser infrastructure with no business meaning, and meaning
+     * is domain code that must stay testable without a browser at all.
+     *
+     * Null when the bundle is missing, like every other surface here — a
+     * capture screen must be able to say "manual entry only" rather than
+     * throw.
+     * ---------------------------------------------------------------- */
+    extraction: extraction && {
+      /** Recognised text in; fields, dots, provenance and checks out. */
+      read: function (text, assumeIssueDate) {
+        return extraction.read(text, assumeIssueDate);
+      },
+      /** Re-check after a person edits a value. Typed values are checked too. */
+      recheck: function (result, corrections) {
+        return extraction.recheck(result, corrections);
+      },
+      /** Which jurisdiction profile is bound. */
+      profile: function () {
+        return extraction.profile();
+      },
+    },
 
     scheduling: {
       /**

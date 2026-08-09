@@ -227,6 +227,107 @@ describe("ExtractionService", () => {
     expect(second.fields.map((f) => f.value)).toEqual(first.fields.map((f) => f.value));
   });
 
+  /* ---------------------------------------------------------------------
+     The dots. A field goes green ONLY when a validator vouched for it — the
+     rule the OCR spike exists to justify, and the one thing on this screen a
+     confident misreading must not be able to satisfy.
+     --------------------------------------------------------------------- */
+  describe("verdicts", () => {
+    it("turns green only where something actually checked the value", () => {
+      const r = svc().extract({ text: DOC });
+      // Checked: a check digit that computes, a real calendar date, and
+      // arithmetic that balances.
+      expect(field(r, "issuerTaxId").verdict).toBe("green");
+      expect(field(r, "iban").verdict).toBe("green");
+      expect(field(r, "issueDate").verdict).toBe("green");
+      expect(field(r, "dueDate").verdict).toBe("green");
+      expect(field(r, "netAmount").verdict).toBe("green");
+      expect(field(r, "totalAmount").verdict).toBe("green");
+      // Nothing can check a name, a document number or an order reference —
+      // so they stay amber however cleanly they were read. (The spike never
+      // once read a document number correctly off a raster.)
+      expect(field(r, "issuerName").verdict).toBe("amber");
+      expect(field(r, "docNumber").verdict).toBe("amber");
+      expect(field(r, "issuerName").confidence).toBeGreaterThan(0.6);
+    });
+
+    it("keeps a well-read but unverifiable tax id amber, not green", () => {
+      // AB123401 is perfectly shaped, sits under its own label at the head of
+      // the document, and reads cleanly. Its check digit is simply wrong —
+      // which is exactly the shape of the spike's A08912907.
+      const doc = DOC.replace("Registry no AB123400", "Registry no AB123401");
+      const r = svc().extract({ text: doc });
+      const nif = field(r, "issuerTaxId");
+      expect(nif.value).toBe("AB123401");
+      expect(nif.validated).toBe(false);
+      expect(nif.verdict).toBe("amber");
+      expect(nif.reasons.join(" ")).toMatch(/fails its check digit/);
+      expect(r.needsReview).toContain("issuerTaxId");
+    });
+
+    it("sends every amount amber when the arithmetic does not balance", () => {
+      const wrong = DOC.replace("Grand total 1_150|00", "Grand total 1_200|00");
+      const r = svc().extract({ text: wrong });
+      for (const key of ["netAmount", "taxAmount", "totalAmount"] as FieldKey[]) {
+        expect(field(r, key).verdict).toBe("amber");
+        expect(r.needsReview).toContain(key);
+      }
+      // …and leaves the fields the arithmetic says nothing about alone.
+      expect(field(r, "issuerTaxId").verdict).toBe("green");
+    });
+
+    it("leaves amounts amber when there was not enough to check them with", () => {
+      const r = svc().extract({ text: "Issued by: Acme\nGrand total 1_150|00" });
+      expect(r.checks.find((c) => c.id === "totals")!.status).toBe("unknown");
+      expect(field(r, "totalAmount").value).toBe(115000);
+      expect(field(r, "totalAmount").verdict).toBe("amber");
+    });
+
+    it("refuses a date that is shaped like one but is not a day", () => {
+      const r = svc().extract({ text: DOC.replace("Dated 2026.03.14", "Dated 2026.02.31") });
+      const d = field(r, "issueDate");
+      expect(d.validated).toBe(false);
+      expect(d.verdict).toBe("amber");
+    });
+
+    it("re-checks a value a person typed instead of trusting it", () => {
+      const r = svc().extract({ text: DOC });
+      // A hand-typed tax id with a bad check digit is still amber, however
+      // certain the person was. Typing is where a digit gets transposed.
+      const typedBad = svc().recheck(r, { issuerTaxId: "AB123401" });
+      expect(field(typedBad, "issuerTaxId").confidence).toBe(1);
+      expect(field(typedBad, "issuerTaxId").verdict).toBe("amber");
+      expect(typedBad.needsReview).toContain("issuerTaxId");
+
+      // Correcting it properly turns the dot green — the point of the dot.
+      const typedGood = svc().recheck(r, { issuerTaxId: "AB123400" });
+      expect(field(typedGood, "issuerTaxId").verdict).toBe("green");
+      expect(typedGood.needsReview).not.toContain("issuerTaxId");
+    });
+
+    it("turns the amounts green again once a correction makes them balance", () => {
+      const wrong = DOC.replace("Grand total 1_150|00", "Grand total 1_200|00");
+      const r = svc().extract({ text: wrong });
+      expect(field(r, "totalAmount").verdict).toBe("amber");
+      const fixed = svc().recheck(r, { totalAmount: 115000 });
+      expect(fixed.checks.find((c) => c.id === "totals")!.status).toBe("ok");
+      expect(field(fixed, "totalAmount").verdict).toBe("green");
+      expect(field(fixed, "netAmount").verdict).toBe("green");
+    });
+
+    it("never reports a field as green while it is still on the review list", () => {
+      // The invariant the screen relies on: the dots and the review list are
+      // two readings of one decision, not two decisions.
+      for (const text of [DOC, DOC.replace("Grand total 1_150|00", "Grand total 9_999|00")]) {
+        const r = svc().extract({ text });
+        for (const f of r.fields) {
+          if (r.needsReview.includes(f.key)) continue;
+          expect(f.verdict).toBe("green");
+        }
+      }
+    });
+  });
+
   it("tracks which page a value came from", () => {
     const r = svc().extract({ text: ["Issued by: Acme Supplies Ltd", "Grand total 1_150|00"] });
     const totalPaged = field(r, "totalAmount");

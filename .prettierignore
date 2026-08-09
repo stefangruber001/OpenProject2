@@ -17,3 +17,8 @@ tenants/_template
 # would reformat these artifacts and make the CI drift check fail permanently.
 site/erp-factory.js
 site/erp-factory.cjs
+
+# Third-party OCR runtime, copied by tools/vendor-ocr.mjs and committed because
+# pages.yml publishes site/** from a bare checkout with no Node. Not ours to
+# format, and reformatting it would corrupt the wasm loader.
+site/vendor

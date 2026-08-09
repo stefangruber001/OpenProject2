@@ -1,0 +1,357 @@
+/* Canei Subirats — recognition: a file in, text out.
+ *
+ * The HALF OF DOCUMENT CAPTURE THAT IS NOT DOMAIN. Turning a PDF or a
+ * photograph into lines of text is infrastructure: it needs pdf.js and
+ * tesseract.js, roughly 7 MB of them, and it knows nothing about invoices.
+ * What those lines MEAN — which is the issuer, which the tax id, which amount
+ * is the total, and whether anything actually checked them — is domain
+ * knowledge and lives in `@repo/capability-extraction`, reached through
+ * `ErpBridge.extraction`. Keeping the two apart is what lets the meaning be
+ * tested against a jurisdiction that does not exist while this file is tested
+ * against a real browser.
+ *
+ * THREE RULES, all from the S0b spike (`docs/CANEI-V4-OCR-SPIKE.md`):
+ *
+ *   1. TRY THE TEXT LAYER FIRST, ALWAYS. Most supplier quotes are digital
+ *      PDFs; pdf.js read one 11/11 instantly, and for those OCR never runs.
+ *   2. OCR ONLY WHERE THERE IS NOTHING TO READ. A scan, a photograph, an
+ *      image, or a PDF whose pages are pictures of paper.
+ *   3. NOTHING LOADS UNTIL IT IS NEEDED. Not at boot, not on the capture
+ *      screen, not until a file is actually handed over — and the OCR half
+ *      never at all on a document that had a text layer.
+ *
+ * ON SIGNAL. The bundle needs a good connection ONCE, to install. That is the
+ * opposite of the site it is meant for, so `prepareOffline()` exists: an
+ * explicit, user-pressed pre-fetch, on wifi, with a progress figure. Nothing
+ * here ever downloads 7 MB on its own initiative.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.ErpOcr = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  /* The global, from inside the factory. The UMD wrapper above has it, the
+     factory does not — and tesseract.min.js is a classic script that hangs
+     itself off the global rather than exporting anything, so this file needs
+     its own handle on it. */
+  var root = typeof self !== "undefined" ? self : globalThis;
+
+  /* Resolved against THIS script's own URL, not the page's. erp.html is served
+     from site/, but the iOS and Android shells load the same files through a
+     different base, and journey.html sits beside it — a relative path from the
+     document would break on any of them the moment one moved. */
+  var HERE = (function () {
+    try {
+      if (typeof document !== "undefined" && document.currentScript)
+        return document.currentScript.src.replace(/[^/]*$/, "");
+    } catch (e) {
+      /* fall through */
+    }
+    return "";
+  })();
+  var V = HERE + "vendor/";
+
+  /** Recognition quality below which a photograph is not worth reading. */
+  var MIN_PIXELS = 1_200_000; // ≈ 1,400 × 860. See "capture minimum" below.
+  var OCR_LANGS = "spa+cat";
+
+  var pdfjsP = null;
+  var tessP = null;
+
+  /* ------------------------------------------------------------------ *
+   * Loading, lazily and once
+   * ------------------------------------------------------------------ */
+
+  function loadPdfjs() {
+    if (!pdfjsP)
+      pdfjsP = import(V + "pdfjs/pdf.min.mjs").then(function (m) {
+        m.GlobalWorkerOptions.workerSrc = V + "pdfjs/pdf.worker.min.mjs";
+        return m;
+      });
+    return pdfjsP;
+  }
+
+  function loadScript(src) {
+    return new Promise(function (res, rej) {
+      var s = document.createElement("script");
+      s.src = src;
+      s.onload = function () {
+        res();
+      };
+      s.onerror = function () {
+        rej(new Error("No se ha podido cargar " + src));
+      };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadTesseract() {
+    if (!tessP)
+      tessP = loadScript(V + "tesseract/tesseract.min.js").then(function () {
+        if (!root.Tesseract) throw new Error("Tesseract no se ha cargado");
+        return root.Tesseract;
+      });
+    return tessP;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Reading
+   * ------------------------------------------------------------------ */
+
+  /** A PDF's own text layer. Empty string when the pages are pictures. */
+  function pdfText(buf) {
+    return loadPdfjs().then(function (pdfjs) {
+      return pdfjs
+        .getDocument({ data: new Uint8Array(buf), useSystemFonts: true })
+        .promise.then(function (doc) {
+          var pages = [];
+          var chain = Promise.resolve();
+          for (var i = 1; i <= doc.numPages; i++)
+            (function (n) {
+              chain = chain
+                .then(function () {
+                  return doc.getPage(n);
+                })
+                .then(function (page) {
+                  return page.getTextContent();
+                })
+                .then(function (tc) {
+                  pages.push(
+                    tc.items
+                      .map(function (it) {
+                        return it.str + (it.hasEOL ? "\n" : "");
+                      })
+                      .join(""),
+                  );
+                });
+            })(i);
+          return chain.then(function () {
+            return { pages: pages, doc: doc };
+          });
+        });
+    });
+  }
+
+  /** Render PDF pages to canvases, for the OCR path. */
+  function pdfRaster(doc, scale) {
+    var out = [];
+    var chain = Promise.resolve();
+    for (var i = 1; i <= doc.numPages; i++)
+      (function (n) {
+        chain = chain
+          .then(function () {
+            return doc.getPage(n);
+          })
+          .then(function (page) {
+            var vp = page.getViewport({ scale: scale || 2 });
+            var c = document.createElement("canvas");
+            c.width = Math.round(vp.width);
+            c.height = Math.round(vp.height);
+            return page
+              .render({ canvasContext: c.getContext("2d"), viewport: vp })
+              .promise.then(function () {
+                out.push(c);
+              });
+          });
+      })(i);
+    return chain.then(function () {
+      return out;
+    });
+  }
+
+  function ocr(images, onProgress) {
+    return loadTesseract().then(function (T) {
+      return T.createWorker(OCR_LANGS, 1, {
+        workerPath: V + "tesseract/worker.min.js",
+        corePath: V + "tesseract/tesseract-core-simd-lstm.js",
+        langPath: V + "tessdata",
+        // Never the CDN. On a bare static host it is not reachable, and on a
+        // site with no signal neither is anything else — a silent fallback to
+        // the network is exactly the failure this vendoring exists to prevent.
+        cacheMethod: "none",
+        logger: onProgress
+          ? function (m) {
+              if (m.status === "recognizing text") onProgress(m.progress);
+            }
+          : undefined,
+      }).then(function (worker) {
+        var pages = [];
+        var confidences = [];
+        var chain = Promise.resolve();
+        images.forEach(function (img) {
+          chain = chain
+            .then(function () {
+              return worker.recognize(img);
+            })
+            .then(function (r) {
+              pages.push(r.data.text || "");
+              confidences.push(r.data.confidence);
+            });
+        });
+        return chain
+          .then(function () {
+            return worker.terminate();
+          })
+          .then(function () {
+            return {
+              pages: pages,
+              confidence: confidences.length
+                ? Math.round(
+                    confidences.reduce(function (a, b) {
+                      return a + b;
+                    }, 0) / confidences.length,
+                  )
+                : null,
+            };
+          });
+      });
+    });
+  }
+
+  function imageBitmapOf(file) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(file);
+      var im = new Image();
+      im.onload = function () {
+        URL.revokeObjectURL(url);
+        res(im);
+      };
+      im.onerror = function () {
+        URL.revokeObjectURL(url);
+        rej(new Error("No se ha podido leer la imagen"));
+      };
+      im.src = url;
+    });
+  }
+
+  /** Is there enough text here to call this a digital document? */
+  function meaningful(pages) {
+    var joined = pages.join("").replace(/\s+/g, "");
+    return joined.length >= 40;
+  }
+
+  /**
+   * Read a file.
+   *
+   * Resolves `{ text, pages, engine, confidence, warnings, pageCount }`.
+   * `engine` is "pdf-text" or "ocr" — the screen says which, because "the
+   * computer read it" and "the computer guessed at a photograph" deserve
+   * different amounts of trust from the person checking it.
+   */
+  function recognise(file, opts) {
+    opts = opts || {};
+    var onProgress = opts.onProgress || null;
+    var warnings = [];
+    var isPdf = /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name || "");
+
+    if (isPdf) {
+      return file.arrayBuffer().then(function (buf) {
+        return pdfText(buf).then(function (r) {
+          if (meaningful(r.pages))
+            return {
+              text: r.pages,
+              pages: r.pages,
+              pageCount: r.pages.length,
+              engine: "pdf-text",
+              confidence: null,
+              warnings: warnings,
+            };
+          // A PDF whose pages are pictures of paper. Rule 2.
+          warnings.push("El PDF no lleva texto: se ha leído como imagen.");
+          return pdfRaster(r.doc, 2).then(function (canvases) {
+            return ocr(canvases, onProgress).then(function (o) {
+              return {
+                text: o.pages,
+                pages: o.pages,
+                pageCount: o.pages.length,
+                engine: "ocr",
+                confidence: o.confidence,
+                warnings: warnings,
+              };
+            });
+          });
+        });
+      });
+    }
+
+    return imageBitmapOf(file).then(function (im) {
+      /* THE CAPTURE MINIMUM, and it is about pixels rather than steadiness.
+         The spike's angled phone photo scored 9/11 while a low-resolution
+         scan managed 5/11, so resolution is the thing worth refusing on. The
+         warning is a warning and not a block: a bad photograph of a document
+         nobody can find again is still worth more than nothing, and the
+         amber dots will say what could not be read. */
+      var px = im.naturalWidth * im.naturalHeight;
+      if (px < MIN_PIXELS)
+        warnings.push(
+          "La imagen tiene poca resolución (" +
+            im.naturalWidth +
+            "×" +
+            im.naturalHeight +
+            "). Acérquese y repita la foto si algún dato sale en ámbar.",
+        );
+      return ocr([im], onProgress).then(function (o) {
+        return {
+          text: o.pages,
+          pages: o.pages,
+          pageCount: o.pages.length,
+          engine: "ocr",
+          confidence: o.confidence,
+          warnings: warnings,
+        };
+      });
+    });
+  }
+
+  /**
+   * Pull the whole OCR runtime down now, on purpose.
+   *
+   * Rule 09 asks for capture where there is no signal; this bundle needs a
+   * connection once to install. So the resolution is an explicit action a
+   * person takes while they still have wifi — never a silent 7 MB download
+   * over somebody's mobile data on a site.
+   */
+  function prepareOffline(onProgress) {
+    var files = [
+      "pdfjs/pdf.min.mjs",
+      "pdfjs/pdf.worker.min.mjs",
+      "tesseract/tesseract.min.js",
+      "tesseract/worker.min.js",
+      "tesseract/tesseract-core-simd-lstm.js",
+      "tesseract/tesseract-core-simd-lstm.wasm",
+      "tessdata/spa.traineddata.gz",
+      "tessdata/cat.traineddata.gz",
+    ];
+    var done = 0;
+    return Promise.all(
+      files.map(function (f) {
+        return fetch(V + f, { cache: "force-cache" }).then(function (r) {
+          if (!r.ok) throw new Error("No se ha podido descargar " + f);
+          return r.blob().then(function (b) {
+            done++;
+            if (onProgress) onProgress(done / files.length);
+            return b.size;
+          });
+        });
+      }),
+    ).then(function (sizes) {
+      return {
+        files: files.length,
+        bytes: sizes.reduce(function (a, b) {
+          return a + b;
+        }, 0),
+      };
+    });
+  }
+
+  return {
+    recognise: recognise,
+    prepareOffline: prepareOffline,
+    /** For a screen that wants to say what it will have to fetch. */
+    vendorBase: function () {
+      return V;
+    },
+    minPixels: MIN_PIXELS,
+  };
+});

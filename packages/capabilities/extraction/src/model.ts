@@ -73,7 +73,33 @@ export interface Candidate {
   reasons: string[];
   /** Whether a word on the page announced this value as this field. */
   labelled: boolean;
+  /**
+   * Whether something CHECKED this value, as opposed to something liking the
+   * look of it. A check digit that computes, an account number whose mod-97
+   * comes out, a date that is a real day in a real month. Confidence is a
+   * heuristic and can be high about a wrong answer; this cannot.
+   */
+  validated: boolean;
 }
+
+/**
+ * Green or amber, per the specification's dots.
+ *
+ * The rule is the whole point and it is deliberately strict: **a field goes
+ * green only when a validator vouched for its value.** Never on confidence,
+ * however high. The OCR spike (`docs/CANEI-V4-OCR-SPIKE.md` §3) is why — a
+ * scanned NIF came back as `A08912907` for `A08932907`, which is not a blank a
+ * person would notice but a plausible lie that flows into duplicate detection,
+ * the archive and a filing. The check digit catches it; a confidence score
+ * never would, because the reader was perfectly confident.
+ *
+ * A consequence worth stating: fields with no validator available — an issuer
+ * name, a document number, an order reference — are **always amber**. That
+ * matches the spike's finding that the document number was never once read
+ * correctly off a raster. Amber is not a failure here; it is where the cursor
+ * goes.
+ */
+export type FieldVerdict = "green" | "amber";
 
 export interface ExtractedField {
   key: FieldKey;
@@ -84,6 +110,10 @@ export interface ExtractedField {
   /** Runners-up, best first. A validation screen offers these as one tap. */
   alternatives: Candidate[];
   reasons: string[];
+  /** A validator vouched for this value. See `Candidate.validated`. */
+  validated: boolean;
+  /** What colour the dot is. See `FieldVerdict`. */
+  verdict: FieldVerdict;
 }
 
 /** One rate's worth of a document that mixes several (spec §5.2). */

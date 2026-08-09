@@ -714,6 +714,11 @@
      Both degrade silently if unavailable, so the ERP still runs without them. -->
 <script src="erp-factory.js"></script>
 <script src="erp-bridge.js"></script>
+<!-- Document recognition (S6). This file is ~9 KB and loads nothing: pdf.js
+     and tesseract.js, the ~7 MB behind it, are fetched only when a file is
+     actually handed over — and the OCR half never at all for a PDF that
+     turned out to have a text layer. -->
+<script src="erp-ocr.js"></script>
 <script>
 /* =============================== boot & persistence =============================== */
 const $=s=>document.querySelector(s), el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};

@@ -25,9 +25,14 @@
     "test:i18n": "node tests/i18n/coverage.mjs"
   },
   "devDependencies": {
+    "@tesseract.js-data/cat": "^1.0.0",
+    "@tesseract.js-data/spa": "^1.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
+    "pdfjs-dist": "6.2.108",
     "prettier": "^3.7.4",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0",
     "tsx": "^4.19.2",
     "turbo": "^2.10.5",
     "typescript": "5.9.2"

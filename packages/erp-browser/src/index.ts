@@ -14,6 +14,20 @@
    If you find yourself writing a domain rule here, it belongs one layer down.
    ========================================================================== */
 
+import { ExtractionService, extractionConfigSchema } from "@repo/capability-extraction";
+import type {
+  ExtractedField,
+  ExtractionResult,
+  FieldKey,
+  FieldVerdict,
+} from "@repo/capability-extraction";
+// The pack's own entry point pulls in its invoice-chain module, which needs
+// node:crypto and has no place in a browser bundle. The profile is pure data
+// and pure functions, so it gets an export subpath of its own rather than a
+// deep import reaching past the package's public surface.
+import { ES_EXTRACTION_PROFILE } from "@repo/pack-jurisdiction-es-es/extraction";
+import { PortRegistry } from "@repo/kernel";
+import { EXTRACTION_PROFILE_PORT } from "@repo/capability-extraction";
 import { composeAnnex, resolveAnnexOptions } from "@repo/capability-docs";
 import type {
   Annex,
@@ -272,6 +286,57 @@ export function createComms() {
  * the browser reaches for it yet, and a surface that grows methods before their
  * callers exist is a surface nobody can safely change later.
  */
+/**
+ * Reading a received document.
+ *
+ * The RECOGNITION half — turning a PDF or a photograph into text — is not
+ * here and must not be: it needs pdf.js and tesseract.js, which are megabytes
+ * of browser infrastructure with no business meaning at all. That lives in
+ * `site/erp-ocr.js`, loads only when a capture screen is open, and hands its
+ * text to this surface.
+ *
+ * What is here is the INTERPRETATION half: which words on the page are the
+ * issuer, the tax id, the amounts; how confident each reading is; and — the
+ * part that matters — whether anything actually CHECKED each value. That is
+ * domain knowledge, it is tested against a jurisdiction that does not exist,
+ * and it stays in the capability.
+ *
+ * The Spanish profile is bound here because this bundle serves tenant #1. A
+ * second jurisdiction is a second binding, not a change to the capability.
+ */
+export function createExtraction(config?: { reviewThreshold?: number } | null) {
+  const ports = new PortRegistry();
+  ports.bind(EXTRACTION_PROFILE_PORT, ES_EXTRACTION_PROFILE, "pack/jurisdiction-es-es");
+  const svc = new ExtractionService({
+    ports,
+    config: extractionConfigSchema.parse(config ?? {}),
+  });
+
+  return {
+    /** Recognised text in, candidate fields with dots and provenance out. */
+    read(text: string | string[], assumeIssueDate?: string): ExtractionResult {
+      return svc.extract({ text, assumeIssueDate });
+    },
+    /**
+     * Re-run the checks over values a person has edited. The screen calls this
+     * on every correction so the dots and the arithmetic move together — and
+     * so a typed value is re-checked rather than merely believed.
+     */
+    recheck(
+      result: ExtractionResult,
+      corrections: Partial<Record<FieldKey, string | number | null>>,
+    ): ExtractionResult {
+      return svc.recheck(result, corrections);
+    },
+    /** The profile actually bound, for a screen that wants to say so. */
+    profile(): { id: string; version: string } {
+      return { id: ES_EXTRACTION_PROFILE.id, version: ES_EXTRACTION_PROFILE.version };
+    },
+  };
+}
+
+export type { ExtractedField, ExtractionResult, FieldKey, FieldVerdict };
+
 export function createDocs() {
   return {
     /** Fills in the defaults and pulls out-of-range values back into range. */
@@ -331,5 +396,9 @@ export type {
  *     derivation, the progress curve and the risk report.
  * 6 — `createReconciliation` (statement matching) and `createComms` (template
  *     rendering and rule planning) added.
+ * 7 — `createExtraction` added: the interpretation half of document capture,
+ *     with the Spanish profile bound. The recognition half (pdf.js /
+ *     tesseract.js) stays out of this bundle on purpose — see the note on
+ *     createExtraction.
  */
-export const SURFACE_VERSION = 6;
+export const SURFACE_VERSION = 7;

@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Jurisdiction pack es-ES: effective-dated Spanish VAT rules (incl. dwelling-renovation reduced rate), retention rules, invoice chaining, document labels.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./extraction": "./src/extraction/profile.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
