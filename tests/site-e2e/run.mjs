@@ -132,6 +132,20 @@ function attachConsole(page, errors) {
   page.on("pageerror", (e) => errors.push(String(e)));
 }
 
+/** Three v4 screens are merges of two built ones and carry a tab strip
+    (PRY-01, ADM-03, ADM-05). Navigating to the route lands on the first tab,
+    so a check that wants the other one has to ask for it — the same click a
+    person makes. */
+async function openTab(pg, route, tab) {
+  await pg.evaluate((r) => (location.hash = r), route);
+  await pg.waitForTimeout(400);
+  const btn = pg.locator(`.tabstrip [data-tab="${tab}"]`);
+  if ((await btn.count()) > 0) {
+    await btn.click();
+    await pg.waitForTimeout(500);
+  }
+}
+
 // ── The full journey: load the sample, walk every stage, generate docs, export.
 async function testJourney(browser, base) {
   const page = await browser.newPage({
@@ -342,10 +356,10 @@ async function testNoOverflow(browser, base) {
     "journey.html",
     "master-data.html",
     "financial-data.html",
-    "erp.html#torre",
-    "erp.html#clientes",
-    "erp.html#facturacion",
-    "erp.html#seguimiento",
+    "erp.html#tower",
+    "erp.html#customers",
+    "erp.html#invoicing",
+    "erp.html#progress",
   ];
   const page = await browser.newPage({
     viewport: { width: 390, height: 844 },
@@ -508,10 +522,10 @@ async function testDataTabs(browser, base) {
 //    history — Back has to leave, not bounce.
 async function testRetired(browser, base) {
   const cases = [
-    ["index.html", "erp.html#torre"],
-    ["dashboard.html", "erp.html#torre"],
-    ["clientes.html", "erp.html#clientes"],
-    ["frontend.html", "erp.html#presupuestos"],
+    ["index.html", "erp.html#tower"],
+    ["dashboard.html", "erp.html#tower"],
+    ["clientes.html", "erp.html#customers"],
+    ["frontend.html", "erp.html#quotes"],
   ];
   for (const [from, to] of cases) {
     const page = await browser.newPage();
@@ -538,33 +552,44 @@ async function testShell(browser, base) {
   const errs = [];
   attachConsole(pg, errs);
   try {
-    await pg.goto(`${base}/erp.html#torre`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(600);
 
     const sections = await pg.locator("#p1 .secitem").count();
     const subsOpen = await pg.locator("#p2.on").count();
-    if (sections === 7 && subsOpen === 0) ok("shell: 7 sections, subsection panel collapsed");
+    if (sections === 6 && subsOpen === 0) ok("shell: 6 sections, subsection panel collapsed");
     else bad("shell: sections + collapsed panel", `sections=${sections} open=${subsOpen}`);
 
+    // The specification's own count, asserted rather than assumed: six
+    // secciones and twenty-nine subsecciones. It is twenty-nine and not the
+    // doc's twenty-six because Comunicaciones, Alertas and Usuarios were moved
+    // into Configuración instead of being deleted.
+    const shape = await pg.evaluate(() => ({
+      sections: SECTIONS.length,
+      subs: SECTIONS.reduce((n, s) => n + s.subs.length, 0),
+    }));
+    if (shape.sections === 6 && shape.subs === 29) ok("shell: 6 secciones × 29 subsecciones");
+    else bad("shell: 6×29", JSON.stringify(shape));
+
     // Press a section → panel 2 opens with that section's subsections.
-    await pg.locator('#p1 .secitem[data-sec="comercial"]').click();
+    await pg.locator('#p1 .secitem[data-sec="sales"]').click();
     await pg.waitForTimeout(250);
     const subs = await pg.locator("#p2.on .navitem").count();
     if (subs === 4) ok("shell: section opens its subsection panel");
     else bad("shell: section opens panel", `subsections=${subs}`);
 
     // Choosing a subsection routes and collapses the panel again.
-    await pg.locator('#p2 .navitem[data-k="contratos"]').click();
+    await pg.locator('#p2 .navitem[data-k="contracts"]').click();
     await pg.waitForTimeout(350);
     const hash = await pg.evaluate(() => location.hash);
     const stillOpen = await pg.locator("#p2.on").count();
     const title = await pg.locator("#ttl").innerText();
-    if (hash === "#contratos" && stillOpen === 0 && /Contratos/i.test(title))
+    if (hash === "#contracts" && stillOpen === 0 && /Contratos/i.test(title))
       ok("shell: choosing a subsection routes and collapses the panel");
     else bad("shell: subsection routes", `hash=${hash} open=${stillOpen} title=${title}`);
 
     // Clicking outside closes it too.
-    await pg.locator('#p1 .secitem[data-sec="obra"]').click();
+    await pg.locator('#p1 .secitem[data-sec="projects"]').click();
     await pg.waitForTimeout(200);
     await pg.locator("#subscrim").click();
     await pg.waitForTimeout(250);
@@ -572,10 +597,10 @@ async function testShell(browser, base) {
     else bad("shell: outside click collapses", "still open");
 
     // Unbuilt subsections say what will live there instead of rendering blank.
-    // This used to probe `conciliacion`, which session 11 built; `reportes` is
-    // the last deliberate placeholder, and when it goes this check should be
-    // deleted rather than repointed at something that is merely unfinished.
-    await pg.evaluate(() => (location.hash = "reportes"));
+    // Reportes used to be the probe; it was removed outright (a menu entry with
+    // no screen behind it). `units` is a real not-yet-built subsección: the
+    // list exists but is hardcoded, so DMC-03 makes it maintainable in S3.
+    await pg.evaluate(() => (location.hash = "units"));
     await pg.waitForTimeout(300);
     const ph = await pg.locator("#view").innerText();
     if (/En preparación/.test(ph)) ok("shell: unbuilt subsection explains itself");
@@ -607,7 +632,7 @@ async function testShell(browser, base) {
     await pg.keyboard.press("Escape");
 
     // Contextual create: the menu follows the active section and opens a form.
-    await pg.evaluate(() => (location.hash = "proyectos"));
+    await pg.evaluate(() => (location.hash = "progress"));
     await pg.waitForTimeout(300);
     await pg.locator("#btnCreate").click();
     await pg.waitForTimeout(200);
@@ -622,7 +647,7 @@ async function testShell(browser, base) {
     await pg.locator("#dClose").click();
 
     // Period selector: switching to a month filters, and says how much it hides.
-    await pg.evaluate(() => (location.hash = "facturacion"));
+    await pg.evaluate(() => (location.hash = "invoicing"));
     await pg.waitForTimeout(300);
     const beforeRows = await pg.locator("#view tbody tr").count();
     await pg.selectOption("#periodMode", "month");
@@ -661,8 +686,9 @@ async function testGantt(browser, base) {
   attachConsole(pg, errs);
   const finishChip = () => pg.locator(".gtools .chip").first().innerText();
   try {
-    await pg.goto(`${base}/erp.html#seguimiento`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/erp.html#progress`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(800);
+    await openTab(pg, "progress", "_projectSchedule");
 
     // Empty plan → derive it from the project's accepted budget.
     if (await pg.locator("#gDerive").count()) {
@@ -755,8 +781,11 @@ async function testGantt(browser, base) {
     else bad("gantt: non-working day shifts the plan", `${finishIso} → ${finishIso2}`);
 
     // The plan lives in the state blob (schema v3), so it survives a reload.
+    // The chosen TAB deliberately does not — which tab you last looked at is
+    // not company data — so the schedule has to be reopened after the reload.
     await pg.reload({ waitUntil: "networkidle" });
     await pg.waitForTimeout(900);
+    await openTab(pg, "progress", "_projectSchedule");
     const barsAfter = await pg.locator("#gSvg .gbar").count();
     if (barsAfter === bars) ok("gantt: the plan persists across a reload");
     else bad("gantt: plan persists", `${bars} → ${barsAfter}`);
@@ -782,7 +811,7 @@ async function testBudgetBuilder(browser, base) {
   const errs = [];
   attachConsole(pg, errs);
   try {
-    await pg.goto(`${base}/erp.html#presupuestos`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(800);
 
     // Open the one budget that is still a draft — a frozen version is
@@ -934,7 +963,7 @@ async function testProjectTracking(browser, base) {
   const errs = [];
   attachConsole(pg, errs);
   try {
-    await pg.goto(`${base}/erp.html#seguimiento`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/erp.html#progress`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(900);
 
     // ---- the persistent selector and its fixed header ----
@@ -952,7 +981,7 @@ async function testProjectTracking(browser, base) {
     // The context must survive a change of subsection — that is what makes it
     // a section context rather than one screen's dropdown.
     const chosen = await pg.locator("#psel").inputValue();
-    await pg.evaluate(() => (location.hash = "economia"));
+    await pg.evaluate(() => (location.hash = "economics"));
     await pg.waitForTimeout(600);
     const stillChosen = await pg.locator("#psel").inputValue();
     if (stillChosen === chosen) ok("project context survives a subsection change");
@@ -998,8 +1027,7 @@ async function testProjectTracking(browser, base) {
     else bad("economics: both figures shown", adjusted.replace(/\n/g, " ").slice(0, 160));
 
     // ---- derive the plan from the budget ----
-    await pg.evaluate(() => (location.hash = "seguimiento"));
-    await pg.waitForTimeout(600);
+    await openTab(pg, "progress", "_projectSchedule");
     await pg.locator("#gDerive").click();
     await pg.waitForTimeout(900);
     const bars = await pg.locator("#gSvg .gbar").count();
@@ -1054,7 +1082,7 @@ async function testProjectTracking(browser, base) {
 
     // The economics must move with the progress just recorded — the two screens
     // are two views of one set of figures, not two sets.
-    await pg.evaluate(() => (location.hash = "economia"));
+    await pg.evaluate(() => (location.hash = "economics"));
     await pg.waitForTimeout(600);
     const after = await pg.locator("#view").innerText();
     if (/%/.test(after) && /Total/.test(after))
@@ -1083,7 +1111,7 @@ async function testProcurement(browser, base) {
   attachConsole(pg, errs);
   try {
     // ---- Compras: needs → new order → send → accept → receive ----
-    await pg.goto(`${base}/erp.html#compras`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/erp.html#purchasing`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(800);
     const needBtn = pg.locator("[data-need]").first();
     if ((await needBtn.count()) === 0) {
@@ -1128,68 +1156,23 @@ async function testProcurement(browser, base) {
       await pg.waitForTimeout(200);
     }
 
-    // ---- Subcontratos: create → doc block → renew → start → certify ----
+    // ---- Subcontratos: the screen is gone, the rules are not ----
+    // The v4 specification has no subcontract-management screen, so S1b removed
+    // it. Everything this block used to walk in a browser — send, accept, the
+    // documentation block on starting work, certification, retention — is now
+    // asserted directly against the engine in manageability-sim.mjs, which is
+    // where it survives the UI. What is checked HERE is only that the retired
+    // route lands somewhere honest rather than on a blank panel.
     await pg.evaluate(() => (location.hash = "subcontratos"));
-    await pg.waitForTimeout(700);
-    await pg.click("#sNew");
-    await pg.waitForTimeout(300);
-    await pg.selectOption("#s_sup", { index: 1 });
-    await pg.fill("#s_trade", "Fontanería E2E");
-    await pg.fill("#s_amt", "3000");
-    await pg.fill("#s_ret", "5");
-    await pg.click("#s_save");
     await pg.waitForTimeout(500);
-    await pg.locator("[data-sub]").first().click();
-    await pg.waitForTimeout(300);
-    await pg.click("#x_send");
-    await pg.waitForTimeout(300);
-    await pg.click("#x_accept");
-    await pg.waitForTimeout(300);
-
-    // Starting work is BLOCKED — not merely flagged — while the mandatory
-    // documentation is missing, per §4.2's own "bloqueo ... si está vencida".
-    const startBtn = pg.locator("#x_start");
-    if ((await startBtn.count()) > 0) {
-      await startBtn.click();
-      await pg.waitForTimeout(300);
-      const refusal = await pg.locator("#toast").innerText();
-      if (/^⚠/.test(refusal.trim()))
-        ok("subcontratos: entering the site is blocked without mandatory documentation");
-      else bad("subcontratos: doc block", refusal);
-    } else {
-      bad("subcontratos: start button available to test the doc block", "no #x_start");
-    }
-
-    const docInputs = pg.locator("[data-doc]");
-    const kinds = await docInputs.evaluateAll((els) => els.map((e) => e.dataset.doc));
-    for (const kind of kinds) {
-      await pg.fill(`[data-doc="${kind}"]`, "2027-01-01");
-      await pg.click(`[data-docsave="${kind}"]`);
-      await pg.waitForTimeout(300);
-    }
-    const docStatusAfter = await pg
-      .locator(".drawer .pill")
-      .nth(1)
-      .innerText()
-      .catch(() => "");
-    await pg.click("#x_start");
-    await pg.waitForTimeout(400);
-    const startedOk = (await pg.locator("#x_complete").count()) > 0;
-    if (startedOk) ok("subcontratos: renewing all three documents lifts the block");
-    else bad("subcontratos: doc renewal unblocks start", docStatusAfter);
-
-    await pg.fill("#x_cert", "1200");
-    await pg.click("#x_certsave");
-    await pg.waitForTimeout(400);
-    const certText = await pg.locator(".drawer").innerText();
-    if (/1.200,00/.test(certText) || /Certificado/i.test(certText))
-      ok("subcontratos: a certification is recorded and shown");
-    else bad("subcontratos: certification recorded", certText.slice(0, 150));
-    await pg.click("#dClose");
-    await pg.waitForTimeout(200);
+    const subHash = await pg.evaluate(() => location.hash);
+    const subText = await pg.locator("#view").innerText();
+    if (subHash === "#subcontractors" && /En preparación/.test(subText))
+      ok("subcontratos: the retired route redirects and explains where the data went");
+    else bad("subcontratos: retired route", `${subHash} · ${subText.slice(0, 70)}`);
 
     // ---- Modificaciones: detect → value → send → approve → adenda ----
-    await pg.evaluate(() => (location.hash = "modificaciones"));
+    await pg.evaluate(() => (location.hash = "variations"));
     await pg.waitForTimeout(700);
     const kpisBefore = await pg.locator("#view .kpi .val").allInnerTexts();
     await pg.click("#mNew");
@@ -1230,7 +1213,7 @@ async function testProcurement(browser, base) {
     await pg.waitForTimeout(200);
 
     // ---- Horas: assign → enter → approve locks → repeat day ----
-    await pg.evaluate(() => (location.hash = "horas"));
+    await pg.evaluate(() => (location.hash = "labour"));
     await pg.waitForTimeout(700);
     await pg.click("#hAssign");
     await pg.waitForTimeout(300);
@@ -1288,8 +1271,9 @@ async function testAdmin(browser, base) {
   });
   try {
     // ---- §5.3 Conciliación: suggestion + reasons → accept → transfers → close refuses
-    await pg.goto(`${base}/erp.html#conciliacion`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/erp.html#banking`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(900);
+    await openTab(pg, "banking", "_reconcile");
     const openBefore = await pg.locator(".movrow").count();
     if (openBefore > 0) ok(`conciliación: unreconciled statement lines are listed (${openBefore})`);
     else bad("conciliación: statement lines listed", "no .movrow");
@@ -1345,7 +1329,7 @@ async function testAdmin(browser, base) {
     else bad("conciliación: close refuses", closeMsg.slice(0, 120));
 
     // ---- §5.7 Comunicaciones: preview with real data, simulate, queue, approve
-    await pg.evaluate(() => (location.hash = "comunicaciones"));
+    await pg.evaluate(() => (location.hash = "messaging"));
     await pg.waitForTimeout(800);
     const preview = await pg
       .locator("#cm_preview")
@@ -1401,7 +1385,7 @@ async function testAdmin(browser, base) {
     else bad("comunicaciones: manual send record", "no [data-sent-msg]");
 
     // ---- §5.6 Gestoría: blocked send → justify each exception → send with recipient
-    await pg.evaluate(() => (location.hash = "gestoria"));
+    await pg.evaluate(() => (location.hash = "accountant"));
     await pg.waitForTimeout(800);
     const blocks = await pg.locator(".blk").count();
     if (blocks >= 7) ok(`gestoría: the package completeness blocks are shown (${blocks})`);
@@ -1431,9 +1415,10 @@ async function testAdmin(browser, base) {
       ok("gestoría: the send is recorded with its recipient and its justified exceptions");
     else bad("gestoría: send record", gesText.slice(-200));
 
-    // ---- §5.4 Banco keeps position and forecast, and hands allocation over
-    await pg.evaluate(() => (location.hash = "banco"));
-    await pg.waitForTimeout(700);
+    // ---- §5.4 Banco keeps position and forecast, and hands allocation over.
+    //      Both are tabs of ADM-05 now, so this asserts the ACCOUNTS tab still
+    //      has no allocation control on it — the point of the split.
+    await openTab(pg, "banking", "_bankAccounts");
     const bancoText = await pg.locator("#view").innerText();
     const stillHasInput = await pg.locator("#view input[data-mov]").count();
     if (stillHasInput === 0 && /Previsión de caja/.test(bancoText))
@@ -1441,9 +1426,11 @@ async function testAdmin(browser, base) {
     else bad("banco: allocation removed", `inputs=${stillHasInput}`);
     await pg.click("#bToRec");
     await pg.waitForTimeout(600);
-    if (/#conciliacion$/.test(pg.url()))
-      ok("banco: the screen hands over to Conciliación Bancaria explicitly");
-    else bad("banco: link to reconciliation", pg.url());
+    // The two are tabs of ADM-05 now, so handing over means selecting the
+    // sibling tab rather than navigating somewhere else.
+    const onRec = await pg.locator('.tabstrip [data-tab="_reconcile"].on').count();
+    if (onRec === 1) ok("banco: the screen hands over to Conciliación explicitly");
+    else bad("banco: link to reconciliation", `active tab not _reconcile (${pg.url()})`);
 
     if (errs.length === 0) ok("administración: no console errors");
     else bad("administración: no console errors", errs.slice(0, 3).join(" | "));
@@ -1474,49 +1461,68 @@ async function testControlTowerAndDay(browser, base) {
     else await d.accept("");
   });
   try {
-    await pg.goto(`${base}/erp.html#torre`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(900);
 
+    // TC-01: four indicators, no sparkline, no customiser. The doc is explicit
+    // that adding one means removing another, so the COUNT is the check.
     const cardCount = await pg.locator(".tcard").count();
-    if (cardCount === 8) ok("torre: the eight spec cards render (§2.1)");
-    else bad("torre: eight cards", `found ${cardCount}`);
+    if (cardCount === 4) ok("torre: exactly the four spec indicators (TC-01)");
+    else bad("torre: four cards", `found ${cardCount}`);
 
     const sparkCount = await pg.locator(".tcard svg.spark").count();
-    if (sparkCount >= 6) ok(`torre: cards carry a 12-period sparkline (${sparkCount}/8)`);
-    else bad("torre: sparklines render", `only ${sparkCount}`);
+    if (sparkCount === 0) ok("torre: no sparklines — the figure survived, the trend did not");
+    else bad("torre: sparklines removed", `${sparkCount} still drawn`);
 
-    // The alerts panel manages, it doesn't just display: assign, snooze,
-    // resolve-with-note, and convert-to-task each mutate real state.
+    // "El Torre lee toda la cadena y no escribe nada": at most five alert rows,
+    // and not one control that changes an alert.
+    const alertRows = await pg.locator(".alrow").count();
+    if (alertRows <= 5) ok(`torre: at most five alert rows (${alertRows})`);
+    else bad("torre: five alerts max", `${alertRows} rows`);
+
+    const writeControls = await pg
+      .locator(
+        "[data-assign], [data-snooze], [data-resolve], [data-totask], #aRules, #tCustomize, #tExportCsv",
+      )
+      .count();
+    if (writeControls === 0) ok("torre: read-only — no panel opens from it");
+    else bad("torre: read-only", `${writeControls} write controls still present`);
+
+    // Everything one DOES about an alert moved to Configuración › Alertas.
+    await pg.evaluate(() => (location.hash = "alerts"));
+    await pg.waitForTimeout(700);
+    // DMC-07 manages, it doesn't just display: assign, snooze,
+    // resolve-with-note and convert-to-task each mutate real state.
     const openBefore = await pg.locator(".alrow").count();
     await pg.locator("[data-assign]").first().click();
     await pg.waitForTimeout(500);
     if (/Alerta asignada/.test(await pg.locator("#toast").innerText()))
-      ok("torre: an alert can be assigned to someone");
-    else bad("torre: assign alert", await pg.locator("#toast").innerText());
+      ok("alertas: an alert can be assigned to someone");
+    else bad("alertas: assign alert", await pg.locator("#toast").innerText());
 
     await pg.locator("[data-snooze]").first().click();
     await pg.waitForTimeout(500);
     const afterSnooze = await pg.locator(".alrow").count();
     if (afterSnooze === openBefore - 1)
-      ok("torre: snoozing an alert removes it from the open list until its date");
-    else bad("torre: snooze alert", `${openBefore} → ${afterSnooze}`);
+      ok("alertas: snoozing an alert removes it from the open list until its date");
+    else bad("alertas: snooze alert", `${openBefore} → ${afterSnooze}`);
 
     const resolveTarget = pg.locator("[data-resolve]").first();
     await resolveTarget.click();
     await pg.waitForTimeout(500);
     const afterResolve = await pg.locator(".alrow").count();
     if (afterResolve === afterSnooze - 1)
-      ok("torre: resolving an alert with a note clears it from the open list");
-    else bad("torre: resolve alert", `${afterSnooze} → ${afterResolve}`);
+      ok("alertas: resolving an alert with a note clears it from the open list");
+    else bad("alertas: resolve alert", `${afterSnooze} → ${afterResolve}`);
 
     const totaskBtn = pg.locator("[data-totask]:not([disabled])").first();
     if ((await totaskBtn.count()) > 0) {
       await totaskBtn.click();
       await pg.waitForTimeout(500);
       if (/Convertida en tarea/.test(await pg.locator("#toast").innerText()))
-        ok("torre: an alert can be converted into a real task");
-      else bad("torre: convert alert to task", await pg.locator("#toast").innerText());
-    } else bad("torre: convert alert to task", "no enabled [data-totask] button");
+        ok("alertas: an alert can be converted into a real task");
+      else bad("alertas: convert alert to task", await pg.locator("#toast").innerText());
+    } else bad("alertas: convert alert to task", "no enabled [data-totask] button");
 
     // Grouping switches between "por tipo" and "por proyecto" (DAS-06).
     await pg.click('[data-grp="project"]');
@@ -1528,8 +1534,8 @@ async function testControlTowerAndDay(browser, base) {
     // .algroup is CSS text-transform:uppercase, so the rendered text is
     // "ECONÓMICA" etc. regardless of the source casing — match case-insensitively.
     if (byType.some((t) => /econ[oó]mica|t[eé]cnica|documental/i.test(t)) && byProject.length > 0)
-      ok("torre: alerts group by type and by project");
-    else bad("torre: alert grouping", `type=${byType.join(",")} project=${byProject.join(",")}`);
+      ok("alertas: alerts group by type and by project");
+    else bad("alertas: alert grouping", `type=${byType.join(",")} project=${byProject.join(",")}`);
 
     // The rule editor: a threshold change actually persists (DAS-06 "el
     // propietario define condición, umbral, destinatario y canal").
@@ -1540,57 +1546,22 @@ async function testControlTowerAndDay(browser, base) {
     await thInput.dispatchEvent("change");
     await pg.waitForTimeout(400);
     if (/Umbral actualizado/.test(await pg.locator("#toast").innerText()))
-      ok("torre: an alert rule's threshold can be edited and is saved");
-    else bad("torre: rule threshold edit", await pg.locator("#toast").innerText());
+      ok("alertas: an alert rule's threshold can be edited and is saved");
+    else bad("alertas: rule threshold edit", await pg.locator("#toast").innerText());
     await pg.click("#dClose");
     await pg.waitForTimeout(300);
 
-    // Card visibility/order is a real, persisted preference.
-    await pg.click("#tCustomize");
-    await pg.waitForTimeout(400);
-    await pg.locator("[data-vis]").first().click();
-    await pg.waitForTimeout(400);
-    await pg.click("#dClose");
-    await pg.waitForTimeout(400);
-    const afterHide = await pg.locator(".tcard").count();
-    if (afterHide === 7) ok("torre: hiding a card from the customiser removes it from the grid");
-    else bad("torre: card visibility", `expected 7, got ${afterHide}`);
+    // Mi Día was removed with the Torre extras: it was the only person-level
+    // view, and the doc has no slot for it. Assert it is really gone rather
+    // than leaving a check that silently stopped testing anything.
+    const miDia = await pg.evaluate(() => !!SUBMAP.hoy);
+    if (!miDia) ok("mi día: removed from the menu, and #hoy redirects");
+    else bad("mi día: removed", "SUBMAP still has a `hoy` entry");
 
-    // ---- Mi Día: the hitos calendar (§2.2) ----
-    await pg.evaluate(() => (location.hash = "hoy"));
-    await pg.waitForTimeout(800);
-    const cellCount = await pg.locator(".calcell").count();
-    if (cellCount === 42) ok("mi día: the monthly calendar renders a full six-week grid");
-    else bad("mi día: calendar grid", `${cellCount} cells`);
-
-    const evCount = await pg.locator(".ev").count();
-    if (evCount > 0) ok(`mi día: real milestones are plotted on the calendar (${evCount})`);
-    else bad("mi día: milestones plotted", "no .ev found");
-
-    const monthBefore = await pg.locator(".calhead b").innerText();
-    await pg.click("#miNext");
-    await pg.waitForTimeout(400);
-    const monthAfter = await pg.locator(".calhead b").innerText();
-    await pg.click("#miToday");
-    await pg.waitForTimeout(400);
-    if (monthAfter !== monthBefore) ok("mi día: month navigation moves the calendar forward");
-    else bad("mi día: month navigation", `${monthBefore} → ${monthAfter}`);
-
-    const legendCount = await pg.locator("[data-legend]").count();
-    if (legendCount > 0) {
-      const before = await pg.locator(".ev").count();
-      await pg.locator("[data-legend]").first().click();
-      await pg.waitForTimeout(400);
-      const after = await pg.locator(".ev").count();
-      if (after < before)
-        ok(`mi día: the legend filters milestones by kind (${before} → ${after})`);
-      else bad("mi día: legend filter", `${before} → ${after}`);
-    } else bad("mi día: legend present", "no [data-legend] entries");
-
-    if (errs.length === 0) ok("torre/mi día: no console errors");
-    else bad("torre/mi día: no console errors", errs.slice(0, 3).join(" | "));
+    if (errs.length === 0) ok("torre/alertas: no console errors");
+    else bad("torre/alertas: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
-    bad("torre de control / mi día", String(e).slice(0, 220));
+    bad("torre de control / alertas", String(e).slice(0, 220));
   } finally {
     await pg.close();
   }
@@ -1612,7 +1583,7 @@ async function testJourneyRealMode(browser, base) {
     // Visit erp.html first so this browser context's IndexedDB has real
     // tenant data before journey.html asks for it — real mode reads the
     // SAME "caneiERP" database, not a fixture of its own.
-    await pg.goto(`${base}/erp.html#torre`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(900);
 
     await pg.goto(`${base}/journey.html`, { waitUntil: "networkidle" });
@@ -1713,15 +1684,15 @@ async function testErp(browser, base) {
   const eerr = [];
   attachConsole(pg, eerr);
   try {
-    await pg.goto(`${base}/erp.html#torre`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(700);
     const kpiText = await pg.locator("#view").innerText();
-    if (/€/.test(kpiText) && /Alertas/.test(kpiText))
+    if (/€/.test(kpiText) && /Necesita atención/.test(kpiText))
       ok("erp: Control Tower indicators + alerts render");
     else bad("erp: Control Tower renders", kpiText.slice(0, 80));
 
     // module navigation (DAS-01): presupuestos shows versioned budgets
-    await pg.evaluate(() => (location.hash = "presupuestos"));
+    await pg.evaluate(() => (location.hash = "quotes"));
     await pg.waitForTimeout(400);
     const preText = await pg.locator("#view").innerText();
     if (/PRE-2026/.test(preText) && /versiones/i.test(preText))
@@ -1732,8 +1703,7 @@ async function testErp(browser, base) {
     // 11 moved the gesture off Banco and into Conciliación — casar el
     // movimiento y repartirlo son el mismo acto — so the requirement is
     // asserted where it now lives, not where it used to.
-    await pg.evaluate(() => (location.hash = "conciliacion"));
-    await pg.waitForTimeout(600);
+    await openTab(pg, "banking", "_reconcile");
     const inp = pg.locator("#rcProj");
     if ((await inp.count()) > 0) {
       await inp.fill("P-2026-0001");
@@ -1751,7 +1721,7 @@ async function testErp(browser, base) {
     }
 
     // MDM: every party field is correctable from the UI (edit drawer → updateParty)
-    await pg.evaluate(() => (location.hash = "clientes"));
+    await pg.evaluate(() => (location.hash = "customers"));
     await pg.waitForTimeout(400);
     await pg.locator("tr.click").first().click();
     await pg.waitForTimeout(250);
@@ -1774,7 +1744,7 @@ async function testErp(browser, base) {
 
     // Clientes: the list pages at 10 by default, the size selector changes it,
     // and "Siguiente" actually moves to different clients.
-    await pg.evaluate(() => (location.hash = "clientes"));
+    await pg.evaluate(() => (location.hash = "customers"));
     await pg.waitForTimeout(350);
     const pageOne = await pg.locator("tbody tr.click").count();
     const firstCode = await pg.locator("tbody tr.click").first().innerText();
@@ -1812,7 +1782,7 @@ async function testErp(browser, base) {
       bad("erp: clientes export", `${menuTxt.replace(/\n/g, " ")} · ${JSON.stringify(zipMagic)}`);
 
     // Gestoría: exception list + VAT summary render
-    await pg.evaluate(() => (location.hash = "gestoria"));
+    await pg.evaluate(() => (location.hash = "accountant"));
     await pg.waitForTimeout(400);
     const gesText = await pg.locator("#view").innerText();
     if (/excepciones/i.test(gesText) && /IVA/.test(gesText))
@@ -1834,7 +1804,7 @@ async function testI18n(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   try {
     // The workspace is the entry screen now, so the toggle is exercised there.
-    await pg.goto(`${base}/erp.html#torre`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(600);
     const pill = await pg.locator("#canei-lang-pill button").count();
     if (pill === 2) ok("i18n: language toggle present on the workspace");

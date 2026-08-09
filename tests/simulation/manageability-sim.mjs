@@ -463,6 +463,89 @@ assert(
   assert(reused, "an INACTIVE tax-id holder does not block re-registration");
 }
 
+// -----------------------------------------------------------------------------
+// Subcontracts: the lifecycle, kept alive after its screens were retired.
+//
+// The v4 specification has no subcontract-management screen, so S1b removed the
+// UI — but the DATA and the rules stay (operator decision), and the browser
+// checks that used to walk that screen were the only thing exercising them.
+// Deleting those checks with the screen would have quietly un-covered 69 engine
+// references, so the coverage moves down a layer instead of disappearing: same
+// guarantees, asserted where they actually live.
+// -----------------------------------------------------------------------------
+{
+  const sub = erp.addSubcontract(
+    prj.id,
+    { supplierId: supIrpf.id, trade: "Fontanería", awardedCents: 300000, retentionPct: 5 },
+    "bo",
+  );
+  assert(
+    sub.status === "draft" && sub.number.startsWith("SUB-"),
+    "a subcontract is numbered and starts as a draft",
+  );
+
+  throws(
+    () => erp.certifySubcontract(sub.id, { amountCents: 1000 }, "bo"),
+    "certifying before acceptance is refused",
+  );
+
+  erp.sendSubcontract(sub.id, "bo");
+  erp.acceptSubcontract(sub.id, { plannedStart: "2026-03-10" }, "bo");
+  assert(
+    erp.state.subcontracts.find((s) => s.id === sub.id).status === "accepted",
+    "send then accept moves it to accepted",
+  );
+
+  // The rule worth keeping most: work cannot START while mandatory
+  // documentation is missing or expired. Blocked, not merely flagged.
+  assert(
+    erp.subcontractDocStatus(sub).worst === "r",
+    "a new subcontract has no documentation, so its worst status is red",
+  );
+  throws(
+    () => erp.markSubcontractStarted(sub.id, "bo"),
+    "starting on site is BLOCKED while mandatory documentation is missing",
+  );
+
+  for (const { kind } of erp.subcontractDocStatus(sub).items)
+    erp.renewSubcontractDoc(sub.id, { kind, expiresOn: "2027-01-01", docRef: "doc.pdf" }, "bo");
+  assert(
+    erp.subcontractDocStatus(erp.state.subcontracts.find((s) => s.id === sub.id)).worst === "g",
+    "filing every document in date turns the status green",
+  );
+
+  erp.markSubcontractStarted(sub.id, "bo");
+  assert(
+    erp.state.subcontracts.find((s) => s.id === sub.id).status === "inExecution",
+    "with the documentation in order, work can start",
+  );
+
+  // An expired document must re-block a subcontract that already started —
+  // otherwise the check is a one-off at the gate rather than a standing rule.
+  const first = erp.subcontractDocStatus(sub).items[0].kind;
+  erp.renewSubcontractDoc(
+    sub.id,
+    { kind: first, expiresOn: "2026-01-01", docRef: "old.pdf" },
+    "bo",
+  );
+  assert(
+    erp.subcontractDocStatus(erp.state.subcontracts.find((s) => s.id === sub.id)).worst === "r",
+    "a document that lapses turns the subcontract red again",
+  );
+  erp.renewSubcontractDoc(
+    sub.id,
+    { kind: first, expiresOn: "2027-01-01", docRef: "new.pdf" },
+    "bo",
+  );
+
+  erp.certifySubcontract(sub.id, { amountCents: 100000, note: "primera certificación" }, "bo");
+  const certified = erp.state.subcontracts.find((s) => s.id === sub.id);
+  assert(
+    certified.certifications.length === 1 && certified.certifications[0].amountCents === 100000,
+    "executed work is valued as a certification against the award",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);
