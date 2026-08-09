@@ -387,6 +387,40 @@
         return s;
       },
     },
+    {
+      to: 11,
+      name: "catalogue: chapter tree, brand/model/quality (S3, DMC-01)",
+      /*
+       * A separate step rather than more keys inside v10, because v10 had
+       * already been written to blobs by the time DMC-01 needed these. A blob
+       * stamped 10 never re-runs 10, so anything appended to it afterwards
+       * would silently never reach the documents that most needed it — which
+       * is the exact failure the ladder exists to prevent.
+       *
+       *   lists.itemChapters       added — DMC-01's chapter tree, seeded from
+       *                            the engine's defaults. Its ARRAY ORDER is
+       *                            the display order, which is what makes the
+       *                            tree draggable without a second sort field
+       *                            that could disagree with it.
+       *   catalogue[].brand        added, empty. Empty is the truth: nobody
+       *   catalogue[].model        recorded a brand for these, and inventing
+       *   catalogue[].quality      one would put a claim in a document that
+       *                            is used to settle arguments on site.
+       */
+      up: function (s) {
+        if (!s.lists || typeof s.lists !== "object" || Array.isArray(s.lists)) s.lists = {};
+        if (!Array.isArray(s.lists.itemChapters)) {
+          var seed = listSeed();
+          s.lists.itemChapters = seed.itemChapters || [];
+        }
+        (Array.isArray(s.catalogue) ? s.catalogue : []).forEach(function (i) {
+          if (typeof i.brand !== "string") i.brand = "";
+          if (typeof i.model !== "string") i.model = "";
+          if (typeof i.quality !== "string") i.quality = "";
+        });
+        return s;
+      },
+    },
   ];
 
   /**

@@ -1721,6 +1721,120 @@ async function testControlTowerAndDay(browser, base) {
       ok("DMC-05: payment terms are listed and maintainable");
     else bad("DMC-05", payText.replace(/\n/g, " ").slice(0, 140));
 
+    // ---- DMC-01: the partidas catalogue, finally inside the shell ---------
+    // It used to be a link out to master-data.html, which held a MOCK dataset
+    // never wired to the engine — so the real catalogue had no interface at
+    // all. What is asserted is that this screen reads the engine's own
+    // catalogue, not that a page renders.
+    await pg.evaluate(() => (location.hash = "items"));
+    await pg.waitForTimeout(450);
+    const catState = await pg.evaluate(() => ({
+      hash: location.hash,
+      branches: document.querySelectorAll(".catbr[data-chap]").length,
+      rows: document.querySelectorAll("tr.click[data-item]").length,
+      engineItems: erp.state.catalogue.filter((i) => i.active !== false).length,
+    }));
+    if (
+      catState.hash === "#items" &&
+      catState.branches > 1 &&
+      catState.rows === catState.engineItems
+    )
+      ok(`DMC-01: the catalogue renders in the shell from the engine (${catState.rows} partidas)`);
+    else bad("DMC-01 catalogue", JSON.stringify(catState));
+
+    // The tree filters the table, and the branch counts are real.
+    const firstChapter = await pg.evaluate(() => {
+      const withItems = erp
+        .listAll("itemChapters")
+        .find((c) => erp.state.catalogue.some((i) => i.chapter === c.code && i.active !== false));
+      return withItems ? withItems.code : null;
+    });
+    if (firstChapter) {
+      await pg.locator(`.catbr[data-chap="${firstChapter}"]`).click();
+      await pg.waitForTimeout(350);
+      const filtered = await pg.evaluate((c) => {
+        const shown = document.querySelectorAll("tr.click[data-item]").length;
+        const expect = erp.state.catalogue.filter(
+          (i) => i.chapter === c && i.active !== false,
+        ).length;
+        return { shown, expect };
+      }, firstChapter);
+      if (filtered.shown === filtered.expect && filtered.shown > 0)
+        ok("DMC-01: choosing a chapter in the tree filters the partidas table");
+      else bad("DMC-01 tree filter", JSON.stringify(filtered));
+    } else {
+      bad("DMC-01 tree filter", "no seeded chapter carries any partida");
+    }
+
+    // Chapter order is the array order, so a reorder is a real state change
+    // the presupuesto will follow — not a cosmetic sort on this screen.
+    const reordered = await pg.evaluate(() => {
+      const before = erp.listAll("itemChapters").map((c) => c.code);
+      erp.moveListEntry("itemChapters", before[0], 2, "e2e");
+      const after = erp.listAll("itemChapters").map((c) => c.code);
+      return {
+        before: before.slice(0, 3),
+        after: after.slice(0, 3),
+        moved: after[2] === before[0],
+      };
+    });
+    if (reordered.moved) ok("DMC-01: chapters reorder, and the order lives in the document");
+    else bad("DMC-01 reorder", JSON.stringify(reordered));
+
+    // brand/model/quality are the doc's DMC-01 columns and must round-trip.
+    await pg.evaluate(() => (location.hash = "items"));
+    await pg.waitForTimeout(400);
+    await pg.locator("#catNew").click();
+    await pg.waitForTimeout(300);
+    const catCode = "E2E-" + String(Date.now()).slice(-5);
+    await pg.locator("#ci_code").fill(catCode);
+    await pg.locator("#ci_desc").fill("Partida de prueba");
+    await pg.locator("#ci_brand").fill("MarcaX");
+    await pg.locator("#ci_model").fill("ModeloY");
+    await pg.locator("#ci_qual").fill("alta");
+    await pg.locator("#ci_cost").fill("12.50");
+    await pg.locator("#ci_save").click();
+    await pg.waitForTimeout(400);
+    const made = await pg.evaluate((c) => {
+      const i = erp.state.catalogue.find((x) => x.code === c);
+      return i
+        ? {
+            brand: i.brand,
+            model: i.model,
+            quality: i.quality,
+            cost: i.defaultCostCents,
+            price: i.defaultPriceCents,
+          }
+        : null;
+    }, catCode);
+    if (
+      made &&
+      made.brand === "MarcaX" &&
+      made.model === "ModeloY" &&
+      made.quality === "alta" &&
+      made.cost === 1250
+    )
+      ok("DMC-01: brand, model and quality capture and persist");
+    else bad("DMC-01 brand/model/quality", JSON.stringify(made));
+
+    // A blank reference price stays blank. Zero would mean "we quote this for
+    // nothing", which is a different and untrue statement.
+    // The new partida was created with no chapter, so clear the tree filter
+    // still set from the check above before looking for its row.
+    await pg.locator('.catbr[data-chap=""]').click();
+    await pg.waitForTimeout(350);
+    if (made && made.price === 0) {
+      const priceCell = await pg.evaluate((c) => {
+        const tr = [...document.querySelectorAll("tr.click[data-item]")].find((r) =>
+          r.textContent.includes(c),
+        );
+        return tr ? tr.textContent : "";
+      }, catCode);
+      if (/sin precio/i.test(priceCell))
+        ok("DMC-01: a partida with no reference price reads «sin precio», not 0,00 €");
+      else bad("DMC-01 blank price", priceCell.slice(0, 120));
+    }
+
     // ---- DMC-02: the comparison strip, and the rule it exists to protect ----
     await pg.evaluate(() => (location.hash = "price-list"));
     await pg.waitForTimeout(450);

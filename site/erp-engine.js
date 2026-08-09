@@ -284,6 +284,22 @@
       { code: "noResponse", es: "Sin respuesta", ca: "Sense resposta" },
       { code: "withdrew", es: "Desistió", ca: "Va desistir" },
     ],
+    // DMC-01. The catalogue's chapter tree, and the reason it is a LIST and
+    // not a derived set of the distinct values on items: a tree the owner can
+    // drag into order needs somewhere to keep that order, and a chapter with
+    // nothing in it yet still has to be visible or it can never be filled.
+    itemChapters: [
+      { code: "DEM", es: "Demoliciones", ca: "Enderrocs" },
+      { code: "ALB", es: "Albañilería", ca: "Paleteria" },
+      { code: "FON", es: "Fontanería", ca: "Lampisteria" },
+      { code: "ELE", es: "Electricidad", ca: "Electricitat" },
+      { code: "CLI", es: "Climatización", ca: "Climatització" },
+      { code: "REV", es: "Revestimientos", ca: "Revestiments" },
+      { code: "CAR", es: "Carpintería", ca: "Fusteria" },
+      { code: "PIN", es: "Pintura", ca: "Pintura" },
+      { code: "SAN", es: "Sanitarios y grifería", ca: "Sanitaris i aixetes" },
+      { code: "VAR", es: "Varios", ca: "Diversos" },
+    ],
     // MDM-07 / PAY-01.
     paymentMethods: [
       { code: "cash", es: "Efectivo", ca: "Efectiu" },
@@ -598,9 +614,25 @@
       this._log(user, active ? "activateListEntry" : "deactivateListEntry", kind + "/" + code);
       return hit;
     }
+    /**
+     * Move an entry within its list. The array order IS the display order,
+     * which is what makes DMC-01's chapter tree draggable without a second
+     * "sortIndex" field that could disagree with it.
+     */
+    moveListEntry(kind, code, toIndex, user) {
+      const rows = this.listAll(kind);
+      const from = rows.findIndex((e) => e.code === code);
+      if (from < 0) throw new Error("No such entry in " + kind + ": " + code);
+      const to = Math.max(0, Math.min(rows.length - 1, toIndex));
+      if (to === from) return rows;
+      rows.splice(to, 0, rows.splice(from, 1)[0]);
+      this._log(user, "moveListEntry", kind + "/" + code + "→" + to);
+      return rows;
+    }
     /** How many stored records still carry this code — shown before retiring one. */
     listEntryUsage(kind, code) {
       const S = this.state;
+      if (kind === "itemChapters") return S.catalogue.filter((i) => i.chapter === code).length;
       if (kind === "leadSources")
         return (
           S.parties.filter((p) => p.leadSource === code).length +
@@ -1036,12 +1068,30 @@
           imageRefs: [],
           defaultCostCents: 0,
           defaultPriceCents: 0,
+          // DMC-01. What the customer is actually getting: the same "punto de
+          // agua" at two qualities is two different jobs and two different
+          // prices, and an argument on site months later is settled by what
+          // the presupuesto said the brand and model were.
+          brand: "",
+          model: "",
+          quality: "",
         },
         it,
       );
       this.state.catalogue.push(rec);
       this._log(user, "addCatalogueItem", rec.code);
       return rec;
+    }
+    /** DMC-01's edit path. `code` is excluded: budget lines store it. */
+    updateCatalogueItem(id, patch, user) {
+      const it = this.state.catalogue.find((x) => x.id === id);
+      if (!it) throw new Error("Catalogue item not found");
+      const clean = Object.assign({}, patch);
+      delete clean.id;
+      delete clean.code;
+      Object.assign(it, clean);
+      this._log(user, "updateCatalogueItem", it.code);
+      return it;
     }
     addWorkPackage(wp, user) {
       // CAT-04: yield, min purchase, container size
