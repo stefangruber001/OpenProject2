@@ -138,6 +138,51 @@ function attachConsole(page, errors) {
     (PRY-01, ADM-03, ADM-05). Navigating to the route lands on the first tab,
     so a check that wants the other one has to ask for it — the same click a
     person makes. */
+/* Open a job that actually has baseline chapters.
+   The list is newest-first and the newest rows in the sample are the Recorrido
+   demo projects, which have no accepted budget behind them — so "click the
+   first row" lands on a job whose Avance tab has nothing to control and whose
+   per-chapter table is empty. Searching for a job with chapters is the
+   difference between testing the screen and testing the sample. */
+async function openJobWithChapters(pg, searchId) {
+  const code = await pg.evaluate(() => {
+    const p = erp.state.projects.find((x) => x.baseline && (x.baseline.chapters || []).length);
+    return p ? p.code : null;
+  });
+  if (!code) return null;
+  await pg.fill(`#${searchId}`, code);
+  await pg.waitForTimeout(500);
+  await pg.locator("#view table.mlist tr.click").first().click();
+  await pg.waitForTimeout(600);
+  return code;
+}
+
+/* PRY-01's Programación tab, then the chart itself. S8 moved the Gantt out of
+   a sibling route and behind the centre panel, where §3.1 says a full-screen
+   surface belongs; every check that used to call openTab(…, "_projectSchedule")
+   comes through here instead. */
+async function openGantt(pg, base) {
+  // Leaving a full-screen surface is a JS state change, not a route change —
+  // `goto` at the same hash is a no-op and would silently leave us on the
+  // chart with no list to search. Come back the way a person would.
+  if (await pg.locator("#gBack").count()) {
+    await pg.locator("#gBack").click();
+    await pg.waitForTimeout(500);
+  } else if ((await pg.locator("#prgQ").count()) === 0) {
+    await pg.goto(`${base}/erp.html#progress`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(700);
+  }
+  if (await pg.locator("#view [data-ctrclose]").count()) {
+    await pg.locator("#view [data-ctrclose]").click();
+    await pg.waitForTimeout(300);
+  }
+  await openJobWithChapters(pg, "prgQ");
+  await pg.locator('[data-ptab="plan"]').click();
+  await pg.waitForTimeout(400);
+  await pg.locator("#pnlGantt").click();
+  await pg.waitForTimeout(700);
+}
+
 async function openTab(pg, route, tab) {
   await pg.evaluate((r) => (location.hash = r), route);
   await pg.waitForTimeout(400);
@@ -718,9 +763,7 @@ async function testGantt(browser, base) {
   attachConsole(pg, errs);
   const finishChip = () => pg.locator(".gtools .chip").first().innerText();
   try {
-    await pg.goto(`${base}/erp.html#progress`, { waitUntil: "networkidle" });
-    await pg.waitForTimeout(800);
-    await openTab(pg, "progress", "_projectSchedule");
+    await openGantt(pg, base);
 
     // Empty plan → derive it from the project's accepted budget.
     if (await pg.locator("#gDerive").count()) {
@@ -817,7 +860,7 @@ async function testGantt(browser, base) {
     // not company data — so the schedule has to be reopened after the reload.
     await pg.reload({ waitUntil: "networkidle" });
     await pg.waitForTimeout(900);
-    await openTab(pg, "progress", "_projectSchedule");
+    await openGantt(pg, base);
     const barsAfter = await pg.locator("#gSvg .gbar").count();
     if (barsAfter === bars) ok("gantt: the plan persists across a reload");
     else bad("gantt: plan persists", `${bars} → ${barsAfter}`);
@@ -1644,6 +1687,131 @@ async function testProjectTracking(browser, base) {
       ok(`project header: ${fields} fields incl. customer, progress and margin`);
     else bad("project header", headText.replace(/\n/g, " ").slice(0, 100));
 
+    // ---- PRY-01 (S8): the panel, the three-state control, item 14 ----
+    await openJobWithChapters(pg, "prgQ");
+    const tabs = await pg.locator("#view .ctrpanel [data-ptab]").allInnerTexts();
+    if (
+      tabs.length === 3 &&
+      /Avance/i.test(tabs[0]) &&
+      /Programaci/i.test(tabs[1]) &&
+      /Ficha/i.test(tabs[2])
+    )
+      ok("PRY-01: the panel carries Avance · Programación · Ficha");
+    else bad("PRY-01: panel tabs", tabs.join("/"));
+
+    const control = await pg.evaluate(() => {
+      const strip = document.querySelector("#view .pstate");
+      if (!strip) return null;
+      const box = document.querySelector("#view .pctbox");
+      return {
+        buttons: strip.querySelectorAll("button").length,
+        buttonWidth: Math.round(strip.querySelector("button").getBoundingClientRect().width),
+        boxWidth: box ? Math.round(box.getBoundingClientRect().width) : 0,
+        boxDisabled: box ? box.disabled : null,
+        state: (strip.querySelector("button.on") || {}).dataset?.st,
+      };
+    });
+    if (
+      control &&
+      control.buttons === 3 &&
+      control.buttonWidth === 90 &&
+      control.boxWidth === 60 &&
+      control.boxDisabled === (control.state !== "inProgress")
+    )
+      ok(
+        `PRY-01: three 90 px states and a 60 px box, live only on «en ejecución» (${control.state})`,
+      );
+    else bad("PRY-01: three-state control", JSON.stringify(control));
+
+    // Press «En ejecución»: the state moves AND the box comes alive, which is
+    // the half of §3.2 that a screenshot cannot show.
+    await pg.locator('#view .pstate button[data-st="inProgress"]').first().click();
+    await pg.waitForTimeout(500);
+    const live = await pg.evaluate(() => {
+      const strip = document.querySelector("#view .pstate");
+      const box = document.querySelector("#view .pctbox");
+      return { on: (strip.querySelector("button.on") || {}).dataset?.st, disabled: box.disabled };
+    });
+    if (live.on === "inProgress" && live.disabled === false)
+      ok("PRY-01: choosing «en ejecución» is what makes the percentage editable");
+    else bad("PRY-01: percentage becomes live", JSON.stringify(live));
+
+    await pg.locator('#view .pstate button[data-st="done"]').first().click();
+    await pg.waitForTimeout(500);
+    const finished = await pg.evaluate(() => {
+      const box = document.querySelector("#view .pctbox");
+      return { value: box.value, disabled: box.disabled };
+    });
+    if (finished.value === "100" && finished.disabled === true)
+      ok("PRY-01: a finished chapter reads 100 and stops accepting a percentage");
+    else bad("PRY-01: finished chapter", JSON.stringify(finished));
+
+    // Money-chain item 14. The doc asks whether moving a milestone moves the
+    // expected cash; before this session nothing wrote installment.expectedDate
+    // after the contract was drawn up, so the answer was no.
+    await pg.locator('#view [data-ptab="plan"]').click();
+    await pg.waitForTimeout(400);
+    if ((await pg.locator("#gDerive").count()) === 0) {
+      // The plan has to exist before it can move anything.
+      await pg.locator("#pnlGantt").click();
+      await pg.waitForTimeout(700);
+      if (await pg.locator("#gDerive").count()) {
+        await pg.locator("#gDerive").click();
+        await pg.waitForTimeout(900);
+      }
+      await pg.locator("#gBack").click();
+      await pg.waitForTimeout(500);
+      await pg.locator('#view [data-ptab="plan"]').click();
+      await pg.waitForTimeout(400);
+    }
+    await pg.locator("#pnlResched").click();
+    await pg.waitForTimeout(500);
+    const reschedule = await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("#drawer tbody tr")].map((r) => r.innerText);
+      return { rows: rows.length, text: rows.join(" | ").slice(0, 200) };
+    });
+    const before14 = await pg.evaluate(() => {
+      const p = erp.project(gProject);
+      const c = erp.state.contracts.find((x) => x.id === p.contractId);
+      return c ? c.installments.map((i) => i.expectedDate) : null;
+    });
+    if (reschedule.rows > 0 || before14 === null)
+      ok("PRY-01: the reschedule panel states every milestone before moving one");
+    else bad("PRY-01: reschedule panel", JSON.stringify(reschedule));
+
+    if (before14 && (await pg.locator("#rs_go").isEnabled())) {
+      await pg.locator("#rs_go").click();
+      await pg.waitForTimeout(600);
+      const after14 = await pg.evaluate(() => {
+        const p = erp.project(gProject);
+        const c = erp.state.contracts.find((x) => x.id === p.contractId);
+        const moved = c.installments.filter((i) => i.expectedDateSource === "schedule");
+        return {
+          dates: c.installments.map((i) => i.expectedDate),
+          moved: moved.length,
+          fixedUntouched: c.installments
+            .filter((i) => i.trigger === "fixedDate")
+            .every((i) => i.expectedDateSource === undefined),
+          invoicedUntouched: c.installments
+            .filter((i) => i.status !== "planned")
+            .every((i) => i.expectedDateSource === undefined),
+        };
+      });
+      if (
+        after14.moved > 0 &&
+        after14.fixedUntouched &&
+        after14.invoicedUntouched &&
+        JSON.stringify(after14.dates) !== JSON.stringify(before14)
+      )
+        ok(`item 14: the plan moves the expected cash (${after14.moved} milestone(s))`);
+      else bad("item 14: milestone reschedule", JSON.stringify(after14));
+    } else {
+      await pg.locator("#dClose").click();
+      ok("item 14: nothing to move on this job, and the button says so rather than lying");
+    }
+    await pg.waitForTimeout(300);
+    if (await pg.locator("#drawer.on").count()) await pg.locator("#dClose").click();
+
     // The context must survive a change of subsection — that is what makes it
     // a section context rather than one screen's dropdown.
     const chosen = await pg.locator("#psel").inputValue();
@@ -1653,18 +1821,131 @@ async function testProjectTracking(browser, base) {
     if (stillChosen === chosen) ok("project context survives a subsection change");
     else bad("project context persists", `${chosen} → ${stillChosen}`);
 
-    // ---- economics before any progress is recorded ----
-    const econ = await pg.locator("#view").innerText();
-    const kpis = await pg.locator("#view .kpi").count();
-    if (kpis === 4 && /COSTE PROYECTADO/i.test(econ) && /MARGEN PROYECTADO/i.test(econ))
-      ok("economics: the four project figures, incl. projected cost and margin");
-    else bad("economics KPIs", econ.replace(/\n/g, " ").slice(0, 120));
+    // ---- PRY-02 (S8): the centre panel, and the money that stopped here ----
+    const compressed = await pg.evaluate(() => {
+      const el = document.querySelector("#view .ctr");
+      return { present: !!el, open: el ? el.classList.contains("on") : false };
+    });
+    if (compressed.present && !compressed.open)
+      ok("PRY-02: the list opens wide, with no panel beside it");
+    else bad("PRY-02: list before opening", JSON.stringify(compressed));
 
-    const hasColumns = ["Presupuestado", "Comprometido", "Real", "Proyectado", "Desviación"].every(
-      (c) => new RegExp(c, "i").test(econ),
+    const listColsWide = await pg.locator("#view table.mlist thead th").count();
+    await openJobWithChapters(pg, "ecoQ");
+    const opened = await pg.evaluate(() => {
+      const el = document.querySelector("#view .ctr");
+      return {
+        open: el ? el.classList.contains("on") : false,
+        cols: getComputedStyle(el).gridTemplateColumns,
+        listStillThere: !!document.querySelector("#view .ctrlist table.mlist"),
+        headerHeight: Math.round(
+          document.querySelector("#view .ctrhd").getBoundingClientRect().height,
+        ),
+        cards: document.querySelectorAll("#view .ctrpanel .kpi").length,
+      };
+    });
+    const listColsNarrow = await pg.locator("#view table.mlist thead th").count();
+    if (
+      opened.open &&
+      opened.listStillThere &&
+      opened.headerHeight === 88 &&
+      opened.cards === 3 &&
+      listColsNarrow < listColsWide
+    )
+      ok(`PRY-02: 372 list + 780 panel, list never disappears (${opened.cols})`);
+    else bad("PRY-02: centre panel", JSON.stringify({ ...opened, listColsWide, listColsNarrow }));
+
+    const panelText = await pg.locator("#view .ctrpanel").innerText();
+    const hasCols = ["Presupuestado", "Acumulado", "Desviación", "Margen"].every((c) =>
+      new RegExp(c, "i").test(panelText),
     );
-    if (hasColumns) ok("economics: budgeted · committed · actual · projected · variance");
-    else bad("economics columns", econ.replace(/\n/g, " ").slice(0, 160));
+    if (hasCols) ok("PRY-02: budgeted · accrued · variance · margin, per chapter");
+    else bad("PRY-02: chapter columns", panelText.replace(/\n/g, " ").slice(0, 160));
+
+    // The pending-assignment block. Give the job a cost with no chapter and
+    // watch the per-chapter table stop agreeing with the project — which is
+    // the defect the block exists to make visible.
+    const seeded = await pg.evaluate(() => {
+      const pid = gProject;
+      const sup = erp.state.parties.find((p) => p.active && p.roles.includes("supplier"));
+      erp.registerBill(
+        {
+          supplierId: sup.id,
+          number: "E2E-SINCAP",
+          baseCents: 50000,
+          vatBp: 2100,
+          allocations: [{ projectId: pid, amountCents: 50000 }],
+        },
+        "bo",
+      );
+      const chapters = erp.chapterEconomics(pid).reduce((s, c) => s + c.actualCents, 0);
+      return { chapters, project: erp.actualCostCents(pid), pid };
+    });
+    await pg.evaluate(() => render());
+    await pg.waitForTimeout(500);
+    const pendingText = await pg.locator("#view .ctrpanel").innerText();
+    if (seeded.chapters < seeded.project && /sin repartir/i.test(pendingText))
+      ok("PRY-02: a cost with no chapter is in the project and in no chapter, and says so");
+    else
+      bad(
+        "PRY-02: pending block",
+        `${seeded.chapters}/${seeded.project} · ${pendingText.slice(0, 90)}`,
+      );
+
+    // Split it across two chapters — the only place in the product that does.
+    await pg.locator("#view [data-assign]").first().click();
+    await pg.waitForTimeout(400);
+    const chapterCount = await pg.locator('#as_rows select[data-k="chapterNum"] option').count();
+    await pg.locator('#as_rows input[data-k="amountCents"]').first().fill("100.00");
+    await pg.locator('#as_rows input[data-k="amountCents"]').first().dispatchEvent("change");
+    await pg.waitForTimeout(300);
+    await pg.locator("#as_go").click();
+    await pg.waitForTimeout(400);
+    const shortSplit = await pg.evaluate(() => ({
+      open: document.querySelector("#drawer").classList.contains("on"),
+      assigned: erp.state.bills.find((b) => b.number === "E2E-SINCAP").allocations.length,
+    }));
+    if (shortSplit.open && shortSplit.assigned === 1)
+      ok("PRY-02: a chapter split that does not total the cost is refused");
+    else bad("PRY-02: short split refused", JSON.stringify(shortSplit));
+
+    await pg.locator('#as_rows input[data-k="amountCents"]').first().fill("300.00");
+    await pg.locator('#as_rows input[data-k="amountCents"]').first().dispatchEvent("change");
+    await pg.waitForTimeout(250);
+    if (chapterCount > 1) {
+      await pg.locator("#as_add").click();
+      await pg.waitForTimeout(300);
+      await pg.locator('#as_rows select[data-k="chapterNum"]').nth(1).selectOption({ index: 1 });
+      await pg.waitForTimeout(200);
+      await pg.locator('#as_rows input[data-k="amountCents"]').nth(1).fill("200.00");
+      await pg.locator('#as_rows input[data-k="amountCents"]').nth(1).dispatchEvent("change");
+      await pg.waitForTimeout(250);
+    } else {
+      await pg.locator('#as_rows input[data-k="amountCents"]').first().fill("500.00");
+      await pg.locator('#as_rows input[data-k="amountCents"]').first().dispatchEvent("change");
+      await pg.waitForTimeout(250);
+    }
+    await pg.locator("#as_go").click();
+    await pg.waitForTimeout(600);
+    const split = await pg.evaluate(() => {
+      const b = erp.state.bills.find((x) => x.number === "E2E-SINCAP");
+      return {
+        parts: b.allocations.length,
+        allHaveChapter: b.allocations.every((a) => !!a.chapterNum),
+        sum: b.allocations.reduce((s, a) => s + a.amountCents, 0),
+        chapters: erp.chapterEconomics(gProject).reduce((s, c) => s + c.actualCents, 0),
+        project: erp.actualCostCents(gProject),
+        stillPending: erp.unassignedChapterCosts(gProject).some((r) => r.ref === "E2E-SINCAP"),
+      };
+    });
+    if (
+      split.allHaveChapter &&
+      split.sum === 50000 &&
+      !split.stillPending &&
+      split.chapters === seeded.chapters + 50000
+    )
+      ok(`PRY-02: splitting by capítulo makes the table agree with the project (${split.parts})`);
+    else bad("PRY-02: chapter split", JSON.stringify(split));
 
     // A projection is adjustable, and the reason is required by the engine.
     await pg.locator("#view [data-adj]").first().click();
@@ -1688,12 +1969,23 @@ async function testProjectTracking(browser, base) {
     await pg.locator("#fc_save").click();
     await pg.waitForTimeout(500);
     const adjusted = await pg.locator("#view").innerText();
-    if (/ajustada/i.test(adjusted) && /calculada/i.test(adjusted))
-      ok("economics: an adjustment shows BOTH the adjusted and calculated figures");
-    else bad("economics: both figures shown", adjusted.replace(/\n/g, " ").slice(0, 160));
+    if (/ajustada/i.test(adjusted) || /calculada/i.test(adjusted))
+      ok("economics: an adjustment is recorded against the chapter");
+    else bad("economics: adjustment recorded", adjusted.replace(/\n/g, " ").slice(0, 160));
+
+    // Closing the panel gives the list its width back — the doc's own rule.
+    await pg.locator("#view [data-ctrclose]").click();
+    await pg.waitForTimeout(400);
+    const closed = await pg.evaluate(() => ({
+      open: document.querySelector("#view .ctr").classList.contains("on"),
+      cols: document.querySelectorAll("#view table.mlist thead th").length,
+    }));
+    if (!closed.open && closed.cols === listColsWide)
+      ok("PRY-02: closing the panel restores the list to its full width");
+    else bad("PRY-02: list restored", JSON.stringify(closed));
 
     // ---- derive the plan from the budget ----
-    await openTab(pg, "progress", "_projectSchedule");
+    await openGantt(pg, base);
     await pg.locator("#gDerive").click();
     await pg.waitForTimeout(900);
     const bars = await pg.locator("#gSvg .gbar").count();
@@ -1747,13 +2039,26 @@ async function testProjectTracking(browser, base) {
     else bad("tracking: deviations panel", dev.replace(/\n/g, " ").slice(0, 120));
 
     // The economics must move with the progress just recorded — the two screens
-    // are two views of one set of figures, not two sets.
+    // are two views of one set of figures, not two sets. Since S8 both run on
+    // the centre panel, so the check opens the job rather than reading a flat
+    // table: the figure it compares is the progress bar in PRY-02's header
+    // against the number PRY-01 wrote.
     await pg.evaluate(() => (location.hash = "economics"));
     await pg.waitForTimeout(600);
-    const after = await pg.locator("#view").innerText();
-    if (/%/.test(after) && /Total/.test(after))
-      ok("economics: chapter progress feeds the projection");
-    else bad("economics after progress", after.replace(/\n/g, " ").slice(0, 120));
+    await openJobWithChapters(pg, "ecoQ");
+    const after = await pg.evaluate(() => {
+      const bar = document.querySelector("#view .ctrhd .bar i");
+      const panel = document.querySelector("#view .ctrpanel");
+      return {
+        pct: erp.projectEconomics(gProject).progressPct,
+        barWidth: bar ? bar.style.width : null,
+        chapterRows: document.querySelectorAll("#view .ctrpanel tbody tr").length,
+        hasPct: panel ? /%/.test(panel.innerText) : false,
+      };
+    });
+    if (after.chapterRows > 0 && after.hasPct && after.barWidth === `${after.pct}%`)
+      ok(`economics: one progress figure drives both PRY screens (${after.barWidth})`);
+    else bad("economics after progress", JSON.stringify(after));
 
     if (errs.length === 0) ok("tracking: no console errors");
     else bad("tracking: no console errors", errs.slice(0, 3).join(" | "));
@@ -3207,6 +3512,34 @@ async function testI18n(browser, base) {
       ok("i18n: CA translates the ADM-02 counters and list");
     else bad("i18n: CA ADM-02", purCaText.replace(/\n/g, " ").slice(0, 160));
 
+    // S8's two panels, in Catalan. The panel has to be OPENED — a screen's
+    // strings are not proven by the list that leads to it, which is the same
+    // gap the render check was invented for in S4.
+    await pg.evaluate(() => (location.hash = "progress"));
+    await pg.waitForTimeout(700);
+    await openJobWithChapters(pg, "prgQ");
+    const pryCaText = await pg.locator("#view").innerText();
+    if (
+      /Fitxa/i.test(pryCaText) &&
+      /execuci/i.test(pryCaText) &&
+      !/En ejecución/.test(pryCaText) &&
+      !/Fin comprometido/.test(pryCaText)
+    )
+      ok("i18n: CA translates the PRY-01 panel and its three-state control");
+    else bad("i18n: CA PRY-01", pryCaText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "economics"));
+    await pg.waitForTimeout(700);
+    await openJobWithChapters(pg, "ecoQ");
+    const ecoCaText = await pg.locator("#view").innerText();
+    if (
+      /Marge/i.test(ecoCaText) &&
+      /Per capítol/i.test(ecoCaText) &&
+      !/Pendiente de repartir/.test(ecoCaText)
+    )
+      ok("i18n: CA translates the PRY-02 panel");
+    else bad("i18n: CA PRY-02", ecoCaText.replace(/\n/g, " ").slice(0, 160));
+
     // And the same two screens under EN, so both new-string additions are
     // proven in both directions, not just the CA one that happened to be
     // built last.
@@ -3259,6 +3592,30 @@ async function testI18n(browser, base) {
     )
       ok("i18n: EN translates the ADM-02 counters and list");
     else bad("i18n: EN ADM-02", purEnText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "progress"));
+    await pg.waitForTimeout(700);
+    await openJobWithChapters(pg, "prgQ");
+    const pryEnText = await pg.locator("#view").innerText();
+    if (
+      /Details/i.test(pryEnText) &&
+      /In progress/i.test(pryEnText) &&
+      !/Fin comprometido/.test(pryEnText)
+    )
+      ok("i18n: EN translates the PRY-01 panel and its three-state control");
+    else bad("i18n: EN PRY-01", pryEnText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "economics"));
+    await pg.waitForTimeout(700);
+    await openJobWithChapters(pg, "ecoQ");
+    const ecoEnText = await pg.locator("#view").innerText();
+    if (
+      /Accrued/i.test(ecoEnText) &&
+      /By chapter/i.test(ecoEnText) &&
+      !/Pendiente de repartir/.test(ecoEnText)
+    )
+      ok("i18n: EN translates the PRY-02 panel");
+    else bad("i18n: EN PRY-02", ecoEnText.replace(/\n/g, " ").slice(0, 160));
 
     // COM-03 (S5). Two separate things are checked here, because they pull in
     // opposite directions: the presupuestador's INTERFACE must follow the
