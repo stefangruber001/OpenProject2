@@ -81,7 +81,7 @@ const ca = D.ca || {};
  *
  * Lower it whenever you translate a batch; the check tells you the new value.
  */
-const CA_BACKLOG = 1304;
+const CA_BACKLOG = 1303;
 
 const problems = [];
 const note = (kind, detail) => problems.push({ kind, detail });

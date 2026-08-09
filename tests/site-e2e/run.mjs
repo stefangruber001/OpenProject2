@@ -75,6 +75,7 @@ async function main() {
     await testCapture(browser, base);
     await testProjectTracking(browser, base);
     await testInvoicing(browser, base);
+    await testBankAndCash(browser, base);
     await testContract(browser, base);
     await testProcurement(browser, base);
     await testAdmin(browser, base);
@@ -146,6 +147,20 @@ function attachConsole(page, errors) {
    first row" lands on a job whose Avance tab has nothing to control and whose
    per-chapter table is empty. Searching for a job with chapters is the
    difference between testing the screen and testing the sample. */
+/* Wait for the shell to have BOOTED, rather than for a fixed number of
+   milliseconds.
+
+   Three intermittent reds in this programme — "sections=0", "0 budgets" and a
+   third in S11 — were all the same thing: a check that measured the page a
+   fixed number of milliseconds after `goto` and happened to measure it before
+   boot() had rendered, on a machine busy doing something else. A fixed sleep
+   is a guess about somebody else's CPU; a selector is a fact. The tell was
+   always the same — the very next assertion, over the same page, passed. */
+async function bootedShell(pg) {
+  await pg.waitForSelector("#p1 .secitem", { timeout: 15000 });
+  await pg.waitForTimeout(200);
+}
+
 async function openJobWithChapters(pg, searchId) {
   const code = await pg.evaluate(() => {
     const p = erp.state.projects.find((x) => x.baseline && (x.baseline.chapters || []).length);
@@ -631,7 +646,7 @@ async function testShell(browser, base) {
   attachConsole(pg, errs);
   try {
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
-    await pg.waitForTimeout(600);
+    await bootedShell(pg);
 
     const sections = await pg.locator("#p1 .secitem").count();
     const subsOpen = await pg.locator("#p2.on").count();
@@ -679,7 +694,9 @@ async function testShell(browser, base) {
     // (removed outright), `units` (DMC-03, S3), `visits` (COM-02, S4).
     // `petty-cash` is the current real not-yet-built subsección — ADM-06,
     // scheduled for S11.
-    await pg.evaluate(() => (location.hash = "petty-cash"));
+    // The probe moves as screens get built. `petty-cash` was it until S11
+    // built ADM-06; `cash-flow` (ADM-08, S12) is the last one left.
+    await pg.evaluate(() => (location.hash = "cash-flow"));
     await pg.waitForTimeout(300);
     const ph = await pg.locator("#view").innerText();
     if (/En preparación/.test(ph)) ok("shell: unbuilt subsection explains itself");
@@ -889,7 +906,8 @@ async function testBudgetBuilder(browser, base) {
   attachConsole(pg, errs);
   try {
     await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
-    await pg.waitForTimeout(800);
+    await bootedShell(pg);
+    await pg.waitForSelector("#view table", { timeout: 15000 });
 
     // Open the one budget that is still a draft — a frozen version is
     // deliberately read-only, so editing has to be tried on an editable one.
@@ -2071,6 +2089,127 @@ async function testProjectTracking(browser, base) {
   }
 }
 
+// ── ADM-05 Consolidación bancaria and ADM-06 Caja chica (§3.2), plus gap 13 —
+//    the last structural break in the money chain, closed in S11.
+async function testBankAndCash(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    // ---- ADM-06: the simplest screen, and the count that proves it ----
+    await pg.goto(`${base}/erp.html#petty-cash`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(500);
+
+    const shape = await pg.evaluate(() => ({
+      strip: !!document.querySelector("#view .queuebar"),
+      inBtn: !!document.querySelector("#cashIn"),
+      outBtn: !!document.querySelector("#cashOut"),
+      close: document.querySelector("#cashClose")
+        ? document.querySelector("#cashClose").textContent
+        : null,
+    }));
+    if (shape.strip && shape.inBtn && shape.outBtn && shape.close)
+      ok("ADM-06: entrada/salida, the balance strip and the arqueo at the foot");
+    else bad("ADM-06: screen shape", JSON.stringify(shape));
+
+    // The arqueo has to agree with the account balance, or one is decoration.
+    const agrees = await pg.evaluate(() => {
+      const cc = erp.cashCount(cashAcc);
+      return cc.closingCents === erp.accountBalanceCents(cashAcc);
+    });
+    if (agrees) ok("ADM-06: the count agrees with the account balance");
+    else bad("ADM-06: count vs balance", "they disagree");
+
+    // A payment out with no receipt is counted, never hidden.
+    const before = await pg.evaluate(() => erp.cashCount(cashAcc).awaitingDoc);
+    await pg.locator("#cashOut").click();
+    await pg.waitForTimeout(400);
+    await pg.fill("#ca_c", "Ferretería E2E");
+    await pg.fill("#ca_a", "12.50");
+    await pg.locator("#ca_go").click();
+    await pg.waitForTimeout(600);
+    const after = await pg.evaluate(() => {
+      const cc = erp.cashCount(cashAcc);
+      return {
+        awaiting: cc.awaitingDoc,
+        closing: cc.closingCents,
+        bal: erp.accountBalanceCents(cashAcc),
+      };
+    });
+    if (after.awaiting === before + 1 && after.closing === after.bal)
+      ok(`ADM-06: a cash payment with no receipt is counted (${before} → ${after.awaiting})`);
+    else bad("ADM-06: undocumented cash", JSON.stringify({ before, ...after }));
+
+    // ---- ADM-05: classification edited in the row ----
+    await pg.goto(`${base}/erp.html#banking`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(600);
+    const inline = await pg.evaluate(() => ({
+      classSelects: document.querySelectorAll("[data-bkclass]").length,
+      destSelects: document.querySelectorAll("[data-bkdest]").length,
+      amberRows: document.querySelectorAll("#view tr.xrow.unapproved").length,
+      openMovements: erp.state.movements.filter(
+        (m) => m.status === "unallocated" && inPeriod(m.accountingDate),
+      ).length,
+    }));
+    if (inline.classSelects > 0 && inline.classSelects === inline.destSelects)
+      ok(`ADM-05: class and destination are edited in the row (${inline.classSelects} rows)`);
+    else bad("ADM-05: inline editing", JSON.stringify(inline));
+    if (inline.amberRows === inline.openMovements)
+      ok(`ADM-05: every unmatched movement carries the amber bar (${inline.amberRows})`);
+    else bad("ADM-05: amber on unmatched", JSON.stringify(inline));
+
+    // Classifying one in the row really writes it.
+    const target = await pg.evaluate(() => {
+      const el = document.querySelector("[data-bkclass]");
+      return el ? el.dataset.bkclass : null;
+    });
+    if (target) {
+      await pg.selectOption(`[data-bkclass="${target}"]`, "overhead");
+      await pg.waitForTimeout(600);
+      const cls = await pg.evaluate(
+        (id) => (erp.state.movements.find((m) => m.id === id) || {}).class,
+        target,
+      );
+      if (cls === "overhead") ok("ADM-05: choosing a class in the row writes it straight away");
+      else bad("ADM-05: inline class writes", String(cls));
+    }
+
+    // ---- Gap 13: a cost that lands on an account, not a project ----
+    const gap13 = await pg.evaluate(() => {
+      const led = erp.accountLedger();
+      return {
+        rows: led.rows.length,
+        unassigned: led.unassignedCents,
+        resolvesOverhead: erp.resolveAccountCode({ overheadCategory: "insurance" }),
+        resolvesJob: erp.resolveAccountCode({
+          projectId: erp.state.projects[0].id,
+          kind: "subcontract",
+        }),
+        everyAllocHasCode: erp.state.bills
+          .flatMap((b) => b.allocations)
+          .every((a) => !!a.accountCode || (!a.projectId && !a.overheadCategory)),
+      };
+    });
+    if (
+      gap13.rows > 0 &&
+      gap13.resolvesOverhead === "625" &&
+      gap13.resolvesJob === "601" &&
+      gap13.everyAllocHasCode
+    )
+      ok(`gap 13: every allocated cost names its account, and rolls up (${gap13.rows} accounts)`);
+    else bad("gap 13: accountCode", JSON.stringify(gap13));
+
+    if (errs.length === 0) ok("ADM-05/06: no console errors");
+    else bad("ADM-05/06: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("bank and cash", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
 // ── ADM-01 Facturación (§3.2) — four counters over the register, and the one
 //    row treatment the doc is explicit about: days overdue red FROM DAY ONE.
 async function testInvoicing(browser, base) {
@@ -2773,11 +2912,16 @@ async function testAdmin(browser, base) {
     //      Both are tabs of ADM-05 now, so this asserts the ACCOUNTS tab still
     //      has no allocation control on it — the point of the split.
     await openTab(pg, "banking", "_bankAccounts");
-    const bancoText = await pg.locator("#view").innerText();
-    const stillHasInput = await pg.locator("#view input[data-mov]").count();
-    if (stillHasInput === 0 && /Previsión de caja/.test(bancoText))
-      ok("banco: allocation moved out to Conciliación; position and forecast stay");
-    else bad("banco: allocation removed", `inputs=${stillHasInput}`);
+    // Session 11 moved allocation OUT of this screen; S11 of the v4 programme
+    // brings it back deliberately, because §3.2 asks for classification and
+    // assignment edited in the row. What must not come back is the old
+    // free-text allocation input divorced from a document — the selects here
+    // write through the same `splitMovement` Conciliación does.
+    const oldInputs = await pg.locator("#view input[data-mov]").count();
+    const rowSelects = await pg.locator("#view [data-bkdest]").count();
+    if (oldInputs === 0 && rowSelects > 0)
+      ok(`ADM-05: assignment is a row control, not a free-text field (${rowSelects} rows)`);
+    else bad("banco: row assignment", `old=${oldInputs} selects=${rowSelects}`);
     await pg.click("#bToRec");
     await pg.waitForTimeout(600);
     // The two are tabs of ADM-05 now, so handing over means selecting the
@@ -3885,6 +4029,13 @@ async function testI18n(browser, base) {
       ok("i18n: CA translates the PRY-03 counters and rows");
     else bad("i18n: CA PRY-03", chgCaText.replace(/\n/g, " ").slice(0, 160));
 
+    await pg.evaluate(() => (location.hash = "petty-cash"));
+    await pg.waitForTimeout(700);
+    const cashCaText = await pg.locator("#view").innerText();
+    if (/a caixa|Entrades|Sortides/i.test(cashCaText) && !/Saldo final\nSaldo/.test(cashCaText))
+      ok("i18n: CA translates the ADM-06 cash screen");
+    else bad("i18n: CA ADM-06", cashCaText.replace(/\n/g, " ").slice(0, 160));
+
     await pg.evaluate(() => (location.hash = "invoicing"));
     await pg.waitForTimeout(700);
     const invCaText = await pg.locator("#view").innerText();
@@ -4013,6 +4164,13 @@ async function testI18n(browser, base) {
     )
       ok("i18n: EN translates the PRY-03 counters and rows");
     else bad("i18n: EN PRY-03", chgEnText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "petty-cash"));
+    await pg.waitForTimeout(700);
+    const cashEnText = await pg.locator("#view").innerText();
+    if (/in the till|Cash in|Cash out/i.test(cashEnText) && !/Saldo final/.test(cashEnText))
+      ok("i18n: EN translates the ADM-06 cash screen");
+    else bad("i18n: EN ADM-06", cashEnText.replace(/\n/g, " ").slice(0, 160));
 
     await pg.evaluate(() => (location.hash = "invoicing"));
     await pg.waitForTimeout(700);

@@ -1453,6 +1453,136 @@ assert(
   );
 }
 
+/* ---- S11 · gap 13, and the cash box ------------------------------------
+   §6's money chain has carried one ✗ since S0: a cost can reach an ACCOUNT
+   rather than a project, and no field carried it. These are the checks that
+   say it does now. */
+{
+  const accounts = erp.listAll("accounts");
+  assert(accounts.length > 0, "the chart of accounts is a maintainable list, not a constant");
+  assert(
+    accounts.every((a) => a.code && a.es && a.ca),
+    "every account has a code and a name in both languages",
+  );
+  // Every overhead category the engine accepts must resolve to an account, or
+  // rule 07 has a hole exactly where the doc says it must not.
+  const cats = erp
+    .listAll("accounts")
+    .filter((a) => a.overhead)
+    .map((a) => a.overhead);
+  assert(
+    [
+      "rent",
+      "vehicles",
+      "fuel",
+      "insurance",
+      "office",
+      "accountingFirm",
+      "marketing",
+      "financial",
+      "taxes",
+      "fixedAsset",
+      "renting",
+      "otherOverhead",
+    ].every((c) => cats.includes(c)),
+    "every overhead category resolves to an account — rule 07 has no hole",
+    cats.join(","),
+  );
+
+  assert(
+    erp.resolveAccountCode({ overheadCategory: "insurance" }) === "625",
+    "an overhead allocation resolves to its account",
+    erp.resolveAccountCode({ overheadCategory: "insurance" }),
+  );
+  assert(
+    erp.resolveAccountCode({ projectId: prj.id, kind: "subcontract" }) === "601",
+    "a job cost resolves by its cost kind",
+  );
+  assert(
+    erp.resolveAccountCode({ projectId: prj.id, kind: "material", accountCode: "999" }) === "999",
+    "an explicit code always wins — somebody who typed one has looked at the invoice",
+  );
+  assert(
+    erp.resolveAccountCode({ amountCents: 1 }) === null,
+    "an allocation that names nothing resolves to nothing, rather than to a guess",
+  );
+
+  const billG13 = erp.registerBill(
+    {
+      supplierId: sup.id,
+      number: "G13-1",
+      baseCents: 12000,
+      vatBp: 2100,
+      allocations: [{ overheadCategory: "insurance", amountCents: 12000 }],
+    },
+    "bo",
+  );
+  assert(
+    erp.state.bills.find((b) => b.id === billG13.id).allocations[0].accountCode === "625",
+    "registerBill files the account at the moment the cost arrives",
+  );
+  const led = erp.accountLedger();
+  assert(
+    led.rows.some((r) => r.code === "625"),
+    "accountLedger rolls costs up by account — the report gap 13 existed to make possible",
+  );
+  assert(
+    led.totalCents + led.unassignedCents > 0 && led.unassignedCents >= 0,
+    "…and reports what it could not place rather than dropping it",
+    JSON.stringify({ t: led.totalCents, u: led.unassignedCents }),
+  );
+
+  // ADM-06. Cash goes through the EXISTING recordCashMovement (BNK-07) —
+  // this session briefly added a second one and the class silently kept the
+  // old, which is why `cashCount` is the only new method here.
+  const till = erp.addBankAccount({ name: "Caja S11", kind: "till", openingCents: 20000 });
+  erp.recordCashMovement(
+    till.id,
+    { accountingDate: erp.today, concept: "Ferretería", amountCents: -4500 },
+    "ops",
+  );
+  erp.recordCashMovement(
+    till.id,
+    {
+      accountingDate: erp.today,
+      concept: "Reposición",
+      amountCents: 10000,
+      supportingDocRef: "r-1",
+    },
+    "ops",
+  );
+  const cc = erp.cashCount(till.id);
+  assert(
+    cc.openingCents === 20000 && cc.inCents === 10000 && cc.outCents === 4500,
+    "cashCount separates what came in from what went out",
+    JSON.stringify(cc),
+  );
+  assert(
+    cc.closingCents === cc.openingCents + cc.inCents - cc.outCents,
+    "…and the closing figure is COMPUTED, because a stored one is a number nobody counted",
+  );
+  // The arqueo has to agree with the balance, or one of them is decoration.
+  assert(
+    cc.closingCents === erp.accountBalanceCents(till.id),
+    "…and it agrees with the account balance, which is the point of counting",
+    `${cc.closingCents} vs ${erp.accountBalanceCents(till.id)}`,
+  );
+  assert(
+    cc.awaitingDoc === 1,
+    "…and a cash payment with no receipt is counted, never hidden (BNK-07)",
+    String(cc.awaitingDoc),
+  );
+  // An unbounded count starts at the opening balance. Writing the window as
+  // `!from || …` folded the whole history into the opening figure and still
+  // balanced, which is exactly what made it worth a check.
+  const bounded = erp.cashCount(till.id, erp.today, erp.today);
+  assert(
+    bounded.openingCents === 20000 && bounded.count === 2,
+    "a bounded count opens where the unbounded one does when nothing precedes it",
+    JSON.stringify(bounded),
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);
