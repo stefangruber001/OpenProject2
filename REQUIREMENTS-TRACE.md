@@ -229,7 +229,7 @@ BRD's own §11 phasing (justification given per item). MISSING: none remain.
 | NFR-15 | PLANNED     | BRD §11: offline-first sync deferred; IndexedDB persistence covers offline reads today. No compression/retention handling; photos are string refs only — real file storage management needs infrastructure this build lacks |
 | NFR-16 | PARTIAL     | Data-driven engine scales in design, but single JSON blob in IndexedDB with full recompute per render limits years of history                                                                                               |
 | NFR-17 | PARTIAL     | master-data.html edits catalogue, series, VAT codes, price lists, templates — but on a separate dataset not wired to the ERP engine; no clause-block UI                                                                     |
-| NFR-18 | PARTIAL     | GDPR consent flags (clientes.html/master-data.html), deactivateParty (MDM-12), export; no retention policy or data-subject request workflow                                                                                 |
+| NFR-18 | PARTIAL     | GDPR consent flags (master-data.html; clientes.html retired into erp.html#clientes), deactivateParty (MDM-12), export; no retention policy or data-subject request workflow                                                 |
 | NFR-19 | IMPLEMENTED | Recurring vs build cost statement documented in REQUIREMENTS-TRACE.md §Cost of ownership                                                                                                                                    |
 
 ## ORG
