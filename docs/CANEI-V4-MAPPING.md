@@ -111,14 +111,40 @@ Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, resh
 | DMC-05 | Formas de Pago           | hardcoded `LISTS.paymentMethods`                                     | **BUILD** — make maintainable                                                            |
 | DMC-06 | Comunicaciones _(added)_ | `#comunicaciones` — templates, rules, queue                          | **RE-HOME** to Configuración (plan decision 18) — three tabs: Plantillas · Reglas · Cola |
 
-**Removed** (plan decision 1, operator-reviewed): **Reportes** (a placeholder — no screen exists
-behind it) · **subcontract screens** (UI only; all 69 engine references stay, decision 5) ·
-**Torre extras** (8 cards → 4, sparklines, reorder/hide, CSV) · **Mi Día** (the only person-level
-view; Torre is company-level).
+**Removed — done in S1b** (plan decision 1, operator-reviewed): **Reportes** (a placeholder — no
+screen existed behind it) · **subcontract screens** (UI only; all 69 engine references stay,
+decision 5, and their rules are now asserted in `manageability-sim` instead of through the retired
+screen) · **Torre extras** (8 cards → 4, sparklines, reorder/hide, CSV) · **Mi Día** (the only
+person-level view; Torre is company-level).
 
-**Reprieved:** `journey.html` (Recorrido), pending review after S1a · **Comunicaciones** → DMC-06 ·
-**Alert management** → DMC-07. `clientes.html`, `dashboard.html`, `frontend.html` are already
-32–35-line redirects and stay unchanged.
+**Reprieved:** `journey.html` (Recorrido) — reviewed and **kept, out of the menu**: it is reached
+from the profile menu, alongside the guides, since the doc has no subsección for it and inventing a
+thirtieth would be drift. **Comunicaciones** → DMC-06 · **Alert management** → DMC-07.
+`clientes.html`, `dashboard.html`, `frontend.html` are already 32–35-line redirects and stay
+unchanged.
+
+### Route keys as shipped (S1b)
+
+Six secciones, twenty-nine subsecciones, addressed in English. Every retired hash is mapped in
+`ROUTE_ALIASES`, so old links, bookmarks and both native tab bars still land where they did.
+
+| Sección                      | Subsecciones (route key)                                                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `tower` Torre de control     | `tower`                                                                                                                            |
+| `sales` Comercial            | `leads` · `visits` · `quotes` · `contracts`                                                                                        |
+| `projects` Proyectos         | `progress` · `economics` · `variations`                                                                                            |
+| `admin` Administración       | `invoicing` · `purchasing` · `supplier-invoices` · `labour` · `banking` · `petty-cash` · `accountant` · `cash-flow` · `financials` |
+| `master-data` Datos maestros | `customers` · `suppliers` · `subcontractors` · `staff`                                                                             |
+| `settings` Configuración     | `items` · `price-list` · `units` · `lead-sources` · `payment-methods` · `messaging` · `alerts` · `users`                           |
+
+Three routes are **tab strips over screens that already existed**, because the doc merges six built
+screens into three and rewriting them to its layouts is S7/S8/S11's work:
+`progress` = Avance + Programación · `supplier-invoices` = Bandeja + Registradas ·
+`banking` = Cuentas y saldos + Conciliación.
+
+Ten subsecciones are **placeholders** that say what will live there and where the data sits today:
+`visits` (S4) · `suppliers`, `subcontractors`, `staff` (S2) · `units`, `lead-sources`,
+`payment-methods` (S3) · `users` (S1c) · `petty-cash` (S11) · `cash-flow` (S12).
 
 ---
 

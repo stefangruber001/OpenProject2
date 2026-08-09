@@ -663,6 +663,40 @@ site E2E 154/154, cross-device refresh 17/17.
 **Next:** S1b — the navigation restructure to the doc's six secciones, the
 English rename and the agreed removals.
 
+## S1b — six secciones, in English (2026-08-09)
+
+The menu was seven secciones and twenty-five subsecciones, named in Spanish and
+shaped by what had been built. It is now **six and twenty-nine**, addressed in
+English — twenty-nine because Comunicaciones, Alertas and Usuarios moved into
+Configuración rather than being deleted.
+
+- **Old links keep working.** `ROUTE_ALIASES` maps every retired hash;
+  `go()`, boot and `hashchange` resolve through it and normalise the address bar
+  with `replaceState`. Two cases the first attempt got wrong now have checks: an
+  alias resolving to the screen you are already on, and an alias whose target is
+  a page this shell does not own.
+- **Six built screens become three**, as the doc asks (PRY-01, ADM-03, ADM-05),
+  each as a tab strip over the existing bodies — the real rewrites are S7, S8
+  and S11.
+- **Torre: eight indicators to four**, and it computes none of them. Read-only,
+  five alert rows; everything one _does_ to an alert is now DMC-07.
+- **Removed:** Mi Día, Reportes, the Torre's sparklines/customiser/CSV, and the
+  subcontract lifecycle screens. The subcontract _rules_ moved down into
+  `manageability-sim` (48 → 57 checks) rather than going untested with the UI.
+- **Mobile:** a five-icon bottom bar that no longer scrolls sideways, with
+  Configuración in the profile menu; both native shells address sections by
+  route key instead of the redirect stubs they were pointed at.
+- **No schema migration.** There were no state-level removals or renames to
+  carry, and an empty v10 would claim a change nobody made.
+
+Verified: site E2E 153/153 · cross-device refresh 17/17 · year 149/149 and
+214/214 · manageability 57/57 · migrations 43/43 · import 25/25 · scheduling
+30/30 · ownership guard 27 areas · lint, boundaries, types, tests, build,
+`make gates`, `make demo`.
+
+**Next:** S1c — DMC-08 Usuarios and the role model, before the screens inherit a
+permission check rather than being retrofitted with one.
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

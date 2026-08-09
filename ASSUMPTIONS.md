@@ -1761,3 +1761,45 @@ different decisions, so these ten arrived colliding. They are renumbered from
   request**; the list keeps natural column widths and scrolls horizontally. Reversible: v9 is the
   only non-additive step and is documented as such in both the ladder and the guard; everything
   else is UI, and no packages/capability changed, so the committed browser bundle is untouched.
+
+- **#101 — S1b: six secciones, English routes, and the four things that were
+  removed (2026-08-09).** The v4 specification replaces the seven-section menu
+  with six, and the programme adds three subsecciones to its twenty-six
+  (Comunicaciones, Alertas, Usuarios move into Configuración rather than being
+  deleted) — so the shipped shape is **6 × 29**, asserted in the e2e suite so it
+  cannot drift unnoticed. **Decisions:** (a) route keys become **English**, and
+  `ROUTE_ALIASES` maps every retired hash to its replacement with `go()`, boot
+  and `hashchange` all resolving through it — a rename that breaks a bookmark
+  silently is not a rename, it is a bug with a changelog entry. The address bar
+  is normalised with `replaceState`, so Back never bounces between the old name
+  and the new. (b) The doc merges six built screens into three (PRY-01, ADM-03,
+  ADM-05); each merged route is a **tab strip over the existing bodies** rather
+  than a rewrite, because rewriting them to the layouts the doc specifies is
+  S7/S8/S11's job and doing it here would put two large changes in one commit.
+  The chosen tab is remembered per route and deliberately **not persisted** —
+  which tab you last looked at is not company data. (c) The Torre goes from
+  eight indicators to the doc's four, and **computes none of them**: each is
+  asked of the module that owns it, so the Torre cannot become a second,
+  disagreeing source of truth. It is read-only, five alert rows ordered by
+  severity, no control that writes — because the doc says twice that it reads
+  the whole chain and writes nothing. (d) Everything one _does_ to an alert
+  moves to **DMC-07 Alertas**, reading `managedAlerts()` rather than `alerts()`
+  so a snoozed alert is not still sitting there with buttons on it. (e) The
+  subcontract lifecycle **screens** go, the data and rules stay — but those
+  screens were the only thing exercising the rules, so the coverage **moved down
+  a layer** into `manageability-sim` (48 → 57 checks) rather than disappearing
+  with the UI. That is the difference between retiring a screen and quietly
+  un-testing an engine. (f) **No schema migration.** The plan expected v10 to
+  carry removals and key renames; there are none — what changed are route keys
+  and view code, and the two preferences involved live in the store's `meta`,
+  not the state blob. An empty migration is a version bump that claims a change
+  nobody made. (g) The mobile bar carries **five icons** as the doc requires, so
+  Configuración leaves it for the profile menu; an e2e check enforces the count
+  and the absence of horizontal scroll. (h) Both native shells now address
+  sections by route key instead of the four redirect stubs they were pointed
+  at — the tabs resolved, but through two hops and onto whichever screen the
+  stub forwarded to rather than the one the tab was named after. (i) The
+  language toggle reaches the **breadcrumb** for the first time: it was built as
+  one text node, `"ERP › Torre de control"`, which is a string no dictionary can
+  hold. **Reversible:** the removed screens are one `git revert` away and no
+  engine code was deleted.
