@@ -1432,3 +1432,34 @@ SERVER_SSH_KEY`. The browser-ops path has never had its credentials, so it has n
   `INBOX.Borradores`. `pathAsListed` is the literal string the server put on the
   wire, which is by definition a name it understands, so that is what the adapter
   uses now.
+- **#92 — Mailbox setup moved into the app, because the operator's time is the
+  scarce thing (2026-08-08).** The first design needed a GitHub secret and a
+  workflow run. That is two minutes, once — but the operator said this mailbox
+  is a temporary test and a different one follows, which turns "two minutes,
+  once" into a recurring errand in a place they do not otherwise go.
+  **So: a single authenticated page at `/settings/email`.** Type the address and
+  the password, press Save. No GitHub, no SSH, no shell. The environment path
+  (`ops/set-email.sh`) still exists and still WINS over the stored value, because
+  it is the channel someone reaches for when things are wrong and they need
+  certainty about what the server is using.
+  **Saving proves the credential before storing it.** The route opens a real IMAP
+  connection and files a "mailbox connected" draft; only if the mail server
+  accepts does anything get written down. A saved-but-wrong mailbox is worse than
+  an unsaved one, because every screen then reports itself configured — and the
+  discovery comes when somebody expects a draft that never arrived.
+  **The password is encrypted at rest** (AES-256-GCM, key derived per-secret from
+  SESSION_SECRET with scrypt). Honest about the ceiling: this means a stolen
+  database dump is not a stolen mailbox, since the key lives in the server's
+  environment and not in the database. It does NOT protect against someone who
+  already has the running server, because that machine must be able to decrypt to
+  work at all. That is the ceiling for any credential a program uses unattended.
+  Rotating SESSION_SECRET makes stored secrets unopenable, so the error says
+  exactly that rather than failing as a login problem.
+  **The draft button looks identical and behaves as it did.** It still downloads
+  the `.eml`; it now ALSO files the same message in the mailbox. In addition to,
+  never instead of — the file is what works on a published copy, on a machine
+  with no session, and on the day the mail server is unreachable.
+  **Every outcome reaches the activity feed**, including "no mailbox connected"
+  (said once per session, not on every draft) and a failed append. Silence was
+  not one of the options: a draft the operator believes is in their mailbox and
+  is not has a customer on the other end of it.

@@ -34,11 +34,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ tenant: string 
   return guarded(async () => {
     const tenant = await tenantFor(req, param);
     await requireUser(req);
-    const config = mailboxConfig();
+    const config = await mailboxConfig(tenant).catch(() => null);
     return json({
       tenant,
-      configured: mailboxConfigured(),
-      from: mailFrom() || null,
+      configured: await mailboxConfigured(tenant),
+      from: config?.from || mailFrom() || null,
       host: config?.host ?? null,
       // Never the user or the password. "Which server" is operational
       // information; the credentials are not.
@@ -66,22 +66,25 @@ export async function POST(req: Request, ctx: { params: Promise<{ tenant: string
       throw new FactoryError("BAD_REQUEST", "Body must be an RFC 822 message.");
     }
 
-    if (!mailboxConfigured()) {
+    if (!(await mailboxConfigured(tenant))) {
       // 503, not 200. The caller asked for the draft to be in a mailbox; saying
       // "fine" while it is nowhere is the failure this project keeps meeting.
       return json(
         {
           tenant,
           delivered: false,
-          reason:
-            "No mailbox is configured on this server yet. Run ops/set-email.sh, " +
-            "or the Ops workflow's set-email action.",
+          reason: "No mailbox is configured yet. Open /settings/email and connect one.",
         },
         503,
       );
     }
 
-    const result = await appendDraft(raw);
-    return json({ tenant, requestedBy: user, from: mailFrom(), ...result });
+    const result = await appendDraft(tenant, raw);
+    return json({
+      tenant,
+      requestedBy: user,
+      from: (await mailboxConfig(tenant))?.from,
+      ...result,
+    });
   });
 }

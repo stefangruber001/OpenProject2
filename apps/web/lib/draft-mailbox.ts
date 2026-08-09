@@ -24,6 +24,8 @@
  * other end of it.
  */
 import { FactoryError } from "@repo/kernel";
+import { loadMailSettings } from "./erp-runtime";
+import { open as unseal } from "./secret-box";
 
 export interface DraftResult {
   delivered: boolean;
@@ -56,7 +58,7 @@ export function mailFrom(): string {
   return env("ERP_MAIL_FROM") || env("ERP_MAIL_USER");
 }
 
-export function mailboxConfig(): MailboxConfig | null {
+export function mailboxFromEnv(): MailboxConfig | null {
   const host = env("ERP_MAIL_IMAP_HOST");
   const user = env("ERP_MAIL_USER");
   const password = env("ERP_MAIL_PASSWORD");
@@ -73,8 +75,45 @@ export function mailboxConfig(): MailboxConfig | null {
   };
 }
 
-export function mailboxConfigured(): boolean {
-  return mailboxConfig() !== null;
+/**
+ * Where the mailbox comes from, in order.
+ *
+ *   1. the environment — set by ops/set-email.sh, and it WINS
+ *   2. the settings screen — stored per company, password encrypted at rest
+ *
+ * Environment first on purpose. It is the channel an operator reaches for when
+ * something is wrong and they need to be certain what the server is using; a
+ * stored value quietly overriding it would make that recovery route untrue.
+ */
+export async function mailboxConfig(tenantId: string): Promise<MailboxConfig | null> {
+  const fromEnv = mailboxFromEnv();
+  if (fromEnv) return fromEnv;
+
+  const stored = (await loadMailSettings(tenantId).catch(() => null)) as {
+    from?: string;
+    host?: string;
+    port?: number;
+    user?: string;
+    sealedPassword?: string;
+    drafts?: string;
+  } | null;
+  if (!stored?.host || !stored.user || !stored.sealedPassword) return null;
+
+  return {
+    from: stored.from || stored.user,
+    host: stored.host,
+    port: Number(stored.port || 993),
+    user: stored.user,
+    // Throws rather than returning a blank if SESSION_SECRET has moved under
+    // it — a login attempted with an empty password fails in a way that points
+    // at the mailbox provider instead of at this server.
+    password: unseal(stored.sealedPassword),
+    drafts: stored.drafts || "",
+  };
+}
+
+export async function mailboxConfigured(tenantId: string): Promise<boolean> {
+  return (await mailboxConfig(tenantId).catch(() => null)) !== null;
 }
 
 /**
@@ -112,12 +151,20 @@ export function withSender(rfc822: string, from: string): string {
  * as a received item, and the operator finds something that looks like mail
  * from themselves instead of something they can open and send.
  */
-export async function appendDraft(rfc822: string): Promise<DraftResult> {
-  const config = mailboxConfig();
+export async function appendDraft(tenantId: string, rfc822: string): Promise<DraftResult> {
+  const config = await mailboxConfig(tenantId);
   if (!config) {
-    return { delivered: false, reason: "No mailbox configured (ERP_MAIL_* not set)." };
+    return { delivered: false, reason: "No mailbox configured." };
   }
+  return appendDraftWith(config, rfc822);
+}
 
+/**
+ * The part that talks to a mail server, separated from the part that decides
+ * which mail server. Exported so the tests can drive a stub without a database
+ * or a tenant — the conversation is what has failure modes worth asserting.
+ */
+export async function appendDraftWith(config: MailboxConfig, rfc822: string): Promise<DraftResult> {
   const { ImapFlow } = await import("imapflow");
   const client = new ImapFlow({
     host: config.host,

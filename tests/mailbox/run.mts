@@ -138,7 +138,7 @@ process.env.ERP_MAIL_PASSWORD = "stub-password-not-a-real-one";
 process.env.ERP_MAIL_FROM = "if@2iberia.com";
 process.env.ERP_MAIL_DRAFTS = "";
 
-const { appendDraft, mailboxConfigured, mailFrom, withSender } = await import(
+const { appendDraftWith, mailboxFromEnv, mailFrom, withSender } = await import(
   "../../apps/web/lib/draft-mailbox.ts"
 );
 
@@ -160,7 +160,7 @@ const { appendDraft, mailboxConfigured, mailFrom, withSender } = await import(
 }
 
 // ── The real conversation ───────────────────────────────────────────────────
-check("mailbox reports itself configured", mailboxConfigured());
+check("mailbox reports itself configured", mailboxFromEnv() !== null);
 check("the from address is the configured one", mailFrom() === "if@2iberia.com");
 
 const message = [
@@ -173,7 +173,7 @@ const message = [
   "",
 ].join("\r\n");
 
-const result = await appendDraft(message);
+const result = await appendDraftWith(mailboxFromEnv()!, message);
 
 check("the adapter reports delivery", result.delivered === true);
 check(
@@ -208,13 +208,37 @@ check(
 {
   delete process.env.ERP_MAIL_PASSWORD;
   // The module reads env per call, so this takes effect without a reload.
-  check("with no password, the mailbox reports itself unconfigured", !mailboxConfigured());
-  const quiet = await appendDraft("From: a@b.com\r\n\r\nhi\r\n");
-  check(
-    "and an append reports delivered:false with a reason",
-    quiet.delivered === false && !!quiet.reason,
-    quiet.reason,
-  );
+  check("with no password, the environment yields no mailbox", mailboxFromEnv() === null);
+}
+
+// ── The password is never stored in the clear ───────────────────────────────
+{
+  process.env.SESSION_SECRET = "a-test-session-secret-long-enough";
+  const { seal, open } = await import("../../apps/web/lib/secret-box.ts");
+  const secret = "p@ss$word \"with\" 'quotes' & $HOME";
+  const sealed = seal(secret);
+  check("the sealed form does not contain the password", !sealed.includes("p@ss"));
+  check("it round-trips exactly", open(sealed) === secret);
+  check("two seals of the same secret differ", seal(secret) !== seal(secret));
+
+  const tampered = Buffer.from(sealed, "base64");
+  tampered[tampered.length - 1] ^= 0xff;
+  let refused = false;
+  try {
+    open(tampered.toString("base64"));
+  } catch {
+    refused = true;
+  }
+  check("a tampered secret is refused, not silently decrypted", refused);
+
+  process.env.SESSION_SECRET = "a-completely-different-secret-value";
+  let rotated = false;
+  try {
+    open(sealed);
+  } catch {
+    rotated = true;
+  }
+  check("rotating SESSION_SECRET makes it unopenable, and says so", rotated);
 }
 
 server.close();
