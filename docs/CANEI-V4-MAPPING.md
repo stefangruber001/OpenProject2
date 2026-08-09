@@ -94,11 +94,11 @@ Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, resh
 | ADM-01 | Facturación              | `#invoicing`                                                         | **BUILT (S10)** — four counters, saldo + días, red from day one                          |
 | ADM-02 | Compras y Pedidos        | `#compras`                                                           | **BUILT (S7)** — three counters, full-screen order beside the supplier's quote           |
 | ADM-03 | Facturas de proveedores  | `#supplier-invoices`                                                 | **BUILT (S6+S7)** — OCR and validation, then the two zones and allocation                |
-| ADM-04 | Horas                    | `#horas`                                                             | **ADAPT** — add monthly reconciliation                                                   |
+| ADM-04 | Horas                    | `#horas`                                                             | **BUILT (S12)** — day sheet + 372 calendar, Resumen tab, monthly reconciliation          |
 | ADM-05 | Consolidación Bancaria   | `#banking`                                                           | **BUILT (S11)** — merged, class and destination edited in the row                        |
 | ADM-06 | Caja Chica               | `#petty-cash`                                                        | **BUILT (S11)** — entradas, salidas y arqueo                                             |
-| ADM-07 | Reporte a Gestoría       | `#gestoria`                                                          | **ADAPT** — 3-step wizard                                                                |
-| ADM-08 | Flujo de Caja            | — (`cashForecast()` exists)                                          | **BUILD**                                                                                |
+| ADM-07 | Reporte a Gestoría       | `#gestoria`                                                          | **BUILT (S12)** — three steps behind a 48 indicator, step 3 gated on exceptions          |
+| ADM-08 | Flujo de Caja            | `#cash-flow`                                                         | **BUILT (S12)** — 240 + 96×n grid, week/month, company or one job                        |
 | ADM-09 | Datos Financieros        | `financial-data.html`, 14 panels                                     | **KEEP** (decision 1) — feed + ledger import                                             |
 | DMT-01 | Clientes                 | `#customers`                                                         | **ADAPTED (S2)** — refactored onto the shared list primitive                             |
 | DMT-02 | Proveedores              | `#suppliers`                                                         | **BUILT (S2)**                                                                           |

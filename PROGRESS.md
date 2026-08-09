@@ -1186,6 +1186,41 @@ unit tests, build, `make gates`, `make demo`.
 
 **Next:** S12 — ADM-04 Horas + ADM-07 Gestoría + ADM-08 Flujo de caja.
 
+## S12 — the last placeholder in the menu (2026-08-09)
+
+- **ADM-08 exists**, and the forecast finally answers the question it is asked.
+  It opens from `cashPositionAsOf(yesterday)` rather than zero, because "what
+  is the net of the next 13 weeks" is never what anybody wants to know. Every
+  row is an expectation with a committed date behind it — nothing is
+  extrapolated from an average, because an average cannot be chased. Anything
+  already overdue lands in the first bucket instead of being dropped: a
+  forecast that discards late money gets rosier the later you are.
+- **ADM-04 became a day sheet with the week beside it.** The grid spans every
+  project, because §3.2 gives it a Proyecto column and a column with one
+  possible value is a caption. Approval stays per worker per **week** — that is
+  what payroll cares about — so the lock sits on the worker's row.
+- **The monthly reconciliation states a difference rather than demanding a
+  zero.** Hours cost is an accrual; wages are cash, and they also pay for
+  holidays, sick days and office staff. The two are not supposed to match. The
+  useful signal is a NEGATIVE difference: more hours booked than wages paid
+  means an unimported payroll run or hours in the wrong month.
+- **ADM-07's gate moved one screen earlier.** The engine's refusal is
+  unchanged; what changed is that step three is disabled from the moment you
+  arrive rather than discovered at the end. Exceptions group by type, and each
+  group links to the screen where that kind is actually fixed.
+- **The "unbuilt subsección" probe inverted instead of retiring.** Its subject
+  has been built four times over; it now walks all 29 menu entries and fails on
+  any dead link. `PLACEHOLDERS` is gone — a route that resolves to nothing says
+  «Ruta desconocida» rather than promising a screen nobody planned.
+
+Verified: site E2E 314/314 (15 new checks) · manageability 225/225 (14 new
+engine checks) · migrations 48/48 (no schema change) · year 149/149 · import
+25/25 · scheduling 30/30 · i18n coverage (EN 100%, CA ceiling 1303 → 1301) ·
+site-sync 17/17 · ownership guard · bundle safety · lint, boundaries, types,
+unit tests, build, `make gates`, `make demo`.
+
+**Next:** S13 — ADM-09 Datos Financieros, the last screen in the document.
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

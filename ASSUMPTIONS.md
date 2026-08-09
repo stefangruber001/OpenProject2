@@ -2442,3 +2442,49 @@ different decisions, so these ten arrived colliding. They are renumbered from
   `splitMovement` Conciliación calls, not through the old free-text input. The
   e2e asserts both halves: the old input must stay gone, the row control must
   be there. **Reversible: yes.**
+
+- **#130 — S12: the day sheet spans every project, not the one in the project
+  bar (2026-08-09).** §3.2 gives ADM-04's day grid a **Proyecto** column, which
+  only makes sense if more than one can appear. An hour is recorded by the
+  person who worked it, and that person moved between two jobs on Tuesday; a
+  sheet scoped to one job asks them to remember which screen they were on.
+  Approval stays per worker per **week**, because that is what payroll and the
+  law care about, so the lock button sits on the worker's row and locks the
+  week containing the selected day. **Reversible: yes** — scoping back to one
+  project is a filter, not a rewrite.
+
+- **#131 — S12: the monthly labour reconciliation reports a difference, it
+  does not demand a zero (2026-08-09).** Hours cost is an accrual booked to
+  jobs on the day the work happened; wages are cash leaving on payday, and they
+  also pay for holidays, sick days, office staff and time nobody logged. The
+  two are not supposed to match, so the block states `unbookedCents` and its
+  percentage of the wage bill rather than flagging every month red. The
+  interesting case is a **negative** difference — more hours booked than wages
+  paid — which means an unimported payroll run or hours in the wrong month.
+  **Reversible: yes.**
+
+- **#132 — S12: ADM-08's forecast opens from real cash and absorbs what is
+  already overdue (2026-08-09).** The cumulative row starts at
+  `cashPositionAsOf(yesterday)`, not zero, because "what is the net of the next
+  13 weeks" is never the question — "do we run out, and when" is. And anything
+  past its date lands in the first bucket rather than being dropped: a forecast
+  that discards overdue money gets rosier the later you are, which is the one
+  direction a forecast must never drift. **Reversible: yes** — both are single
+  expressions in `cashFlowGrid`.
+
+- **#133 — S12: the forecast grid uses a fixed table layout at a computed
+  width (2026-08-09).** §3.2 fixes the label column at 240 and each period
+  column at 96. An auto-layout table distributes spare container width across
+  its columns, which silently turned 96 into 106; the table therefore declares
+  `table-layout: fixed` and an inline width of `240 + 96 × periods`, and the
+  card scrolls horizontally. A money figure longer than 96 px will overflow its
+  cell rather than be truncated — a clipped amount is worse than an untidy one.
+  **Reversible: yes.**
+
+- **#134 — S12: the "unbuilt subsección" probe inverts rather than retires
+  (2026-08-09).** It has moved four times as its subject got built (Reportes,
+  `units`, `visits`, `petty-cash`) and `cash-flow` was the last candidate. The
+  e2e now walks **every** entry in the menu and fails if any lands on the
+  dead-link fallback, and `PLACEHOLDERS` is gone: a route that resolves to
+  nothing says «Ruta desconocida», because promising a screen nobody planned is
+  a worse lie than admitting a stale bookmark. **Reversible: yes.**
