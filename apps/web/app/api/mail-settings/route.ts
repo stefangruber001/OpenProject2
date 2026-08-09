@@ -33,6 +33,26 @@ const KNOWN_HOSTS: Record<string, string> = {
   "office365.com": "outlook.office365.com",
 };
 
+/** Errors that mean "there is nothing at that address", as opposed to "that
+ *  address rejected you". Only the first kind is evidence the guessed host was
+ *  the wrong host; a refused password says nothing about the server name. */
+const UNREACHABLE = /ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH/i;
+
+/**
+ * Turn the mail library's error into something the operator can act on.
+ *
+ * The failure this exists for: `imap.<domain>` is a guess, and when the guess
+ * is wrong the operator sees a DNS error about a host they never typed, for a
+ * password that was entirely correct. The natural conclusion is that the
+ * password is wrong, and they go and reset a working mailbox. So when we
+ * guessed the host AND nothing answered there, say which field fixes it.
+ */
+function explain(error: Error, guessed: boolean, host: string): string {
+  const raw = error.message.slice(0, 200);
+  if (!guessed || !UNREACHABLE.test(raw)) return raw;
+  return `${raw} — nothing is listening at ${host}, which the ERP guessed from the address. Your password is probably fine: open Advanced settings and enter your provider's IMAP server (Hostinger uses imap.hostinger.com).`;
+}
+
 function back(status: string, detail = ""): never {
   const query = new URLSearchParams({ status, ...(detail ? { detail } : {}) });
   redirect(`/settings/email?${query.toString()}`);
@@ -55,6 +75,10 @@ export async function POST(req: Request) {
   if (!password) back("bad", "Enter the mailbox password.");
 
   const domain = address.split("@")[1] || "";
+  // `imap.<domain>` is a convention, not a rule. It is right often enough to be
+  // worth trying and wrong often enough that the operator has to be told when
+  // it is — see the hint below.
+  const guessed = !hostRaw;
   const host = hostRaw || KNOWN_HOSTS[domain] || `imap.${domain}`;
 
   const config: MailboxConfig = {
@@ -89,7 +113,7 @@ export async function POST(req: Request) {
   } catch (e) {
     // Nothing is stored. A saved-but-broken mailbox is worse than an unsaved
     // one, because it looks configured on every screen that asks.
-    back("failed", (e as Error).message.slice(0, 240));
+    back("failed", explain(e as Error, guessed, host));
   }
 
   await saveMailSettings(

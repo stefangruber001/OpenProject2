@@ -175,11 +175,16 @@ export default async function MailSettingsPage({
           {status === "failed" && (
             <Banner tone="bad">
               The mail server did not accept these details, so nothing was saved.
-              {detail ? ` (${detail})` : ""}
               <br />
               <span style={{ opacity: 0.75 }}>
                 El servidor de correo no aceptó estos datos, así que no se ha guardado nada.
               </span>
+              {/* On its own line, not in parentheses: this is now a sentence
+                  telling the operator which field to change, and the useful
+                  half of it was the half that got buried. */}
+              {detail && (
+                <div style={{ marginTop: 8, font: `400 12.5px/1.5 ${SANS}` }}>{detail}</div>
+              )}
             </Banner>
           )}
           {status === "bad" && <Banner tone="bad">{detail || "Check the details."}</Banner>}
