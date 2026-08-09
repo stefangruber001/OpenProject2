@@ -626,10 +626,11 @@ async function testShell(browser, base) {
     else bad("shell: outside click collapses", "still open");
 
     // Unbuilt subsections say what will live there instead of rendering blank.
-    // The probe has moved twice as its subject got built: Reportes (removed
-    // outright), then `units` (built as DMC-03 in S3). `visits` is the current
-    // real not-yet-built subsección — COM-02, scheduled for S4.
-    await pg.evaluate(() => (location.hash = "visits"));
+    // The probe has moved three times as its subject got built: Reportes
+    // (removed outright), `units` (DMC-03, S3), `visits` (COM-02, S4).
+    // `petty-cash` is the current real not-yet-built subsección — ADM-06,
+    // scheduled for S11.
+    await pg.evaluate(() => (location.hash = "petty-cash"));
     await pg.waitForTimeout(300);
     const ph = await pg.locator("#view").innerText();
     if (/En preparación/.test(ph)) ok("shell: unbuilt subsection explains itself");
@@ -1484,6 +1485,7 @@ async function testControlTowerAndDay(browser, base) {
     if (/A quién/.test(m)) await d.accept("backoffice");
     else if (/Fecha límite/.test(m)) await d.accept("2026-05-20");
     else if (/Posponer hasta/.test(m)) await d.accept("2026-05-15");
+    else if (/^Motivo de la pérdida/.test(m)) await d.accept("price");
     else if (/^Motivo/.test(m)) await d.accept("");
     else if (/Nota de resoluci/.test(m)) await d.accept("Resuelto en el E2E");
     else if (/^Evidencia/.test(m)) await d.accept("");
@@ -1720,6 +1722,128 @@ async function testControlTowerAndDay(browser, base) {
     if (/Formas de pago/.test(payText) && /Transferencia 30 días/.test(payText))
       ok("DMC-05: payment terms are listed and maintainable");
     else bad("DMC-05", payText.replace(/\n/g, " ").slice(0, 140));
+
+    // ---- COM-01/02: leads and the visit lifecycle (S4) --------------------
+    // A lead is created, a visit is scheduled against it (shows in the
+    // "Programadas" block of COM-02), completed with a real capture (moves
+    // to "Realizadas"), and a presupuesto is created from it — end to end,
+    // not screen by screen, because the point of the visit lifecycle is that
+    // those screens agree with each other.
+    await pg.evaluate(() => (location.hash = "leads"));
+    await pg.waitForTimeout(400);
+    await pg.locator("#ldNew").click();
+    await pg.waitForTimeout(300);
+    const leadName = "E2E Lead " + String(Date.now()).slice(-5);
+    await pg.locator("#o_work").fill(leadName);
+    await pg.locator("#o_save").click();
+    await pg.waitForTimeout(400);
+    await pg.locator("#ldQ").fill(leadName);
+    await pg.waitForTimeout(300);
+    const leadRows = await pg.locator("tbody tr.click").count();
+    if (leadRows === 1) ok("COM-01: a new lead is created and listed");
+    else bad("COM-01 create", `rows=${leadRows}`);
+
+    await pg.locator("tbody tr.click").first().click();
+    await pg.waitForTimeout(300);
+    const drawerBeforeVisit = await pg.locator("#drawer").innerText();
+    if (
+      /Pendiente de visita/.test(drawerBeforeVisit) &&
+      /Sin visitas todavía/.test(drawerBeforeVisit)
+    )
+      ok("COM-01: a new lead's drawer shows it awaiting a visit, with none yet");
+    else bad("COM-01 drawer initial state", drawerBeforeVisit.replace(/\n/g, " ").slice(0, 140));
+
+    await pg.locator("#opp_sched").click();
+    await pg.waitForTimeout(300);
+    // Today's date, so the scheduled visit is not drawn "overdue" and can be
+    // completed straight away in this same run.
+    const today = await pg.evaluate(() => erp.today);
+    await pg.locator("#sv_date").fill(today);
+    await pg.locator("#sv_save").click();
+    await pg.waitForTimeout(400);
+
+    await pg.evaluate(() => (location.hash = "visits"));
+    await pg.waitForTimeout(400);
+    const progRows = await pg.locator("#visProgWrap tbody tr.click").count();
+    if (progRows >= 1) ok(`COM-02: a scheduled visit appears in "Programadas" (${progRows})`);
+    else bad("COM-02 programadas", `rows=${progRows}`);
+
+    await pg.locator("#visProgWrap tbody tr.click").first().click();
+    await pg.waitForTimeout(350);
+    await pg.locator("#cv_what").fill("cocina");
+    await pg.locator("#cv_qty").fill("9.5");
+    await pg.locator("#cv_addmeas").click();
+    await pg.waitForTimeout(200);
+    const measRow = await pg.locator("#cv_meas").innerText();
+    if (/cocina/.test(measRow) && /9\.5/.test(measRow))
+      ok("COM-02: a measurement is added to the capture before saving");
+    else bad("COM-02 measurement add", measRow.replace(/\n/g, " ").slice(0, 120));
+    await pg.locator("#cv_notes").fill("croquis a mano adjunto");
+    await pg.locator("#cv_save").click();
+    await pg.waitForTimeout(400);
+
+    await pg.evaluate(() => (location.hash = "visits"));
+    await pg.waitForTimeout(400);
+    const realRows = await pg.locator("#visRealWrap tbody tr.click").count();
+    if (realRows >= 1) ok(`COM-02: completing a visit moves it to "Realizadas" (${realRows})`);
+    else bad("COM-02 realizadas", `rows=${realRows}`);
+
+    // Completing a visit is the exact transition that used to require a
+    // separate "awaitingBudget" check on the lead — assert it here too, so
+    // the two screens are proven to agree rather than tested in isolation.
+    await pg.evaluate(() => (location.hash = "leads"));
+    await pg.waitForTimeout(400);
+    await pg.locator("#ldQ").fill(leadName);
+    await pg.waitForTimeout(300);
+    const leadAfterVisit = await pg.locator("tbody tr.click").first().innerText();
+    if (/Pendiente de presupuesto/.test(leadAfterVisit) && /Realizada/.test(leadAfterVisit))
+      ok("COM-01: the lead reflects the completed visit (awaiting presupuesto, visita realizada)");
+    else bad("COM-01 post-visit state", leadAfterVisit.replace(/\n/g, " ").slice(0, 140));
+
+    // Creating a presupuesto from the visit hands off to the real builder.
+    await pg.evaluate(() => (location.hash = "visits"));
+    await pg.waitForTimeout(400);
+    await pg.locator("#visRealWrap tbody tr.click").first().click();
+    await pg.waitForTimeout(350);
+    const budgetBtn = pg.locator("#vd_newbudget");
+    if ((await budgetBtn.count()) === 1) {
+      await budgetBtn.click();
+      await pg.waitForTimeout(500);
+      const onQuotes = await pg.evaluate(() => location.hash.startsWith("#quotes"));
+      if (onQuotes) ok("COM-02: creating a presupuesto from a visit opens the real builder");
+      else bad("COM-02 → presupuestador handoff", await pg.evaluate(() => location.hash));
+    } else {
+      bad(
+        "COM-02 → presupuestador handoff",
+        "no #vd_newbudget button on a visit with no budget yet",
+      );
+    }
+
+    // Marking a lead lost, with a reason from the owner-maintained list.
+    await pg.evaluate(() => (location.hash = "leads"));
+    await pg.waitForTimeout(400);
+    const secondLeadName = "E2E Perdida " + String(Date.now()).slice(-5);
+    await pg.locator("#ldNew").click();
+    await pg.waitForTimeout(300);
+    await pg.locator("#o_work").fill(secondLeadName);
+    await pg.locator("#o_save").click();
+    await pg.waitForTimeout(400);
+    await pg.locator("#ldQ").fill(secondLeadName);
+    await pg.waitForTimeout(300);
+    await pg.locator("tbody tr.click").first().click();
+    await pg.waitForTimeout(300);
+    // Answered by this page's persistent dialog handler above
+    // (/^Motivo de la pérdida/ → "price"), registered once per page rather
+    // than per-click — a second one-shot handler here would race it.
+    await pg.locator("#opp_lose").click();
+    await pg.waitForTimeout(400);
+    const lostState = await pg.evaluate((name) => {
+      const o = erp.state.opportunities.find((x) => x.requestedWork === name);
+      return o ? { status: o.status, reason: o.lossReason } : null;
+    }, secondLeadName);
+    if (lostState && lostState.status === "lost" && lostState.reason === "price")
+      ok("COM-01: marking a lead lost records the status and the reason");
+    else bad("COM-01 lose", JSON.stringify(lostState));
 
     // ---- DMC-01: the partidas catalogue, finally inside the shell ---------
     // It used to be a link out to master-data.html, which held a MOCK dataset
@@ -2337,6 +2461,68 @@ async function testI18n(browser, base) {
     )
       ok("i18n: CA translates the navigation, and Spanish does not leak through");
     else bad("i18n: CA workspace", `lang=${caLang} ${caText.replace(/\n/g, " ").slice(0, 160)}`);
+
+    // COM-01/02 (S4) are new screens, not old ones re-skinned — the coverage
+    // guard only proves dictionary entries exist, not that these specific
+    // screens render them. Checked here, still under the CA reload above.
+    // Asserted on the intro line, the button and the block headers — all
+    // genuinely new S4 strings — rather than on the dynamic "N oportunidades"
+    // row-count tag, which (like every other screen's row count) is built
+    // from a noun pair spliced into a number and does not go through the
+    // translator; that gap predates S4 and is not what this check is for.
+    await pg.evaluate(() => (location.hash = "leads"));
+    await pg.waitForTimeout(500);
+    const leadsCaText = await pg.locator("body").innerText();
+    if (
+      /Cada consulta crea una oportunitat/.test(leadsCaText) &&
+      /Nova oportunitat/.test(leadsCaText) &&
+      !/Cada consulta crea una oportunidad/.test(leadsCaText)
+    )
+      ok("i18n: CA translates the COM-01 leads screen");
+    else bad("i18n: CA leads screen", leadsCaText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "visits"));
+    await pg.waitForTimeout(500);
+    const visitsCaText = await pg.locator("body").innerText();
+    if (
+      /Programades/.test(visitsCaText) &&
+      /Realitzades/.test(visitsCaText) &&
+      !/Programadas/.test(visitsCaText) &&
+      !/Realizadas/.test(visitsCaText)
+    )
+      ok("i18n: CA translates the COM-02 visits screen");
+    else bad("i18n: CA visits screen", visitsCaText.replace(/\n/g, " ").slice(0, 160));
+
+    // And the same two screens under EN, so both new-string additions are
+    // proven in both directions, not just the CA one that happened to be
+    // built last.
+    await pg.evaluate(() => localStorage.setItem("caneiLang", "en"));
+    await pg.reload({ waitUntil: "networkidle" });
+    await pg.waitForTimeout(500);
+    await pg.evaluate(() => (location.hash = "leads"));
+    await pg.waitForTimeout(500);
+    const leadsEnText = await pg.locator("body").innerText();
+    if (
+      /Every enquiry creates an opportunity/.test(leadsEnText) &&
+      /New opportunity/.test(leadsEnText) &&
+      !/Cada consulta crea/.test(leadsEnText)
+    )
+      ok("i18n: EN translates the COM-01 leads screen");
+    else bad("i18n: EN leads screen", leadsEnText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "visits"));
+    await pg.waitForTimeout(500);
+    const visitsEnText = await pg.locator("body").innerText();
+    if (
+      /Scheduled\s/.test(visitsEnText) &&
+      /Completed\s/.test(visitsEnText) &&
+      !/Programadas/.test(visitsEnText) &&
+      !/Realizadas/.test(visitsEnText)
+    )
+      ok("i18n: EN translates the COM-02 visits screen");
+    else bad("i18n: EN visits screen", visitsEnText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => localStorage.setItem("caneiLang", "ca"));
 
     // The three languages must be genuinely distinct on the same label. A
     // Catalan that silently equals the Spanish everywhere would pass a

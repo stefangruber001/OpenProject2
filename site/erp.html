@@ -908,8 +908,6 @@ const SUBMAP={}; SECTIONS.forEach(s=>s.subs.forEach(x=>SUBMAP[x.k]={...x,sec:s})
    will live there and links to where that data is managed today, so the menu
    never leads to a blank screen. */
 const PLACEHOLDERS={
- visits:{sub:"COM-02 · programadas y realizadas, en dos bloques.",
-   body:"Las visitas se registran hoy dentro de Leads. Esta pantalla las separa en programadas y realizadas con su propia paginación.",goto:["leads","Ir a Leads"]},
  "petty-cash":{sub:"ADM-06 · entradas, salidas y arqueo.",
    body:"El modelo ya guarda la caja; falta la pantalla. Los movimientos en efectivo se ven de momento en Consolidación bancaria.",goto:["banking","Ir a Consolidación bancaria"]},
  "cash-flow":{sub:"ADM-08 · previsión semanal y mensual.",
@@ -2997,8 +2995,17 @@ function saveListPageSize(id,size){ try{ ErpStore.setMeta("ui.list."+id,{pageSiz
  *        baseRows, matches(row,q), columns:[{label,get,primary?,html?,sheet?}],
  *        onRowClick(id), exportFile, exportSheetName, emptyText }
  */
+/**
+ * cfg gains three optional flags for compact, fixed-height blocks like
+ * COM-02's programadas/realizadas pair (S4): `fixedSize` pins the page size
+ * and hides the "filas por pantalla" selector — the block's height is fixed
+ * by the doc, not chosen by the operator; `noExport`/`noNew` drop those
+ * toolbar buttons when a block has neither (a read-mostly sub-list still
+ * gets its own search and pagination either way).
+ */
 function renderMasterList(v,cfg){
-  const st=getListState(cfg.id,cfg.defSize);
+  const st=getListState(cfg.id,cfg.fixedSize||cfg.defSize);
+  if(cfg.fixedSize) st.pageSize=cfg.fixedSize;
   const ids=Object.assign({q:"mlQ",size:"mlSize",prev:"mlPrev",next:"mlNext",newBtn:"mlNew",
     exp:"mlExp",expMenu:"mlExpMenu",expXlsx:"mlExpXlsx",expCsv:"mlExpCsv"},cfg.ids||{});
   const q=st.q.trim().toLowerCase();
@@ -3010,16 +3017,16 @@ function renderMasterList(v,cfg){
   const cols=cfg.columns;
   const sing=cfg.nounSingular||"registro", plur=cfg.nounPlural||"registros";
   v.innerHTML=`<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-    <button class="btn primary sm" id="${ids.newBtn}">${cfg.newLabel||"＋ Nuevo"}</button>
+    ${cfg.noNew?"":`<button class="btn primary sm" id="${ids.newBtn}">${cfg.newLabel||"＋ Nuevo"}</button>`}
     <input id="${ids.q}" placeholder="${esc(cfg.searchPlaceholder||"Buscar…")}" value="${esc(st.q)}"
       style="flex:0 1 280px;min-width:190px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)">
-    <span style="position:relative">
+    ${cfg.noExport?"":`<span style="position:relative">
       <button class="btn sm" id="${ids.exp}">⬇ Exportar</button>
       <span id="${ids.expMenu}" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:40;min-width:160px;
         background:var(--paper);border:1px solid var(--line);border-radius:9px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:4px;flex-direction:column">
         <button class="btn sm" id="${ids.expXlsx}" style="justify-content:flex-start;border:0;background:none">Excel (.xlsx)</button>
         <button class="btn sm" id="${ids.expCsv}" style="justify-content:flex-start;border:0;background:none">CSV (.csv)</button>
-      </span></span>
+      </span></span>`}
     <span class="tag">${rows.length}${q?` de ${base.length}`:""} ${rows.length===1?sing:plur}</span></div>
    <div class="card"><div class="scroll"><table class="mlist"><thead><tr>
      ${cols.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>
@@ -3028,23 +3035,24 @@ function renderMasterList(v,cfg){
     ||`<tr><td colspan="${cols.length}"><div class="empty">${esc(cfg.emptyText||"Ningún registro coincide con la búsqueda.")}</div></td></tr>`}
    </tbody></table></div>
    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line)">
-     <label style="font-size:12px;color:var(--dim)">Filas por pantalla
+     ${cfg.fixedSize?"":`<label style="font-size:12px;color:var(--dim)">Filas por pantalla
        <select id="${ids.size}" style="font:inherit;font-size:12px;margin-left:6px;padding:4px 6px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink)">
          ${LIST_PAGE_SIZES.map(n=>`<option value="${n}"${n===st.pageSize?" selected":""}>${n}</option>`).join("")}
-       </select></label>
+       </select></label>`}
      <span style="flex:1"></span>
      <span style="font-size:12px;color:var(--dim)">${rows.length?`${start+1}–${Math.min(start+st.pageSize,rows.length)} de ${rows.length}`:"0 de 0"} · página ${st.page} de ${pages}</span>
      <button class="btn sm" id="${ids.prev}"${st.page<=1?" disabled":""}>‹ Anterior</button>
      <button class="btn sm" id="${ids.next}"${st.page>=pages?" disabled":""}>Siguiente ›</button>
    </div></div>`;
   v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>cfg.onRowClick(tr.dataset.id));
-  $('#'+ids.newBtn).onclick=cfg.onNew;
+  if(!cfg.noNew) $('#'+ids.newBtn).onclick=cfg.onNew;
   const qi=$('#'+ids.q);
   qi.oninput=()=>{ st.q=qi.value; st.page=1; const at=qi.selectionStart; render();
     const n=$('#'+ids.q); if(n){n.focus(); n.setSelectionRange(at,at);} };
-  $('#'+ids.size).onchange=e=>{ st.pageSize=Number(e.target.value)||st.pageSize; st.page=1; saveListPageSize(cfg.id,st.pageSize); render(); };
+  if(!cfg.fixedSize) $('#'+ids.size).onchange=e=>{ st.pageSize=Number(e.target.value)||st.pageSize; st.page=1; saveListPageSize(cfg.id,st.pageSize); render(); };
   $('#'+ids.prev).onclick=()=>{ if(st.page>1){ st.page--; render(); } };
   $('#'+ids.next).onclick=()=>{ if(st.page<pages){ st.page++; render(); } };
+  if(cfg.noExport) return;
   const menu=$('#'+ids.expMenu);
   const closeMenu=()=>{ menu.style.display="none"; };
   $('#'+ids.exp).onclick=ev=>{ ev.stopPropagation();
@@ -3716,24 +3724,109 @@ const VIEWS={
   });
  },
 
- /* ---------- Oportunidades ---------- */
+ /* ---------- Leads (COM-01, spec §COM-01) ----------
+    One standard list of every opportunity — open AND closed — rather than
+    the three separate blocks (en curso / visitas / cerradas) this screen
+    used to render. The doc's own Estado column already covers won/lost, and
+    Days already means "days open" for an open lead or "days since decided"
+    for a closed one, so a single list loses nothing the three blocks showed
+    and gains the shared primitive's search, pagination and export for free.
+    Visitas moved to its own COM-02 screen — this one shows only whether a
+    visit is pending, scheduled or done, as a column, not a second table. */
  leads(v){
-  $('#sub').textContent="Cada consulta crea una oportunidad con origen, estado y próxima acción. Las visitas capturan mediciones, fotos y el croquis a mano.";
-  const rows=erp.opportunityAges();
-  const done=erp.state.opportunities.filter(o=>["won","lost"].includes(o.status));
-  const ST={awaitingVisit:["Pendiente de visita","y"],awaitingBudget:["Pendiente de presupuesto","y"],awaitingResponse:["Esperando al cliente","b"],won:["Ganada","g"],lost:["Perdida","r"]};
-  v.innerHTML=`<div class="card"><div class="ch"><h3>En curso</h3><span class="tag">${rows.length} abiertas</span></div>
-   <div class="scroll"><table><thead><tr><th>Cliente</th><th>Trabajo</th><th>Origen</th><th>Estado</th><th class="num">Días</th><th>Próxima acción</th></tr></thead><tbody>
-   ${rows.map(o=>`<tr><td class="k">${esc(erp.party(o.partyId).name)}</td><td>${esc(o.requestedWork)}</td><td>${esc(erp.listLabel("leadSources",o.source))}</td>
-     <td><span class="pill ${ST[o.status]?.[1]||''}">${ST[o.status]?.[0]||o.status}</span></td>
-     <td class="num">${o.ageDays}</td><td>${esc(o.nextAction||"—")}</td></tr>`).join("")||'<tr><td colspan="6"><div class="empty">Sin oportunidades abiertas.</div></td></tr>'}
-   </tbody></table></div></div>
-   <div class="card"><div class="ch"><h3>Visitas de obra</h3></div><div class="scroll"><table><thead><tr><th>Fecha</th><th>Mediciones</th><th>Fotos</th><th>Croquis</th><th>Notas</th></tr></thead><tbody>
-   ${erp.state.visits.map(x=>`<tr><td>${fmtD(x.date)}</td><td>${x.measurements.map(m=>m.what+" "+m.qty+" "+m.unit).join(" · ")}</td><td>${x.photos.length} 📷</td><td>${x.handwrittenEstimateRef?"✓ adjunto":"—"}</td><td>${esc(x.notes)}</td></tr>`).join("")}
-   </tbody></table></div></div>
-   <div class="card"><div class="ch"><h3>Cerradas</h3></div><div class="scroll"><table><tbody>
-   ${done.map(o=>`<tr><td class="k">${esc(erp.party(o.partyId).name)}</td><td>${esc(o.requestedWork)}</td><td><span class="pill ${o.status==="won"?"g":"r"}">${o.status==="won"?"Ganada":"Perdida"+(o.lossReason?" · "+o.lossReason:"")}</span></td></tr>`).join("")}
-   </tbody></table></div></div>`;
+  $('#sub').textContent="Cada consulta crea una oportunidad con origen, estado y próxima acción. La visita se programa y se captura desde su propia pantalla.";
+  const latestVisit=o=>erp.state.visits.filter(x=>x.opportunityId===o.id)
+    .sort((a,b)=>(b.scheduledAt||"").localeCompare(a.scheduledAt||""))[0]||null;
+  const days=o=>["won","lost"].includes(o.status)?isoDiff(o.decidedAt||o.date,erp.today):isoDiff(o.date,erp.today);
+  renderMasterList(v,{
+    id:"leads",
+    ids:{q:"ldQ",size:"ldSize",prev:"ldPrev",next:"ldNext",newBtn:"ldNew",exp:"ldExp",expMenu:"ldExpMenu",expXlsx:"ldExpXlsx",expCsv:"ldExpCsv"},
+    newLabel:"＋ Nueva oportunidad", onNew:()=>newOpportunityDrawer(),
+    searchPlaceholder:"Buscar por cliente o trabajo",
+    nounSingular:"oportunidad", nounPlural:"oportunidades",
+    defSize:25,
+    baseRows:erp.state.opportunities.slice().sort((a,b)=>b.date.localeCompare(a.date)),
+    matches:(o,q)=>erp.party(o.partyId).name.toLowerCase().includes(q)||o.requestedWork.toLowerCase().includes(q),
+    columns:[
+      {label:"Fecha", get:o=>o.date, html:o=>fmtD(o.date)},
+      {label:"Cliente", primary:true, get:o=>erp.party(o.partyId).name, html:o=>esc(erp.party(o.partyId).name)},
+      {label:"Inmueble", get:o=>o.propertyId?erp.state.properties.find(p=>p.id===o.propertyId)?.street||"":"",
+        html:o=>{const p=o.propertyId&&erp.state.properties.find(x=>x.id===o.propertyId); return p?esc(p.street):"—";}},
+      {label:"Descripción", get:o=>o.requestedWork, html:o=>esc(o.requestedWork)},
+      {label:"Origen", get:o=>erp.listLabel("leadSources",o.source), html:o=>esc(erp.listLabel("leadSources",o.source))},
+      {label:"Visita", get:o=>{const lv=latestVisit(o); return lv?(lv.status==="done"?"Realizada":"Programada"):"Pendiente";},
+        html:o=>{const lv=latestVisit(o);
+          if(!lv) return '<span class="pill">Sin programar</span>';
+          if(lv.status==="done") return '<span class="pill g">Realizada</span>';
+          const overdue=lv.scheduledAt&&lv.scheduledAt<erp.today;
+          return `<span class="pill ${overdue?'r':'y'}">Programada${overdue?" · atrasada":""}</span>`;}},
+      {label:"Estado", get:o=>OPP_STATUS[o.status]?.[0]||o.status,
+        html:o=>`<span class="pill ${OPP_STATUS[o.status]?.[1]||''}">${OPP_STATUS[o.status]?.[0]||o.status}${o.status==="lost"&&o.lossReason?" · "+esc(erp.listLabel("lossReasons",o.lossReason)):""}</span>`},
+      {label:"Días", get:o=>days(o)},
+    ],
+    onRowClick:id=>opportunityDrawer(id),
+    exportFile:"oportunidades", exportSheetName:"Oportunidades",
+    emptyText:"Ninguna oportunidad coincide con la búsqueda.",
+  });
+ },
+
+ /* ---------- Visita (COM-02, spec §COM-02) ----------
+    Two blocks, per the doc: programadas above (fixed six rows, own search
+    and pagination) and realizadas below (same). A visit is one collection
+    with a lifecycle (scheduled → done, S4 engine work), so both blocks read
+    the same `state.visits` filtered by status rather than being two
+    different kinds of record — scheduling one and completing it are two
+    views onto one lifecycle, not two features. */
+ visits(v){
+  $('#sub').textContent="Visitas programadas y realizadas. Programar una visita no captura nada todavía; completarla registra mediciones, fotos y notas.";
+  v.innerHTML=`<div class="card"><div class="ch"><h3>Programadas</h3></div><div style="padding:10px 14px" id="visProgWrap"></div></div>
+    <div class="card" style="margin-top:14px"><div class="ch"><h3>Realizadas</h3></div><div style="padding:10px 14px" id="visRealWrap"></div></div>`;
+  const scheduled=erp.state.visits.filter(x=>x.status==="scheduled").sort((a,b)=>(a.scheduledAt||"").localeCompare(b.scheduledAt||""));
+  const done=erp.state.visits.filter(x=>x.status==="done").sort((a,b)=>(b.completedAt||"").localeCompare(a.completedAt||""));
+  const OWNER={operations:"Obra",backoffice:"Oficina"};
+  renderMasterList($('#visProgWrap'),{
+    id:"visits-programadas", fixedSize:6, noExport:true,
+    ids:{q:"vpQ",prev:"vpPrev",next:"vpNext",newBtn:"vpNew"},
+    newLabel:"＋ Programar visita",
+    onNew:()=>{ const withOpp=erp.opportunityAges(); if(!withOpp.length){ toast("⚠ No hay oportunidades abiertas para programar una visita"); return; }
+      scheduleVisitDrawer(withOpp[0].id); },
+    searchPlaceholder:"Buscar por cliente",
+    nounSingular:"visita programada", nounPlural:"visitas programadas",
+    baseRows:scheduled,
+    matches:(x,q)=>erp.party(erp.state.opportunities.find(o=>o.id===x.opportunityId).partyId).name.toLowerCase().includes(q),
+    columns:[
+      {label:"Fecha/hora", get:x=>x.scheduledAt, html:x=>`${fmtD(x.scheduledAt)}${x.scheduledTime?" "+esc(x.scheduledTime):""}`},
+      {label:"Cliente", primary:true, get:x=>erp.party(erp.state.opportunities.find(o=>o.id===x.opportunityId).partyId).name},
+      {label:"Dirección", get:x=>{const p=x.propertyId&&erp.state.properties.find(y=>y.id===x.propertyId); return p?p.street:"";},
+        html:x=>{const p=x.propertyId&&erp.state.properties.find(y=>y.id===x.propertyId); return p?esc(p.street):"—";}},
+      {label:"Responsable", get:x=>OWNER[x.owner]||x.owner},
+      {label:"Estado", get:x=>x.scheduledAt<erp.today?"Atrasada":"Programada",
+        html:x=>{const overdue=x.scheduledAt&&x.scheduledAt<erp.today;
+          return `<span class="pill ${overdue?'r':'y'}">${overdue?"Atrasada":"Programada"}</span>`;}},
+    ],
+    onRowClick:id=>completeVisitDrawer(id),
+    emptyText:"Sin visitas programadas.",
+  });
+  renderMasterList($('#visRealWrap'),{
+    id:"visits-realizadas", fixedSize:6, noExport:true, noNew:true,
+    ids:{q:"vrQ",prev:"vrPrev",next:"vrNext"},
+    searchPlaceholder:"Buscar por cliente",
+    nounSingular:"visita realizada", nounPlural:"visitas realizadas",
+    baseRows:done,
+    matches:(x,q)=>erp.party(erp.state.opportunities.find(o=>o.id===x.opportunityId).partyId).name.toLowerCase().includes(q),
+    columns:[
+      {label:"Fecha", get:x=>x.completedAt, html:x=>fmtD(x.completedAt)},
+      {label:"Cliente", primary:true, get:x=>erp.party(erp.state.opportunities.find(o=>o.id===x.opportunityId).partyId).name},
+      {label:"Dirección", get:x=>{const p=x.propertyId&&erp.state.properties.find(y=>y.id===x.propertyId); return p?p.street:"";},
+        html:x=>{const p=x.propertyId&&erp.state.properties.find(y=>y.id===x.propertyId); return p?esc(p.street):"—";}},
+      {label:"Fotos", get:x=>(x.photos||[]).length},
+      {label:"Informe", get:x=>x.notes?"Sí":"No", html:x=>x.notes?'<span class="pill g">Sí</span>':'<span class="pill">No</span>'},
+      {label:"Presupuesto", get:x=>x.budgetId?erp.state.budgets.find(b=>b.id===x.budgetId)?.number||"":"",
+        html:x=>{const b=x.budgetId&&erp.state.budgets.find(y=>y.id===x.budgetId); return b?esc(b.number):'<span class="pill y">Sin crear</span>';}},
+    ],
+    onRowClick:id=>visitDetailDrawer(id),
+    emptyText:"Sin visitas realizadas.",
+  });
  },
 
  /* ---------- Presupuestos (PRE/QUO) ----------
@@ -4738,23 +4831,216 @@ function newPartyDrawer(role){
 function partyOptions(filter){
   return erp.state.parties.filter(p=>p.active&&filter(p)).map(p=>`<option value="${p.id}">${esc(p.name)} (${p.code})</option>`).join("");
 }
+/** Every inmueble on file for one client — "" is always offered first (a lead
+    with no known address yet is normal; the client record itself is not). */
+function propertyOptions(partyId,selected){
+  const props=erp.state.properties.filter(p=>p.partyId===partyId);
+  return `<option value="">— sin inmueble asociado —</option>`+
+    props.map(p=>`<option value="${p.id}"${p.id===selected?" selected":""}>${esc(p.street)}${p.city?", "+esc(p.city):""}</option>`).join("");
+}
 function newOpportunityDrawer(){
+  const custs=erp.state.parties.filter(p=>p.active&&p.roles.includes("customer"));
   const db=openDrawer("Nueva oportunidad");
   db.innerHTML=`<div class="fgrid">
    <div class="field full"><label>Cliente *</label><select id="o_party">${partyOptions(p=>p.roles.includes("customer"))}</select></div>
+   <div class="field full"><label>Inmueble</label><select id="o_prop">${propertyOptions(custs[0]&&custs[0].id,null)}</select></div>
    <div class="field full"><label>Trabajo solicitado *</label><input id="o_work" placeholder="Reforma integral de baño"></div>
    <div class="field"><label>Origen *</label><select id="o_src">${listOptions("leadSources")}</select></div>
    <div class="field"><label>Valor estimado (€)</label><input id="o_val" type="number" min="0" step="100" value="0"></div>
    <div class="field full"><label>Próxima acción</label><input id="o_next" value="Programar visita"></div>
    <div class="field full" style="margin-top:8px"><button class="btn primary" id="o_save">Crear oportunidad</button></div></div>`;
+  // The property list depends on which client is selected, so it is rebuilt
+  // on every change rather than loaded once for whichever client happened
+  // to be first in the list.
+  $('#o_party').onchange=e=>{ $('#o_prop').innerHTML=propertyOptions(e.target.value,null); };
   $('#o_save').onclick=()=>mutate(()=>{
     const work=$('#o_work').value.trim();
     if(!$('#o_party').value) throw new Error("Hace falta un cliente");
     if(!work) throw new Error("Describe el trabajo solicitado");
-    erp.addOpportunity({partyId:$('#o_party').value,requestedWork:work,source:$('#o_src').value,
+    erp.addOpportunity({partyId:$('#o_party').value,propertyId:$('#o_prop').value||null,
+      requestedWork:work,source:$('#o_src').value,
       expectedValue:Math.round((+$('#o_val').value||0)*100),nextAction:$('#o_next').value.trim()||"Programar visita"},"backoffice");
     closeDrawer(); go("leads");
   },"Oportunidad creada");
+}
+
+/* ---------- COM-01 · a lead's own drawer (S4) ----------
+   Identification, editable next action, the visit trail (schedule one from
+   here, or open one already on the calendar), and the one manual state
+   change this screen owns: marking a lead lost, with a reason. Winning is
+   never a button here — it is what acceptVersion does automatically the
+   moment the client accepts a presupuesto version, so a lead cannot be
+   marked won without the fiscal trail (an accepted version) that justifies
+   it existing. */
+const OPP_STATUS={awaitingVisit:["Pendiente de visita","y"],awaitingBudget:["Pendiente de presupuesto","y"],
+  awaitingResponse:["Esperando al cliente","b"],won:["Ganada","g"],lost:["Perdida","r"]};
+function opportunityDrawer(id){
+  const o=erp.state.opportunities.find(x=>x.id===id); if(!o)return;
+  const party=erp.party(o.partyId);
+  const prop=o.propertyId?erp.state.properties.find(p=>p.id===o.propertyId):null;
+  const visits=erp.state.visits.filter(v=>v.opportunityId===id).sort((a,b)=>(b.scheduledAt||"").localeCompare(a.scheduledAt||""));
+  const open=!["won","lost"].includes(o.status);
+  const db=openDrawer(esc(party.name));
+  db.innerHTML=`<div class="card"><div class="ch"><h3>Oportunidad</h3>
+     <span class="pill ${OPP_STATUS[o.status]?.[1]||''}">${OPP_STATUS[o.status]?.[0]||o.status}${o.status==="lost"&&o.lossReason?" · "+esc(erp.listLabel("lossReasons",o.lossReason)):""}</span></div>
+    <div class="daylist">
+     <div class="it">Trabajo: <b>${esc(o.requestedWork)}</b></div>
+     <div class="it">Inmueble: ${prop?esc(prop.street)+(prop.city?", "+esc(prop.city):""):"sin asociar"}</div>
+     <div class="it">Origen: ${esc(erp.listLabel("leadSources",o.source))} · Alta: ${fmtD(o.date)}</div>
+     <div class="it">Valor estimado: ${eur(o.expectedValue||0)}</div>
+    </div></div>
+   ${open?`<div class="card"><div class="ch"><h3>Próxima acción</h3></div><div class="fgrid" style="padding:12px 16px">
+     <div class="field full"><input id="opp_next" value="${esc(o.nextAction||"")}"></div>
+     <div class="field full"><button class="btn sm" id="opp_savenext">Guardar próxima acción</button></div></div></div>`:""}
+   <div class="card"><div class="ch"><h3>Visitas</h3>${open?'<button class="btn sm" id="opp_sched">＋ Programar visita</button>':""}</div>
+    <div class="daylist">
+     ${visits.map(v=>`<div class="it click" data-visit="${v.id}">
+       ${v.status==="scheduled"?`📅 Programada ${fmtD(v.scheduledAt)}${v.scheduledTime?" · "+esc(v.scheduledTime):""}`
+         :`✓ Realizada ${fmtD(v.completedAt)} · ${v.measurements.length} medición${v.measurements.length===1?"":"es"} · ${(v.photos||[]).length} 📷`}
+      </div>`).join("")||'<div class="it">Sin visitas todavía.</div>'}
+    </div></div>
+   ${open?`<div style="display:flex;gap:8px;margin-top:10px">
+     <button class="btn danger" id="opp_lose">Marcar como perdida</button>
+   </div>`:""}`;
+  db.querySelectorAll('[data-visit]').forEach(el=>el.onclick=()=>{
+    const v=erp.state.visits.find(x=>x.id===el.dataset.visit);
+    if(v.status==="scheduled") completeVisitDrawer(v.id); else visitDetailDrawer(v.id);
+  });
+  const sched=$('#opp_sched'); if(sched) sched.onclick=()=>scheduleVisitDrawer(id);
+  const savenext=$('#opp_savenext'); if(savenext) savenext.onclick=()=>mutate(()=>{
+    erp.updateOpportunity(id,{nextAction:$('#opp_next').value.trim()},"backoffice");
+    opportunityDrawer(id);
+  },"Próxima acción actualizada");
+  const lose=$('#opp_lose'); if(lose) lose.onclick=()=>{
+    const reason=prompt("Motivo de la pérdida (código: "+erp.listActive("lossReasons").map(r=>r.code).join(", ")+")");
+    if(reason==null) return;
+    if(!erp.listAll("lossReasons").some(r=>r.code===reason)){ toast("⚠ Motivo no reconocido"); return; }
+    mutate(()=>{ erp.loseOpportunity(id,reason,"backoffice"); closeDrawer(); },"Oportunidad marcada como perdida");
+  };
+}
+
+/* ---------- COM-02 · scheduling and capturing a visit (S4) ---------- */
+function scheduleVisitDrawer(opportunityId){
+  const o=erp.state.opportunities.find(x=>x.id===opportunityId); if(!o)return;
+  const db=openDrawer("Programar visita — "+erp.party(o.partyId).name);
+  db.innerHTML=`<div class="fgrid">
+   <div class="field"><label>Fecha *</label><input id="sv_date" type="date" value="${erp.today}"></div>
+   <div class="field"><label>Hora</label><input id="sv_time" type="time" value="10:00"></div>
+   <div class="field full"><label>Responsable</label><select id="sv_owner"><option value="operations">Obra</option><option value="backoffice">Oficina</option></select></div>
+   <div class="field full"><label>Notas</label><input id="sv_notes" placeholder="Referencias, acceso, contacto en obra…"></div>
+   <div class="field full" style="margin-top:8px"><button class="btn primary" id="sv_save">Programar</button></div></div>`;
+  $('#sv_save').onclick=()=>mutate(()=>{
+    const date=$('#sv_date').value; if(!date) throw new Error("Indica la fecha de la visita");
+    erp.scheduleVisit({opportunityId,propertyId:o.propertyId,scheduledAt:date,
+      scheduledTime:$('#sv_time').value||"",owner:$('#sv_owner').value,notes:$('#sv_notes').value.trim()},"backoffice");
+    closeDrawer(); go("visits");
+  },"Visita programada");
+}
+
+/** Photo capture shared by completeVisitDrawer and visitDetailDrawer: upload
+    or camera → compress → blob store → plain storageKey string, matching the
+    shape demo visits already carry (a filename string), so one render path
+    (imageUrl/paintImages) covers both real and seeded photos. */
+async function captureVisitPhotos(files){
+  const keys=[];
+  for(const f of files){
+    if(!/^image\//.test(f.type||"")){ toast("⚠ "+f.name+" no es una imagen"); continue; }
+    try{
+      const c=(typeof ErpBridge!=="undefined"&&ErpBridge.docs)?await ErpBridge.docs.compressImage(f):{blob:f};
+      const key="img_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,9);
+      await ErpStore.putBlob(key,c.blob);
+      keys.push(key);
+    }catch(e){ toast("⚠ "+e.message); }
+  }
+  return keys;
+}
+function completeVisitDrawer(visitId){
+  const v=erp.state.visits.find(x=>x.id===visitId); if(!v)return;
+  const o=erp.state.opportunities.find(x=>x.id===v.opportunityId);
+  // Local, unsaved draft — nothing is written to the visit until "Guardar".
+  // Uploaded photos are the one exception: the file has to leave the <input>
+  // and reach the blob store immediately or it cannot survive a re-render,
+  // so those keys are held here and only LINKED to the visit on save.
+  const draft={measurements:(v.measurements||[]).slice(),photos:(v.photos||[]).slice()};
+  const overdue=v.scheduledAt&&v.scheduledAt<erp.today;
+  const db=openDrawer("Visita — "+erp.party(o.partyId).name);
+  const paint=()=>{
+    db.innerHTML=`<div class="card"><div class="ch"><h3>Programada</h3>
+       <span class="pill ${overdue?'r':'y'}">${fmtD(v.scheduledAt)}${v.scheduledTime?" "+esc(v.scheduledTime):""}${overdue?" · atrasada":""}</span></div>
+      <div class="daylist"><div class="it">${esc(o.requestedWork)}</div>
+       ${v.notes?`<div class="it">${esc(v.notes)}</div>`:""}</div></div>
+     <div class="card"><div class="ch"><h3>Mediciones</h3></div><div class="daylist" id="cv_meas">
+      ${draft.measurements.map((m,i)=>`<div class="it" style="display:flex;gap:8px;align-items:center">
+        <span style="flex:1">${esc(m.what)} · ${m.qty} ${esc(m.unit)}</span>
+        <button class="btn sm danger" data-rm-meas="${i}">✕</button></div>`).join("")||'<div class="it">Sin mediciones todavía.</div>'}
+      </div>
+      <div class="fgrid" style="padding:0 16px 14px">
+       <div class="field"><label>Qué</label><input id="cv_what" placeholder="baño"></div>
+       <div class="field"><label>Cantidad</label><input id="cv_qty" type="number" min="0" step="0.01"></div>
+       <div class="field"><label>Unidad</label><select id="cv_unit">${listOptionsUnits("m2")}</select></div>
+       <div class="field full"><button class="btn sm" id="cv_addmeas">＋ Añadir medición</button></div></div></div>
+     <div class="card"><div class="ch"><h3>Fotos</h3><span class="tag">${draft.photos.length}</span></div>
+      <div class="gal" style="padding:12px 16px" id="cv_photos">
+       ${draft.photos.map((k,i)=>`<div class="gi"><img data-blob="${esc(k)}" alt="" style="width:100%;border-radius:8px"><button class="btn sm danger" data-rm-photo="${i}" style="margin-top:4px">✕</button></div>`).join("")}
+      </div>
+      <div class="daylist"><div class="it">
+       <label class="btn sm">Desde el ordenador<input type="file" id="cv_file" accept="image/*" multiple hidden></label>
+       <label class="btn sm">Cámara<input type="file" id="cv_cam" accept="image/*" capture="environment" hidden></label>
+      </div></div></div>
+     <div class="card"><div class="ch"><h3>Notas de la visita</h3></div><div style="padding:12px 16px">
+      <textarea id="cv_notes" rows="3" style="width:100%;font:inherit;font-size:13px;padding:8px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)" placeholder="Croquis a mano, estado del inmueble, supuestos…">${esc(v.notes||"")}</textarea>
+     </div></div>
+     <div style="margin-top:10px"><button class="btn primary" id="cv_save">Completar visita</button></div>`;
+    paintImages(db);
+    db.querySelectorAll('[data-rm-meas]').forEach(b=>b.onclick=()=>{ draft.measurements.splice(+b.dataset.rmMeas,1); paint(); });
+    db.querySelectorAll('[data-rm-photo]').forEach(b=>b.onclick=()=>{ draft.photos.splice(+b.dataset.rmPhoto,1); paint(); });
+    $('#cv_addmeas').onclick=()=>{
+      const what=$('#cv_what').value.trim(), qty=+$('#cv_qty').value||0, unit=$('#cv_unit').value;
+      if(!what||qty<=0){ toast("⚠ Indica qué se mide y una cantidad"); return; }
+      draft.measurements.push({what,qty,unit}); paint();
+    };
+    const onFiles=async(input)=>{ if(!input.files.length)return;
+      const keys=await captureVisitPhotos([...input.files]);
+      draft.photos.push(...keys); paint(); };
+    $('#cv_file').onchange=e=>onFiles(e.target);
+    $('#cv_cam').onchange=e=>onFiles(e.target);
+    $('#cv_save').onclick=()=>mutate(()=>{
+      erp.completeVisit(visitId,{measurements:draft.measurements,photos:draft.photos,notes:$('#cv_notes').value.trim()},"operations");
+      closeDrawer();
+    },"Visita completada");
+  };
+  paint();
+}
+/** A completed visit, read-only capture plus the one thing left to do with
+    it: send it to a presupuesto. Building the presupuesto ITSELF is COM-03
+    (S5) — this only creates the header and hands off to the existing
+    builder, exactly as the global "+ Crear" shortcut already does for a
+    client with no visit behind it at all. */
+function visitDetailDrawer(visitId){
+  const v=erp.state.visits.find(x=>x.id===visitId); if(!v)return;
+  const o=erp.state.opportunities.find(x=>x.id===v.opportunityId);
+  const budget=v.budgetId?erp.state.budgets.find(b=>b.id===v.budgetId):null;
+  const db=openDrawer("Visita — "+erp.party(o.partyId).name);
+  db.innerHTML=`<div class="card"><div class="ch"><h3>Realizada</h3><span class="pill g">${fmtD(v.completedAt)}</span></div>
+    <div class="daylist"><div class="it">${esc(o.requestedWork)}</div>
+     <div class="it">${v.measurements.map(m=>`${esc(m.what)} · ${m.qty} ${esc(m.unit)}`).join(" · ")||"Sin mediciones registradas"}</div>
+     ${v.notes?`<div class="it">${esc(v.notes)}</div>`:""}</div></div>
+   <div class="card"><div class="ch"><h3>Fotos</h3><span class="tag">${(v.photos||[]).length}</span></div>
+    <div class="gal" style="padding:12px 16px">
+     ${(v.photos||[]).map(k=>`<img data-blob="${esc(k)}" alt="" style="width:100%;border-radius:8px">`).join("")||'<div class="empty">Sin fotos.</div>'}
+    </div></div>
+   <div class="card"><div class="ch"><h3>Presupuesto</h3></div><div class="daylist">
+    ${budget?`<div class="it click" id="vd_openbudget">📄 ${esc(budget.number)} — abrir</div>`
+      :`<div class="it">Todavía no se ha creado un presupuesto desde esta visita.</div>
+        <div class="it"><button class="btn sm primary" id="vd_newbudget">＋ Crear presupuesto</button></div>`}
+   </div></div>`;
+  paintImages(db);
+  const openb=$('#vd_openbudget'); if(openb) openb.onclick=()=>{ closeDrawer(); go("quotes",v.budgetId); };
+  const newb=$('#vd_newbudget'); if(newb) newb.onclick=()=>mutate(()=>{
+    const b=erp.createBudget({partyId:o.partyId,propertyId:o.propertyId},"backoffice");
+    erp.validateVisit(v.id,{budgetId:b.id},"backoffice");
+    closeDrawer(); go("quotes",b.id);
+  },"Presupuesto creado desde la visita");
 }
 function newQuickProjectDrawer(){
   const db=openDrawer("Nuevo proyecto");
