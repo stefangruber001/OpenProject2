@@ -1152,8 +1152,6 @@ const SUBMAP={}; SECTIONS.forEach(s=>s.subs.forEach(x=>SUBMAP[x.k]={...x,sec:s})
    will live there and links to where that data is managed today, so the menu
    never leads to a blank screen. */
 const PLACEHOLDERS={
- "petty-cash":{sub:"ADM-06 · entradas, salidas y arqueo.",
-   body:"El modelo ya guarda la caja; falta la pantalla. Los movimientos en efectivo se ven de momento en Consolidación bancaria.",goto:["banking","Ir a Consolidación bancaria"]},
  "cash-flow":{sub:"ADM-08 · previsión semanal y mensual.",
    body:"La previsión ya se calcula en el motor y se muestra en la Torre; esta pantalla la abre por periodos y por proyecto.",goto:["tower","Ir a la Torre"]},
 };
@@ -5522,6 +5520,7 @@ const VIEWS={
     (matching, message planning) and are long enough that inlining them
     here would bury the rest of the map. */
  _reconcile:conciliacion,
+ "petty-cash":cajaChica,
  messaging:comunicaciones,
 
  /* ---------- Partidas y subpartidas (DMC-01, spec §DMC-01) ----------
@@ -5795,31 +5794,95 @@ const VIEWS={
     es el mismo gesto, y hacerlo en dos pantallas distintas producía
     movimientos asignados a una obra pero sin factura detrás. Todo eso vive
     ahora en Conciliación Bancaria; esta pantalla informa y enlaza. */
- _bankAccounts(v){
-  $('#sub').textContent="Posición de tesorería, movimientos importados y previsión de caja. La asignación y el casado con documentos se hacen en Conciliación Bancaria.";
-  const cf=erp.cashForecast(6);
-  const movAll=erp.state.movements, movs=movAll.filter(m=>inPeriod(m.accountingDate));
-  v.innerHTML=`<div class="kpis" style="grid-template-columns:repeat(${erp.state.bankAccounts.length+1},1fr)">
-    ${erp.state.bankAccounts.map(a=>`<div class="kpi"><div class="lab">${esc(a.name)}</div><div class="val">${eur0(erp.accountBalanceCents(a.id))}</div><div class="sub">${a.kind==="till"?"caja":"banco"}</div></div>`).join("")}
-    <div class="kpi hi"><div class="lab">Total disponible</div><div class="val">${eur0(erp.cashPosition().totalCents)}</div><div class="sub">bancos + caja</div></div></div>
-   ${periodNote(movs.length,movAll.length)}
-   <div class="card"><div class="ch"><h3>Movimientos</h3><button class="btn sm" id="bToRec">Ir a Conciliación →</button></div>
-   <div class="scroll"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Clase</th><th>Asignación</th></tr></thead><tbody>
-   ${movs.slice().reverse().map(m=>{
-     const cls={projectCost:"Coste de obra",overhead:"Gasto general",tax:"Impuestos",salary:"Nóminas",financial:"Financiero",internalTransfer:"Traspaso interno",customerReceipt:"Cobro de cliente"}[m.class]||"—";
-     const alloc=m.allocations.length?m.allocations.map(a=>(a.projectId?erp.project(a.projectId).code:a.overheadCategory)+(a.kind?` · ${a.kind}`:"")).join(", "):null;
-     return `<tr><td>${fmtD(m.accountingDate)}</td>
-      <td>${esc(m.merchantText||m.counterparty||m.concept)}${m.card?` <span class="pill b">${m.card}</span>`:""}${m.needsDoc?' <span class="pill r">Falta justificante</span>':''}</td>
-      <td class="num" style="color:${m.amountCents<0?'var(--danger)':'var(--greenDeep)'}">${eur(m.amountCents)}</td>
-      <td>${m.class?`<span class="pill ${m.class==="internalTransfer"?"b":m.class==="customerReceipt"?"g":""}">${cls}</span>`:'<span class="pill r">Sin clasificar</span>'}</td>
-      <td>${alloc?esc(alloc):(m.status==="unallocated"?'<span class="pill y">Sin asignar</span>':"—")}</td></tr>`;}).join("")}
-   </tbody></table></div></div>
-   <div class="card"><div class="ch"><h3>Previsión de caja — próximas 6 semanas</h3></div><div class="scroll"><table><thead><tr><th>Semana</th><th class="num">Cobros previstos</th><th class="num">Pagos previstos</th><th class="num">Neto</th></tr></thead><tbody>
-   ${cf.map(w=>`<tr><td>${fmtD(w.from)} – ${fmtD(w.to)}</td><td class="num">${eur0(w.inflowCents)}</td><td class="num">${eur0(w.outflowCents)}</td><td class="num" style="color:${w.netCents<0?'var(--danger)':'var(--greenDeep)'}">${eur0(w.netCents)}</td></tr>`).join("")}
-   </tbody></table></div></div>`;
-  $('#bToRec').onclick=()=>goTab("banking","_reconcile");
- },
+ /* ---------- ADM-05 Consolidación bancaria (S11) ----------
+    The last of S1b's three tab strips, merged. §3.2: header plus account
+    selector, a 56 strip carrying the selected balance, the total balance and
+    the unmatched count, and a table where **classification and assignment are
+    edited inline in the row**.
 
+    Inline is the whole point. Classifying a movement is a two-second decision
+    made forty times in a row; a drawer per movement turns forty seconds of
+    work into forty interruptions. An unmatched movement carries an amber left
+    bar and shows its age, so the queue reads as a queue.
+
+    Conciliación keeps its own tab: assisted matching is a different job from
+    classifying a card payment, and it is the only screen that drives the
+    reconciliation capability. */
+ _bankAccounts(v){
+  $('#sub').textContent="Saldos, movimientos y clasificación. La clase y el destino se editan en la propia fila; lo que sigue sin casar lleva una barra ámbar y dice cuántos días lleva ahí.";
+  const accs=erp.state.bankAccounts;
+  if(!accs.length){ v.innerHTML='<div class="card"><div class="empty">No hay cuentas configuradas.</div></div>'; return; }
+  if(bankAcc&&!accs.some(a=>a.id===bankAcc)) bankAcc="";
+  const movAll=erp.state.movements.filter(m=>!bankAcc||m.accountId===bankAcc);
+  const movs=movAll.filter(m=>inPeriod(m.accountingDate));
+  const unmatched=movs.filter(m=>m.status==="unallocated").length;
+  const selBal=bankAcc?erp.accountBalanceCents(bankAcc):erp.cashPosition().totalCents;
+  const CLASSES=[["projectCost","Coste de obra"],["overhead","Gasto general"],["tax","Impuestos"],
+    ["salary","Nóminas"],["financial","Financiero"],["internalTransfer","Traspaso interno"],
+    ["customerReceipt","Cobro de cliente"]];
+
+  v.innerHTML=`
+   <div class="stepbar">
+     <select class="inline" id="bkSel">
+       <option value="">Todas las cuentas</option>
+       ${accs.map(a=>`<option value="${a.id}"${a.id===bankAcc?" selected":""}>${esc(a.name)}</option>`).join("")}
+     </select>
+     <span style="flex:1"></span>
+     <button class="btn sm" id="bToRec">Ir a Conciliación →</button>
+   </div>
+   <div class="card"><div class="queuebar">
+     <span class="n">${eur0(selBal)}</span><span>${bankAcc?"en la cuenta seleccionada":"en todas las cuentas"}</span>
+     <span style="flex:1"></span>
+     <span>${eur0(erp.cashPosition().totalCents)}</span><span>total disponible</span>
+     <span style="flex:1"></span>
+     ${unmatched?`<span class="pill y"><span>${unmatched}</span> <span>sin casar</span></span>`:'<span class="pill g">Todo casado</span>'}
+   </div></div>
+   ${periodNote(movs.length,movAll.length)}
+   <div class="card"><div class="ch"><h3>Movimientos</h3><span class="tag">${movs.length}</span></div>
+   <div class="scroll"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Clase</th><th>Destino</th><th>Antigüedad</th></tr></thead><tbody>
+   ${movs.slice().reverse().map(m=>{
+     const open=m.status==="unallocated";
+     const age=open?Math.max(0,ErpEngine.daysBetween(erp.today,m.accountingDate)):0;
+     const alloc=(m.allocations||[]).length
+       ? (m.allocations||[]).map(a=>a.projectId?erp.project(a.projectId).code
+           :(OVERHEAD_LABEL[a.overheadCategory]||a.overheadCategory||"—")).join(", ")
+       : null;
+     return `<tr class="xrow${open?" unapproved":""}">
+      <td>${fmtD(m.accountingDate)}</td>
+      <td class="k">${esc(m.merchantText||m.counterparty||m.concept||"—")}${m.card?` <span class="pill b">${esc(m.card)}</span>`:""}</td>
+      <td class="num" style="color:${m.amountCents<0?'var(--danger)':'var(--greenDeep)'}">${eur(m.amountCents)}</td>
+      <td><select class="inline" data-bkclass="${m.id}">
+        <option value="">—</option>
+        ${CLASSES.map(([k,l])=>`<option value="${k}"${m.class===k?" selected":""}>${esc(l)}</option>`).join("")}
+      </select></td>
+      <td><select class="inline" data-bkdest="${m.id}">
+        <option value="">${alloc?esc(alloc):"—"}</option>
+        <optgroup label="Obras">${erp.state.projects.filter(p=>!p.closed).map(p=>`<option value="p:${p.id}">${esc(p.code)}</option>`).join("")}</optgroup>
+        <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL).map(([k,l])=>`<option value="o:${k}">${esc(l)}</option>`).join("")}</optgroup>
+      </select></td>
+      <td>${open?`<span title="Días sin casar"><span>${age}</span> <span>d</span></span>`:'<span class="pill g">Casado</span>'}</td>
+     </tr>`;}).join("")
+     ||'<tr><td colspan="6"><div class="empty">Sin movimientos en el periodo.</div></td></tr>'}
+   </tbody></table></div></div>`;
+
+  $('#bkSel').onchange=e=>{ bankAcc=e.target.value; render(); };
+  $('#bToRec').onclick=()=>goTab("banking","_reconcile");
+  v.querySelectorAll('[data-bkclass]').forEach(sel=>sel.onchange=()=>{
+    if(!sel.value) return;
+    mutate(()=>erp.classifyMovement(sel.dataset.bkclass,sel.value,"backoffice"),"Movimiento clasificado");
+  });
+  v.querySelectorAll('[data-bkdest]').forEach(sel=>sel.onchange=()=>{
+    const val=sel.value; if(!val) return;
+    mutate(()=>{
+      const m=erp.state.movements.find(x=>x.id===sel.dataset.bkdest);
+      const amount=Math.abs(m.amountCents);
+      erp.splitMovement(m.id,[val.startsWith("p:")
+        ?{projectId:val.slice(2),kind:"material",amountCents:amount}
+        :{overheadCategory:val.slice(2),amountCents:amount}],"backoffice");
+    },"Movimiento asignado");
+  });
+ },
+ 
  /* ---------- Lista de precios (DMC-02, spec §DMC-02) ----------
     The doc puts a partida filter at the top and makes it permanent, because
     the comparison the screen exists for is "who is cheapest for THIS item" —
@@ -6950,6 +7013,89 @@ function chapSplitRows(pid,row,chapters){
     chapSplitRows(pid,row,chapters);
   });
   host.querySelectorAll('[data-srm]').forEach(b=>b.onclick=()=>{ chapSplit.splice(+b.dataset.srm,1); chapSplitRows(pid,row,chapters); });
+}
+
+/* ================= ADM-06 · Caja chica (S11) ==============================
+   "The simplest screen" (§3.2), and the one that most rewards not being
+   clever: a till is a bank account whose statement nobody imports, so entries
+   are typed and the arqueo at the foot is what proves them.
+
+   The closing figure is COMPUTED from the opening balance and the period's
+   movements. A stored closing balance is a number nobody counted. */
+let cashAcc="", bankAcc="";
+function cajaChica(v){
+  $('#sub').textContent="Entradas y salidas de la caja en efectivo, y el arqueo que las prueba. Una salida sin justificante se cuenta aparte: es el agujero clásico en las cuentas de una empresa pequeña.";
+  const tills=erp.state.bankAccounts.filter(a=>a.kind==="till");
+  if(!tills.length){ v.innerHTML='<div class="card"><div class="empty">No hay ninguna caja en efectivo configurada.</div></div>'; return; }
+  if(!cashAcc||!tills.some(t=>t.id===cashAcc)) cashAcc=tills[0].id;
+  const r=periodRange();
+  const cc=erp.cashCount(cashAcc,r.from,r.to);
+  const movs=erp.state.movements
+    .filter(m=>m.accountId===cashAcc&&inPeriod(m.accountingDate))
+    .slice().reverse();
+
+  v.innerHTML=`
+   <div class="stepbar">
+     ${tills.length>1?`<select class="inline" id="cashSel">${tills.map(t=>`<option value="${t.id}"${t.id===cashAcc?" selected":""}>${esc(t.name)}</option>`).join("")}</select>`:""}
+     <button class="btn primary sm" id="cashIn">＋ Entrada</button>
+     <button class="btn sm" id="cashOut">− Salida</button>
+   </div>
+   <div class="card"><div class="queuebar">
+     <span class="n">${eur(cc.closingCents)}</span><span>en caja</span>
+     <span style="flex:1"></span>
+     ${cc.awaitingDoc?`<span class="pill r"><span>${cc.awaitingDoc}</span> <span>sin justificante</span></span>`:'<span class="pill g">Todo justificado</span>'}
+   </div></div>
+   <div class="card"><div class="ch"><h3>Movimientos</h3><span class="tag">${cc.count}</span></div>
+    <div class="scroll"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Justificante</th><th></th></tr></thead><tbody>
+    ${movs.map(m=>`<tr><td>${fmtD(m.accountingDate)}</td>
+      <td class="k">${esc(m.concept||m.merchantText||"—")}</td>
+      <td class="num" style="color:${m.amountCents<0?'var(--danger)':'var(--greenDeep)'}">${eur(m.amountCents)}</td>
+      <td>${m.needsDoc?'<span class="pill r">Falta</span>':'<span class="pill g">Sí</span>'}</td>
+      <td>${m.needsDoc?`<button class="btn sm" data-cashdoc="${m.id}">Marcar justificado</button>`:""}</td></tr>`).join("")
+      ||'<tr><td colspan="5"><div class="empty">Sin movimientos de caja en el periodo.</div></td></tr>'}
+    </tbody></table></div>
+    <div class="daylist" style="border-top:1px solid var(--line)">
+      <div class="it"><span>Saldo inicial</span><span style="flex:1"></span><b>${eur(cc.openingCents)}</b></div>
+      <div class="it"><span>Entradas</span><span style="flex:1"></span><b>${eur(cc.inCents)}</b></div>
+      <div class="it"><span>Salidas</span><span style="flex:1"></span><b>${eur(-cc.outCents)}</b></div>
+      <div class="it"><span>Saldo final</span><span style="flex:1"></span><b id="cashClose">${eur(cc.closingCents)}</b></div>
+    </div>
+   </div>`;
+  const sel=$('#cashSel'); if(sel) sel.onchange=()=>{ cashAcc=sel.value; render(); };
+  $('#cashIn').onclick=()=>cashDrawer(cashAcc,1);
+  $('#cashOut').onclick=()=>cashDrawer(cashAcc,-1);
+  v.querySelectorAll('[data-cashdoc]').forEach(b=>b.onclick=()=>mutate(()=>{
+    const m=erp.state.movements.find(x=>x.id===b.dataset.cashdoc);
+    m.needsDoc=false;
+  },"Justificante registrado"));
+}
+function cashDrawer(accountId,sign){
+  const db=openDrawer(sign>0?"Entrada de caja":"Salida de caja");
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Concepto *</label><input id="ca_c" placeholder="${sign>0?"Reposición de caja":"Ferretería del barrio"}"></div>
+   <div class="field"><label>Importe (€)</label><input id="ca_a" type="number" step="0.01" min="0"></div>
+   <div class="field"><label>Fecha</label><input id="ca_d" type="date" value="${erp.today}"></div>
+   ${sign<0?`<div class="field full"><label style="display:flex;gap:6px;align-items:center">
+     <input type="checkbox" id="ca_doc" checked> <span>Falta el justificante</span></label></div>`:""}
+   <div class="field full" style="margin-top:6px"><button class="btn primary" id="ca_go">Registrar</button></div>
+  </div>`;
+  $('#ca_go').onclick=()=>mutate(()=>{
+    const amt=Math.round(Number(String($('#ca_a').value).replace(",","."))*100);
+    if(!(amt>0)) throw new Error("Indica el importe");
+    const concept=$('#ca_c').value.trim();
+    if(!concept) throw new Error("El concepto es obligatorio");
+    const doc=$('#ca_doc');
+    // BNK-07's own signature: the movement goes in through importMovements,
+    // and NOT naming a supporting document is what flags it. There is no
+    // second cash method — see the note in erp-engine.js.
+    erp.recordCashMovement(accountId,{
+      accountingDate:$('#ca_d').value||erp.today,
+      concept,
+      amountCents:sign*amt,
+      supportingDocRef:(sign<0&&doc&&doc.checked)?null:"registrado-en-pantalla",
+    },"operations");
+    closeDrawer();
+  },sign>0?"Entrada registrada":"Salida registrada");
 }
 
 /* ================= ADM-01 · Facturación (S10) =============================
