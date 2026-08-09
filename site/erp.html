@@ -527,6 +527,48 @@
      everything already filed on the right. The split is not decorative: the
      left column is a worklist that empties, and a worklist you can see the
      bottom of is the difference between filing documents and having a pile. */
+  /* ---------- COM-04: the contract, full screen (S9) ----------
+     The fourth and last of §3.1's out-of-shell surfaces. Wider on the left
+     than ADM-02's 620 because a contract is read, not compared: 760 for the
+     document and a fixed 392 for the panel that indexes it. */
+  .con2{display:grid;grid-template-columns:minmax(0,760px) 392px;min-height:0;flex:1}
+  .condoc{min-height:0;overflow:auto;background:var(--hair);padding:16px;display:flex;justify-content:center}
+  .conpanel{min-height:0;overflow:auto;background:var(--paper);border-left:1px solid var(--line)}
+  /* The document itself. Type, not chrome: it is the thing the customer signs,
+     so it is set like a document and marked translate="no" (S5) — its language
+     is a field on the contract, not a preference of whoever is at the screen. */
+  .cdoc{background:#fff;color:#111;width:100%;max-width:720px;padding:34px 40px;
+    border:1px solid var(--line);border-radius:4px;box-shadow:var(--shadow);
+    font:13px/1.55 var(--sans)}
+  .cdoc h1{font:700 17px var(--sans);margin:0 0 4px;letter-spacing:.06em;text-transform:uppercase}
+  .cdoc h2{font:700 11px var(--sans);letter-spacing:.1em;text-transform:uppercase;
+    color:#666;margin:22px 0 6px;border-bottom:1px solid #ddd;padding-bottom:4px}
+  .cdoc .meta{color:#666;font-size:12px;margin-bottom:18px}
+  .cdoc table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .cdoc th{text-align:left;font-weight:600;color:#666;padding:4px 6px;border-bottom:1px solid #ddd}
+  .cdoc td{padding:4px 6px;border-bottom:1px solid #f0f0f0}
+  .cdoc td.n{text-align:right;font-variant-numeric:tabular-nums}
+  .cdoc .tot td{font-weight:700;border-top:1px solid #999;border-bottom:0}
+  .cdoc .pair{display:flex;gap:10px;padding:3px 0;border-bottom:1px solid #f4f4f4}
+  .cdoc .pair span:first-child{color:#666;min-width:180px}
+  @media(max-width:1180px){ .con2{grid-template-columns:minmax(0,1fr)} }
+
+  /* ---------- PRY-03: adicionales (S9) ----------
+     Rows are 56 rather than 44 because they carry a 40 × 40 photograph, and an
+     unapproved extra gets a 3 px amber rule down its left edge as well as its
+     pill — §3.2 wants it readable from across a site office, where nobody is
+     going to lean in and read a word. */
+  /* 56 exactly: the cells' own padding would otherwise push a row carrying a
+     40 px thumbnail to 59, and §3.2's numbers are the point of this screen. */
+  tr.xrow td{height:56px;padding-top:4px;padding-bottom:4px}
+  /* A border, not a box-shadow: the table is border-collapse:collapse, where a
+     shadow on a cell is not painted at all in Chromium. */
+  tr.xrow.unapproved td:first-child{border-left:3px solid var(--amber)}
+  .xthumb{width:40px;height:40px;border-radius:6px;border:1px solid var(--line);
+    background:var(--hair);display:inline-flex;align-items:center;justify-content:center;
+    overflow:hidden;font-size:15px;color:var(--faint);vertical-align:middle}
+  .xthumb img{width:100%;height:100%;object-fit:cover}
+
   /* ---------- Counter strip (S7) ----------
      The specification's second shared primitive: a row of fixed-width cards
      carrying a count AND an amount, where pressing one filters the list below
@@ -1183,6 +1225,8 @@ function go(k,arg){
   // that survives a trip to another section ambushes whoever comes back — they
   // asked for the list and got a document.
   if(k!=="purchasing") puWork=null;
+  if(k!=="contracts") conWork=null;
+  if(k!=="progress") ganttFull=false;
   cur=k; location.hash=k; window._arg=arg; closeMenus(); render(); window.scrollTo(0,0);
 }
 
@@ -2250,29 +2294,84 @@ function subcontractDrawer(id){
 }
 
 /* ---------- Modificaciones contractuales (§4.5) ---------- */
+/* ---------- PRY-03 Adicionales (S9) ----------
+   §3.2 is unusually precise about this screen, and the precision is the
+   point: five 216 counters that filter, rows 56 tall so a photograph fits in
+   them, and an unapproved extra marked twice — an amber pill AND a 3 px amber
+   rule down the left of its row. The rule is not decoration. CHG-04 says
+   unapproved work is never billable, and the person who needs to know that is
+   walking past a screen in a site office, not reading a column.
+
+   The counters are the doc's five stages, derived in the engine from the
+   record's eight statuses; a rejected or cancelled extra is counted in none
+   of them. */
+let chgStage="";
 function modificaciones(v){
-  $('#sub').textContent="Extras y modificaciones contractuales: captura, valoración, envío y aprobación. El trabajo no aprobado nunca es facturable — CHG-04.";
+  $('#sub').textContent="Extras y modificaciones: detectados, valorados, aprobados, ejecutados y facturados. El trabajo no aprobado nunca es facturable — la barra ámbar lo dice desde lejos.";
   if(!erp.state.projects.length) return noProjectsCard(v);
   const pid=gProject;
   const reg=erp.extrasRegister(pid);
-  const e=erp.projectEconomics(pid);
+  const sum=erp.changeStageSummary(pid);
+  const STAGES=[["identified","Identificado"],["priced","Valorado"],["approved","Aprobado"],
+    ["executed","Ejecutado"],["invoiced","Facturado"]];
+  const shown=chgStage?reg.items.filter(c=>erp.changeStage(c)===chgStage):reg.items;
+
   v.innerHTML=`
-   <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
-    <div class="kpi"><div class="lab">Contrato original</div><div class="val">${eur0(e.baselineRevenueCents)}</div></div>
-    <div class="kpi"><div class="lab">Modificaciones aprobadas</div><div class="val">${eur0(e.approvedChangesCents)}</div><div class="sub">${reg.approved} de ${reg.items.length}</div></div>
-    <div class="kpi hi"><div class="lab">Contrato vigente</div><div class="val">${eur0(e.currentRevenueCents)}</div></div>
+   <div class="counters" style="--cw:216px">
+    ${STAGES.map(([k,l])=>`<button class="counter${chgStage===k?" on":""}" data-cstage="${k}">
+      <div class="lab">${esc(l)}</div>
+      <div class="val">${eur0(sum[k].amountCents)}</div>
+      <div class="sub"><span>${sum[k].count}</span> <span>${sum[k].count===1?"extra":"extras"}</span></div>
+     </button>`).join("")}
    </div>
-   <div class="stepbar"><button class="btn primary sm" id="mNew">＋ Nueva modificación</button></div>
+   <div class="stepbar"><button class="btn primary sm" id="mNew">＋ Nueva modificación</button>
+     <span style="flex:1"></span>
+     <span class="tag"><span>Sin aprobar</span> <b>${eur0(reg.unapprovedValueCents)}</b></span></div>
    <div class="card"><div class="ch"><h3>Modificaciones</h3><span class="tag">no facturable sin aprobación</span></div>
-    <div class="scroll"><table><thead><tr><th>Descripción</th><th>Capítulo</th><th class="num">Venta</th><th class="num">Coste</th><th>Plazo</th><th>Fecha</th><th>Estado</th><th></th></tr></thead><tbody>
-    ${reg.items.slice().reverse().map(c=>{const lab=CHANGE_STATUS_LABEL[c.status]||[c.status,""];
-      return `<tr><td class="k">${esc(c.desc)}${c.photoRef?" 📷":""}</td><td>${c.chapterNum||"—"}</td>
-      <td class="num">${eur(c.priceCents)}</td><td class="num">${eur(c.costCents)}</td><td class="num">${c.scheduleImpactDays?(c.scheduleImpactDays>0?"+":"")+c.scheduleImpactDays+" d":"—"}</td>
-      <td>${fmtD(c.date)}</td><td><span class="pill ${lab[1]}">${lab[0]}</span></td>
-      <td>${changeActionsHtml(c)}</td></tr>`;}).join("")||'<tr><td colspan="8"><div class="empty">Sin modificaciones.</div></td></tr>'}
+    <div class="scroll"><table><thead><tr><th></th><th>Descripción</th><th>Capítulo</th><th class="num">Venta</th><th class="num">Coste</th><th>Plazo</th><th>Fecha</th><th>Estado</th><th></th></tr></thead><tbody>
+    ${shown.slice().reverse().map(c=>{const lab=CHANGE_STATUS_LABEL[c.status]||[c.status,""];
+      const unapproved=["identified","priced","sent"].includes(c.status);
+      return `<tr class="xrow${unapproved?" unapproved":""}">
+      <td><span class="xthumb" data-photo="${esc(c.photoRef||"")}">📷</span></td>
+      <td class="k">${esc(c.desc)}</td><td>${c.chapterNum||"—"}</td>
+      <td class="num">${eur(c.priceCents)}</td><td class="num">${eur(c.costCents)}</td>
+      <td class="num">${c.scheduleImpactDays?(c.scheduleImpactDays>0?"+":"")+c.scheduleImpactDays+" d":"—"}</td>
+      <td>${fmtD(c.date)}</td>
+      <td><span class="pill ${lab[1]}">${lab[0]}</span>${unapproved?' <span class="pill y">Sin aprobar</span>':""}</td>
+      <td>${changeActionsHtml(c)}</td></tr>`;}).join("")
+      ||`<tr><td colspan="9"><div class="empty">${chgStage?"Ningún extra en esta etapa.":"Sin modificaciones."}</div></td></tr>`}
     </tbody></table></div></div>`;
+  v.querySelectorAll('[data-cstage]').forEach(b=>b.onclick=()=>{
+    chgStage=chgStage===b.dataset.cstage?"":b.dataset.cstage; render();
+  });
   $('#mNew').onclick=()=>changeFormDrawer(pid);
+  changeThumbs(v);
   wireChangeActions(pid);
+}
+
+/* The 40 × 40 photograph. Same cache and same fallback as ADM-03's inbox
+   cards: a key that is not a blob (the seed writes plain file names) simply
+   stays the camera icon rather than showing a broken image. */
+const chgThumbUrls={};
+function changeThumbs(root){
+  root.querySelectorAll('.xthumb[data-photo]').forEach(box=>{
+    const key=box.dataset.photo; if(!key) return;
+    const show=url=>{ if(!url) return;
+      const img=new Image();
+      img.onload=()=>{ box.innerHTML=''; box.appendChild(img); };
+      img.onerror=()=>{};
+      img.alt=''; img.src=url;
+    };
+    if(chgThumbUrls[key]!==undefined){ show(chgThumbUrls[key]); return; }
+    const direct=ErpStore.blobUrl(key);
+    if(direct){ chgThumbUrls[key]=direct; show(direct); return; }
+    chgThumbUrls[key]=null;
+    ErpStore.getBlob(key).then(b=>{
+      if(!b) return;
+      chgThumbUrls[key]=URL.createObjectURL(b);
+      show(chgThumbUrls[key]);
+    }).catch(()=>{});
+  });
 }
 function changeActionsHtml(c){
   if(c.status==="identified") return `<button class="btn sm" data-price="${c.id}">Valorar</button>`;
@@ -2315,12 +2414,34 @@ function changeFormDrawer(pid){
    <div class="field full"><label>Descripción *</label><input id="c_desc" placeholder="Suelo radiante en baño"></div>
    <div class="field full"><label>Motivo</label><input id="c_reason" placeholder="Petición del cliente"></div>
    <div class="field"><label>Capítulo</label><select id="c_ch"><option value="">—</option>${chapterOptions(pid)}</select></div>
-   <div class="field"><label>Foto</label><input id="c_photo" placeholder="extra-01.jpg"></div>
+   <div class="field full"><label>Foto</label>
+     <div style="display:flex;gap:8px;align-items:center">
+       <span class="xthumb" id="c_thumb">📷</span>
+       <label class="btn sm">Hacer foto<input type="file" id="c_photo" accept="image/*" capture="environment" hidden></label>
+       <span style="font-size:12px;color:var(--muted)" id="c_photolab">Sin foto</span>
+     </div></div>
    <div class="field full" style="margin-top:6px"><button class="btn primary" id="c_save">Registrar como detectada</button></div>
   </div>`;
+  /* The photograph is a real file now, stored as a blob like every other
+     picture since S6, because §3.2 puts a 40 × 40 thumbnail in the row and a
+     typed file name renders as nothing. It is taken BEFORE the record is
+     written, so a failed upload cannot leave an extra pointing at a picture
+     that is not there. */
+  let photoKey=null;
+  const fi=$('#c_photo');
+  fi.onchange=()=>{
+    const f=fi.files&&fi.files[0]; if(!f) return;
+    const key="chg_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
+    const url=URL.createObjectURL(f);
+    const img=new Image(); img.alt=""; img.src=url;
+    img.onload=()=>{ const t=$('#c_thumb'); if(t){ t.innerHTML=''; t.appendChild(img); } };
+    ErpStore.putBlob(key,f)
+      .then(()=>{ photoKey=key; chgThumbUrls[key]=url; const l=$('#c_photolab'); if(l) l.textContent=f.name||"Foto adjunta"; })
+      .catch(()=>{ const l=$('#c_photolab'); if(l) l.textContent="No se ha podido guardar la foto"; });
+  };
   $('#c_save').onclick=()=>mutate(()=>{
     const desc=$('#c_desc').value.trim(); if(!desc) throw new Error("La descripción es obligatoria");
-    erp.addChange(pid,{desc,reason:$('#c_reason').value,chapterNum:$('#c_ch').value||null,photoRef:$('#c_photo').value||null},"operations");
+    erp.addChange(pid,{desc,reason:$('#c_reason').value,chapterNum:$('#c_ch').value||null,photoRef:photoKey},"operations");
     closeDrawer();
   },"Extra registrado");
 }
@@ -5111,17 +5232,51 @@ const VIEWS={
  },
 
  /* ---------- Contratos (CON-13) ---------- */
+ /* ---------- COM-04 Contrato (S9) ----------
+    Two tabs, a list, and the last of §3.1's four full-screen surfaces.
+
+    The column that earns the screen is «Importe vigente»: it goes amber the
+    moment it differs from the original, because a difference means annexes
+    exist and that is the one fact about a contract nobody should have to open
+    it to discover. */
  contracts(v){
-  $('#sub').textContent="Términos clave como datos, no texto libre: hitos de pago, regla de inicio, duración, penalizaciones y garantías. Sin firma no hay obra ni primera factura.";
-  const view=erp.contractControlView();
-  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Contrato</th><th>Cliente</th><th class="num">Valor</th><th>Hitos de pago</th><th>Inicio</th><th class="num">Duración</th><th>Garantías</th><th>Firma</th><th>Estado</th></tr></thead><tbody>
-   ${view.map(c=>`<tr><td class="k">${c.number}</td><td>${esc(c.party)}</td><td class="num k">${eur0(c.valueCents)}</td>
-    <td>${c.installments.map(i=>`<span class="pill ${i.status==="invoiced"?"g":"b"}">${eur0(i.amountCents)}</span>`).join(" ")}</td>
-    <td>≤${c.startRule.startWithinDays} días${c.startRule.committedStartDate?" · "+fmtD(c.startRule.committedStartDate):""}</td>
-    <td class="num">${c.durationDays} días</td><td>${c.guarantees} categorías</td>
-    <td>${c.signed?'<span class="pill g">Firmado</span>':'<span class="pill r">Sin firmar</span>'}</td>
-    <td><span class="pill ${c.status==="completed"?"g":c.status==="inForce"?"b":"y"}">${({draft:"Borrador",sent:"Enviado",signed:"Firmado",inForce:"En vigor",completed:"Finalizado",cancelled:"Anulado"})[c.status]}</span></td></tr>`).join("")}
-   </tbody></table></div></div>`;
+  $('#sub').textContent="Contratos vigentes e históricos. El importe vigente se marca en ámbar cuando ya no coincide con el original: significa que hay anexos.";
+  if(conWork) return contractScreen(v);
+  const all=erp.contractsView();
+  const rows=all.filter(c=>conTab==="active"?c.active:!c.active);
+  const CST={draft:["Borrador",""],sent:["Enviado","b"],signed:["Firmado","b"],
+    inForce:["En vigor","b"],completed:["Finalizado","g"],cancelled:["Anulado","r"]};
+  v.innerHTML=`
+   <div class="tabstrip">
+     <button class="tab${conTab==="active"?" on":""}" data-ctab="active">Vigentes</button>
+     <button class="tab${conTab==="inactive"?" on":""}" data-ctab="inactive">Históricos</button>
+   </div>
+   <div id="conList"></div>`;
+  v.querySelectorAll('[data-ctab]').forEach(b=>b.onclick=()=>{ conTab=b.dataset.ctab; render(); });
+  renderMasterList($('#conList'),{
+    id:"contracts-"+conTab, noNew:true,
+    ids:{q:"conQ",size:"conSize",prev:"conPrev",next:"conNext",exp:"conExp",
+      expMenu:"conExpMenu",expXlsx:"conExpXlsx",expCsv:"conExpCsv"},
+    nounSingular:"contrato", nounPlural:"contratos",
+    searchPlaceholder:"Buscar por número, cliente u obra…",
+    emptyText:"Ningún contrato coincide con la búsqueda.",
+    baseRows:rows.slice().reverse(),
+    matches:(c,q)=>[c.number,c.party,c.projectCode].filter(Boolean).join(" ").toLowerCase().includes(q),
+    columns:[
+      {label:"Contrato",primary:true,get:c=>c.number},
+      {label:"Cliente",get:c=>c.party},
+      {label:"Obra",get:c=>c.projectCode||"—"},
+      {label:"Importe original",html:c=>eur0(c.originalCents)},
+      {label:"Importe vigente",html:c=>c.differs
+        ? `<span class="pill y">${eur0(c.currentCents)}</span>`
+        : eur0(c.currentCents)},
+      {label:"Anexos",get:c=>c.annexes||"—"},
+      {label:"Firma",html:c=>c.signed?'<span class="pill g">Firmado</span>':'<span class="pill r">Sin firmar</span>'},
+      {label:"Estado",html:c=>{const l=CST[c.status]||[c.status,""];
+        return `<span class="pill ${l[1]}">${esc(l[0])}</span>`;}},
+    ],
+    onRowClick:id=>{ conWork={id,tab:"datos"}; render(); },
+  });
  },
 
  /* ---------- PRY-01 Avance físico (S8) ----------
@@ -6741,6 +6896,164 @@ function chapSplitRows(pid,row,chapters){
     chapSplitRows(pid,row,chapters);
   });
   host.querySelectorAll('[data-srm]').forEach(b=>b.onclick=()=>{ chapSplit.splice(+b.dataset.srm,1); chapSplitRows(pid,row,chapters); });
+}
+
+/* ================= COM-04 · the contract, full screen (S9) ================
+   The last of §3.1's four out-of-shell surfaces. The document at 760 on the
+   left, a fixed 392 panel on the right with Datos · Hitos de pago · Anexos.
+
+   The document is rendered FROM DATA, like the presupuesto in COM-03 and for
+   the same reason: CON-03 made the terms structured on purpose, so requiring
+   somebody to attach a scan of what the database already knows would be
+   asking for the same contract twice. A signed scan is a captured document
+   and belongs beside this, not instead of it.
+
+   It carries `translate="no"`: the contract's language is a field on the
+   record, chosen for the customer, not a preference of whoever is reading it.
+   Same rule S5 established for the customer's presupuesto. */
+let conWork=null;   // {id, tab}
+let conTab="active";
+const CON_TRIGGER={onSignature:"A la firma",atWorksStart:"Al inicio de obra",
+  atStage:"Al llegar a una fase",onCompletion:"A la finalización",fixedDate:"Fecha fija"};
+
+function contractScreen(v){
+  const d=(()=>{ try{ return erp.renderContractDoc(conWork.id); }catch(e){ return null; } })();
+  if(!d){ conWork=null; return render(); }
+  document.body.classList.add('fs');
+  const val=erp.contractValue(conWork.id);
+  const TABS=[["datos","Datos"],["hitos","Hitos de pago"],["anexos","Anexos"]];
+  v.innerHTML=`<div class="pb">
+   <div class="pbbar">
+    <button class="btn sm" id="conBack" title="Volver a la lista">←</button>
+    <div class="who"><b>${esc(d.number)}</b><span>${esc(d.customer.name)}</span></div>
+    ${val.differs?`<span class="pill y">${val.annexes===1?"1 anexo":val.annexes+" anexos"}</span>`:""}
+    <div class="tot"><span>Importe vigente</span><b>${eur(val.currentCents)}</b></div>
+    <div class="acts"><span class="tag">${esc(d.language==="ca"?"Català":"Español")}</span></div>
+   </div>
+   <div class="con2">
+    <div class="condoc"><div class="cdoc" translate="no" id="conDoc"></div></div>
+    <div class="conpanel">
+      <div class="tabstrip" style="margin:0;padding:0 12px">
+        ${TABS.map(([k,l])=>`<button class="tab${k===conWork.tab?" on":""}" data-contab="${k}">${l}</button>`).join("")}
+      </div>
+      <div id="conBody" style="padding:12px 14px 18px"></div>
+    </div>
+   </div>
+  </div>`;
+  $('#conBack').onclick=()=>{ conWork=null; render(); };
+  v.querySelectorAll('[data-contab]').forEach(b=>b.onclick=()=>{ conWork.tab=b.dataset.contab; render(); });
+  contractDocPane(d);
+  contractPanel(d,val);
+}
+
+/** The document. Every label comes from DOCL, not the i18n dictionary. */
+function contractDocPane(d){
+  const host=$('#conDoc'); if(!host) return;
+  const L=(d.language==="ca")
+    ?{doc:"CONTRACTE D'OBRA",no:"Núm.",date:"Data",issuer:"Empresa",cust:"Client",
+      work:"Obra",budget:"Pressupost",terms:"Condicions econòmiques",base:"Import original",
+      annex:"Anexos",cur:"Import vigent",vat:"IVA",mil:"Fites de pagament",trig:"Motiu",
+      amt:"Import",due:"Data prevista",dur:"Termini d'execució",days:"dies",
+      start:"Inici compromès",pen:"Penalitzacions",gua:"Garanties",months:"mesos",
+      sign:"Signatura",signed:"Signat el",unsigned:"Pendent de signatura",none:"—"}
+    :{doc:"CONTRATO DE OBRA",no:"Nº",date:"Fecha",issuer:"Empresa",cust:"Cliente",
+      work:"Obra",budget:"Presupuesto",terms:"Condiciones económicas",base:"Importe original",
+      annex:"Anexos",cur:"Importe vigente",vat:"IVA",mil:"Hitos de pago",trig:"Motivo",
+      amt:"Importe",due:"Fecha prevista",dur:"Plazo de ejecución",days:"días",
+      start:"Inicio comprometido",pen:"Penalizaciones",gua:"Garantías",months:"meses",
+      sign:"Firma",signed:"Firmado el",unsigned:"Pendiente de firma",none:"—"};
+  const TR=(d.language==="ca")
+    ?{onSignature:"A la signatura",atWorksStart:"A l'inici d'obra",atStage:"En arribar a una fase",
+      onCompletion:"A la finalització",fixedDate:"Data fixa"}
+    :CON_TRIGGER;
+  host.innerHTML=`
+   <h1>${esc(L.doc)}</h1>
+   <div class="meta">${esc(L.no)} ${esc(d.number)} · ${esc(L.date)} ${fmtD(d.date)}</div>
+
+   <h2>${esc(L.issuer)}</h2>
+   <div class="pair"><span>${esc(d.issuer.legalName||L.none)}</span><span>${esc(d.issuer.taxId||"")}</span></div>
+   <div class="pair"><span>${esc(d.issuer.address||"")}</span><span>${esc(d.issuer.email||"")}</span></div>
+
+   <h2>${esc(L.cust)}</h2>
+   <div class="pair"><span>${esc(d.customer.name)}</span><span>${esc(d.customer.taxId||"")}</span></div>
+   <div class="pair"><span>${esc(d.customer.address||"")}</span><span></span></div>
+   <div class="pair"><span>${esc(L.work)}</span><span>${esc(d.projectCode||L.none)}</span></div>
+   <div class="pair"><span>${esc(L.budget)}</span><span>${esc(d.budgetNumber||L.none)}</span></div>
+
+   <h2>${esc(L.terms)}</h2>
+   <div class="pair"><span>${esc(L.base)}</span><span>${eur(d.originalCents)}</span></div>
+   ${d.currentCents!==d.originalCents?`<div class="pair"><span>${esc(L.cur)}</span><span>${eur(d.currentCents)}</span></div>`:""}
+   <div class="pair"><span>${esc(L.vat)}</span><span>${d.vatBp/100}%</span></div>
+   <div class="pair"><span>${esc(L.dur)}</span><span>${d.duration.estimatedDays||"—"} ${esc(L.days)}</span></div>
+   <div class="pair"><span>${esc(L.start)}</span><span>${d.initiation.committedStartDate?fmtD(d.initiation.committedStartDate):L.none}</span></div>
+
+   <h2>${esc(L.mil)}</h2>
+   <table><thead><tr><th>${esc(L.trig)}</th><th class="n">${esc(L.amt)}</th><th>${esc(L.due)}</th></tr></thead><tbody>
+   ${d.installments.map(i=>`<tr><td>${esc(TR[i.trigger]||i.trigger)}${i.pct!=null?` (${i.pct}%)`:""}</td>
+     <td class="n">${eur(i.amountCents)}</td><td>${i.expectedDate?fmtD(i.expectedDate):L.none}</td></tr>`).join("")
+     ||`<tr><td colspan="3">${esc(L.none)}</td></tr>`}
+   <tr class="tot"><td>${esc(L.amt)}</td><td class="n">${eur(d.installments.reduce((s,i)=>s+i.amountCents,0))}</td><td></td></tr>
+   </tbody></table>
+
+   ${d.guarantees.length?`<h2>${esc(L.gua)}</h2>
+    ${d.guarantees.map(g=>`<div class="pair"><span>${esc(g.category||"")}</span><span>${g.months||0} ${esc(L.months)}</span></div>`).join("")}`:""}
+
+   <h2>${esc(L.pen)}</h2>
+   <div class="pair"><span>${d.penalties.latePaymentInterestPctYear||0}% · ${d.penalties.graceDays||0} ${esc(L.days)}</span><span></span></div>
+
+   <h2>${esc(L.sign)}</h2>
+   <div class="pair"><span>${d.signature.customerSignedAt?esc(L.signed)+" "+fmtD(d.signature.customerSignedAt):esc(L.unsigned)}</span><span>${esc(d.signature.method||"")}</span></div>`;
+}
+
+/** Datos · Hitos de pago · Anexos — the 392 index beside the document. */
+function contractPanel(d,val){
+  const host=$('#conBody'); if(!host) return;
+  const CST={draft:"Borrador",sent:"Enviado",signed:"Firmado",inForce:"En vigor",
+    completed:"Finalizado",cancelled:"Anulado"};
+  if(conWork.tab==="datos"){
+    host.innerHTML=`<div class="daylist">
+      <div class="it"><span>Estado</span><span style="flex:1"></span><b>${esc(CST[d.status]||d.status)}</b></div>
+      <div class="it"><span>Cliente</span><span style="flex:1"></span><b>${esc(d.customer.name)}</b></div>
+      <div class="it"><span>Obra</span><span style="flex:1"></span><b>${esc(d.projectCode||"—")}</b></div>
+      <div class="it"><span>Presupuesto</span><span style="flex:1"></span><b>${esc(d.budgetNumber||"—")}</b></div>
+      <div class="it"><span>Importe original</span><span style="flex:1"></span><b>${eur(d.originalCents)}</b></div>
+      <div class="it"><span>Importe vigente</span><span style="flex:1"></span><b>${eur(d.currentCents)}</b></div>
+      <div class="it"><span>Plazo</span><span style="flex:1"></span><b>${d.duration.estimatedDays||"—"}</b></div>
+      <div class="it"><span>Firma</span><span style="flex:1"></span>
+        ${d.signature.customerSignedAt?`<b>${fmtD(d.signature.customerSignedAt)}</b>`:'<span class="pill r">Sin firmar</span>'}</div>
+     </div>`;
+    return;
+  }
+  if(conWork.tab==="anexos"){
+    host.innerHTML=`<div class="daylist">
+      ${d.annexes.map(a=>`<div class="it"><b>${esc(a.number)}</b><span style="flex:1"></span>
+        <span>${fmtD(a.date)}</span><b>${eur(a.valueCents)}</b></div>`).join("")
+        ||'<div class="it">Sin anexos. El importe vigente es el original.</div>'}
+      ${d.annexes.length?`<div class="it"><span>Total anexos</span><span style="flex:1"></span><b>${eur(val.annexCents)}</b></div>`:""}
+     </div>`;
+    return;
+  }
+  // Hitos de pago. §3.2 asks for trigger, %/amount, expected date and the
+  // factura, with the sum against the contracted amount at the foot — and S8
+  // added one column the doc could not have known about: where the date came
+  // from, now that a plan can move it.
+  const sum=d.installments.reduce((s,i)=>s+i.amountCents,0);
+  const diff=sum-d.originalCents;
+  host.innerHTML=`<div class="scroll"><table><thead><tr>
+     <th>Motivo</th><th class="num">Importe</th><th>Prevista</th><th>Factura</th></tr></thead><tbody>
+   ${d.installments.map(i=>`<tr>
+     <td class="k">${esc(CON_TRIGGER[i.trigger]||i.trigger)}${i.pct!=null?` <span style="color:var(--muted)">${i.pct}%</span>`:""}</td>
+     <td class="num">${eur(i.amountCents)}</td>
+     <td>${i.expectedDate?fmtD(i.expectedDate):"—"}
+       ${i.expectedDateSource==="schedule"?'<br><span class="pill b">de la planificación</span>':""}</td>
+     <td>${i.status==="invoiced"?'<span class="pill g">Facturado</span>':'<span class="pill">Pendiente</span>'}</td></tr>`).join("")
+     ||'<tr><td colspan="4"><div class="empty">Este contrato no tiene hitos de pago.</div></td></tr>'}
+   <tr class="tot"><td>Suma de hitos</td><td class="num">${eur(sum)}</td>
+     <td colspan="2">${Math.abs(diff)<=d.installments.length
+       ?'<span class="pill g">cuadra con el contratado</span>'
+       :`<span class="pill r">${diff>0?"+":""}${eur(diff)} sobre el contratado</span>`}</td></tr>
+   </tbody></table></div>
+   <div class="daylist" style="margin-top:10px"><div class="it" style="color:var(--muted)">Una fecha marcada «de la planificación» la movió el calendario de obra, no una persona. Una fecha fija y un hito ya facturado nunca se mueven solos.</div></div>`;
 }
 
 /** The Gantt, outside the shell — the fourth of §3.1's full-screen surfaces. */
