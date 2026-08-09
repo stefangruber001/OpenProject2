@@ -466,6 +466,21 @@
     background:var(--ink);color:#fff;font:600 12.5px var(--sans);padding:10px 16px;border-radius:11px;max-width:88vw}
   .toast.on{opacity:1;transform:translate(-50%,0)}
 
+  /* DMC-03/04/05 — the three list-configuration screens (S3). The doc asks
+     for a centred table with a help column beside it explaining where the
+     list is used, and no side panel: these screens are short enough that a
+     drawer would be more navigation than content. */
+  .cfgwrap{display:grid;grid-template-columns:minmax(0,720px) 396px;gap:18px;align-items:start}
+  .cfgtables{display:grid;gap:14px}
+  .cfgtables.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cfghelp{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+  .cfghelp h4{font:700 12px var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+  .cfghelp p{font-size:12.5px;line-height:1.55;color:var(--body);margin:0 0 9px}
+  .cfghelp code{font:12px ui-monospace,monospace;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 4px}
+  .cfgtables input.inline{width:100%}
+  tr.retired td{opacity:.5}
+  @media(max-width:1180px){.cfgwrap{grid-template-columns:minmax(0,1fr)}.cfgtables.two{grid-template-columns:minmax(0,1fr)}}
+
   /* Shared master-data list primitive (S2, decision 15): one row template
      for both table (desktop) and card (phone) — the phone rule below turns
      each row into a labelled card via the td[data-th] the primitive already
@@ -859,12 +874,6 @@ const PLACEHOLDERS={
    body:"El modelo ya guarda la caja; falta la pantalla. Los movimientos en efectivo se ven de momento en Consolidación bancaria.",goto:["banking","Ir a Consolidación bancaria"]},
  "cash-flow":{sub:"ADM-08 · previsión semanal y mensual.",
    body:"La previsión ya se calcula en el motor y se muestra en la Torre; esta pantalla la abre por periodos y por proyecto.",goto:["tower","Ir a la Torre"]},
- units:{sub:"DMC-03 · unidades de medida.",
-   body:"La lista existe pero está escrita en el código, así que no se puede mantener. Esta pantalla la pasa a datos.",goto:null},
- "lead-sources":{sub:"DMC-04 · fuentes de leads y motivos de pérdida.",
-   body:"Igual que las unidades: la lista funciona pero no es editable por quien la usa.",goto:null},
- "payment-methods":{sub:"DMC-05 · formas de pago.",
-   body:"Igual que las unidades: la lista funciona pero no es editable por quien la usa.",goto:null},
 };
 function placeholderView(k,v){
   const p=PLACEHOLDERS[k]||{sub:"",body:"Sin contenido."};
@@ -3244,6 +3253,119 @@ async function storeLineImages(budgetId,lineId,files,source){
   if(added){ persist(); render(); lineImagesDrawer(budgetId,lineId); toast(`${added} ${added===1?"imagen añadida":"imágenes añadidas"}`); }
 }
 
+/* ===================== DMC-03/04/05 · the lists the owner maintains ================
+   Three subsecciones, one renderer. They differ only in which list kinds they
+   show and what the help column says, so writing them three times would be
+   three chances for the same edit-and-save behaviour to drift.
+
+   The editing model is the doc's: no drawer, no modal, no save button. A cell
+   is an input; Enter or moving away commits it. That is right for a screen
+   whose whole content is twenty short labels — a drawer per row would be more
+   interaction than the data justifies.
+
+   Two things are deliberately NOT offered:
+
+     * renaming a code. Records store the code forever, so an editable code is
+       an offer to break every record already carrying it. The label is what
+       people read and the label is what is editable.
+     * deleting an entry. Deactivate, never delete — the system-wide rule. A
+       retired entry leaves the pickers and keeps resolving on the records
+       that already carry it, which is why the "en uso" count is shown beside
+       the retire button rather than used to block it. */
+const LIST_META={
+  units:{title:"Unidades de medida",code:"DMC-03",singular:"unidad",
+    codeLabel:"Símbolo",codePlaceholder:"m2",esPlaceholder:"metro cuadrado",caPlaceholder:"metre quadrat"},
+  leadSources:{title:"Fuentes de leads",code:"DMC-04",singular:"fuente",
+    codeLabel:"Código",codePlaceholder:"feriaLocal",esPlaceholder:"Feria local",caPlaceholder:"Fira local"},
+  lossReasons:{title:"Motivos de pérdida",code:"DMC-04",singular:"motivo",
+    codeLabel:"Código",codePlaceholder:"plazo",esPlaceholder:"Plazo",caPlaceholder:"Termini"},
+  paymentMethods:{title:"Formas de pago",code:"DMC-05",singular:"forma de pago",
+    codeLabel:"Código",codePlaceholder:"transfer15",esPlaceholder:"Transferencia 15 días",caPlaceholder:"Transferència 15 dies"},
+};
+/** New-row drafts, keyed by list kind, so a half-typed entry survives re-render. */
+const listDraft={};
+
+/**
+ * A picker over one of the owner-maintained lists.
+ *
+ * The option VALUE is the code and the option TEXT is the label, which is the
+ * whole point of moving these lists into the document: a customer's origin
+ * used to render as `referrer` because the list had codes and nothing else.
+ *
+ * A `selected` code that is no longer active is still offered, marked as
+ * retired. Dropping it would silently rewrite the record to whatever happens
+ * to be first in the list the next time somebody opens the drawer and saves —
+ * a retired list entry must not be able to change data behind somebody's back.
+ */
+function listOptions(kind,selected){
+  const rows=erp.listActive(kind).slice();
+  if(selected&&!rows.some(r=>r.code===selected)){
+    const gone=erp.listAll(kind).find(r=>r.code===selected);
+    rows.unshift(gone?Object.assign({},gone,{_retired:true}):{code:selected,es:selected,_retired:true});
+  }
+  return rows.map(r=>`<option value="${esc(r.code)}"${r.code===selected?" selected":""}>${esc(r.es||r.code)}${r._retired?" (retirada)":""}</option>`).join("");
+}
+
+function listConfigTable(kind){
+  const m=LIST_META[kind];
+  const rows=erp.listAll(kind);
+  const d=listDraft[kind]||{code:"",es:"",ca:""};
+  return `<div class="card"><div class="ch"><h3>${esc(m.title)}</h3>
+    <span class="tag">${rows.filter(r=>r.active!==false).length} activas de ${rows.length}</span></div>
+   <div class="scroll"><table><thead><tr>
+     <th style="width:110px">${esc(m.codeLabel)}</th><th>Nombre (ES)</th><th>Nom (CA)</th>
+     <th class="num" style="width:70px">En uso</th><th style="width:96px"></th></tr></thead><tbody>
+   ${rows.map(r=>{const used=erp.listEntryUsage(kind,r.code);const off=r.active===false;
+     return `<tr${off?' class="retired"':''}>
+      <td class="k">${esc(r.code)}</td>
+      <td><input class="inline" data-lk="${kind}" data-lc="${esc(r.code)}" data-lf="es" value="${esc(r.es)}"></td>
+      <td><input class="inline" data-lk="${kind}" data-lc="${esc(r.code)}" data-lf="ca" value="${esc(r.ca||"")}"></td>
+      <td class="num">${used||"—"}</td>
+      <td><button class="btn sm" data-ltoggle="${kind}" data-lc="${esc(r.code)}" data-lon="${off?"1":"0"}">${off?"Reactivar":"Retirar"}</button></td></tr>`;}).join("")}
+   <tr>
+     <td><input class="inline" id="new_${kind}_code" placeholder="${esc(m.codePlaceholder)}" value="${esc(d.code)}"></td>
+     <td><input class="inline" id="new_${kind}_es" placeholder="${esc(m.esPlaceholder)}" value="${esc(d.es)}"></td>
+     <td><input class="inline" id="new_${kind}_ca" placeholder="${esc(m.caPlaceholder)}" value="${esc(d.ca)}"></td>
+     <td></td>
+     <td><button class="btn sm primary" data-ladd="${kind}">＋ Añadir</button></td></tr>
+   </tbody></table></div></div>`;
+}
+function wireListConfig(v){
+  // Label edits commit on change (Enter or moving away), never on keystroke —
+  // a re-render per character would take the caret with it.
+  v.querySelectorAll('input[data-lk]').forEach(inp=>inp.onchange=()=>{
+    const {lk,lc,lf}=inp.dataset;
+    mutate(()=>erp.updateListEntry(lk,lc,{[lf]:inp.value},"backoffice"),"Lista actualizada");
+  });
+  v.querySelectorAll('[data-ltoggle]').forEach(b=>b.onclick=()=>{
+    const kind=b.dataset.ltoggle, code=b.dataset.lc, turningOn=b.dataset.lon==="1";
+    const used=erp.listEntryUsage(kind,code);
+    if(!turningOn&&used&&!confirm(`«${erp.listLabel(kind,code)}» se usa en ${used} registro${used===1?"":"s"}.\n\nRetirarla la quita de los desplegables; los registros que ya la llevan la conservan y se siguen viendo con su nombre. ¿Continuar?`)) return;
+    mutate(()=>erp.setListEntryActive(kind,code,turningOn,"backoffice"),turningOn?"Entrada reactivada":"Entrada retirada");
+  });
+  v.querySelectorAll('[data-ladd]').forEach(b=>b.onclick=()=>{
+    const kind=b.dataset.ladd;
+    const code=$('#new_'+kind+'_code').value.trim();
+    const es=$('#new_'+kind+'_es').value.trim();
+    const ca=$('#new_'+kind+'_ca').value.trim();
+    // Kept before the mutate so a rejected entry (duplicate code, missing
+    // name) is still in the boxes when the toast explains why.
+    listDraft[kind]={code,es,ca};
+    try{
+      erp.addListEntry(kind,{code,es,ca},"backoffice");
+      listDraft[kind]={code:"",es:"",ca:""};
+      persist(); render(); toast("Entrada añadida");
+    }catch(e){ toast("⚠ "+e.message); }
+  });
+}
+function listConfigScreen(v,kinds,sub,help){
+  $('#sub').textContent=sub;
+  v.innerHTML=`<div class="cfgwrap">
+    <div class="cfgtables${kinds.length>1?" two":""}">${kinds.map(listConfigTable).join("")}</div>
+    <div class="cfghelp">${help}</div></div>`;
+  wireListConfig(v);
+}
+
 const VIEWS={
  /* ---------- Torre de control · Mi día (DAS, spec §2.1/§2.2) ----------
     Defined once, above, as standalone functions — big enough (sparklines,
@@ -3386,7 +3508,7 @@ const VIEWS={
   const ST={awaitingVisit:["Pendiente de visita","y"],awaitingBudget:["Pendiente de presupuesto","y"],awaitingResponse:["Esperando al cliente","b"],won:["Ganada","g"],lost:["Perdida","r"]};
   v.innerHTML=`<div class="card"><div class="ch"><h3>En curso</h3><span class="tag">${rows.length} abiertas</span></div>
    <div class="scroll"><table><thead><tr><th>Cliente</th><th>Trabajo</th><th>Origen</th><th>Estado</th><th class="num">Días</th><th>Próxima acción</th></tr></thead><tbody>
-   ${rows.map(o=>`<tr><td class="k">${esc(erp.party(o.partyId).name)}</td><td>${esc(o.requestedWork)}</td><td>${esc(o.source)}</td>
+   ${rows.map(o=>`<tr><td class="k">${esc(erp.party(o.partyId).name)}</td><td>${esc(o.requestedWork)}</td><td>${esc(erp.listLabel("leadSources",o.source))}</td>
      <td><span class="pill ${ST[o.status]?.[1]||''}">${ST[o.status]?.[0]||o.status}</span></td>
      <td class="num">${o.ageDays}</td><td>${esc(o.nextAction||"—")}</td></tr>`).join("")||'<tr><td colspan="6"><div class="empty">Sin oportunidades abiertas.</div></td></tr>'}
    </tbody></table></div></div>
@@ -3624,6 +3746,55 @@ const VIEWS={
     here would bury the rest of the map. */
  _reconcile:conciliacion,
  messaging:comunicaciones,
+
+ /* ---------- Unidades de medida (DMC-03) ---------- */
+ units(v){
+  listConfigScreen(v,["units"],
+   "Las unidades que usan las partidas, los presupuestos y los documentos impresos. El símbolo es lo que aparece en la tabla; el nombre, en el desplegable y en el documento.",
+   `<h4>Dónde se usa</h4>
+    <p>Cada partida del catálogo y cada línea de presupuesto llevan una unidad. Es lo que se
+       imprime junto a la cantidad en el presupuesto y en la factura.</p>
+    <p><b>El símbolo no se puede cambiar.</b> Es lo que queda guardado en cada línea ya escrita:
+       renombrarlo rompería documentos ya emitidos. Lo que sí se edita es el nombre, y por eso
+       hay dos — <code>ES</code> y <code>CA</code>. El documento sale en el idioma del cliente,
+       así que una unidad sin nombre en catalán saldría en castellano dentro de un presupuesto
+       en catalán.</p>
+    <h4>Retirar, no borrar</h4>
+    <p>Retirar una unidad la quita de los desplegables. Las líneas que ya la llevan la conservan
+       y se siguen viendo con su nombre — por eso la columna «en uso» informa, pero no bloquea.</p>`);
+ },
+
+ /* ---------- Fuentes de leads y motivos de pérdida (DMC-04) ----------
+    Two lists on one screen because they are two halves of one question:
+    where the work comes from, and why it does not close. */
+ "lead-sources"(v){
+  listConfigScreen(v,["leadSources","lossReasons"],
+   "De dónde llegan los clientes y por qué se pierden las oportunidades. Las dos listas alimentan los informes de origen y de conversión.",
+   `<h4>Dónde se usa</h4>
+    <p><b>Fuentes</b> — en la ficha de cada cliente («origen del contacto») y en cada oportunidad.
+       Es lo que responde a «¿de dónde viene el trabajo?», así que añadir una fuente propia
+       (una feria, un portal concreto) hace el informe más útil, no menos.</p>
+    <p><b>Motivos de pérdida</b> — al marcar una oportunidad como perdida. Sin un motivo escrito
+       en el momento, el porqué se pierde y sólo queda el número.</p>
+    <h4>Antes existían, pero en el código</h4>
+    <p>Estas listas estaban escritas dentro del programa: añadir una fuente era una entrega
+       nueva. Ahora son datos de la empresa y se mantienen desde aquí.</p>`);
+ },
+
+ /* ---------- Formas de pago (DMC-05) ---------- */
+ "payment-methods"(v){
+  listConfigScreen(v,["paymentMethods"],
+   "Las condiciones de pago que se ofrecen en contratos y facturas. El vencimiento real lo calcula cada documento; aquí se mantiene la lista.",
+   `<h4>Dónde se usa</h4>
+    <p>En el contrato y en cada factura emitida, y es lo que se imprime como condición de pago.</p>
+    <p>El código es lo que queda guardado en los documentos ya emitidos, así que no se edita.
+       El nombre sí — <code>transfer30</code> puede pasar de «Transferencia 30 días» a
+       «Transferencia a 30 días fecha factura» sin tocar ninguna factura antigua.</p>
+    <h4>Retirar una forma de pago</h4>
+    <p>Deja de ofrecerse en documentos nuevos. Los contratos y facturas que ya la llevan no
+       cambian: siguen diciendo lo que decían el día que se emitieron, que es justamente lo
+       que un documento fiscal tiene que hacer.</p>`);
+ },
 
  /* ---------- Facturación y cobros (AR) ---------- */
  invoicing(v){
@@ -4020,7 +4191,7 @@ function partyDrawer(id){
      <div class="it">Dirección: ${esc(p.billStreet||"—")}</div>
      <div class="it">Población: ${esc(p.billCity||"—")} · Provincia: ${esc(p.billProvince||"—")} · C.P.: ${esc(p.billPostalCode||"—")}</div>
      <div class="it">IRPF: ${p.irpfApplies?`aplica ${p.irpfRateBp/100}%`:"no aplica"} <span class="pill y" title="La retención depende del perfil del proveedor (profesional / empresarial / módulos). Pendiente de confirmar con la gestoría — ver LEGAL_REVIEW.md §3.">A revisar</span></div>
-     <div class="it">Origen: ${p.leadSource||"—"} · Alta: ${p.createdAt?fmtD(p.createdAt):"—"}</div>
+     <div class="it">Origen: ${p.leadSource?esc(erp.listLabel("leadSources",p.leadSource)):"—"} · Alta: ${p.createdAt?fmtD(p.createdAt):"—"}</div>
     </div></div>
    <div class="card"><div class="ch"><h3>Historial</h3></div><div class="daylist">
      <div class="it"><b>${h.budgets.length}</b> presupuestos · <b>${h.contracts.length}</b> contratos · <b>${h.projects.length}</b> proyectos</div>
@@ -4055,7 +4226,7 @@ function editPartyDrawer(id){
    <div class="field"><label>Móvil *</label><input id="e_mob" value="${esc(p.mobile||"")}"></div>
    <div class="field"><label>Fijo</label><input id="e_land" value="${esc(p.landline||"")}"></div>
    <div class="field full"><label>Email</label><input id="e_mail" value="${esc(p.email||"")}"></div>
-   <div class="field"><label>Origen del contacto</label><select id="e_src">${ErpEngine.LISTS.leadSources.map(s=>`<option${p.leadSource===s?" selected":""}>${s}</option>`).join("")}</select></div>
+   <div class="field"><label>Origen del contacto</label><select id="e_src">${listOptions("leadSources",p.leadSource)}</select></div>
    <div class="field"><label>Línea de negocio</label><input id="e_bl" value="${esc(p.businessLine||"")}" placeholder="p. ej. Reformas"></div>
    <div class="field"><label>Categoría (proveedores)</label><input id="e_cat" value="${esc(p.category||"")}" placeholder="p. ej. Materiales"></div>
    <div class="field full"><label>Nombres originales / alias (separados por coma)</label><input id="e_alias" value="${esc((p.aliases||[]).join(", "))}"></div>
@@ -4134,7 +4305,7 @@ function newPartyDrawer(role){
    <div class="field"><label>C.P. *</label><input id="f_cp"></div>
    <div class="field"><label>Población *</label><input id="f_city"></div>
    <div class="field"><label>Provincia</label><input id="f_prov" value="Barcelona"></div>
-   <div class="field"><label>Origen del contacto *</label><select id="f_src">${ErpEngine.LISTS.leadSources.map(s=>`<option>${s}</option>`).join("")}</select></div>
+   <div class="field"><label>Origen del contacto *</label><select id="f_src">${listOptions("leadSources")}</select></div>
    <div class="field full" style="margin-top:8px"><button class="btn primary" id="f_save">${cta}</button></div></div>`;
   $('#f_save').onclick=()=>{
     // A duplicate suspect is a soft warning (findDuplicateParty), never a
@@ -4171,7 +4342,7 @@ function newOpportunityDrawer(){
   db.innerHTML=`<div class="fgrid">
    <div class="field full"><label>Cliente *</label><select id="o_party">${partyOptions(p=>p.roles.includes("customer"))}</select></div>
    <div class="field full"><label>Trabajo solicitado *</label><input id="o_work" placeholder="Reforma integral de baño"></div>
-   <div class="field"><label>Origen *</label><select id="o_src">${ErpEngine.LISTS.leadSources.map(s=>`<option>${s}</option>`).join("")}</select></div>
+   <div class="field"><label>Origen *</label><select id="o_src">${listOptions("leadSources")}</select></div>
    <div class="field"><label>Valor estimado (€)</label><input id="o_val" type="number" min="0" step="100" value="0"></div>
    <div class="field full"><label>Próxima acción</label><input id="o_next" value="Programar visita"></div>
    <div class="field full" style="margin-top:8px"><button class="btn primary" id="o_save">Crear oportunidad</button></div></div>`;

@@ -626,10 +626,10 @@ async function testShell(browser, base) {
     else bad("shell: outside click collapses", "still open");
 
     // Unbuilt subsections say what will live there instead of rendering blank.
-    // Reportes used to be the probe; it was removed outright (a menu entry with
-    // no screen behind it). `units` is a real not-yet-built subsección: the
-    // list exists but is hardcoded, so DMC-03 makes it maintainable in S3.
-    await pg.evaluate(() => (location.hash = "units"));
+    // The probe has moved twice as its subject got built: Reportes (removed
+    // outright), then `units` (built as DMC-03 in S3). `visits` is the current
+    // real not-yet-built subsección — COM-02, scheduled for S4.
+    await pg.evaluate(() => (location.hash = "visits"));
     await pg.waitForTimeout(300);
     const ph = await pg.locator("#view").innerText();
     if (/En preparación/.test(ph)) ok("shell: unbuilt subsection explains itself");
@@ -1605,6 +1605,121 @@ async function testControlTowerAndDay(browser, base) {
     const miDia = await pg.evaluate(() => !!SUBMAP.hoy);
     if (!miDia) ok("mi día: removed from the menu, and #hoy redirects");
     else bad("mi día: removed", "SUBMAP still has a `hoy` entry");
+
+    // ---- DMC-03/04/05: the lists the owner maintains (S3) ----------------
+    // These four lists were hardcoded in the engine until this session, so
+    // what is being tested is not "a table renders" but "an owner can change
+    // the company's vocabulary without a deploy, and old records survive it".
+    await pg.evaluate(() => (location.hash = "units"));
+    await pg.waitForTimeout(400);
+    // The names live in input VALUES, which innerText does not carry — read
+    // the boxes themselves. The Catalan column is the point of DMC-03 per the
+    // doc: a unit with no Catalan name prints Spanish inside a Catalan
+    // document, which is exactly the silent fallback decision 20 forbids.
+    const unitNames = await pg.evaluate(() => ({
+      es: [...document.querySelectorAll('input[data-lk="units"][data-lf="es"]')].map(
+        (i) => i.value,
+      ),
+      ca: [...document.querySelectorAll('input[data-lk="units"][data-lf="ca"]')].map(
+        (i) => i.value,
+      ),
+    }));
+    if (
+      unitNames.es.includes("metro cuadrado") &&
+      unitNames.ca.includes("metre quadrat") &&
+      unitNames.ca.every((v) => v.trim().length > 0)
+    )
+      ok("DMC-03: every unit carries both a Spanish and a Catalan name");
+    else bad("DMC-03 units", `es=${unitNames.es.slice(0, 4)} ca=${unitNames.ca.slice(0, 4)}`);
+
+    // Editing a LABEL is offered; editing the CODE is not, because records
+    // store the code forever.
+    const codeEditable = await pg.evaluate(
+      () => document.querySelectorAll('input[data-lk="units"][data-lf="code"]').length,
+    );
+    const labelEditable = await pg.evaluate(
+      () => document.querySelectorAll('input[data-lk="units"][data-lf="es"]').length,
+    );
+    if (codeEditable === 0 && labelEditable > 0)
+      ok("DMC-03: labels are editable, codes are not (records store the code)");
+    else
+      bad("DMC-03 code immutability", `code inputs=${codeEditable} label inputs=${labelEditable}`);
+
+    // Add a unit, and confirm it reaches the pickers the rest of the app uses.
+    const newUnit = "tst" + String(Date.now()).slice(-4);
+    await pg.locator("#new_units_code").fill(newUnit);
+    await pg.locator("#new_units_es").fill("Unidad de prueba");
+    await pg.locator("#new_units_ca").fill("Unitat de prova");
+    await pg.locator('[data-ladd="units"]').click();
+    await pg.waitForTimeout(400);
+    const added = await pg.evaluate(
+      (c) => erp.listActive("units").some((u) => u.code === c),
+      newUnit,
+    );
+    if (added) ok("DMC-03: a new unit is added by the owner, from the screen");
+    else bad("DMC-03 add", `${newUnit} not in listActive`);
+
+    // A duplicate code is refused rather than silently creating a second entry
+    // that would make every stored code ambiguous.
+    await pg.locator("#new_units_code").fill(newUnit);
+    await pg.locator("#new_units_es").fill("Duplicada");
+    await pg.locator('[data-ladd="units"]').click();
+    await pg.waitForTimeout(350);
+    const dupCount = await pg.evaluate(
+      (c) => erp.listAll("units").filter((u) => u.code === c).length,
+      newUnit,
+    );
+    const dupToast = await pg
+      .locator("#toast")
+      .innerText()
+      .catch(() => "");
+    if (dupCount === 1 && /existe|exists/i.test(dupToast))
+      ok("DMC-03: a duplicate code is refused and says so");
+    else bad("DMC-03 duplicate", `count=${dupCount} toast=${dupToast.slice(0, 80)}`);
+
+    // Retiring keeps the record: the entry leaves the pickers, the row stays.
+    await pg.evaluate((c) => erp.setListEntryActive("units", c, false, "e2e"), newUnit);
+    await pg.evaluate(() => render());
+    await pg.waitForTimeout(300);
+    const stillOnRecord = await pg.evaluate(
+      (c) => ({
+        active: erp.listActive("units").some((u) => u.code === c),
+        all: erp.listAll("units").some((u) => u.code === c),
+        label: erp.listLabel("units", c),
+      }),
+      newUnit,
+    );
+    if (!stillOnRecord.active && stillOnRecord.all && stillOnRecord.label === "Unidad de prueba")
+      ok("DMC-03: retiring drops it from the pickers and keeps it resolving on old records");
+    else bad("DMC-03 retire", JSON.stringify(stillOnRecord));
+
+    // DMC-04 is two lists on one screen — sources and loss reasons together.
+    await pg.evaluate(() => (location.hash = "lead-sources"));
+    await pg.waitForTimeout(400);
+    const leadText = await pg.locator("#view").innerText();
+    if (/Fuentes de leads/.test(leadText) && /Motivos de pérdida/.test(leadText))
+      ok("DMC-04: sources and loss reasons on one screen");
+    else bad("DMC-04", leadText.replace(/\n/g, " ").slice(0, 140));
+
+    // The reason these lists moved into the document: a customer's origin used
+    // to render as its raw English key. It must now read as a Spanish label.
+    await pg.evaluate(() => (location.hash = "customers"));
+    await pg.waitForTimeout(400);
+    await pg.locator("tr.click").first().click();
+    await pg.waitForTimeout(300);
+    const drawerText = await pg.locator("#drawer").innerText();
+    if (/Origen:/.test(drawerText) && !/referrer|wordOfMouth|propertyManager/.test(drawerText))
+      ok("DMC-04: a customer's origin reads as a label, not as its stored code");
+    else bad("DMC-04 label rendering", drawerText.replace(/\n/g, " ").slice(0, 140));
+    await pg.locator("#dClose").click();
+    await pg.waitForTimeout(200);
+
+    await pg.evaluate(() => (location.hash = "payment-methods"));
+    await pg.waitForTimeout(400);
+    const payText = await pg.locator("#view").innerText();
+    if (/Formas de pago/.test(payText) && /Transferencia 30 días/.test(payText))
+      ok("DMC-05: payment terms are listed and maintainable");
+    else bad("DMC-05", payText.replace(/\n/g, " ").slice(0, 140));
 
     if (errs.length === 0) ok("torre/alertas: no console errors");
     else bad("torre/alertas: no console errors", errs.slice(0, 3).join(" | "));

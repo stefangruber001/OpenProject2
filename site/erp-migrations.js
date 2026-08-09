@@ -333,7 +333,93 @@
         return s;
       },
     },
+    {
+      to: 10,
+      name: "owner-maintained lists, price detail, line provenance (S3)",
+      /*
+       *   state.lists           added — units, leadSources, lossReasons and
+       *                         paymentMethods move out of code and into the
+       *                         document, so DMC-03/04/05 can maintain them.
+       *                         Seeded from the engine's own defaults (see
+       *                         listSeed below) rather than left empty: a
+       *                         company that migrated must come out with the
+       *                         same vocabulary it had five minutes ago, not
+       *                         with four empty pickers.
+       *   prices[].taxRateBp    added, gaps 6-9. taxRateBp is null, NOT 0 —
+       *   prices[].supplierRef  a historic price row genuinely does not record
+       *   prices[].wasteCents   which rate applied, and stamping 0% would be a
+       *   prices[].minOrder     confident wrong answer on every one of them.
+       *   prices[].projectRef   The screen renders null as "—".
+       *   prices[].notes        wasteCents defaults to 0 because it is an
+       *                         amount that was genuinely absent, not unknown.
+       *   line.sourceFile       added, gap 12 — provenance for a line that
+       *   line.sourceSheet      came from an uploaded workbook. Empty string
+       *   line.chapterOriginal  on every existing line, which is the truth:
+       *                         they were typed here, not imported.
+       */
+      up: function (s) {
+        if (!s.lists || typeof s.lists !== "object" || Array.isArray(s.lists)) s.lists = {};
+        var seed = listSeed();
+        Object.keys(seed).forEach(function (kind) {
+          if (!Array.isArray(s.lists[kind])) s.lists[kind] = seed[kind];
+        });
+
+        (Array.isArray(s.prices) ? s.prices : []).forEach(function (p) {
+          if (!("taxRateBp" in p)) p.taxRateBp = null;
+          if (typeof p.supplierRef !== "string") p.supplierRef = "";
+          if (typeof p.wasteCents !== "number") p.wasteCents = 0;
+          if (!("minOrder" in p)) p.minOrder = null;
+          if (typeof p.projectRef !== "string") p.projectRef = "";
+          if (typeof p.notes !== "string") p.notes = "";
+        });
+
+        (Array.isArray(s.budgets) ? s.budgets : []).forEach(function (b) {
+          (Array.isArray(b.versions) ? b.versions : []).forEach(function (v) {
+            (Array.isArray(v.chapters) ? v.chapters : []).forEach(function (c) {
+              (Array.isArray(c.lines) ? c.lines : []).forEach(function (l) {
+                if (typeof l.sourceFile !== "string") l.sourceFile = "";
+                if (typeof l.sourceSheet !== "string") l.sourceSheet = "";
+                if (typeof l.chapterOriginal !== "string") l.chapterOriginal = "";
+              });
+            });
+          });
+        });
+        return s;
+      },
+    },
   ];
+
+  /**
+   * The seed for `state.lists`, taken from the engine rather than copied.
+   *
+   * Two copies of this data would drift, and the failure mode is quiet: a
+   * migrated company and a new one would start with different units and
+   * nobody would notice until a printed document disagreed. `erp-engine.js`
+   * loads before this file in the browser and is `require`-able in Node, so
+   * there is no ordering problem to work around — only a fallback for the
+   * case where it genuinely is not there, which keeps the ladder runnable in
+   * isolation rather than throwing mid-migration.
+   */
+  function listSeed() {
+    var E = null;
+    try {
+      E =
+        (typeof module === "object" && module.exports && require("./erp-engine.js")) ||
+        (typeof globalThis !== "undefined" && globalThis.ErpEngine) ||
+        null;
+    } catch (e) {
+      E = typeof globalThis !== "undefined" ? globalThis.ErpEngine || null : null;
+    }
+    var defaults = E && E.LIST_DEFAULTS;
+    if (!defaults) return { units: [], leadSources: [], lossReasons: [], paymentMethods: [] };
+    var out = {};
+    Object.keys(defaults).forEach(function (kind) {
+      out[kind] = defaults[kind].map(function (e) {
+        return { code: e.code, es: e.es, ca: e.ca, active: true };
+      });
+    });
+    return out;
+  }
 
   var CURRENT_VERSION = MIGRATIONS.reduce(function (max, m) {
     return Math.max(max, m.to);

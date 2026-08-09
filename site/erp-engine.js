@@ -218,6 +218,95 @@
     alertTypes: ["economica", "tecnica", "documental", "fiscal"], // DAS-06 grouping
   };
 
+  /* ---------------- owner-maintained lists (DMC-03/04/05) ----------------
+   *
+   * Four of the lists above are not the system's business at all — they are
+   * the company's vocabulary, and the company changes it. A new payment term,
+   * a lead source that only this owner uses, a unit their suppliers quote in:
+   * each of those was a code edit and a deploy, which is the definition of a
+   * list nobody maintains.
+   *
+   * So these four move into `state.lists`, where the owner edits them from
+   * DMC-03/04/05, and what stays here is only the SEED a new company starts
+   * from. The rest of LISTS above is genuinely structural — invoice kinds,
+   * document statuses, movement classes are keys the engine branches on, and
+   * an owner renaming one would not be configuration, it would be a bug.
+   *
+   * The shape is `{code, es, ca, active}`, and the distinction matters:
+   *
+   *   code   what records store, forever. Never edited — a record written
+   *          last year has to keep resolving, so renaming the LABEL is the
+   *          supported operation and renaming the key is not offered.
+   *   es/ca  what a person reads. Both, from the first day: the doc requires
+   *          unit names in Spanish and Catalan regardless of the interface
+   *          language, and a list that only carries one of them makes the
+   *          Catalan interface fall back to Spanish silently (decision 20).
+   *   active deactivate, never delete — the system-wide rule. A retired
+   *          entry leaves the pickers and keeps resolving on the records
+   *          that already carry it.
+   */
+  const LIST_DEFAULTS = {
+    // CAT-02. The code IS the abbreviation shown in a table cell; es/ca are
+    // the full names a picker and the printed document need.
+    units: [
+      { code: "ud", es: "unidad", ca: "unitat" },
+      { code: "pa", es: "partida alzada", ca: "partida alçada" },
+      { code: "m", es: "metro", ca: "metre" },
+      { code: "ml", es: "metro lineal", ca: "metre lineal" },
+      { code: "m2", es: "metro cuadrado", ca: "metre quadrat" },
+      { code: "m3", es: "metro cúbico", ca: "metre cúbic" },
+      { code: "h", es: "hora", ca: "hora" },
+      { code: "kg", es: "kilogramo", ca: "quilogram" },
+      { code: "l", es: "litro", ca: "litre" },
+      { code: "%", es: "porcentaje", ca: "percentatge" },
+    ],
+    // MDM-06. These used to render as their raw English key in the Spanish
+    // interface ("referrer" in a customer record) — nobody had a label to show
+    // because there was no field to put one in.
+    leadSources: [
+      { code: "referrer", es: "Prescriptor", ca: "Prescriptor" },
+      { code: "leadPlatform", es: "Plataforma de leads", ca: "Plataforma de leads" },
+      { code: "searchEngine", es: "Buscador", ca: "Cercador" },
+      { code: "website", es: "Web propia", ca: "Web pròpia" },
+      { code: "socialMedia", es: "Redes sociales", ca: "Xarxes socials" },
+      { code: "wordOfMouth", es: "Boca a boca", ca: "Boca-orella" },
+      { code: "propertyManager", es: "Administrador de fincas", ca: "Administrador de finques" },
+      { code: "repeatCustomer", es: "Cliente recurrente", ca: "Client recurrent" },
+      { code: "other", es: "Otros", ca: "Altres" },
+    ],
+    // CRM-05. Shown beside the sources on DMC-04, because "where did it come
+    // from" and "why was it lost" are the same conversation.
+    lossReasons: [
+      { code: "price", es: "Precio", ca: "Preu" },
+      { code: "timing", es: "Plazos", ca: "Terminis" },
+      { code: "scope", es: "Alcance", ca: "Abast" },
+      { code: "competitor", es: "Competencia", ca: "Competència" },
+      { code: "noResponse", es: "Sin respuesta", ca: "Sense resposta" },
+      { code: "withdrew", es: "Desistió", ca: "Va desistir" },
+    ],
+    // MDM-07 / PAY-01.
+    paymentMethods: [
+      { code: "cash", es: "Efectivo", ca: "Efectiu" },
+      { code: "transfer", es: "Transferencia", ca: "Transferència" },
+      { code: "transfer30", es: "Transferencia 30 días", ca: "Transferència 30 dies" },
+      { code: "transfer60", es: "Transferencia 60 días", ca: "Transferència 60 dies" },
+      { code: "transfer90", es: "Transferencia 90 días", ca: "Transferència 90 dies" },
+      { code: "directDebit", es: "Domiciliación", ca: "Domiciliació" },
+      { code: "card", es: "Tarjeta", ca: "Targeta" },
+      { code: "onAccount", es: "A cuenta", ca: "A compte" },
+      { code: "oneOff", es: "Pago único", ca: "Pagament únic" },
+    ],
+  };
+  /** The four kinds DMC-03/04/05 maintain, in the order those screens show them. */
+  const LIST_KINDS = Object.keys(LIST_DEFAULTS);
+  /** A fresh copy — callers mutate what they get back, seeds must not drift. */
+  function seedLists() {
+    const out = {};
+    for (const kind of LIST_KINDS)
+      out[kind] = LIST_DEFAULTS[kind].map((e) => Object.assign({ active: true }, e));
+    return out;
+  }
+
   /*
    * DAS-06 — one entry per alert CONDITION alerts() can raise, keyed by a
    * stable code. This is the single place that says what TYPE a condition
@@ -373,6 +462,11 @@
         importConflicts: [],
         imports: {},
         plans: {},
+        // DMC-03/04/05: the company's own vocabulary, not the engine's. Seeded
+        // rather than empty — a new company that had to type its own units
+        // before it could write a line would be worse off than one with a
+        // starting list it can edit.
+        lists: seedLists(),
         seq: { id: 1 },
       };
     }
@@ -392,6 +486,15 @@
       // feature. Cheap here, very expensive to diagnose there.
       for (const k of Object.keys(fresh))
         if (Array.isArray(fresh[k]) && !Array.isArray(e.state[k])) e.state[k] = [];
+      // `lists` is an object, not an array, so the loop above cannot restore
+      // it — and a blob without it has no units and no payment terms, which is
+      // every picker in the application empty. The v10 migration is the real
+      // owner; this is the belt-and-braces for a blob that reached `from()`
+      // without passing through the ladder (a direct construction in a test,
+      // a fixture written by hand).
+      if (!e.state.lists || typeof e.state.lists !== "object") e.state.lists = seedLists();
+      for (const kind of LIST_KINDS)
+        if (!Array.isArray(e.state.lists[kind])) e.state.lists[kind] = seedLists()[kind];
       return e;
     }
 
@@ -407,6 +510,119 @@
     }
     get today() {
       return this.state.today;
+    }
+
+    /* ============ DMC-03/04/05 — the lists the owner maintains ============
+     *
+     * Four reference lists that used to be code. Everything here is about one
+     * distinction: a CODE is what records store and is therefore permanent,
+     * a LABEL is what people read and is therefore editable. Offering to
+     * rename a code would be offering to break every record already carrying
+     * it, so it is not offered — `updateListEntry` patches labels and nothing
+     * else.
+     */
+    /** Every entry of a kind, retired ones included — what DMC-03/04/05 edit. */
+    listAll(kind) {
+      if (!LIST_KINDS.includes(kind)) throw new Error("Unknown list: " + kind);
+      if (!Array.isArray(this.state.lists[kind])) this.state.lists[kind] = seedLists()[kind];
+      return this.state.lists[kind];
+    }
+    /** The entries a picker should offer: active only, in the owner's order. */
+    listActive(kind) {
+      return this.listAll(kind).filter((e) => e.active !== false);
+    }
+    /**
+     * The label to show for a stored code.
+     *
+     * A code with no entry returns the code itself rather than an empty
+     * string: a record written before the entry was retired — or one carrying
+     * a code from an import nobody has curated yet — must still render as
+     * SOMETHING a person can read and act on. A blank cell in a customer's
+     * "origen" is indistinguishable from a customer who never had one.
+     */
+    listLabel(kind, code, lang) {
+      const hit = this.listAll(kind).find((e) => e.code === code);
+      if (!hit) return String(code || "");
+      return (lang === "ca" ? hit.ca : hit.es) || hit.es || hit.code;
+    }
+    addListEntry(kind, entry, user) {
+      const rows = this.listAll(kind);
+      const code = String((entry && entry.code) || "").trim();
+      if (!code) throw new Error("A list entry needs a code");
+      if (rows.some((e) => e.code === code))
+        throw new Error("That code already exists in " + kind + ": " + code);
+      const es = String((entry && entry.es) || "").trim();
+      if (!es) throw new Error("A list entry needs a Spanish name");
+      const rec = {
+        code,
+        es,
+        // Catalan falls back to the Spanish name rather than to empty, so a
+        // half-filled entry degrades to a readable interface instead of a
+        // blank one. The coverage guard is what stops that being permanent.
+        ca: String((entry && entry.ca) || "").trim() || es,
+        active: true,
+      };
+      rows.push(rec);
+      this._log(user, "addListEntry", kind + "/" + code);
+      return rec;
+    }
+    updateListEntry(kind, code, patch, user) {
+      const hit = this.listAll(kind).find((e) => e.code === code);
+      if (!hit) throw new Error("No such entry in " + kind + ": " + code);
+      // `code` is deliberately absent from what a patch may touch — see the
+      // block comment above.
+      if (patch && typeof patch.es === "string") {
+        const es = patch.es.trim();
+        if (!es) throw new Error("A list entry needs a Spanish name");
+        hit.es = es;
+      }
+      if (patch && typeof patch.ca === "string") hit.ca = patch.ca.trim() || hit.es;
+      this._log(user, "updateListEntry", kind + "/" + code);
+      return hit;
+    }
+    /**
+     * Retire an entry. Deactivate, never delete — the system-wide rule.
+     *
+     * Deliberately NOT refused when the code is still in use: a list is
+     * retired precisely BECAUSE it is no longer how the company works, and
+     * every record already carrying it keeps resolving through `listLabel`.
+     * Blocking on use would mean the only lists you can tidy are the ones
+     * nobody ever used.
+     */
+    setListEntryActive(kind, code, active, user) {
+      const hit = this.listAll(kind).find((e) => e.code === code);
+      if (!hit) throw new Error("No such entry in " + kind + ": " + code);
+      if (!active && this.listActive(kind).length <= 1 && hit.active !== false)
+        throw new Error("A list cannot be left with no active entries");
+      hit.active = !!active;
+      this._log(user, active ? "activateListEntry" : "deactivateListEntry", kind + "/" + code);
+      return hit;
+    }
+    /** How many stored records still carry this code — shown before retiring one. */
+    listEntryUsage(kind, code) {
+      const S = this.state;
+      if (kind === "leadSources")
+        return (
+          S.parties.filter((p) => p.leadSource === code).length +
+          S.opportunities.filter((o) => o.source === code).length
+        );
+      if (kind === "lossReasons")
+        return S.opportunities.filter((o) => o.lossReason === code).length;
+      if (kind === "units")
+        return (
+          S.catalogue.filter((i) => i.unit === code).length +
+          sum(S.budgets, (b) =>
+            sum(b.versions, (v) =>
+              sum(v.chapters, (c) => c.lines.filter((l) => l.unit === code).length),
+            ),
+          )
+        );
+      if (kind === "paymentMethods")
+        return (
+          S.contracts.filter((c) => c.paymentMethod === code).length +
+          S.invoices.filter((i) => i.paymentMethod === code).length
+        );
+      return 0;
     }
 
     /* =========================== ORG — entity & series =========================== */
@@ -884,6 +1100,15 @@
           transportCents: 0,
           validUntil: null,
           dims: null, // SUP-09 {pieces,lengthMm,widthMm}
+          // DMC-02 detail (v4 plan gaps 6-9). taxRateBp and minOrder default to
+          // null rather than 0: "no rate recorded" and "0% tax" are different
+          // facts, and so are "no minimum" and "a minimum of nothing".
+          taxRateBp: null, // gap 6 — «IVA %» on the price row
+          supplierRef: "", // gap 7 — «Código art.», the SUPPLIER's code, not ours
+          wasteCents: 0, // gap 8 — waste-management charge, alongside transport
+          minOrder: null, // gap 8 — minimum order quantity
+          projectRef: "", // gap 9 — «Proyecto» the price was quoted for
+          notes: "", // gap 9 — «Notas»
         },
         pr,
       );
@@ -1058,6 +1283,13 @@
           progressPct: 0,
           imageRefs: [],
           notes: "",
+          // Provenance for a line that arrived from an uploaded workbook
+          // (v4 plan gap 12, decision 10). Empty on a line typed here, which
+          // is the honest answer — and the reason a later filtered upload can
+          // still be re-matched against what is already on file.
+          sourceFile: "",
+          sourceSheet: "",
+          chapterOriginal: "",
         },
         ln,
       );
@@ -6127,6 +6359,8 @@
   return {
     ERP,
     LISTS,
+    LIST_DEFAULTS,
+    LIST_KINDS,
     validTaxId,
     validIban,
     validEmail,
