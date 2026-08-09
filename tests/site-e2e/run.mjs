@@ -1179,6 +1179,128 @@ async function testCapture(browser, base) {
       ok("ADM-03: the machine's reading is kept beside it, and never marked confirmed by itself");
     else bad("ADM-03: reading kept unconfirmed", JSON.stringify(saved));
 
+    // ---- S7: the two zones, and the half of ADM-03 that was not built -----
+    await pg.waitForTimeout(400);
+    const zones = await pg.evaluate(() => {
+      const wrap = document.querySelector("#view .inbox2");
+      const card = document.querySelector("#view .icard");
+      return {
+        two: !!wrap,
+        cols: wrap ? getComputedStyle(wrap).gridTemplateColumns : "",
+        cards: document.querySelectorAll("#view .icard").length,
+        cardHeight: card ? Math.round(card.getBoundingClientRect().height) : 0,
+        register: document.querySelectorAll("#view table.mlist").length,
+      };
+    });
+    if (zones.two && zones.cards >= 1 && zones.cardHeight === 96 && zones.register === 1)
+      ok(`ADM-03: the inbox is 96 px cards beside the register (${zones.cols})`);
+    else bad("ADM-03: two zones", JSON.stringify(zones));
+
+    // The document just saved is on the LEFT, because nobody has said who
+    // pays for it yet. That is the whole reason the column exists.
+    const cardText = await pg.locator("#view .icard").first().innerText();
+    // The issuer NAME is the one field the reader routinely cannot find — no
+    // keyword introduces it and no validator can vouch for it, so it comes
+    // back null on this fixture exactly as it did in the S0b spike. The card
+    // says so rather than showing a blank line: same discipline as the amber
+    // dot, one screen later.
+    if (/2\.037,59/.test(cardText) && /confirmar/i.test(cardText))
+      ok("ADM-03: a card carries the detected amount, and says when the issuer was not detected");
+    else bad("ADM-03: card content", cardText.replace(/\n/g, " · ").slice(0, 90));
+
+    // …and a document whose issuer WAS confirmed shows it, so the line above
+    // is about this document rather than about the card never rendering a name.
+    const named = await pg.evaluate(() =>
+      [...document.querySelectorAll("#view .icard")].some((c) =>
+        /Vall/.test(c.querySelector(".who").textContent),
+      ),
+    );
+    if (named) ok("ADM-03: a card whose issuer is known shows the issuer");
+    else bad("ADM-03: named card", "no card carried a confirmed issuer name");
+
+    // ---- allocation: the half S6 left for this session --------------------
+    await pg.locator("#view .icard").first().click();
+    await pg.waitForTimeout(400);
+    await pg.fill("#cd_ref", "PED-E2E-77");
+    await pg.fill("#cd_notes", "reforma baño");
+    await pg.click("#cd_save");
+    await pg.waitForTimeout(600);
+    const filed = await pg.evaluate(() => {
+      const c = erp.state.captured[erp.state.captured.length - 1];
+      return { ref: c.reference, notes: c.notes, path: c.sourcePath, name: c.stdName };
+    });
+    if (filed.ref === "PED-E2E-77" && filed.notes === "reforma baño" && /\.pdf$/.test(filed.path))
+      ok(`ADM-03: gaps 10-11 — reference, note and the file's own origin persist (${filed.path})`);
+    else bad("ADM-03: archive fields persist", JSON.stringify(filed));
+
+    // A split that does not add up is refused, and says so rather than saving.
+    const destSel = pg.locator('#cd_rows select[data-k="dest"]').first();
+    const projValue = await pg.evaluate(
+      () =>
+        [...document.querySelectorAll('#cd_rows select[data-k="dest"] option')].find((o) =>
+          /^p:/.test(o.value),
+        ).value,
+    );
+    await destSel.selectOption(projValue);
+    await pg.waitForTimeout(300);
+    await pg.locator('#cd_rows input[data-k="amountCents"]').first().fill("100.00");
+    await pg.locator('#cd_rows input[data-k="amountCents"]').first().dispatchEvent("change");
+    await pg.waitForTimeout(300);
+    await pg.click("#cd_alloc");
+    await pg.waitForTimeout(500);
+    const refused = await pg.evaluate(() => ({
+      allocated: erp.state.captured[erp.state.captured.length - 1].allocations.length,
+      toast: (document.querySelector("#toast") || {}).textContent || "",
+      stillOpen: document.querySelector("#drawer").classList.contains("on"),
+    }));
+    if (refused.allocated === 0 && refused.stillOpen)
+      ok("ADM-03: a split that does not total the document is refused, panel still open");
+    else bad("ADM-03: short split refused", JSON.stringify(refused));
+
+    // Now split it properly: part to a project, the rest to an overhead.
+    await pg.locator('#cd_rows input[data-k="amountCents"]').first().fill("1000.00");
+    await pg.locator('#cd_rows input[data-k="amountCents"]').first().dispatchEvent("change");
+    await pg.waitForTimeout(300);
+    await pg.click("#cd_add");
+    await pg.waitForTimeout(300);
+    await pg.locator('#cd_rows select[data-k="dest"]').nth(1).selectOption("o:office");
+    await pg.waitForTimeout(300);
+    await pg.locator('#cd_rows input[data-k="amountCents"]').nth(1).fill("1037.59");
+    await pg.locator('#cd_rows input[data-k="amountCents"]').nth(1).dispatchEvent("change");
+    await pg.waitForTimeout(300);
+    await pg.click("#cd_alloc");
+    await pg.waitForTimeout(700);
+    const allocated = await pg.evaluate(() => {
+      const c = erp.state.captured[erp.state.captured.length - 1];
+      return {
+        n: c.allocations.length,
+        status: c.status,
+        onlyOneDest: c.allocations.every((a) => !!a.projectId !== !!a.overheadCategory),
+        sum: c.allocations.reduce((s, a) => s + a.amountCents, 0),
+        stillPending: document.querySelectorAll("#view .icard").length,
+      };
+    });
+    if (
+      allocated.n === 2 &&
+      allocated.status === "allocated" &&
+      allocated.onlyOneDest &&
+      allocated.sum === 203759
+    )
+      ok("ADM-03: a document splits between a project and an overhead, and adds up");
+    else bad("ADM-03: split allocation", JSON.stringify(allocated));
+    const gone = await pg.evaluate(() => {
+      const id = erp.state.captured[erp.state.captured.length - 1].id;
+      return {
+        inInbox: !!document.querySelector(`#view .icard[data-cap="${id}"]`),
+        inRegister: [...document.querySelectorAll("#view table.mlist tr.click")].some(
+          (tr) => tr.dataset.id === id,
+        ),
+      };
+    });
+    if (!gone.inInbox && gone.inRegister)
+      ok("ADM-03: an allocated document leaves the inbox for the register");
+    else bad("ADM-03: allocated document moves side", JSON.stringify(gone));
+
     if (errs.length === 0) ok("ADM-03: no console errors");
     else bad("ADM-03: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
@@ -1671,33 +1793,84 @@ async function testProcurement(browser, base) {
       await pg.waitForTimeout(500);
       ok("compras: a purchase order can be created from an open need");
 
-      await pg.locator("[data-pu]").first().click();
-      await pg.waitForTimeout(300);
-      const before = await pg.locator(".drawer .pill").first().innerText();
-      await pg.click("#a_send");
+      // S7: the order opens on the full-screen two-zone detail, not a drawer.
+      // The lifecycle is driven from the 480 record pane on its right.
+      await pg.locator("#view table.mlist tr.click").first().click();
       await pg.waitForTimeout(400);
-      const after = await pg.locator(".drawer .pill").first().innerText();
-      // The exact bug this session shipped once: the send handler updated the
-      // record but never re-rendered the open drawer, so the status pill and
-      // the next action both stayed stale until the drawer was closed and
-      // reopened.
-      if (after !== before && (await pg.locator("#a_accept").count()) > 0)
-        ok(`compras: sending an order refreshes the open drawer (${before} → ${after})`);
-      else bad("compras: drawer refreshes after send", `${before} → ${after}`);
+      const fs = await pg.evaluate(() => ({
+        full: document.body.classList.contains("fs"),
+        zones: document.querySelectorAll(".pb .cap2 > *").length,
+      }));
+      if (fs.full && fs.zones === 2)
+        ok("ADM-02: an order opens full screen, document left and record right");
+      else bad("ADM-02: full-screen two-zone detail", JSON.stringify(fs));
 
-      await pg.fill("#a_arr", "2026-01-01");
-      await pg.click("#a_accept");
+      const before = await pg.locator(".pbbar .pill").first().innerText();
+      await pg.click("#pa_send");
+      await pg.waitForTimeout(500);
+      const after = await pg.locator(".pbbar .pill").first().innerText();
+      // The bug session 10b shipped once, in its new home: the action updated
+      // the record but never re-rendered the pane, so the stage pill and the
+      // next action both stayed stale until the screen was left and reopened.
+      if (after !== before && (await pg.locator("#pa_accept").count()) > 0)
+        ok(`ADM-02: an action refreshes the open record pane (${before} → ${after})`);
+      else bad("ADM-02: record pane refreshes after send", `${before} → ${after}`);
+
+      await pg.fill("#pa_arr", "2026-01-01");
+      await pg.click("#pa_accept");
       await pg.waitForTimeout(400);
-      await pg.fill("#a_qty", "10");
-      await pg.fill("#a_doc", "ALB-E2E-1");
-      await pg.click("#a_recv");
+      await pg.fill("#pa_qty", "10");
+      await pg.fill("#pa_doc", "ALB-E2E-1");
+      await pg.click("#pa_recv");
+      await pg.waitForTimeout(500);
+      // The doc drops goods receipt as a STAGE — the order is a pedido before
+      // and after the delivery note. The engine's receiving lifecycle is
+      // untouched, and this is where the two statements are checked together.
+      const stageAfterReceipt = await pg.locator(".pbbar .pill").first().innerText();
+      const statusAfterReceipt = await pg.locator("#puForm .pbh .tag").first().innerText();
+      if (/Pedido/i.test(stageAfterReceipt) && /Recibida/i.test(statusAfterReceipt))
+        ok("ADM-02: receiving is evidence, not a fourth stage (Pedido · Recibida)");
+      else bad("ADM-02: stage after receipt", `${stageAfterReceipt} · ${statusAfterReceipt}`);
+
+      // Base/IVA/total at the foot — 10 × 5,00 € = 50,00 € + 21%.
+      const foot = await pg.locator("#puForm").innerText();
+      if (/50,00/.test(foot) && /60,50/.test(foot))
+        ok("ADM-02: the record pane foots base, IVA and total");
+      else bad("ADM-02: totals at the foot", foot.slice(-200));
+
+      await pg.click("#puBack");
       await pg.waitForTimeout(400);
-      const finalStatus = await pg.locator(".drawer .pill").first().innerText();
-      if (/Recibida/.test(finalStatus))
-        ok("compras: draft → sent → accepted → received, in one drawer session");
-      else bad("compras: full receiving lifecycle", finalStatus);
-      await pg.click("#dClose");
-      await pg.waitForTimeout(200);
+      const backOut = await pg.evaluate(() => ({
+        full: document.body.classList.contains("fs"),
+        rows: document.querySelectorAll("#view table.mlist tr.click").length,
+      }));
+      if (!backOut.full && backOut.rows > 0)
+        ok("ADM-02: leaving the detail restores the list and its navigation");
+      else bad("ADM-02: back to the list", JSON.stringify(backOut));
+
+      // The three counters, and the filter each one applies.
+      const counters = await pg.locator("#view .counter .lab").allInnerTexts();
+      const rowsAll = await pg.locator("#view table.mlist tr.click").count();
+      await pg.locator("#view .counter").nth(2).click(); // Facturado
+      await pg.waitForTimeout(400);
+      const rowsInvoiced = await pg.locator("#view table.mlist tr.click").count();
+      await pg.locator("#view .counter.on").first().click(); // press it again to clear
+      await pg.waitForTimeout(400);
+      const rowsCleared = await pg.locator("#view table.mlist tr.click").count();
+      if (
+        counters.length === 3 &&
+        /Oferta/i.test(counters[0]) &&
+        /Pedido/i.test(counters[1]) &&
+        /Facturado/i.test(counters[2]) &&
+        rowsInvoiced < rowsAll &&
+        rowsCleared === rowsAll
+      )
+        ok(`ADM-02: three counters filter and un-filter the list (${rowsAll} → ${rowsInvoiced})`);
+      else
+        bad(
+          "ADM-02: counter strip",
+          `${counters.join("/")} · ${rowsAll}/${rowsInvoiced}/${rowsCleared}`,
+        );
     }
 
     // ---- Subcontratos: the lifecycle screen is gone, the rules are not ----
@@ -3007,6 +3180,33 @@ async function testI18n(browser, base) {
       ok("i18n: CA translates the COM-02 visits screen");
     else bad("i18n: CA visits screen", visitsCaText.replace(/\n/g, " ").slice(0, 160));
 
+    // S7's two screens, in Catalan. The dictionary guard proves an entry
+    // exists; only this proves the screen reaches it — the gap S4 and S5 both
+    // found, and the reason every session since adds a render check with the
+    // strings it introduces.
+    await pg.evaluate(() => (location.hash = "supplier-invoices"));
+    await pg.waitForTimeout(700);
+    const capCaText = await pg.locator("body").innerText();
+    if (
+      /Safata/i.test(capCaText) &&
+      /Documents/i.test(capCaText) &&
+      !/\bBandeja\b/i.test(capCaText) &&
+      !/Emisor por confirmar/i.test(capCaText)
+    )
+      ok("i18n: CA translates the ADM-03 inbox and register");
+    else bad("i18n: CA ADM-03", capCaText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "purchasing"));
+    await pg.waitForTimeout(700);
+    const purCaText = await pg.locator("body").innerText();
+    if (
+      /Comanda/i.test(purCaText) &&
+      /Facturat/i.test(purCaText) &&
+      !/Llegada prevista/i.test(purCaText)
+    )
+      ok("i18n: CA translates the ADM-02 counters and list");
+    else bad("i18n: CA ADM-02", purCaText.replace(/\n/g, " ").slice(0, 160));
+
     // And the same two screens under EN, so both new-string additions are
     // proven in both directions, not just the CA one that happened to be
     // built last.
@@ -3035,6 +3235,30 @@ async function testI18n(browser, base) {
     )
       ok("i18n: EN translates the COM-02 visits screen");
     else bad("i18n: EN visits screen", visitsEnText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "supplier-invoices"));
+    await pg.waitForTimeout(700);
+    const capEnText = await pg.locator("body").innerText();
+    if (
+      /Inbox/i.test(capEnText) &&
+      /Allocation/i.test(capEnText) &&
+      !/\bBandeja\b/i.test(capEnText) &&
+      !/Asignación/i.test(capEnText)
+    )
+      ok("i18n: EN translates the ADM-03 inbox and register");
+    else bad("i18n: EN ADM-03", capEnText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "purchasing"));
+    await pg.waitForTimeout(700);
+    const purEnText = await pg.locator("body").innerText();
+    if (
+      /Offer/i.test(purEnText) &&
+      /Invoiced/i.test(purEnText) &&
+      /Expected arrival/i.test(purEnText) &&
+      !/Llegada prevista/i.test(purEnText)
+    )
+      ok("i18n: EN translates the ADM-02 counters and list");
+    else bad("i18n: EN ADM-02", purEnText.replace(/\n/g, " ").slice(0, 160));
 
     // COM-03 (S5). Two separate things are checked here, because they pull in
     // opposite directions: the presupuestador's INTERFACE must follow the
