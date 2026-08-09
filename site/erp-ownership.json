@@ -150,11 +150,11 @@
       "note": "Owned by @repo/capability-scheduling and reached only through ErpBridge.scheduling.plans. Session 6 gave it the calendar, CPM and baselines; session 10a added the three things §4.3 asks for around them: the real derivation from the accepted budget (chapters and lines in, durations from quantity divided by the vertical pack's daily output, dependencies chained, re-derivable without losing what the site recorded), the progress curve, and the risk report. Two properties are load-bearing. Derived task ids come from the caller's own references rather than a generator, so re-deriving after a quote change is a merge and not a reset. And the actual-progress curve is drawn from an append-only progress log, never from today's percentages: dates and the critical path recompute from the network at any time, but how much was done by the end of March is only knowable if somebody wrote it down in March."
     },
     "extraction-ocr": {
-      "owner": "unbuilt",
+      "owner": "factory",
       "specSection": "5.2 (Improvement #2)",
       "engineSection": null,
-      "plannedSession": "8",
-      "note": "Session 7 built the reading half: @repo/capability-extraction turns recognised text into candidate fields with confidence, provenance and arithmetic checks, and @repo/pack-jurisdiction-es-es supplies the profile behind the extraction-profile@1 port (number and date notation, NIF/CIF/NIE and IBAN check characters, the words each field is announced by, the rates in force on a date). Still 'unbuilt' here because no screen reaches it: session 8 adds the camera, the recognition adapter and the validation screen, and flips this. Nothing is ever auto-confirmed — CAP-04 is enforced by the capability's type, which always reports confirmed:false."
+      "plannedSession": "S6",
+      "note": "Built. @repo/capability-extraction turns recognised text into candidate fields with confidence, provenance and arithmetic checks, and now also a VERDICT per field: green only where a validator vouched for the value — a check digit that computes, a real calendar date, arithmetic that balances — never on confidence alone. site/erp-ocr.js supplies the recognition half (pdf.js text layer first, tesseract.js spa+cat only where there is nothing to read), lazily loaded from site/vendor with no CDN. ADM-03's validation screen writes the record only when a person presses Confirmar, so CAP-04 is enforced by the flow as well as by the capability's confirmed:false type."
     },
     "journey-project-selector": {
       "owner": "engine",

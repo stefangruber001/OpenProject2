@@ -664,6 +664,42 @@ window.CANEI_DICT.ca = {
   imágenes: "imatges",
   activo: "actiu",
   desactivado: "desactivat",
+  // ── ADM-03: document capture and validation (S6).
+  "＋ Capturar documento": "＋ Capturar document",
+  Cámara: "Càmera",
+  "Preparar para trabajar sin cobertura": "Preparar per treballar sense cobertura",
+  "Un PDF con texto se lee al instante y sin descargar nada. Una foto o un escaneado necesitan el lector de imágenes: unos 7 MB que se descargan la primera vez que hagan falta. Prepárelo con wifi si va a trabajar en una obra sin cobertura.":
+    "Un PDF amb text es llegeix a l'instant i sense descarregar res. Una foto o un escaneig necessiten el lector d'imatges: uns 7 MB que es descarreguen el primer cop que calguin. Prepareu-ho amb wifi si heu de treballar en una obra sense cobertura.",
+  "Descargando el lector de documentos…": "Descarregant el lector de documents…",
+  "Listo para trabajar sin cobertura": "Llest per treballar sense cobertura",
+  "Leyendo el documento…": "Llegint el document…",
+  "Validar documento": "Validar document",
+  "Volver a la bandeja": "Tornar a la safata",
+  "Por revisar": "Per revisar",
+  "Confirmar y guardar": "Confirmar i desar",
+  "Documento guardado": "Document desat",
+  "Leído del texto del PDF": "Llegit del text del PDF",
+  "Datos leídos": "Dades llegides",
+  "No cuadra": "No quadra",
+  Comprobado: "Comprovat",
+  "Sin comprobar — revíselo": "Sense comprovar — reviseu-ho",
+  "Un punto verde significa que algo ha comprobado el dato — un dígito de control, una fecha real, una suma que cuadra. Ámbar significa que nadie lo ha comprobado, por muy claro que se leyera.":
+    "Un punt verd significa que alguna cosa ha comprovat la dada — un dígit de control, una data real, una suma que quadra. Ambre significa que ningú no ho ha comprovat, per clar que es llegís.",
+  "No se ha leído nada del documento. Escriba los datos a mano; la imagen queda adjunta igualmente.":
+    "No s'ha llegit res del document. Escriviu les dades a mà; la imatge queda adjunta igualment.",
+  "Preparando la vista…": "Preparant la vista…",
+  "No se ha podido mostrar el documento.": "No s'ha pogut mostrar el document.",
+  "No se ha podido leer el documento": "No s'ha pogut llegir el document",
+  "⚠ El lector de documentos no está disponible": "⚠ El lector de documents no està disponible",
+  "⚠ El lector de documentos no está disponible — introdúzcalo a mano":
+    "⚠ El lector de documents no està disponible — introduïu-ho a mà",
+  "⚠ No se ha podido leer nada: rellénelo a mano": "⚠ No s'ha pogut llegir res: ompliu-ho a mà",
+  "Nº documento": "Núm. document",
+  Retención: "Retenció",
+  "Factura de proveedor": "Factura de proveïdor",
+  "Factura de autónomo": "Factura d'autònom",
+  "Confirmación de pedido": "Confirmació de comanda",
+  "Justificante de pago": "Justificant de pagament",
 };
 window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Programar visita — (.+)$"), "Programar visita — $1"],

@@ -487,6 +487,34 @@
     .pbpane{overflow:visible;border:0;border-bottom:1px solid var(--line)}
     .pb{height:auto}
   }
+  /* ---------- ADM-03: document validation, full screen (S6) ----------
+     The second of the specification's four out-of-shell surfaces. Two zones:
+     the document itself on the left at 620, the form on the right at 480,
+     both full height, because checking a reading against a picture is the
+     one job here and anything else on screen is in the way. */
+  .cap2{display:grid;grid-template-columns:minmax(0,620px) 480px;min-height:0;flex:1}
+  .capdoc{min-height:0;overflow:auto;background:var(--hair);padding:12px;text-align:center}
+  .capdoc img,.capdoc canvas{max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .capform{min-height:0;overflow:auto;background:var(--paper);border-left:1px solid var(--line)}
+  .capf{display:grid;grid-template-columns:14px 150px minmax(0,1fr);gap:8px;align-items:center;
+    padding:6px 12px;border-bottom:1px solid var(--hair)}
+  .capf:hover{background:var(--hair)}
+  .capf.on{background:var(--greenSoft)}
+  .capf label{font-size:12px;color:var(--muted)}
+  .capf input{font:12.5px var(--sans);border:1px solid var(--line);border-radius:8px;padding:5px 8px;
+    background:var(--paper);color:var(--ink);outline:0;width:100%}
+  .capf input:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--greenSoft)}
+  /* The dot. Green means a validator vouched for the value; amber means
+     nothing did — never "the reader was confident", which is the whole point
+     (see FieldVerdict in the extraction capability). */
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .dot.green{background:var(--green)}
+  .dot.amber{background:var(--amber)}
+  .capwhy{grid-column:2 / -1;font-size:11px;color:var(--muted);padding:0 0 4px}
+  .capsrc{background:var(--amberSoft,#fdf3d7);outline:2px solid var(--amber);border-radius:3px}
+  .caplines{font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;
+    text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:10px}
+
   /* The status groups of the register (Borradores · Enviados · …). */
   .grouphd{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;
     color:var(--faint);background:var(--hair)}
@@ -3701,6 +3729,248 @@ function builderVisitPanel(b){
     </div>`:""}`;
 }
 
+/* ================= ADM-03 · document capture and validation (S6) =========
+   Recognition happens in site/erp-ocr.js and meaning in the extraction
+   capability; this is only the screen between them. Its whole job is the
+   sentence the specification and CAP-04 both insist on: a partial extraction
+   never creates a validated record in silence. So the record is written at
+   the END, by a person pressing a button, and every field carries a dot
+   saying whether anything actually checked it.
+
+   `capWork` holds the document being validated. It is deliberately NOT in
+   `erp.state`: nothing about a half-checked reading belongs in the company's
+   data, and the moment it does belong there it stops being a reading and
+   becomes a captured document. */
+let capWork=null;   // {file, url, kind, recognised, result, blobKey, docType, focusKey}
+
+const CAP_FIELDS=[
+  ["issuerName","Emisor"],
+  ["issuerTaxId","NIF"],
+  ["docNumber","Nº documento"],
+  ["issueDate","Fecha"],
+  ["dueDate","Vencimiento"],
+  ["netAmount","Base imponible"],
+  ["taxAmount","IVA"],
+  ["withholdingAmount","Retención"],
+  ["totalAmount","Total"],
+  ["iban","IBAN"],
+  ["orderRef","Referencia"],
+];
+const CAP_AMOUNTS=new Set(["netAmount","taxAmount","withholdingAmount","totalAmount"]);
+
+/** Read a chosen file and open the validation screen on the result. */
+function captureStart(file){
+  if(typeof ErpOcr==="undefined"||!ErpBridge.extraction){
+    toast("⚠ El lector de documentos no está disponible — introdúzcalo a mano"); return;
+  }
+  toast("Leyendo el documento…");
+  ErpOcr.recognise(file,{onProgress:p=>{ if(p>0&&p<1) toast(`Leyendo… ${Math.round(p*100)}%`); }})
+    .then(rec=>{
+      let result;
+      try{ result=ErpBridge.extraction.read(rec.text); }
+      catch(e){
+        // A photograph with nothing readable on it. The document is still
+        // worth keeping — it just has to be typed. Never a dead end.
+        toast("⚠ No se ha podido leer nada: rellénelo a mano");
+        result=null;
+      }
+      capWork={file,url:URL.createObjectURL(file),
+        kind:/pdf$/i.test(file.type)?"pdf":"image",
+        recognised:rec,result,docType:"supplierInvoice",
+        focusKey:(result&&result.needsReview[0])||null};
+      render();
+    })
+    .catch(e=>toast("⚠ "+(e.message||"No se ha podido leer el documento")));
+}
+
+function captureClose(){
+  if(capWork&&capWork.url) URL.revokeObjectURL(capWork.url);
+  capWork=null; render();
+}
+
+/** The value as it should appear in its box: cents become euros, else text. */
+function capShown(f){
+  if(f.value===null||f.value===undefined) return "";
+  return CAP_AMOUNTS.has(f.key)?(f.value/100).toFixed(2):String(f.value);
+}
+
+function captureValidate(v){
+  const w=capWork, r=w.result;
+  document.body.classList.add('fs');
+  const rec=w.recognised;
+  const engine=rec.engine==="pdf-text"
+    ?'<span class="pill g">Leído del texto del PDF</span>'
+    :`<span class="pill y">Leído de una imagen${rec.confidence!=null?" · "+rec.confidence+"% de confianza":""}</span>`;
+  const amber=r?r.fields.filter(f=>f.verdict==="amber").length:CAP_FIELDS.length;
+
+  v.innerHTML=`<div class="pb">
+   <div class="pbbar">
+    <button class="btn sm" id="capBack" title="Volver a la bandeja">←</button>
+    <div class="who"><b>Validar documento</b><span>${esc(w.file.name||"documento")}</span></div>
+    ${engine}
+    <div class="tot"><span>Por revisar</span><b id="capAmber">${amber}</b></div>
+    <div class="acts">
+     <select id="capType" style="font:12px var(--sans);border:1px solid var(--line);border-radius:8px;padding:5px 7px;background:var(--paper);color:var(--ink)">
+      ${[["supplierInvoice","Factura de proveedor"],["selfEmployedInvoice","Factura de autónomo"],
+         ["deliveryNote","Albarán"],["valuedDeliveryNote","Albarán valorado"],["ticket","Ticket"],
+         ["supplierOffer","Oferta"],["orderConfirmation","Confirmación de pedido"],
+         ["paymentProof","Justificante de pago"],["creditNote","Abono"]]
+        .map(([k,l])=>`<option value="${k}"${w.docType===k?" selected":""}>${l}</option>`).join("")}
+     </select>
+     <button class="btn primary sm" id="capSave">Confirmar y guardar</button>
+    </div>
+   </div>
+   ${rec.warnings.length?`<div class="pbcond"><span class="pill y">⚠</span> ${rec.warnings.map(x=>`<span>${esc(x)}</span>`).join(" ")}</div>`:""}
+   <div class="cap2">
+    <div class="capdoc" id="capDoc"></div>
+    <div class="capform" id="capForm"></div>
+   </div>
+  </div>`;
+
+  $('#capBack').onclick=captureClose;
+  $('#capType').onchange=e=>{ w.docType=e.target.value; };
+  $('#capSave').onclick=captureSave;
+  captureDocPane();
+  captureFormPane();
+}
+
+/** The document itself. A PDF's first page is rendered, an image shown. */
+function captureDocPane(){
+  const host=$('#capDoc'), w=capWork;
+  if(w.kind==="image"){ host.innerHTML=`<img src="${w.url}" alt="">`; }
+  else{
+    host.innerHTML='<div class="empty">Preparando la vista…</div>';
+    w.file.arrayBuffer()
+      .then(buf=>import(ErpOcr.vendorBase()+"pdfjs/pdf.min.mjs").then(m=>({m,buf})))
+      .then(({m,buf})=>m.getDocument({data:new Uint8Array(buf)}).promise)
+      .then(doc=>doc.getPage(1))
+      .then(page=>{
+        const vp=page.getViewport({scale:1.4});
+        const c=document.createElement('canvas');
+        c.width=Math.round(vp.width); c.height=Math.round(vp.height);
+        return page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise.then(()=>c);
+      })
+      .then(c=>{ host.innerHTML=''; host.appendChild(c); captureLines(host); })
+      .catch(()=>{ host.innerHTML='<div class="empty">No se ha podido mostrar el documento.</div>'; captureLines(host); });
+    return;
+  }
+  captureLines(host);
+}
+
+/* The text the reader actually saw, under the picture. This is the provenance
+   the specification asks for — "al pulsar un campo se destaca la zona de la
+   imagen de la que se obtuvo". We have line offsets rather than pixel boxes,
+   so the honest version of that is to highlight the LINE, and to show the
+   lines. A wrong reading you can see the source of is a wrong reading somebody
+   can fix; one you cannot is a mystery. */
+function captureLines(host){
+  if(!capWork) return;
+  const r=capWork.result; if(!r) return;
+  const box=document.createElement('div');
+  box.className='caplines'; box.id='capLines';
+  box.innerHTML=r.lines.map((l,i)=>`<div data-line="${i}">${esc(l)||"&nbsp;"}</div>`).join("");
+  host.appendChild(box);
+  captureHighlight();
+}
+
+function captureHighlight(){
+  if(!capWork) return;
+  const r=capWork.result; if(!r) return;
+  const box=$('#capLines'); if(!box) return;
+  box.querySelectorAll('[data-line]').forEach(d=>d.classList.remove('capsrc'));
+  const f=r.fields.find(x=>x.key===capWork.focusKey);
+  if(f&&f.source){
+    const d=box.querySelector(`[data-line="${f.source.line}"]`);
+    if(d){ d.classList.add('capsrc'); d.scrollIntoView({block:"nearest"}); }
+  }
+}
+
+function captureFormPane(){
+  /* Guarded because the teardown order is genuinely racy: pressing "Confirmar"
+     blurs whatever field had focus, and a blur fires `change` — which lands
+     AFTER the save has already closed the screen and cleared capWork. */
+  if(!capWork) return;
+  const r=capWork.result;
+  const host=$('#capForm');
+  if(!r){
+    host.innerHTML=`<div class="pbh">Datos</div><div class="pbbody">
+      <div class="empty">No se ha leído nada del documento. Escriba los datos a mano; la imagen queda adjunta igualmente.</div></div>`;
+    return;
+  }
+  const badChecks=r.checks.filter(c=>c.status==="mismatch");
+  host.innerHTML=`<div class="pbh">Datos leídos<span style="flex:1"></span>
+     <span class="tag">${r.profile.id.split("/")[1]||r.profile.id}</span></div>
+   ${badChecks.length?`<div class="pbbody" style="padding-bottom:0">${badChecks.map(c=>
+     `<div class="it"><span class="pill r">No cuadra</span> <span>${esc(c.detail)}</span></div>`).join("")}</div>`:""}
+   ${CAP_FIELDS.map(([key,label])=>{
+     const f=r.fields.find(x=>x.key===key);
+     const why=f.reasons.slice(0,2).join(" · ");
+     return `<div class="capf${capWork.focusKey===key?" on":""}" data-f="${key}">
+       <span class="dot ${f.verdict}" title="${f.verdict==="green"?"Comprobado":"Sin comprobar — revíselo"}"></span>
+       <label for="cap_${key}">${label}</label>
+       <input id="cap_${key}" data-key="${key}" value="${esc(capShown(f))}"
+         ${CAP_AMOUNTS.has(key)?'inputmode="decimal"':''}>
+       ${why?`<div class="capwhy">${esc(why)}</div>`:""}
+      </div>`;}).join("")}
+   <div class="pbbody"><div class="it" style="color:var(--muted)">Un punto verde significa que algo ha comprobado el dato — un dígito de control, una fecha real, una suma que cuadra. Ámbar significa que nadie lo ha comprobado, por muy claro que se leyera.</div></div>`;
+
+  host.querySelectorAll('.capf').forEach(row=>{
+    row.onclick=()=>{ if(!capWork) return; capWork.focusKey=row.dataset.f; captureFormPane(); captureHighlight();
+      const i=document.getElementById('cap_'+row.dataset.f); if(i) i.focus(); };
+  });
+  host.querySelectorAll('input[data-key]').forEach(inp=>{
+    inp.onchange=()=>{
+      if(!capWork||!capWork.result) return;
+      const key=inp.dataset.key;
+      const raw=inp.value.trim();
+      const value=raw===""?null:(CAP_AMOUNTS.has(key)?Math.round(Number(raw.replace(",","."))*100):raw);
+      // Re-check through the capability — the same arithmetic and the same
+      // check digits the reading was judged by, so a typed value earns its
+      // dot exactly as a read one does.
+      capWork.result=ErpBridge.extraction.recheck(capWork.result,{[key]:Number.isNaN(value)?null:value});
+      captureFormPane(); captureHighlight();
+      const again=document.getElementById('cap_'+key); if(again){ again.focus(); }
+      const a=$('#capAmber'); if(a) a.textContent=capWork.result.fields.filter(f=>f.verdict==="amber").length;
+    };
+  });
+  // The specification's own instruction: the cursor starts on the first thing
+  // that needs a person.
+  if(capWork.focusKey){ const i=document.getElementById('cap_'+capWork.focusKey); if(i) i.focus(); }
+}
+
+/** Write the record — the only moment anything reaches the company's data. */
+function captureSave(){
+  const w=capWork, r=w.result;
+  const val=k=>{ const f=r&&r.fields.find(x=>x.key===k); return f?f.value:null; };
+  const key="cap_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
+  const store=ErpStore.putBlob(key,w.file).catch(()=>null);
+  store.then(()=>{
+    mutate(()=>{
+      const cap=erp.captureDocument({
+        docType:w.docType,
+        imageRef:key,
+        machineReadable:w.recognised.engine==="pdf-text",
+        // The reading travels with the record, unconfirmed, so that what the
+        // machine proposed stays visible beside what the person accepted.
+        extractable:r?{fields:r.fields.map(f=>({key:f.key,value:f.value,verdict:f.verdict,
+          confidence:f.confidence,raw:f.raw})),profile:r.profile,engine:w.recognised.engine}:null,
+        confidence:w.recognised.confidence!=null?w.recognised.confidence/100:undefined,
+      },"backoffice");
+      erp.confirmCapture(cap.id,{
+        issuerName:val("issuerName")||"",
+        issuerTaxId:val("issuerTaxId")||"",
+        docNumber:val("docNumber")||"",
+        date:val("issueDate")||erp.today,
+        dueDate:val("dueDate")||null,
+        baseCents:val("netAmount")||0,
+        vatCents:val("taxAmount")||0,
+        totalCents:val("totalAmount")||0,
+        iban:val("iban")||"",
+      },"backoffice");
+    },"Documento guardado");
+  }).then(()=>captureClose());
+}
+
 function builderIssues(id,issues){
   const db=openDrawer("Validación · "+erp.budget(id).number);
   db.innerHTML=`<div class="card"><div class="ch"><h3>${issues.length} incidencias</h3><span class="tag">PRE-09</span></div><div class="daylist">
@@ -4477,6 +4747,7 @@ const VIEWS={
 
  /* ---------- Captura (CAP) ---------- */
  _docInbox(v){
+  if(capWork) return captureValidate(v);
   $('#sub').textContent="Fotografía o sube una factura, albarán o ticket y asígnalo a un proyecto o a gastos generales. Nada se valida sin confirmación humana.";
   const ST={captured:["Capturado","y"],extracted:["Extraído","y"],validated:["Validado","b"],allocated:["Asignado","g"],sentToAccounting:["Enviado a gestoría","g"],paid:["Pagado","g"]};
   v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Documento</th><th>Tipo</th><th>Emisor</th><th class="num">Importe</th><th>Asignación</th><th>Estado</th></tr></thead><tbody>
@@ -4487,7 +4758,23 @@ const VIEWS={
     <td class="num">${cf?eur(cf.totalCents):"—"}</td>
     <td>${c.allocations.length?c.allocations.map(a=>a.projectId?erp.project(a.projectId).code:a.overheadCategory).join(", "):"—"}</td>
     <td><span class="pill ${ST[c.status]?.[1]}">${ST[c.status]?.[0]||c.status}</span>${c.duplicateSuspect?' <span class="pill r">¿Duplicado?</span>':''}</td></tr>`;}).join("")||'<tr><td colspan="6"><div class="empty">Sin documentos capturados.</div></td></tr>'}
-   </tbody></table></div></div>`;
+   </tbody></table></div></div>
+   <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;align-items:center">
+    <label class="btn primary sm">＋ Capturar documento<input type="file" id="capFile" accept="image/*,application/pdf" hidden></label>
+    <label class="btn sm">Cámara<input type="file" id="capCam" accept="image/*" capture="environment" hidden></label>
+    <span style="flex:1"></span>
+    <button class="btn sm" id="capPrep">Preparar para trabajar sin cobertura</button>
+   </div>
+   <div class="card"><div class="daylist"><div class="it">Un PDF con texto se lee al instante y sin descargar nada. Una foto o un escaneado necesitan el lector de imágenes: unos 7 MB que se descargan la primera vez que hagan falta. Prepárelo con wifi si va a trabajar en una obra sin cobertura.</div></div></div>`;
+  const take=(el)=>{ if(el) el.onchange=()=>{ if(el.files&&el.files[0]) captureStart(el.files[0]); }; };
+  take($('#capFile')); take($('#capCam'));
+  $('#capPrep').onclick=()=>{
+    if(typeof ErpOcr==="undefined"){ toast("⚠ El lector de documentos no está disponible"); return; }
+    toast("Descargando el lector de documentos…");
+    ErpOcr.prepareOffline(p=>{ if(p>=1) toast("Listo para trabajar sin cobertura"); })
+      .then(r=>toast(`Listo para trabajar sin cobertura (${Math.round(r.bytes/1024/1024)} MB)`))
+      .catch(e=>toast("⚠ "+e.message));
+  };
  },
 
  /* ---------- Compras · Subcontratos · Modificaciones · Horas (§4.1/§4.2/§4.5/§4.6) ----------

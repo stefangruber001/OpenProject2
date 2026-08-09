@@ -4611,7 +4611,8 @@ var ErpFactory = (() => {
     applyVerdicts(fields, checks) {
       const totals = checks.find((c) => c.id === "totals");
       const contradicted = /* @__PURE__ */ new Set();
-      for (const c of checks) if (c.status === "mismatch") for (const k of c.fields) contradicted.add(k);
+      for (const c of checks)
+        if (c.status === "mismatch") for (const k of c.fields) contradicted.add(k);
       for (const f of fields) {
         if (f.value === null || contradicted.has(f.key)) {
           f.verdict = "amber";

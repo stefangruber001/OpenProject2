@@ -72,6 +72,7 @@ async function main() {
     await testGantt(browser, base);
     await testBudgetBuilder(browser, base);
     await testPresupuestador(browser, base);
+    await testCapture(browser, base);
     await testProjectTracking(browser, base);
     await testProcurement(browser, base);
     await testAdmin(browser, base);
@@ -984,6 +985,204 @@ async function testBudgetBuilder(browser, base) {
     else bad("builder: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("budget builder", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── ADM-03 / S6: document capture, from a real file to a saved record.
+//    The pipeline is the point, and it is checked end to end in one browser:
+//    a PDF with a text layer is read WITHOUT loading the 7 MB OCR runtime;
+//    every field carries a dot that a validator earned rather than a
+//    confidence score; a typed correction is re-checked; and the record is
+//    written only when a person presses the button.
+async function testCapture(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#supplier-invoices`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(900);
+
+    const wired = await pg.evaluate(() => ({
+      ocr: typeof window.ErpOcr,
+      extraction: typeof (window.ErpBridge && window.ErpBridge.extraction),
+      surface: window.ErpBridge && window.ErpBridge.surfaceVersion,
+      capture: !!document.getElementById("capFile"),
+    }));
+    if (wired.ocr === "object" && wired.extraction === "object" && wired.capture)
+      ok(`ADM-03: the capture pipeline is wired (bundle surface v${wired.surface})`);
+    else bad("ADM-03: pipeline wired", JSON.stringify(wired));
+
+    // Nothing of the OCR runtime may load merely because the screen is open.
+    const idle = await pg.evaluate(() => ({
+      tesseract: typeof window.Tesseract,
+      vendorRequests: performance
+        .getEntriesByType("resource")
+        .filter((r) => /vendor\//.test(r.name)).length,
+    }));
+    if (idle.tesseract === "undefined" && idle.vendorRequests === 0)
+      ok("ADM-03: opening the inbox loads none of the 7 MB reader");
+    else bad("ADM-03: nothing loads at rest", JSON.stringify(idle));
+
+    // Hand it a genuine PDF with a text layer, built in the page.
+    await pg.evaluate(() => {
+      const lines = [
+        "DISTRIBUCIONES CERYGRES, S.A.",
+        "NIF: A08932907",
+        "Factura n 26OFV001345",
+        "Fecha: 26/02/2026",
+        "Vencimiento: 27/03/2026",
+        "Base imponible 1.683,96",
+        "IVA 21% 353,63",
+        "TOTAL 2.037,59",
+        "IBAN ES91 2100 0418 4502 0005 1332",
+      ];
+      const content = lines
+        .map((l, i) => `BT /F1 11 Tf 40 ${760 - i * 18} Td (${l.replace(/[()\\]/g, "\\$&")}) Tj ET`)
+        .join("\n");
+      const objs = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+        `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+      ];
+      let pdf = "%PDF-1.4\n";
+      const off = [];
+      objs.forEach((o, i) => {
+        off.push(pdf.length);
+        pdf += `${i + 1} 0 obj\n${o}\nendobj\n`;
+      });
+      const x = pdf.length;
+      pdf +=
+        `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` +
+        off.map((o) => String(o).padStart(10, "0") + " 00000 n \n").join("") +
+        `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${x}\n%%EOF`;
+      const blob = new Blob([new Uint8Array([...pdf].map((c) => c.charCodeAt(0)))], {
+        type: "application/pdf",
+      });
+      const dt = new DataTransfer();
+      dt.items.add(new File([blob], "factura.pdf", { type: "application/pdf" }));
+      const inp = document.getElementById("capFile");
+      inp.files = dt.files;
+      inp.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(2500);
+
+    const screen = await pg.evaluate(() => ({
+      fs: document.body.classList.contains("fs"),
+      zones:
+        !!document.querySelector(".cap2 .capdoc") && !!document.querySelector(".cap2 .capform"),
+      engine: (document.querySelector(".pbbar .pill") || {}).textContent || "",
+      tesseract: typeof window.Tesseract,
+    }));
+    if (screen.fs && screen.zones && /PDF/i.test(screen.engine))
+      ok("ADM-03: a text-layer PDF opens the two-zone validation screen, outside the shell");
+    else bad("ADM-03: validation screen", JSON.stringify(screen));
+    if (screen.tesseract === "undefined")
+      ok("ADM-03: …and the OCR half never loaded, because it was never needed");
+    else bad("ADM-03: OCR skipped for a digital PDF", "tesseract was loaded anyway");
+
+    // The dots. This is the rule the whole session exists for.
+    const dots = await pg.evaluate(() =>
+      Object.fromEntries(
+        [...document.querySelectorAll(".capf")].map((r) => [
+          r.dataset.f,
+          r.querySelector(".dot").classList.contains("green") ? "green" : "amber",
+        ]),
+      ),
+    );
+    const greens = [
+      "issuerTaxId",
+      "issueDate",
+      "dueDate",
+      "netAmount",
+      "taxAmount",
+      "totalAmount",
+      "iban",
+    ];
+    if (greens.every((k) => dots[k] === "green"))
+      ok("ADM-03: everything a validator could check reads green (NIF, dates, amounts, IBAN)");
+    else bad("ADM-03: green fields", JSON.stringify(dots));
+    if (dots.docNumber === "amber" && dots.issuerName === "amber")
+      ok("ADM-03: the document number and the issuer name stay amber — nothing can check them");
+    else bad("ADM-03: unverifiable fields amber", JSON.stringify(dots));
+
+    const focused = await pg.evaluate(() => document.activeElement && document.activeElement.id);
+    if (focused && /^cap_/.test(focused))
+      ok(`ADM-03: the cursor starts on the first field needing a person (${focused})`);
+    else bad("ADM-03: focus on first amber", String(focused));
+
+    // Provenance: pressing a field shows the line it was read from.
+    await pg.locator('.capf[data-f="totalAmount"]').click();
+    await pg.waitForTimeout(300);
+    const src = await pg.evaluate(() => {
+      const d = document.querySelector("#capLines .capsrc");
+      return d ? d.textContent.trim() : "";
+    });
+    if (/2\.037,59/.test(src)) ok("ADM-03: choosing a field highlights the line it was read off");
+    else bad("ADM-03: provenance highlight", src.slice(0, 60));
+
+    // A typed value is re-checked, not believed.
+    await pg.locator("#cap_issuerTaxId").fill("A08912907");
+    await pg.locator("#cap_issuerTaxId").dispatchEvent("change");
+    await pg.waitForTimeout(400);
+    const typedBad = await pg.evaluate(() => {
+      const r = [...document.querySelectorAll(".capf")].find((x) => x.dataset.f === "issuerTaxId");
+      return {
+        dot: r.querySelector(".dot").className,
+        why: (r.querySelector(".capwhy") || {}).textContent || "",
+      };
+    });
+    if (/amber/.test(typedBad.dot) && /check digit|dígito|control/i.test(typedBad.why))
+      ok("ADM-03: a hand-typed NIF with a bad check digit stays amber and says why");
+    else bad("ADM-03: typed value re-checked", JSON.stringify(typedBad));
+
+    await pg.locator("#cap_issuerTaxId").fill("A08932907");
+    await pg.locator("#cap_issuerTaxId").dispatchEvent("change");
+    await pg.waitForTimeout(400);
+    const typedGood = await pg.evaluate(
+      () =>
+        [...document.querySelectorAll(".capf")]
+          .find((x) => x.dataset.f === "issuerTaxId")
+          .querySelector(".dot").className,
+    );
+    if (/green/.test(typedGood)) ok("ADM-03: correcting it properly turns the dot green");
+    else bad("ADM-03: corrected value goes green", typedGood);
+
+    // Nothing exists in the data until a person presses the button.
+    const before = await pg.evaluate(() => erp.state.captured.length);
+    await pg.locator("#capSave").click();
+    await pg.waitForTimeout(1500);
+    const saved = await pg.evaluate((b) => {
+      const c = erp.state.captured[erp.state.captured.length - 1];
+      return {
+        added: erp.state.captured.length - b,
+        status: c.status,
+        nif: c.confirmed && c.confirmed.issuerTaxId,
+        total: c.confirmed && c.confirmed.totalCents,
+        keptReading: !!c.extracted,
+        neverAutoConfirmed: c.extracted ? c.extracted.confirmed !== true : true,
+        backOnInbox: !document.body.classList.contains("fs"),
+      };
+    }, before);
+    if (
+      saved.added === 1 &&
+      saved.status === "validated" &&
+      saved.nif === "A08932907" &&
+      saved.total === 203759
+    )
+      ok("ADM-03: confirming writes one captured document, with the values on screen");
+    else bad("ADM-03: confirm writes the record", JSON.stringify(saved));
+    if (saved.keptReading && saved.neverAutoConfirmed && saved.backOnInbox)
+      ok("ADM-03: the machine's reading is kept beside it, and never marked confirmed by itself");
+    else bad("ADM-03: reading kept unconfirmed", JSON.stringify(saved));
+
+    if (errs.length === 0) ok("ADM-03: no console errors");
+    else bad("ADM-03: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("document capture", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }
