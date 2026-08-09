@@ -170,11 +170,24 @@
         // site with no signal neither is anything else — a silent fallback to
         // the network is exactly the failure this vendoring exists to prevent.
         cacheMethod: "none",
-        logger: onProgress
-          ? function (m) {
-              if (m.status === "recognizing text") onProgress(m.progress);
-            }
-          : undefined,
+        /* Load the worker from its real URL rather than wrapping it in a blob.
+           This is not a preference — without it the pipeline does not run at
+           all, and it fails in a way worth recording: tesseract's default is a
+           blob: worker, and the Emscripten core inside it resolves its .wasm
+           against `scriptDirectory`, which a blob URL does not have. The
+           result is a fetch for the bare name "tesseract-core-simd-lstm.wasm"
+           with nothing to resolve it against, an "Invalid URL" from deep
+           inside the wasm loader, and a promise that never settles. Loading
+           the worker from vendor/tesseract/ gives the core a real directory
+           and the .wasm beside it is found. */
+        workerBlobURL: false,
+        /* Always a function, never undefined: tesseract calls this without
+           checking, so omitting it throws "m is not a function" on every
+           progress tick — noisy in the console and, because the site E2E
+           asserts zero console errors, a failing build. */
+        logger: function (m) {
+          if (onProgress && m && m.status === "recognizing text") onProgress(m.progress);
+        },
       }).then(function (worker) {
         var pages = [];
         var confidences = [];
@@ -209,13 +222,24 @@
     });
   }
 
-  function imageBitmapOf(file) {
+  /**
+   * The pixel dimensions of an image file, and nothing else.
+   *
+   * Deliberately returns numbers rather than the <img>: the object URL is
+   * revoked the moment it has been measured, and handing the element on would
+   * hand on a `src` that no longer resolves. That is not hypothetical — an
+   * earlier draft did exactly that, tesseract read `img.src`, and the whole
+   * pipeline died on a revoked blob: URL with `ERR_FILE_NOT_FOUND`. The File
+   * itself goes to the recogniser, which needs no URL at all.
+   */
+  function measure(file) {
     return new Promise(function (res, rej) {
       var url = URL.createObjectURL(file);
       var im = new Image();
       im.onload = function () {
+        var out = { width: im.naturalWidth, height: im.naturalHeight };
         URL.revokeObjectURL(url);
-        res(im);
+        res(out);
       };
       im.onerror = function () {
         URL.revokeObjectURL(url);
@@ -275,23 +299,22 @@
       });
     }
 
-    return imageBitmapOf(file).then(function (im) {
+    return measure(file).then(function (dim) {
       /* THE CAPTURE MINIMUM, and it is about pixels rather than steadiness.
          The spike's angled phone photo scored 9/11 while a low-resolution
          scan managed 5/11, so resolution is the thing worth refusing on. The
          warning is a warning and not a block: a bad photograph of a document
          nobody can find again is still worth more than nothing, and the
          amber dots will say what could not be read. */
-      var px = im.naturalWidth * im.naturalHeight;
-      if (px < MIN_PIXELS)
+      if (dim.width * dim.height < MIN_PIXELS)
         warnings.push(
           "La imagen tiene poca resolución (" +
-            im.naturalWidth +
+            dim.width +
             "×" +
-            im.naturalHeight +
+            dim.height +
             "). Acérquese y repita la foto si algún dato sale en ámbar.",
         );
-      return ocr([im], onProgress).then(function (o) {
+      return ocr([file], onProgress).then(function (o) {
         return {
           text: o.pages,
           pages: o.pages,
