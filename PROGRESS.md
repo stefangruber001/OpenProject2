@@ -735,6 +735,52 @@ arrives on its own. The screen never claims a message was sent when none was.
 **Next:** S2 — DMT-01…04 Datos Maestros, the first screens to inherit the
 permission primitive rather than have it retrofitted.
 
+## S2 — the terceros file grows a screen per role, and Personal gets one at all (2026-08-09)
+
+Clientes was the only master-data screen with a real registry. Proveedores and
+Subcontratas were placeholders; Personal interno had no screen of its own at
+all — a timesheet needed only a worker's name.
+
+- **A shared list primitive** (`renderMasterList`) replaces the Clientes-only
+  toolbar/table/pagination/export code, so DMT-02/03/04 inherit it instead of
+  each retyping it. Page sizes correct to **10/25/50, 25 default** — Clientes
+  shipped with 10/20/50.
+- **DMT-02 Proveedores and DMT-03 Subcontratas** filter the same party file by
+  role rather than being new collections, reusing the existing party drawers.
+  `editPartyDrawer` gains `businessLine`/`category`/`aliases` (gaps 1/2/4 of
+  the v4 plan's thirteen).
+- **DMT-04 Personal interno** is `state.workers`' first real registry: list,
+  create, edit, append-only tarifa history, documentación, deactivate-never-
+  delete. The engine gained `updateWorker`/`deactivateWorker` — there was no
+  way to edit or retire a worker before this session.
+- **The CIF check digit is now verified**, not just the shape — closing a real
+  validation hole (a corrupted scanned character could pass before). Nine
+  pre-existing fixture/seed tax ids across five files had never actually
+  carried a valid check digit and were corrected.
+- **Two real bugs fixed along the way**: `searchAll()`'s "Proveedores" group
+  routed every supplier AND subcontractor hit to the Clientes screen (adjacent
+  to audit F-020); and `findDuplicateParty`'s result was computed on every
+  `addParty` but never read — `newPartyDrawer` now surfaces it as a warning
+  instead of a plain "created" toast.
+- **`GET /api/~/session`** is new — the only way the static workspace can know
+  its own permissions — and gates the IBAN field behind `party.bank.read`.
+  Verified live against a real Postgres and the standalone Next build, not
+  just reasoned about. This is client-side masking, not enforcement:
+  server-side per-command RBAC on `/erp/command` does not exist yet and is
+  logged as a follow-up in `ASSUMPTIONS.md #103`, not attempted piecemeal here.
+- **Not built this session, by explicit scope decision**: the doc's
+  480px-with-tabs drawer layout (Identification/Contact/History plus
+  role-specific Precios/Compras/Documentos/Tarifas tabs). The existing
+  single-scroll drawers are reused and extended instead — rebuilding them as
+  tabs is real UI work with real regression risk across 29 screens, deferred
+  rather than rushed.
+
+Verified: site E2E 163/163 · server-e2e 27/27 (live Postgres + standalone
+build) · manageability 84/84 · year 149/149 and 214/214 · import 25/25 ·
+ownership guard 27 areas · lint, boundaries, types, tests, build, `make demo`.
+
+**Next:** S3 — DMC-01…07 Configuración + Catalan (gaps 6–9, 12).
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

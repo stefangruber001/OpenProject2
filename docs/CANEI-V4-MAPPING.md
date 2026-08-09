@@ -100,10 +100,10 @@ Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, resh
 | ADM-07 | Reporte a Gestoría       | `#gestoria`                                                          | **ADAPT** — 3-step wizard                                                                |
 | ADM-08 | Flujo de Caja            | — (`cashForecast()` exists)                                          | **BUILD**                                                                                |
 | ADM-09 | Datos Financieros        | `financial-data.html`, 14 panels                                     | **KEEP** (decision 1) — feed + ledger import                                             |
-| DMT-01 | Clientes                 | `#clientes` (customers-only)                                         | **ADAPT**                                                                                |
-| DMT-02 | Proveedores              | —                                                                    | **BUILD**                                                                                |
-| DMT-03 | Subcontratos             | `#subcontratos` (lifecycle)                                          | **BUILD** as master data; lifecycle data retained, screens dropped (decision 5)          |
-| DMT-04 | Personal Interno         | inside `#horas`                                                      | **BUILD**                                                                                |
+| DMT-01 | Clientes                 | `#customers`                                                         | **ADAPTED (S2)** — refactored onto the shared list primitive                             |
+| DMT-02 | Proveedores              | `#suppliers`                                                         | **BUILT (S2)**                                                                           |
+| DMT-03 | Subcontratos             | `#subcontractors`                                                    | **BUILT (S2)** as master data; lifecycle data retained, screens dropped (decision 5)     |
+| DMT-04 | Personal Interno         | `#staff`                                                             | **BUILT (S2)**                                                                           |
 | DMC-01 | Partidas / Subpartidas   | `master-data.html`                                                   | **ADAPT** into the shell                                                                 |
 | DMC-02 | Lista de Precios         | `#precios`                                                           | **ADAPT** — add comparison strip                                                         |
 | DMC-03 | Unidades de Medida       | hardcoded `LISTS.units`                                              | **BUILD** — make maintainable                                                            |
@@ -243,34 +243,34 @@ Status: **✓** covered by an existing model field · **NEW** field to add (numb
 
 ### Clientes → `parties` (role `customer`)
 
-| Column                                         | Model                                                         | Status                                           |
-| ---------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------ |
-| Cliente                                        | `name`                                                        | ✓                                                |
-| Código MASTER                                  | `legacy`                                                      | ✓                                                |
-| DNI / NIF                                      | `taxId`                                                       | ✓                                                |
-| Teléfono(s)                                    | `landline` + `mobile`                                         | ✓ (source is `;`-separated — split on load)      |
-| Email                                          | `email`                                                       | ✓                                                |
-| Calle · C.P. · Ciudad · Provincia              | `billStreet` · `billPostalCode` · `billCity` · `billProvince` | ✓                                                |
-| Línea de negocio                               | `businessLine`                                                | **NEW 1** — not the `activityLine` removed in v9 |
-| Origen del lead                                | `leadSource`                                                  | ✓                                                |
-| Fuente                                         | `sourceSystem`                                                | **NEW 3**                                        |
-| Aviso duplicado                                | `state.importConflicts`                                       | ✓ (exists)                                       |
-| Proyecto vinculado · Nº facturas · Facturado € | —                                                             | ⊘ derived                                        |
-| Trabajos en TDF                                | —                                                             | ✗ discarded                                      |
+| Column                                         | Model                                                         | Status                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------- |
+| Cliente                                        | `name`                                                        | ✓                                                       |
+| Código MASTER                                  | `legacy`                                                      | ✓                                                       |
+| DNI / NIF                                      | `taxId`                                                       | ✓                                                       |
+| Teléfono(s)                                    | `landline` + `mobile`                                         | ✓ (source is `;`-separated — split on load)             |
+| Email                                          | `email`                                                       | ✓                                                       |
+| Calle · C.P. · Ciudad · Provincia              | `billStreet` · `billPostalCode` · `billCity` · `billProvince` | ✓                                                       |
+| Línea de negocio                               | `businessLine`                                                | **NEW 1 — closed S2** — not `activityLine` (removed v9) |
+| Origen del lead                                | `leadSource`                                                  | ✓                                                       |
+| Fuente                                         | `sourceSystem`                                                | **NEW 3 — closed S2**                                   |
+| Aviso duplicado                                | `state.importConflicts`                                       | ✓ (exists)                                              |
+| Proyecto vinculado · Nº facturas · Facturado € | —                                                             | ⊘ derived                                               |
+| Trabajos en TDF                                | —                                                             | ✗ discarded                                             |
 
 ### Proveedores → `parties` (roles `supplier` / `subcontractor`)
 
 | Column                                                       | Model                                        | Status                       |
 | ------------------------------------------------------------ | -------------------------------------------- | ---------------------------- |
 | Proveedor                                                    | `name`                                       | ✓                            |
-| Categoría                                                    | `category`                                   | **NEW 2**                    |
+| Categoría                                                    | `category`                                   | **NEW 2 — closed S2**        |
 | CIF/NIF                                                      | `taxId`                                      | ✓                            |
 | Persona de contacto                                          | `contactPerson`                              | ✓                            |
 | Teléfono(s) · Email · Dirección                              | `landline`/`mobile` · `email` · `billStreet` | ✓                            |
 | IBAN / cuenta                                                | `bank`                                       | ✓ (permission-gated per DMT) |
 | Código MASTER                                                | `legacy`                                     | ✓                            |
-| Nombres originales                                           | `aliases[]`                                  | **NEW 4**                    |
-| Fuente                                                       | `sourceSystem`                               | **NEW 3**                    |
+| Nombres originales                                           | `aliases[]`                                  | **NEW 4 — closed S2**        |
+| Fuente                                                       | `sourceSystem`                               | **NEW 3 — closed S2**        |
 | Aviso duplicado                                              | `state.importConflicts`                      | ✓                            |
 | Nº docs · Proyectos · Primer/Último doc · Tipos de documento | —                                            | ⊘ derived                    |
 

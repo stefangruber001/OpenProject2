@@ -1845,3 +1845,66 @@ different decisions, so these ten arrived colliding. They are renumbered from
   says plainly that no mail was sent. The fallback is a working path, not a
   degraded one — what is never acceptable is a success message for a message
   nobody will receive.
+
+- **#103 — S2: DMT-01…04 Datos Maestros, a shared list primitive, and closing
+  gaps 1–4 (2026-08-09).** Clientes was the only master-data screen; Proveedores
+  and Subcontratas were placeholders, and Personal interno had no registry at
+  all — a timesheet needed only a worker's name. **Decisions:** (a) **The CIF
+  check digit is now verified, not just the shape.** `validTaxId`'s CIF branch
+  used to `return true` on a regex match alone; it now runs the same
+  odd-positions-doubled-and-summed algorithm the DNI/NIE branches already used
+  for their own check letter. Nine pre-existing fixture/seed tax ids across
+  `year-sim.mjs`, `import-sim.mjs`, `manageability-sim.mjs`, `erp-seed.js`,
+  `erp-history.js` and `apps/web/lib/erp-engine.test.ts` had only ever satisfied
+  the old structure-only regex and were corrected to the nearest valid check
+  character, preserving every other digit for traceability. (b) **A shared list
+  primitive** (`renderMasterList`) replaces the Clientes-only
+  toolbar/table/pagination/export code, so DMT-02/03/04 — and every list screen
+  after them — inherit it instead of retyping it. Page sizes correct to
+  **10/25/50, 25 default**, fixing the 10/20/50 Clientes shipped with; the
+  50-scan `.mlist` CSS rule is a first phone-card rendering, not the full
+  verification S14 owns. (c) **Proveedores and Subcontratas are the same party
+  file, filtered by role** — not a new collection — reusing
+  `newPartyDrawer`/`partyDrawer`/`editPartyDrawer` rather than building
+  duplicate screens. `editPartyDrawer` gains `businessLine`/`category`/`aliases`
+  fields (gaps 1/2/4); `sourceSystem` (gap 3) is provenance, set by import, not
+  hand-edited. (d) **Personal interno (DMT-04) is `state.workers`, its own
+  registry** — list, create, edit, append-only tarifa history, documentación
+  (reusing the existing `workerDocDrawer`), deactivate-never-delete. The engine
+  gained `updateWorker`/`deactivateWorker` (there was no way to edit or retire a
+  worker before this session) and a taxId check-digit validation on
+  `addWorker`/`updateWorker`, matching parties. **Known limitation, not fixed
+  here:** two rates dated the same day break the tie by array order, not by
+  which was added last — real for a same-day correction, out of scope for this
+  session. (e) **`searchAll()`'s "Proveedores" group routed every hit — supplier
+  AND subcontractor — to `k:"customers"`** (adjacent to audit F-020): a search
+  hit on a subcontracted industrial opened the customer screen. Split into two
+  groups routing to their own DMT-02/03 screens. (f) **`findDuplicateParty`'s
+  result is now surfaced**, not silently discarded: `newPartyDrawer` shows which
+  earlier record a new one may collide with instead of a plain "created"
+  toast — the engine already computed `duplicateSuspect` on every `addParty`,
+  nothing read it. (g) **The 480px-with-tabs drawer layout the spec describes is
+  not built this session.** The existing single-scroll party and worker drawers
+  are reused and extended in place; only the global `.drawer` width moved to
+  480px. Rebuilding the drawer as a tabbed panel (Identification/Contact,
+  role-specific Precios/Compras/Documentos/Tarifas tabs) is real UI work with
+  real regression risk across every existing drawer flow across 29 screens —
+  deferred rather than rushed, and not silently dropped: it is the reason S2 is
+  scoped as "screens landed, tabs deferred" rather than "DMT-01…04 done" in
+  `docs/CANEI-V4-MAPPING.md`. (h) **`GET /api/~/session`** is new — the
+  workspace is a static file with no server-side render, so it is the only way
+  a screen can know its own permissions. It gates the IBAN field in
+  `editPartyDrawer` behind `party.bank.read`, verified live against a real
+  Postgres and the standalone Next build (`server-e2e` 27/27). **This is
+  masking, not enforcement** — both the route's own doc-comment and the
+  client's `SESSION` variable say so explicitly, and it is recorded here again
+  for visibility: **server-side per-command RBAC on `/erp/command` does not
+  exist yet.** Today every signed-in identity can issue every command the
+  engine accepts; `party.bank.read` only decides whether the workspace SHOWS the
+  field, not whether a direct API call could set it. Closing that gap is a
+  distinct, larger piece of work (a permission check per command name) and is
+  logged here as the follow-up rather than attempted piecemeal inside a
+  UI session. **Reversible:** every list screen change is additive (new
+  `VIEWS` entries, a new shared function); the CIF fixture repairs are
+  git-diffable single-character corrections; the session endpoint is a new,
+  independent route.
