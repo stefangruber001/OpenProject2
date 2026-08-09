@@ -425,6 +425,73 @@
   .bside .opt select{font:12px var(--sans);border:1px solid var(--line);border-radius:8px;padding:3px 6px;
     background:var(--paper);color:var(--ink);margin-left:auto}
 
+  /* ---------- COM-03: the presupuestador, full screen ----------
+     One of the four surfaces the specification puts outside the normal shell.
+     The reason is not drama: a presupuesto is worked through WHOLE — the
+     estimator reads the tree, edits a row, watches the total, and does that a
+     hundred times — so anything that costs vertical space (breadcrumb, page
+     heading, project strip) or horizontal space (the section rail) is taken
+     from the only three things that matter. `body.fs` hides them; render()
+     clears the class on every navigation, so no other screen can inherit it.
+
+     The line table is the ONE table in the app that does not paginate. Page 2
+     of a presupuesto is not a thing an estimator can hold in their head. */
+  body.fs .rail,body.fs .crumbs,body.fs .head,body.fs #projbar,body.fs #seedbar{display:none}
+  body.fs .shell{grid-template-columns:minmax(0,1fr);max-width:none}
+  body.fs main{padding:0}
+  .pb{display:flex;flex-direction:column;height:calc(100vh - var(--top,59px));min-height:0}
+  .pbbar{flex:0 0 56px;display:flex;align-items:center;gap:10px;padding:0 14px;background:var(--paper);
+    border-bottom:1px solid var(--line)}
+  .pbbar .who{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .pbbar .who b{font:600 13px var(--sans);color:var(--ink);white-space:nowrap}
+  .pbbar .who span{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pbbar .tot{margin:0 auto;text-align:center;line-height:1.1}
+  .pbbar .tot b{font-family:var(--serif);font-size:21px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .pbbar .tot span{display:block;font:600 9.5px var(--sans);letter-spacing:.11em;
+    text-transform:uppercase;color:var(--faint)}
+  .pbbar .acts{display:flex;gap:7px;align-items:center;margin-left:auto}
+  .pbpanes{flex:1;display:grid;grid-template-columns:260px minmax(0,1fr) 300px;min-height:0}
+  .pbpane{min-height:0;overflow:auto;background:var(--paper)}
+  .pbpane.mid{background:var(--bg);border-left:1px solid var(--line);border-right:1px solid var(--line)}
+  .pbh{position:sticky;top:0;z-index:2;background:var(--paper);border-bottom:1px solid var(--line);
+    padding:7px 11px;display:flex;align-items:center;gap:7px;font:600 11px var(--sans);
+    letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+  .pbpane.mid .pbh{background:var(--bg)}
+  .pbtabs{display:flex;gap:0;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;background:var(--paper)}
+  .pbtabs button{flex:1;appearance:none;border:0;background:none;padding:9px 8px;cursor:pointer;
+    font:600 11.5px var(--sans);color:var(--muted);border-bottom:2px solid transparent}
+  .pbtabs button.on{color:var(--greenDeep);border-bottom-color:var(--green)}
+  .pbbody{padding:10px 12px}
+  /* The drag handle. 16 px, per the specification, and it is the ONLY grab
+     point: making the whole row draggable steals the text selection an
+     estimator needs to copy a description. */
+  .pbdrag{width:16px;cursor:grab;color:var(--faint);text-align:center;user-select:none;line-height:1}
+  .pbdrag:active{cursor:grabbing}
+  tr.pbrow.drag{opacity:.4}
+  tr.pbrow.over td{box-shadow:inset 0 2px 0 var(--green)}
+  .btree .bc.over{box-shadow:inset 0 2px 0 var(--green)}
+  .btree .bc.drag{opacity:.4}
+  /* Cost and margin sit on grey, so that what is internal LOOKS internal even
+     before you read the header — the specification's own instruction, and the
+     cheapest possible guard against reading a cost figure aloud to a customer. */
+  .bgrid td.int,.bgrid th.int{background:var(--hair)}
+  .pbcond{flex:0 0 auto;border-top:1px solid var(--line);background:var(--paper);
+    padding:8px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12px}
+  .pbcond label{display:inline-flex;gap:6px;align-items:center;color:var(--muted);white-space:nowrap}
+  .pbcond input,.pbcond select{font:12px var(--sans);border:1px solid var(--line);border-radius:8px;
+    padding:4px 7px;background:var(--paper);color:var(--ink);outline:0}
+  .pbcond input:focus,.pbcond select:focus{border-color:var(--green)}
+  .pbcond input.grow{flex:1 1 220px;min-width:130px}
+  @media(max-width:1180px){
+    .pbpanes{grid-template-columns:minmax(0,1fr);overflow:auto}
+    .pbpane{overflow:visible;border:0;border-bottom:1px solid var(--line)}
+    .pb{height:auto}
+  }
+  /* The status groups of the register (Borradores · Enviados · …). */
+  .grouphd{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;
+    color:var(--faint);background:var(--hair)}
+  .grouphd td{padding:8px 10px!important;height:32px}
+
   /* ---------- Graphic annex (Improvement #1) ----------
      Pictures never enter a line's row: they collect at the end of the document
      and the row carries a discreet mark instead, so a table of numbers stays a
@@ -660,6 +727,12 @@ function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clea
    because a second page opening "caneiERP" at a different version would throw
    VersionError and render nothing. */
 let saveT;function persist(){clearTimeout(saveT);saveT=setTimeout(()=>ErpStore.saveState(erp.toJSON()).catch(()=>{}),140);}
+/* Flush the debounce and report the outcome. Everything on screen saves on its
+   own 140 ms later; this exists for the one place that asks in so many words
+   ("Guardar", COM-03) and so has to be able to answer truthfully — including
+   when the write fails, which the fire-and-forget path above deliberately
+   swallows because a toast per keystroke would be unreadable. */
+function persistNow(){ clearTimeout(saveT); return ErpStore.saveState(erp.toJSON()); }
 
 let erp, cur="tower", bootNotice="";
 /* Who is signed in and what they may see — client-side only, fetched once at
@@ -997,6 +1070,11 @@ function render(){
   $('#sub').textContent="";
   renderBell(); renderCreateMenu(); renderProjectBar(); renderSeedBar();
   const v=$('#view');
+  // Full screen is opt-in per render, never sticky: a view that wants it turns
+  // it on for itself (today only the presupuestador does). Clearing it here
+  // rather than on the way out means no screen can strand the next one without
+  // its navigation, whatever route the person took to leave.
+  document.body.classList.remove('fs');
   if(VIEWS[cur]) VIEWS[cur](v); else placeholderView(cur,v);
 }
 
@@ -3179,21 +3257,87 @@ function paintImages(root){
   });
 }
 
-function openBuilder(id){ bChapter=null; go("quotes",id); }
+function openBuilder(id){ bChapter=null; bTab="totals"; go("quotes",id); }
+
+/* The five stages, in the order the specification lists them — which is also
+   the order they matter in: what still needs writing, what is waiting on the
+   customer, what was won, and then the two kinds of over. `erp.budgetStage`
+   derives them; nothing here decides a status of its own. */
+const BUD_STAGES=[
+  ["draft","Borradores","y"],
+  ["issued","Enviados","b"],
+  ["accepted","Aceptados","g"],
+  ["rejected","Rechazados","r"],
+  ["expired","Caducados","r"],
+];
 
 function budgetList(v){
-  const rows=erp.state.budgets;
-  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Número</th><th>Cliente</th><th>Estado</th><th>Versión</th><th class="num">Base</th><th class="num">Total</th><th class="num">Margen</th><th>Pendientes</th><th>Anexo</th><th>Validez</th></tr></thead><tbody>
-   ${rows.map(b=>{const t=erp.budgetTotals(b.id,b.acceptedVersionId||b.currentVersionId);const cv=b.versions[b.versions.length-1];
-    const imgs=erp.budgetImages(b.id,b.acceptedVersionId||b.currentVersionId).length;
-    const st=b.acceptedVersionId?'<span class="pill g">Aceptado</span>':b.status==="issued"?'<span class="pill b">Emitido</span>':'<span class="pill y">Borrador</span>';
-    return `<tr class="click" data-id="${b.id}"><td class="k">${b.number}</td><td>${esc(erp.party(b.partyId).name)}</td><td>${st}</td>
-     <td>v${cv.vNumber} · ${b.versions.length} versiones</td><td class="num">${eur0(t.baseCents)}</td><td class="num k">${eur0(t.grandCents)}</td>
-     <td class="num">${t.marginBasePct}%</td><td>${t.pendingCount?`<span class="pill y">${t.pendingCount} (${eur0(t.pendingEstCents)})</span>`:"—"}</td>
-     <td>${(b.annex&&b.annex.enabled)?(imgs?`<span class="pill g">${imgs} imágenes</span>`:'<span class="pill">activo</span>'):'<span class="pill">desactivado</span>'}</td>
-     <td>${fmtD(b.validityDate)}</td></tr>`;}).join("")}
-   </tbody></table></div></div>`;
+  $('#sub').textContent="El registro va agrupado por estado: primero lo que falta por escribir, después lo que espera al cliente, y al final lo cerrado.";
+  const groups=BUD_STAGES.map(([key,label,tone])=>({key,label,tone,
+    rows:erp.state.budgets.filter(b=>erp.budgetStage(b)===key)}));
+  const total=erp.state.budgets.length;
+  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr>
+     <th>Número</th><th>Cliente</th><th>Versión</th><th class="num">Base</th><th class="num">Total</th>
+     <th class="num">Margen</th><th>Pendientes</th><th>Anexo</th><th>Validez</th></tr></thead><tbody>
+   ${groups.filter(g=>g.rows.length).map(g=>`
+     <tr class="grouphd"><td colspan="9"><span>${g.label}</span> · <span>${g.rows.length}</span></td></tr>
+     ${g.rows.map(b=>{const vid=b.acceptedVersionId||b.currentVersionId;
+       const t=erp.budgetTotals(b.id,vid);const cv=b.versions[b.versions.length-1];
+       const imgs=erp.budgetImages(b.id,vid).length;
+       return `<tr class="click" data-id="${b.id}"><td class="k">${b.number}</td>
+        <td>${esc(erp.party(b.partyId).name)}</td>
+        <td>v${cv.vNumber} · ${b.versions.length} <span>versiones</span></td>
+        <td class="num">${eur0(t.baseCents)}</td><td class="num k">${eur0(t.grandCents)}</td>
+        <td class="num">${t.marginBasePct}%</td>
+        <td>${t.pendingCount?`<span class="pill y">${t.pendingCount} (${eur0(t.pendingEstCents)})</span>`:"—"}</td>
+        <td>${(b.annex&&b.annex.enabled)?(imgs?`<span class="pill g">${imgs} <span>imágenes</span></span>`:'<span class="pill">activo</span>'):'<span class="pill">desactivado</span>'}</td>
+        <td>${fmtD(b.validityDate)}</td></tr>`;}).join("")}`).join("")
+    ||`<tr><td colspan="9"><div class="empty">Todavía no hay presupuestos.</div></td></tr>`}
+   </tbody></table></div></div>
+   <div class="periodnote"><span class="tag">${total} ${total===1?"presupuesto":"presupuestos"}</span>
+    ${groups.filter(g=>g.rows.length).map(g=>`<span class="pill ${g.tone}"><span>${g.label}</span>: ${g.rows.length}</span>`).join(" ")}</div>`;
   v.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>openBuilder(tr.dataset.id));
+}
+
+/* ---------- The customer document's own vocabulary (COM-03, "ES/CA output")
+   These labels are NOT in the i18n dictionary, and the block that prints them
+   carries `translate="no"`, on purpose. The dictionary translates the
+   INTERFACE for whoever is at the screen; this table translates a DOCUMENT for
+   whoever receives it. They are different people making different choices:
+   `budget.language` is a field an estimator sets per customer, and it must not
+   move because a colleague prefers to work in English. Keeping the document
+   out of the toggle is what makes both behaviours correct at once. */
+const DOCL={
+  es:{doc:"PRESUPUESTO",base:"Base imponible",options:"Opcionales (aparte)",vat:"IVA",
+    total:"TOTAL",perM2:"Total por m²",pending:"⚠ Líneas pendientes de precio (no incluidas)",
+    annex:"Anexo gráfico",page:"página",of:"de",item:"partida",validity:"Validez",
+    exclusions:"Exclusiones",assumptions:"Supuestos",
+    sections:{base:"",optional:" (opcional — aparte)",outOfScope:" (fuera de presupuesto)",extras:" (extras)"}},
+  ca:{doc:"PRESSUPOST",base:"Base imposable",options:"Opcionals (a part)",vat:"IVA",
+    total:"TOTAL",perM2:"Total per m²",pending:"⚠ Partides pendents de preu (no incloses)",
+    annex:"Annex gràfic",page:"pàgina",of:"de",item:"partida",validity:"Validesa",
+    exclusions:"Exclusions",assumptions:"Supòsits",
+    sections:{base:"",optional:" (opcional — a part)",outOfScope:" (fora de pressupost)",extras:" (extres)"}},
+};
+
+const SECL={base:"Base",optional:"Opcional",outOfScope:"Fuera de presupuesto",extras:"Extras"};
+/* Which of the two right-hand tabs is showing. Module state, not per-render,
+   so that editing a row does not throw the estimator back to Totales while
+   they are reading the visit report they are pricing from. */
+let bTab="totals";
+
+/** The visit this presupuesto is being written from, if there is one.
+    Preferring the explicit link (S4's `visit.budgetId`) and falling back to
+    the customer's own last capture — labelled as the guess it is, because a
+    report from the wrong visit is worse than no report at all. */
+function budgetVisit(b){
+  const linked=erp.state.visits.find(x=>x.budgetId===b.id);
+  if(linked) return {visit:linked,linked:true};
+  const mine=erp.state.visits
+    .filter(x=>x.status==="done")
+    .filter(x=>{const o=erp.state.opportunities.find(y=>y.id===x.opportunityId); return o&&o.partyId===b.partyId;})
+    .sort((x,y)=>(y.completedAt||"").localeCompare(x.completedAt||""));
+  return mine.length?{visit:mine[0],linked:false}:null;
 }
 
 function budgetBuilder(v,id){
@@ -3201,40 +3345,70 @@ function budgetBuilder(v,id){
   const vsel=b.currentVersionId; const V=erp.version(id,vsel);
   const locked=V.frozen||V.issued||b.acceptedVersionId===V.id;
   const dis=locked?" disabled":"";
-  const SECL={base:"Base",optional:"Opcional",outOfScope:"Fuera de presupuesto",extras:"Extras"};
-  $('#sub').textContent=`Constructor de ${b.number} · v${V.vNumber}. Árbol de capítulos, rejilla editable y totales en vivo; las imágenes van al anexo gráfico, nunca a la fila.`;
+  const stage=erp.budgetStage(b);
+  const meta=BUD_STAGES.find(s=>s[0]===stage)||["draft","Borrador","y"];
+  const t=erp.budgetTotals(id,vsel);
+  // Outside the shell, per §3.2: the rail, breadcrumb and page heading go, and
+  // the three panes get the room. render() takes the class off again on the
+  // way to any other screen.
+  document.body.classList.add('fs');
 
   v.innerHTML=`
-   <div class="periodnote"><button class="btn sm" id="bBack">← Todos los presupuestos</button>
-     <span class="pill">${b.number} · v${V.vNumber}</span>
-     <span>${esc(erp.party(b.partyId).name)}</span>
-     ${locked?'<span class="pill b">Versión congelada — cree una versión nueva para editar</span>':''}</div>
-   <div class="bwrap">
-    <div class="card" style="margin:0"><div class="ch"><h3>Capítulos</h3>${locked?"":'<button class="btn sm" id="bAddChap">+</button>'}</div>
-      <div class="btree" id="bTree"></div></div>
+   <div class="pb">
+    <div class="pbbar">
+     <button class="btn sm" id="bBack" title="Todos los presupuestos">←</button>
+     <div class="who"><b>${b.number} · v${V.vNumber}</b><span>${esc(erp.party(b.partyId).name)}</span></div>
+     <span class="pill ${meta[2]}">${meta[1]}</span>
+     ${locked&&stage!=="accepted"?'<span class="pill b">Congelada</span>':''}
+     <div class="tot"><span>Total</span><b id="pbTotal">${eur(t.grandCents)}</b></div>
+     <div class="acts">
+      ${locked&&!b.acceptedVersionId?'<button class="btn sm" id="bNewVer">Nueva versión</button>':''}
+      <button class="btn sm" id="bSave">Guardar</button>
+      <button class="btn sm" id="bPreview">Vista previa</button>
+      ${V.issued&&!V.customerResponse&&!b.acceptedVersionId
+        ?'<button class="btn primary sm" id="bAnswer">Respuesta del cliente</button>':''}
+      ${locked?"":'<button class="btn primary sm" id="bSend">Enviar</button>'}
+     </div>
+    </div>
 
-    <div class="card bgrid" style="margin:0"><div class="ch"><h3>Partidas</h3>
-       <span class="tag" id="bGridTag"></span></div>
+    <div class="pbpanes">
+     <div class="pbpane">
+      <div class="pbh">Capítulos<span style="flex:1"></span>
+       ${locked?"":'<button class="btn sm" id="bAddChap">+</button>'}</div>
+      <div class="btree" id="bTree" style="max-height:none"></div>
+     </div>
+
+     <div class="pbpane mid bgrid">
+      <div class="pbh">Partidas<span style="flex:1"></span><span class="tag" id="bGridTag"></span></div>
       <div class="scroll"><table><thead><tr>
-        <th>Nº</th><th>Código</th><th>Descripción</th><th>Ud</th><th class="num">Cantidad</th>
-        <th class="num">P. coste</th><th class="num">P. venta</th><th class="num">Importe</th><th class="num">Margen</th>
+        <th style="width:16px"></th><th>Nº</th><th>Código</th><th>Descripción</th><th>Ud</th><th class="num">Cantidad</th>
+        <th class="num">P. venta</th><th class="num">Importe</th>
+        <th class="num int">P. coste</th><th class="num int">Margen</th>
         <th>Estado</th><th>Imágenes</th>${locked?"":"<th></th>"}
-      </tr></thead><tbody id="bRows"></tbody></table></div></div>
+      </tr></thead><tbody id="bRows"></tbody></table></div>
+     </div>
 
-    <div class="bside">
-     <div class="card" style="margin:0 0 12px"><div class="ch"><h3>Totales</h3><span class="tag">en vivo</span></div>
-       <div class="daylist" id="bTotals" style="padding:10px 14px"></div></div>
-     <div class="card" style="margin:0 0 12px"><div class="ch"><h3>Anexo gráfico</h3></div>
-       <div class="daylist" style="padding:10px 14px">
-        <label class="opt"><input type="checkbox" id="bAnnexOn"${(b.annex&&b.annex.enabled)?" checked":""}> Incluir anexo en el documento</label>
-        <label class="opt">Imágenes por página
-          <select id="bAnnexPer">${[1,2,3,4,6].map(n=>`<option value="${n}"${(b.annex&&b.annex.imagesPerPage)===n?" selected":""}>${n}</option>`).join("")}</select></label>
-        <div class="row mut" id="bAnnexCount"></div>
-       </div></div>
-     <div class="card" style="margin:0"><div class="daylist" style="padding:10px 14px;gap:8px">
-       <button class="btn" id="bPreview">Vista del cliente</button>
-       <button class="btn" id="bValidate">Validar</button>
-      </div></div>
+     <div class="pbpane">
+      <div class="pbtabs">
+       <button data-tab="totals"${bTab==="totals"?' class="on"':''}>Totales</button>
+       <button data-tab="visit"${bTab==="visit"?' class="on"':''}>Visita</button>
+      </div>
+      <div class="pbbody" id="bSide"></div>
+     </div>
+    </div>
+
+    <div class="pbcond">
+     <label>Validez <input type="date" id="bcValid" value="${esc(b.validityDate||"")}"${dis}></label>
+     <label>Idioma del documento
+      <select id="bcLang"${dis}>
+       <option value="es"${b.language==="es"?" selected":""}>Español</option>
+       <option value="ca"${b.language==="ca"?" selected":""}>Català</option>
+      </select></label>
+     <label class="grow" style="flex:1 1 220px">Condiciones de pago
+      <input class="grow" id="bcPay" value="${esc(b.paymentConditions||"")}" placeholder="40% a la firma, 60% a la entrega"${dis}></label>
+     <label>Superficie <input type="number" id="bcM2" min="0" step="1" style="width:74px" value="${b.surfaceM2||0}"${dis}> m²</label>
+     <button class="btn sm" id="bcMore">Exclusiones y supuestos (${(b.exclusions||[]).length + (b.assumptions||[]).length})</button>
+     <button class="btn sm" id="bValidate">Validar</button>
     </div>
    </div>`;
 
@@ -3245,14 +3419,33 @@ function budgetBuilder(v,id){
     bChapter=erp.addChapter(id,{name:name||"Nuevo capítulo"}).id;
   },"Capítulo añadido");
   $('#bPreview').onclick=()=>budgetDrawer(id,vsel);
+  // "Guardar" is in the bar because the specification's own layout puts it
+  // there — but §3.1 is equally explicit that nothing waits for it, and this
+  // screen already writes every keystroke through to the engine. So the button
+  // does the one honest thing left: it flushes the debounced write NOW and
+  // says the work is safe. It never claims to have saved something that was
+  // not already saved.
+  $('#bSave').onclick=()=>{ persistNow().then(()=>toast("Guardado")).catch(()=>toast("⚠ No se ha podido guardar")); };
+  const send=$('#bSend'); if(send) send.onclick=()=>sendBudgetDrawer(id);
+  const answer=$('#bAnswer'); if(answer) answer.onclick=()=>budgetResponseDrawer(id,vsel);
+  const nv=$('#bNewVer');
+  if(nv) nv.onclick=()=>mutate(()=>erp.newVersion(id,{reason:prompt("Motivo de la nueva versión","Revisión")||"Revisión",author:"backoffice"}),
+    "Nueva versión creada");
   $('#bValidate').onclick=()=>{
     const issues=erp.validateBudget(id);
     toast(issues.length?`${issues.filter(i=>i.level==="block").length} bloqueos · ${issues.filter(i=>i.level==="warn").length} avisos`:"Sin incidencias");
     builderIssues(id,issues);
   };
-  $('#bAnnexOn').onchange=e=>mutate(()=>erp.setAnnexOptions(id,{enabled:e.target.checked}),
-    e.target.checked?"Anexo gráfico activado":"Anexo gráfico desactivado");
-  $('#bAnnexPer').onchange=e=>mutate(()=>erp.setAnnexOptions(id,{imagesPerPage:+e.target.value}),"Anexo actualizado");
+  $('#bcMore').onclick=()=>budgetConditionsDrawer(id);
+  v.querySelectorAll('.pbtabs button').forEach(btn=>btn.onclick=()=>{ bTab=btn.dataset.tab; render(); });
+
+  if(!locked){
+    const hdr=(el,patch,msg)=>{ el.onchange=()=>mutate(()=>erp.updateBudget(id,patch(el),"backoffice"),msg); };
+    hdr($('#bcValid'),el=>({validityDate:el.value}),"Validez actualizada");
+    hdr($('#bcLang'),el=>({language:el.value}),"Idioma del documento actualizado");
+    hdr($('#bcPay'),el=>({paymentConditions:el.value}),"Condiciones de pago actualizadas");
+    hdr($('#bcM2'),el=>({surfaceM2:Math.max(0,Number(el.value)||0)}),"Superficie actualizada");
+  }
 
   builderRows(id,vsel,locked,SECL);
   builderRecalc(id,vsel);
@@ -3262,12 +3455,23 @@ function budgetBuilder(v,id){
      straight through to the engine record, so the tree, the panel and the
      document can never disagree about what was typed. `change` fires once when
      the field is left, and that is the one the audit trail hears: a trail with
-     an entry per character is a trail nobody reads. */
+     an entry per character is a trail nobody reads.
+
+     `num` is the exception and goes through setLineNumber, not editLine: a
+     number is checked against every other row before it is taken, so it can
+     be REFUSED — and a refusal has to be seen once, when the field is left,
+     not shouted on every keystroke of a number being typed. */
   if(!locked){
     const rows=$('#bRows');
     const write=(target,audit)=>{
       const f=target.dataset.f, lid=target.dataset.line; if(!f||!lid)return;
       const val=target.value;
+      if(f==="num"){
+        if(!audit) return; // committed on blur only — see above
+        try{ erp.setLineNumber(id,lid,val,"backoffice"); }
+        catch(err){ toast(err.code==="DUPLICATE_NUMBER"?"⚠ Ese número ya está en uso":"⚠ "+err.message); }
+        render(); return;
+      }
       const patch=f==="qty"?{qtyMilli:bQty(val)}
         :f==="cost"?{costCents:bMoney(val)}
         :f==="price"?{priceCents:bMoney(val)}
@@ -3282,27 +3486,68 @@ function budgetBuilder(v,id){
   }
 }
 
+/* ---------- Dragging (COM-03) ----------
+   Chapters reorder among themselves; lines reorder within a chapter and move
+   BETWEEN chapters, which is the case that earns the feature: a line under the
+   wrong capítulo is in the wrong subtotal and, if that chapter is optional or
+   out of scope, in the wrong part of the customer's document.
+
+   The drag id lives here rather than in dataTransfer because Safari will not
+   let a dragover handler read dataTransfer — and dragover is where the drop
+   target has to decide whether it accepts. */
+let bDrag=null; // {kind:"chapter"|"line", id}
+function bDragClear(){
+  document.querySelectorAll('.over,.drag').forEach(el=>el.classList.remove('over','drag'));
+}
+/** What can be picked up. `mark` is the element that dims while it travels —
+    for a line that is the row, not the 16 px handle you actually grabbed. */
+function bDragSource(el,kind,dragId,mark){
+  el.draggable=true;
+  el.addEventListener('dragstart',e=>{
+    bDrag={kind,id:dragId}; (mark||el).classList.add('drag');
+    e.dataTransfer.effectAllowed="move";
+    try{ e.dataTransfer.setData("text/plain",dragId); }catch(err){ /* Safari refuses some types */ }
+  });
+  el.addEventListener('dragend',()=>{ bDrag=null; bDragClear(); });
+}
+/** Where it can be put down. */
+function bDropTarget(el,accept,onDrop){
+  el.addEventListener('dragover',e=>{
+    if(!bDrag||!accept(bDrag)) return;
+    e.preventDefault(); e.dataTransfer.dropEffect="move"; el.classList.add('over');
+  });
+  el.addEventListener('dragleave',()=>el.classList.remove('over'));
+  el.addEventListener('drop',e=>{
+    if(!bDrag||!accept(bDrag)) return;
+    e.preventDefault(); e.stopPropagation();
+    const d=bDrag; bDrag=null; bDragClear();
+    onDrop(d);
+  });
+}
+
 /** Renders the grid body. Called once per builder render — never on keystroke,
     which would move the caret out from under the person typing. */
 function builderRows(id,vsel,locked,SECL){
   const V=erp.version(id,vsel);
   const chapters=bChapter?V.chapters.filter(c=>c.id===bChapter):V.chapters;
   $('#bGridTag').textContent=bChapter?"capítulo seleccionado":`${V.chapters.length} capítulos`;
-  const cols=locked?11:12;
+  const cols=locked?12:13;
   $('#bRows').innerHTML=chapters.map(c=>`
-    <tr class="chaprow"><td colspan="${cols}">${c.num}. ${esc(c.name)} · ${SECL[c.section]||c.section}
+    <tr class="chaprow" data-chaprow="${c.id}"><td colspan="${cols}">${esc(c.num)}. ${esc(c.name)} · ${SECL[c.section]||c.section}
       ${locked?"":`<button class="btn sm" data-addline="${c.id}" style="margin-left:8px">+ partida</button>`}</td></tr>
     ${c.lines.map(l=>{const a=bLineAmt(l);const m=a.saleCents-a.costCents;
-      return `<tr data-row="${l.id}">
-      <td class="k">${l.num}</td>
+      return `<tr class="pbrow" data-row="${l.id}" data-chap="${c.id}">
+      <td class="pbdrag" data-handle="${l.id}" title="Arrastrar para reordenar">${locked?"":"⠿"}</td>
+      <td><input data-line="${l.id}" data-f="num" value="${esc(l.num)}" style="width:56px"
+        title="${l.manualNum?"Número escrito a mano — se mantiene al reordenar":"Número automático — cambia con la posición"}"${locked?" disabled":""}></td>
       <td><input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="6"${locked?" disabled":""}></td>
       <td><input data-line="${l.id}" data-f="desc" value="${esc(l.desc)}"${locked?" disabled":""}></td>
       <td><input data-line="${l.id}" data-f="unit" value="${esc(l.unit)}" style="width:52px"${locked?" disabled":""}></td>
       <td><input class="r" data-line="${l.id}" data-f="qty" type="number" step="0.001" value="${l.qtyMilli/1000}"${locked||l.subLines.length?" disabled":""}></td>
-      <td><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents/100).toFixed(2)}"${locked?" disabled":""}></td>
       <td><input class="r" data-line="${l.id}" data-f="price" type="number" step="0.01" value="${(l.priceCents/100).toFixed(2)}"${locked?" disabled":""}></td>
       <td><span class="out" data-out="amt-${l.id}">${eur(a.saleCents)}</span></td>
-      <td><span class="out${m<0?" neg":""}" data-out="mar-${l.id}">${eur(m)}</span></td>
+      <td class="int"><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents/100).toFixed(2)}"${locked?" disabled":""}></td>
+      <td class="int"><span class="out${m<0?" neg":""}" data-out="mar-${l.id}">${eur(m)}</span></td>
       <td><select data-line="${l.id}" data-f="status"${locked?" disabled":""}>
         <option value="normal"${bStatus(l)==="normal"?" selected":""}>Normal</option>
         <option value="pending"${bStatus(l)==="pending"?" selected":""}>Pendiente</option>
@@ -3310,7 +3555,7 @@ function builderRows(id,vsel,locked,SECL){
       <td><button class="bimg${l.imageRefs.length?" has":""}" data-gal="${l.id}">🖼 ${l.imageRefs.length}</button></td>
       ${locked?"":`<td><button class="btn sm danger" data-delline="${l.id}">✕</button></td>`}
     </tr>`;}).join("")}`).join("")
-    ||'<tr><td colspan="12"><div class="empty">Sin capítulos todavía.</div></td></tr>';
+    ||`<tr><td colspan="${cols}"><div class="empty">Sin capítulos todavía.</div></td></tr>`;
 
   $('#bRows').querySelectorAll('[data-gal]').forEach(btn=>btn.onclick=()=>lineImagesDrawer(id,btn.dataset.gal));
   $('#bRows').querySelectorAll('[data-addline]').forEach(btn=>btn.onclick=()=>mutate(()=>{
@@ -3319,20 +3564,53 @@ function builderRows(id,vsel,locked,SECL){
   $('#bRows').querySelectorAll('[data-delline]').forEach(btn=>btn.onclick=()=>mutate(()=>{
     erp.deleteLine(id,btn.dataset.delline,"backoffice");
   },"Partida eliminada"));
+  if(locked) return;
+
+  // Dragging. Only the 16 px handle starts a drag — the rest of the row still
+  // selects text, which is how a description gets copied.
+  const accept=d=>d.kind==="line";
+  $('#bRows').querySelectorAll('[data-handle]').forEach(h=>{
+    const row=h.closest('tr');
+    bDragSource(h,"line",h.dataset.handle,row);
+    // The handle is the grip; the whole ROW is the target, so dropping anywhere
+    // along it puts the travelling line in that row's place.
+    bDropTarget(row,accept,d=>{
+      if(d.id===row.dataset.row) return;
+      const dest=row.dataset.chap;
+      const idx=erp.version(id,vsel).chapters.find(c=>c.id===dest).lines.findIndex(l=>l.id===row.dataset.row);
+      mutate(()=>erp.moveLine(id,d.id,dest,idx,"backoffice"),"Partida movida");
+    });
+  });
+  // Dropping on a chapter heading appends to that chapter — the only way to
+  // move a line into a chapter that has no rows to drop between yet.
+  $('#bRows').querySelectorAll('[data-chaprow]').forEach(tr=>{
+    bDropTarget(tr,accept,d=>
+      mutate(()=>erp.moveLine(id,d.id,tr.dataset.chaprow,null,"backoffice"),"Partida movida de capítulo"));
+  });
 }
 
 /** The live half: tree totals, the edited row's own figures, and the panel. */
 function builderRecalc(id,vsel,lineId){
   const b=erp.budget(id), V=erp.version(id,vsel), t=erp.budgetTotals(id,vsel);
+  const locked=V.frozen||V.issued||b.acceptedVersionId===V.id;
   const byId={}; t.chapters.forEach(c=>{byId[c.id]=c;});
 
   $('#bTree').innerHTML=V.chapters.map(c=>{const ct=byId[c.id]||{saleCents:0};
-    return `<div class="bc${bChapter===c.id?" on":""}" data-chap="${c.id}"><span>${c.num}. ${esc(c.name||"—")}</span><span class="amt">${eur0(ct.saleCents)}</span></div>
-     ${c.lines.map(l=>{const a=bLineAmt(l);
-       return `<div class="bl${l.pending?" pend":""}" data-line="${l.id}"><span>${l.num} ${esc(l.desc||"—")}</span><span class="amt">${l.pending?"pdte.":eur0(a.saleCents)}</span></div>`;}).join("")}`;
+    const open=!bChapter||bChapter===c.id;
+    return `<div class="bc${bChapter===c.id?" on":""}" data-chap="${c.id}" data-idx="${V.chapters.indexOf(c)}">
+       <span>${locked?"":'<span class="pbdrag" style="display:inline-block">⠿</span> '}${esc(c.num)}. ${esc(c.name||"—")}</span>
+       <span class="amt">${eur0(ct.saleCents)}</span></div>
+     ${open?c.lines.map(l=>{const a=bLineAmt(l);
+       return `<div class="bl${l.pending?" pend":""}" data-line="${l.id}"><span>${esc(l.num)} ${esc(l.desc||"—")}</span><span class="amt">${l.pending?"pdte.":eur0(a.saleCents)}</span></div>`;}).join(""):""}`;
   }).join("")||'<div class="empty" style="padding:16px">Sin capítulos.</div>';
-  $('#bTree').querySelectorAll('[data-chap]').forEach(d=>d.onclick=()=>{
-    bChapter=bChapter===d.dataset.chap?null:d.dataset.chap; render();
+  $('#bTree').querySelectorAll('[data-chap]').forEach(d=>{
+    d.onclick=()=>{ bChapter=bChapter===d.dataset.chap?null:d.dataset.chap; render(); };
+    if(locked) return;
+    bDragSource(d,"chapter",d.dataset.chap,d);
+    bDropTarget(d,x=>x.kind==="chapter",x=>{
+      if(x.id===d.dataset.chap) return;
+      mutate(()=>erp.moveChapter(id,x.id,Number(d.dataset.idx),"backoffice"),"Capítulo movido");
+    });
   });
   $('#bTree').querySelectorAll('.bl[data-line]').forEach(d=>d.onclick=()=>{
     const row=document.querySelector(`tr[data-row="${d.dataset.line}"]`);
@@ -3347,13 +3625,22 @@ function builderRecalc(id,vsel,lineId){
       if(me){me.textContent=eur(m);me.classList.toggle("neg",m<0);}}
   }
 
-  const imgs=erp.budgetImages(id,vsel).length;
-  $('#bAnnexCount').innerHTML=imgs
-    ? `${imgs} ${imgs===1?"imagen":"imágenes"} en ${(b.annex&&b.annex.enabled)?Math.ceil(imgs/((b.annex&&b.annex.imagesPerPage)||2))+" página(s)":"—"}`
-    : "Ninguna partida tiene imágenes todavía.";
+  const bar=$('#pbTotal'); if(bar) bar.textContent=eur(t.grandCents);
+  const side=$('#bSide'); if(!side) return;
+  side.innerHTML=bTab==="visit"?builderVisitPanel(b):builderTotalsPanel(b,id,vsel,t);
+  if(bTab==="visit"){ paintImages(side); return; }
+  $('#bAnnexOn').onchange=e=>mutate(()=>erp.setAnnexOptions(id,{enabled:e.target.checked}),
+    e.target.checked?"Anexo gráfico activado":"Anexo gráfico desactivado");
+  $('#bAnnexPer').onchange=e=>mutate(()=>erp.setAnnexOptions(id,{imagesPerPage:+e.target.value}),"Anexo actualizado");
+}
 
-  $('#bTotals').innerHTML=`
-    <div class="row"><span>Base</span><b>${eur(t.baseCents)}</b></div>
+function builderTotalsPanel(b,id,vsel,t){
+  const imgs=erp.budgetImages(id,vsel).length;
+  const SEC=[["baseCents","Base"],["optionsCents","Opcionales (aparte)"],
+    ["outOfScopeCents","Fuera de presupuesto"],["extrasCents","Extras"]];
+  return `<div class="bside" style="position:static">
+    ${SEC.filter(([k])=>k==="baseCents"||t[k]).map(([k,lab])=>
+      `<div class="row${k==="baseCents"?"":" mut"}"><span>${lab}</span><b>${eur(t[k])}</b></div>`).join("")}
     ${t.discountCents?`<div class="row"><span>Descuento</span><b>−${eur(t.discountCents)}</b></div>`:""}
     <div class="row"><span>Base imponible</span><b>${eur(t.taxableCents)}</b></div>
     <div class="row"><span>IVA ${t.vatBp/100}%</span><b>${eur(t.vatCents)}</b></div>
@@ -3361,9 +3648,52 @@ function builderRecalc(id,vsel,lineId){
     <div class="row big"><span>Total</span><b>${eur(t.grandCents)}</b></div>
     <div class="row"><span>Coste</span><b>${eur(t.costBaseCents)}</b></div>
     <div class="row"><span>Margen</span><b class="${t.marginBaseCents<0?"neg":""}">${eur(t.marginBaseCents)} · ${t.marginBasePct}%</b></div>
-    ${t.optionsCents?`<div class="row mut"><span>Opcionales (aparte)</span><b>${eur(t.optionsCents)}</b></div>`:""}
     <div class="row ${t.pendingCount?"warn":"mut"}"><span>Pendientes de precio</span><b>${t.pendingCount} · ${eur(t.pendingEstCents)}</b></div>
-    ${t.perM2Cents?`<div class="row mut"><span>Por m²</span><b>${eur(t.perM2Cents)}</b></div>`:""}`;
+    ${t.perM2Cents?`<div class="row mut"><span>Por m²</span><b>${eur(t.perM2Cents)}</b></div>`:""}
+    <div class="row mut" style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px"><span>Coste y margen</span><b>no salen del documento</b></div>
+   </div>
+   <div style="margin-top:14px">
+    <div class="pbh" style="position:static;padding-left:0;border:0">Anexo gráfico</div>
+    <div class="bside" style="position:static">
+     <label class="opt"><input type="checkbox" id="bAnnexOn"${(b.annex&&b.annex.enabled)?" checked":""}> Incluir anexo en el documento</label>
+     <label class="opt">Imágenes por página
+      <select id="bAnnexPer">${[1,2,3,4,6].map(n=>`<option value="${n}"${(b.annex&&b.annex.imagesPerPage)===n?" selected":""}>${n}</option>`).join("")}</select></label>
+     <div class="row mut" id="bAnnexCount">${imgs
+       ? `${imgs} ${imgs===1?"imagen":"imágenes"} en ${(b.annex&&b.annex.enabled)?Math.ceil(imgs/((b.annex&&b.annex.imagesPerPage)||2))+" página(s)":"—"}`
+       : "Ninguna partida tiene imágenes todavía."}</div>
+    </div>
+   </div>`;
+}
+
+/* The visit, beside the presupuesto being written from it — the whole reason
+   COM-02 records a report at all. Strictly reference: nothing here writes, and
+   nothing here is copied into a line, because the specification's own note is
+   that the visit does NOT inherit into the presupuesto (mapping §6, row 2). */
+function builderVisitPanel(b){
+  const found=budgetVisit(b);
+  if(!found) return '<div class="empty">Este presupuesto no tiene ninguna visita asociada.</div>';
+  const x=found.visit;
+  const photos=(x.photos||[]).map(p=>typeof p==="string"?p:p.storageKey).filter(Boolean);
+  return `
+   ${found.linked?'<span class="pill g">Visita de este presupuesto</span>'
+     :'<span class="pill y">Última visita del cliente — no vinculada a este presupuesto</span>'}
+   <div class="bside" style="position:static;margin-top:10px">
+    <div class="row"><span>Fecha</span><b>${fmtD(x.completedAt||x.date)}</b></div>
+    <div class="row"><span>Mediciones</span><b>${(x.measurements||[]).length}</b></div>
+    <div class="row"><span>Fotos</span><b>${photos.length}</b></div>
+   </div>
+   ${(x.measurements||[]).length?`<div style="margin-top:10px">
+     <div class="pbh" style="position:static;padding-left:0;border:0">Mediciones</div>
+     <div class="bside" style="position:static">${(x.measurements||[]).map(m=>
+      `<div class="row"><span>${esc(m.what||m.room||"—")}</span><b>${m.qtyMilli!=null?(m.qtyMilli/1000):esc(String(m.qty??""))} ${esc(m.unit||"")}</b></div>`).join("")}</div>
+    </div>`:""}
+   ${x.notes?`<div style="margin-top:10px">
+     <div class="pbh" style="position:static;padding-left:0;border:0">Informe</div>
+     <div style="font-size:12.5px;color:var(--body);white-space:pre-wrap">${esc(x.notes)}</div>
+    </div>`:""}
+   ${photos.length?`<div class="gal" style="margin-top:10px">
+     ${photos.map(p=>`<div class="gi" style="grid-template-columns:minmax(0,1fr)"><img data-blob="${esc(p)}" alt="" style="width:100%;height:120px"></div>`).join("")}
+    </div>`:""}`;
 }
 
 function builderIssues(id,issues){
@@ -3372,6 +3702,121 @@ function builderIssues(id,issues){
     ${issues.map(i=>`<div class="it"><span class="pill ${i.level==="block"?"r":"y"}">${i.level==="block"?"Bloquea":"Aviso"}</span> <span>${esc(i.line)} — ${esc(i.msg)}</span></div>`).join("")
       ||'<div class="it">Nada que corregir. El presupuesto puede emitirse.</div>'}
   </div></div>`;
+}
+
+/* ---------- Sending (COM-03) ----------
+   The last screen before a document leaves, and the only place the pending
+   lines are stated as plainly as they deserve: they are NOT in the total the
+   customer is about to read, and if nobody says so here the difference is
+   discovered by the customer. Blocking issues disable the button rather than
+   hiding it, so the reason the presupuesto cannot go is visible. */
+function sendBudgetDrawer(id){
+  const b=erp.budget(id), vsel=b.currentVersionId, V=erp.version(id,vsel);
+  const t=erp.budgetTotals(id,vsel);
+  const issues=erp.validateBudget(id);
+  const blocks=issues.filter(i=>i.level==="block"), warns=issues.filter(i=>i.level==="warn");
+  const party=erp.party(b.partyId);
+  const db=openDrawer(`Enviar ${b.number} · v${V.vNumber}`);
+  // Every sentence below is one whole text node, and every figure sits in an
+  // element of its own. A sentence broken across <b> tags is three keys the
+  // dictionary can never hold, which is how a screen ends up half translated.
+  db.innerHTML=`
+   <div class="card"><div class="ch"><h3>Lo que va a recibir el cliente</h3></div><div class="daylist">
+    <div class="it"><span>${esc(party.name)}</span><span style="flex:1"></span>
+      ${party.email?`<span>${esc(party.email)}</span>`:'<span class="pill y">sin correo</span>'}</div>
+    <div class="it"><span>Total</span><span style="flex:1"></span><b>${eur(t.grandCents)}</b></div>
+    <div class="it"><span>Base imponible</span><span style="flex:1"></span><b>${eur(t.taxableCents)}</b></div>
+    <div class="it"><span>IVA</span><span style="flex:1"></span><b>${t.vatBp/100}%</b></div>
+    <div class="it"><span>Idioma del documento</span><span style="flex:1"></span>
+      <b>${b.language==="ca"?"Català":"Español"}</b></div>
+    <div class="it"><span>Validez</span><span style="flex:1"></span><b>${fmtD(b.validityDate)}</b></div>
+   </div></div>
+   ${t.pendingCount?`<div class="card"><div class="ch"><h3>Pendientes de precio</h3><span class="tag">no van en el total</span></div>
+    <div class="daylist">
+     <div class="it"><span>Partidas sin precio todavía</span><span style="flex:1"></span>
+       <span class="pill y">${t.pendingCount}</span></div>
+     <div class="it"><span>Valoradas provisionalmente en</span><span style="flex:1"></span><b>${eur(t.pendingEstCents)}</b></div>
+     <div class="it"><span>No están incluidas en el total y no se imprimen en el documento.</span></div>
+    </div></div>`:""}
+   ${blocks.length?`<div class="card"><div class="ch"><h3>Bloqueos</h3><span class="tag">${blocks.length}</span></div><div class="daylist">
+    ${blocks.map(i=>`<div class="it"><span class="pill r">Bloquea</span> <span>${esc(i.line)} — ${esc(i.msg)}</span></div>`).join("")}</div></div>`:""}
+   ${warns.length?`<div class="card"><div class="ch"><h3>Avisos</h3><span class="tag">${warns.length}</span></div><div class="daylist">
+    ${warns.map(i=>`<div class="it"><span class="pill y">Aviso</span> <span>${esc(i.line)} — ${esc(i.msg)}</span></div>`).join("")}</div></div>`:""}
+   <div class="card"><div class="ch"><h3>Enviar</h3></div><div class="daylist" style="gap:9px">
+    <div class="it"><label class="opt">Canal
+      <select id="sbChannel" style="margin-left:auto">
+       <option value="email">Correo electrónico</option>
+       <option value="whatsapp">WhatsApp</option>
+       <option value="hand">En mano</option>
+      </select></label></div>
+    <div class="it"><span>Al enviar, esta versión queda congelada: el documento del cliente se podrá reproducir siempre tal cual salió. Para cambiar algo después hay que crear una versión nueva.</span></div>
+    <div class="it"><button class="btn primary" id="sbGo"${blocks.length?" disabled":""}>${blocks.length?"Corrija los bloqueos primero":"Enviar y congelar la versión"}</button></div>
+   </div></div>`;
+  const go=$('#sbGo');
+  if(go&&!blocks.length) go.onclick=()=>mutate(()=>{
+    erp.issueVersion(id,{channel:$('#sbChannel').value},"backoffice"); closeDrawer();
+  },"Presupuesto enviado — versión congelada");
+}
+
+/* The customer's answer. One version, one answer — so this drawer closes the
+   question for good, in whichever direction. */
+function budgetResponseDrawer(id,versionId){
+  const b=erp.budget(id), V=erp.version(id,versionId);
+  const reasons=erp.listActive("lossReasons");
+  const db=openDrawer(`Respuesta del cliente · ${b.number} v${V.vNumber}`);
+  db.innerHTML=`
+   <div class="card"><div class="ch"><h3>Aceptar</h3></div><div class="daylist" style="gap:9px">
+    <div class="it">Aceptar crea el proyecto y da la oportunidad por ganada. La versión queda cerrada.</div>
+    <div class="it"><label class="opt">Justificante <input id="brEvid" placeholder="correo-aceptacion.pdf" style="margin-left:auto"></label></div>
+    <div class="it"><button class="btn primary" id="brOk">Marcar como aceptado</button></div>
+   </div></div>
+   <div class="card"><div class="ch"><h3>Rechazar</h3></div><div class="daylist" style="gap:9px">
+    <div class="it">Rechazar da la oportunidad por perdida con el motivo elegido, que es el mismo que cuentan los informes de conversión.</div>
+    <div class="it"><label class="opt">Motivo
+      <select id="brReason" style="margin-left:auto">${listOptions("lossReasons","")}</select></label></div>
+    <div class="it"><label class="opt">Qué dijo <input id="brNotes" placeholder="Opcional" style="margin-left:auto"></label></div>
+    <div class="it"><button class="btn danger" id="brNo"${reasons.length?"":" disabled"}>Marcar como rechazado</button></div>
+   </div></div>`;
+  $('#brOk').onclick=()=>mutate(()=>{
+    erp.acceptVersion(id,versionId,{evidenceRef:$('#brEvid').value||null},"backoffice"); closeDrawer();
+  },"Presupuesto aceptado");
+  const no=$('#brNo');
+  if(no&&reasons.length) no.onclick=()=>mutate(()=>{
+    erp.rejectVersion(id,versionId,{reason:$('#brReason').value,notes:$('#brNotes').value},"backoffice");
+    closeDrawer();
+  },"Presupuesto rechazado");
+}
+
+/** Exclusions and assumptions: the two lists the conditions bar has no room
+    for, and the two a dispute is usually about. */
+function budgetConditionsDrawer(id){
+  const b=erp.budget(id);
+  const cur=erp.currentVersion(id);
+  const locked=cur.frozen||cur.issued||!!b.acceptedVersionId;
+  const db=openDrawer(`Condiciones · ${b.number}`);
+  const list=(key,title,help)=>`
+   <div class="card"><div class="ch"><h3>${title}</h3><span class="tag">${(b[key]||[]).length}</span></div>
+    <div class="daylist">
+     <div class="it">${help}</div>
+     ${(b[key]||[]).map((x,i)=>`<div class="it"><span>${esc(x)}</span><span style="flex:1"></span>
+       ${locked?"":`<button class="btn sm danger" data-del="${key}:${i}">✕</button>`}</div>`).join("")
+       ||'<div class="it" style="color:var(--muted)">Ninguna todavía.</div>'}
+     ${locked?"":`<div class="it"><input id="bc_${key}" placeholder="Añadir y pulsar Enter" style="flex:1"></div>`}
+    </div></div>`;
+  db.innerHTML=list("exclusions","Exclusiones","Lo que el precio NO incluye. Se imprime bajo los totales.")
+    +list("assumptions","Supuestos","Aquello que se ha dado por cierto al valorar; si cambia, cambia el precio.")
+    +(locked?'<div class="card"><div class="daylist"><div class="it">La versión está congelada: sus condiciones se conservan tal como se enviaron.</div></div></div>':"");
+  if(locked) return;
+  ["exclusions","assumptions"].forEach(key=>{
+    const inp=$('#bc_'+key);
+    inp.onkeydown=e=>{ if(e.key!=="Enter")return; const val=inp.value.trim(); if(!val)return;
+      mutate(()=>{ erp.updateBudget(id,{[key]:[...(b[key]||[]),val]},"backoffice"); budgetConditionsDrawer(id); },"Añadido"); };
+  });
+  db.querySelectorAll('[data-del]').forEach(btn=>btn.onclick=()=>{
+    const [key,i]=btn.dataset.del.split(":");
+    mutate(()=>{ erp.updateBudget(id,{[key]:(b[key]||[]).filter((_,n)=>n!==Number(i))},"backoffice");
+      budgetConditionsDrawer(id); },"Eliminado");
+  });
 }
 
 /* ---------- Gallery for one line (Improvement #1) ----------
@@ -3839,7 +4284,6 @@ const VIEWS={
   bBudget=window._arg||null;
   if(bBudget&&!erp.state.budgets.some(b=>b.id===bBudget)) bBudget=null;
   if(bBudget) return budgetBuilder(v,bBudget);
-  $('#sub').textContent="Presupuestos con capítulos, partidas y sub-mediciones, opciones y pendientes separados, y control de versiones con una única versión aceptada.";
   budgetList(v);
  },
 
@@ -5086,33 +5530,38 @@ function budgetDrawer(id,versionId){
   const marked=new Set(annex.markedItems);
   const perPage=(doc.annex&&doc.annex.imagesPerPage)||2;
   const db=openDrawer(b.number+" · v"+V.vNumber+(b.acceptedVersionId?" (aceptada)":""));
-  const SEC={base:"",optional:" (opcional — aparte)",outOfScope:" (fuera de presupuesto)",extras:" (extras)"};
+  const L=DOCL[doc.language]||DOCL.es;
+  const SEC=L.sections;
   db.innerHTML=`
    <div class="card"><div class="ch"><h3>Versiones</h3><span class="tag">automáticas, emitidas = congeladas</span></div><div class="daylist">
     ${b.versions.map(x=>`<div class="it"><b>v${x.vNumber}</b> ${fmtD(x.date)} · ${esc(x.reason||"—")} ${x.id===b.acceptedVersionId?'<span class="pill g">Aceptada</span>':x.issued?'<span class="pill b">Emitida</span>':'<span class="pill y">Borrador</span>'}${x.sent?` · enviada por ${x.sent.channel}`:""}</div>`).join("")}
     ${b.versions.length>1?(()=>{const d=erp.diffVersions(id,b.versions[0].id,b.versions[b.versions.length-1].id);return `<div class="it">Δ v${b.versions[0].vNumber}→v${b.versions[b.versions.length-1].vNumber}: <b>${eur(d.deltaCents)}</b> (${d.deltaPct}%) · ${d.changed.length} líneas modificadas</div>`;})():""}
    </div></div>
-   <div class="doc">
-    <div class="dh"><div><b>PRESUPUESTO ${doc.number} · v${doc.version}</b><br>${esc(doc.issuer.legalName)} · ${esc(doc.issuer.taxId)}<br>${esc(doc.issuer.address)}</div>
+   <div class="doc" translate="no" lang="${esc(doc.language)}">
+    <div class="dh"><div><b>${L.doc} ${doc.number} · v${doc.version}</b><br>${esc(doc.issuer.legalName)} · ${esc(doc.issuer.taxId)}<br>${esc(doc.issuer.address)}</div>
     <div style="text-align:right">${esc(doc.customer.name)}<br>${esc(doc.customer.taxId)}<br>${esc(doc.customer.address)}</div></div>
-    ${doc.chapters.map(c=>`<div style="margin-bottom:8px"><b style="color:var(--greenDeep)">${c.num}. ${esc(c.name)}${SEC[c.section]||""}</b>
-      ${c.lines.map(l=>`<div class="chapline"><span>${l.num} ${esc(l.desc)} — ${l.qty} ${l.unit} × ${eur(l.priceCents)}${marked.has(l.num)?'<span class="amark" title="Ver anexo gráfico">A</span>':""}</span><b>${eur(l.totalCents)}</b></div>`).join("")}</div>`).join("")}
+    ${doc.chapters.map(c=>`<div style="margin-bottom:8px"><b style="color:var(--greenDeep)">${esc(c.num)}. ${esc(c.name)}${SEC[c.section]||""}</b>
+      ${c.lines.map(l=>`<div class="chapline"><span>${esc(l.num)} ${esc(l.desc)} — ${l.qty} ${esc(l.unit)} × ${eur(l.priceCents)}${marked.has(l.num)?'<span class="amark" title="Ver anexo gráfico">A</span>':""}</span><b>${eur(l.totalCents)}</b></div>`).join("")}</div>`).join("")}
     <div style="border-top:2px solid var(--green);padding-top:8px;margin-top:8px">
-      <div class="chapline"><span>Base imponible</span><b>${eur(doc.totals.taxableCents)}</b></div>
-      ${doc.totals.optionsCents?`<div class="chapline"><span>Opcionales (aparte)</span><span>${eur(doc.totals.optionsCents)}</span></div>`:""}
-      <div class="chapline"><span>IVA ${doc.totals.vatBp/100}%</span><span>${eur(doc.totals.vatCents)}</span></div>
-      <div class="chapline" style="font-size:14px"><b>TOTAL</b><b>${eur(doc.totals.grandCents)}</b></div>
-      ${doc.totals.perM2Cents?`<div class="chapline"><span>Total por m²</span><span>${eur(doc.totals.perM2Cents)}/m²</span></div>`:""}
-      ${t.pendingCount?`<div class="chapline"><span>⚠ Líneas pendientes de precio (no incluidas)</span><span>${t.pendingCount} · ~${eur(t.pendingEstCents)}</span></div>`:""}
+      <div class="chapline"><span>${L.base}</span><b>${eur(doc.totals.taxableCents)}</b></div>
+      ${doc.totals.optionsCents?`<div class="chapline"><span>${L.options}</span><span>${eur(doc.totals.optionsCents)}</span></div>`:""}
+      <div class="chapline"><span>${L.vat} ${doc.totals.vatBp/100}%</span><span>${eur(doc.totals.vatCents)}</span></div>
+      <div class="chapline" style="font-size:14px"><b>${L.total}</b><b>${eur(doc.totals.grandCents)}</b></div>
+      ${doc.totals.perM2Cents?`<div class="chapline"><span>${L.perM2}</span><span>${eur(doc.totals.perM2Cents)}/m²</span></div>`:""}
+      ${t.pendingCount?`<div class="chapline"><span>${L.pending}</span><span>${t.pendingCount} · ~${eur(t.pendingEstCents)}</span></div>`:""}
     </div>
     ${annex.pages.map(pg=>`<div class="annexpg" data-annexpage="${pg.number}">
-      <div class="ah">Anexo gráfico · página ${pg.number} de ${annex.pages.length}</div>
+      <div class="ah">${L.annex} · ${L.page} ${pg.number} ${L.of} ${annex.pages.length}</div>
       <div class="plates" style="grid-template-columns:repeat(${Math.min(perPage,2)},minmax(0,1fr))">
        ${pg.plates.map(p=>`<figure class="plate"><img data-blob="${esc(p.ref)}" alt="${esc(p.itemLabel)}">
-         <figcaption><b>${p.groupNum}. ${esc(p.groupName)} · partida ${p.itemNum}</b><br>${esc(p.itemLabel)}${p.sequence?` (${p.sequence} de ${p.siblings})`:""}${p.caption?`<br>${esc(p.caption)}`:""}</figcaption>
+         <figcaption><b>${esc(p.groupNum)}. ${esc(p.groupName)} · ${L.item} ${esc(p.itemNum)}</b><br>${esc(p.itemLabel)}${p.sequence?` (${p.sequence} ${L.of} ${p.siblings})`:""}${p.caption?`<br>${esc(p.caption)}`:""}</figcaption>
         </figure>`).join("")}
       </div></div>`).join("")}
-    <div style="margin-top:8px;color:var(--muted)">Validez: ${fmtD(b.validityDate)} · ${esc(b.paymentConditions)} · IBAN ${esc(doc.issuer.iban)}</div>
+    ${(doc.exclusions||[]).length?`<div style="margin-top:8px"><b>${L.exclusions}</b>
+      ${doc.exclusions.map(x=>`<div class="chapline"><span>· ${esc(x)}</span></div>`).join("")}</div>`:""}
+    ${(doc.assumptions||[]).length?`<div style="margin-top:8px"><b>${L.assumptions}</b>
+      ${doc.assumptions.map(x=>`<div class="chapline"><span>· ${esc(x)}</span></div>`).join("")}</div>`:""}
+    <div style="margin-top:8px;color:var(--muted)">${L.validity}: ${fmtD(b.validityDate)} · ${esc(b.paymentConditions)} · IBAN ${esc(doc.issuer.iban)}</div>
    </div>
    <div class="card" style="margin-top:12px"><div class="ch"><h3>Margen interno</h3><span class="tag">nunca aparece en el documento del cliente</span></div><div class="daylist">
     <div class="it">Coste interno base: <b>${eur(t.costBaseCents)}</b> · Margen: <b>${eur(t.marginBaseCents)} (${t.marginBasePct}%)</b></div>

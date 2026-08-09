@@ -71,6 +71,7 @@ async function main() {
     await testShell(browser, base);
     await testGantt(browser, base);
     await testBudgetBuilder(browser, base);
+    await testPresupuestador(browser, base);
     await testProjectTracking(browser, base);
     await testProcurement(browser, base);
     await testAdmin(browser, base);
@@ -846,18 +847,22 @@ async function testBudgetBuilder(browser, base) {
 
     // Open the one budget that is still a draft — a frozen version is
     // deliberately read-only, so editing has to be tried on an editable one.
-    const rows = pg.locator("#view tr.click");
-    const n = await rows.count();
-    let opened = false;
-    for (let i = 0; i < n; i++) {
-      if (/Borrador/.test(await rows.nth(i).innerText())) {
-        await rows.nth(i).click();
-        opened = true;
-        break;
-      }
-    }
+    // The register groups by stage (COM-03), so the draft is the first row
+    // under the «Borradores» heading rather than a row carrying its own pill.
+    const opened = await pg.evaluate(() => {
+      const hd = [...document.querySelectorAll("#view tr.grouphd")].find((t) =>
+        /^Borradores/i.test(t.innerText.trim()),
+      );
+      let row = hd && hd.nextElementSibling;
+      if (!row || !row.classList.contains("click")) return false;
+      row.click();
+      return true;
+    });
     if (!opened) {
-      bad("builder: a draft budget exists to edit", `${n} budgets, none in draft`);
+      bad(
+        "builder: a draft budget exists to edit",
+        `${await pg.locator("#view tr.click").count()} budgets, none under «Borradores»`,
+      );
       return;
     }
     await pg.waitForTimeout(500);
@@ -865,14 +870,14 @@ async function testBudgetBuilder(browser, base) {
     // Zone 1, 2 and 3 simultaneously — the whole point of the layout.
     const tree = await pg.locator("#bTree .bc").count();
     const gridRows = await pg.locator("#bRows tr[data-row]").count();
-    const totals = await pg.locator("#bTotals").isVisible();
+    const totals = await pg.locator("#bSide").isVisible();
     if (tree >= 2 && gridRows >= 2 && totals)
       ok(`builder: three zones at once (${tree} chapters · ${gridRows} lines · live totals)`);
     else bad("builder: three zones", `tree=${tree} rows=${gridRows} totals=${totals}`);
 
     // The panel recalculates ON EVERY KEYSTROKE, not on blur. Type into a
     // price field and read the total back without leaving the field.
-    const totalOf = async () => pg.locator("#bTotals .row.big b").innerText();
+    const totalOf = async () => pg.locator("#bSide .row.big b").innerText();
     const before = await totalOf();
     const price = pg.locator('#bRows input[data-f="price"]').first();
     await price.click();
@@ -979,6 +984,316 @@ async function testBudgetBuilder(browser, base) {
     else bad("builder: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("budget builder", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── COM-03 (S5): the presupuestador as the v4 specification describes it.
+//    Everything below is about the things a screenshot cannot prove — that the
+//    surface really is outside the shell, that a drag really moves money
+//    between subtotals, that a typed number really survives a reorder, and
+//    that a document really cannot leave with a blocking issue on it.
+async function testPresupuestador(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  pg.on("dialog", async (d) => {
+    const m = d.message() || "";
+    if (/^Nombre del capítulo/.test(m)) await d.accept("Capítulo E2E");
+    else if (/^Motivo de la nueva versión/.test(m)) await d.accept("Revisión E2E");
+    else await d.accept("");
+  });
+  try {
+    await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(900);
+
+    // ---- the register, grouped by the five stages -------------------------
+    const heads = await pg.evaluate(() =>
+      [...document.querySelectorAll("#view tr.grouphd")].map((t) => t.innerText.trim()),
+    );
+    // innerText is the RENDERED text and the headings are uppercased in CSS,
+    // so the comparison has to be case-insensitive or it tests the stylesheet.
+    const known = ["borradores", "enviados", "aceptados", "rechazados", "caducados"];
+    if (heads.length && heads.every((h) => known.some((k) => h.toLowerCase().startsWith(k))))
+      ok(`COM-03: the register is grouped by stage (${heads.length} groups)`);
+    else bad("COM-03: grouped register", JSON.stringify(heads));
+
+    // «Caducados» is the proof that the stage is derived rather than stored:
+    // nothing was ever written to those records on the day they expired.
+    const expiredDerived = await pg.evaluate(() => {
+      const e = erp.state.budgets.filter((b) => erp.budgetStage(b) === "expired");
+      return { n: e.length, storedStatuses: [...new Set(e.map((b) => b.status))] };
+    });
+    if (expiredDerived.n > 0 && !expiredDerived.storedStatuses.includes("expired"))
+      ok(
+        `COM-03: «Caducados» is derived, not stored (${expiredDerived.n}, still stored as issued)`,
+      );
+    else bad("COM-03: derived expiry", JSON.stringify(expiredDerived));
+
+    // ---- open the draft: the surface must leave the shell ------------------
+    const draftId = await pg.evaluate(() => {
+      const b = erp.state.budgets.find((x) => erp.budgetStage(x) === "draft");
+      return b ? b.id : null;
+    });
+    if (!draftId) {
+      bad("COM-03: a draft to build in", "no budget is in draft");
+      return;
+    }
+    await pg.evaluate((id) => go("quotes", id), draftId);
+    await pg.waitForTimeout(600);
+    const shell = await pg.evaluate(() => ({
+      fs: document.body.classList.contains("fs"),
+      rail: getComputedStyle(document.querySelector(".rail")).display,
+      cols: getComputedStyle(document.querySelector(".pbpanes")).gridTemplateColumns,
+      bar: !!document.querySelector(".pbbar #pbTotal"),
+      cond: !!document.querySelector(".pbcond"),
+    }));
+    if (shell.fs && shell.rail === "none" && /^260px .* 300px$/.test(shell.cols) && shell.bar)
+      ok(`COM-03: full screen — rail hidden, three panes at ${shell.cols}, own bar with the total`);
+    else bad("COM-03: full-screen layout", JSON.stringify(shell));
+    if (shell.cond) ok("COM-03: the conditions bar sits below the panes");
+    else bad("COM-03: conditions bar", "absent");
+
+    // The drag handle is the only grip: a draggable row would steal the text
+    // selection an estimator needs to copy a description.
+    const grips = await pg.evaluate(() => ({
+      handles: [...document.querySelectorAll("#bRows .pbdrag[data-handle]")].filter(
+        (h) => h.draggable,
+      ).length,
+      rows: [...document.querySelectorAll("#bRows tr.pbrow")].filter((r) => r.draggable).length,
+      chapters: [...document.querySelectorAll("#bTree .bc")].filter((c) => c.draggable).length,
+    }));
+    if (grips.handles >= 2 && grips.rows === 0 && grips.chapters >= 2)
+      ok(`COM-03: ${grips.handles} line handles and ${grips.chapters} chapters drag; rows do not`);
+    else bad("COM-03: drag handles", JSON.stringify(grips));
+
+    // Cost and margin are on grey, and say so.
+    const internal = await pg.evaluate(() => {
+      const th = [...document.querySelectorAll(".pbpane.mid thead th")];
+      const cost = th.findIndex((t) => /coste/i.test(t.innerText));
+      const margin = th.findIndex((t) => /margen/i.test(t.innerText));
+      return {
+        cost: cost >= 0 && th[cost].classList.contains("int"),
+        margin: margin >= 0 && th[margin].classList.contains("int"),
+        note: /no salen del documento|never|no surten/i.test(
+          document.querySelector("#bSide").innerText,
+        ),
+      };
+    });
+    if (internal.cost && internal.margin && internal.note)
+      ok("COM-03: cost and margin are marked internal and say they stay out of the document");
+    else bad("COM-03: internal columns", JSON.stringify(internal));
+
+    // ---- free numbering ---------------------------------------------------
+    const nums = () =>
+      pg.evaluate(() =>
+        [...document.querySelectorAll('#bRows input[data-f="num"]')].map((i) => i.value),
+      );
+    const firstNum = pg.locator('#bRows input[data-f="num"]').first();
+    await firstNum.fill("EX-7");
+    await firstNum.blur();
+    await pg.waitForTimeout(400);
+    const flagged = await pg.evaluate((id) => {
+      const v = erp.currentVersion(id);
+      const l = v.chapters.flatMap((c) => c.lines).find((x) => x.num === "EX-7");
+      return l ? l.manualNum : null;
+    }, draftId);
+    if ((await nums())[0] === "EX-7" && flagged === true)
+      ok("COM-03: a typed line number is taken verbatim and recorded as manual");
+    else bad("COM-03: free numbering", JSON.stringify(await nums()));
+
+    // A duplicate is refused, in the interface's own words rather than the
+    // engine's English.
+    const second = pg.locator('#bRows input[data-f="num"]').nth(1);
+    const beforeDup = await nums();
+    await second.fill("EX-7");
+    await second.blur();
+    await pg.waitForTimeout(400);
+    const toastText = await pg.locator("#toast").innerText();
+    if (
+      /ya está en uso|already in use|ja s'utilitza/i.test(toastText) &&
+      JSON.stringify(await nums()) === JSON.stringify(beforeDup)
+    )
+      ok("COM-03: a duplicate number is refused and nothing changes");
+    else bad("COM-03: duplicate number", `${toastText} / ${JSON.stringify(await nums())}`);
+
+    // ---- a reorder moves money between subtotals --------------------------
+    // Done through the engine the drop handler calls, because a synthetic
+    // HTML5 drag proves the browser's event plumbing rather than the rule.
+    const moved = await pg.evaluate((id) => {
+      const v = erp.currentVersion(id);
+      const base = v.chapters.find((c) => c.section === "base" && c.lines.length);
+      let opt = v.chapters.find((c) => c.section === "optional");
+      if (!opt) opt = erp.addChapter(id, { name: "Opcionales E2E", section: "optional" });
+      const line = base.lines[0];
+      const before = erp.budgetTotals(id);
+      erp.moveLine(id, line.id, opt.id, null, "e2e");
+      const after = erp.budgetTotals(id);
+      return {
+        num: erp.findLine(id, line.id).line.num,
+        chapter: erp.findLine(id, line.id).chapter.id === opt.id,
+        baseFell: after.baseCents < before.baseCents,
+        optionsRose: after.optionsCents > before.optionsCents,
+        manualKept: erp.findLine(id, line.id).line.num === "EX-7",
+      };
+    }, draftId);
+    if (moved.chapter && moved.baseFell && moved.optionsRose)
+      ok(
+        "COM-03: dragging a line into an optional chapter moves its money out of the base subtotal",
+      );
+    else bad("COM-03: reorder moves money", JSON.stringify(moved));
+    if (moved.manualKept)
+      ok("COM-03: and the typed number survives the move that renumbered everything around it");
+    else bad("COM-03: manual number survives reorder", moved.num);
+    await pg.evaluate(() => render());
+    await pg.waitForTimeout(300);
+
+    // ---- the visit, beside the presupuesto written from it ----------------
+    await pg.locator('.pbtabs button[data-tab="visit"]').click();
+    await pg.waitForTimeout(400);
+    const visit = await pg.locator("#bSide").innerText();
+    if (/visita/i.test(visit) && !/^\s*$/.test(visit))
+      ok("COM-03: the second panel tab shows the visit this presupuesto is priced from");
+    else bad("COM-03: visit tab", visit.slice(0, 120));
+    const readOnly = await pg.evaluate(
+      () => document.querySelectorAll("#bSide input, #bSide select, #bSide button").length,
+    );
+    if (readOnly === 0) ok("COM-03: the visit panel is reference only — nothing on it writes");
+    else bad("COM-03: visit tab is read-only", `${readOnly} controls`);
+    await pg.locator('.pbtabs button[data-tab="totals"]').click();
+    await pg.waitForTimeout(300);
+
+    // ---- sending: the pending lines have to be stated ---------------------
+    await pg.evaluate((id) => {
+      const v = erp.currentVersion(id);
+      const c = v.chapters.find((x) => x.lines.length);
+      erp.addLine(id, c.id, {
+        desc: "Partida sin precio E2E",
+        unit: "ud",
+        qtyMilli: 1000,
+        priceCents: 90000,
+        pending: true,
+      });
+      render();
+    }, draftId);
+    await pg.waitForTimeout(400);
+    await pg.locator("#bSend").click();
+    await pg.waitForTimeout(500);
+    const sendText = await pg.locator("#dbody").innerText();
+    if (
+      /pendientes de precio/i.test(sendText) &&
+      /no están incluidas|no van en el total/i.test(sendText)
+    )
+      ok("COM-03: the send screen states that pending-price lines are not in the customer's total");
+    else bad("COM-03: pre-send pending warning", sendText.slice(0, 200));
+
+    // A blocking issue must stop the document, visibly.
+    await pg.locator("#dClose").click();
+    await pg.waitForTimeout(200);
+    await pg.evaluate((id) => {
+      const v = erp.currentVersion(id);
+      const c = v.chapters.find((x) => x.lines.some((l) => !l.pending));
+      const l = c.lines.find((x) => !x.pending);
+      erp.editLine(id, l.id, { priceCents: 0, optionalLine: false }, { user: "e2e" });
+      render();
+    }, draftId);
+    await pg.waitForTimeout(300);
+    await pg.locator("#bSend").click();
+    await pg.waitForTimeout(500);
+    const blocked = await pg.evaluate(() => {
+      const b = document.querySelector("#sbGo");
+      return { present: !!b, disabled: b ? b.disabled : null };
+    });
+    if (blocked.present && blocked.disabled)
+      ok("COM-03: a blocking issue disables sending rather than hiding the reason");
+    else bad("COM-03: blocking issue stops the send", JSON.stringify(blocked));
+    await pg.locator("#dClose").click();
+    await pg.waitForTimeout(200);
+
+    // ---- send, then the customer's answer ---------------------------------
+    await pg.evaluate((id) => {
+      const v = erp.currentVersion(id);
+      v.chapters.forEach((c) =>
+        c.lines.forEach((l) => {
+          if (!l.pending && l.priceCents === 0)
+            erp.editLine(id, l.id, { priceCents: 5000 }, { user: "e2e" });
+        }),
+      );
+      render();
+    }, draftId);
+    await pg.waitForTimeout(300);
+    await pg.locator("#bSend").click();
+    await pg.waitForTimeout(400);
+    await pg.locator("#sbGo").click();
+    await pg.waitForTimeout(600);
+    const afterSend = await pg.evaluate(
+      (id) => ({
+        stage: erp.budgetStage(id),
+        frozen: erp.currentVersion(id).frozen,
+        editable: [...document.querySelectorAll("#bRows input")].some((i) => !i.disabled),
+        send: !!document.querySelector("#bSend"),
+        answer: !!document.querySelector("#bAnswer"),
+      }),
+      draftId,
+    );
+    if (afterSend.stage === "issued" && afterSend.frozen && !afterSend.editable && !afterSend.send)
+      ok("COM-03: sending freezes the version — the grid goes read-only and Enviar goes away");
+    else bad("COM-03: send freezes", JSON.stringify(afterSend));
+    if (afterSend.answer) ok("COM-03: and the customer's answer becomes the next thing to record");
+    else bad("COM-03: answer button", "absent after sending");
+
+    await pg.locator("#bAnswer").click();
+    await pg.waitForTimeout(400);
+    await pg.locator("#brReason").selectOption({ index: 0 });
+    await pg.locator("#brNotes").fill("E2E: fuera de presupuesto");
+    await pg.locator("#brNo").click();
+    await pg.waitForTimeout(600);
+    const answered = await pg.evaluate((id) => {
+      const b = erp.budget(id);
+      const r = erp.version(id, b.currentVersionId).customerResponse;
+      const o = erp.state.opportunities.find((x) => x.partyId === b.partyId && x.status === "lost");
+      return {
+        stage: erp.budgetStage(id),
+        accepted: r && r.accepted,
+        reason: r && r.reason,
+        notes: r && r.notes,
+        opp: o ? o.lossReason : null,
+      };
+    }, draftId);
+    if (
+      answered.stage === "rejected" &&
+      answered.accepted === false &&
+      answered.reason &&
+      answered.opp === answered.reason
+    )
+      ok(
+        "COM-03: a refusal is recorded with its reason and loses the opportunity for the same one",
+      );
+    else bad("COM-03: refusal", JSON.stringify(answered));
+
+    await pg.evaluate(() => go("quotes"));
+    await pg.waitForTimeout(500);
+    const regrouped = await pg.evaluate(() =>
+      [...document.querySelectorAll("#view tr.grouphd")].map((t) => t.innerText.trim()),
+    );
+    if (regrouped.some((h) => /^rechazados/i.test(h)))
+      ok("COM-03: and the register regroups it under «Rechazados»");
+    else bad("COM-03: regrouped after refusal", JSON.stringify(regrouped));
+
+    // Leaving the builder must give the navigation back.
+    const backOut = await pg.evaluate(() => ({
+      fs: document.body.classList.contains("fs"),
+      rail: getComputedStyle(document.querySelector(".rail")).display,
+    }));
+    if (!backOut.fs && backOut.rail !== "none")
+      ok("COM-03: leaving the presupuestador restores the section rail");
+    else bad("COM-03: full screen released", JSON.stringify(backOut));
+
+    if (errs.length === 0) ok("COM-03: no console errors");
+    else bad("COM-03: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("presupuestador", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }
@@ -2522,7 +2837,81 @@ async function testI18n(browser, base) {
       ok("i18n: EN translates the COM-02 visits screen");
     else bad("i18n: EN visits screen", visitsEnText.replace(/\n/g, " ").slice(0, 160));
 
+    // COM-03 (S5). Two separate things are checked here, because they pull in
+    // opposite directions: the presupuestador's INTERFACE must follow the
+    // toggle, while the customer's DOCUMENT must not — it is written in the
+    // language of the person receiving it, which is a field on the record.
+    await pg.evaluate(() => (location.hash = "quotes"));
+    await pg.waitForTimeout(500);
+    const quotesEn = await pg.locator("#view").innerText();
+    if (/Drafts|Sent|Accepted/i.test(quotesEn) && !/Borradores|Enviados/.test(quotesEn))
+      ok("i18n: EN translates the COM-03 register's stage groups");
+    else bad("i18n: EN quotes register", quotesEn.replace(/\n/g, " ").slice(0, 160));
+
+    const draftId = await pg.evaluate(() => {
+      const b = erp.state.budgets.find((x) => erp.budgetStage(x) === "draft");
+      return b ? b.id : null;
+    });
+    if (draftId) {
+      await pg.evaluate((id) => go("quotes", id), draftId);
+      await pg.waitForTimeout(600);
+      const builderEn = await pg.locator(".pb").innerText();
+      if (
+        /Chapters/i.test(builderEn) &&
+        /Line items/i.test(builderEn) &&
+        /Document language/i.test(builderEn) &&
+        !/Capítulos|Idioma del documento/.test(builderEn)
+      )
+        ok("i18n: EN translates the presupuestador — panes, bar and conditions");
+      else bad("i18n: EN presupuestador", builderEn.replace(/\n/g, " ").slice(0, 200));
+
+      // The document keeps ITS language while the interface around it changes.
+      // "Base imponible" and "Validez" are both in the dictionary, so before
+      // `translate="no"` they came out English inside a Spanish presupuesto.
+      await pg.evaluate((id) => {
+        erp.updateBudget(id, { language: "es" }, "e2e");
+        render();
+      }, draftId);
+      await pg.waitForTimeout(300);
+      await pg.locator("#bPreview").click();
+      await pg.waitForTimeout(600);
+      const docEs = await pg.locator("#dbody .doc").innerText();
+      const around = await pg.locator("#dbody .card").first().innerText();
+      if (/PRESUPUESTO/.test(docEs) && /Base imponible/.test(docEs) && /Validez/.test(docEs))
+        ok("i18n: a Spanish document stays Spanish while the operator reads English");
+      else bad("i18n: document opts out of the toggle", docEs.replace(/\n/g, " ").slice(0, 160));
+      if (/Versions/i.test(around) && !/Versiones/.test(around))
+        ok("i18n: …and the interface around that document is still translated");
+      else bad("i18n: interface around the document", around.replace(/\n/g, " ").slice(0, 120));
+
+      // And the same document in Catalan, from the same English interface.
+      await pg.locator("#dClose").click();
+      await pg.waitForTimeout(200);
+      await pg.evaluate((id) => {
+        erp.updateBudget(id, { language: "ca" }, "e2e");
+        render();
+      }, draftId);
+      await pg.waitForTimeout(300);
+      await pg.locator("#bPreview").click();
+      await pg.waitForTimeout(600);
+      const docCa = await pg.locator("#dbody .doc").innerText();
+      if (/PRESSUPOST/.test(docCa) && /Base imposable/.test(docCa) && !/PRESUPUESTO/.test(docCa))
+        ok("i18n: the same quote emitted in Catalan, chosen per customer not per operator");
+      else bad("i18n: Catalan document", docCa.replace(/\n/g, " ").slice(0, 160));
+      await pg.locator("#dClose").click();
+      await pg.waitForTimeout(200);
+    } else bad("i18n: a draft quote to preview", "none in draft");
+
+    // Back to Catalan for the COM-03 interface check.
     await pg.evaluate(() => localStorage.setItem("caneiLang", "ca"));
+    await pg.reload({ waitUntil: "networkidle" });
+    await pg.waitForTimeout(700);
+    await pg.evaluate(() => (location.hash = "quotes"));
+    await pg.waitForTimeout(500);
+    const quotesCa = await pg.locator("#view").innerText();
+    if (/Esborranys|Enviats|Acceptats/i.test(quotesCa) && !/Borradores|Aceptados/.test(quotesCa))
+      ok("i18n: CA translates the COM-03 register's stage groups");
+    else bad("i18n: CA quotes register", quotesCa.replace(/\n/g, " ").slice(0, 160));
 
     // The three languages must be genuinely distinct on the same label. A
     // Catalan that silently equals the Spanish everywhere would pass a

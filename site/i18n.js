@@ -108,6 +108,22 @@
   var ATTRS = ["placeholder", "title", "aria-label", "alt"];
   var SKIP = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, CODE: 1, PRE: 0 };
 
+  /**
+   * `translate="no"` — the standard HTML opt-out, honoured for the subtree.
+   *
+   * It exists here for one specific and important case: a document addressed
+   * to somebody else. A presupuesto is written in the CUSTOMER's language,
+   * which is a field on the record; the toggle is the OPERATOR's language,
+   * which is a preference of whoever happens to be at the screen. Without
+   * this, a Spanish back-office user reading their interface in English would
+   * see — and print — an English presupuesto for a Catalan customer. Marking
+   * the document keeps the two ideas apart.
+   */
+  function noTranslate(node) {
+    var el = node.nodeType === 1 ? node : node.parentNode;
+    return !!(el && el.closest && el.closest('[translate="no"]'));
+  }
+
   function translateNode(root) {
     if (!active || !root) return;
     var doc = root.ownerDocument || root;
@@ -116,6 +132,7 @@
     while ((n = walker.nextNode())) {
       var pn = n.parentNode && n.parentNode.nodeName;
       if (pn && SKIP[pn]) continue;
+      if (noTranslate(n)) continue;
       var out = tr(n.nodeValue);
       if (out !== null) n.nodeValue = out;
     }
@@ -128,6 +145,7 @@
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
       if (SKIP[el.nodeName]) continue;
+      if (noTranslate(el)) continue;
       for (var a = 0; a < ATTRS.length; a++) {
         var v = el.getAttribute && el.getAttribute(ATTRS[a]);
         if (v) {
@@ -177,13 +195,16 @@
           for (var i = 0; i < muts.length; i++) {
             var m = muts[i];
             if (m.type === "characterData") {
+              if (noTranslate(m.target)) continue;
               var out = tr(m.target.nodeValue);
               if (out !== null) m.target.nodeValue = out;
             } else if (m.type === "attributes") {
+              if (noTranslate(m.target)) continue;
               translateAttr(m.target, m.attributeName);
             } else {
               for (var j = 0; j < m.addedNodes.length; j++) {
                 var node = m.addedNodes[j];
+                if (noTranslate(node)) continue;
                 if (node.nodeType === 3) {
                   var o = tr(node.nodeValue);
                   if (o !== null) node.nodeValue = o;

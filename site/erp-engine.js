@@ -1613,14 +1613,25 @@
       return c;
     }
 
-    /** Two rows may not answer to one number: it is the reader's only index. */
+    /**
+     * Two rows may not answer to one number: it is the reader's only index.
+     *
+     * The error carries a `code`, unlike most in this class, because this is
+     * the one failure here a USER causes in normal work — mistyping a number
+     * that is already taken — and an interface should answer that in the
+     * language it is speaking, not echo an English sentence written for a
+     * developer. Everything unexpected still surfaces as its raw message,
+     * which is what makes an unexpected failure visible at all.
+     */
     _requireFreeNumber(version, wanted, exceptId) {
+      const clash = (what) => {
+        const e = new Error("That number is already used by a " + what);
+        e.code = "DUPLICATE_NUMBER";
+        return e;
+      };
       for (const c of version.chapters) {
-        if (c.id !== exceptId && c.num === wanted)
-          throw new Error("That number is already used by a chapter");
-        for (const l of c.lines)
-          if (l.id !== exceptId && l.num === wanted)
-            throw new Error("That number is already used by a line");
+        if (c.id !== exceptId && c.num === wanted) throw clash("chapter");
+        for (const l of c.lines) if (l.id !== exceptId && l.num === wanted) throw clash("line");
       }
     }
 
