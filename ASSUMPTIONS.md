@@ -1908,3 +1908,64 @@ different decisions, so these ten arrived colliding. They are renumbered from
   `VIEWS` entries, a new shared function); the CIF fixture repairs are
   git-diffable single-character corrections; the session endpoint is a new,
   independent route.
+
+- **#104 — S3: the company's vocabulary leaves the code, and the interface
+  learns a third language (2026-08-09).** Four reference lists were compiled
+  into the engine, DMC-01/02 had no way to create anything, and the language
+  toggle was ES⇄EN in a product built for a Catalan-speaking region.
+  **Decisions:** (a) **Only vocabulary moves into `state.lists`** — units, lead
+  sources, loss reasons, payment methods, and (for DMC-01) the catalogue's
+  chapter tree. The rest of `LISTS` stays compiled in, because invoice kinds,
+  document statuses and movement classes are keys the engine BRANCHES on: an
+  owner renaming one would not be configuration, it would be a bug. (b) **A
+  code is permanent, a label is editable.** Records store the code forever, so
+  `updateListEntry` patches `es`/`ca` and nothing else — offering to rename a
+  code is offering to break every record already carrying it. This also fixed
+  a real display bug: a customer's origin rendered as its raw English key
+  (`referrer`) because the list had codes and no field to put a label in. (c)
+  **Retiring is never blocked by usage.** A list is retired precisely BECAUSE
+  it is no longer how the company works; `listLabel` keeps resolving it on
+  records that already carry it, so the usage count informs rather than
+  blocks. The one refusal is emptying a list entirely. (d) **A record whose
+  code has since been retired keeps it**, marked, in the picker. Dropping it
+  would silently rewrite the record to whatever happens to be first the next
+  time somebody opens the drawer and saves. (e) **`state.lists.itemChapters`
+  is a list, not a derived set** of the distinct chapters on items: a tree the
+  owner can drag needs somewhere to keep that order, and a chapter with
+  nothing in it yet still has to be visible or it can never be filled. The
+  array order IS the display order, so no second sort field can disagree with
+  what is on screen. (f) **Migration v11 rather than more keys in v10.** v10
+  had already been written to blobs by the time DMC-01 needed the catalogue
+  fields, and a blob stamped 10 never re-runs 10 — appending to it would have
+  meant the documents that most needed the keys were exactly the ones that
+  never got them. (g) **DMC-02 has no edit path, deliberately.** Prices are
+  append-only (SUP-05) because a budget written last month has to keep
+  explaining itself with the price that applied then; the detail drawer says
+  so and offers "record a new one". An unstated IVA stays `null` rather than
+  becoming 0%, and a supplier with no price reads «sin precio» rather than
+  0,00 € — rendering a blank as zero makes the supplier who never quoted look
+  like the cheapest, which is how a purchase order goes to the wrong company.
+  (h) **`master-data.html` stays.** DMC-01 supersedes only its partidas half;
+  it still owns company, branches and other registers the engine has no home
+  for, and the legacy import path reads its localStorage. (i) **Spanish is the
+  i18n hub.** Entries are triples keyed on the Spanish form, so EN → CA is one
+  lookup instead of two hops through Spanish losing whatever the first missed.
+  Catalan lives in its own file because it is the column most likely to be
+  corrected by somebody who is not editing the application. (j) **The Catalan
+  guard is a ratchet, and this is the honest part of the entry.** 466 of 1792
+  entries are translated — the whole navigation, shell, launchpad and the main
+  screen headings, i.e. what a Catalan user reads first. The remaining **1326
+  are NOT translated**, are recorded as `CA_BACKLOG` in
+  `tests/i18n/coverage.mjs`, and the check fails if that number grows. So
+  every string from S3 onward must ship with Catalan, while the historical
+  backlog is counted in the open rather than hidden behind a check scoped
+  small enough to pass. Translating it is content work a native speaker should
+  review, not a side effect of a feature session; English, by contrast, is at
+  100% and enforced absolutely. (k) The guard immediately found a real
+  pre-existing bug — **11 duplicate Spanish keys, 4 with different English** —
+  where only the first was ever reachable, so `Pendiente de cobro` rendered
+  "Pending collection" everywhere the second entry intended "Receivable". The
+  shadowed copies were removed; keeping the first preserves today's rendering
+  exactly. **Reversible:** the lists are data with a seeded migration, so
+  reverting the screens leaves the vocabulary intact; the Catalan file is
+  additive and can be deleted without touching the ES/EN spine.

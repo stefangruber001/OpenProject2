@@ -104,11 +104,11 @@ Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, resh
 | DMT-02 | Proveedores              | `#suppliers`                                                         | **BUILT (S2)**                                                                           |
 | DMT-03 | Subcontratos             | `#subcontractors`                                                    | **BUILT (S2)** as master data; lifecycle data retained, screens dropped (decision 5)     |
 | DMT-04 | Personal Interno         | `#staff`                                                             | **BUILT (S2)**                                                                           |
-| DMC-01 | Partidas / Subpartidas   | `master-data.html`                                                   | **ADAPT** into the shell                                                                 |
-| DMC-02 | Lista de Precios         | `#precios`                                                           | **ADAPT** — add comparison strip                                                         |
-| DMC-03 | Unidades de Medida       | hardcoded `LISTS.units`                                              | **BUILD** — make maintainable                                                            |
-| DMC-04 | Fuentes de Leads         | hardcoded `LISTS.leadSources`                                        | **BUILD** — make maintainable                                                            |
-| DMC-05 | Formas de Pago           | hardcoded `LISTS.paymentMethods`                                     | **BUILD** — make maintainable                                                            |
+| DMC-01 | Partidas / Subpartidas   | `#items`                                                             | **BUILT (S3)** in the shell; master-data.html keeps its other registers                  |
+| DMC-02 | Lista de Precios         | `#price-list`                                                        | **ADAPTED (S3)** — comparison strip + price capture                                      |
+| DMC-03 | Unidades de Medida       | `#units`                                                             | **BUILT (S3)** — `state.lists.units`, ES+CA names                                        |
+| DMC-04 | Fuentes de Leads         | `#lead-sources`                                                      | **BUILT (S3)** — sources + loss reasons, owner-maintained                                |
+| DMC-05 | Formas de Pago           | `#payment-methods`                                                   | **BUILT (S3)** — `state.lists.paymentMethods`                                            |
 | DMC-06 | Comunicaciones _(added)_ | `#comunicaciones` — templates, rules, queue                          | **RE-HOME** to Configuración (plan decision 18) — three tabs: Plantillas · Reglas · Cola |
 
 **Removed — done in S1b** (plan decision 1, operator-reviewed): **Reportes** (a placeholder — no
@@ -287,20 +287,20 @@ Status: **✓** covered by an existing model field · **NEW** field to add (numb
 
 ### Partidas → `catalogue` + budget `versions[].chapters[].lines[]`
 
-| Column                       | Model                                                      | Status     |
-| ---------------------------- | ---------------------------------------------------------- | ---------- |
-| Proyecto · Cliente           | via `budget.partyId` / project                             | ✓          |
-| Archivo · Hoja               | line `sourceFile` · `sourceSheet`                          | **NEW 12** |
-| Versión · ¿Última versión?   | `version.vNumber` · `currentVersionId`/`acceptedVersionId` | ✓          |
-| Nº presupuesto · Fecha       | `budget.number` · `budget.date`                            | ✓          |
-| Cap. nº · Subcapítulo        | `chapter.num` (nested chapters)                            | ✓          |
-| Capítulo (normalizado)       | `chapter.name` / `catalogue.chapter`                       | ✓          |
-| Capítulo (original)          | line `chapterOriginal`                                     | **NEW 12** |
-| Código · Descripción         | `line.code` / `catalogue.code` · `line.desc`               | ✓          |
-| Detalle medición             | `line.subLines`                                            | ✓          |
-| Cant. · Ud · Precio unit.    | `line.qtyMilli` · `line.unit` · `line.priceCents`          | ✓          |
-| Nota                         | `line.notes`                                               | ✓          |
-| Importe · Precio unit. calc. | —                                                          | ⊘ derived  |
+| Column                       | Model                                                      | Status                 |
+| ---------------------------- | ---------------------------------------------------------- | ---------------------- |
+| Proyecto · Cliente           | via `budget.partyId` / project                             | ✓                      |
+| Archivo · Hoja               | line `sourceFile` · `sourceSheet`                          | **NEW 12 — closed S3** |
+| Versión · ¿Última versión?   | `version.vNumber` · `currentVersionId`/`acceptedVersionId` | ✓                      |
+| Nº presupuesto · Fecha       | `budget.number` · `budget.date`                            | ✓                      |
+| Cap. nº · Subcapítulo        | `chapter.num` (nested chapters)                            | ✓                      |
+| Capítulo (normalizado)       | `chapter.name` / `catalogue.chapter`                       | ✓                      |
+| Capítulo (original)          | line `chapterOriginal`                                     | **NEW 12 — closed S3** |
+| Código · Descripción         | `line.code` / `catalogue.code` · `line.desc`               | ✓                      |
+| Detalle medición             | `line.subLines`                                            | ✓                      |
+| Cant. · Ud · Precio unit.    | `line.qtyMilli` · `line.unit` · `line.priceCents`          | ✓                      |
+| Nota                         | `line.notes`                                               | ✓                      |
+| Importe · Precio unit. calc. | —                                                          | ⊘ derived              |
 
 ### Precios → `prices`
 
@@ -312,11 +312,11 @@ Status: **✓** covered by an existing model field · **NEW** field to add (numb
 | Nº doc · Archivo origen                   | `sourceDocRef`                           | ✓                               |
 | Descripción · Ud                          | via `itemId` → catalogue                 | ✓                               |
 | Precio unit. · % Dto · Precio unit. calc. | `listCents` · `discountPct` · `netCents` | ✓                               |
-| Código art.                               | `supplierRef`                            | **NEW 7**                       |
-| IVA %                                     | `taxRateBp`                              | **NEW 6**                       |
-| Proyecto · Notas                          | `projectRef` · `notes`                   | **NEW 9**                       |
+| Código art.                               | `supplierRef`                            | **NEW 7 — closed S3**           |
+| IVA %                                     | `taxRateBp`                              | **NEW 6 — closed S3**           |
+| Proyecto · Notas                          | `projectRef` · `notes`                   | **NEW 9 — closed S3**           |
 | ID · Cant. · Cliente/Obra · Importe línea | —                                        | ⊘ derived / context             |
-| _(doc-required, not in the sheet)_        | `wasteCents` · `minOrder`                | **NEW 8**                       |
+| _(doc-required, not in the sheet)_        | `wasteCents` · `minOrder`                | **NEW 8 — closed S3**           |
 
 ### Documentos → `captured`
 

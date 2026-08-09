@@ -781,6 +781,55 @@ ownership guard 27 areas · lint, boundaries, types, tests, build, `make demo`.
 
 **Next:** S3 — DMC-01…07 Configuración + Catalan (gaps 6–9, 12).
 
+## S3 — the company's vocabulary leaves the code (2026-08-09)
+
+Four reference lists were compiled into the engine, so adding a payment term
+or a lead source the owner actually uses was a code edit and a deploy. DMC-01
+and DMC-02 had no way to create anything at all. And the language toggle was
+ES⇄EN in a product built for a Catalan-speaking region.
+
+- **`state.lists`** holds units, lead sources, loss reasons, payment methods
+  and the catalogue's chapter tree, each entry `{code, es, ca, active}`. The
+  rest of `LISTS` stays compiled in, because invoice kinds and movement
+  classes are keys the engine branches on — an owner renaming one would be a
+  bug, not configuration.
+- **A code is permanent, a label is editable.** Records store the code
+  forever, so only the labels can be changed. That also fixed a real display
+  bug: a customer's origin used to render as its raw English key
+  (`referrer`), because the list had codes and no field to hold a label.
+- **DMC-03/04/05** are three screens on one renderer — centred table, help
+  column, inline add, commit on Enter or blur, no drawer. Retiring an entry
+  removes it from the pickers and keeps it resolving on records that already
+  carry it, so the usage count informs rather than blocks.
+- **DMC-01 Partidas** finally has a screen inside the shell: chapter tree with
+  per-branch counts and its own search, draggable to reorder, partidas table
+  with brand/model/quality. It used to link out to master-data.html, which
+  holds a mock dataset never wired to the engine — so the real catalogue had
+  no interface at all.
+- **DMC-02** gained the doc's comparison strip and, more importantly, a way to
+  record a price. A supplier who never quoted reads «sin precio», never
+  0,00 € — rendering a blank as zero makes them look like the cheapest, which
+  is how a purchase order goes to the wrong company. An unstated IVA stays
+  null rather than becoming 0%.
+- **Gaps 6–9 and 12 closed**: IVA, supplier's own article code, waste and
+  minimum order, project and notes on prices; source file, sheet and original
+  chapter on budget lines.
+- **Catalan is real**, and the i18n dictionary is now enforced. English is at
+  100% and hard-enforced. Catalan covers 466 of 1792 entries — the whole
+  navigation, shell and main screen headings — and the remaining **1326 are
+  counted in the open** as a ratchet that may only shrink, so every new string
+  from here ships with Catalan while the historical backlog stays visible
+  rather than excused.
+- The new guard immediately found a real bug: **11 duplicate Spanish keys**, 4
+  with different English, where only the first was ever reachable. Removed.
+
+Verified: site E2E 183/183 · manageability 84/84 · year 149/149 · import
+25/25 · scheduling 30/30 · migrations 43/43 (ladder now v11) · i18n coverage ·
+site-sync 17/17 · ownership guard · lint, boundaries, types, tests, build,
+`make demo`.
+
+**Next:** S4 — COM-01 Leads + COM-02 Visita.
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

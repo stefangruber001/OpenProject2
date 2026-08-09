@@ -75,7 +75,7 @@ trilingual UI · server-first, always) are recorded with the plan.
 | S1b | Navigation restructure + English rename + removals   | done        | f3fdb9c, d924da9                   |
 | S1c | DMC-08 Usuarios and the role model                   | done        | c5e50da, 963ef1c, 00917e7          |
 | S2  | DMT-01…04 Datos Maestros                             | done        | 03fc246, fa580b1, 0572cf8          |
-| S3  | DMC-01…07 Configuración + Catalan                    | not started | —                                  |
+| S3  | DMC-01…07 Configuración + Catalan                    | done        | 8e190d2, 27a1c0f, 3e34598, 23df2ce |
 | S4  | COM-01 Leads + COM-02 Visita                         | not started | —                                  |
 | S5  | COM-03 Presupuestador                                | not started | —                                  |
 | S6  | OCR pipeline                                         | not started | —                                  |
