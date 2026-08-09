@@ -1803,3 +1803,45 @@ different decisions, so these ten arrived colliding. They are renumbered from
   one text node, `"ERP › Torre de control"`, which is a string no dictionary can
   hold. **Reversible:** the removed screens are one `git revert` away and no
   engine code was deleted.
+
+- **#102 — S1c: accounts become rows, and a role becomes a permission
+  (2026-08-09).** Accounts lived in `ERP_USERS` in the server's `.env`, the file
+  that also holds the database password — so adding a colleague meant handing
+  over the keys, and the pilot write-up's "any limit on what a visitor may do:
+  NONE" was literally true. **Decisions:** (a) `erp_users` and `erp_user_tokens`
+  are tenant-scoped with FORCED row-level security like every other table, and
+  the RLS test for them runs as the RESTRICTED role — a superuser bypasses RLS
+  regardless of FORCE, so proving it as the owner proves nothing. (b) **The
+  admin never learns the password**: creating a user mints a single-use,
+  time-limited token, stores only its SHA-256, and the invited person chooses
+  their own. The script this replaces generated a password and printed it to the
+  admin, who then knew a credential somebody else was responsible for. SHA-256
+  rather than scrypt for the token because 32 random bytes have nothing to
+  guess; the slow hash would only make the activation page feel broken. (c)
+  **Disable, never delete** — the audit trail has to keep resolving who did
+  what — and disabling **moves `sessionsValidFrom` forward**, which is what
+  actually ends that person's sessions: tokens are signed and stateless, so the
+  only previous lever was rotating `SESSION_SECRET`, which signs out the whole
+  company to remove one person. (d) **Roles grant opaque permission strings**,
+  so a screen asks `may(session, "user.manage")` rather than testing
+  `role === "admin"`; gestoría's exclusion from margins and commercial prices is
+  expressed as an absent permission and asserted in a test, because that
+  exclusion is the reason the role exists. (e) **The last admin cannot lock the
+  system** — no stepping down, no disabling themselves, and a disabled admin
+  counts as none. (f) **`ERP_USERS` still works, as the bootstrap**: a server
+  with no rows must still let somebody in to create the first account, and those
+  accounts read as admin/active because they are the people who held the keys
+  before there was a screen. A row wins over an environment entry for the same
+  address. (g) **The session check lives in the middleware, not in
+  `requireUser`** — seven of fourteen tenant routes never call `requireUser`,
+  because they only read, so the check placed there left a disabled colleague
+  reading the register. (h) **A database that cannot be reached does not lock
+  anybody out**: the signature was still valid, so an outage stays an outage
+  rather than becoming a lockout. (i) **The login form is rate-limited**, by
+  network address and by the address being tried, since either alone has a hole.
+  It is an in-process counter and says so — right for one container, wrong
+  behind several. (j) **SMTP is deferred by operator decision.** With it the
+  invitation is mailed; without it the admin gets a copyable link and the screen
+  says plainly that no mail was sent. The fallback is a working path, not a
+  degraded one — what is never acceptable is a success message for a message
+  nobody will receive.

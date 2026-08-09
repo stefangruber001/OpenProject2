@@ -73,7 +73,7 @@ trilingual UI · server-first, always) are recorded with the plan.
 | S0b | OCR spike — measure before committing to an approach | done        | 5874964                            |
 | S1a | Integrate `main`; one history again                  | done        | 6aec167, 0180732, 34c0267, 952e2a7 |
 | S1b | Navigation restructure + English rename + removals   | done        | f3fdb9c, d924da9                   |
-| S1c | DMC-08 Usuarios and the role model                   | not started | —                                  |
+| S1c | DMC-08 Usuarios and the role model                   | done        | c5e50da, 963ef1c, 00917e7          |
 | S2  | DMT-01…04 Datos Maestros                             | not started | —                                  |
 | S3  | DMC-01…07 Configuración + Catalan                    | not started | —                                  |
 | S4  | COM-01 Leads + COM-02 Visita                         | not started | —                                  |

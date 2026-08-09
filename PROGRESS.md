@@ -697,6 +697,44 @@ Verified: site E2E 153/153 · cross-device refresh 17/17 · year 149/149 and
 **Next:** S1c — DMC-08 Usuarios and the role model, before the screens inherit a
 permission check rather than being retrofitted with one.
 
+## S1c — add a colleague without handing over the keys (2026-08-09)
+
+Accounts lived in `ERP_USERS` in the server's `.env`, alongside the database
+password. **DMC-08 Usuarios** takes them out of there: create, set what somebody
+may do, disable, reset a password — from a screen.
+
+- **The admin never learns the password.** Creating a user mints a single-use,
+  time-limited token, stores only its SHA-256, and the invited person chooses
+  their own on `/activate`.
+- **Disabling really ends their sessions.** Tokens are signed and stateless, so
+  each now carries its issue time and each user a `sessionsValidFrom` stamp. The
+  only lever before was rotating `SESSION_SECRET` — sign out the company to
+  remove one person.
+- **Four roles as permissions**: admin · back-office · site · gestoría. Gestoría
+  reads and exports and never sees a margin, which is asserted rather than
+  documented.
+- **The last admin cannot lock the system**, and the login form is rate-limited
+  — the open risk the pilot write-up named.
+
+Verified against a live server and a real Postgres, not reasoned about: invite →
+refuse to sign in → reject a short password → activate → the link fails the
+second time → sign in → refuse `user.manage` → disable → the existing session
+dies → re-enable → the old token stays dead.
+
+Three bugs that verification caught and that would otherwise have shipped: login
+never read the users table, so an activated person could not sign in; the
+account-state check sat in `requireUser`, which half the API never calls, so a
+disabled colleague kept reading the register; and the users screen mentioned the
+literal `name="erp-api"`, which made sync-workspace skip erp.html and would have
+served the whole workspace without its server marker.
+
+**SMTP is deferred by decision** and `INTEGRATIONS_PENDING.md` says exactly what
+it changes: not whether an account can be created, only whether the invitation
+arrives on its own. The screen never claims a message was sent when none was.
+
+**Next:** S2 — DMT-01…04 Datos Maestros, the first screens to inherit the
+permission primitive rather than have it retrofitted.
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-
