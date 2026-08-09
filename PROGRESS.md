@@ -921,6 +921,52 @@ ownership guard · lint, boundaries, types, tests, build, `make demo`.
 
 **Next:** S6 — OCR pipeline (approach fixed by the S0b memo).
 
+## S6 — the machine reads, and says what it could not check (2026-08-09)
+
+`extraction-ocr` was the last `unbuilt` area. Session 7 had built the half
+that turns text into candidate fields; nothing could reach it, because there
+was no way to turn a PDF or a photograph into text in the first place.
+
+- **Recognition is in `site/erp-ocr.js`** and knows nothing about invoices.
+  It tries the PDF's own text layer first — a digital invoice reads in about
+  170 ms that way, and the OCR half never loads at all — and reaches for
+  tesseract only where there is nothing to read.
+- **The runtime is vendored** (7.23 MB under `site/vendor`, via
+  `tools/vendor-ocr.mjs`): `pages.yml` publishes `site/**` from a bare
+  checkout with no Node, and a bare static host and a site with no signal both
+  forbid the CDN these libraries reach for. Nothing loads until a file is
+  handed over, and «preparar para trabajar sin cobertura» is an explicit
+  button rather than a silent 7 MB download on somebody's mobile data.
+- **A dot has to be earned.** A field goes green only where a validator
+  vouched for its value — a check digit that computes, a real calendar date,
+  arithmetic that balances — and never on confidence. That is the S0b memo's
+  whole point: its scanned NIF came back `A08912907` for `A08932907`, read
+  with perfect confidence. Fields nothing can check are therefore always
+  amber, which is where the cursor goes.
+- **ADM-03's validation screen** puts the document at 620 on the left and the
+  form at 480 on the right, shows the lines the reader actually saw, and
+  highlights the one a value came off when you choose the field. A typed
+  correction goes back through the same checks, so a hand-typed NIF with a
+  transposed digit stays amber and says why.
+- **Nothing reaches the company's data until a person presses Confirmar.**
+  The machine's reading is kept beside the confirmed values, never instead of
+  them.
+- Three defects in this session's own new code were found by driving a real
+  browser rather than by reading it: a `blob:` worker that left the wasm
+  loader with nothing to resolve against, an object URL revoked before
+  tesseract read it, and an unchecked `logger` callback.
+
+**`extraction-ocr` flips `unbuilt` → `factory`. There are now no unbuilt areas
+left.**
+
+Verified: site E2E 234/234 · manageability 131/131 · year 149/149 · import
+25/25 · scheduling 30/30 · migrations 43/43 · extraction capability 22/22 ·
+i18n coverage (EN 100%, CA backlog held at 1326 across 31 new triples) ·
+site-sync 17/17 · ownership guard (0 unbuilt) · lint, boundaries, types,
+tests, build, `make demo`.
+
+**Next:** S7 — ADM-03 Facturas de proveedores + ADM-02 Compras (+ gaps 10-11).
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

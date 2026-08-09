@@ -141,3 +141,34 @@ create a validated record in silence, which is the rule ADM-03 already states.
 **S6 scope is therefore confirmed, not reduced.** The honest expectation to set with the operator:
 **digital supplier quotes will feel automatic; scanned and photographed invoices will feel like a
 fast form that fills in most of itself and points at what it could not read.**
+
+---
+
+## 6 · What S6 found when it built this (2026-08-09)
+
+The recommendation above survived contact with the implementation. Three
+things are worth adding to it, none of which change the design:
+
+- **The check-digit defence works, and caught something on its first run.**
+  The IBAN in this memo's own test document — `ES63 2100 0362 1601 0102 4471` —
+  **fails mod-97**. It was invented for the fixture and nobody noticed until
+  the pipeline flagged it amber. That is precisely the failure mode §3
+  describes, found by the rule §5.3 asks for, before a human looked.
+- **The verdict is a type, not a screen convention.** `ExtractedField.verdict`
+  is computed in the capability: green only where a validator vouched for the
+  value, and `needsReview` is now the amber list rather than a separate
+  confidence threshold. A screen cannot accidentally paint a green dot on an
+  unchecked value, because it is not the screen's decision.
+- **The 7 MB is real but it is inert.** Vendored under `site/vendor`, loaded
+  only when a file is handed over, and never at all for a PDF with a text
+  layer — which reads in about 170 ms. Measured in the sandbox browser: a
+  rendered invoice image OCRs in ~780 ms at 92% confidence, and reproduced
+  this memo's finding exactly, misreading `26OFV001345` as `200FV001345` while
+  the NIF, both dates, all three amounts and the IBAN passed their validators.
+
+**Still unverified, and still worth doing:** §1's note stands — the real
+GESTOR scans have never been run through this. The harness scores any folder;
+pointing it at them remains one command.
+
+**Timings on a real phone remain unmeasured.** The figures above are a
+development machine and a headless sandbox.

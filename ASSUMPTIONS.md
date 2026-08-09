@@ -2084,3 +2084,49 @@ different decisions, so these ten arrived colliding. They are renumbered from
   the dictionary guard, which was green throughout. **Reversible:** every
   engine method is additive; `body.fs` is one class on one screen; the
   document label table can be deleted to return every presupuesto to Spanish.
+
+- **#107 — S6: the OCR pipeline, and the rule that a dot has to be earned
+  (2026-08-09).** `extraction-ocr` was the one `unbuilt` area: session 7 built
+  the interpretation half and nothing could reach it. **Decisions:** (a) **The
+  recognition half is host infrastructure, not domain, and lives in
+  `site/erp-ocr.js`.** pdf.js and tesseract.js are ~7 MB that know nothing
+  about invoices; what the text MEANS stays in
+  `@repo/capability-extraction`, which is why the meaning is still tested
+  against a jurisdiction that does not exist while the recognition is tested
+  against a real browser. (b) **Green only where a validator vouched for the
+  value** — a check digit that computes, a real calendar date, arithmetic that
+  balances — **never on confidence**, however high. This is the memo's whole
+  point: the spike's scanned NIF came back `A08912907` for `A08932907`, read
+  with perfect confidence. A consequence stated rather than hidden: fields
+  with no validator available (issuer name, document number, order reference)
+  are **always amber**, matching the spike never once reading a document
+  number correctly off a raster. `needsReview` became the amber list, so the
+  dots and the review list are two readings of one decision instead of two
+  decisions that can disagree. (c) **A typed correction is re-checked, not
+  believed.** Typing is exactly where a NIF acquires a transposed digit, and a
+  check digit does not care who produced the number. (d) **The runtime is
+  vendored under `site/vendor` (7.23 MB, `tools/vendor-ocr.mjs`)** because
+  `pages.yml` publishes `site/**` from a bare checkout with no Node, and both
+  a bare static host and offline capture forbid the CDN these libraries reach
+  for by default. A script rather than a one-time copy, so the provenance of
+  7 MB of binaries is a command anybody can re-run and diff. (e) **Nothing
+  loads until it is needed**, and `prepareOffline()` is an explicit
+  user-pressed pre-fetch — 7 MB must never land on somebody's mobile data on a
+  site because a screen opened. (f) **`captureDocument` is called at the END**,
+  by a person pressing Confirmar, so CAP-04 is enforced by the flow as well as
+  by the capability's `confirmed: false` type. The machine's reading is stored
+  beside the confirmed values rather than instead of them. (g) **Provenance is
+  the LINE, not a pixel box.** The capability records character offsets into
+  the recognised text, not image coordinates, so the honest rendering of the
+  doc's "highlight the area of the image it came from" is to show the lines
+  and highlight the one a value was read off. Claiming a pixel box we do not
+  have would be a nicer screen and a lie. **Three real defects were found by
+  driving a browser rather than by reading code**, all in this session's own
+  new code: tesseract's default `blob:` worker gives its Emscripten core no
+  script directory, so the `.wasm` resolved to a bare filename and the promise
+  never settled (`workerBlobURL:false`); the image's object URL was revoked in
+  `onload` before tesseract read `img.src`; and `logger: undefined` throws once
+  per progress tick because tesseract calls it unchecked. **Reversible:** the
+  vendored runtime is inert until a file is handed over, and deleting
+  `site/erp-ocr.js` leaves the capture screen offering manual entry, which it
+  already does when the reader is unavailable.

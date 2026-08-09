@@ -93,7 +93,7 @@ Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, resh
 | PRY-03 | Adicionales              | `#modificaciones`                                                    | **ADAPT** — add photo capture + approval evidence                                        |
 | ADM-01 | Facturación              | `#facturacion`                                                       | **ADAPT**                                                                                |
 | ADM-02 | Compras y Pedidos        | `#compras`                                                           | **ADAPT** — 3 states only, no goods receipt                                              |
-| ADM-03 | Facturas de proveedores  | `#pagos` + `#captura`                                                | **MERGE** + OCR (S6)                                                                     |
+| ADM-03 | Facturas de proveedores  | `#supplier-invoices`                                                 | **OCR + validation BUILT (S6)** — inbox cards and validated list remain (S7)             |
 | ADM-04 | Horas                    | `#horas`                                                             | **ADAPT** — add monthly reconciliation                                                   |
 | ADM-05 | Consolidación Bancaria   | `#banco` + `#conciliacion`                                           | **MERGE**                                                                                |
 | ADM-06 | Caja Chica               | — (`till` exists in the model)                                       | **BUILD**                                                                                |
