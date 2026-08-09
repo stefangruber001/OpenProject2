@@ -237,6 +237,36 @@ assert(
   );
 }
 
+// ---- v14: the archive fields, and the array ADM-02 reads every render ------
+{
+  const captured = r1.state.captured || [];
+  assert(captured.length > 0, "the fixture actually carries captured documents to migrate");
+  assert(
+    captured.every(
+      (c) =>
+        typeof c.sourcePath === "string" &&
+        typeof c.reference === "string" &&
+        typeof c.notes === "string",
+    ),
+    "v14 gives every captured document sourcePath, reference and notes",
+  );
+  // The distinction v13's note argued for, asserted rather than assumed: the
+  // backfill is an empty string somebody can read, not an absent key that
+  // reads as "which build wrote this?".
+  assert(
+    captured.every((c) => "sourcePath" in c && "reference" in c && "notes" in c),
+    "v14 backfills the keys rather than leaving them absent",
+  );
+  assert(
+    (r1.state.purchases || []).every((p) => Array.isArray(p.docRefs)),
+    "v14 normalises docRefs to an array on every purchase order",
+  );
+  assert(
+    (v1.captured || []).every((c) => c.reference === undefined),
+    "sanity: the raw v1 fixture really has no reference on its captures",
+  );
+}
+
 // ---- idempotency -----------------------------------------------------------
 const r2 = M.migrate(r1.state);
 assert(

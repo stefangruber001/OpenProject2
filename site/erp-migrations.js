@@ -493,6 +493,38 @@
         return s;
       },
     },
+    {
+      to: 14,
+      name: "captured documents carry their origin, their reference and a note (S7, gaps 10-11)",
+      /*
+       * Three fields the workbook has columns for and the model had nowhere to
+       * put: where the file came from ("Ruta completa"), the reference the
+       * supplier's own paperwork carries, and whatever the person who filed it
+       * wanted the next person to know.
+       *
+       * Backfilled to "" rather than left absent, for the same reason v13
+       * spelled out: an empty string is a document nobody has told us about,
+       * and it reads identically whichever build wrote the record. A missing
+       * key is a question about the build.
+       *
+       * `docRefs` on purchases is normalised here too. It has been in
+       * `addPurchase`'s defaults since session 10b and nothing ever wrote to
+       * it, so orders that predate that default have no array at all — and
+       * ADM-02 now reads it on every render to decide whether the supplier's
+       * quote can be shown.
+       */
+      up: function (s) {
+        (Array.isArray(s.captured) ? s.captured : []).forEach(function (c) {
+          if (typeof c.sourcePath !== "string") c.sourcePath = "";
+          if (typeof c.reference !== "string") c.reference = "";
+          if (typeof c.notes !== "string") c.notes = "";
+        });
+        (Array.isArray(s.purchases) ? s.purchases : []).forEach(function (p) {
+          if (!Array.isArray(p.docRefs)) p.docRefs = [];
+        });
+        return s;
+      },
+    },
   ];
 
   /**

@@ -1012,6 +1012,158 @@ assert(
   erp.state.today = realToday;
 }
 
+/* ---- S7 · ADM-03 allocation and ADM-02 stages ---------------------------
+   Every rule here is enforced in the engine rather than by the screen that
+   calls it, so it stays true of the next screen too — the distinction S1b
+   drew when the subcontract UI was retired and its guarantees moved down a
+   layer rather than out of the product. */
+{
+  const cap = erp.captureDocument(
+    {
+      docType: "supplierInvoice",
+      imageRef: "blob-s7",
+      sourcePath: "2026/proveedores/cerygres.pdf",
+      reference: "PED-4471",
+      notes: "material del baño",
+    },
+    "bo",
+  );
+  assert(
+    cap.sourcePath === "2026/proveedores/cerygres.pdf" &&
+      cap.reference === "PED-4471" &&
+      cap.notes === "material del baño",
+    "gaps 10-11: a capture keeps its origin, its reference and its note",
+  );
+  const bare = erp.captureDocument({ docType: "ticket" }, "bo");
+  assert(
+    bare.sourcePath === "" && bare.reference === "" && bare.notes === "",
+    "…and a capture given none of the three carries empty strings, not absent keys",
+  );
+
+  erp.updateCapture(cap.id, { notes: "corregido" }, "bo");
+  assert(erp.state.captured.find((c) => c.id === cap.id).notes === "corregido", "updateCapture");
+  const before = erp.state.captured.find((c) => c.id === cap.id).stdName;
+  erp.updateCapture(cap.id, { reference: "PED-9999" }, "bo");
+  assert(
+    erp.state.captured.find((c) => c.id === cap.id).stdName === before,
+    "updateCapture does not rename the filed document — the archive name is not a note",
+  );
+  throws(() => erp.updateCapture("nope", { notes: "x" }, "bo"), "updateCapture on a missing id");
+
+  erp.confirmCapture(
+    cap.id,
+    {
+      issuerName: "Sup SA",
+      issuerTaxId: "A58818501",
+      docNumber: "F-1",
+      date: erp.today,
+      baseCents: 10000,
+      vatCents: 2100,
+      totalCents: 12100,
+    },
+    "bo",
+  );
+  throws(() => erp.allocateCapture(cap.id, [], "bo"), "a document must be allocated to something");
+  throws(
+    () =>
+      erp.allocateCapture(
+        cap.id,
+        [{ projectId: prj.id, overheadCategory: "office", amountCents: 12100 }],
+        "bo",
+      ),
+    "a line naming both a project and an overhead category is refused",
+  );
+  throws(
+    () => erp.allocateCapture(cap.id, [{ amountCents: 12100 }], "bo"),
+    "a line naming neither is refused too",
+  );
+  throws(
+    () => erp.allocateCapture(cap.id, [{ overheadCategory: "biscuits", amountCents: 12100 }], "bo"),
+    "an overhead category the engine does not know is refused",
+  );
+  throws(
+    () =>
+      erp.allocateCapture(cap.id, [{ projectId: prj.id, kind: "vibes", amountCents: 12100 }], "bo"),
+    "a cost kind the engine does not know is refused",
+  );
+  throws(
+    () => erp.allocateCapture(cap.id, [{ projectId: "prj-gone", amountCents: 12100 }], "bo"),
+    "a project that is not there is refused, by the accessor that names it",
+  );
+  throws(
+    () => erp.allocateCapture(cap.id, [{ projectId: prj.id, amountCents: 9000 }], "bo"),
+    "a split that does not total the confirmed document is refused",
+  );
+  const split = erp.allocateCapture(
+    cap.id,
+    [
+      { projectId: prj.id, chapterNum: "1", kind: "material", amountCents: 8000 },
+      { overheadCategory: "office", amountCents: 4100 },
+    ],
+    "bo",
+  );
+  assert(
+    split.status === "allocated" && split.allocations.length === 2,
+    "a document splits across a project and an overhead category",
+  );
+  assert(
+    split.allocations[1].projectId === null && split.allocations[0].overheadCategory === null,
+    "…and each line carries exactly one destination",
+  );
+
+  // ADM-02's three stages, derived from the same facts as the seven statuses.
+  const pu = erp.addPurchase(
+    { supplierId: sup.id, projectId: prj.id, desc: "Azulejo", qtyMilli: 1000, unitCents: 5000 },
+    "bo",
+  );
+  assert(erp.purchaseStage(pu) === "offer", "purchaseStage: a draft order is an oferta");
+  erp.sendPurchase(pu.id, "bo");
+  assert(erp.purchaseStage(pu) === "order", "purchaseStage: a sent order is a pedido");
+  const t = erp.purchaseTotals(pu);
+  assert(
+    t.baseCents === 5000 && t.vatCents === 1050 && t.totalCents === 6050,
+    "purchaseTotals derives the tax rather than storing it",
+    JSON.stringify(t),
+  );
+  const summary = erp.purchaseStageSummary(prj.id);
+  assert(
+    summary.order.count >= 1 && summary.order.amountCents >= 5000,
+    "purchaseStageSummary counts and totals by stage",
+  );
+  erp.cancelPurchase(pu.id, "supplier out of stock", "bo");
+  assert(
+    erp.purchaseStage(pu) === "cancelled",
+    "purchaseStage: a cancelled order is its own thing",
+  );
+  const after = erp.purchaseStageSummary(prj.id);
+  assert(
+    after.offer.count + after.order.count + after.invoiced.count ===
+      summary.offer.count + summary.order.count + summary.invoiced.count - 1,
+    "…and it is counted in none of the three, rather than quietly in one",
+  );
+
+  const pu2 = erp.addPurchase({ supplierId: sup.id, projectId: prj.id, unitCents: 100 }, "bo");
+  erp.attachPurchaseDocument(pu2.id, cap.id, "bo");
+  assert(
+    erp.state.purchases.find((x) => x.id === pu2.id).docRefs.includes(cap.id),
+    "attachPurchaseDocument links the supplier's own paperwork to the order",
+  );
+  erp.attachPurchaseDocument(pu2.id, cap.id, "bo");
+  assert(
+    erp.state.purchases.find((x) => x.id === pu2.id).docRefs.length === 1,
+    "…attaching the same document twice does not list it twice",
+  );
+  throws(
+    () => erp.attachPurchaseDocument(pu2.id, "cap-gone", "bo"),
+    "attaching a document that is not there is refused",
+  );
+  erp.detachPurchaseDocument(pu2.id, cap.id, "bo");
+  assert(
+    erp.state.purchases.find((x) => x.id === pu2.id).docRefs.length === 0,
+    "detachPurchaseDocument removes it again",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

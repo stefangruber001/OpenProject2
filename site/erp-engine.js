@@ -2661,6 +2661,75 @@
       if (pu.sentAt) return "sent";
       return "draft";
     }
+    /**
+     * The three the v4 screen counts by: oferta · pedido · facturado.
+     *
+     * Derived from `purchaseStatus`, not stored beside it. The seven-state
+     * lifecycle above is what the record actually knows and it stays — this
+     * is the coarser reading ADM-02 is built around, and two stored fields
+     * that must agree about the same order is precisely how they stop
+     * agreeing. A cancelled order is deliberately in none of the three: it is
+     * shown in the list and counted nowhere, because a counter that includes
+     * work nobody will do is a counter that has to be explained.
+     */
+    purchaseStage(pu) {
+      const st = this.purchaseStatus(pu);
+      if (st === "cancelled") return "cancelled";
+      if (st === "invoiced" || st === "paid") return "invoiced";
+      if (st === "draft") return "offer";
+      return "order";
+    }
+    /** Count and committed amount per stage — the three counters of ADM-02. */
+    purchaseStageSummary(projectId) {
+      const out = {
+        offer: { count: 0, amountCents: 0 },
+        order: { count: 0, amountCents: 0 },
+        invoiced: { count: 0, amountCents: 0 },
+      };
+      this.state.purchases
+        .filter((p) => !projectId || p.projectId === projectId)
+        .forEach((p) => {
+          const stage = this.purchaseStage(p);
+          if (!out[stage]) return; // cancelled
+          out[stage].count += 1;
+          out[stage].amountCents += p.totalCents - (p.status.returnedCents || 0);
+        });
+      return out;
+    }
+    /**
+     * Put the supplier's own paperwork beside the order — the left zone of
+     * ADM-02's detail. The document is a captured one, so the picture, the
+     * reading and the provenance all come with it rather than being uploaded
+     * a second time under a different name.
+     */
+    attachPurchaseDocument(purchaseId, capId, user) {
+      const pu = this.state.purchases.find((x) => x.id === purchaseId);
+      if (!pu) throw new Error("Purchase not found");
+      const c = this.state.captured.find((x) => x.id === capId);
+      if (!c) throw new Error("Captured document not found: " + capId);
+      pu.docRefs = pu.docRefs || [];
+      if (!pu.docRefs.includes(capId)) pu.docRefs.push(capId);
+      this._log(user, "attachPurchaseDocument", pu.number + " " + capId);
+      return pu;
+    }
+    detachPurchaseDocument(purchaseId, capId, user) {
+      const pu = this.state.purchases.find((x) => x.id === purchaseId);
+      if (!pu) throw new Error("Purchase not found");
+      pu.docRefs = (pu.docRefs || []).filter((x) => x !== capId);
+      this._log(user, "detachPurchaseDocument", pu.number + " " + capId);
+      return pu;
+    }
+    /**
+     * Base, tax and total for one order, as the foot of the record pane
+     * states them. The order stores a net unit price, so the tax is computed
+     * rather than read — a stored tax amount that disagrees with the rate is
+     * one more thing that can be wrong on a document somebody pays from.
+     */
+    purchaseTotals(pu) {
+      const baseCents = pu.totalCents - (pu.status.returnedCents || 0);
+      const vatCents = pctOf(baseCents, pu.vatBp || 0);
+      return { baseCents, vatBp: pu.vatBp || 0, vatCents, totalCents: baseCents + vatCents };
+    }
     /** Send the order to the supplier by email — PDF + template (PUR-...). */
     sendPurchase(id, user) {
       const pu = this.state.purchases.find((x) => x.id === id);
@@ -3016,6 +3085,16 @@
           allocations: [],
           billId: null,
           keyFields: doc.keyFields || {}, // CAP-10 manual key fields for photos with no text
+          // Gaps 10 and 11 of the workbook mapping. `sourcePath` is where the
+          // file came from before it was ours — the "Ruta completa" column of
+          // a folder tree nobody wants to lose the trail of; `reference` is
+          // the number the supplier's own paperwork carries (an order ref, a
+          // job number) and `notes` is what the person who filed it wanted the
+          // next person to know. None of the three is derivable from the
+          // document, which is exactly why they are stored.
+          sourcePath: doc.sourcePath || "",
+          reference: doc.reference || "",
+          notes: doc.notes || "",
         },
         {},
       );
@@ -3049,18 +3128,60 @@
       this._log(user, "confirmCapture", capId);
       return c;
     }
+    /**
+     * The three text fields a person adds to a filed document — the two
+     * workbook columns the model had nowhere to put, plus the free note.
+     *
+     * Deliberately separate from `confirmCapture`: that method records what
+     * the document SAYS and is the moment a reading becomes a fact, so it
+     * re-derives the standard name and re-runs duplicate detection. These
+     * three say nothing about the document's content and must not disturb
+     * either — renaming a filed invoice because somebody added a note would
+     * be a surprise, and a surprise in an archive is a lost document.
+     */
+    updateCapture(capId, patch, user) {
+      const c = this.state.captured.find((x) => x.id === capId);
+      if (!c) throw new Error("Captured document not found: " + capId);
+      ["sourcePath", "reference", "notes"].forEach((k) => {
+        if (patch[k] !== undefined) c[k] = String(patch[k] ?? "");
+      });
+      this._log(user, "updateCapture", capId);
+      return c;
+    }
     allocateCapture(capId, allocations, user) {
       // CAP-03/07: one project, split, or overhead
       const c = this.state.captured.find((x) => x.id === capId);
-      const total = c.confirmed ? c.confirmed.totalCents : sum(allocations, (a) => a.amountCents);
-      if (Math.abs(sum(allocations, (a) => a.amountCents) - total) > 1)
+      if (!c) throw new Error("Captured document not found: " + capId);
+      const rows = Array.isArray(allocations) ? allocations : [];
+      if (!rows.length) throw new Error("A document must be allocated to something");
+      rows.forEach((a) => {
+        // Rule 4 of the mapping's entity model: every cost lands on a project
+        // OR an account. "Both" is not a third option — it is two answers to
+        // one question, and whichever one a later report happens to read
+        // first decides where the money went.
+        if (!!a.projectId === !!a.overheadCategory)
+          throw new Error("Each line goes to a project or to an overhead category, not both");
+        if (a.projectId) this.project(a.projectId); // throws with the id if it is gone
+        if (a.overheadCategory && !LISTS.overheadCategories.includes(a.overheadCategory))
+          throw new Error("Unknown overhead category: " + a.overheadCategory);
+        if (a.kind && !LISTS.costKinds.includes(a.kind))
+          throw new Error("Unknown cost kind: " + a.kind);
+        if (!(Math.round(a.amountCents) > 0)) throw new Error("Every line needs a positive amount");
+      });
+      // A confirmed document has a total to check the split against. An
+      // unconfirmed one does not, and inventing one from the split itself
+      // would make the check agree with whatever it was handed — so the
+      // arithmetic is only asserted where there is something to assert it
+      // against, and filing an unread photograph stays possible.
+      const total = c.confirmed ? c.confirmed.totalCents : sum(rows, (a) => a.amountCents);
+      if (Math.abs(sum(rows, (a) => a.amountCents) - total) > 1)
         throw new Error("Split must total the document amount"); // 7.4
-      c.allocations = allocations.map((a) => ({
+      c.allocations = rows.map((a) => ({
         projectId: a.projectId || null,
         overheadCategory: a.overheadCategory || null,
         chapterNum: a.chapterNum || null,
         kind: a.kind || "material",
-        amountCents: a.amountCents,
+        amountCents: Math.round(a.amountCents),
       }));
       c.status = "allocated";
       this._log(user, "allocateCapture", capId);
