@@ -514,6 +514,51 @@
   .capsrc{background:var(--amberSoft,#fdf3d7);outline:2px solid var(--amber);border-radius:3px}
   .caplines{font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;
     text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:10px}
+  /* Zoom for a document pane (S7). The picture is the evidence, so it has to
+     be readable at the size the reader needs, not the size the pane happens
+     to be — a 9 pt order reference on an A4 scan is unreadable at fit-width
+     on every screen anybody actually owns. */
+  .capzoom{display:flex;gap:6px;align-items:center;justify-content:center;padding:6px 0 2px}
+  .capdoc.z img,.capdoc.z canvas{max-width:none}
+
+  /* ---------- ADM-03: the inbox beside the register (S7) ----------
+     The specification's two zones: a 372 column of 96 px cards on the left —
+     one per document still waiting for a person — and the 756 register of
+     everything already filed on the right. The split is not decorative: the
+     left column is a worklist that empties, and a worklist you can see the
+     bottom of is the difference between filing documents and having a pile. */
+  /* ---------- Counter strip (S7) ----------
+     The specification's second shared primitive: a row of fixed-width cards
+     carrying a count AND an amount, where pressing one filters the list below
+     (§3.2 — TC-01, PRY-03, ADM-01, ADM-02, ADM-07 all use it at different
+     widths). Width is the caller's, through --cw, because the doc gives a
+     different one per screen and a strip that quietly rounds them all to the
+     same number is a strip that stopped following the document. */
+  .counters{display:flex;gap:24px;flex-wrap:wrap;margin:4px 0 16px}
+  .counter{flex:0 1 var(--cw,270px);min-width:190px;text-align:left;font:inherit;color:inherit;
+    background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:12px 14px;
+    box-shadow:var(--shadow);cursor:pointer;transition:.12s}
+  .counter:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--green) 36%,var(--line))}
+  .counter.on{border-color:var(--green);box-shadow:0 0 0 3px var(--greenSoft)}
+  .counter .lab{font:600 10px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .counter .val{font-family:var(--serif);font-size:21px;color:var(--ink);margin-top:5px;line-height:1;font-variant-numeric:tabular-nums}
+  .counter .sub{font-size:11px;color:var(--muted);margin-top:4px}
+
+  .inbox2{display:grid;grid-template-columns:372px minmax(0,1fr);gap:16px;align-items:start}
+  .inbox{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .inbox .ih{display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .inbox .ih h3{font:600 13px var(--sans);margin:0}
+  .inboxl{max-height:640px;overflow:auto}
+  .icard{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;align-items:center;
+    height:96px;padding:0 12px;border-bottom:1px solid var(--hair);cursor:pointer}
+  .icard:hover{background:var(--hair)}
+  .icard .thumb{width:72px;height:72px;border-radius:8px;border:1px solid var(--line);background:var(--hair);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:22px;color:var(--faint)}
+  .icard .thumb img{width:100%;height:100%;object-fit:cover}
+  .icard .who{font:600 12.5px var(--sans);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .icard .amt{font:700 15px var(--sans);color:var(--ink)}
+  .icard .meta{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  @media(max-width:1180px){ .inbox2{grid-template-columns:minmax(0,1fr)} }
 
   /* The status groups of the register (Borradores · Enviados · …). */
   .grouphd{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;
@@ -1086,6 +1131,10 @@ function go(k,arg){
   k=resolveRoute(k);
   const s=SUBMAP[k];
   if(s&&s.href){ location.href=s.href; return; }        // pages this shell does not own
+  // Leaving ADM-02 closes the order that was open on it. A full-screen detail
+  // that survives a trip to another section ambushes whoever comes back — they
+  // asked for the list and got a document.
+  if(k!=="purchasing") puWork=null;
   cur=k; location.hash=k; window._arg=arg; closeMenus(); render(); window.scrollTo(0,0);
 }
 
@@ -1758,6 +1807,11 @@ const SUPPLIER_ROLES=["supplier","subcontractor","selfEmployed"];
 const PURCHASE_STATUS_LABEL={draft:["Borrador",""],sent:["Enviada","b"],accepted:["Aceptada","b"],
   partialReceived:["Recibida parcial","y"],received:["Recibida","g"],invoiced:["Facturada","g"],
   paid:["Pagada","g"],cancelled:["Anulada","r"]};
+/* The three the v4 screen counts by. The seven above still describe what the
+   order knows; these are the coarser reading ADM-02 is organised around, and
+   both are derived from the same facts so they cannot disagree. */
+const PURCHASE_STAGE_LABEL={offer:["Oferta","y"],order:["Pedido","b"],invoiced:["Facturado","g"],
+  cancelled:["Anulada","r"]};
 const SUBCONTRACT_STATUS_LABEL={draft:["Borrador",""],sent:["Enviada","b"],accepted:["Aceptada","b"],
   inExecution:["En ejecución","y"],completed:["Completada","g"],terminated:["Rescindida","r"],
   rejected:["Rechazada","r"]};
@@ -1770,42 +1824,253 @@ function supplierOptions(sel){
 }
 function chapterOptions(pid,sel){
   const p=erp.project(pid);
-  return (p.baseline.chapters||[]).map(c=>`<option value="${c.num}"${c.num===sel?" selected":""}>${c.num}. ${esc(c.name)}</option>`).join("");
+  // A project reached from ADM-03's allocation panel need not have a frozen
+  // baseline — a cost can land on a job before its presupuesto was accepted.
+  // The screen offers no capítulo in that case rather than throwing.
+  return ((p.baseline&&p.baseline.chapters)||[]).map(c=>`<option value="${c.num}"${c.num===sel?" selected":""}>${c.num}. ${esc(c.name)}</option>`).join("");
 }
 function noProjectsCard(v){ v.innerHTML='<div class="card"><div class="empty">Todavía no hay proyectos.</div></div>'; }
 
-/* ---------- Compras (§4.1) ---------- */
+/* ---------- Compras (§4.1 · ADM-02, rebuilt in S7) ----------
+   The specification's shape: three counters across the top — oferta, pedido,
+   facturado — each carrying a count AND an amount, and each filtering the
+   list when pressed. Then the orders themselves, on the shared list primitive
+   so they paginate like every other table in the application.
+
+   Necesidades and the arrivals calendar stay below. The v4 document does not
+   describe them and could be read as removing them; they are kept because
+   they are the only place the budget's committed-versus-pending figure is
+   visible, and an order created from an open need is an order that already
+   knows which capítulo it belongs to. Retiring them would move real work back
+   into somebody's head. Logged in ASSUMPTIONS.md.
+
+   Goods receipt is no longer a stage of this screen, which is what the doc
+   asks for. The engine keeps `receivePurchase` and its reconciliation — the
+   evidence a delivery note gives is not something to delete because a screen
+   stopped counting by it — and the action stays in the record panel. */
+let purchStage="";   // "" | offer | order | invoiced — which counter is pressed
 function compras(v){
-  $('#sub').textContent="Necesidades derivadas del presupuesto, órdenes de compra con su ciclo de vida y calendario de llegadas.";
+  $('#sub').textContent="Ofertas, pedidos y facturado por obra. Cada orden se abre junto a la oferta del proveedor para comprobarla contra lo pedido.";
   if(!erp.state.projects.length) return noProjectsCard(v);
+  if(puWork) return purchaseScreen(v);
   const pid=gProject;
   const needs=erp.purchaseNeeds(pid).filter(c=>c.pendingCents>0);
   const orders=erp.state.purchases.filter(p=>p.projectId===pid);
+  const sum=erp.purchaseStageSummary(pid);
   const arrivals=orders.filter(p=>p.expectedArrival&&!p.status.delivered&&!p.cancelledAt)
     .sort((a,b)=>a.expectedArrival<b.expectedArrival?-1:1);
+  const shown=purchStage?orders.filter(p=>erp.purchaseStage(p)===purchStage):orders;
+
   v.innerHTML=`
-   <div class="stepbar"><button class="btn primary sm" id="cNew">＋ Nueva orden de compra</button></div>
+   <div class="counters" style="--cw:360px">
+    ${["offer","order","invoiced"].map(k=>`<button class="counter${purchStage===k?" on":""}" data-stage="${k}">
+      <div class="lab">${esc(PURCHASE_STAGE_LABEL[k][0])}</div>
+      <div class="val">${eur0(sum[k].amountCents)}</div>
+      <div class="sub"><span>${sum[k].count}</span> <span>${sum[k].count===1?"orden":"órdenes"}</span></div>
+     </button>`).join("")}
+   </div>
+   <div id="puList"></div>
    <div class="card"><div class="ch"><h3>Necesidades</h3><span class="tag">lo comprometido frente a lo pendiente, por capítulo</span></div>
     <div class="scroll"><table><thead><tr><th>Capítulo</th><th class="num">Presupuestado</th><th class="num">Comprometido</th><th class="num">Pendiente</th><th></th></tr></thead><tbody>
     ${needs.map(c=>`<tr><td>${c.num}. ${esc(c.name)}</td><td class="num">${eur0(c.budgetCostCents)}</td><td class="num">${eur0(c.committedCents)}</td>
       <td class="num warn">${eur0(c.pendingCents)}</td><td><button class="btn sm" data-need="${c.num}">＋ OC</button></td></tr>`).join("")
       ||'<tr><td colspan="5"><div class="empty">Todos los capítulos están comprometidos.</div></td></tr>'}
     </tbody></table></div></div>
-   <div class="card"><div class="ch"><h3>Órdenes de compra</h3><span class="tag">${orders.length}</span></div>
-    <div class="scroll"><table><thead><tr><th>Número</th><th>Proveedor</th><th>Capítulo</th><th class="num">Importe</th><th>Llegada prevista</th><th>Estado</th></tr></thead><tbody>
-    ${orders.slice().reverse().map(pu=>{const st=erp.purchaseStatus(pu),lab=PURCHASE_STATUS_LABEL[st];
-      return `<tr class="click" data-pu="${pu.id}"><td class="k">${pu.number}</td><td>${esc(erp.party(pu.supplierId).name)}</td>
-      <td>${pu.chapterNum||"—"}</td><td class="num">${eur(pu.totalCents-pu.status.returnedCents)}</td>
-      <td>${pu.expectedArrival?fmtD(pu.expectedArrival):"—"}</td><td><span class="pill ${lab[1]}">${lab[0]}</span></td></tr>`;}).join("")
-      ||'<tr><td colspan="6"><div class="empty">Sin órdenes de compra.</div></td></tr>'}
-    </tbody></table></div></div>
    <div class="card"><div class="ch"><h3>Calendario de llegadas</h3></div><div class="daylist">
     ${arrivals.map(pu=>`<div class="it"><span class="pill ${pu.expectedArrival<erp.today?"r":"b"}">${fmtD(pu.expectedArrival)}</span> ${pu.number} — ${esc(erp.party(pu.supplierId).name)}</div>`).join("")
      ||'<div class="it">Sin llegadas previstas.</div>'}
    </div></div>`;
-  $('#cNew').onclick=()=>purchaseFormDrawer(pid);
+
+  renderMasterList($('#puList'),{
+    id:"purchases",
+    ids:{q:"puQ",size:"puSize",prev:"puPrev",next:"puNext",newBtn:"cNew",exp:"puExp",
+      expMenu:"puExpMenu",expXlsx:"puExpXlsx",expCsv:"puExpCsv"},
+    newLabel:"＋ Nueva orden de compra",
+    nounSingular:"orden", nounPlural:"órdenes",
+    searchPlaceholder:"Buscar por número, proveedor o descripción…",
+    emptyText:"Ninguna orden coincide con la búsqueda.",
+    baseRows:shown.slice().reverse(),
+    matches:(p,q)=>[p.number,p.desc,p.orderRef,erp.party(p.supplierId).name]
+      .filter(Boolean).join(" ").toLowerCase().includes(q),
+    columns:[
+      {label:"Número",primary:true,get:p=>p.number},
+      {label:"Proveedor",get:p=>erp.party(p.supplierId).name},
+      {label:"Capítulo",get:p=>p.chapterNum||"—"},
+      {label:"Importe",html:p=>eur(p.totalCents-(p.status.returnedCents||0))},
+      {label:"Llegada prevista",get:p=>p.expectedArrival?fmtD(p.expectedArrival):"—"},
+      {label:"Documento",html:p=>(p.docRefs||[]).length?'<span class="pill g">Sí</span>':'<span class="pill y">No</span>'},
+      {label:"Estado",html:p=>{const l=PURCHASE_STAGE_LABEL[erp.purchaseStage(p)];
+        return `<span class="pill ${l[1]}">${esc(l[0])}</span>`;}},
+    ],
+    onNew:()=>purchaseFormDrawer(pid),
+    onRowClick:id=>{ puWork={id,zoom:1}; render(); },
+  });
+
+  v.querySelectorAll('[data-stage]').forEach(b=>b.onclick=()=>{
+    purchStage=purchStage===b.dataset.stage?"":b.dataset.stage; render();
+  });
   v.querySelectorAll('[data-need]').forEach(b=>b.onclick=()=>purchaseFormDrawer(pid,b.dataset.need));
-  v.querySelectorAll('[data-pu]').forEach(tr=>tr.onclick=()=>purchaseDrawer(tr.dataset.pu));
+}
+
+/* ---------- ADM-02's order, full screen (S7) ----------
+   The third of the specification's four out-of-shell surfaces to be built:
+   the supplier's own quote at 620 with zoom on the left, the record at 480 on
+   the right. The reason it is full screen is the reason the validation screen
+   is: checking a record against the paper it came from is one job, and a
+   breadcrumb above it is 56 px taken from the paper. */
+let puWork=null;   // {id, zoom}
+function purchaseScreen(v){
+  const pu=erp.state.purchases.find(x=>x.id===puWork.id);
+  if(!pu){ puWork=null; return render(); }
+  document.body.classList.add('fs');
+  const stage=erp.purchaseStage(pu), lab=PURCHASE_STAGE_LABEL[stage];
+  const t=erp.purchaseTotals(pu);
+  const docId=(pu.docRefs||[])[0]||null;
+  v.innerHTML=`<div class="pb">
+   <div class="pbbar">
+    <button class="btn sm" id="puBack" title="Volver a la lista">←</button>
+    <div class="who"><b>${esc(pu.number)}</b><span>${esc(erp.party(pu.supplierId).name)}</span></div>
+    <span class="pill ${lab[1]}">${esc(lab[0])}</span>
+    <div class="tot"><span>Total</span><b>${eur(t.totalCents)}</b></div>
+    <div class="acts">
+     <button class="btn sm" id="puZoomOut">−</button>
+     <button class="btn sm" id="puZoomIn">+</button>
+     <button class="btn sm" id="puDoc">${docId?"Cambiar documento":"Adjuntar documento"}</button>
+    </div>
+   </div>
+   <div class="cap2">
+    <div class="capdoc${puWork.zoom!==1?" z":""}" id="puDocPane"></div>
+    <div class="capform" id="puForm"></div>
+   </div>
+  </div>`;
+  $('#puBack').onclick=()=>{ puWork=null; render(); };
+  $('#puZoomIn').onclick=()=>{ puWork.zoom=Math.min(3,puWork.zoom+0.25); render(); };
+  $('#puZoomOut').onclick=()=>{ puWork.zoom=Math.max(0.5,puWork.zoom-0.25); render(); };
+  $('#puDoc').onclick=()=>purchaseDocDrawer(pu.id);
+  purchaseDocPane(docId);
+  purchaseFormPane(pu);
+}
+
+/** The supplier's paperwork, or an honest statement that there is none. */
+function purchaseDocPane(capId){
+  const host=$('#puDocPane'); if(!host) return;
+  const zoom=puWork?puWork.zoom:1;
+  const fit=elm=>{ elm.style.width=(zoom*100)+"%"; };
+  if(!capId){
+    host.innerHTML='<div class="empty">Sin la oferta del proveedor. Captúrela en Facturas de proveedores y adjúntela aquí para comprobar el pedido contra lo que ofreció.</div>';
+    return;
+  }
+  const cap=erp.state.captured.find(x=>x.id===capId);
+  if(!cap||!cap.imageRef){ host.innerHTML='<div class="empty">El documento adjunto ya no tiene archivo.</div>'; return; }
+  host.innerHTML='<div class="empty">Preparando la vista…</div>';
+  ErpStore.getBlob(cap.imageRef).then(blob=>{
+    if(!blob){ host.innerHTML='<div class="empty">El archivo no está en este dispositivo.</div>'; return; }
+    if(!/pdf/i.test(blob.type||"")){
+      const img=new Image();
+      img.onload=()=>{ host.innerHTML=''; host.appendChild(img); fit(img); };
+      img.onerror=()=>{ host.innerHTML='<div class="empty">No se ha podido mostrar el documento.</div>'; };
+      img.alt=""; img.src=URL.createObjectURL(blob);
+      return;
+    }
+    return blob.arrayBuffer()
+      .then(buf=>import(ErpOcr.vendorBase()+"pdfjs/pdf.min.mjs").then(m=>({m,buf})))
+      .then(({m,buf})=>m.getDocument({data:new Uint8Array(buf)}).promise)
+      .then(doc=>doc.getPage(1))
+      .then(page=>{
+        const vp=page.getViewport({scale:1.4});
+        const c=document.createElement('canvas');
+        c.width=Math.round(vp.width); c.height=Math.round(vp.height);
+        return page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise.then(()=>c);
+      })
+      .then(c=>{ host.innerHTML=''; host.appendChild(c); fit(c); });
+  }).catch(()=>{ host.innerHTML='<div class="empty">No se ha podido mostrar el documento.</div>'; });
+}
+
+/** Header, line table, and base/IVA/total at the foot — §3.2's ADM-02 pane. */
+function purchaseFormPane(pu){
+  const host=$('#puForm'); if(!host) return;
+  const t=erp.purchaseTotals(pu);
+  const st=erp.purchaseStatus(pu);
+  const rec=pu.status.invoicedBillId?erp.purchaseReconciliation(pu.id):null;
+  // One line today, rendered as the collection the doc asks for: a purchase
+  // order stores a single description, quantity and unit price, and the
+  // quantity is what receiving completes against. Multi-line orders are a
+  // separate piece of work (ASSUMPTIONS #109) and this table already renders
+  // however many rows it is given.
+  const lines=[{desc:pu.desc||"Material",qtyMilli:pu.qtyMilli,unitCents:pu.unitCents,
+    totalCents:pu.totalCents}];
+  host.innerHTML=`<div class="pbh">Pedido<span style="flex:1"></span>
+     <span class="tag">${esc(PURCHASE_STATUS_LABEL[st][0])}</span></div>
+   <div class="pbbody"><div class="daylist">
+     <div class="it"><span>Proveedor</span><span style="flex:1"></span><b>${esc(erp.party(pu.supplierId).name)}</b></div>
+     <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${fmtD(pu.date)}</b></div>
+     <div class="it"><span>Capítulo</span><span style="flex:1"></span><b>${pu.chapterNum||"—"}</b></div>
+     <div class="it"><span>Llegada prevista</span><span style="flex:1"></span><b>${pu.expectedArrival?fmtD(pu.expectedArrival):"—"}</b></div>
+     ${pu.orderRef?`<div class="it"><span>Referencia</span><span style="flex:1"></span><b>${esc(pu.orderRef)}</b></div>`:""}
+     ${pu.cancelledAt?`<div class="it"><span class="pill r">Anulada</span><span>${fmtD(pu.cancelledAt)}${pu.cancelReason?" — "+esc(pu.cancelReason):""}</span></div>`:""}
+   </div></div>
+   <div class="scroll"><table><thead><tr><th>Descripción</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Importe</th></tr></thead><tbody>
+    ${lines.map(l=>`<tr><td class="k">${esc(l.desc)}</td><td class="num">${(l.qtyMilli/1000).toLocaleString('es-ES')}</td>
+      <td class="num">${eur(l.unitCents)}</td><td class="num">${eur(l.totalCents)}</td></tr>`).join("")}
+   </tbody></table></div>
+   <div class="pbbody"><div class="daylist">
+     <div class="it"><span>Base imponible</span><span style="flex:1"></span><b id="puBase">${eur(t.baseCents)}</b></div>
+     <div class="it"><span>IVA</span><span style="flex:1"></span><b>${t.vatBp/100}% · ${eur(t.vatCents)}</b></div>
+     <div class="it"><span>Total</span><span style="flex:1"></span><b id="puTotal">${eur(t.totalCents)}</b></div>
+     ${pu.status.returnedCents?`<div class="it"><span>Devuelto</span><span style="flex:1"></span><b>${eur(pu.status.returnedCents)}</b></div>`:""}
+   </div></div>
+   ${rec?`<div class="pbbody"><div class="daylist">
+     <div class="it"><span class="pill ${rec.ok?'g':'r'}">${rec.ok?"Conciliada":"Diferencias"}</span>
+      <span>Pedido</span><b>${eur(rec.orderedCents)}</b>
+      <span>Facturado</span><b>${rec.invoicedCents!=null?eur(rec.invoicedCents):"—"}</b></div>
+   </div></div>`:""}
+   <div class="pbbody"><div class="daylist" style="gap:8px">
+    ${st==="draft"?'<button class="btn sm" id="pa_send">Enviar al proveedor</button>':""}
+    ${st==="sent"?`<div class="it"><label for="pa_arr">Fecha de llegada</label><input id="pa_arr" type="date" value="${pu.expectedArrival||""}"></div><button class="btn sm" id="pa_accept">Registrar aceptación</button>`:""}
+    ${["accepted","partialReceived"].includes(st)?`<div class="it"><label for="pa_qty">Cantidad recibida</label><input id="pa_qty" type="number" step="0.001"></div>
+     <div class="it"><label for="pa_doc">Albarán</label><input id="pa_doc" placeholder="ALB-..."></div><button class="btn sm" id="pa_recv">Registrar recepción</button>`:""}
+    ${!pu.cancelledAt&&!pu.status.invoicedBillId?'<button class="btn sm" id="pa_dup">Duplicar</button><button class="btn sm danger" id="pa_cancel">Anular</button>':""}
+    ${pu.status.delivered?`<div class="it"><label for="pa_ret">Importe a devolver (€)</label><input id="pa_ret" type="number" step="0.01" value="0"></div><button class="btn sm" id="pa_return">Registrar devolución</button>`:""}
+   </div></div>`;
+
+  const on=(id,fn)=>{ const b=$('#'+id); if(b) b.onclick=fn; };
+  on('pa_send',()=>mutate(()=>erp.sendPurchase(pu.id,"backoffice"),"Orden enviada"));
+  on('pa_accept',()=>mutate(()=>erp.acceptPurchase(pu.id,{expectedArrival:$('#pa_arr').value||null},"backoffice"),"Aceptación registrada"));
+  on('pa_recv',()=>mutate(()=>{
+    const q=+$('#pa_qty').value; if(!(q>0)) throw new Error("Indica la cantidad recibida");
+    erp.receivePurchase(pu.id,{qtyMilli:Math.round(q*1000),docRef:$('#pa_doc').value},"operations");
+  },"Recepción registrada"));
+  on('pa_dup',()=>mutate(()=>{erp.duplicatePurchase(pu.id,"backoffice");puWork=null;},"Orden duplicada"));
+  on('pa_cancel',()=>{
+    const reason=prompt("Motivo de la anulación")||"";
+    mutate(()=>erp.cancelPurchase(pu.id,reason,"backoffice"),"Orden anulada");
+  });
+  on('pa_return',()=>mutate(()=>{
+    const amt=Math.round(+$('#pa_ret').value*100); if(!(amt>0)) throw new Error("Indica el importe a devolver");
+    erp.recordReturn(pu.id,amt,"backoffice");
+  },"Devolución registrada"));
+}
+
+/** Link one of the captured documents to this order — the left zone's source. */
+function purchaseDocDrawer(purchaseId){
+  const pu=erp.state.purchases.find(x=>x.id===purchaseId);
+  const attached=(pu.docRefs||[])[0]||null;
+  const cands=erp.state.captured.slice().reverse();
+  const db=openDrawer("Documento de "+pu.number);
+  db.innerHTML=`<div class="fgrid">
+   <div class="field full"><label>Documento capturado</label><select id="pd_cap">
+     <option value="">— sin documento —</option>
+     ${cands.map(c=>`<option value="${c.id}"${c.id===attached?" selected":""}>${esc((CAP_TYPE_LABEL[c.docType]||c.docType)+" · "+((c.confirmed&&c.confirmed.issuerName)||c.imageRef||c.id))}</option>`).join("")}
+   </select></div>
+   <div class="field full"><p style="font-size:12.5px;color:var(--body);margin:0">Se adjunta un documento ya capturado, no se sube otra copia: así la lectura, la fecha y el origen del archivo siguen siendo los mismos en las dos pantallas.</p></div>
+   <div class="field full"><button class="btn primary" id="pd_save">Guardar</button></div>
+  </div>`;
+  $('#pd_save').onclick=()=>mutate(()=>{
+    const chosen=$('#pd_cap').value;
+    if(attached&&attached!==chosen) erp.detachPurchaseDocument(purchaseId,attached,"backoffice");
+    if(chosen) erp.attachPurchaseDocument(purchaseId,chosen,"backoffice");
+    closeDrawer();
+  },"Documento actualizado");
 }
 function purchaseFormDrawer(pid,chapterNum){
   const db=openDrawer("Nueva orden de compra");
@@ -1826,52 +2091,10 @@ function purchaseFormDrawer(pid,chapterNum){
     closeDrawer();
   },"Orden de compra creada");
 }
-function purchaseDrawer(id){
-  const pu=erp.state.purchases.find(x=>x.id===id);
-  const st=erp.purchaseStatus(pu), lab=PURCHASE_STATUS_LABEL[st];
-  const rec=pu.status.invoicedBillId?erp.purchaseReconciliation(id):null;
-  const db=openDrawer(pu.number+" · "+erp.party(pu.supplierId).name);
-  db.innerHTML=`
-   <div class="card"><div class="ch"><h3>${esc(pu.desc)||"Orden de compra"}</h3><span class="pill ${lab[1]}">${lab[0]}</span></div>
-    <div class="daylist">
-     <div class="it">Cantidad <b>${(pu.qtyMilli/1000).toLocaleString('es-ES')}</b> · Precio unitario <b>${eur(pu.unitCents)}</b> · Total <b>${eur(pu.totalCents)}</b></div>
-     ${pu.status.returnedCents?`<div class="it">Devuelto <b>${eur(pu.status.returnedCents)}</b></div>`:""}
-     <div class="it">Capítulo ${pu.chapterNum||"—"} · Llegada prevista ${pu.expectedArrival?fmtD(pu.expectedArrival):"—"}</div>
-     ${pu.cancelledAt?`<div class="it">Anulada el ${fmtD(pu.cancelledAt)}${pu.cancelReason?" — "+esc(pu.cancelReason):""}</div>`:""}
-    </div></div>
-   ${(pu.receipts||[]).length?`<div class="card"><div class="ch"><h3>Recepciones</h3></div><div class="daylist">
-    ${pu.receipts.map(r=>`<div class="it">${fmtD(r.date)} — <b>${(r.qtyMilli/1000).toLocaleString('es-ES')}</b>${r.docRef?" · "+esc(r.docRef):""}${r.photoRef?" · 📷":""}</div>`).join("")}
-   </div></div>`:""}
-   ${rec?`<div class="card"><div class="ch"><h3>Conciliación</h3><span class="pill ${rec.ok?'g':'r'}">${rec.ok?"OK":"Diferencias"}</span></div>
-    <div class="daylist"><div class="it">Pedido ${(rec.orderedQtyMilli/1000)} / Recibido ${(rec.receivedQtyMilli/1000)}${rec.qtyMismatch?' <span class="pill r">cantidad</span>':""}</div>
-    <div class="it">Pedido ${eur(rec.orderedCents)} / Facturado ${rec.invoicedCents!=null?eur(rec.invoicedCents):"—"}${rec.amountMismatch?' <span class="pill r">importe</span>':""}</div></div></div>`:""}
-   <div class="card"><div class="ch"><h3>Acciones</h3></div><div class="daylist" style="gap:8px">
-    ${st==="draft"?'<button class="btn sm" id="a_send">Enviar al proveedor</button>':""}
-    ${st==="sent"?`<div class="it"><label>Fecha de llegada</label><input id="a_arr" type="date" value="${pu.expectedArrival||""}"></div><button class="btn sm" id="a_accept">Registrar aceptación</button>`:""}
-    ${["accepted","partialReceived"].includes(st)?`<div class="it"><label>Cantidad recibida</label><input id="a_qty" type="number" step="0.001"></div>
-     <div class="it"><label>Albarán</label><input id="a_doc" placeholder="ALB-..."></div><button class="btn sm" id="a_recv">Registrar recepción</button>`:""}
-    ${!pu.cancelledAt&&!pu.status.invoicedBillId?'<button class="btn sm" id="a_dup">Duplicar</button><button class="btn sm danger" id="a_cancel">Anular</button>':""}
-    ${pu.status.delivered?`<div class="it"><label>Importe a devolver (€)</label><input id="a_ret" type="number" step="0.01" value="0"></div><button class="btn sm" id="a_return">Registrar devolución</button>`:""}
-   </div></div>`;
-  const send=$('#a_send'); if(send) send.onclick=()=>mutate(()=>{erp.sendPurchase(id,"backoffice");purchaseDrawer(id);},"Orden enviada");
-  const accept=$('#a_accept'); if(accept) accept.onclick=()=>mutate(()=>{
-    erp.acceptPurchase(id,{expectedArrival:$('#a_arr').value||null},"backoffice"); purchaseDrawer(id);
-  },"Aceptación registrada");
-  const recv=$('#a_recv'); if(recv) recv.onclick=()=>mutate(()=>{
-    const q=+$('#a_qty').value; if(!(q>0)) throw new Error("Indica la cantidad recibida");
-    erp.receivePurchase(id,{qtyMilli:Math.round(q*1000),docRef:$('#a_doc').value},"operations"); purchaseDrawer(id);
-  },"Recepción registrada");
-  const dup=$('#a_dup'); if(dup) dup.onclick=()=>mutate(()=>{erp.duplicatePurchase(id,"backoffice");closeDrawer();},"Orden duplicada");
-  const cancel=$('#a_cancel'); if(cancel) cancel.onclick=()=>{
-    const reason=prompt("Motivo de la anulación")||"";
-    mutate(()=>{erp.cancelPurchase(id,reason,"backoffice");closeDrawer();},"Orden anulada");
-  };
-  const ret=$('#a_return'); if(ret) ret.onclick=()=>mutate(()=>{
-    const amt=Math.round(+$('#a_ret').value*100); if(!(amt>0)) throw new Error("Indica el importe a devolver");
-    erp.recordReturn(id,amt,"backoffice"); purchaseDrawer(id);
-  },"Devolución registrada");
-}
-
+/* `purchaseDrawer` retired in S7. Its header, its receipts, its reconciliation
+   and all six actions moved into `purchaseFormPane`, the 480 record pane of
+   the full-screen detail — the same rules, driven from the surface §3.2 puts
+   them on. Nothing about the engine's receiving lifecycle changed with it. */
 /* ---------- Subcontratos (§4.2) ---------- */
 function subcontratos(v){
   $('#sub').textContent="Subcontratas por oficio: adjudicado, certificado, facturado y pendiente, con la documentación obligatoria y su vigencia.";
@@ -3758,6 +3981,167 @@ const CAP_FIELDS=[
 ];
 const CAP_AMOUNTS=new Set(["netAmount","taxAmount","withholdingAmount","totalAmount"]);
 
+const CAP_TYPE_LABEL={supplierInvoice:"Factura proveedor",selfEmployedInvoice:"Factura autónomo",
+  deliveryNote:"Albarán",valuedDeliveryNote:"Albarán valorado",ticket:"Ticket",
+  supplierOffer:"Oferta",orderConfirmation:"Confirmación",paymentProof:"Justificante pago",
+  creditNote:"Abono"};
+const CAP_STATUS={captured:["Capturado","y"],extracted:["Extraído","y"],validated:["Validado","b"],
+  allocated:["Asignado","g"],sentToAccounting:["Enviado a gestoría","g"],paid:["Pagado","g"]};
+/* The overhead categories the engine accepts, in the words the owner uses.
+   The codes are the engine's (LISTS.overheadCategories) and this is only a
+   rendering of them, so a category the engine does not know cannot be
+   offered — which is the failure the allocation guard exists to prevent. */
+const OVERHEAD_LABEL={rent:"Alquiler",vehicles:"Vehículos",fuel:"Combustible",insurance:"Seguros",
+  office:"Oficina",accountingFirm:"Gestoría",marketing:"Marketing",financial:"Gastos financieros",
+  taxes:"Impuestos",fixedAsset:"Inmovilizado",renting:"Renting",otherOverhead:"Otros gastos generales"};
+const COST_KIND_LABEL={material:"Material",labour:"Mano de obra",subcontract:"Subcontrata",other:"Otros"};
+
+/** How a document's allocation reads in a table cell. */
+function capAllocationText(c){
+  if(!c.allocations.length) return '<span class="pill y">Sin asignar</span>';
+  return esc(c.allocations.map(a=>a.projectId
+    ?erp.project(a.projectId).code+(a.chapterNum?" · "+a.chapterNum:"")
+    :(OVERHEAD_LABEL[a.overheadCategory]||a.overheadCategory)).join(", "));
+}
+
+/* Thumbnails for the inbox cards.
+   Cached per blob key for the life of the page: a card list re-renders on
+   every keystroke elsewhere on the screen, and minting a fresh object URL
+   each time would hold every picture ever shown in memory until the tab is
+   closed. A PDF has no thumbnail an <img> can draw, so the icon stays — found
+   by letting the load fail rather than by guessing from the file name, which
+   is the only test that works for both the local and the served path. */
+const capThumbUrls={};
+function capThumbs(root){
+  root.querySelectorAll('.thumb[data-blob]').forEach(box=>{
+    const key=box.dataset.blob; if(!key) return;
+    const show=url=>{ if(!url) return;
+      const img=new Image();
+      img.onload=()=>{ box.innerHTML=''; box.appendChild(img); };
+      img.onerror=()=>{}; // stays the 📄 icon: a PDF, or a blob that has gone
+      img.alt=''; img.src=url;
+    };
+    if(capThumbUrls[key]!==undefined){ show(capThumbUrls[key]); return; }
+    const direct=ErpStore.blobUrl(key);
+    if(direct){ capThumbUrls[key]=direct; show(direct); return; }
+    capThumbUrls[key]=null; // claim the key so a re-render does not fetch twice
+    ErpStore.getBlob(key).then(b=>{
+      if(!b) return;
+      capThumbUrls[key]=URL.createObjectURL(b);
+      show(capThumbUrls[key]);
+    }).catch(()=>{});
+  });
+}
+
+/* ---------- The document's own panel (ADM-03, S7) ----------
+   Everything a filed document needs a person for, in the 480 side panel the
+   specification makes the universal edit surface: where the cost lands, the
+   two archive fields the workbook has columns for, and the note.
+
+   Allocation is deliberately the last block rather than the first. The order
+   on screen is the order of the questions — what is this, where did it come
+   from, then who pays for it — and the amount you are splitting is stated
+   above the split rather than remembered from the row you clicked. */
+function captureDrawer(id){
+  const c=erp.state.captured.find(x=>x.id===id); if(!c) return;
+  const cf=c.confirmed;
+  const total=cf?cf.totalCents:0;
+  const db=openDrawer(c.stdName||CAP_TYPE_LABEL[c.docType]||"Documento");
+  capAlloc=(c.allocations.length?c.allocations:[{projectId:"",overheadCategory:"",chapterNum:"",kind:"material",amountCents:total}])
+    .map(a=>({projectId:a.projectId||"",overheadCategory:a.overheadCategory||"",
+      chapterNum:a.chapterNum||"",kind:a.kind||"material",amountCents:a.amountCents}));
+  db.innerHTML=`
+   <div class="card"><div class="ch"><h3>${esc(CAP_TYPE_LABEL[c.docType]||c.docType)}</h3>
+     <span class="pill ${CAP_STATUS[c.status]?CAP_STATUS[c.status][1]:""}">${esc(CAP_STATUS[c.status]?CAP_STATUS[c.status][0]:c.status)}</span></div>
+    <div class="daylist">
+     <div class="it"><span>Emisor</span><span style="flex:1"></span><b>${cf?esc(cf.issuerName||"—"):"—"}</b></div>
+     <div class="it"><span>NIF</span><span style="flex:1"></span><b>${cf?esc(cf.issuerTaxId||"—"):"—"}</b></div>
+     <div class="it"><span>Nº documento</span><span style="flex:1"></span><b>${cf?esc(cf.docNumber||"—"):"—"}</b></div>
+     <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${cf&&cf.date?fmtD(cf.date):"—"}</b></div>
+     <div class="it"><span>Total</span><span style="flex:1"></span><b>${cf?eur(cf.totalCents):"—"}</b></div>
+     ${c.duplicateSuspect?'<div class="it"><span class="pill r">Posible duplicado</span><span>ya hay un documento con el mismo NIF y número</span></div>':""}
+    </div></div>
+   <div class="card"><div class="ch"><h3>Archivo</h3><span class="tag">de dónde viene y con qué se relaciona</span></div>
+    <div class="fgrid" style="padding:10px 12px 12px">
+     <div class="field full"><label>Referencia</label><input id="cd_ref" value="${esc(c.reference||"")}" placeholder="Nº de pedido, obra o expediente"></div>
+     <div class="field full"><label>Ruta de origen</label><input id="cd_path" value="${esc(c.sourcePath||"")}" placeholder="Carpeta o archivo del que procede"></div>
+     <div class="field full"><label>Notas</label><input id="cd_notes" value="${esc(c.notes||"")}" placeholder="Lo que la siguiente persona necesita saber"></div>
+     <div class="field full"><button class="btn" id="cd_save">Guardar datos de archivo</button></div>
+    </div></div>
+   <div class="card"><div class="ch"><h3>Asignación</h3><span class="tag" id="cd_rest"></span></div>
+    <div id="cd_rows" style="padding:6px 12px 12px"></div>
+    <div style="display:flex;gap:8px;padding:0 12px 12px;flex-wrap:wrap">
+     <button class="btn sm" id="cd_add">＋ Repartir</button>
+     <span style="flex:1"></span>
+     <button class="btn primary" id="cd_alloc">Asignar</button>
+    </div></div>`;
+
+  $('#cd_save').onclick=()=>mutate(()=>{
+    erp.updateCapture(id,{reference:$('#cd_ref').value.trim(),
+      sourcePath:$('#cd_path').value.trim(),notes:$('#cd_notes').value.trim()},"backoffice");
+  },"Datos de archivo guardados");
+  $('#cd_add').onclick=()=>{ capAlloc.push({projectId:"",overheadCategory:"",chapterNum:"",kind:"material",amountCents:0}); capAllocRows(id,total); };
+  $('#cd_alloc').onclick=()=>mutate(()=>{
+    erp.allocateCapture(id,capAlloc.map(a=>({
+      projectId:a.projectId||null,
+      overheadCategory:a.projectId?null:(a.overheadCategory||null),
+      chapterNum:a.chapterNum||null,kind:a.kind,amountCents:a.amountCents})),"backoffice");
+    closeDrawer();
+  },"Documento asignado");
+  capAllocRows(id,total);
+}
+
+/* One row per destination. The destination is ONE select holding both kinds
+   of answer — a project or an overhead category — because the engine refuses
+   a line that names both, and a screen that lets you tick two boxes and then
+   says no is a screen that asked the question badly. */
+let capAlloc=[];
+function capAllocRows(id,total){
+  const host=$('#cd_rows'); if(!host) return;
+  const projects=erp.state.projects.filter(p=>!p.closed);
+  host.innerHTML=capAlloc.map((a,i)=>`
+   <div class="fgrid" style="border-top:${i?"1px solid var(--hair)":"0"};padding-top:${i?"8px":"0"}">
+    <div class="field full"><label>Destino</label><select data-ai="${i}" data-k="dest">
+      <option value="">—</option>
+      <optgroup label="Obras">${projects.map(p=>`<option value="p:${p.id}"${a.projectId===p.id?" selected":""}>${esc(p.code)} — ${esc(erp.party(p.partyId).name)}</option>`).join("")}</optgroup>
+      <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL).map(([k,l])=>`<option value="o:${k}"${a.overheadCategory===k?" selected":""}>${esc(l)}</option>`).join("")}</optgroup>
+     </select></div>
+    ${a.projectId?`<div class="field"><label>Capítulo</label><select data-ai="${i}" data-k="chapterNum"><option value="">—</option>${chapterOptions(a.projectId,a.chapterNum)}</select></div>
+    <div class="field"><label>Naturaleza</label><select data-ai="${i}" data-k="kind">${Object.entries(COST_KIND_LABEL).map(([k,l])=>`<option value="${k}"${a.kind===k?" selected":""}>${esc(l)}</option>`).join("")}</select></div>`:""}
+    <div class="field"><label>Importe (€)</label><input data-ai="${i}" data-k="amountCents" type="number" step="0.01" value="${(a.amountCents/100).toFixed(2)}"></div>
+    ${capAlloc.length>1?`<div class="field" style="display:flex;align-items:flex-end"><button class="btn sm danger" data-rm="${i}">Quitar</button></div>`:""}
+   </div>`).join("");
+  // The label and the figure are separate elements on purpose: a sentence with
+  // a number inside it is one text node no dictionary can hold, which is the
+  // gap S5 found the hard way. Splitting them fixes all three languages with
+  // no interpolation rule at all.
+  const assigned=capAlloc.reduce((s,a)=>s+(a.amountCents||0),0);
+  const rest=$('#cd_rest');
+  if(rest){
+    const diff=total-assigned;
+    rest.innerHTML=total
+      ?(Math.abs(diff)<=1
+        ?'<span>Cuadra con el documento</span>'
+        :`<span>Sin repartir</span> <b>${eur(diff)}</b>`)
+      :'<span>Documento sin total confirmado</span>';
+  }
+  host.querySelectorAll('[data-ai]').forEach(inp=>{
+    inp.onchange=()=>{
+      const a=capAlloc[+inp.dataset.ai], k=inp.dataset.k;
+      if(k==="dest"){
+        const val=inp.value;
+        a.projectId=val.startsWith("p:")?val.slice(2):"";
+        a.overheadCategory=val.startsWith("o:")?val.slice(2):"";
+        if(!a.projectId){ a.chapterNum=""; }
+      }
+      else if(k==="amountCents") a.amountCents=Math.round(Number(String(inp.value).replace(",","."))*100)||0;
+      else a[k]=inp.value;
+      capAllocRows(id,total);
+    };
+  });
+  host.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{ capAlloc.splice(+b.dataset.rm,1); capAllocRows(id,total); });
+}
+
 /** Read a chosen file and open the validation screen on the result. */
 function captureStart(file){
   if(typeof ErpOcr==="undefined"||!ErpBridge.extraction){
@@ -3949,6 +4333,15 @@ function captureSave(){
       const cap=erp.captureDocument({
         docType:w.docType,
         imageRef:key,
+        // Gap 10. A browser only knows what it was handed: the file's own name,
+        // or the path below the folder when a whole folder was chosen. That is
+        // less than the workbook's "Ruta completa" and it is what is true —
+        // the field is editable in the document's panel for the rest.
+        sourcePath:w.file.webkitRelativePath||w.file.name||"",
+        // Gap 11. The reader offers an order reference when it finds one; it
+        // is never green (nothing can check it), so it arrives here as a
+        // proposal a person has already seen on the validation screen.
+        reference:(r&&(r.fields.find(f=>f.key==="orderRef")||{}).value)||"",
         machineReadable:w.recognised.engine==="pdf-text",
         // The reading travels with the record, unconfirmed, so that what the
         // machine proposed stays visible beside what the person accepted.
@@ -4745,27 +5138,69 @@ const VIEWS={
   ganttWire(v,pid,plan,sch);
  },
 
- /* ---------- Captura (CAP) ---------- */
+ /* ---------- Captura (CAP) · ADM-03, two zones (S7) ----------
+    The specification's shape: a 372 column of 96 px cards on the left, the
+    register on the right. What decides which side a document is on is not
+    its status name but whether it still needs a person — an unallocated
+    document is work, an allocated one is history — because that is the only
+    question the person opening this screen is actually asking.
+
+    The register keeps the shared list primitive (S2) rather than a hand-built
+    table, so it paginates 10/25/50 like the other twenty-eight screens. */
  _docInbox(v){
   if(capWork) return captureValidate(v);
   $('#sub').textContent="Fotografía o sube una factura, albarán o ticket y asígnalo a un proyecto o a gastos generales. Nada se valida sin confirmación humana.";
-  const ST={captured:["Capturado","y"],extracted:["Extraído","y"],validated:["Validado","b"],allocated:["Asignado","g"],sentToAccounting:["Enviado a gestoría","g"],paid:["Pagado","g"]};
-  v.innerHTML=`<div class="card"><div class="scroll"><table><thead><tr><th>Documento</th><th>Tipo</th><th>Emisor</th><th class="num">Importe</th><th>Asignación</th><th>Estado</th></tr></thead><tbody>
-   ${erp.state.captured.map(c=>{const cf=c.confirmed;return `<tr>
-    <td class="k">${esc(c.stdName||c.imageRef||c.id)}</td>
-    <td>${({supplierInvoice:"Factura proveedor",selfEmployedInvoice:"Factura autónomo",deliveryNote:"Albarán",valuedDeliveryNote:"Albarán valorado",ticket:"Ticket",supplierOffer:"Oferta",orderConfirmation:"Confirmación",paymentProof:"Justificante pago",creditNote:"Abono"})[c.docType]}</td>
-    <td>${cf?esc(cf.issuerName):'<span class="pill y">Por confirmar</span>'}</td>
-    <td class="num">${cf?eur(cf.totalCents):"—"}</td>
-    <td>${c.allocations.length?c.allocations.map(a=>a.projectId?erp.project(a.projectId).code:a.overheadCategory).join(", "):"—"}</td>
-    <td><span class="pill ${ST[c.status]?.[1]}">${ST[c.status]?.[0]||c.status}</span>${c.duplicateSuspect?' <span class="pill r">¿Duplicado?</span>':''}</td></tr>`;}).join("")||'<tr><td colspan="6"><div class="empty">Sin documentos capturados.</div></td></tr>'}
-   </tbody></table></div></div>
-   <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;align-items:center">
-    <label class="btn primary sm">＋ Capturar documento<input type="file" id="capFile" accept="image/*,application/pdf" hidden></label>
-    <label class="btn sm">Cámara<input type="file" id="capCam" accept="image/*" capture="environment" hidden></label>
-    <span style="flex:1"></span>
-    <button class="btn sm" id="capPrep">Preparar para trabajar sin cobertura</button>
+  // Newest first. The document somebody has just photographed is the one they
+  // are about to file, and a worklist that appends to the bottom asks them to
+  // scroll past everything they have already dealt with to reach it.
+  const pending=erp.state.captured.filter(c=>!c.allocations.length).reverse();
+  v.innerHTML=`<div class="inbox2">
+   <div class="inbox">
+    <div class="ih"><h3>Bandeja</h3><span style="flex:1"></span><span class="tag" id="capPend">${pending.length}</span></div>
+    <div class="inboxl" id="capCards">
+     ${pending.map(c=>{const cf=c.confirmed;return `<div class="icard" data-cap="${c.id}">
+      <div class="thumb" data-blob="${esc(c.imageRef||"")}">📄</div>
+      <div style="min-width:0">
+       <div class="who">${cf&&cf.issuerName?esc(cf.issuerName):"Emisor por confirmar"}</div>
+       <div class="amt">${cf&&cf.totalCents?eur(cf.totalCents):"—"}</div>
+       <div class="meta"><span>${esc(CAP_TYPE_LABEL[c.docType]||c.docType)}</span> · <span>${fmtD(c.capturedAt)}</span></div>
+      </div></div>`;}).join("")
+      ||'<div class="empty">Nada pendiente de asignar.</div>'}
+    </div>
+    <div style="display:flex;gap:8px;padding:10px 12px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line)">
+     <label class="btn primary sm">＋ Capturar documento<input type="file" id="capFile" accept="image/*,application/pdf" hidden></label>
+     <label class="btn sm">Cámara<input type="file" id="capCam" accept="image/*" capture="environment" hidden></label>
+     <button class="btn sm" id="capPrep">Preparar para trabajar sin cobertura</button>
+    </div>
    </div>
-   <div class="card"><div class="daylist"><div class="it">Un PDF con texto se lee al instante y sin descargar nada. Una foto o un escaneado necesitan el lector de imágenes: unos 7 MB que se descargan la primera vez que hagan falta. Prepárelo con wifi si va a trabajar en una obra sin cobertura.</div></div></div>`;
+   <div id="capReg"></div>
+  </div>
+  <div class="card"><div class="daylist"><div class="it">Un PDF con texto se lee al instante y sin descargar nada. Una foto o un escaneado necesitan el lector de imágenes: unos 7 MB que se descargan la primera vez que hagan falta. Prepárelo con wifi si va a trabajar en una obra sin cobertura.</div></div></div>`;
+
+  renderMasterList($('#capReg'),{
+    id:"captured", noNew:true, noExport:false,
+    ids:{q:"capQ",size:"capSize",prev:"capPrev",next:"capNext",exp:"capExp",
+      expMenu:"capExpMenu",expXlsx:"capExpXlsx",expCsv:"capExpCsv"},
+    nounSingular:"documento", nounPlural:"documentos",
+    searchPlaceholder:"Buscar por emisor, número o referencia…",
+    emptyText:"Ningún documento coincide con la búsqueda.",
+    baseRows:erp.state.captured.slice().reverse(),
+    matches:(c,q)=>[c.stdName,c.reference,c.notes,c.confirmed&&c.confirmed.issuerName,
+      c.confirmed&&c.confirmed.docNumber].filter(Boolean).join(" ").toLowerCase().includes(q),
+    columns:[
+      {label:"Documento",primary:true,html:c=>esc(c.stdName||c.imageRef||c.id)},
+      {label:"Tipo",get:c=>CAP_TYPE_LABEL[c.docType]||c.docType},
+      {label:"Emisor",html:c=>c.confirmed?esc(c.confirmed.issuerName):'<span class="pill y">Por confirmar</span>'},
+      {label:"Importe",html:c=>c.confirmed?eur(c.confirmed.totalCents):"—"},
+      {label:"Referencia",get:c=>c.reference||"—"},
+      {label:"Asignación",html:c=>capAllocationText(c)},
+      {label:"Estado",html:c=>`<span class="pill ${CAP_STATUS[c.status]?CAP_STATUS[c.status][1]:""}">${esc(CAP_STATUS[c.status]?CAP_STATUS[c.status][0]:c.status)}</span>${c.duplicateSuspect?' <span class="pill r">¿Duplicado?</span>':''}`},
+    ],
+    onRowClick:id=>captureDrawer(id),
+  });
+
+  v.querySelectorAll('[data-cap]').forEach(card=>card.onclick=()=>captureDrawer(card.dataset.cap));
+  capThumbs(v);
   const take=(el)=>{ if(el) el.onchange=()=>{ if(el.files&&el.files[0]) captureStart(el.files[0]); }; };
   take($('#capFile')); take($('#capCam'));
   $('#capPrep').onclick=()=>{
@@ -5378,7 +5813,12 @@ async function inviteUser(email){
 
 const TABBED={
   progress:[["Avance","_projectList"],["Programación","_projectSchedule"]],
-  "supplier-invoices":[["Bandeja de captura","_docInbox"],["Facturas registradas","_supplierBills"]],
+  // ADM-03's first tab IS the doc's screen — bandeja and registro side by side
+  // since S7. The second is the payables ledger: partial supplier payments and
+  // one payment across several invoices have no screen in the v4 document, and
+  // retiring the only interface that exercises those engine rules would
+  // un-cover them (the distinction S1b drew over the subcontract screens).
+  "supplier-invoices":[["Documentos","_docInbox"],["Facturas registradas","_supplierBills"]],
   banking:[["Cuentas y saldos","_bankAccounts"],["Conciliación","_reconcile"]],
 };
 const tabState={};
