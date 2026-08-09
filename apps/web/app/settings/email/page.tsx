@@ -251,7 +251,10 @@ export default async function MailSettingsPage({
                 autoCorrect="off"
                 spellCheck={false}
                 defaultValue={currentHost}
-                placeholder="imap.hostinger.com"
+                // Empty is the normal case: the server finds this from the
+                // domain's MX records. Naming a provider here would suggest it
+                // has to be filled in.
+                placeholder="(found automatically)"
                 style={{ ...FIELD, marginBottom: 12 }}
               />
               <Bi htmlFor="drafts" en="Drafts folder" es="Carpeta de borradores" />

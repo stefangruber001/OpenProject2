@@ -10,9 +10,20 @@
  * the config, open a real IMAP connection with it, and only write it down if the
  * mail server accepted it. A rejected password is reported on the spot and
  * nothing is kept.
+ *
+ * THE OPERATOR IS NOT ASKED WHERE THEIR MAILBOX IS. `imap.<domain>` is a
+ * convention that fails on shared hosting, and the failure it produces — a DNS
+ * error naming a host the operator never typed — reads as a wrong password.
+ * The domain's MX records already say who runs its mail, so we look, and try
+ * the candidates in order. See imapCandidates().
  */
 import { redirect } from "next/navigation";
-import { appendDraftWith, type MailboxConfig } from "@/lib/draft-mailbox";
+import {
+  appendDraftWith,
+  imapCandidates,
+  isAuthFailure,
+  type MailboxConfig,
+} from "@/lib/draft-mailbox";
 import { saveMailSettings } from "@/lib/erp-runtime";
 import { seal } from "@/lib/secret-box";
 import { requireUser } from "@/lib/session";
@@ -20,38 +31,6 @@ import { tenantFor } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-/** Providers whose mail host is not `imap.<domain>`. Guessing wrong here costs
- *  the operator a confusing "login failed" for a password that is perfectly
- *  correct, so the few that matter are named. */
-const KNOWN_HOSTS: Record<string, string> = {
-  "hostinger.com": "imap.hostinger.com",
-  "gmail.com": "imap.gmail.com",
-  "googlemail.com": "imap.gmail.com",
-  "outlook.com": "outlook.office365.com",
-  "hotmail.com": "outlook.office365.com",
-  "office365.com": "outlook.office365.com",
-};
-
-/** Errors that mean "there is nothing at that address", as opposed to "that
- *  address rejected you". Only the first kind is evidence the guessed host was
- *  the wrong host; a refused password says nothing about the server name. */
-const UNREACHABLE = /ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH/i;
-
-/**
- * Turn the mail library's error into something the operator can act on.
- *
- * The failure this exists for: `imap.<domain>` is a guess, and when the guess
- * is wrong the operator sees a DNS error about a host they never typed, for a
- * password that was entirely correct. The natural conclusion is that the
- * password is wrong, and they go and reset a working mailbox. So when we
- * guessed the host AND nothing answered there, say which field fixes it.
- */
-function explain(error: Error, guessed: boolean, host: string): string {
-  const raw = error.message.slice(0, 200);
-  if (!guessed || !UNREACHABLE.test(raw)) return raw;
-  return `${raw} — nothing is listening at ${host}, which the ERP guessed from the address. Your password is probably fine: open Advanced settings and enter your provider's IMAP server (Hostinger uses imap.hostinger.com).`;
-}
 
 function back(status: string, detail = ""): never {
   const query = new URLSearchParams({ status, ...(detail ? { detail } : {}) });
@@ -74,16 +53,13 @@ export async function POST(req: Request) {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) back("bad", "That is not an email address.");
   if (!password) back("bad", "Enter the mailbox password.");
 
-  const domain = address.split("@")[1] || "";
-  // `imap.<domain>` is a convention, not a rule. It is right often enough to be
-  // worth trying and wrong often enough that the operator has to be told when
-  // it is — see the hint below.
-  const guessed = !hostRaw;
-  const host = hostRaw || KNOWN_HOSTS[domain] || `imap.${domain}`;
+  // Where the mailbox lives is a fact the domain's own DNS publishes, so it is
+  // looked up rather than demanded from the operator. See imapCandidates().
+  const candidates = await imapCandidates(address, hostRaw);
+  if (!candidates.length) back("bad", "That is not an email address.");
 
-  const config: MailboxConfig = {
+  const config: Omit<MailboxConfig, "host"> = {
     from: address,
-    host,
     port: 993,
     user: address,
     password,
@@ -106,14 +82,36 @@ export async function POST(req: Request) {
     "",
   ].join("\r\n");
 
+  let host = "";
   let folder = "";
-  try {
-    const result = await appendDraftWith(config, probe);
-    folder = result.folder || "";
-  } catch (e) {
+  let failure: Error | null = null;
+
+  for (const candidate of candidates) {
+    try {
+      const result = await appendDraftWith({ ...config, host: candidate }, probe);
+      host = candidate;
+      folder = result.folder || "";
+      break;
+    } catch (e) {
+      failure = e as Error;
+      // The server answered and refused the credential. That is the end of the
+      // search, not a reason to try the next one: we have found the mailbox,
+      // and offering the same password to further servers would be spreading a
+      // secret around to learn something we already know.
+      if (isAuthFailure(e)) break;
+    }
+  }
+
+  if (!host) {
     // Nothing is stored. A saved-but-broken mailbox is worse than an unsaved
     // one, because it looks configured on every screen that asks.
-    back("failed", explain(e as Error, guessed, host));
+    const raw = (failure?.message || "Could not reach the mail server.").slice(0, 200);
+    back(
+      "failed",
+      isAuthFailure(failure)
+        ? raw
+        : `${raw} Tried ${candidates.join(", ")}. If your provider's IMAP server is not one of those, enter it under Advanced settings.`,
+    );
   }
 
   await saveMailSettings(

@@ -204,6 +204,127 @@ check(
   !JSON.stringify(result).includes("stub-password-not-a-real-one"),
 );
 
+// ── Finding the server, and knowing when we have found it ───────────────────
+//
+// The operator should not have to know their provider's IMAP hostname, and the
+// consequence of getting this wrong is not a cosmetic error message: a "host
+// not found" for a correct password reads as a wrong password, and the operator
+// goes and resets a working mailbox. So two things are asserted — that a typed
+// host is obeyed exactly, and that a server refusing the credential is told
+// apart from a server that was never there.
+{
+  const { imapCandidates, isAuthFailure } = await import("../../apps/web/lib/draft-mailbox.ts");
+
+  const typed = await imapCandidates("if@2iberia.com", "  imap.hostinger.com  ");
+  check(
+    "a typed host is used alone, trimmed, with no guessing around it",
+    typed.length === 1 && typed[0] === "imap.hostinger.com",
+    typed.join(", "),
+  );
+  check("a non-address yields nothing to try", (await imapCandidates("nonsense")).length === 0);
+
+  /** A server that refuses the login. `hangUp` covers the hosts that drop the
+   *  connection instead of replying — where the rejection says only "Unexpected
+   *  close" and the auth failure is only visible on the emitted error. */
+  const startRefuser = (hangUp: boolean) =>
+    createServer((socket: Socket) => {
+      let buf = "";
+      let pending = "";
+      socket.write("* OK [CAPABILITY IMAP4rev1 AUTH=PLAIN] stub ready\r\n");
+      socket.on("data", (chunk) => {
+        buf += chunk.toString("binary");
+        for (;;) {
+          const nl = buf.indexOf("\r\n");
+          if (nl < 0) return;
+          const line = buf.slice(0, nl);
+          buf = buf.slice(nl + 2);
+
+          // The base64 SASL payload answering our "+" continuation.
+          if (pending) {
+            const tag = pending;
+            pending = "";
+            if (hangUp) return void socket.destroy();
+            socket.write(`${tag} NO [AUTHENTICATIONFAILED] Invalid credentials\r\n`);
+            continue;
+          }
+
+          const [tag, verb = ""] = line.split(" ");
+          const command = verb.toUpperCase();
+          if (command === "CAPABILITY") {
+            socket.write("* CAPABILITY IMAP4rev1 AUTH=PLAIN\r\n");
+            socket.write(`${tag} OK CAPABILITY completed\r\n`);
+          } else if (command === "AUTHENTICATE") {
+            pending = tag!;
+            socket.write("+ \r\n");
+          } else if (command === "LOGIN") {
+            if (hangUp) return void socket.destroy();
+            socket.write(`${tag} NO [AUTHENTICATIONFAILED] Invalid credentials\r\n`);
+          } else {
+            socket.write(`${tag} OK ${command} completed\r\n`);
+          }
+        }
+      });
+      socket.on("error", () => {});
+    });
+
+  for (const hangUp of [false, true]) {
+    const refuser = startRefuser(hangUp);
+    refuser.listen(0, "127.0.0.1");
+    await once(refuser, "listening");
+    const how = hangUp ? "hangs up after refusing" : "replies NO";
+
+    let refusedError: unknown = null;
+    try {
+      await appendDraftWith(
+        {
+          from: "if@2iberia.com",
+          host: "127.0.0.1",
+          port: (refuser.address() as { port: number }).port,
+          user: "if@2iberia.com",
+          password: "wrong-password",
+          drafts: "",
+        },
+        message,
+      );
+    } catch (e) {
+      refusedError = e;
+    }
+    check(`a refused credential is an error (${how})`, refusedError !== null);
+    check(
+      `a server that refuses is recognised as an auth failure (${how})`,
+      isAuthFailure(refusedError),
+      (refusedError as Error)?.message?.slice(0, 70),
+    );
+    refuser.close();
+  }
+
+  // The direction that matters most: nothing listening must NOT be reported as
+  // a bad password, or the caller stops looking for the real server and the
+  // operator is told to fix a password that was never wrong.
+  let unreachableError: unknown = null;
+  try {
+    await appendDraftWith(
+      {
+        from: "if@2iberia.com",
+        host: "127.0.0.1",
+        port: 1,
+        user: "if@2iberia.com",
+        password: "wrong-password",
+        drafts: "",
+      },
+      message,
+    );
+  } catch (e) {
+    unreachableError = e;
+  }
+  check("an unreachable host is an error", unreachableError !== null);
+  check(
+    "an unreachable host is NOT mistaken for a bad password",
+    !isAuthFailure(unreachableError),
+    (unreachableError as Error)?.message?.slice(0, 70),
+  );
+}
+
 // ── Not configured must be loud, not a quiet success ────────────────────────
 {
   delete process.env.ERP_MAIL_PASSWORD;
