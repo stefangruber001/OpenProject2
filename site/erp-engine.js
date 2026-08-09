@@ -1376,6 +1376,7 @@
         {
           id: this._id("chp"),
           num: String(v.chapters.length + 1),
+          manualNum: false, // COM-03 free numbering — see _renumber
           name: "",
           section: "base",
           order: v.chapters.length,
@@ -1395,6 +1396,7 @@
         {
           id: this._id("lin"),
           num: c.num + "." + (c.lines.length + 1),
+          manualNum: false, // COM-03 free numbering — see _renumber
           code: "",
           itemId: null,
           desc: "",
@@ -1490,15 +1492,38 @@
       return found.line;
     }
 
+    /**
+     * Assign positional numbers across a whole version — EXCEPT to rows whose
+     * number was typed by a person (`manualNum`).
+     *
+     * That exception is the whole of "free numbering" (v4 COM-03). The
+     * automatic scheme is what most rows want: a number is the reader's index
+     * into the document and into the graphic annex, so it has to stay
+     * contiguous when rows are added, deleted or dragged. But a presupuesto is
+     * sometimes written against a numbering the customer or the architect
+     * already uses, and a system that silently renumbers those rows is a system
+     * the estimator has to fight. So: a number you typed is yours and survives
+     * every reorder; a number the system assigned belongs to the position and
+     * moves with it. Clearing a manual number hands the row back to automatic.
+     */
+    _renumber(version) {
+      version.chapters.forEach((c, i) => {
+        c.order = i;
+        if (!c.manualNum) c.num = String(i + 1);
+        c.lines.forEach((l, j) => {
+          if (!l.manualNum) l.num = c.num + "." + (j + 1);
+        });
+      });
+      return version;
+    }
+
     /** Delete a line addressed by its id alone, renumbering what remains. */
     deleteLine(budgetId, lineId, user) {
       const v = this._editableVersion(budgetId);
       const found = this.findLine(budgetId, lineId, v.id);
       if (!found) throw new Error("Line not found");
       found.chapter.lines = found.chapter.lines.filter((l) => l.id !== lineId);
-      // Line numbers are the reader's index into the document — and into the
-      // graphic annex — so they are renumbered to stay contiguous.
-      found.chapter.lines.forEach((l, i) => (l.num = found.chapter.num + "." + (i + 1)));
+      this._renumber(v);
       this._log(user, "deleteLine", this.budget(budgetId).number + " " + found.line.num);
       return found.chapter;
     }
@@ -1506,13 +1531,97 @@
     removeChapter(budgetId, chapterId) {
       const v = this._editableVersion(budgetId);
       v.chapters = v.chapters.filter((c) => c.id !== chapterId);
-      v.chapters.forEach((c, i) => {
-        const num = String(i + 1);
-        c.num = num;
-        c.order = i;
-        c.lines.forEach((l, j) => (l.num = num + "." + (j + 1)));
-      });
+      this._renumber(v);
       return v;
+    }
+
+    /* ---- COM-03: reordering. The builder's tree and grid are dragged, and a
+       drag has to mean something to the document, not just to the screen — so
+       both of these renumber through _renumber and the emitted document follows
+       automatically. Both go through _editableVersion, so a sent presupuesto
+       cannot be quietly re-sequenced under the customer's copy. ---- */
+
+    /** Move a chapter to a new position among its siblings. */
+    moveChapter(budgetId, chapterId, toIndex, user) {
+      const v = this._editableVersion(budgetId);
+      const i = v.chapters.findIndex((c) => c.id === chapterId);
+      if (i < 0) throw new Error("Chapter not found");
+      const j = Math.max(0, Math.min(v.chapters.length - 1, Math.round(Number(toIndex))));
+      if (i !== j) v.chapters.splice(j, 0, v.chapters.splice(i, 1)[0]);
+      this._renumber(v);
+      this._log(user, "moveChapter", this.budget(budgetId).number + " c" + v.chapters[j].num);
+      return v.chapters;
+    }
+
+    /**
+     * Move a line within its chapter, or into another one.
+     *
+     * Moving BETWEEN chapters is the point: a line put under the wrong capítulo
+     * lands in the wrong subtotal and, if that chapter is `optional` or
+     * `outOfScope`, in the wrong section of the customer's document — so the
+     * estimator must be able to correct it by dragging rather than by retyping
+     * the line somewhere else and deleting the original.
+     */
+    moveLine(budgetId, lineId, toChapterId, toIndex, user) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      const dest = v.chapters.find((c) => c.id === (toChapterId || found.chapter.id));
+      if (!dest) throw new Error("Chapter not found");
+      found.chapter.lines.splice(found.chapter.lines.indexOf(found.line), 1);
+      const n = dest.lines.length;
+      const j = toIndex == null ? n : Math.max(0, Math.min(n, Math.round(Number(toIndex))));
+      dest.lines.splice(j, 0, found.line);
+      this._renumber(v);
+      this._log(user, "moveLine", this.budget(budgetId).number + " " + found.line.num);
+      return found.line;
+    }
+
+    /** Give a line the number a person typed, or "" to hand it back to automatic. */
+    setLineNumber(budgetId, lineId, num, user) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      const wanted = String(num == null ? "" : num).trim();
+      if (!wanted) {
+        found.line.manualNum = false;
+        this._renumber(v);
+      } else {
+        this._requireFreeNumber(v, wanted, lineId);
+        found.line.num = wanted;
+        found.line.manualNum = true;
+      }
+      this._log(user, "setLineNumber", this.budget(budgetId).number + " " + found.line.num);
+      return found.line;
+    }
+
+    /** The same for a chapter. Its lines follow unless they are manual too. */
+    setChapterNumber(budgetId, chapterId, num, user) {
+      const v = this._editableVersion(budgetId);
+      const c = v.chapters.find((x) => x.id === chapterId);
+      if (!c) throw new Error("Chapter not found");
+      const wanted = String(num == null ? "" : num).trim();
+      if (!wanted) {
+        c.manualNum = false;
+      } else {
+        this._requireFreeNumber(v, wanted, chapterId);
+        c.num = wanted;
+        c.manualNum = true;
+      }
+      this._renumber(v);
+      this._log(user, "setChapterNumber", this.budget(budgetId).number + " c" + c.num);
+      return c;
+    }
+
+    /** Two rows may not answer to one number: it is the reader's only index. */
+    _requireFreeNumber(version, wanted, exceptId) {
+      for (const c of version.chapters) {
+        if (c.id !== exceptId && c.num === wanted)
+          throw new Error("That number is already used by a chapter");
+        for (const l of c.lines)
+          if (l.id !== exceptId && l.num === wanted)
+            throw new Error("That number is already used by a line");
+      }
     }
 
     /* ---- PRE-10 / CAT-08 / DOC-02: images on a line.
@@ -1864,6 +1973,12 @@
       const v = this.version(budgetId, versionId);
       if (!v.issued) throw new Error("Only an issued version can be accepted");
       if (b.acceptedVersionId) throw new Error("A version is already accepted");
+      // Symmetric with rejectVersion: one version, one answer. Without this a
+      // refused version could be accepted afterwards, overwriting the refusal
+      // and flipping the opportunity from lost back to won with no trace of
+      // which answer the customer actually gave. A customer who changes their
+      // mind gets a NEW version, which is what newVersion is for.
+      if (v.customerResponse) throw new Error("This version already has the customer's answer");
       v.customerResponse = {
         accepted: true,
         date: this.state.today,
@@ -1882,6 +1997,66 @@
       }
       this._log(user, "acceptVersion", b.number + " v" + v.vNumber);
       return v;
+    }
+
+    /**
+     * The customer said no. The mirror of acceptVersion, and it exists because
+     * without it a refused presupuesto is indistinguishable from one nobody has
+     * answered yet — which is precisely the difference the v4 list is grouped
+     * by (Enviados vs Rechazados), and precisely the difference between a lead
+     * worth chasing and one that is over.
+     *
+     * `reason` is a loss-reason CODE from the owner-maintained list (DMC-04),
+     * the same vocabulary loseOpportunity records, so refusals stay countable
+     * across both paths. Anything the customer actually said goes in `notes`,
+     * which is free text and stays on the version.
+     */
+    rejectVersion(budgetId, versionId, { reason, notes, evidenceRef } = {}, user) {
+      const b = this.budget(budgetId);
+      const v = this.version(budgetId, versionId);
+      if (!v) throw new Error("Version not found");
+      if (!v.issued) throw new Error("Only an issued version can be refused");
+      if (b.acceptedVersionId) throw new Error("A version is already accepted");
+      if (v.customerResponse) throw new Error("This version already has the customer's answer");
+      v.customerResponse = {
+        accepted: false,
+        date: this.state.today,
+        reason: reason || "",
+        notes: notes || "",
+        evidenceRef: evidenceRef || null,
+      };
+      v.frozen = true;
+      b.status = "rejected";
+      const o = this.state.opportunities.find(
+        (x) => x.partyId === b.partyId && !["won", "lost"].includes(x.status),
+      );
+      if (o) {
+        o.status = "lost";
+        o.lossReason = reason || "";
+        o.decidedAt = this.state.today;
+      }
+      this._log(user, "rejectVersion", b.number + " v" + v.vNumber);
+      return v;
+    }
+
+    /**
+     * The one status a person recognises, derived rather than stored.
+     *
+     * `budget.status` is a stored field that only ever moves forward when
+     * something is DONE to the record. Expiry is not done to a record — it just
+     * becomes true on a date — so a stored status can never be trusted to know
+     * about it without a nightly job nobody has written. Deriving all five
+     * keeps them consistent by construction: draft · issued · accepted ·
+     * rejected · expired, which is exactly the grouping the v4 list uses.
+     */
+    budgetStage(budgetOrId) {
+      const b = typeof budgetOrId === "string" ? this.budget(budgetOrId) : budgetOrId;
+      if (b.acceptedVersionId) return "accepted";
+      if (b.versions.some((v) => v.customerResponse && !v.customerResponse.accepted))
+        return "rejected";
+      if (!b.versions.some((v) => v.issued)) return "draft";
+      if (b.validityDate && b.validityDate < this.state.today) return "expired";
+      return "issued";
     }
 
     /* =========================== CON — contracts =========================== */
@@ -6043,7 +6218,26 @@
       // validityDate, not validityDays — the budget record has never held a
       // day count, so the old name silently dropped every edit to the one
       // header field an owner most often corrects.
-      const allowed = ["internalRef", "propertyId", "discountCents", "vatBp", "validityDate"];
+      //
+      // The second row is COM-03's conditions bar: everything the customer
+      // reads under the totals, plus the two fields that change what the
+      // totals mean (`surfaceM2` drives the per-m² figure, `irpfBp` the
+      // withholding). `language` is the CUSTOMER's language for the emitted
+      // document — deliberately not the operator's interface language, which
+      // is a separate choice made by a separate person.
+      const allowed = [
+        "internalRef",
+        "propertyId",
+        "discountCents",
+        "vatBp",
+        "validityDate",
+        "language",
+        "surfaceM2",
+        "irpfBp",
+        "paymentConditions",
+        "exclusions",
+        "assumptions",
+      ];
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
       Object.assign(b, patch);
       this._log(user, "updateBudget", b.number);
@@ -6086,7 +6280,7 @@
       const ch = this._editableChapter(budgetId, chapterRef);
       const ln = this._findLine(ch, lineRef);
       ch.lines.splice(ch.lines.indexOf(ln), 1);
-      ch.lines.forEach((l, idx) => (l.num = ch.num + "." + (idx + 1)));
+      this._renumber(this.currentVersion(budgetId));
       this._log(user, "removeLine", this.budget(budgetId).number + " " + ln.num);
     }
     resolvePendingLine(budgetId, chapterRef, lineRef, { priceCents, costCents }, user) {

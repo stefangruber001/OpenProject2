@@ -459,6 +459,40 @@
         return s;
       },
     },
+    {
+      to: 13,
+      name: "budget rows record whether their number was typed (S5, COM-03)",
+      /*
+       * COM-03 lets an estimator type a chapter's or a line's number and keeps
+       * it through every later reorder (`_renumber` skips rows flagged
+       * `manualNum`). Every row that reached this blob was numbered
+       * automatically — there was no way to type one — so they are all
+       * backfilled `false`, which is a fact about them rather than a default.
+       *
+       * It matters that this is explicit. `undefined` is falsy and would
+       * behave identically today, but a row with no field cannot be told from
+       * a row someone answered "no" for, and the next person to read a stored
+       * document should not have to know which build wrote it.
+       *
+       * EVERY version, not just the current one: a frozen version is still
+       * rendered — reissued, diffed, printed — and a document whose rows have
+       * a different shape depending on when it was sent is exactly the kind of
+       * quiet inconsistency this ladder exists to prevent.
+       */
+      up: function (s) {
+        (Array.isArray(s.budgets) ? s.budgets : []).forEach(function (b) {
+          (Array.isArray(b.versions) ? b.versions : []).forEach(function (v) {
+            (Array.isArray(v.chapters) ? v.chapters : []).forEach(function (c) {
+              if (typeof c.manualNum !== "boolean") c.manualNum = false;
+              (Array.isArray(c.lines) ? c.lines : []).forEach(function (l) {
+                if (typeof l.manualNum !== "boolean") l.manualNum = false;
+              });
+            });
+          });
+        });
+        return s;
+      },
+    },
   ];
 
   /**

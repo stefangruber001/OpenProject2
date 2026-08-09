@@ -833,6 +833,185 @@ assert(
   );
 }
 
+// ---------------------------------------------------------------------------
+// S5: COM-03 — reordering, free numbering, and the five stages of a budget.
+//
+// The presupuestador is the one screen where the ORDER of things is part of
+// the document, so the checks below are mostly about what a reorder means to
+// the numbers a customer reads, and about which of them a person is allowed
+// to overrule.
+// ---------------------------------------------------------------------------
+{
+  const bud = erp.createBudget({ partyId: cust.id }, "bo");
+  const cA = erp.addChapter(bud.id, { name: "Demoliciones" });
+  const cB = erp.addChapter(bud.id, { name: "Albañilería" });
+  const cC = erp.addChapter(bud.id, { name: "Pintura", section: "optional" });
+  const lA1 = erp.addLine(bud.id, cA.id, {
+    desc: "Retirada",
+    unit: "m2",
+    qtyMilli: 10000,
+    priceCents: 1000,
+    costCents: 600,
+  });
+  const lA2 = erp.addLine(bud.id, cA.id, {
+    desc: "Carga",
+    unit: "m3",
+    qtyMilli: 2000,
+    priceCents: 5000,
+    costCents: 3000,
+  });
+  const lB1 = erp.addLine(bud.id, cB.id, {
+    desc: "Tabique",
+    unit: "m2",
+    qtyMilli: 8000,
+    priceCents: 4000,
+    costCents: 2500,
+  });
+  const ver = () => erp.currentVersion(bud.id);
+  const numOf = (id) => erp.findLine(bud.id, id).line.num;
+
+  assert(
+    lA1.manualNum === false && cA.manualNum === false,
+    "a new chapter and line record explicitly that their number was not typed",
+  );
+
+  // Reordering chapters. The lines have to follow, or the document's index
+  // stops matching the document.
+  erp.moveChapter(bud.id, cC.id, 0, "bo");
+  assert(
+    ver()
+      .chapters.map((c) => c.name)
+      .join(",") === "Pintura,Demoliciones,Albañilería",
+    "moveChapter reorders the chapters",
+  );
+  assert(
+    ver()
+      .chapters.map((c) => c.num)
+      .join(",") === "1,2,3",
+    "moveChapter renumbers the chapters it moved past",
+  );
+  assert(numOf(lA1.id) === "2.1", "a moved chapter's lines renumber with it");
+  erp.moveChapter(bud.id, cC.id, 2, "bo");
+
+  // Reordering lines, including across chapters — the case that matters,
+  // because the destination chapter's `section` decides which subtotal (and
+  // which part of the customer's document) the line lands in.
+  erp.moveLine(bud.id, lA2.id, cA.id, 0, "bo");
+  assert(
+    numOf(lA2.id) === "1.1" && numOf(lA1.id) === "1.2",
+    "moveLine reorders within a chapter and renumbers both rows",
+  );
+  const beforeMove = erp.budgetTotals(bud.id);
+  erp.moveLine(bud.id, lA2.id, cC.id, 0, "bo");
+  assert(
+    erp.findLine(bud.id, lA2.id).chapter.id === cC.id && numOf(lA2.id) === "3.1",
+    "moveLine moves a line into another chapter and it takes that chapter's numbering",
+  );
+  assert(numOf(lA1.id) === "1.1", "the chapter it left closes its gap");
+  const afterMove = erp.budgetTotals(bud.id);
+  assert(
+    afterMove.baseCents === beforeMove.baseCents - 10000 &&
+      afterMove.optionsCents === beforeMove.optionsCents + 10000,
+    "and the money moves with it — out of the base subtotal, into the optional one",
+  );
+  erp.moveLine(bud.id, lA2.id, cA.id, 1, "bo");
+
+  // Free numbering: a number a person typed outranks the positional scheme.
+  erp.setLineNumber(bud.id, lA1.id, "EX-7", "bo");
+  assert(numOf(lA1.id) === "EX-7", "setLineNumber takes a typed number verbatim");
+  erp.addLine(bud.id, cA.id, { desc: "Otra", unit: "ud", qtyMilli: 1000, priceCents: 100 });
+  assert(numOf(lA1.id) === "EX-7", "a typed number survives an insert that would renumber it");
+  erp.moveChapter(bud.id, cA.id, 2, "bo");
+  assert(numOf(lA1.id) === "EX-7", "and survives its own chapter being dragged elsewhere");
+  throws(
+    () => erp.setLineNumber(bud.id, lB1.id, "EX-7", "bo"),
+    "two rows may not share one number — it is the reader's only index",
+  );
+  erp.setLineNumber(bud.id, lA1.id, "", "bo");
+  assert(
+    erp.findLine(bud.id, lA1.id).line.manualNum === false && /^\d+\.\d+$/.test(numOf(lA1.id)),
+    "clearing a typed number hands the row back to automatic numbering",
+  );
+  erp.setChapterNumber(bud.id, cB.id, "CAP-A", "bo");
+  assert(
+    ver().chapters.find((c) => c.id === cB.id).num === "CAP-A",
+    "a chapter number can be typed too",
+  );
+  assert(numOf(lB1.id).startsWith("CAP-A."), "and its automatic lines follow it");
+  erp.setChapterNumber(bud.id, cB.id, "", "bo");
+
+  // The document is still the same arithmetic as the panel beside it.
+  const tot = erp.budgetTotals(bud.id);
+  const doc = erp.renderBudgetDoc(bud.id, bud.currentVersionId);
+  assert(
+    doc.totals.grandCents === tot.grandCents,
+    "after all that reordering the document total still equals budgetTotals",
+  );
+  assert(
+    !/costCents|margin/.test(JSON.stringify(doc)),
+    "and no cost or margin field reaches the customer document",
+  );
+
+  // The five stages, derived rather than stored.
+  assert(erp.budgetStage(bud.id) === "draft", "budgetStage: nothing issued yet is a draft");
+  erp.issueVersion(bud.id, { channel: "email" }, "bo");
+  assert(erp.budgetStage(bud.id) === "issued", "budgetStage: issued and unanswered is issued");
+
+  const frozen = [
+    ["moveChapter", () => erp.moveChapter(bud.id, cA.id, 0, "bo")],
+    ["moveLine", () => erp.moveLine(bud.id, lB1.id, cA.id, 0, "bo")],
+    ["setLineNumber", () => erp.setLineNumber(bud.id, lB1.id, "Z1", "bo")],
+    ["setChapterNumber", () => erp.setChapterNumber(bud.id, cA.id, "Z", "bo")],
+  ];
+  for (const [name, fn] of frozen)
+    throws(fn, `${name} refuses to re-sequence a version already sent`);
+
+  erp.rejectVersion(bud.id, bud.currentVersionId, { reason: "price", notes: "Muy caro" }, "bo");
+  assert(erp.budgetStage(bud.id) === "rejected", "budgetStage: a refused budget is rejected");
+  const resp = erp.version(bud.id, bud.currentVersionId).customerResponse;
+  assert(
+    resp.accepted === false && resp.reason === "price" && resp.notes === "Muy caro",
+    "rejectVersion records the refusal, its reason code and what the customer said",
+  );
+  throws(
+    () => erp.rejectVersion(bud.id, bud.currentVersionId, { reason: "price" }, "bo"),
+    "a version cannot be answered twice",
+  );
+  throws(
+    () => erp.acceptVersion(bud.id, bud.currentVersionId, {}, "bo"),
+    "and a refused version cannot then be accepted, overwriting the refusal",
+  );
+
+  // Expiry is the one stage nothing writes: it becomes true on a date.
+  const bud2 = erp.createBudget({ partyId: cust.id }, "bo");
+  const c2 = erp.addChapter(bud2.id, { name: "Cap" });
+  erp.addLine(bud2.id, c2.id, {
+    desc: "L",
+    unit: "ud",
+    qtyMilli: 1000,
+    priceCents: 10000,
+    costCents: 6000,
+  });
+  erp.issueVersion(bud2.id, { channel: "email" }, "bo");
+  assert(erp.budgetStage(bud2.id) === "issued", "budgetStage: inside its validity, issued");
+  const realToday = erp.state.today;
+  erp.state.today = "2099-01-01";
+  assert(
+    erp.budgetStage(bud2.id) === "expired",
+    "budgetStage: past its validity date the same record reads expired",
+  );
+  assert(
+    erp.budget(bud2.id).status === "issued",
+    "…with no stored status having changed — nothing was written on that date",
+  );
+  const bud3 = erp.createBudget({ partyId: cust.id }, "bo");
+  assert(
+    erp.budgetStage(bud3.id) === "draft",
+    "budgetStage: a draft past its validity is not expired",
+  );
+  erp.state.today = realToday;
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);
