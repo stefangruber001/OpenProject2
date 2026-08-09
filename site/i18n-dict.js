@@ -2353,6 +2353,23 @@ window.CANEI_DICT = {
     ["Fin de obra", "Works finish"],
     ["Línea base", "Baseline"],
     ["＋ Tarea", "＋ Task"],
+    // The rest of the "＋ …" action buttons in erp.html. They were missing, so
+    // with English as the default the workspace showed English everywhere and
+    // Spanish on its primary actions — the worst of both, and exactly the kind
+    // of gap a coverage check with a hand-written word list will flatter.
+    // Terms follow the entries already in this file: Presupuesto → Quotation,
+    // Oportunidad → Lead, Subcontrata → Subcontract.
+    ["＋ Asignar trabajador", "＋ Assign worker"],
+    ["＋ Factura", "＋ Invoice"],
+    ["＋ Hito/recordatorio", "＋ Milestone/reminder"],
+    ["＋ Nueva modificación", "＋ New change order"],
+    ["＋ Nueva orden de compra", "＋ New purchase order"],
+    ["＋ Nueva regla", "＋ New rule"],
+    ["＋ Nueva subcontrata", "＋ New subcontract"],
+    ["＋ Nuevo", "＋ New"],
+    ["＋ OC", "＋ PO"],
+    ["＋ Oportunidad/visita", "＋ Lead/visit"],
+    ["＋ Presupuesto", "＋ Quotation"],
     ["◆ Hito", "◆ Milestone"],
     ["◆ Hitos de cobro", "◆ Payment milestones"],
     ["Generar desde los capítulos", "Generate from the chapters"],

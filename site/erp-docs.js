@@ -64,10 +64,10 @@
       );
       var msg = document.createElement("span");
       msg.innerHTML =
-        "⚠️ <b>" + title + "</b> " + (detail || "") + " Sus últimos cambios NO están guardados.";
+        "⚠️ <b>" + title + "</b> " + (detail || "") + " Your latest changes are NOT saved.";
       bar.appendChild(msg);
       var again = document.createElement("button");
-      again.textContent = "Recargar";
+      again.textContent = "Reload";
       again.setAttribute(
         "style",
         "background:#fff;color:#8f2d1b;border:0;font-weight:800;padding:7px 14px;" +
@@ -213,13 +213,13 @@
           }
           if (res.status === 409) {
             notify(
-              "Otra persona ha guardado antes que usted.",
-              "Recargue para ver sus cambios y vuelva a introducir los suyos.",
+              "Somebody else saved before you.",
+              "Reload to see their changes, then enter yours again.",
             );
           } else if (res.status === 401) {
-            notify("Su sesión ha caducado.", "Vuelva a iniciar sesión.");
+            notify("Your session has expired.", "Please sign in again.");
           } else {
-            notify("No se ha podido guardar en el servidor.", (res.body && res.body.message) || "");
+            notify("Could not save to the server.", (res.body && res.body.message) || "");
           }
           throw new Error("save refused: HTTP " + res.status);
         })
@@ -228,7 +228,7 @@
           // reaches the branch above and must be caught here — otherwise it is
           // indistinguishable from a save that worked.
           if (String(e && e.message).indexOf("save refused") !== 0) {
-            notify("Sin conexión con el servidor.", "");
+            notify("No connection to the server.", "");
           }
           throw e;
         });

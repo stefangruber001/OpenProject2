@@ -128,11 +128,11 @@
       );
 
       var text = document.createElement("span");
-      text.textContent = "Hay datos más recientes en el servidor.";
+      text.textContent = "There is newer data on the server.";
       pill.appendChild(text);
 
       var go = document.createElement("button");
-      go.textContent = "Actualizar";
+      go.textContent = "Refresh";
       go.setAttribute(
         "style",
         "background:#f2c230;color:#14160f;border:0;font:700 13px/1 inherit;" +
@@ -145,7 +145,7 @@
 
       var close = document.createElement("button");
       close.textContent = "✕";
-      close.setAttribute("aria-label", "Descartar");
+      close.setAttribute("aria-label", "Dismiss");
       close.setAttribute(
         "style",
         "background:transparent;color:rgba(255,255,255,.75);border:0;font:700 14px/1 inherit;" +

@@ -179,7 +179,7 @@ export default async function LoginPage({
                 marginTop: 4,
               }}
             >
-              Sistema de gestión
+              Management system
             </div>
           </div>
         </div>
@@ -225,14 +225,14 @@ export default async function LoginPage({
                 marginBottom: 18,
               }}
             >
-              Correo o contraseña incorrectos.
+              Incorrect email or password.
             </div>
           )}
 
           <input type="hidden" name="next" value={next} />
 
           <label htmlFor="canei-email" style={LABEL}>
-            Correo electrónico
+            Email
           </label>
           {shared && (
             // The shared password needs no address. Saying so is what makes a
@@ -240,7 +240,7 @@ export default async function LoginPage({
             // evaluating the system does is invent an email address, and the
             // sign-in fails for a reason the screen never explains.
             <div style={{ font: `400 12.5px/1.4 ${SANS}`, color: MUTED, margin: "-3px 0 7px" }}>
-              Déjelo vacío si sólo tiene la contraseña.
+              Leave blank if you only have the password.
             </div>
           )}
           <input
@@ -255,12 +255,12 @@ export default async function LoginPage({
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            placeholder="nombre@caneisubirats.com"
+            placeholder="name@caneisubirats.com"
             style={{ ...FIELD, marginBottom: 16 }}
           />
 
           <label htmlFor="canei-password" style={LABEL}>
-            Contraseña
+            Password
           </label>
           <input
             id="canei-password"
@@ -285,7 +285,7 @@ export default async function LoginPage({
               boxShadow: "0 10px 22px -12px rgba(49,83,42,.9)",
             }}
           >
-            Entrar
+            Sign in
           </button>
 
           {/* The closing line says something different in the phone app, because
@@ -302,8 +302,8 @@ export default async function LoginPage({
           `}</style>
           {(
             [
-              ["canei-hint-web", "Guarde la contraseña para entrar con Face ID."],
-              ["canei-hint-app", "La próxima vez entrará con Face ID."],
+              ["canei-hint-web", "Save the password to sign in with Face ID."],
+              ["canei-hint-app", "Next time you will sign in with Face ID."],
             ] as const
           ).map(([cls, line]) => (
             <p
@@ -316,7 +316,7 @@ export default async function LoginPage({
                 margin: "16px 0 0",
               }}
             >
-              La sesión se mantiene abierta en este dispositivo.
+              You stay signed in on this device.
               <br />
               {line}
             </p>

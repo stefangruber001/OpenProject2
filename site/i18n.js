@@ -1,7 +1,13 @@
 /* Canei Subirats — bilingual layer (ES ⇄ EN).
  *
  * Every page declares its base language in <html lang="…">. The visitor's
- * choice is stored in localStorage ("caneiLang", default "es"). When the
+ * choice is stored in localStorage ("caneiLang", default "es").
+ *
+ * The default is Spanish and stays Spanish until the dictionary can carry the
+ * workspace. erp.html is authored in Spanish and builds most of its content in
+ * JavaScript; those generated sentences have no entries, so defaulting to
+ * English produces English chrome around Spanish content — worse than either
+ * language on its own. See task #72. When the
  * chosen language differs from the page's base language, the whole document
  * is translated in place using the dictionary in i18n-dict.js:
  *   - text nodes and key attributes (placeholder / title / aria-label / value / alt)
