@@ -32,6 +32,17 @@
   };
   const quarterOf = (isoDate) =>
     isoDate.slice(0, 4) + "-Q" + (Math.floor((+isoDate.slice(5, 7) - 1) / 3) + 1);
+  // First day of the calendar month containing dateIso, and the month after it.
+  // The forecast grid buckets by month as well as by week, and a month is the
+  // one bucket whose length is not a constant.
+  const monthStartOf = (isoDate) => isoDate.slice(0, 7) + "-01";
+  const addMonths = (isoDate, n) => {
+    const y = +isoDate.slice(0, 4),
+      m = +isoDate.slice(5, 7) - 1 + n;
+    const ny = y + Math.floor(m / 12),
+      nm = ((m % 12) + 12) % 12;
+    return `${ny}-${String(nm + 1).padStart(2, "0")}-01`;
+  };
   // Inverse of quarterOf: the last calendar day of a "YYYY-Qn" label.
   const quarterEndDate = (q) => {
     const [y, qn] = q.split("-Q");
@@ -4379,6 +4390,124 @@
       };
     }
     /**
+     * ADM-08's forecast grid: one column per period, rows grouped into money
+     * in and money out, and a cumulative balance along the foot.
+     *
+     * Three deliberate choices, because a forecast is only useful if you can
+     * say what it does and does not claim:
+     *
+     * 1. It opens from `cashPositionAsOf(today)` — the money that is actually
+     *    there — rather than from zero. A cumulative line that starts at zero
+     *    answers "what is the net of the next 13 weeks", which is never the
+     *    question. The question is "do we run out, and when".
+     * 2. Every row is an EXPECTATION with a date somebody committed to: an
+     *    outstanding invoice on its due date, a planned contract instalment on
+     *    its expected date, an outstanding bill on its due date. Nothing is
+     *    extrapolated from an average, because an average has no due date and
+     *    cannot be chased.
+     * 3. Anything already overdue lands in the FIRST bucket rather than being
+     *    dropped for being in the past. Money that was due last week is still
+     *    coming or still owed; a forecast that silently discards it is a
+     *    forecast that gets rosier the later you are.
+     *
+     * `projectId` narrows all three rows to one job. A bill counts by the part
+     * of its allocations that names that project, not by its whole total —
+     * a shared bill belongs to several jobs and to none of them entirely.
+     */
+    cashFlowGrid(opts) {
+      const o = opts || {};
+      const mode = o.mode === "month" ? "month" : "week";
+      const count = Math.max(1, Math.min(52, o.periods || (mode === "month" ? 6 : 13)));
+      const projectId = o.projectId || null;
+      const t = this.state.today;
+
+      const periods = [];
+      if (mode === "week") {
+        for (let i = 0; i < count; i++) {
+          const from = addDays(t, i * 7);
+          periods.push({ from, to: addDays(from, 6) });
+        }
+      } else {
+        const first = monthStartOf(t);
+        for (let i = 0; i < count; i++) {
+          const from = addMonths(first, i);
+          periods.push({ from: i === 0 ? t : from, to: addDays(addMonths(first, i + 1), -1) });
+        }
+      }
+      // Bucket 0 absorbs everything already due — see note 3 above.
+      const bucketOf = (dateIso) => {
+        if (dateIso <= periods[0].to) return 0;
+        for (let i = 1; i < periods.length; i++)
+          if (dateIso >= periods[i].from && dateIso <= periods[i].to) return i;
+        return -1;
+      };
+      const empty = () => periods.map(() => 0);
+      const put = (cells, dateIso, amountCents) => {
+        const i = bucketOf(dateIso);
+        if (i >= 0) cells[i] += amountCents;
+      };
+
+      const invoiceCells = empty();
+      for (const r of this.receivables())
+        if (r.outstandingCents > 0 && (!projectId || r.projectId === projectId))
+          put(invoiceCells, r.dueDate, r.outstandingCents);
+
+      const milestoneCells = empty();
+      for (const c of this.state.contracts) {
+        if (projectId && c.projectId !== projectId) continue;
+        for (const i of c.installments)
+          if (i.status === "planned" && i.expectedDate)
+            put(milestoneCells, i.expectedDate, i.amountCents);
+      }
+
+      const billCells = empty();
+      for (const b of this.state.bills) {
+        if (b.creditNoteFor) continue;
+        const outstanding = this.billOutstandingCents(b.id);
+        if (outstanding <= 0) continue;
+        let share = outstanding;
+        if (projectId) {
+          const allocated = sum(b.allocations, (a) => a.amountCents);
+          const mine = sum(
+            b.allocations.filter((a) => a.projectId === projectId),
+            (a) => a.amountCents,
+          );
+          if (!mine) continue;
+          // Pro-rate what is still owed by the project's share of the base:
+          // a part-paid bill owes each job a part of what is left, not all.
+          share = allocated ? Math.round((outstanding * mine) / allocated) : outstanding;
+        }
+        put(billCells, b.dueDate, share);
+      }
+
+      const rowsIn = [
+        { key: "invoices", label: "Facturas emitidas pendientes", cells: invoiceCells },
+        { key: "milestones", label: "Hitos de contrato previstos", cells: milestoneCells },
+      ];
+      const rowsOut = [{ key: "bills", label: "Facturas recibidas pendientes", cells: billCells }];
+      const totalOf = (rows) => periods.map((_, i) => sum(rows, (r) => r.cells[i]));
+      const inTotals = totalOf(rowsIn),
+        outTotals = totalOf(rowsOut);
+      const netCents = periods.map((_, i) => inTotals[i] - outTotals[i]);
+
+      const openingCents = this.cashPositionAsOf(addDays(t, -1));
+      let running = openingCents;
+      const cumulativeCents = netCents.map((n) => (running += n));
+
+      return {
+        mode,
+        projectId,
+        periods,
+        openingCents,
+        groups: [
+          { key: "in", label: "Entradas", rows: rowsIn, totals: inTotals },
+          { key: "out", label: "Salidas", rows: rowsOut, totals: outTotals },
+        ],
+        netCents,
+        cumulativeCents,
+      };
+    }
+    /**
      * "Resultado operativo del mes/trimestre en curso: Ingresos − Gastos"
      * (§2.1) — issued revenue (net of credit notes) minus received-invoice
      * cost, both on their document date (accrual, not cash), plus overhead/
@@ -4540,6 +4669,109 @@
         hours: l.hoursMilli / 1000,
         costCents: l.costCents,
       }));
+    }
+    /**
+     * ADM-04's Resumen tab: hours and their cost per project, broken down by
+     * the chapter each entry was booked to. Entries with no chapter are kept
+     * under a null chapter rather than dropped — an hour nobody assigned is
+     * the thing the summary exists to surface.
+     */
+    hoursSummary(from, to, projectId) {
+      const rows = this.state.labour.filter(
+        (l) =>
+          (!from || l.date >= from) &&
+          (!to || l.date <= to) &&
+          (!projectId || l.projectId === projectId),
+      );
+      const byProject = new Map();
+      for (const l of rows) {
+        if (!byProject.has(l.projectId))
+          byProject.set(l.projectId, { projectId: l.projectId, chapters: new Map() });
+        const p = byProject.get(l.projectId);
+        const key = l.chapterNum || "";
+        if (!p.chapters.has(key))
+          p.chapters.set(key, { chapterNum: l.chapterNum || null, hoursMilli: 0, costCents: 0 });
+        const c = p.chapters.get(key);
+        c.hoursMilli += l.hoursMilli;
+        c.costCents += l.costCents;
+      }
+      const projects = [...byProject.values()].map((p) => {
+        const pr = p.projectId ? this.state.projects.find((x) => x.id === p.projectId) : null;
+        const chapters = [...p.chapters.values()].sort((a, b) =>
+          String(a.chapterNum || "~").localeCompare(String(b.chapterNum || "~")),
+        );
+        for (const c of chapters) {
+          const bc =
+            pr && pr.baseline && (pr.baseline.chapters || []).find((x) => x.num === c.chapterNum);
+          c.name = bc ? bc.name : null;
+        }
+        return {
+          projectId: p.projectId,
+          code: pr ? pr.code : null,
+          name: pr ? pr.name : null,
+          chapters,
+          hoursMilli: sum(chapters, (c) => c.hoursMilli),
+          costCents: sum(chapters, (c) => c.costCents),
+        };
+      });
+      projects.sort((a, b) => String(a.code || "~").localeCompare(String(b.code || "~")));
+      return {
+        from: from || null,
+        to: to || null,
+        projects,
+        totalHoursMilli: sum(projects, (p) => p.hoursMilli),
+        totalCostCents: sum(projects, (p) => p.costCents),
+      };
+    }
+    /**
+     * ADM-04's monthly reconciliation block: what the month's hours cost the
+     * jobs, against what actually left the bank as wages.
+     *
+     * These two numbers are NOT supposed to be equal, and the block is honest
+     * about that rather than painting a red flag every month. Hours cost is an
+     * accrual booked to jobs on the day the work happened; wages are cash
+     * leaving on payday, and they also pay for holidays, sick days, office
+     * staff and the time nobody logged. So the difference is reported as
+     * `unbookedCents` — labour that was paid for but never landed on a job —
+     * and the useful reading is its trend and its size relative to the wage
+     * bill, which is why `unbookedPctBp` comes back with it.
+     *
+     * A negative difference is the interesting one: more hours booked to jobs
+     * than wages paid means either a payroll run that has not been imported
+     * yet or hours recorded against the wrong month, and both are worth
+     * knowing before the figures reach a job's margin.
+     */
+    labourReconciliation(monthIso) {
+      const from = monthStartOf(monthIso || this.state.today);
+      const to = addDays(addMonths(from, 1), -1);
+      const entries = this.state.labour.filter((l) => l.date >= from && l.date <= to);
+      const bookedCents = sum(entries, (l) => l.costCents);
+      const wages = this.state.movements.filter(
+        (m) => m.class === "salary" && m.accountingDate >= from && m.accountingDate <= to,
+      );
+      // Wages leave the account, so they arrive here negative; the block reads
+      // in positive money because "nóminas pagadas: −4.200 €" helps nobody.
+      const wagesCents = Math.abs(sum(wages, (m) => m.amountCents));
+      const unbookedCents = wagesCents - bookedCents;
+      return {
+        month: from.slice(0, 7),
+        from,
+        to,
+        bookedCents,
+        bookedHoursMilli: sum(entries, (l) => l.hoursMilli),
+        wagesCents,
+        wagesCount: wages.length,
+        unbookedCents,
+        unbookedPctBp: wagesCents ? Math.round((unbookedCents * 10000) / wagesCents) : 0,
+        approvedHoursMilli: sum(
+          entries.filter((l) => l.locked),
+          (l) => l.hoursMilli,
+        ),
+        openHoursMilli: sum(
+          entries.filter((l) => !l.locked),
+          (l) => l.hoursMilli,
+        ),
+      };
     }
     /**
      * The weekly grid §4.6 asks for: worker × day, with totals. Rows are every
