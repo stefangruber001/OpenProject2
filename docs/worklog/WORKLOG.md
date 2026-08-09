@@ -83,7 +83,7 @@ trilingual UI · server-first, always) are recorded with the plan.
 | S8  | PRY-01 integration + PRY-02 Avance Económico         | done        | (this session)                     |
 | S9  | COM-04 Contrato + PRY-03 Adicionales                 | done        | (this session)                     |
 | S10 | ADM-01 Facturación                                   | done        | (this session)                     |
-| S11 | ADM-05 Banco + ADM-06 Caja + `accountCode`           | not started | —                                  |
+| S11 | ADM-05 Banco + ADM-06 Caja + `accountCode`           | done        | (this session)                     |
 | S12 | ADM-04 Horas + ADM-07 Gestoría + ADM-08 Flujo        | not started | —                                  |
 | S13 | ADM-09 Datos Financieros integration                 | not started | —                                  |
 | S14 | Mobile — cards, bottom bar, three-tap site actions   | not started | —                                  |

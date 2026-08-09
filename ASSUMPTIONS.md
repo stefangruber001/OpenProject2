@@ -2384,3 +2384,61 @@ different decisions, so these ten arrived colliding. They are renumbered from
   relationship, because an invariant nobody tests is an invariant that survives
   by luck. Recorded here so the next person does not re-open a question that
   already has an answer in code.
+
+- **#125 — S11: gap 13, and why the chart of accounts is a LIST
+  (2026-08-09).** Rule 07 says every cost lands on a project **or an account**;
+  the account half had no field, and the chart lived in a separate page's own
+  dataset. **Decisions:** (a) **The chart is `state.lists.accounts`**, which
+  does three things at once — gives the resolver something to validate
+  against, makes the chart owner-maintainable through the same screen as units
+  and payment terms, and keeps the codes out of code. (b) **The mapping lives
+  on the account** (`overhead`, `cost`) rather than in a second table that has
+  to be kept in step with the first. (c) **Precedence is the rule**: an
+  explicit code wins, then the overhead category, then the project's cost
+  kind, then nothing. An allocation that resolves to nothing is reported by
+  `accountLedger` under `unassigned` rather than dropped or given a plausible
+  code — a roll-up that quietly loses money is worse than one that admits it.
+  (d) **Migration v15 RESOLVES rather than defaults**: every existing
+  allocation already knew which account it belonged to; what it could not do
+  was say so. **Reversible: yes — additive field, derived resolver.**
+
+- **#126 — S11: the engine silently swallowed a duplicate method
+  (2026-08-09).** ADM-06 needed a way to record cash, so this session wrote
+  `recordCashMovement` — and the class already had one, 280 lines further
+  down. **A later definition of the same name in a class body silently wins**,
+  so the new method was dead the moment it was written and the tests failed
+  against behaviour nobody could find. S1a recorded this hazard after hitting
+  it once; recording it once was demonstrably not enough, so it is now a
+  comment at the site of the mistake as well. **Before adding a method to
+  `erp-engine.js`, grep for its name.** The pre-existing BNK-07 method is also
+  the better rule — it flags a movement with no `supportingDocRef`, which asks
+  about the evidence rather than about the sign of the amount.
+
+- **#127 — S11: an unbounded cash count starts at the opening balance
+  (2026-08-09).** `cashCount`'s opening window was first written
+  `!from || m.accountingDate < from`, which made **every** movement "before"
+  the period on an unbounded call and folded the whole history into the
+  opening figure. **It still balanced** — opening + in − out = closing held
+  perfectly — which is exactly what made it dangerous and why the arqueo is now
+  asserted against `accountBalanceCents`. A count that does not agree with the
+  balance is decoration.
+
+- **#128 — S11: correcting S10's record (2026-08-09).** S10's commit message,
+  `PROGRESS.md` entry and session pack all claimed a `bootedShell()` e2e helper
+  had been added. **It had not** — the edit failed silently and S10's green run
+  was green by timing rather than by the fix. The helper is added here with
+  both call sites wired, and the S10 entries carry a correction rather than a
+  quiet rewrite: a session pack that edits its own history is a session pack
+  nobody can trust. Three intermittent reds in this programme have now come
+  from the same cause — a check that measures a page a fixed number of
+  milliseconds after `goto`.
+
+- **#129 — S11: ADM-05 brings assignment back into the row, deliberately
+  (2026-08-09).** Session 11 of the _first_ programme moved allocation out of
+  the banco screen into Conciliación, because assigning a movement to a job
+  without a document behind it produced movements allocated to an obra with no
+  invoice. §3.2 of the v4 document asks for classification **and** assignment
+  edited in the row, and this session obliges — but through the same
+  `splitMovement` Conciliación calls, not through the old free-text input. The
+  e2e asserts both halves: the old input must stay gone, the row control must
+  be there. **Reversible: yes.**

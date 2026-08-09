@@ -82,6 +82,13 @@ was always the same: the very next assertion, over the same page, passed.
 `bootedShell()` waits for the shell to exist instead of guessing at somebody
 else's CPU. A fixed sleep is a guess; a selector is a fact.
 
+> **Correction, made in S11.** The helper described above was **not** actually
+> added in this session — the edit that was to add it failed silently, and this
+> session's green run was green by timing rather than by the fix. It exists as
+> of S11, with both call sites wired. The claim is left here with its
+> correction rather than quietly rewritten, because a session pack that edits
+> its own history is a session pack nobody can trust.
+
 ## Verification
 
 Site E2E · manageability **196/196** (8 new engine checks) · migrations 48/48 ·

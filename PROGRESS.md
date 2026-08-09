@@ -1132,10 +1132,11 @@ day one; every primitive it needs already exists).
   ADM-01 has always billed against the contract's current value, and CHG-04 has
   always refused the unapproved extras. Nothing was changed; a check was added,
   because an invariant nobody tests is one that survives by luck.
-- **Two intermittent test reds turned out to be one harness bug** and are
-  fixed: checks that measured a page 600 ms after `goto` sometimes measured it
-  before boot. `bootedShell()` waits for the shell instead of guessing at the
-  machine's CPU.
+- **Two intermittent test reds turned out to be one harness bug.**
+  ~~Fixed here~~ — **correction, made in S11: the `bootedShell()` helper this
+  entry claimed was never actually written.** The script that was to add it
+  failed silently and S10's green run was green by timing rather than by the
+  fix. It exists as of S11, with both call sites wired.
 
 Verified: site E2E 289/289 (9 new checks) · manageability 196/196 (8 new engine
 checks) · migrations 48/48 · year 149/149 · import 25/25 · scheduling 30/30 ·
@@ -1145,6 +1146,45 @@ guard · bundle safety · lint, boundaries, types, unit tests, build,
 
 **Next:** S11 — ADM-05 Banco + ADM-06 Caja + gap 13 (`accountCode`), the last
 structural break in the money chain.
+
+## S11 — the last break in the money chain (2026-08-09)
+
+- **Gap 13 is closed.** §6's chain has carried one ✗ since S0: rule 07 says
+  every cost lands on a project **or an account**, and the account half had no
+  field. The chart of accounts is now `state.lists.accounts` — a list, so the
+  resolver has something to validate against, the chart is owner-maintainable
+  through the same screen as units and payment terms, and the codes stay out
+  of code. Each account names which overhead category defaults to it, so the
+  mapping is a property of the account rather than a second table to keep in
+  step.
+- **`resolveAccountCode` answers in one place**, and the precedence is the
+  rule: an explicit code wins, then the overhead category, then the project's
+  cost kind, then `null` — reported by `accountLedger` under «sin asignar»
+  rather than dropped, because a roll-up that quietly loses money is worse
+  than one that admits it. Migration **v15** resolves rather than defaults.
+- **ADM-05 left the last tab strip.** Class and destination are edited in the
+  row, because classifying a movement is a two-second decision made forty
+  times in a row and a drawer per movement turns that into forty
+  interruptions. Conciliación keeps its own tab; the row's selects write
+  through the same `splitMovement` it does.
+- **ADM-06 exists** — entrada, salida, the balance strip and the arqueo. The
+  closing figure is **computed**, and asserted against the account balance: a
+  stored closing balance is a number nobody counted.
+- **The engine silently swallowed a duplicate method.** This session wrote a
+  second `recordCashMovement`; the class already had one 280 lines further
+  down, a later definition wins, and the new one was dead the moment it was
+  written. S1a recorded this hazard once already — it is now also a comment at
+  the site of the mistake.
+- **A correction to S10's entry above**: the `bootedShell()` helper it claimed
+  was never actually added. It is added here.
+
+Verified: site E2E 299/299 (10 new checks) · manageability 211/211 (15 new
+engine checks) · migrations 48/48 (ladder now v15) · year 149/149 · import
+25/25 · scheduling 30/30 · i18n coverage (EN 100%, CA ceiling 1304 → 1303) ·
+site-sync 17/17 · ownership guard · bundle safety · lint, boundaries, types,
+unit tests, build, `make gates`, `make demo`.
+
+**Next:** S12 — ADM-04 Horas + ADM-07 Gestoría + ADM-08 Flujo de caja.
 
 ## Branch & discipline
 

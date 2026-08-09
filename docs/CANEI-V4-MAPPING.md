@@ -95,8 +95,8 @@ Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, resh
 | ADM-02 | Compras y Pedidos        | `#compras`                                                           | **BUILT (S7)** — three counters, full-screen order beside the supplier's quote           |
 | ADM-03 | Facturas de proveedores  | `#supplier-invoices`                                                 | **BUILT (S6+S7)** — OCR and validation, then the two zones and allocation                |
 | ADM-04 | Horas                    | `#horas`                                                             | **ADAPT** — add monthly reconciliation                                                   |
-| ADM-05 | Consolidación Bancaria   | `#banco` + `#conciliacion`                                           | **MERGE**                                                                                |
-| ADM-06 | Caja Chica               | — (`till` exists in the model)                                       | **BUILD**                                                                                |
+| ADM-05 | Consolidación Bancaria   | `#banking`                                                           | **BUILT (S11)** — merged, class and destination edited in the row                        |
+| ADM-06 | Caja Chica               | `#petty-cash`                                                        | **BUILT (S11)** — entradas, salidas y arqueo                                             |
 | ADM-07 | Reporte a Gestoría       | `#gestoria`                                                          | **ADAPT** — 3-step wizard                                                                |
 | ADM-08 | Flujo de Caja            | — (`cashForecast()` exists)                                          | **BUILD**                                                                                |
 | ADM-09 | Datos Financieros        | `financial-data.html`, 14 panels                                     | **KEEP** (decision 1) — feed + ledger import                                             |
@@ -392,27 +392,29 @@ party ──< property                      a tercero has many inmuebles
 Traced structurally against a real project shape (BAC DE RODA: two presupuesto versions, supplier
 offers, supplier invoices, payments). No row data is used or loaded.
 
-| #   | Step                                             | Carrying field                                                 | Status                        |
-| --- | ------------------------------------------------ | -------------------------------------------------------------- | ----------------------------- |
-| 1   | Lead → visita                                    | `opportunity.partyId`, `propertyId`                            | ✓                             |
-| 2   | Visita → presupuesto                             | deliberate non-inheritance; visit stays as reference           | ✓ by design                   |
-| 3   | Presupuesto accepted → proyecto                  | `project.acceptedVersionId` (frozen baseline)                  | ✓                             |
-| 4   | Contrato → hitos                                 | `contract.installments[]` with `trigger`, `expectedDate`       | ✓                             |
-| 5   | Compra → proyecto                                | `purchase.projectId`                                           | ✓                             |
-| 6   | Supplier factura → compra → proyecto             | `bill` → `purchase` → project                                  | ✓                             |
-| 7   | Supplier factura → proyecto directly             | `bill.projectId`                                               | ✓                             |
-| 8   | **Supplier factura → account (not a job cost)**  | —                                                              | **✗ GAP 13**                  |
-| 9   | Cost → capítulo/partida split                    | done only in PRY-02                                            | ✓ (screen to build)           |
-| 10  | Progress → invoiceable                           | physical progress against the frozen baseline                  | ✓                             |
-| 11  | Factura → cobro, partial and on-account          | `collection` allocations across invoices                       | ✓                             |
-| 12  | Bank movement → document / project / account     | movement → invoice/bill ✓; → project ✓; → **account ✗ GAP 13** |
-| 13  | Movement split across several facturas/proyectos | allocation list                                                | ✓                             |
-| 14  | Hito date moves → expected cash moves            | scheduling → installment `expectedDate` → forecast             | **✗ was a GAP — built in S8** |
+| #   | Step                                             | Carrying field                                            | Status                        |
+| --- | ------------------------------------------------ | --------------------------------------------------------- | ----------------------------- |
+| 1   | Lead → visita                                    | `opportunity.partyId`, `propertyId`                       | ✓                             |
+| 2   | Visita → presupuesto                             | deliberate non-inheritance; visit stays as reference      | ✓ by design                   |
+| 3   | Presupuesto accepted → proyecto                  | `project.acceptedVersionId` (frozen baseline)             | ✓                             |
+| 4   | Contrato → hitos                                 | `contract.installments[]` with `trigger`, `expectedDate`  | ✓                             |
+| 5   | Compra → proyecto                                | `purchase.projectId`                                      | ✓                             |
+| 6   | Supplier factura → compra → proyecto             | `bill` → `purchase` → project                             | ✓                             |
+| 7   | Supplier factura → proyecto directly             | `bill.projectId`                                          | ✓                             |
+| 8   | **Supplier factura → account (not a job cost)**  | `allocation.accountCode`                                  | **✓ closed in S11**           |
+| 9   | Cost → capítulo/partida split                    | done only in PRY-02                                       | ✓ (screen to build)           |
+| 10  | Progress → invoiceable                           | physical progress against the frozen baseline             | ✓                             |
+| 11  | Factura → cobro, partial and on-account          | `collection` allocations across invoices                  | ✓                             |
+| 12  | Bank movement → document / project / account     | movement → invoice/bill ✓; → project ✓; → account ✓ (S11) |
+| 13  | Movement split across several facturas/proyectos | allocation list                                           | ✓                             |
+| 14  | Hito date moves → expected cash moves            | scheduling → installment `expectedDate` → forecast        | **✗ was a GAP — built in S8** |
 
-**Conclusion:** the chain closes for every job-costed euro. The one structural break is the
-non-job branch — insurance, utilities, marketing, professional fees, vehicles, rent — which the
-doc's rule 07 requires and which has no field today. It must land **before** ADM-03, ADM-05 and
-ADM-06 are considered complete, and is scheduled in S11.
+**Conclusion: the chain closes.** The one structural break was the non-job branch — insurance,
+utilities, marketing, professional fees, vehicles, rent — which rule 07 requires and which had no
+field. **S11 closed it**: the chart of accounts is `state.lists.accounts`, `resolveAccountCode`
+answers in one place, every allocation stores the account it belongs to (schema v15), and
+`accountLedger` rolls costs up by account with whatever it could not place named rather than
+dropped.
 
 Item 14 was not a gap but an unverified claim, and the verification found one. `cashForecast` has
 always read `installment.expectedDate`; **nothing ever wrote it after the contract was drawn up**,
