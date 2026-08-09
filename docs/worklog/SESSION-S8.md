@@ -134,6 +134,26 @@ drawer over whatever screen the search was used from.
   only question is which button was pressed and whether the others are on
   screen.
 
+## Verification
+
+Site E2E **264/264** (30 new browser checks) · manageability **174/174** (19
+new engine checks) · migrations 48/48 · year 149/149 · import 25/25 ·
+scheduling 30/30 · i18n coverage (EN 100%, CA ceiling **1316 → 1308**) ·
+site-sync 17/17 · ownership guard 27 areas · bundle safety · lint ·
+boundaries · check-types · unit tests · build · `make gates` · `make demo`.
+
+The committed bundle is byte-identical: nothing this session touched a bundled
+capability.
+
+Three of the browser failures on the way were the same mistake in different
+clothes, and they are worth naming because the next session will meet them
+again. **Clicking the first row of a list tests the sample, not the screen** —
+the newest jobs in the seed are Recorrido demo projects with no budget behind
+them, so the Avance tab had nothing to control; the checks now search for a job
+with baseline chapters first. And **`goto` at an unchanged hash is a no-op**,
+so it cannot leave a full-screen surface: coming back from the Gantt has to
+press the button a person would press.
+
 ## What S9 inherits
 
 S9 owns COM-04 Contrato and PRY-03 Adicionales.

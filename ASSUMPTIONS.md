@@ -2218,3 +2218,73 @@ different decisions, so these ten arrived colliding. They are renumbered from
   arrives already knowing its capítulo. Removing them would move real work back
   into somebody's head to satisfy a document that never argued against them.
   **Reversible: yes — they are two blocks in one view function.**
+
+- **#112 — S8: the centre panel, and what closing it has to remember
+  (2026-08-09).** §3.1's third shared surface: opening a record compresses the
+  list to 372 and puts a 780 panel beside it, and **the list never
+  disappears**. **Decisions:** (a) **The compressed list does not hide columns
+  with CSS — it does not build them.** A 372 column with seven columns inside
+  it is a horizontal scrollbar over six columns nobody can reach; the doc says
+  "code + client only" and that is what is rendered. (b) **Closing restores
+  width, page AND scroll.** Page comes free, because the list keeps rendering
+  through `renderMasterList` and that primitive already holds page state per
+  id — closing the panel is a grid change, not a navigation. Scroll does not,
+  so it is captured on open and restored on close. (c) **`openId` is not
+  persisted**, the same call S1b made for the tab strips: which record somebody
+  last looked at is not company data. (d) **A record that has gone closes the
+  panel** rather than leaving the list compressed against an empty pane.
+  **Reversible: yes** — it is one wrapper function and a grid class.
+
+- **#113 — S8: the Gantt is full screen, not a 780 panel (2026-08-09).**
+  §3.2 puts Programación in a tab of PRY-01's panel; §3.1 names the Gantt as
+  one of exactly four surfaces that hide the side menu. Both are honoured by
+  making the **tab** state the plan in figures — task count, projected finish,
+  critical path, baseline drift, tasks past their date — and open the chart
+  **outside the shell**. Squeezing an SVG timeline with drag, resize and
+  linking into 780 px would have been the literal reading of one sentence at
+  the cost of another, and of the feature. `_projectSchedule` became
+  `_ganttBody` and is otherwise untouched, so nothing about the chart's own
+  behaviour changed in this session. **Reversible: yes.**
+
+- **#114 — S8: item 14 was a gap, and the fix is a button (2026-08-09).**
+  The v4 document asks whether moving a payment milestone's date moves the
+  expected cash. It did not: `cashForecast` has always read
+  `installment.expectedDate` and **nothing has ever written it after the
+  contract was drawn up**, so a job whose plan slipped three weeks kept
+  forecasting the same money in the same week — wrong in the optimistic
+  direction, with nothing on screen admitting it. **Decisions:** (a) **The
+  derivation is in the bridge, the rule is in the engine.** Reading a schedule
+  is scheduling's job and the engine knows nothing about schedules;
+  `installmentDatesFromPlan` proposes dates, `setInstallmentDates` decides
+  which may be applied. (b) **Only `planned` milestones move, and never a
+  `fixedDate` one** — that is what the trigger's name means, and a date the
+  customer agreed to in writing is not the planner's to revise. An invoiced
+  milestone is history and history does not move because a plan did. (c) **It
+  is a button, not an automatic write.** A cash forecast that changes on its
+  own while somebody is reading it is a forecast they stop trusting; the panel
+  states every move before it happens. (d) **The reason is stored beside the
+  date** (`expectedDateSource`, `expectedDateSetAt`): a figure that changed on
+  its own with nothing saying what moved it is worse than the stale figure it
+  replaced. **Reversible: yes — additive fields, and the button is opt-in.**
+
+- **#115 — S8: an hours entry goes to ONE capítulo (2026-08-09).** PRY-02's
+  assignment panel splits a cost across capítulos, because one supplier invoice
+  routinely covers three and refusing to split it is how a chapter ends up
+  carrying a bathroom's tiles and a kitchen's. A **labour** row is the
+  exception and the engine refuses to split it: it is one person's hours on one
+  day, and dividing it here would be inventing a second timesheet nobody
+  signed. The panel says so rather than offering an «＋ Otro capítulo» button
+  that then fails. **Reversible: yes** — the alternative (splitting the
+  timesheet entry itself) is a Horas change, not this screen's.
+
+- **#116 — S8: the retired project drawer, and what kept its rules
+  (2026-08-09).** `projectDrawer` is gone: its economics became PRY-02's panel,
+  its per-chapter buttons became PRY-01's three-state control, its Ficha
+  content is that panel's third tab. Two things it carried were checked before
+  deleting it, in line with S1b's rule that retiring a screen is not the same
+  as un-testing an engine — **approving an extra** has always also lived on
+  Modificaciones, which is where the e2e drives it, and **the manual forecast
+  override** (`setForecastOverride`, whose only interface was the old
+  economics table) kept its «Ajustar» button in the new per-capítulo table.
+  Universal search now opens the job on PRY-01 rather than in a drawer over
+  whatever screen the search was used from. **Reversible: yes.**

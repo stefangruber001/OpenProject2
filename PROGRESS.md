@@ -1023,6 +1023,51 @@ types, unit tests 118/118, build, `make gates`, `make demo`.
 **Next:** S8 — PRY-01 integration + PRY-02 Avance Económico (the 780 centre
 panel with a 372 compressed list, and the money chain's item 14).
 
+## S8 — the list stops disappearing, and the plan starts moving the money (2026-08-09)
+
+- **The centre panel exists** — §3.1's third shared surface, after the 480 side
+  panel and full screen. Opening a job compresses the list to 372 and puts a
+  780 panel beside it, and the list never disappears. Closing it restores the
+  width, the page and the **scroll position**: the first two come free from the
+  list primitive, the third does not and is captured on open.
+- **PRY-01 left its tab strip.** One screen, three tabs inside the panel —
+  Avance, Programación, Ficha — over a fixed 88 header. The chapter's state is
+  the doc's three contiguous 90 px buttons, and the 60 px percentage box is
+  live **only** on «en ejecución»: a percentage on a chapter nobody has started
+  is a number with nothing behind it, and one on a finished chapter is always 100.
+- **The Gantt went full screen rather than into the panel.** §3.2 puts
+  Programación in a tab; §3.1 names the Gantt as one of exactly four
+  out-of-shell surfaces. The tab states the plan in figures and opens the chart
+  outside the shell — the reading that honours both sentences and does not
+  spend the session shrinking a drag-and-drop timeline into half a panel.
+- **PRY-02 shows the money that reached a job and stopped.**
+  `chapterEconomics` was silently skipping every cost with a `projectId` and no
+  `chapterNum`, so the per-capítulo table added up to less than the project and
+  nothing said why. That difference is now its own block, and the 480 panel
+  beside it is the only place in the product that writes a capítulo onto a cost.
+  A split writes sibling allocations, so the amount that reached the job is
+  conserved by construction.
+- **Money-chain item 14 was a GAP, not a claim to confirm.** `cashForecast` has
+  always read `installment.expectedDate`; nothing ever wrote it after the
+  contract was drawn up, so a job whose plan slipped three weeks kept
+  forecasting the same money in the same week — wrong in the optimistic
+  direction. Built: the plan proposes, a person applies, and neither an
+  invoiced milestone nor a `fixedDate` one moves. It is a button rather than an
+  automatic write, because a forecast that changes while somebody is reading it
+  is a forecast they stop trusting.
+- **`projectDrawer` retired**, with both rules it uniquely carried checked
+  first: approving an extra has always also lived on Modificaciones, and the
+  manual forecast override kept its «Ajustar» button in the new table.
+
+Verified: site E2E 264/264 (30 new checks) · manageability 174/174 (19 new
+engine checks) · migrations 48/48 · year 149/149 · import 25/25 · scheduling
+30/30 · i18n coverage (EN 100%, CA ceiling 1316 → 1308) · site-sync 17/17 ·
+ownership guard · bundle safety · lint, boundaries, types, unit tests, build,
+`make gates`, `make demo`. The committed bundle is unchanged.
+
+**Next:** S9 — COM-04 Contrato + PRY-03 Adicionales (the last unbuilt
+full-screen surface, and the five 216 counters).
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

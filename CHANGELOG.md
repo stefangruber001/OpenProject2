@@ -7,6 +7,25 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Avance físico (PRY-01) and Avance económico (PRY-02) are built on a new
+  centre panel: choosing a site compresses the list to a 372 column and opens
+  a 780 panel beside it, and the list never disappears — closing the panel
+  gives back its width, its page and its scroll position. PRY-01 carries
+  Avance, Programación and Ficha as tabs over a fixed header, and a chapter's
+  state is three contiguous buttons with a percentage box that is only live
+  while the chapter is in progress. The Gantt chart opens full screen from the
+  Programación tab.
+- Avance económico shows revenue, cost and margin as three cards, the
+  per-chapter table with variance and margin, and — new — the cost that reached
+  a site and was never given a chapter. Splitting it there is the only place in
+  the product that assigns a chapter to a cost; a split is written as sibling
+  allocations, so the amount that reached the site is conserved.
+- Moving a plan now moves the expected cash. A payment milestone whose trigger
+  follows the works (start, a stage, completion) takes its date from the
+  schedule when somebody applies it; an already-invoiced milestone and one
+  agreed as a fixed date never move, and the panel states every change before
+  it happens.
+
 - Facturas de proveedores (ADM-03) is one screen with two zones: the capture
   inbox on the left, one card per document still waiting for a person, and the
   register of everything already filed on the right. A document is allocated

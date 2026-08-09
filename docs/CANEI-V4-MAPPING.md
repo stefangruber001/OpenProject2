@@ -88,8 +88,8 @@ Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, resh
 | COM-02 | Visita                   | `#visits`                                                            | **BUILT (S4)** — own two-block screen, scheduleVisit/completeVisit lifecycle             |
 | COM-03 | Presupuesto              | `#quotes` + builder                                                  | **BUILT (S5)** — full-screen three-pane builder, five stages, ES/CA output               |
 | COM-04 | Contrato                 | `#contratos` — installments exist                                    | **ADAPT** — add PDF viewer + anexos                                                      |
-| PRY-01 | Avance Físico            | `#proyectos` + `#seguimiento` + Gantt                                | **KEEP** (decision 1) + merge, add 2 recalc chains                                       |
-| PRY-02 | Avance Económico         | `#economia`                                                          | **ADAPT** — add cost-to-partida panel                                                    |
+| PRY-01 | Avance Físico            | `#progress`                                                          | **BUILT (S8)** — centre panel, three-state control, Gantt full screen                    |
+| PRY-02 | Avance Económico         | `#economics`                                                         | **BUILT (S8)** — three cards, per-capítulo table, the chapter-split panel                |
 | PRY-03 | Adicionales              | `#modificaciones`                                                    | **ADAPT** — add photo capture + approval evidence                                        |
 | ADM-01 | Facturación              | `#facturacion`                                                       | **ADAPT**                                                                                |
 | ADM-02 | Compras y Pedidos        | `#compras`                                                           | **BUILT (S7)** — three counters, full-screen order beside the supplier's quote           |
@@ -137,9 +137,12 @@ Six secciones, twenty-nine subsecciones, addressed in English. Every retired has
 | `master-data` Datos maestros | `customers` · `suppliers` · `subcontractors` · `staff`                                                                             |
 | `settings` Configuración     | `items` · `price-list` · `units` · `lead-sources` · `payment-methods` · `messaging` · `alerts` · `users`                           |
 
-Two routes are still **tab strips over screens that already existed**, because the doc merges six
-built screens into three and rewriting them to its layouts is S8/S11's work:
-`progress` = Avance + Programación · `banking` = Cuentas y saldos + Conciliación.
+One route is still a **tab strip over screens that already existed**, because the doc merges six
+built screens into three and rewriting it to the doc's layout is S11's work:
+`banking` = Cuentas y saldos + Conciliación.
+
+`progress` left the strip in S8: it is one screen with the centre panel, and Programación is a tab
+of that panel rather than a sibling route.
 
 `supplier-invoices` was the third. Since S7 its **first tab IS the doc's screen** — bandeja and
 registro side by side — and the strip survives only to hold _Facturas registradas_, the payables
@@ -228,10 +231,12 @@ Only what is particular to each screen; everything else inherits from 3.1.
   shared helper, not per screen.
 - **The 480 side panel is the universal create/edit surface.** The current drawer already behaves
   this way; it needs standardising to the width and the "list never disappears" rule.
-- **The 780 centre panel with a 372 compressed list is not built** — PRY-01 and PRY-02 both need it.
+- **The 780 centre panel with a 372 compressed list** is built (S8) and both PRY screens run on it;
+  it is the third shared surface, after the 480 side panel and full screen.
 - **Four full-screen surfaces** must hide the side menu: presupuestador, Gantt, contrato viewer,
-  document validation. Three of the four are built — the Gantt, the presupuestador (S5) and both
-  document surfaces (S6's validation screen and S7's ADM-02 order); the contrato viewer is S9's.
+  document validation. Three of the four are built — the presupuestador (S5), both document
+  surfaces (S6's validation screen and S7's ADM-02 order) and the Gantt (S8, reached from PRY-01's
+  Programación tab); the contrato viewer is S9's.
 - **Two-zone document screens** (ADM-02, ADM-03, DMC-01) are a new layout primitive; built once as
   `.cap2` in S6 and reused unchanged by ADM-02 in S7.
 - **Counter strips** (TC/PRY-03/ADM-01/ADM-02/ADM-07) are a second shared primitive — built in S7
@@ -386,30 +391,33 @@ party ──< property                      a tercero has many inmuebles
 Traced structurally against a real project shape (BAC DE RODA: two presupuesto versions, supplier
 offers, supplier invoices, payments). No row data is used or loaded.
 
-| #   | Step                                             | Carrying field                                                 | Status                                            |
-| --- | ------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------- |
-| 1   | Lead → visita                                    | `opportunity.partyId`, `propertyId`                            | ✓                                                 |
-| 2   | Visita → presupuesto                             | deliberate non-inheritance; visit stays as reference           | ✓ by design                                       |
-| 3   | Presupuesto accepted → proyecto                  | `project.acceptedVersionId` (frozen baseline)                  | ✓                                                 |
-| 4   | Contrato → hitos                                 | `contract.installments[]` with `trigger`, `expectedDate`       | ✓                                                 |
-| 5   | Compra → proyecto                                | `purchase.projectId`                                           | ✓                                                 |
-| 6   | Supplier factura → compra → proyecto             | `bill` → `purchase` → project                                  | ✓                                                 |
-| 7   | Supplier factura → proyecto directly             | `bill.projectId`                                               | ✓                                                 |
-| 8   | **Supplier factura → account (not a job cost)**  | —                                                              | **✗ GAP 13**                                      |
-| 9   | Cost → capítulo/partida split                    | done only in PRY-02                                            | ✓ (screen to build)                               |
-| 10  | Progress → invoiceable                           | physical progress against the frozen baseline                  | ✓                                                 |
-| 11  | Factura → cobro, partial and on-account          | `collection` allocations across invoices                       | ✓                                                 |
+| #   | Step                                             | Carrying field                                                 | Status                        |
+| --- | ------------------------------------------------ | -------------------------------------------------------------- | ----------------------------- |
+| 1   | Lead → visita                                    | `opportunity.partyId`, `propertyId`                            | ✓                             |
+| 2   | Visita → presupuesto                             | deliberate non-inheritance; visit stays as reference           | ✓ by design                   |
+| 3   | Presupuesto accepted → proyecto                  | `project.acceptedVersionId` (frozen baseline)                  | ✓                             |
+| 4   | Contrato → hitos                                 | `contract.installments[]` with `trigger`, `expectedDate`       | ✓                             |
+| 5   | Compra → proyecto                                | `purchase.projectId`                                           | ✓                             |
+| 6   | Supplier factura → compra → proyecto             | `bill` → `purchase` → project                                  | ✓                             |
+| 7   | Supplier factura → proyecto directly             | `bill.projectId`                                               | ✓                             |
+| 8   | **Supplier factura → account (not a job cost)**  | —                                                              | **✗ GAP 13**                  |
+| 9   | Cost → capítulo/partida split                    | done only in PRY-02                                            | ✓ (screen to build)           |
+| 10  | Progress → invoiceable                           | physical progress against the frozen baseline                  | ✓                             |
+| 11  | Factura → cobro, partial and on-account          | `collection` allocations across invoices                       | ✓                             |
 | 12  | Bank movement → document / project / account     | movement → invoice/bill ✓; → project ✓; → **account ✗ GAP 13** |
-| 13  | Movement split across several facturas/proyectos | allocation list                                                | ✓                                                 |
-| 14  | Hito date moves → expected cash moves            | scheduling → installment `expectedDate` → forecast             | **verify in S8** (doc's own Note for Claude Code) |
+| 13  | Movement split across several facturas/proyectos | allocation list                                                | ✓                             |
+| 14  | Hito date moves → expected cash moves            | scheduling → installment `expectedDate` → forecast             | **✗ was a GAP — built in S8** |
 
 **Conclusion:** the chain closes for every job-costed euro. The one structural break is the
 non-job branch — insurance, utilities, marketing, professional fees, vehicles, rent — which the
 doc's rule 07 requires and which has no field today. It must land **before** ADM-03, ADM-05 and
 ADM-06 are considered complete, and is scheduled in S11.
 
-Item 14 is not a gap but an unverified claim: the doc explicitly asks whether the recalculation
-already exists. S8 confirms or builds it.
+Item 14 was not a gap but an unverified claim, and the verification found one. `cashForecast` has
+always read `installment.expectedDate`; **nothing ever wrote it after the contract was drawn up**,
+so a job whose plan slipped kept forecasting the same money in the same week — wrong in the
+optimistic direction. S8 built the chain: `installmentDatesFromPlan` proposes, `setInstallmentDates`
+applies, and neither an invoiced milestone nor a `fixedDate` one moves.
 
 ---
 
