@@ -23,6 +23,7 @@
     "@repo/pack-vertical-construction-reformas": "workspace:*",
     "@repo/ui": "workspace:*",
     "dotenv": "^16.4.7",
+    "imapflow": "^1.6.6",
     "next": "16.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

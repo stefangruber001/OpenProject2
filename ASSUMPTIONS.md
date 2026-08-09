@@ -1389,3 +1389,46 @@ SERVER_SSH_KEY`. The browser-ops path has never had its credentials, so it has n
     accents. The real pages declare `<meta charset>` so production was never
     affected; the range is now `\u`-escaped anyway, because correctness that
     depends on every future page remembering a meta tag is not correctness.
+- **#91 — The mailbox is somewhere to PUT A DRAFT, never somewhere to send from
+  (2026-08-08).** The operator asked to link `if@2iberia.com` so the ERP's
+  generated emails use it, showed the provider's IMAP/SMTP page, and said not to
+  change UI or logic.
+  **Built the IMAP half and deliberately not the SMTP half.** IMAP APPEND writes
+  a finished message into the Drafts folder of a mailbox the company owns; it
+  appears in Gmail, Outlook or Apple Mail on any device, and a person presses
+  send after reading it. Nothing is transmitted to a customer, so the mandate's
+  "no real emails" rule is intact and the product's on-screen promise —
+  "nothing is sent without you" — stays literally true. SMTP is not in the
+  codebase at all, which is a stronger guarantee than a flag that could be
+  flipped.
+  **The `.eml` download is untouched**, because changing it would be a UI change.
+  What changed is the sender it carries, which is the request itself.
+  **The sender is enforced twice, and that is deliberate**, not an oversight: the
+  page's constant so a downloaded draft is right, and a server-side rewrite of
+  the `From` header so an appended draft is right no matter what composed it. A
+  draft in a mailbox with an address that account cannot send as is confusing at
+  best and rejected by some servers at worst.
+  **Not configured is never a silent success.** With no credential the endpoint
+  answers 503 with a reason rather than 200. The temptation is to return "fine"
+  and log a warning; this project has been bitten repeatedly by things that
+  reported success while doing nothing, and a draft the operator believes is in
+  their mailbox and is not has a customer on the other end of it.
+  **Two ordering traps, both closed before shipping.** The mailbox variables are
+  read from `docker-compose.prod.yml`, which lives on the SERVER and is not part
+  of the released image — so a machine still running an older stack definition
+  would store the password and pass it to nothing, reporting "unconfigured" with
+  a perfectly good credential beside it. `set-email.sh` now refuses unless the
+  server's compose file knows the variables, and the Ops workflow runs
+  `sync-server` first. Separately, `imap.2iberia.com` is NOT the mail host — the
+  provider's own page says `imap.hostinger.com` — so the derived default is
+  overridden explicitly rather than left to be discovered as a login failure.
+  **Verified against a stub IMAP server**, because the real password is the
+  operator's and belongs in neither a repository nor a test. Sixteen assertions
+  cover what we SAY to a mail server: that we authenticate, ask which folder is
+  Drafts and believe the answer, set `\Draft` so clients file it as a draft
+  rather than as received mail, and rewrite the sender without touching the body.
+  **One finding worth keeping:** the client's `path` is a DERIVED value and came
+  back as `INBOX.Sent.INBOX.Borradores` for a mailbox actually called
+  `INBOX.Borradores`. `pathAsListed` is the literal string the server put on the
+  wire, which is by definition a name it understands, so that is what the adapter
+  uses now.
