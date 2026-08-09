@@ -2355,3 +2355,32 @@ different decisions, so these ten arrived colliding. They are renumbered from
   evidence means. Two views of one collection is a smell; it is logged here so
   the next person can retire the first once CON-13's evidence has somewhere
   else to live. **Reversible: yes.**
+
+- **#123 — S10: ADM-01's counters are derived from the register they sit over
+  (2026-08-09).** Four counters — emitido · cobrado · pendiente · vencido — all
+  computed by `invoicingSummary` from the same `invoiceRegister` the rows are
+  drawn from, so a strip of totals over a table cannot tell a different story
+  from the table. **Decisions:** (a) **«Vencido» is a SUBSET of «pendiente»,
+  not a fifth bucket beside it** — money that is late is still money that is
+  owed, and a red counter that double-counts is the worst possible thing to
+  paint red. The sim asserts `collected + outstanding = issued` and
+  `overdue ≤ outstanding` so the two can never drift. (b) **Red only when
+  non-zero**, as the doc says: a counter that is always red is a counter nobody
+  looks at. (c) **Days overdue are red from day one.** Not from a week, not
+  from a grace period; the engine already computed `daysOverdue` that way and
+  the screen now shows it, with a sim check on both sides of the due date.
+  (d) **A settled invoice shows «—», not 0,00 €** in the balance column: a zero
+  in a money column reads as a figure somebody calculated. **Reversible: yes —
+  every figure is derived and nothing was stored.**
+
+- **#124 — S10: the extras question was already answered correctly
+  (2026-08-09).** S9's handover flagged a three-way consistency risk: does
+  ADM-01 bill against the contract's ORIGINAL amount or its CURRENT one, given
+  CON-12's annex chain and CHG-04's billability rule? Traced rather than
+  changed — `projectBilling` reads `projectEconomics().currentRevenueCents`,
+  which is the frozen baseline **plus approved changes**, so it has always
+  billed against the current value and CHG-04 has always refused the
+  unapproved ones. **Nothing was changed; a check was added** asserting the
+  relationship, because an invariant nobody tests is an invariant that survives
+  by luck. Recorded here so the next person does not re-open a question that
+  already has an answer in code.

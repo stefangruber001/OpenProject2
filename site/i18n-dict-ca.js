@@ -700,6 +700,23 @@ window.CANEI_DICT.ca = {
   "Factura de autónomo": "Factura d'autònom",
   "Confirmación de pedido": "Confirmació de comanda",
   "Justificante de pago": "Justificant de pagament",
+  // ── ADM-01 Facturación (S10).
+  "Facturas emitidas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos, las emitidas son inmutables, y un día de retraso ya se ve en rojo.":
+    "Factures emeses des del pressupost acceptat, les fites del contracte o els extres aprovats. Numeració sense buits, les emeses són immutables, i un dia de retard ja es veu en vermell.",
+  facturas: "factures",
+  "Ninguna factura coincide con la búsqueda.": "Cap factura coincideix amb la cerca.",
+  "Días de retraso": "Dies de retard",
+  "Retención IRPF": "Retenció IRPF",
+  Forma: "Forma",
+  "Cobro registrado": "Cobrament registrat",
+  "Indica el importe cobrado": "Indiqueu l'import cobrat",
+  "Un cobro parcial deja el resto pendiente y el contador de vencido lo sigue contando.":
+    "Un cobrament parcial deixa la resta pendent i el comptador de vençut el continua comptant.",
+  // Four more from the ES/EN spine that are on this screen.
+  Vencido: "Vençut",
+  factura: "factura",
+  Saldo: "Saldo",
+  Vencimiento: "Venciment",
   // ── COM-04 Contrato and PRY-03 Adicionales (S9).
   "Contratos vigentes e históricos. El importe vigente se marca en ámbar cuando ya no coincide con el original: significa que hay anexos.":
     "Contractes vigents i històrics. L'import vigent es marca en ambre quan ja no coincideix amb l'original: vol dir que hi ha annexos.",

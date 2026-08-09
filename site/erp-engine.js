@@ -3561,6 +3561,40 @@
           };
         });
     }
+    /**
+     * ADM-01's four counters: emitido · cobrado · pendiente · vencido.
+     *
+     * Every figure is derived from the register above rather than accumulated
+     * separately, so the counters and the rows underneath them cannot tell
+     * different stories — which is the failure mode a strip of totals over a
+     * table exists to avoid, and the reason none of these is stored.
+     *
+     * `overdue` is a SUBSET of `outstanding`, not a fifth bucket beside it:
+     * money that is late is still money that is owed. The doc paints that
+     * counter red when it is non-zero, and a red counter that double-counts
+     * would be the worst possible thing to paint red.
+     */
+    invoicingSummary(filter) {
+      const rows = this.invoiceRegister().filter((r) => (filter ? filter(r) : true));
+      const issuedCents = sum(rows, (r) => r.totalCents);
+      const outstandingCents = sum(rows, (r) => r.outstandingCents);
+      const overdue = rows.filter((r) => r.daysOverdue > 0);
+      return {
+        issued: { count: rows.length, amountCents: issuedCents },
+        collected: {
+          count: rows.filter((r) => r.outstandingCents <= 0).length,
+          amountCents: issuedCents - outstandingCents,
+        },
+        outstanding: {
+          count: rows.filter((r) => r.outstandingCents > 0).length,
+          amountCents: outstandingCents,
+        },
+        overdue: {
+          count: overdue.length,
+          amountCents: sum(overdue, (r) => r.outstandingCents),
+        },
+      };
+    }
     /** AR-08 follow-up list: what is still owed. A settled invoice belongs in
         the register, not in the chase list. */
     receivables() {

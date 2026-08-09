@@ -2657,6 +2657,22 @@ window.CANEI_DICT = {
     ["Factura de autónomo", "Self-employed invoice"],
     ["Confirmación de pedido", "Order confirmation"],
     ["Justificante de pago", "Proof of payment"],
+    // ── ADM-01 Facturación (S10).
+    [
+      "Facturas emitidas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos, las emitidas son inmutables, y un día de retraso ya se ve en rojo.",
+      "Invoices issued from the accepted quote, the contract's milestones or approved extras. No gaps in the numbering, an issued invoice is immutable, and one day late already shows in red.",
+    ],
+    ["facturas", "invoices"],
+    ["Ninguna factura coincide con la búsqueda.", "No invoice matches the search."],
+    ["Días de retraso", "Days late"],
+    ["Retención IRPF", "IRPF withholding"],
+    ["Forma", "Method"],
+    ["Cobro registrado", "Collection recorded"],
+    ["Indica el importe cobrado", "Enter the amount collected"],
+    [
+      "Un cobro parcial deja el resto pendiente y el contador de vencido lo sigue contando.",
+      "A partial collection leaves the rest outstanding, and the overdue counter keeps counting it.",
+    ],
     // ── COM-04 Contrato and PRY-03 Adicionales (S9).
     [
       "Contratos vigentes e históricos. El importe vigente se marca en ámbar cuando ya no coincide con el original: significa que hay anexos.",
@@ -3286,6 +3302,8 @@ window.CANEI_DICT = {
     [new RegExp("^(\\d+) obra$"), "$1 site"],
     [new RegExp("^(\\d+) contratos$"), "$1 contracts"],
     [new RegExp("^(\\d+) contrato$"), "$1 contract"],
+    [new RegExp("^(\\d+) facturas$"), "$1 invoices"],
+    [new RegExp("^(\\d+) factura$"), "$1 invoice"],
     // The two S8 panels title themselves after the record they opened on.
     [new RegExp("^Repartir · (.+)$"), "Split · $1"],
     [new RegExp("^Cobros previstos · (.+)$"), "Expected collections · $1"],
@@ -3327,6 +3345,8 @@ window.CANEI_DICT = {
     [new RegExp("^(\\d+) site$"), "$1 obra"],
     [new RegExp("^(\\d+) contracts$"), "$1 contratos"],
     [new RegExp("^(\\d+) contract$"), "$1 contrato"],
+    [new RegExp("^(\\d+) invoices$"), "$1 facturas"],
+    [new RegExp("^(\\d+) invoice$"), "$1 factura"],
     [new RegExp("^forecast margin (.+)$"), "con margen previsto $1"],
     [new RegExp("^collected (.+)$"), "cobrado $1"],
     [new RegExp("^(.+) at stake$"), "$1 en juego"],

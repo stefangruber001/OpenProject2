@@ -10,6 +10,12 @@ const { ERP } = require("../../site/erp-engine.js");
 const checks = [];
 const assert = (cond, name, detail) =>
   checks.push({ name, pass: !!cond, detail: cond ? "" : String(detail || "") });
+/** Add days to an ISO date without importing the engine's private helper. */
+const addDaysISO = (iso, n) => {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
 const throws = (fn, name) => {
   try {
     fn();
@@ -1383,6 +1389,67 @@ assert(
   assert(
     erp.changeStage(erp.state.changes.find((c) => c.id === rejected.id)) === "",
     "…and changeStage says so rather than inventing a stage for it",
+  );
+}
+
+/* ---- S10 · ADM-01's four counters, and what an invoice is billed against -- */
+{
+  const sum = erp.invoicingSummary();
+  const reg = erp.invoiceRegister();
+  assert(
+    sum.issued.count === reg.length &&
+      sum.issued.amountCents === reg.reduce((s, r) => s + r.totalCents, 0),
+    "invoicingSummary: «emitido» IS the register, not a separate accumulation",
+    JSON.stringify(sum.issued),
+  );
+  assert(
+    sum.collected.amountCents + sum.outstanding.amountCents === sum.issued.amountCents,
+    "…collected plus outstanding equals issued, so the strip cannot disagree with the table",
+    `${sum.collected.amountCents}+${sum.outstanding.amountCents} vs ${sum.issued.amountCents}`,
+  );
+  assert(
+    sum.overdue.amountCents <= sum.outstanding.amountCents,
+    "…overdue is a SUBSET of outstanding, not a fifth bucket beside it",
+    `${sum.overdue.amountCents} vs ${sum.outstanding.amountCents}`,
+  );
+  assert(
+    sum.overdue.count === reg.filter((r) => r.daysOverdue > 0).length,
+    "…and it counts exactly the rows the register calls late",
+  );
+  // Red from day one: an invoice one day past its due date is already late.
+  const anyOpen = erp.state.invoices.find((i) => erp.invoiceOutstandingCents(i.id) > 0);
+  if (anyOpen) {
+    const realToday = erp.state.today;
+    erp.state.today = addDaysISO(anyOpen.dueDate, 1);
+    const late = erp.invoiceRegister().find((r) => r.number === anyOpen.number);
+    assert(
+      late.daysOverdue === 1,
+      "one day past due is one day overdue — no grace period",
+      String(late.daysOverdue),
+    );
+    erp.state.today = anyOpen.dueDate;
+    const onDay = erp.invoiceRegister().find((r) => r.number === anyOpen.number);
+    assert(onDay.daysOverdue === 0, "…and the due date itself is not yet late");
+    erp.state.today = realToday;
+  }
+
+  // S9's handover asked whether ADM-01 bills against the original contract or
+  // the current one. It has always been the current one — projectBilling reads
+  // projectEconomics().currentRevenueCents, which is baseline PLUS approved
+  // changes — so this asserts the answer rather than changing it.
+  const billed = erp.projectBilling(prj.id);
+  const ec = erp.projectEconomics(prj.id);
+  const withVat =
+    ec.currentRevenueCents +
+    Math.round((ec.currentRevenueCents * erp.project(prj.id).vatBp) / 10000);
+  assert(
+    billed.remainingToInvoiceCents === Math.max(0, withVat - billed.invoicedCents),
+    "projectBilling bills against the CURRENT contract value, extras included",
+    `${billed.remainingToInvoiceCents} vs ${Math.max(0, withVat - billed.invoicedCents)}`,
+  );
+  assert(
+    ec.currentRevenueCents >= ec.baselineRevenueCents,
+    "…and the current value is the baseline plus approved extras, never less",
   );
 }
 

@@ -74,6 +74,7 @@ async function main() {
     await testPresupuestador(browser, base);
     await testCapture(browser, base);
     await testProjectTracking(browser, base);
+    await testInvoicing(browser, base);
     await testContract(browser, base);
     await testProcurement(browser, base);
     await testAdmin(browser, base);
@@ -2070,6 +2071,133 @@ async function testProjectTracking(browser, base) {
   }
 }
 
+// ── ADM-01 Facturación (§3.2) — four counters over the register, and the one
+//    row treatment the doc is explicit about: days overdue red FROM DAY ONE.
+async function testInvoicing(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#invoicing`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(800);
+
+    const strip = await pg.evaluate(() => {
+      const cs = [...document.querySelectorAll("#view .counter")];
+      return {
+        n: cs.length,
+        width: cs.length ? Math.round(cs[0].getBoundingClientRect().width) : 0,
+        labels: cs.map((c) => c.querySelector(".lab").textContent),
+        overdueRed: cs.length === 4 ? cs[3].classList.contains("warn") : null,
+        engine: erp.invoicingSummary(),
+      };
+    });
+    if (strip.n === 4 && strip.width === 270 && /Emitido/i.test(strip.labels[0]))
+      ok(`ADM-01: four 270 px counters (${strip.labels.join(" · ")})`);
+    else bad("ADM-01: counter strip", JSON.stringify({ ...strip, engine: undefined }));
+
+    // Red only when non-zero — a counter that is always red is one nobody
+    // looks at, which is why the doc bothers to say "when non-zero".
+    if (strip.overdueRed === strip.engine.overdue.amountCents > 0)
+      ok(
+        `ADM-01: the overdue counter is red exactly when it is non-zero (${strip.engine.overdue.amountCents > 0})`,
+      );
+    else bad("ADM-01: overdue red", `${strip.overdueRed} vs ${strip.engine.overdue.amountCents}`);
+
+    // The strip must agree with the table beneath it.
+    const agree = await pg.evaluate(() => {
+      const s = erp.invoicingSummary();
+      return (
+        s.collected.amountCents + s.outstanding.amountCents === s.issued.amountCents &&
+        s.overdue.amountCents <= s.outstanding.amountCents
+      );
+    });
+    if (agree) ok("ADM-01: collected + outstanding = issued, and overdue is inside outstanding");
+    else bad("ADM-01: counters reconcile", "the strip disagrees with itself");
+
+    // Days overdue, painted red from day one.
+    const days = await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("#view table.mlist tr.click")];
+      const cells = rows.map((tr) => {
+        const td = tr.querySelectorAll("td")[6];
+        const span = td.querySelector("span");
+        return {
+          text: td.textContent.trim(),
+          red:
+            !!span &&
+            /rgb\(/.test(getComputedStyle(span).color) &&
+            getComputedStyle(span).color !== getComputedStyle(td).color,
+        };
+      });
+      return {
+        rows: rows.length,
+        late: cells.filter((c) => c.text !== "—").length,
+        allLateAreRed: cells.filter((c) => c.text !== "—").every((c) => c.red),
+      };
+    });
+    if (days.rows > 0 && (days.late === 0 || days.allLateAreRed))
+      ok(`ADM-01: every late invoice paints its days red (${days.late} of ${days.rows})`);
+    else bad("ADM-01: days column", JSON.stringify(days));
+
+    // A counter filters the register to its own subset.
+    const allRows = await pg.locator("#view table.mlist tr.click").count();
+    await pg.locator('#view [data-inv="outstanding"]').click();
+    await pg.waitForTimeout(400);
+    const openRows = await pg.locator("#view table.mlist tr.click").count();
+    const engineOpen = await pg.evaluate(() => {
+      const issued = {};
+      erp.state.invoices.forEach((i) => (issued[i.number] = i.date));
+      return erp
+        .invoiceRegister()
+        .filter((r) => inPeriod(issued[r.number]))
+        .filter((r) => r.outstandingCents > 0).length;
+    });
+    await pg.locator("#view .counter.on").first().click();
+    await pg.waitForTimeout(400);
+    const clearedRows = await pg.locator("#view table.mlist tr.click").count();
+    if (openRows === Math.min(engineOpen, 25) && clearedRows === allRows)
+      ok(`ADM-01: «pendiente» filters to exactly the open invoices (${openRows})`);
+    else bad("ADM-01: counter filter", `${allRows}/${openRows}/${clearedRows} vs ${engineOpen}`);
+
+    // Settling one moves the counters and the row together.
+    const before = await pg.evaluate(() => erp.invoicingSummary().outstanding.amountCents);
+    const target = await pg.evaluate(() => {
+      const issued = {};
+      erp.state.invoices.forEach((i) => (issued[i.number] = i.date));
+      const r = erp
+        .invoiceRegister()
+        .filter((x) => inPeriod(issued[x.number]))
+        .find((x) => x.outstandingCents > 0);
+      return r ? r.number : null;
+    });
+    if (target) {
+      await pg.fill("#invQ", target);
+      await pg.waitForTimeout(500);
+      await pg.locator("#view table.mlist tr.click").first().click();
+      await pg.waitForTimeout(500);
+      await pg.locator("#iv_go").click();
+      await pg.waitForTimeout(700);
+      const after = await pg.evaluate(() => ({
+        outstanding: erp.invoicingSummary().outstanding.amountCents,
+        drawerClosed: !document.querySelector("#drawer").classList.contains("on"),
+      }));
+      if (after.outstanding < before && after.drawerClosed)
+        ok("ADM-01: recording a collection moves the counters straight away");
+      else bad("ADM-01: collection updates the strip", `${before} → ${after.outstanding}`);
+    } else {
+      ok(
+        "ADM-01: nothing outstanding in the period, and the screen says so rather than inventing a row",
+      );
+    }
+
+    if (errs.length === 0) ok("ADM-01: no console errors");
+    else bad("ADM-01: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("invoicing", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
 // ── COM-04 Contrato (§3.2) — the last of the four full-screen surfaces, and
 //    the one column that earns the screen: «Importe vigente» goes amber the
 //    moment annexes exist, so nobody has to open a contract to find out.
@@ -3757,6 +3885,13 @@ async function testI18n(browser, base) {
       ok("i18n: CA translates the PRY-03 counters and rows");
     else bad("i18n: CA PRY-03", chgCaText.replace(/\n/g, " ").slice(0, 160));
 
+    await pg.evaluate(() => (location.hash = "invoicing"));
+    await pg.waitForTimeout(700);
+    const invCaText = await pg.locator("#view").innerText();
+    if (/Emès|Cobrat|Vençut/i.test(invCaText) && !/Vencimiento/.test(invCaText))
+      ok("i18n: CA translates the ADM-01 counters and register");
+    else bad("i18n: CA ADM-01", invCaText.replace(/\n/g, " ").slice(0, 160));
+
     await pg.evaluate(() => (location.hash = "contracts"));
     await pg.waitForTimeout(700);
     const conCaText = await pg.locator("#view").innerText();
@@ -3878,6 +4013,13 @@ async function testI18n(browser, base) {
     )
       ok("i18n: EN translates the PRY-03 counters and rows");
     else bad("i18n: EN PRY-03", chgEnText.replace(/\n/g, " ").slice(0, 160));
+
+    await pg.evaluate(() => (location.hash = "invoicing"));
+    await pg.waitForTimeout(700);
+    const invEnText = await pg.locator("#view").innerText();
+    if (/Collected/i.test(invEnText) && /Days/i.test(invEnText) && !/Vencimiento/.test(invEnText))
+      ok("i18n: EN translates the ADM-01 counters and register");
+    else bad("i18n: EN ADM-01", invEnText.replace(/\n/g, " ").slice(0, 160));
 
     await pg.evaluate(() => (location.hash = "contracts"));
     await pg.waitForTimeout(700);

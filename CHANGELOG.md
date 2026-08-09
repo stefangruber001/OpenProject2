@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Facturación (ADM-01) is organised around four counters — issued, collected,
+  outstanding and overdue, the last one red only when there is something to be
+  red about — and the register now carries a balance and a days column, with
+  days late painted red from the first day rather than after a grace period a
+  screen invented. Settling an invoice opens a panel that takes the amount and
+  the method, so a partial collection leaves the rest outstanding and the
+  overdue counter keeps counting it.
+
 - Contratos (COM-04) splits into contracts in force and historical ones, and the
   current amount is marked amber as soon as it stops matching the original —
   which means annexes exist. Opening one shows the contract full screen: the

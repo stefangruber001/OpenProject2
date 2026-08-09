@@ -1111,6 +1111,41 @@ unit tests, build, `make gates`, `make demo`. The committed bundle is unchanged.
 **Next:** S10 — ADM-01 Facturación (four 270 counters, days overdue red from
 day one; every primitive it needs already exists).
 
+## S10 — red from day one (2026-08-09)
+
+- **ADM-01 has its four counters** — emitido · cobrado · pendiente · vencido —
+  all derived by `invoicingSummary` from the same register the rows are drawn
+  from, so a strip of totals over a table cannot tell a different story from
+  the table. «Vencido» is a **subset** of «pendiente», not a fifth bucket:
+  money that is late is still money that is owed, and a red counter that
+  double-counts is the worst possible thing to paint red. Two invariants are
+  asserted so they cannot drift — `collected + outstanding = issued` and
+  `overdue ≤ outstanding`.
+- **Days overdue are red from day one**, in their own column. Not from a week,
+  not after a grace period: the check pins both sides of the boundary, so the
+  due date itself is 0 and the day after is 1. A screen that waits before
+  saying an invoice is late has taught somebody that waiting is normal.
+- **A settled invoice shows «—», not 0,00 €.** A zero in a money column reads
+  as a figure somebody calculated.
+- **S9's handover question already had an answer.** `projectBilling` reads
+  `currentRevenueCents` — the frozen baseline plus approved changes — so
+  ADM-01 has always billed against the contract's current value, and CHG-04 has
+  always refused the unapproved extras. Nothing was changed; a check was added,
+  because an invariant nobody tests is one that survives by luck.
+- **Two intermittent test reds turned out to be one harness bug** and are
+  fixed: checks that measured a page 600 ms after `goto` sometimes measured it
+  before boot. `bootedShell()` waits for the shell instead of guessing at the
+  machine's CPU.
+
+Verified: site E2E 289/289 (9 new checks) · manageability 196/196 (8 new engine
+checks) · migrations 48/48 · year 149/149 · import 25/25 · scheduling 30/30 ·
+i18n coverage (EN 100%, CA ceiling 1308 → 1304) · site-sync 17/17 · ownership
+guard · bundle safety · lint, boundaries, types, unit tests, build,
+`make gates`, `make demo`.
+
+**Next:** S11 — ADM-05 Banco + ADM-06 Caja + gap 13 (`accountCode`), the last
+structural break in the money chain.
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-
