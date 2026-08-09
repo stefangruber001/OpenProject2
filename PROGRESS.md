@@ -830,6 +830,48 @@ site-sync 17/17 · ownership guard · lint, boundaries, types, tests, build,
 
 **Next:** S4 — COM-01 Leads + COM-02 Visita.
 
+## S4 — a lead learns to become a visit (2026-08-09)
+
+`addVisit` had always been one unconditional write — there was no way to
+schedule a visit and capture it later, and no screen for leads at all outside
+a placeholder route.
+
+- **Two engine methods replace the one-shot write.** `scheduleVisit` creates
+  a `status:"scheduled"` record with nothing captured; `completeVisit` writes
+  the capture fields once, refuses a second call on a `"done"` visit
+  (`validateVisit` remains the correction path), and moves the opportunity
+  from `awaitingVisit` to `awaitingBudget`. `addVisit` keeps its old signature
+  for the 6 existing seed/history call sites.
+- **COM-01 Leads** (`#leads`): register with next-action editing and loss
+  tracking (`loseOpportunity` with a reason from the owner-maintained list).
+- **COM-02 Visita** (`#visits`): two fixed-height blocks — Programadas and
+  Realizadas — sharing one `state.visits` collection filtered by status, both
+  built on `renderMasterList` extended with `fixedSize`/`noExport`/`noNew`
+  flags rather than a second pagination implementation.
+- **The handoff to a presupuesto stops at a bare budget header** — COM-03
+  (S5) owns the real builder. `visitDetailDrawer` creates the header via the
+  existing `createBudget` and links it with `validateVisit(visitId,
+{budgetId})`, verified in e2e by asserting the hash actually changes to
+  `#quotes`.
+- **The i18n coverage guard proved its own limit.** Dictionary coverage
+  (29 new ES/EN/CA triples) was green on the first pass and still missed two
+  real gaps: the dynamic "N oportunidades"/"N visitas programadas/realizadas"
+  count tag never goes through the translator at all (the same pattern
+  `clientes`/`proveedores` already have — fixed for EN via the same regex
+  convention, left as pre-existing CA backlog since CA has no such regex
+  coverage anywhere yet), and "Programadas"/"Realizadas"/"Sin crear" are
+  distinct strings from the already-dictionaried "Programada"/"Realizada"
+  that the exact-match guard could not see were still raw Spanish on screen.
+  Both fixed once a real-browser check visited the new screens under CA and
+  EN, rather than only asking the dictionary whether an entry exists.
+
+Verified: site E2E 195/195 · manageability 100/100 · year 149/149 · import
+25/25 · scheduling 30/30 · migrations 43/43 (ladder now v12) · i18n coverage
+(EN 100%, CA backlog held at 1326) · ownership guard · lint, boundaries,
+types, tests, build, `make demo`.
+
+**Next:** S5 — COM-03 Presupuestador.
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

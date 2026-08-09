@@ -1969,3 +1969,58 @@ different decisions, so these ten arrived colliding. They are renumbered from
   exactly. **Reversible:** the lists are data with a seeded migration, so
   reverting the screens leaves the vocabulary intact; the Catalan file is
   additive and can be deleted without touching the ES/EN spine.
+
+- **#105 — S4: a lead had no lifecycle, and the coverage guard proved it only
+  checks the dictionary (2026-08-09).** COM-01/COM-02 needed an actual visit
+  lifecycle — `addVisit` had always been a single unconditional write, with no
+  way to schedule one first and capture it later. **Decisions:** (a) **Two
+  engine methods, not a status field bolted onto the old one.**
+  `scheduleVisit(v,user)` creates a `status:"scheduled"` record with nothing
+  captured yet; `completeVisit(id,patch,user)` writes the capture fields once,
+  refuses a second call on an already-`"done"` visit (the existing
+  `validateVisit` is the correction path for that, unchanged), and flips the
+  owning opportunity from `awaitingVisit` to `awaitingBudget`. `addVisit`
+  keeps its old one-step signature for the 6 seed/history call sites — a
+  second lifecycle is not owed to code that only ever wrote finished visits.
+  (b) **`renderMasterList` grew three flags instead of a second, duplicate
+  pagination implementation**: `fixedSize` pins the page size and hides the
+  size selector, `noExport`/`noNew` drop the buttons — needed because COM-02
+  is two fixed-height blocks (Programadas/Realizadas) sharing one `state.visits`
+  collection filtered by status, not two different kinds of record. Verified
+  against every S2/S3 screen that already uses the primitive: no regression.
+  (c) **The handoff to a presupuesto stops at a bare budget header.** COM-03
+  (S5) owns the real builder; `visitDetailDrawer` creates the header via the
+  existing `createBudget`, links it back with `validateVisit(visitId,
+{budgetId})`, and navigates to `#quotes` — proven in e2e by asserting the
+  hash actually changes, not just that a function was called. (d) **The
+  server command whitelist (`apps/web/lib/erp-commands.ts`) is untouched,
+  matching S2/S3 exactly.** `site/erp.html` persists through
+  `ErpStore.saveState()` → `/api/<tenant>/erp/state`, a whole-document sync
+  that already covers every mutation in this file including brand-new ones;
+  the granular `COMMANDS` whitelist backs a separate, narrower surface
+  (`apps/web`'s server-rendered tenant pages) that neither S2 nor S3 extended
+  for their own new engine methods either. Extending it for `scheduleVisit`/
+  `completeVisit` here would be new scope invented mid-session, not a gap S4
+  introduced. (e) **The i18n coverage guard caught two real misses, and
+  proved something about itself in the process.** First pass: 29 new
+  ES/EN/CA triples covered every new sentence, label and button — the guard
+  (`tests/i18n/coverage.mjs`) was green, and it was still wrong. Adding a
+  real-browser check that visits the new screens under CA/EN (rather than
+  only asking the dictionary "does an entry exist") found (i) the row-count
+  tag ("N oportunidades", "N visitas programadas/realizadas") never
+  translates at all — the same dynamic noun-splice pattern `clientes`/
+  `proveedores`/`registros` already use, fixed for EN with the same
+  `rxEs2En`/`rxEn2Es` regex-pair convention those use, left as pre-existing
+  CA backlog because CA has _no_ regex coverage for any such count today,
+  clientes and proveedores included — a decision 20 says is allowed to be a
+  ratchet, not zero; and (ii) the "Programadas"/"Realizadas"/"Sin crear"
+  strings, which are plural/distinct forms of words that WERE in the
+  dictionary ("Programada", "Realizada"), so the coverage guard's exact-string
+  check saw no gap while the screen showed raw Spanish under CA and EN both.
+  Fixed with three more triples. **The lesson, stated plainly: the dictionary
+  coverage guard proves entries exist, not that a specific screen renders
+  them — a real-browser assertion per new screen is the only check that
+  catches a translated-looking string that is actually a different string.**
+  **Reversible:** the two engine methods are additive (old `addVisit` callers
+  unaffected); the `renderMasterList` flags default to their old behavior
+  when omitted; the i18n additions are dictionary entries only.
