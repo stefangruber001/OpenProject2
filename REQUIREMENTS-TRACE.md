@@ -80,15 +80,15 @@ BRD's own §11 phasing (justification given per item). MISSING: none remain.
 
 ## CHG
 
-| ID     | Status      | Evidence / justification                                                                                                                                |
-| ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CHG-01 | IMPLEMENTED | erp-engine.js addChange(): desc, reason, priceCents, costCents, scheduleImpactDays, status per change                                                   |
-| CHG-02 | PARTIAL     | addChange photoRef + priceChange() later (year-sim.mjs:550-555); erp.html has no site-capture form for extras, only approve                             |
-| CHG-03 | IMPLEMENTED | projectEconomics() adds approved change price/cost; baseline Object.freeze (PRJ); approveChange() creates contract annex CTR-…-An                       |
-| CHG-04 | IMPLEMENTED | issueInvoice throws 'Unapproved extra is not billable'; extrasRegister.unapprovedValueCents; Control Tower tile; sim negative test line 938             |
-| CHG-05 | PARTIAL     | extrasRegister() counts identified/priced/approved/invoiced + per-item status, but no code path ever sets 'executed' and register has no executed count |
-| CHG-06 | PARTIAL     | approveChange evidenceRef + photoRef + annexNumber on change record; no attachment slot for revised documents (single evidence ref only)                |
-| CHG-07 | PARTIAL     | projectDrawer shows base + approved extras = current revenue with values and value-weighted progressPct; completed scope not shown as a euro value      |
+| ID     | Status      | Evidence / justification                                                                                                                                                                  |
+| ------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CHG-01 | IMPLEMENTED | erp-engine.js addChange(): desc, reason, priceCents, costCents, scheduleImpactDays, status per change                                                                                     |
+| CHG-02 | PARTIAL     | addChange photoRef + priceChange() later (year-sim.mjs:550-555); erp.html has no site-capture form for extras, only approve                                                               |
+| CHG-03 | IMPLEMENTED | projectEconomics() adds approved change price/cost; baseline Object.freeze (PRJ); approveChange() creates contract annex CTR-…-An                                                         |
+| CHG-04 | IMPLEMENTED | issueInvoice throws 'Unapproved extra is not billable'; extrasRegister.unapprovedValueCents; Control Tower tile; PRY-03 marks every unapproved row with a pill AND a 3 px amber rule (S9) |
+| CHG-05 | PARTIAL     | changeStageSummary() counts and totals the doc's five stages incl. executed (S9); no code path ever sets 'executed', so that counter is structurally present and always zero              |
+| CHG-06 | PARTIAL     | approveChange evidenceRef + photoRef + annexNumber on change record; no attachment slot for revised documents (single evidence ref only)                                                  |
+| CHG-07 | PARTIAL     | projectDrawer shows base + approved extras = current revenue with values and value-weighted progressPct; completed scope not shown as a euro value                                        |
 
 ## CON
 
@@ -106,7 +106,7 @@ BRD's own §11 phasing (justification given per item). MISSING: none remain.
 | CON-10 | PARTIAL     | contract.language carried from budget (CON-10 tag, line 1056); no Catalan legal wording exists anywhere in the build                                                                                                                        |
 | CON-11 | IMPLEMENTED | signContract stores both signature dates+method; startWorks throws if unsigned; issueInvoice blocks first invoice unsigned; alert 'obra iniciada sin contrato firmado'                                                                      |
 | CON-12 | IMPLEMENTED | approveChange creates annex CTR-…-A{n} on contract.annexes referencing changeId/value/date; projectEconomics chains baseline→current value                                                                                                  |
-| CON-13 | PARTIAL     | 6 statuses + contractControlView has all 8 attributes, but erp.html contratos table omits the penalties and language columns from the business view                                                                                         |
+| CON-13 | IMPLEMENTED | contractsView() + COM-04: two tabs, original vs current amount (amber when annexes exist), annex count, signature and status; the full-screen viewer carries penalties, guarantees and language on its Datos tab and in the document (S9)   |
 | CON-14 | PARTIAL     | terms are data (clauseBlocks, defaults) and issued contracts snapshot clause ids; but no business-facing maintenance UI/function — blocks only seedable in code (erp-seed.js:27)                                                            |
 
 ## CRM

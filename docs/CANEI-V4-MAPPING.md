@@ -87,10 +87,10 @@ Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, resh
 | COM-01 | Leads                    | `#leads`                                                             | **BUILT (S4)** — register + next action + loss tracking                                  |
 | COM-02 | Visita                   | `#visits`                                                            | **BUILT (S4)** — own two-block screen, scheduleVisit/completeVisit lifecycle             |
 | COM-03 | Presupuesto              | `#quotes` + builder                                                  | **BUILT (S5)** — full-screen three-pane builder, five stages, ES/CA output               |
-| COM-04 | Contrato                 | `#contratos` — installments exist                                    | **ADAPT** — add PDF viewer + anexos                                                      |
+| COM-04 | Contrato                 | `#contracts`                                                         | **BUILT (S9)** — two tabs, amber current amount, full-screen viewer                      |
 | PRY-01 | Avance Físico            | `#progress`                                                          | **BUILT (S8)** — centre panel, three-state control, Gantt full screen                    |
 | PRY-02 | Avance Económico         | `#economics`                                                         | **BUILT (S8)** — three cards, per-capítulo table, the chapter-split panel                |
-| PRY-03 | Adicionales              | `#modificaciones`                                                    | **ADAPT** — add photo capture + approval evidence                                        |
+| PRY-03 | Adicionales              | `#variations`                                                        | **BUILT (S9)** — five counters, 56 px rows, real photo evidence                          |
 | ADM-01 | Facturación              | `#facturacion`                                                       | **ADAPT**                                                                                |
 | ADM-02 | Compras y Pedidos        | `#compras`                                                           | **BUILT (S7)** — three counters, full-screen order beside the supplier's quote           |
 | ADM-03 | Facturas de proveedores  | `#supplier-invoices`                                                 | **BUILT (S6+S7)** — OCR and validation, then the two zones and allocation                |
@@ -234,14 +234,15 @@ Only what is particular to each screen; everything else inherits from 3.1.
 - **The 780 centre panel with a 372 compressed list** is built (S8) and both PRY screens run on it;
   it is the third shared surface, after the 480 side panel and full screen.
 - **Four full-screen surfaces** must hide the side menu: presupuestador, Gantt, contrato viewer,
-  document validation. Three of the four are built — the presupuestador (S5), both document
-  surfaces (S6's validation screen and S7's ADM-02 order) and the Gantt (S8, reached from PRY-01's
-  Programación tab); the contrato viewer is S9's.
+  document validation. **All four are built** — the presupuestador (S5), the validation screen
+  (S6), ADM-02's order (S7), the Gantt (S8) and the contrato viewer (S9). The contract's document
+  is rendered from data rather than uploaded, for the reason CON-03 made the terms structured.
 - **Two-zone document screens** (ADM-02, ADM-03, DMC-01) are a new layout primitive; built once as
   `.cap2` in S6 and reused unchanged by ADM-02 in S7.
 - **Counter strips** (TC/PRY-03/ADM-01/ADM-02/ADM-07) are a second shared primitive — built in S7
   as `.counters`, with the per-screen width passed in through `--cw` because the doc gives a
-  different one to each of the five.
+  different one to each of the five. Two of the five are on it: ADM-02 at 360 (S7), PRY-03 at
+  216 (S9).
 - **The status colour code is global** and must be a single token set, not per-screen colours.
 - Mobile: **tables become two-line cards and the menu becomes a five-icon bottom bar** — the
   current app scrolls tables horizontally instead, which the doc replaces.

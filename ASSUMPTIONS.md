@@ -2288,3 +2288,70 @@ different decisions, so these ten arrived colliding. They are renumbered from
   economics table) kept its «Ajustar» button in the new per-capítulo table.
   Universal search now opens the job on PRY-01 rather than in a drawer over
   whatever screen the search was used from. **Reversible: yes.**
+
+- **#117 — S9: the contract's document is rendered from data, not uploaded
+  (2026-08-09).** §3.2 puts a PDF **760 wide** on the left of COM-04's viewer.
+  There is no contract PDF anywhere in this system, and there does not need to
+  be one: **CON-03 made the terms structured on purpose**, so requiring somebody
+  to attach a scan of what the database already knows would be asking for the
+  same contract twice and then trusting the copy. `renderContractDoc` builds it
+  the way `renderBudgetDoc` has built the presupuesto since session 9 — issuer,
+  customer, economic terms, milestones, guarantees, penalties, signature — and
+  the viewer sets it as a document rather than as interface. A signed scan,
+  when there is one, is a **captured document** and belongs beside this rather
+  than instead of it; S7's `attachPurchaseDocument` is the pattern if that is
+  ever wanted. **Reversible: yes** — nothing was removed and the renderer is
+  additive.
+
+- **#118 — S9: the contract document is outside the language toggle
+  (2026-08-09).** Same rule S5 established for the customer's presupuesto, and
+  for the same reason: `contract.language` is a field an estimator sets **per
+  customer**, while the toggle is a preference of **whoever is at the screen**.
+  The document carries `translate="no"` and its fixed labels come from a small
+  per-language table inside the view, deliberately **not** from the i18n
+  dictionary — otherwise «Importe vigente» and «Hitos de pago» would be
+  translated inside a document a Catalan customer is about to sign in Spanish.
+  The panel beside it is interface and does follow the toggle. **Reversible:
+  yes.**
+
+- **#119 — S9: what «vigente» means in COM-04's two tabs (2026-08-09).** The
+  doc gives the register Active and Inactive tabs without saying what decides.
+  Taken as **whether the contract still governs work**, not whether it is
+  signed: a draft is active because somebody is still working on it, and a
+  cancelled one is not, whatever its signature says. So `active` is
+  `status ∉ {completed, cancelled}` and the signature is its own column.
+  **Reversible: yes — one predicate in `contractsView`.**
+
+- **#120 — S9: `sent` folds into «valorado» in PRY-03's counters
+  (2026-08-09).** The doc counts by five stages — identificado · valorado ·
+  aprobado · ejecutado · facturado — and the record has eight statuses. The
+  mapping is one-to-one except for `sent`, which folds into **valorado**:
+  from the site's point of view an extra that has been priced and one already
+  with the customer are the same thing — priced, not yet agreed — and the
+  difference is visible in the row's own status pill. A **rejected or
+  cancelled** extra is counted in **none** of the five, for the reason a
+  cancelled purchase order is in none of ADM-02's three: a counter that
+  includes work nobody will do has to be explained every time it is read.
+  **Reversible: yes — `changeStage` is derived, nothing is stored.**
+
+- **#121 — S9: an extra's photograph became a real file (2026-08-09).** §3.2
+  puts a **40 × 40 thumbnail** in every PRY-03 row. `change.photoRef` has been
+  a typed file name since session 10b — «extra-01.jpg» — which renders as
+  nothing. It is now a blob key written through `ErpStore.putBlob`, the same
+  path every picture has taken since S6, and the photograph is stored **before
+  the record is written** so a failed upload cannot leave an extra pointing at
+  a picture that is not there. A `photoRef` that is not a blob (everything the
+  seed wrote) stays the camera icon rather than showing a broken image — the
+  same fallback-by-letting-it-fail that ADM-03's cards use, and the only test
+  that works for both the local and the served path. **Reversible: yes — the
+  field still holds a string and old values still read.**
+
+- **#122 — S9: `contractControlView` stays beside `contractsView`
+  (2026-08-09).** COM-04 needed a richer row than CON-13's control view — both
+  money columns, the annex count, the project code, the active predicate — so
+  `contractsView` is new rather than a widening of the old one. The old one is
+  kept because **`year-sim` drives it as CON-13's own trace evidence**, and
+  widening a method a simulation asserts against would have changed what that
+  evidence means. Two views of one collection is a smell; it is logged here so
+  the next person can retire the first once CON-13's evidence has somewhere
+  else to live. **Reversible: yes.**

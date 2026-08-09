@@ -1068,6 +1068,49 @@ ownership guard · bundle safety · lint, boundaries, types, unit tests, build,
 **Next:** S9 — COM-04 Contrato + PRY-03 Adicionales (the last unbuilt
 full-screen surface, and the five 216 counters).
 
+## S9 — the last full screen, and a photograph that is actually a photograph (2026-08-09)
+
+- **COM-04 has its two tabs and the column that earns the screen.** «Importe
+  vigente» goes amber the moment it differs from the original, because that
+  difference means annexes exist — the one fact about a contract nobody should
+  have to open it to discover. Both figures are the taxable base: an annex
+  records a net price, so adding it to a VAT-inclusive figure would produce a
+  number that is neither.
+- **The contract opens full screen** — document 760 on the left, a fixed 392
+  panel on the right with Datos, Hitos de pago and Anexos. That is the fourth
+  and last of the specification's out-of-shell surfaces; all four are now built.
+- **The document is rendered from data, not uploaded.** There is no contract
+  PDF in this system and there need not be one: CON-03 made the terms
+  structured on purpose, so asking somebody to attach a scan of what the
+  database already knows is asking for the same contract twice and trusting the
+  copy. It carries `translate="no"` — the contract's language is a field chosen
+  for the customer, not a preference of whoever is reading it — while the panel
+  beside it follows the toggle, and the e2e checks both in one breath.
+- **Hitos de pago foot against the contracted amount**, and a date the works
+  calendar moved says so. That is S8's honesty carried one screen along: a
+  milestone marked «de la planificación» was not moved by a person.
+- **PRY-03 has its five counters** (identificado · valorado · aprobado ·
+  ejecutado · facturado), each with a count and an amount and each filtering.
+  `sent` folds into valorado — priced and already-with-the-customer are the
+  same thing from a site's point of view — and a rejected extra is counted in
+  none of the five.
+- **An unapproved extra is marked twice**: the pill, and a 3 px amber rule down
+  the left of its row. CHG-04 is why — unapproved work is never billable, and
+  the person who needs to know is walking past a screen in a site office.
+- **The photograph became a real file.** `photoRef` had been a typed file name
+  since session 10b, which renders as a blank square; it is now a blob written
+  through the same path every picture has taken since S6, stored before the
+  record so a failed upload cannot leave an extra pointing at nothing.
+
+Verified: site E2E 280/280 (16 new checks) · manageability 188/188 (14 new
+engine checks) · migrations 48/48 · year 149/149 · import 25/25 · scheduling
+30/30 · i18n coverage (EN 100%, CA ceiling held at 1308 across 39 new triples) ·
+site-sync 17/17 · ownership guard · bundle safety · lint, boundaries, types,
+unit tests, build, `make gates`, `make demo`. The committed bundle is unchanged.
+
+**Next:** S10 — ADM-01 Facturación (four 270 counters, days overdue red from
+day one; every primitive it needs already exists).
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

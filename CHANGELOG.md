@@ -7,6 +7,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Contratos (COM-04) splits into contracts in force and historical ones, and the
+  current amount is marked amber as soon as it stops matching the original —
+  which means annexes exist. Opening one shows the contract full screen: the
+  document itself on the left, built from the terms the system already holds
+  rather than from an uploaded scan, and a panel on the right with the details,
+  the payment milestones footed against the contracted amount, and the annexes.
+  A milestone whose date the works calendar moved says so.
+- Adicionales (PRY-03) is organised around five counters — identified, priced,
+  approved, executed, invoiced — each carrying a count and an amount and each
+  filtering the list. Rows are taller so they can carry a photograph, taken with
+  the camera and stored like every other picture, and an unapproved extra is
+  marked with an amber bar down the left of its row as well as a label: work
+  that has not been approved is never billable, and that has to be readable from
+  across a site office.
+
 - Avance físico (PRY-01) and Avance económico (PRY-02) are built on a new
   centre panel: choosing a site compresses the list to a 372 column and opens
   a 780 panel beside it, and the list never disappears — closing the panel
