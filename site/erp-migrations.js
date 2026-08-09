@@ -525,6 +525,54 @@
         return s;
       },
     },
+    {
+      to: 15,
+      name: "every allocated cost names its account (S11, gap 13)",
+      /*
+       * Rule 07 of the specification: every cost lands on a project OR an
+       * account. The account half had no field, so §6's money chain has
+       * carried one ✗ since S0 — this closes it.
+       *
+       * The backfill RESOLVES rather than defaults: an allocation to an
+       * overhead category already knew which account it belonged to (the
+       * chart names the mapping), and one to a project knows it from its cost
+       * kind. What it could not do before was say so, which is why a report by
+       * account was impossible and not merely empty.
+       *
+       * A row that resolves to nothing is left without the field rather than
+       * given a wrong one. `accountLedger` reports those under `unassigned`,
+       * which is a number somebody can act on; an invented account code is a
+       * number nobody can.
+       */
+      up: function (s) {
+        var accounts = (s.lists && s.lists.accounts) || [];
+        function resolve(a) {
+          if (!a || a.accountCode) return a && a.accountCode;
+          var hit = null;
+          if (a.overheadCategory)
+            hit = accounts.filter(function (x) {
+              return x.overhead === a.overheadCategory;
+            })[0];
+          else if (a.projectId)
+            hit = accounts.filter(function (x) {
+              return x.cost === (a.kind || "material");
+            })[0];
+          return hit ? hit.code : null;
+        }
+        function walk(list, key) {
+          (Array.isArray(list) ? list : []).forEach(function (rec) {
+            (Array.isArray(rec[key]) ? rec[key] : []).forEach(function (a) {
+              var code = resolve(a);
+              if (code) a.accountCode = code;
+            });
+          });
+        }
+        walk(s.bills, "allocations");
+        walk(s.captured, "allocations");
+        walk(s.movements, "allocations");
+        return s;
+      },
+    },
   ];
 
   /**

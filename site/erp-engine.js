@@ -312,6 +312,54 @@
       { code: "onAccount", es: "A cuenta", ca: "A compte" },
       { code: "oneOff", es: "Pago único", ca: "Pagament únic" },
     ],
+    /**
+     * GAP 13 — the chart of accounts, and the reason it is a LIST.
+     *
+     * Rule 07 of the specification says every cost lands on a project **or an
+     * account**. The account half had no field anywhere in the model, and the
+     * chart itself lived in a separate page's own dataset that the engine had
+     * never heard of. Bringing it in as `state.lists.accounts` does three
+     * things at once: it gives the resolver something to validate against, it
+     * makes the chart owner-maintainable through the same DMC-03/04/05 screen
+     * as every other reference list, and it keeps the codes out of code.
+     *
+     * `overhead` names which overhead category defaults to this account, so
+     * the mapping is a property of the account rather than a second table that
+     * has to be kept in step with this one.
+     */
+    accounts: [
+      { code: "600", es: "Compras de material", ca: "Compres de material", cost: "material" },
+      { code: "601", es: "Subcontratas", ca: "Subcontractes", cost: "subcontract" },
+      { code: "602", es: "Mano de obra de obra", ca: "Mà d'obra d'obra", cost: "labour" },
+      { code: "629", es: "Otros costes de obra", ca: "Altres costos d'obra", cost: "other" },
+      { code: "621", es: "Alquileres", ca: "Lloguers", overhead: "rent" },
+      { code: "624", es: "Vehículos", ca: "Vehicles", overhead: "vehicles" },
+      {
+        code: "628",
+        es: "Combustible y suministros",
+        ca: "Combustible i subministraments",
+        overhead: "fuel",
+      },
+      { code: "625", es: "Seguros", ca: "Assegurances", overhead: "insurance" },
+      { code: "629.1", es: "Oficina", ca: "Oficina", overhead: "office" },
+      {
+        code: "623",
+        es: "Servicios profesionales",
+        ca: "Serveis professionals",
+        overhead: "accountingFirm",
+      },
+      { code: "627", es: "Marketing", ca: "Màrqueting", overhead: "marketing" },
+      { code: "662", es: "Gastos financieros", ca: "Despeses financeres", overhead: "financial" },
+      { code: "631", es: "Otros tributos", ca: "Altres tributs", overhead: "taxes" },
+      { code: "218", es: "Inmovilizado", ca: "Immobilitzat", overhead: "fixedAsset" },
+      { code: "621.1", es: "Renting", ca: "Rènting", overhead: "renting" },
+      {
+        code: "629.9",
+        es: "Otros gastos generales",
+        ca: "Altres despeses generals",
+        overhead: "otherOverhead",
+      },
+    ],
   };
   /** The four kinds DMC-03/04/05 maintain, in the order those screens show them. */
   const LIST_KINDS = Object.keys(LIST_DEFAULTS);
@@ -3384,13 +3432,17 @@
       const total = c.confirmed ? c.confirmed.totalCents : sum(rows, (a) => a.amountCents);
       if (Math.abs(sum(rows, (a) => a.amountCents) - total) > 1)
         throw new Error("Split must total the document amount"); // 7.4
-      c.allocations = rows.map((a) => ({
-        projectId: a.projectId || null,
-        overheadCategory: a.overheadCategory || null,
-        chapterNum: a.chapterNum || null,
-        kind: a.kind || "material",
-        amountCents: Math.round(a.amountCents),
-      }));
+      c.allocations = rows.map((a) =>
+        // Gap 13: the account is resolved at the moment the cost is filed, so
+        // a later report never has to guess what somebody meant.
+        this.withAccountCode({
+          projectId: a.projectId || null,
+          overheadCategory: a.overheadCategory || null,
+          chapterNum: a.chapterNum || null,
+          kind: a.kind || "material",
+          amountCents: Math.round(a.amountCents),
+        }),
+      );
       c.status = "allocated";
       this._log(user, "allocateCapture", capId);
       return c;
@@ -3653,7 +3705,11 @@
           irpfBp,
           irpfCents,
           totalCents: baseCents + vatCents - irpfCents,
-          allocations: b.allocations || [], // AP-02 {projectId|overheadCategory, chapterNum, kind, amountCents}
+          // AP-02 {projectId|overheadCategory, chapterNum, kind, amountCents,
+          // accountCode}. Gap 13's field is resolved here so a bill registered
+          // with its allocations already on it is filed as completely as one
+          // allocated afterwards through `allocateBill`.
+          allocations: (b.allocations || []).map((a) => this.withAccountCode(a)),
           docRef: b.docRef || null,
           capId: b.capId || null,
           status: "registered",
@@ -3861,11 +3917,134 @@
       const m = this.state.movements.find((x) => x.id === movId);
       if (Math.abs(sum(allocations, (a) => a.amountCents) - Math.abs(m.amountCents)) > 1)
         throw new Error("Split must total the movement");
-      m.allocations = allocations;
+      m.allocations = allocations.map((a) => this.withAccountCode(a));
       m.class = "projectCost";
       m.status = "allocated";
       this._log(user, "splitMovement", movId);
       return m;
+    }
+    /* =========================== GAP 13 — costs that land on an account ====
+       §6's money chain has carried one ✗ since S0: a cost can reach an
+       ACCOUNT rather than a project — insurance, utilities, marketing, fees,
+       vehicles, rent — and no field carried it. The rest of the chain closed
+       long ago; this is the last structural break in it. */
+
+    /** The account a cost belongs to, resolved from where it was allocated. */
+    resolveAccountCode(alloc) {
+      // An explicit code always wins. Somebody who has typed one has looked at
+      // the invoice; a rule has only looked at a category.
+      if (alloc.accountCode) return alloc.accountCode;
+      const accounts = this.listAll("accounts");
+      if (alloc.overheadCategory) {
+        const byOverhead = accounts.find((a) => a.overhead === alloc.overheadCategory);
+        return byOverhead ? byOverhead.code : null;
+      }
+      if (alloc.projectId) {
+        const byKind = accounts.find((a) => a.cost === (alloc.kind || "material"));
+        return byKind ? byKind.code : null;
+      }
+      return null;
+    }
+    /** The same allocation with its account resolved onto it. */
+    withAccountCode(alloc) {
+      const code = this.resolveAccountCode(alloc);
+      return code ? { ...alloc, accountCode: code } : { ...alloc };
+    }
+    /**
+     * Cost by account over a period — the roll-up that proves the wiring, and
+     * the thing the gestoría package and ADM-09 both want.
+     *
+     * Reads bills, captured documents and bank/till movements together,
+     * because rule 07 is about every cost and those are the three doors a cost
+     * comes in through. A row with no resolvable account is reported under
+     * `unassigned` rather than dropped: an account roll-up that quietly loses
+     * money is worse than one that admits it.
+     */
+    accountLedger(from, to) {
+      const inRange = (d) => (!from || d >= from) && (!to || d <= to);
+      const byCode = {};
+      let unassignedCents = 0;
+      const add = (alloc, date, amountCents) => {
+        if (!inRange(date)) return;
+        const code = this.resolveAccountCode(alloc);
+        if (!code) {
+          unassignedCents += amountCents;
+          return;
+        }
+        byCode[code] = (byCode[code] || 0) + amountCents;
+      };
+      for (const b of this.state.bills)
+        for (const a of b.allocations)
+          add(a, b.date, b.creditNoteFor ? -a.amountCents : a.amountCents);
+      for (const c of this.state.captured)
+        for (const a of c.allocations)
+          add(a, (c.confirmed && c.confirmed.date) || c.capturedAt, a.amountCents);
+      for (const m of this.state.movements) {
+        if (m.excludedFromPL) continue;
+        for (const a of m.allocations || []) add(a, m.accountingDate, a.amountCents);
+      }
+      const accounts = this.listAll("accounts");
+      return {
+        rows: Object.keys(byCode)
+          .sort()
+          .map((code) => {
+            const acc = accounts.find((a) => a.code === code);
+            return { code, name: acc ? acc.es : code, amountCents: byCode[code] };
+          }),
+        unassignedCents,
+        totalCents: Object.values(byCode).reduce((s, v) => s + v, 0),
+      };
+    }
+    /* =========================== ADM-06 — petty cash ======================
+       The simplest screen in the document, and the one that most rewards not
+       being clever: a till is a bank account whose statement nobody imports,
+       so entries are typed and the count at the foot is what proves them. */
+
+    /* ADM-06 records cash through the EXISTING `recordCashMovement` further
+       down this class (BNK-07), not through a second one added here.
+
+       This session briefly shipped a duplicate, and the class swallowed it
+       without a word: a later definition of the same name silently wins, so
+       the new method was dead the moment it was written and the tests failed
+       against behaviour nobody could find. S1a wrote this hazard down after
+       hitting it once; it is written down again here because writing it down
+       once was demonstrably not enough. Before adding a method to this class,
+       grep for its name. */
+    /**
+     * The arqueo at the foot of ADM-06: opening, in, out, closing.
+     *
+     * `closing` is computed from the opening balance and the period's
+     * movements rather than read from anywhere, because that IS the count —
+     * a stored closing balance is a number nobody counted.
+     */
+    cashCount(accountId, from, to) {
+      const acc = this.state.bankAccounts.find((a) => a.id === accountId);
+      if (!acc) throw new Error("Account not found");
+      const movs = this.state.movements.filter((m) => m.accountId === accountId);
+      // With no `from`, NOTHING is before: an unbounded count starts at the
+      // account's opening balance. Writing this as `!from || …` made every
+      // movement "before" the period and folded the whole history into the
+      // opening figure — the count still balanced, which is what made it
+      // dangerous.
+      const before = from ? movs.filter((m) => m.accountingDate < from) : [];
+      const inPeriod = movs.filter(
+        (m) => (!from || m.accountingDate >= from) && (!to || m.accountingDate <= to),
+      );
+      const openingCents = (acc.openingCents || 0) + before.reduce((s, m) => s + m.amountCents, 0);
+      const inCents = inPeriod
+        .filter((m) => m.amountCents > 0)
+        .reduce((s, m) => s + m.amountCents, 0);
+      const outCents = inPeriod
+        .filter((m) => m.amountCents < 0)
+        .reduce((s, m) => s + Math.abs(m.amountCents), 0);
+      return {
+        openingCents,
+        inCents,
+        outCents,
+        closingCents: openingCents + inCents - outCents,
+        awaitingDoc: inPeriod.filter((m) => m.needsDoc).length,
+        count: inPeriod.length,
+      };
     }
     classifyMovement(movId, klass, user) {
       // BNK-03
@@ -6985,7 +7164,7 @@
       const s = sum(allocations, (a) => a.amountCents);
       if (Math.abs(s - b.baseCents) > 1)
         throw new Error("Allocations must equal the bill base amount");
-      b.allocations = allocations;
+      b.allocations = allocations.map((a) => this.withAccountCode(a));
       this._log(user, "allocateBill", b.number);
       return b;
     }
