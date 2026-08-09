@@ -31,7 +31,7 @@ const assert = (cond, name, detail) => (cond ? ok(name) : bad(name, detail));
 const erp = new ERP("2026-01-05");
 erp.configureEntity({
   legalName: "Canei Subirats, S.L.",
-  taxId: "B66666666",
+  taxId: "B66666660",
   street: "Carrer de la Creu 74",
   postalCode: "08960",
   city: "Sant Just Desvern",
@@ -70,7 +70,7 @@ const supElec = erp.addParty({
   roles: ["subcontractor"],
   partyType: "company",
   name: "ElectroBaix S.L.",
-  taxId: "B65739207",
+  taxId: "B65739203",
   billStreet: "C/ Industria 12",
   billPostalCode: "08980",
   billCity: "Sant Feliu",

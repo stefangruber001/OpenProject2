@@ -60,9 +60,44 @@
       const n = { X: "0", Y: "1", Z: "2" }[v[0]] + v.slice(1, 8);
       return NIF_L[parseInt(n, 10) % 23] === v[8]; // NIE
     }
-    if (/^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$/.test(v)) return true; // CIF structure
+    if (/^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$/.test(v)) return cifControlOk(v); // CIF, digit checked
     if (/^[A-Z]{2}[0-9A-Z]{2,13}$/.test(v)) return true; // EU VAT (structural)
     return false;
+  }
+  /**
+   * CIF check digit (MDM-03: "validated for format and check digit").
+   *
+   * The DNI/NIE branches above compute their own check letter; this one used
+   * to accept anything of the right shape. That gap is what let a scanned
+   * NIF come back wrong-but-plausible during the S0b OCR spike — a corrupted
+   * character in a mixed letter/digit code produces something that still
+   * matches the regex, and only the check digit catches it.
+   *
+   * The seven digits are summed with the odd positions (1st, 3rd, 5th, 7th)
+   * doubled and digit-summed first; the total's last digit gives a control
+   * digit, which is looked up as a letter for organisation types that require
+   * one. Verified against the workbook during the spike: 166 of 170
+   * CIF-shaped values passed, a rate consistent with occasional scanning
+   * errors rather than a wrong algorithm.
+   */
+  function cifControlOk(v) {
+    const letter = v[0],
+      digits = v.slice(1, 8),
+      control = v[8];
+    let sum = 0;
+    for (let i = 0; i < 7; i++) {
+      let d = +digits[i];
+      if (i % 2 === 0) {
+        d *= 2;
+        if (d > 9) d -= 9;
+      }
+      sum += d;
+    }
+    const controlDigit = (10 - (sum % 10)) % 10;
+    const controlLetter = "JABCDEFGHI"[controlDigit];
+    if (/[ABEH]/.test(letter)) return control === String(controlDigit); // digit-only orgs
+    if (/[NPQRSW]/.test(letter)) return control === controlLetter; // letter-only orgs
+    return control === String(controlDigit) || control === controlLetter; // either is accepted
   }
   function validIban(v) {
     v = String(v || "")
@@ -472,6 +507,11 @@
           // budgets and projects (where profitability("activityLine") reads it)
           // and was removed from the party model. Schema v9 drops it from
           // stored records too.
+          businessLine: "", // DMT-01 "Línea de negocio" — which BUSINESS, not which job (v4 plan gap 1)
+          category: "", // DMT-02 "Categoría" — a supplier's own classification (gap 2)
+          sourceSystem: "", // "Fuente" — where this record's data originally came from (gap 3)
+          aliases: [], // "Nombres originales" — every name this party was ever filed under; the
+          // only way to re-match it against a future re-upload (gap 4)
           createdAt: this.state.today, // MDM-01: when this record entered the file
           paymentMethod: "transfer",
           paymentTermsDays: 30,
@@ -645,7 +685,11 @@
       const missing = MANDATORY_TO_INVOICE.filter((f) => !String(p[f] || "").trim());
       if (p.taxId && !validTaxId(p.taxId)) missing.push("taxId(valid)");
       if (!p.mobile && !p.landline) missing.push("telephone");
-      const extras = ["email", "leadSource", "activityLine"].filter(
+      // "activityLine" here used to reference a field that left the party
+      // model in v9 (see addParty) — every party read as permanently missing
+      // it, which quietly deflated everyone's completeness percentage for a
+      // field nobody could ever fill in. businessLine is its DMT replacement.
+      const extras = ["email", "leadSource", "businessLine"].filter(
         (f) => !String(p[f] || "").trim(),
       );
       const total =
@@ -1312,7 +1356,13 @@
         throw new Error(
           "Budget fails validation: " + blocks.map((x) => x.line + " " + x.msg).join("; "),
         );
-      this._requireComplete(b.partyId, "budget"); // MDM-10 (budget needs identified party)
+      // No completeness block here (decision 21): a presupuesto is a commercial
+      // offer, not a fiscal document, and it must proceed with whatever data
+      // exists on the party — the RD 1619/2012 requirement for a full NIF and
+      // address is specific to the factura, and to the contrato that precedes
+      // it (see createContract and issueInvoice, which still call
+      // _requireComplete). Only the channel-specific check below stands: you
+      // cannot email a document to an address that does not exist.
       const ch = channel || "email";
       if (ch === "email" && !validEmail(this.party(b.partyId).email))
         throw new Error("Email required to send electronically (MDM-04)");
@@ -3278,9 +3328,22 @@
 
     /* =========================== LAB — labour hours =========================== */
     addWorker(w, user) {
-      // LAB-04/05
+      // LAB-04/05. DMT-04: personal interno is master data in its own right,
+      // not just a name on the hours grid — the fields below are what a
+      // registry screen needs that a timesheet never did.
       const rec = Object.assign(
-        { id: this._id("wkr"), name: "", kind: "employee", rateHistory: [], docs: [] },
+        {
+          id: this._id("wkr"),
+          code: "P-" + String(this.state.workers.length + 1).padStart(4, "0"),
+          name: "",
+          kind: "employee",
+          taxId: "",
+          phone: "",
+          email: "",
+          active: true,
+          rateHistory: [],
+          docs: [],
+        },
         w,
       ); // rateHistory {from, rateCentsPerHour}; docs {kind, expiresOn, docRef}
       this.state.workers.push(rec);

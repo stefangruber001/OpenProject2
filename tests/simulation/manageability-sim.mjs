@@ -22,7 +22,7 @@ const throws = (fn, name) => {
 const erp = new ERP("2026-03-02");
 erp.configureEntity({
   legalName: "Canei Subirats, S.L.",
-  taxId: "B66666666",
+  taxId: "B66666660",
   street: "Creu 74",
   postalCode: "08960",
   city: "SJD",
@@ -543,6 +543,150 @@ assert(
   assert(
     certified.certifications.length === 1 && certified.certifications[0].amountCents === 100000,
     "executed work is valued as a certification against the award",
+  );
+}
+
+// -----------------------------------------------------------------------------
+// S2: the CIF check digit, the four gap fields, the completeness/issuance
+// rules the v4 doc's DMT screens depend on, and the workers registry (DMT-04).
+// -----------------------------------------------------------------------------
+{
+  // The DNI/NIE branches of validTaxId compute their check letter; the CIF
+  // branch used to accept anything of the right SHAPE. This is what let a
+  // scanned NIF come back wrong-but-plausible during the S0b OCR spike.
+  const { validTaxId } = require("../../site/erp-engine.js");
+  assert(validTaxId("A58881509"), "CIF: correct digit control passes (org type requiring a digit)");
+  assert(!validTaxId("A58881508"), "CIF: wrong digit control fails");
+  assert(
+    validTaxId("N0012345E"),
+    "CIF: correct letter control passes (org type requiring a letter)",
+  );
+  assert(!validTaxId("N00123455"), "CIF: a digit where a letter-only org needs a letter fails");
+  assert(
+    validTaxId("C12345674") && validTaxId("C1234567D"),
+    "CIF: either form passes for an org type that accepts both",
+  );
+  assert(!validTaxId("C1234567X"), "CIF: neither form still fails");
+}
+{
+  // Gap fields 1-4 (plan): businessLine, category, sourceSystem, aliases[].
+  // Present on a fresh party, round-trip through an edit, and — the actual
+  // point — the workbook's «Nombres originales» column has somewhere real to
+  // land, which is the only way a later filtered upload can re-match a
+  // supplier against what is already on file.
+  const sup = erp.addParty(
+    {
+      roles: ["supplier"],
+      name: "Suministros de Prueba",
+      taxId: "B65410011",
+      billStreet: "C/ B 2",
+      billPostalCode: "08002",
+      billCity: "BCN",
+      billProvince: "Barcelona",
+      mobile: "600222333",
+      businessLine: "Canei",
+      category: "Fontanería",
+      sourceSystem: "Factura Canei",
+      aliases: ["Suministros Prueba SL", "SUM. PRUEBA"],
+    },
+    "bo",
+  );
+  assert(
+    sup.businessLine === "Canei" &&
+      sup.category === "Fontanería" &&
+      sup.sourceSystem === "Factura Canei",
+    "gap fields 1-3 round-trip through addParty",
+  );
+  assert(
+    Array.isArray(sup.aliases) && sup.aliases.length === 2,
+    "gap field 4 (aliases[]) round-trips through addParty",
+  );
+  erp.updateParty(sup.id, { aliases: [...sup.aliases, "Suministros P."] }, "bo");
+  assert(
+    erp.party(sup.id).aliases.length === 3,
+    "aliases[] is editable, not just settable at creation",
+  );
+
+  // The stale "activityLine" reference in partyCompleteness's extras — a field
+  // that left the party model in v9 — used to make EVERY party read as
+  // permanently missing it. businessLine is the field that actually exists;
+  // this party already set it, so it should not appear as recommended-missing.
+  const c = erp.partyCompleteness(sup.id);
+  assert(
+    !c.recommendedMissing.includes("activityLine"),
+    "partyCompleteness no longer references the removed party.activityLine field",
+  );
+  assert(
+    !c.recommendedMissing.includes("businessLine"),
+    "a party that set businessLine is not flagged as missing it",
+  );
+}
+{
+  // Decision 21: capture proceeds regardless of completeness; only the two
+  // FISCAL documents — contrato and factura — are blocked. This is the rule
+  // the DMT completeness ring exists to make visible before it becomes a
+  // block, so both halves are asserted: presupuesto issues, contrato/factura
+  // do not.
+  const bare = erp.addParty({ roles: ["customer"], name: "Cliente Incompleto" }, "bo");
+  assert(!erp.partyCompleteness(bare.id).ok, "sanity: this party really is incomplete");
+
+  const bb = erp.createBudget({ partyId: bare.id }, "bo");
+  const bc1 = erp.addChapter(bb.id, { name: "Obra" }, "bo");
+  erp.addLine(
+    bb.id,
+    bc1.id,
+    { desc: "Trabajo", unit: "u", qtyMilli: 1000, priceCents: 1000, costCents: 500 },
+    "bo",
+  );
+  // channel:"inPerson" sidesteps the SEPARATE, unrelated "email required to
+  // send electronically" check (MDM-04) — this assertion is about
+  // completeness, not about whether the party happens to have an email.
+  let issued = false;
+  try {
+    erp.issueVersion(bb.id, { channel: "inPerson" }, "bo");
+    issued = true;
+  } catch {
+    issued = false;
+  }
+  assert(
+    issued,
+    "issueVersion succeeds for an incomplete party (presupuesto is not a fiscal document)",
+  );
+
+  throws(
+    () => erp.createContract(bb.id, { installments: [], duration: { estimatedDays: 1 } }, "bo"),
+    "createContract still refuses an incomplete party",
+  );
+  throws(
+    () => erp.issueInvoice({ partyId: bare.id, kind: "progress", baseCents: 1000 }, "bo"),
+    "issueInvoice still refuses an incomplete party",
+  );
+}
+{
+  // DMT-04 Personal Interno: the workers registry had no code, no contact
+  // fields and no active flag — a timesheet needed only a name. A master-data
+  // screen needs all four.
+  const w = erp.addWorker({ name: "Trabajador de Prueba" }, "bo");
+  assert(/^P-\d{4}$/.test(w.code), "addWorker assigns a human-readable code");
+  assert(w.active === true, "a new worker defaults to active");
+  erp.adminPatch(
+    "worker",
+    w.id,
+    { taxId: "12345678Z", phone: "600333444", email: "t@example.com" },
+    "bo",
+  );
+  const w2 = erp.state.workers.find((x) => x.id === w.id);
+  assert(
+    w2.taxId === "12345678Z" && w2.phone === "600333444",
+    "worker contact fields are editable via adminPatch",
+  );
+
+  // Deactivate, never delete — same rule as everywhere else in this system.
+  erp.adminPatch("worker", w.id, { active: false }, "bo");
+  assert(
+    erp.state.workers.find((x) => x.id === w.id).active === false &&
+      erp.state.workers.some((x) => x.id === w.id),
+    "a deactivated worker stays on record",
   );
 }
 

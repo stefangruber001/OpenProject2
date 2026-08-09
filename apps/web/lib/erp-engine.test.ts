@@ -23,7 +23,7 @@ describe("the ERP engine, loaded server-side", () => {
       addParty: (p: Record<string, unknown>, user: string) => unknown;
     };
     erp.addParty(
-      { name: "Test Cliente S.L.", taxId: "B66666666", roles: ["customer"], active: true },
+      { name: "Test Cliente S.L.", taxId: "B66666660", roles: ["customer"], active: true },
       "server-test",
     );
     expect(erp.state.parties).toHaveLength(1);
