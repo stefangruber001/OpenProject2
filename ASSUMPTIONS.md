@@ -2024,3 +2024,63 @@ different decisions, so these ten arrived colliding. They are renumbered from
   **Reversible:** the two engine methods are additive (old `addVisit` callers
   unaffected); the `renderMasterList` flags default to their old behavior
   when omitted; the i18n additions are dictionary entries only.
+
+- **#106 — S5: the presupuestador leaves the shell, and the document stops
+  speaking the operator's language (2026-08-09).** COM-03 is the screen the
+  business runs on and it was a three-pane card layout inside the normal page,
+  with no way to reorder anything, no way to number a row by hand, and — this
+  was the surprise — **no way to send a presupuesto or record the customer's
+  answer at all**: `issueVersion` and `acceptVersion` had exactly zero callers
+  outside `erp-seed.js` and `erp-history.js`. **Decisions:** (a) **Free
+  numbering is a flag on the row, not a mode on the screen.** `_renumber`
+  assigns positional numbers to every row EXCEPT those carrying `manualNum`,
+  so a number a person typed survives every later insert, delete and drag,
+  while a number the system assigned belongs to the position and moves with
+  it. Duplicates are refused, because the number is the reader's only index
+  into the document and into the graphic annex. (b) **The five stages are
+  derived, not stored.** `budgetStage` computes draft/issued/accepted/
+  rejected/expired from the record. Expiry is the reason: it is not something
+  done to a record on a date, it just becomes true, and a stored status can
+  never know that without a nightly job nobody has written — the shipped data
+  proved it, with four seeded budgets long past their validity still stored as
+  `issued`. (c) **`rejectVersion` was missing and had to exist**, or the v4
+  register could not have a «Rechazados» group at all; it takes a loss-reason
+  CODE from DMC-04 so refusals stay countable alongside `loseOpportunity`, and
+  free text goes in `notes`. Testing it immediately exposed a real defect in
+  the code that was already there: **`acceptVersion` never checked for an
+  existing customer response**, so a refused version could be accepted
+  afterwards, overwriting the refusal and flipping the opportunity from lost
+  back to won with no trace of which answer the customer gave. Both now refuse
+  a version that already has an answer; a customer who changes their mind gets
+  a new version. (d) **Full screen is opt-in per render, cleared by
+  `render()`** rather than turned off on the way out, so no exit path can
+  strand the next screen without its navigation. (e) **"Guardar" is in the bar
+  because §3.2 puts it there, and does the only honest thing left**: §3.1 says
+  nothing waits for a save and this screen already writes every keystroke
+  through, so the button flushes the 140 ms debounce and reports the real
+  outcome (`persistNow`), including failure — which the fire-and-forget path
+  deliberately swallows. It never claims to have saved something that was not
+  already saved. (f) **The customer's document is not interface.** It is
+  written in `budget.language`, a field set per customer, and marked
+  `translate="no"` — which `i18n.js` now honours for a whole subtree. This
+  fixed a real pre-existing bug rather than only enabling Catalan: "Base
+  imponible", "Validez", "Opcionales (aparte)" and "Total por m²" are all in
+  the dictionary, so a Spanish presupuesto previewed by an operator working in
+  English came out partly English. The document label table (`DOCL`) is
+  deliberately NOT in the i18n dictionary, because those two ideas must not
+  share a switch. (g) **The visit panel falls back to the customer's last
+  capture when no visit is linked, and says so in a pill.** Only S4-era
+  budgets carry `visit.budgetId`, so a strict reading would have shown an
+  empty tab on every historical presupuesto; a labelled guess is more useful
+  than nothing and safer than an unlabelled one. Nothing on that tab writes,
+  and nothing is copied into a line — the mapping's own row 2 says the visit
+  does not inherit into the presupuesto. (h) **Two count labels were rebuilt
+  as separate text nodes instead of being given regex rules.** "Borradores ·
+  1" is one text node and no dictionary entry can reach it; a regex would have
+  fixed English only, since Catalan has no regex coverage for any such count.
+  Splitting the label from the number fixes all three languages with no rules
+  at all, and is the general answer to the class of bug S4 recorded. Found by
+  the real-browser render check, exactly as #105 said it would be, and not by
+  the dictionary guard, which was green throughout. **Reversible:** every
+  engine method is additive; `body.fs` is one class on one screen; the
+  document label table can be deleted to return every presupuesto to Spanish.

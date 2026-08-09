@@ -872,6 +872,55 @@ types, tests, build, `make demo`.
 
 **Next:** S5 — COM-03 Presupuestador.
 
+## S5 — the heart of the system leaves the shell (2026-08-09)
+
+COM-03 is the screen the business runs on. It was a three-pane card layout
+inside the normal page, with nothing draggable, no way to number a row by
+hand, and — the surprise of the session — **no way to send a presupuesto or
+record the customer's answer at all**: `issueVersion` and `acceptVersion` had
+zero callers outside the seed and the history generator.
+
+- **The register groups by the five stages** the specification names —
+  Borradores · Enviados · Aceptados · Rechazados · Caducados — and all five
+  are **derived**, not stored. Expiry is why: it is not something done to a
+  record on a date, it just becomes true. The shipped data proved the point,
+  with four seeded budgets long past their validity still stored as `issued`.
+- **The builder is full screen**, per §3.2: the rail, breadcrumb and page
+  heading go, and the three panes get 260 / flexible / 300 with the 56 px bar
+  above and the conditions bar below. `render()` clears the class on every
+  navigation, so no exit path can strand the next screen without its menu.
+- **Dragging means something to the document.** A 16 px handle per line (only
+  the handle, so the row still selects text), chapters draggable in the tree,
+  and lines draggable into another chapter — which moves their money between
+  the base and optional subtotals, and moves them in the customer's document
+  with it.
+- **Free numbering**: a number a person typed survives every later insert,
+  delete and drag; a number the system assigned belongs to the position and
+  moves with it. Duplicates are refused — the number is the reader's only
+  index into the document and into the graphic annex.
+- **Sending and answering now exist.** The send screen states plainly that
+  pending-price lines are NOT in the total the customer is about to read, and
+  a blocking issue disables the button rather than hiding the reason.
+  `rejectVersion` is new; testing it exposed a real defect in code that was
+  already there — `acceptVersion` never checked for an existing customer
+  response, so a refused version could be accepted afterwards, overwriting the
+  refusal and flipping the opportunity from lost back to won.
+- **The customer's document speaks the customer's language.** `budget.language`
+  drives it, and the document is marked `translate="no"`, which `i18n.js` now
+  honours. That fixed a bug rather than only adding Catalan: "Base imponible",
+  "Validez" and "Total por m²" are all in the dictionary, so a Spanish
+  presupuesto previewed by an operator working in English came out partly
+  English.
+- **The visit sits beside the presupuesto priced from it** — the payoff of S4's
+  link — as a second panel tab, strictly read-only.
+
+Verified: site E2E 221/221 · manageability 131/131 · year 149/149 · import
+25/25 · scheduling 30/30 · migrations 43/43 (ladder now v13) · i18n coverage
+(EN 100%, CA backlog held at 1326 across 83 new triples) · site-sync 17/17 ·
+ownership guard · lint, boundaries, types, tests, build, `make demo`.
+
+**Next:** S6 — OCR pipeline (approach fixed by the S0b memo).
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

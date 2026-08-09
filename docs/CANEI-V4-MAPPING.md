@@ -86,7 +86,7 @@ Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, resh
 | TC-01  | Torre de Control         | `#torre` — 8 cards, sparklines, customisation, CSV, alert management | **STRIP** to 4 indicators + project status + max 5 alerts                                |
 | COM-01 | Leads                    | `#leads`                                                             | **BUILT (S4)** — register + next action + loss tracking                                  |
 | COM-02 | Visita                   | `#visits`                                                            | **BUILT (S4)** — own two-block screen, scheduleVisit/completeVisit lifecycle             |
-| COM-03 | Presupuesto              | `#presupuestos` + builder                                            | **ADAPT** — sections/mediciones/versions exist                                           |
+| COM-03 | Presupuesto              | `#quotes` + builder                                                  | **BUILT (S5)** — full-screen three-pane builder, five stages, ES/CA output               |
 | COM-04 | Contrato                 | `#contratos` — installments exist                                    | **ADAPT** — add PDF viewer + anexos                                                      |
 | PRY-01 | Avance Físico            | `#proyectos` + `#seguimiento` + Gantt                                | **KEEP** (decision 1) + merge, add 2 recalc chains                                       |
 | PRY-02 | Avance Económico         | `#economia`                                                          | **ADAPT** — add cost-to-partida panel                                                    |
