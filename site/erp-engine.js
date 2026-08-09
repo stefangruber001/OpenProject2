@@ -2234,6 +2234,116 @@
         status: c.status,
       }));
     }
+    /**
+     * The contract's ORIGINAL value and what it is worth today — COM-04's two
+     * money columns, and the reason the second one goes amber when it differs.
+     *
+     * Both are the taxable base, not the gross: an annex records a net price
+     * (`change.priceCents`), so adding it to a VAT-inclusive figure would
+     * produce a number that is neither one thing nor the other. A difference
+     * between the two means annexes exist, which is exactly what the screen
+     * is trying to say without making anybody open the contract to find out.
+     */
+    contractValue(contractId) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const annexCents = sum(c.annexes || [], (a) => a.valueCents);
+      return {
+        originalCents: c.valueCents,
+        annexCents,
+        currentCents: c.valueCents + annexCents,
+        annexes: (c.annexes || []).length,
+        differs: annexCents !== 0,
+      };
+    }
+    /**
+     * Contracts as COM-04 lists them, split the way its two tabs split them.
+     *
+     * "Active" is about whether the contract still governs work, not about
+     * whether it is signed: a draft is active because somebody is still
+     * working on it, and a cancelled one is not, whatever its signature says.
+     */
+    contractsView() {
+      return this.state.contracts.map((c) => {
+        const v = this.contractValue(c.id);
+        const project = this.state.projects.find((p) => p.contractId === c.id) || null;
+        return {
+          id: c.id,
+          number: c.number,
+          party: this.party(c.partyId).name,
+          projectCode: project ? project.code : null,
+          date: c.date,
+          originalCents: v.originalCents,
+          currentCents: v.currentCents,
+          differs: v.differs,
+          annexes: v.annexes,
+          installments: c.installments.length,
+          signed: !!c.signature.customerSignedAt,
+          status: c.status,
+          active: !["completed", "cancelled"].includes(c.status),
+        };
+      });
+    }
+    /**
+     * The customer's contract document, from data.
+     *
+     * There is no uploaded PDF anywhere in this system and there does not need
+     * to be: CON-03 made the terms structured on purpose, so the document is
+     * rendered the same way the presupuesto is (QUO-05/DOC-01) rather than
+     * requiring somebody to attach a scan of what the database already knows.
+     * A signed scan, when there is one, is a captured document and belongs
+     * beside this rather than instead of it.
+     */
+    renderContractDoc(contractId) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const cfg = this.state.config;
+      const project = this.state.projects.find((p) => p.contractId === c.id) || null;
+      const v = this.contractValue(c.id);
+      return {
+        docType: "CONTRATO",
+        number: c.number,
+        date: c.date,
+        language: c.language,
+        issuer: {
+          legalName: cfg.legalName,
+          taxId: cfg.taxId,
+          address: `${cfg.street}, ${cfg.postalCode} ${cfg.city}`,
+          phone: cfg.phone,
+          email: cfg.email,
+          iban: cfg.iban,
+        },
+        customer: (({ name, taxId, billStreet, billPostalCode, billCity }) => ({
+          name,
+          taxId,
+          address: `${billStreet}, ${billPostalCode} ${billCity}`,
+        }))(this.party(c.partyId)),
+        projectCode: project ? project.code : null,
+        budgetNumber: c.budgetNumber,
+        originalCents: v.originalCents,
+        currentCents: v.currentCents,
+        vatBp: c.vatBp,
+        installments: c.installments.map((i, idx) => ({
+          idx,
+          trigger: i.trigger,
+          pct: i.pct != null ? i.pct : null,
+          amountCents: i.amountCents,
+          expectedDate: i.expectedDate || null,
+          // S8 made this date movable; the document has to say who moved it,
+          // or the honesty that session bought is lost one screen along.
+          expectedDateSource: i.expectedDateSource || null,
+          status: i.status,
+          invoiceId: i.invoicedInvoiceId || null,
+        })),
+        initiation: clone(c.initiation),
+        duration: clone(c.duration),
+        penalties: clone(c.penalties),
+        guarantees: clone(c.guarantees),
+        annexes: clone(c.annexes || []),
+        signature: clone(c.signature),
+        status: c.status,
+      };
+    }
 
     /* =========================== PRJ — projects =========================== */
     createProjectFromAcceptance(budgetId, user) {
@@ -2645,6 +2755,60 @@
           (c) => c.priceCents,
         ), // CHG-04 visible
       };
+    }
+    /**
+     * The five PRY-03 counts by — identificado · valorado · aprobado ·
+     * ejecutado · facturado — each with a count AND an amount.
+     *
+     * Derived from `status`, like every other stage reading in this engine,
+     * and mapped rather than renamed: the doc's five and the record's eight
+     * are different vocabularies for the same lifecycle. `sent` folds into
+     * **valorado** because from the site's point of view a priced extra and
+     * one already with the customer are the same thing — priced, not yet
+     * agreed — and the difference is visible in the row's own status pill.
+     *
+     * `rejected` and `cancelled` are in none of the five, for the reason a
+     * cancelled purchase order is in none of ADM-02's three: a counter that
+     * includes work nobody will do has to be explained every time it is read.
+     */
+    changeStageSummary(projectId) {
+      const STAGE = {
+        identified: "identified",
+        priced: "priced",
+        sent: "priced",
+        approved: "approved",
+        executed: "executed",
+        invoiced: "invoiced",
+      };
+      const out = {
+        identified: { count: 0, amountCents: 0 },
+        priced: { count: 0, amountCents: 0 },
+        approved: { count: 0, amountCents: 0 },
+        executed: { count: 0, amountCents: 0 },
+        invoiced: { count: 0, amountCents: 0 },
+      };
+      this.state.changes
+        .filter((c) => c.projectId === projectId)
+        .forEach((c) => {
+          const stage = STAGE[c.status];
+          if (!stage) return; // rejected · cancelled
+          out[stage].count += 1;
+          out[stage].amountCents += c.priceCents || 0;
+        });
+      return out;
+    }
+    /** Which of the five a single extra is in — "" for rejected/cancelled. */
+    changeStage(change) {
+      return (
+        {
+          identified: "identified",
+          priced: "priced",
+          sent: "priced",
+          approved: "approved",
+          executed: "executed",
+          invoiced: "invoiced",
+        }[change.status] || ""
+      );
     }
 
     /* =========================== PUR — purchases =========================== */

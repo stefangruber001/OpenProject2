@@ -1289,6 +1289,103 @@ assert(
   assert(none.moved.length === 0, "an empty proposal moves nothing and says so");
 }
 
+/* ---- S9 · COM-04's two money columns and PRY-03's five stages ----------- */
+{
+  const con = erp.state.contracts[0];
+  const v0 = erp.contractValue(con.id);
+  // This fixture already carries an annex from the change checks above, so the
+  // assertions here are about the DELTA rather than about a pristine contract:
+  // a test that needs the world to be empty is a test that breaks whenever
+  // somebody adds a step before it.
+  assert(
+    v0.originalCents === con.valueCents && v0.currentCents === v0.originalCents + v0.annexCents,
+    "contractValue: current is the original plus its annexes, and nothing else",
+    JSON.stringify(v0),
+  );
+  assert(
+    v0.differs === (v0.annexCents !== 0),
+    "…and «differs» is exactly the question «are there annexes»",
+  );
+
+  // An approved extra writes an annex, and that is what makes the two differ —
+  // the single fact COM-04's amber column exists to state.
+  const extra = erp.addChange(
+    prj.id,
+    { desc: "Extra S9", chapterNum: String(erp.project(prj.id).baseline.chapters[0].num) },
+    "ops",
+  );
+  erp.priceChange(extra.id, 50000, 30000, 2, "bo");
+  assert(
+    erp.changeStage(erp.state.changes.find((c) => c.id === extra.id)) === "priced",
+    "changeStage: a priced extra is valorado",
+  );
+  erp.sendChange(extra.id, "bo");
+  assert(
+    erp.changeStage(erp.state.changes.find((c) => c.id === extra.id)) === "priced",
+    "changeStage: one already with the customer is still valorado — the pill says the rest",
+  );
+  erp.approveChange(extra.id, "firma.png", "bo");
+
+  const v1 = erp.contractValue(con.id);
+  assert(
+    v1.differs && v1.currentCents === v0.currentCents + 50000 && v1.annexes === v0.annexes + 1,
+    "contractValue: an approved extra moves the current amount and names its annex",
+    `${JSON.stringify(v0)} -> ${JSON.stringify(v1)}`,
+  );
+  const row = erp.contractsView().find((c) => c.id === con.id);
+  assert(
+    row.differs && row.originalCents !== row.currentCents,
+    "contractsView carries both amounts, so the list can go amber without opening anything",
+  );
+  assert(
+    erp.contractsView().every((c) => c.active === !["completed", "cancelled"].includes(c.status)),
+    "contractsView: active is about whether the contract still governs work, not about signature",
+  );
+
+  const doc = erp.renderContractDoc(con.id);
+  assert(
+    doc.docType === "CONTRATO" && doc.number === con.number && doc.customer.name,
+    "renderContractDoc builds the customer's document from data — there is no PDF to upload",
+  );
+  assert(
+    doc.installments.length === con.installments.length &&
+      doc.installments.every((i) => "expectedDateSource" in i),
+    "…and every milestone carries where its date came from (S8's chain, one screen along)",
+  );
+  assert(
+    doc.annexes.length === v1.annexes && doc.annexes.some((a) => a.changeId === extra.id),
+    "…and the annex the approval created",
+  );
+  throws(() => erp.renderContractDoc("con-gone"), "a contract that is not there is refused");
+
+  const st = erp.changeStageSummary(prj.id);
+  assert(
+    st.approved.count >= 1 && st.approved.amountCents >= 50000,
+    "changeStageSummary counts and totals by stage",
+    JSON.stringify(st),
+  );
+  const totalStaged = ["identified", "priced", "approved", "executed", "invoiced"].reduce(
+    (s, k) => s + st[k].count,
+    0,
+  );
+  const rejected = erp.addChange(prj.id, { desc: "Rechazado S9" }, "ops");
+  erp.priceChange(rejected.id, 10000, 5000, 0, "bo");
+  erp.sendChange(rejected.id, "bo");
+  erp.rejectChange(rejected.id, "el cliente dijo que no", "bo");
+  const st2 = erp.changeStageSummary(prj.id);
+  assert(
+    ["identified", "priced", "approved", "executed", "invoiced"].reduce(
+      (s, k) => s + st2[k].count,
+      0,
+    ) === totalStaged,
+    "a rejected extra is counted in none of the five, rather than quietly in one",
+  );
+  assert(
+    erp.changeStage(erp.state.changes.find((c) => c.id === rejected.id)) === "",
+    "…and changeStage says so rather than inventing a stage for it",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);
