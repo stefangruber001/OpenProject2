@@ -405,7 +405,7 @@
    * Call surface
    * ------------------------------------------------------------------ */
 
-  return {
+  var api = {
     /** False when the bundle failed to load; callers must degrade, not throw. */
     available: available,
 
@@ -490,6 +490,68 @@
         } catch (e) {
           return [];
         }
+      },
+
+      /**
+       * What each payment milestone's expected date WOULD be if it followed
+       * the plan — money-chain item 14, the half that has to read a schedule.
+       *
+       * The mapping from a trigger to a date is the whole content:
+       *
+       *   atWorksStart  the plan's earliest planned start
+       *   atStage       the end of the task the milestone names in `stageRef`
+       *   onCompletion  the plan's finish
+       *   onSignature   nothing — it is an event, not a date on a chart
+       *   fixedDate     nothing — the engine refuses to move it anyway
+       *
+       * Returns a plain {idx: "YYYY-MM-DD"} map and writes nothing. Deciding
+       * which of these may be applied belongs to `setInstallmentDates`, so a
+       * proposal computed here can be shown to a person before it lands.
+       */
+      installmentDatesFromPlan: function (erp, projectId) {
+        var out = {};
+        try {
+          if (!scheduling) return out;
+          var project = erp.project(projectId);
+          if (!project.contractId) return out;
+          var contract = erp.state.contracts.find(function (c) {
+            return c.id === project.contractId;
+          });
+          if (!contract) return out;
+          // `api` rather than the ErpBridge global: this file is also
+          // require()d in Node, where that global does not exist and the
+          // ReferenceError would be swallowed by the catch below — a method
+          // that silently returns nothing is worse than one that throws.
+          var plan = api.scheduling.plans.get(erp.state, projectId);
+          if (!plan || !plan.tasks || !plan.tasks.length) return out;
+          var sch = api.scheduling.plans.schedule(plan);
+          if (!sch) return out;
+          var byId = {};
+          (sch.tasks || plan.tasks).forEach(function (t) {
+            byId[t.id] = t;
+          });
+          var starts = plan.tasks
+            .map(function (t) {
+              return (byId[t.id] && byId[t.id].plannedStart) || t.plannedStart;
+            })
+            .filter(Boolean)
+            .sort();
+          var start = starts[0] || null;
+          contract.installments.forEach(function (i, idx) {
+            if (i.trigger === "atWorksStart" && start) out[idx] = start;
+            else if (i.trigger === "onCompletion" && sch.finish) out[idx] = sch.finish;
+            else if (i.trigger === "atStage" && i.stageRef) {
+              var t = plan.tasks.find(function (x) {
+                return x.id === i.stageRef || x.sourceRef === i.stageRef;
+              });
+              var end = t && ((byId[t.id] && byId[t.id].plannedEnd) || t.plannedEnd);
+              if (end) out[idx] = end;
+            }
+          });
+        } catch (e) {
+          return out;
+        }
+        return out;
       },
 
       /* ---------------------------------------------------------------- *
@@ -815,4 +877,6 @@
       projectValue: projectValue,
     },
   };
+
+  return api;
 });

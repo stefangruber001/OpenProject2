@@ -1164,6 +1164,131 @@ assert(
   );
 }
 
+/* ---- S8 · PRY-02's chapter split and money-chain item 14 -----------------
+   Both are engine rules with exactly one interface each, so they are asserted
+   here rather than only through the screen that calls them. */
+{
+  const chapters = erp.project(prj.id).baseline.chapters;
+  assert(chapters.length > 0, "the fixture project has baseline chapters to split against");
+  const chNum = String(chapters[0].num);
+
+  const bill = erp.registerBill(
+    {
+      supplierId: sup.id,
+      number: "S8-1",
+      baseCents: 30000,
+      vatBp: 2100,
+      // Reaches the project and stops there: no chapterNum, which is exactly
+      // the row PRY-02's pending-assignment block exists to show.
+      allocations: [{ projectId: prj.id, amountCents: 30000 }],
+    },
+    "bo",
+  );
+  const pending = erp.unassignedChapterCosts(prj.id);
+  const row = pending.find((r) => r.ref === "S8-1");
+  assert(!!row, "unassignedChapterCosts finds a cost that reached the project with no chapter");
+  assert(
+    row.source === "bill" && row.amountCents === 30000,
+    "…and reports its origin and its amount",
+    JSON.stringify(row),
+  );
+  // The defect this screen exists for, stated as a check: the per-chapter
+  // table adds up to LESS than the project until somebody splits the row.
+  const chapTotalBefore = erp.chapterEconomics(prj.id).reduce((s, c) => s + c.actualCents, 0);
+  assert(
+    chapTotalBefore < erp.actualCostCents(prj.id),
+    "an unassigned cost is in the project's actual cost and in no chapter's",
+    `${chapTotalBefore} vs ${erp.actualCostCents(prj.id)}`,
+  );
+
+  throws(
+    () => erp.assignChapterSplit(prj.id, row.id, [], "bo"),
+    "a split into no chapters is refused",
+  );
+  throws(
+    () => erp.assignChapterSplit(prj.id, row.id, [{ chapterNum: "999", amountCents: 30000 }], "bo"),
+    "a chapter the project's baseline does not know is refused",
+  );
+  throws(
+    () => erp.assignChapterSplit(prj.id, row.id, [{ chapterNum: chNum, amountCents: 10000 }], "bo"),
+    "a split that does not total the cost is refused",
+  );
+  throws(
+    () =>
+      erp.assignChapterSplit(prj.id, row.id, [{ chapterNum: chNum, amountCents: -30000 }], "bo"),
+    "a negative chapter line is refused",
+  );
+
+  const second = chapters[1] ? String(chapters[1].num) : chNum;
+  erp.assignChapterSplit(
+    prj.id,
+    row.id,
+    [
+      { chapterNum: chNum, amountCents: 20000 },
+      { chapterNum: second, amountCents: 10000 },
+    ],
+    "bo",
+  );
+  const after = erp.state.bills.find((b) => b.id === bill.id);
+  assert(
+    after.allocations.length === 2 && after.allocations.every((a) => a.chapterNum),
+    "assignChapterSplit replaces the row with siblings that each carry a chapter",
+  );
+  assert(
+    after.allocations.reduce((s, a) => s + a.amountCents, 0) === 30000,
+    "…and the amount that reached the project is conserved",
+  );
+  assert(
+    erp.chapterEconomics(prj.id).reduce((s, c) => s + c.actualCents, 0) === chapTotalBefore + 30000,
+    "…so the per-chapter table now accounts for it",
+  );
+  assert(
+    !erp.unassignedChapterCosts(prj.id).some((r) => r.ref === "S8-1"),
+    "…and the row leaves the pending-assignment block",
+  );
+  throws(
+    () => erp.assignChapterSplit(prj.id, row.id, [{ chapterNum: chNum, amountCents: 30000 }], "bo"),
+    "a row that already has a chapter cannot be split again through the same id",
+  );
+
+  // Item 14. `cashForecast` has always read installment.expectedDate; nothing
+  // ever wrote it after the contract was drawn up.
+  const con = erp.state.contracts.find((x) => x.id === con2status.id) || erp.state.contracts[0];
+  const inst = con.installments[0];
+  assert(!!inst, "the fixture contract has a payment milestone");
+  const originally = inst.expectedDate;
+  const moved = erp.setInstallmentDates(con.id, { 0: "2027-01-15" }, "bo", "schedule");
+  assert(
+    inst.trigger === "fixedDate"
+      ? inst.expectedDate === originally
+      : inst.expectedDate === "2027-01-15",
+    "setInstallmentDates moves a planned milestone and leaves a fixed date alone",
+    `${inst.trigger} ${originally} -> ${inst.expectedDate}`,
+  );
+  if (inst.trigger !== "fixedDate") {
+    assert(
+      inst.expectedDateSource === "schedule" && !!inst.expectedDateSetAt,
+      "…and records what moved it, beside the date it wrote",
+    );
+    assert(moved.moved.length === 1, "…and reports the move rather than doing it silently");
+    // The whole point: the forecast notices.
+    const inWeek = erp.cashForecast(60).find((w) => w.from <= "2027-01-15" && w.to >= "2027-01-15");
+    assert(
+      !inWeek || inWeek.inflowCents >= inst.amountCents,
+      "…and cashForecast expects the money in the week the date moved to",
+    );
+  }
+  // History does not move because a plan did.
+  const invoiced = con.installments.find((i) => i.status !== "planned");
+  if (invoiced) {
+    const was = invoiced.expectedDate;
+    erp.setInstallmentDates(con.id, { [con.installments.indexOf(invoiced)]: "2099-01-01" }, "bo");
+    assert(invoiced.expectedDate === was, "an invoiced milestone is never moved by the planner");
+  }
+  const none = erp.setInstallmentDates(con.id, {}, "bo");
+  assert(none.moved.length === 0, "an empty proposal moves nothing and says so");
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

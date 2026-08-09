@@ -2162,6 +2162,50 @@
       this._log(user, "signContract", c.number);
       return c;
     }
+    /**
+     * Move the expected dates of a contract's payment milestones — item 14 of
+     * the money chain, which the v4 document asks about and which did not
+     * exist.
+     *
+     * `cashForecast` has always read `installment.expectedDate`, and nothing
+     * has ever written it after the contract was drawn up. So a job whose
+     * plan slipped three weeks kept forecasting the same money in the same
+     * week, and the forecast was wrong in the one direction that matters —
+     * optimistic — with nothing on screen admitting it.
+     *
+     * What moves and what does not is the whole rule:
+     *
+     *   - only `planned` installments. An invoiced one is history, and history
+     *     does not move because a plan did.
+     *   - never a `fixedDate` trigger. That is what the name means, and a
+     *     date the customer agreed to in writing is not the planner's to
+     *     revise.
+     *   - the reason is stored beside the date. A figure in a cash forecast
+     *     that changed on its own, with nothing saying what moved it, is
+     *     worse than the stale figure it replaced.
+     *
+     * The DATES are computed by the caller, because deriving them means
+     * reading a schedule and this class knows nothing about scheduling. This
+     * method owns the rule about which of them may be applied.
+     */
+    setInstallmentDates(contractId, byIdx, user, reason) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const moved = [];
+      c.installments.forEach((i, idx) => {
+        const next = byIdx[idx];
+        if (!next) return;
+        if (i.status !== "planned") return;
+        if (i.trigger === "fixedDate") return;
+        if (i.expectedDate === next) return;
+        moved.push({ idx, from: i.expectedDate || null, to: next, trigger: i.trigger });
+        i.expectedDate = next;
+        i.expectedDateSource = reason || "schedule";
+        i.expectedDateSetAt = this.state.today;
+      });
+      if (moved.length) this._log(user, "setInstallmentDates", c.number + " ×" + moved.length);
+      return { contractId, moved };
+    }
     recordFirstPayment(contractId) {
       // CON-05: derive committed dates
       const c = this.state.contracts.find((x) => x.id === contractId);
@@ -4328,6 +4372,124 @@
         actualCents: actualByCh[c.num] || 0,
         overrun: (actualByCh[c.num] || 0) > c.costCents,
       }));
+    }
+    /**
+     * Money that reached this project and stopped there — allocated to the job
+     * but to no capítulo (PRY-02's pending-assignment block).
+     *
+     * `chapterEconomics` above silently skips exactly these rows: a bill line
+     * with a `projectId` and no `chapterNum` contributes to the project's
+     * actual cost and to none of its chapters, so the per-capítulo table adds
+     * up to less than the project does and nothing on screen says why. This
+     * method is that difference, itemised.
+     *
+     * The row id is a composite of source, record and index rather than a new
+     * stored key: these rows are a view of other records, they come and go as
+     * those records are assigned, and minting ids for them would be inventing
+     * a collection that has to be kept in step with three others.
+     */
+    unassignedChapterCosts(projectId) {
+      this.project(projectId);
+      const rows = [];
+      for (const b of this.state.bills)
+        b.allocations.forEach((a, i) => {
+          if (a.projectId !== projectId || a.chapterNum) return;
+          rows.push({
+            id: "bill:" + b.id + ":" + i,
+            source: "bill",
+            ref: b.number,
+            party: b.supplierId ? this.party(b.supplierId).name : "",
+            date: b.date,
+            amountCents: b.creditNoteFor ? -a.amountCents : a.amountCents,
+            kind: a.kind || "material",
+          });
+        });
+      for (const l of this.state.labour) {
+        if (l.projectId !== projectId || l.chapterNum) continue;
+        rows.push({
+          id: "labour:" + l.id + ":0",
+          source: "labour",
+          ref: l.date,
+          party: l.workerId
+            ? (this.state.workers.find((w) => w.id === l.workerId) || {}).name || ""
+            : "",
+          date: l.date,
+          amountCents: l.costCents,
+          kind: "labour",
+        });
+      }
+      for (const c of this.state.captured)
+        c.allocations.forEach((a, i) => {
+          if (a.projectId !== projectId || a.chapterNum) return;
+          rows.push({
+            id: "capture:" + c.id + ":" + i,
+            source: "capture",
+            ref: c.stdName || c.reference || c.id,
+            party: (c.confirmed && c.confirmed.issuerName) || "",
+            date: (c.confirmed && c.confirmed.date) || c.capturedAt,
+            amountCents: a.amountCents,
+            kind: a.kind || "material",
+          });
+        });
+      return rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    }
+    /**
+     * Split one of those rows across capítulos — the only place in the product
+     * where a cost acquires a chapter (§3.2, PRY-02).
+     *
+     * A split writes SIBLING allocations rather than editing one in place, so
+     * the amount that reached the project is conserved by construction: the
+     * row is replaced by rows that add up to it. Every capítulo has to exist
+     * in the project's frozen baseline, because a chapter number nothing
+     * recognises is a cost that has left the project's own accounting without
+     * leaving the project.
+     */
+    assignChapterSplit(projectId, rowId, splits, user) {
+      const p = this.project(projectId);
+      const parts = Array.isArray(splits) ? splits : [];
+      if (!parts.length) throw new Error("A cost must be split into at least one chapter");
+      const known = new Set((p.baseline.chapters || []).map((c) => String(c.num)));
+      parts.forEach((s) => {
+        if (!known.has(String(s.chapterNum)))
+          throw new Error("Unknown chapter for this project: " + s.chapterNum);
+        if (!(Math.round(s.amountCents) > 0))
+          throw new Error("Every chapter line needs a positive amount");
+      });
+      const [source, recId, idxRaw] = String(rowId).split(":");
+      const idx = Number(idxRaw);
+      const collection =
+        source === "bill" ? this.state.bills : source === "capture" ? this.state.captured : null;
+      if (source === "labour") {
+        const l = this.state.labour.find((x) => x.id === recId);
+        if (!l || l.projectId !== projectId) throw new Error("Cost not found on this project");
+        // Hours are one entry against one worker on one day; they are not
+        // divisible without inventing a second timesheet row, so a labour
+        // cost takes ONE chapter and says so rather than pretending.
+        if (parts.length !== 1)
+          throw new Error("An hours entry goes to a single chapter — split the timesheet instead");
+        if (Math.abs(parts[0].amountCents - l.costCents) > 1)
+          throw new Error("Split must total the cost");
+        l.chapterNum = String(parts[0].chapterNum);
+        this._log(user, "assignChapterSplit", rowId);
+        return l;
+      }
+      if (!collection) throw new Error("Unknown cost source: " + source);
+      const rec = collection.find((x) => x.id === recId);
+      if (!rec) throw new Error("Cost not found on this project");
+      const alloc = rec.allocations[idx];
+      if (!alloc || alloc.projectId !== projectId || alloc.chapterNum)
+        throw new Error("That cost is no longer waiting for a chapter");
+      const total = Math.abs(alloc.amountCents);
+      if (Math.abs(sum(parts, (s) => Math.round(s.amountCents)) - total) > 1)
+        throw new Error("Split must total the cost");
+      const replacement = parts.map((s) => ({
+        ...clone(alloc),
+        chapterNum: String(s.chapterNum),
+        amountCents: Math.round(s.amountCents),
+      }));
+      rec.allocations.splice(idx, 1, ...replacement);
+      this._log(user, "assignChapterSplit", rowId);
+      return rec;
     }
     unallocatedSummary() {
       // FIN-04: quantified
