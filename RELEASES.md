@@ -13,39 +13,48 @@ v101 was promoted by deploy run `31358917862`: both images built, the `smoke`
 job ran the migrations and drove the ERP end to end inside the published image,
 and only then did `promote` re-point `:main`.
 
-**Promotion is not arrival.** The VPS was later found still serving an image
-from before the workspace era — every `/workspace/*` page answered the Next.js
-404, which no code path in v100 or v101 can produce (logged out you get the
-login page, logged in you get the screen; both were re-proven by running the
-v101 standalone build locally with the server's configuration: 307 → `/login` →
-password → 200 on every workspace page). So the box's every-minute pull loop
-had been failing silently, exactly the failure `ops/deploy-now.sh` exists for.
-The remedy is on the operator's machine: `./ops/deploy-now.sh`, preceded by
-`./ops/set-ghcr-token.sh` if the pull reports an auth failure. The check that
-settles it from any phone: `https://<host>/api/health` must report
-`"revision": "6ba1850…"`.
+Confirmed live: `/api/health` over the public address reports `status ok`,
+`database connected`, revision `6ba1850…`. **The VPS serves v101.**
 
-_Cleared 2026-08-10 06:07Z_ — `/api/health` over the public address reported
-`status ok`, `database connected`, and revision `6ba1850…`. **The VPS serves
-v101.**
+> **A wrong turn, kept on the record.** When the phone showed a 404 on every
+> screen, this file briefly said the VPS had failed to pull the release — the
+> deploy history made a silently-stale server the likely suspect, and the Next
+> 404 fitted it. It was wrong: the box was current the whole time, and the
+> operator was sent to run `ops/deploy-now.sh` against a server that needed
+> nothing. `/api/health` answers "is the server current?" in one request from
+> any phone, and it is the FIRST thing to check, not the confirmation of a
+> theory formed without it. The real fault was in the app — see below.
 
 ## The iOS app against v101
 
-TestFlight holds **v1.1 build 7**, uploaded 2026-08-10 05:53 from `main`
-(`a06fd0f`, whose `ios/` tree is byte-identical to v101 — the commits after
-`6ba1850` touch only documentation). The native shell now matches `main`
-exactly; nothing in the shipped app diverges from the repository.
+**Install v1.1 build 8** (`becd9f9`, uploaded 2026-08-10 06:23). Builds 6 and 7
+are on TestFlight and **should not be used**: every tab but Guide answers 404 in
+them, against a perfectly healthy server.
 
-The path there had one detour worth recording. Build 6 (04:43, from the
-programme branch head `136b131`) was the first post-S15 shell, and because the
-app loads `site/` from the server rather than bundling it, build 6 was already
-showing v101 the moment the promote above ran. The first rebuild attempt from
-`main` then failed on Apple's certificate cap — each CI run mints a fresh
-signing certificate and the account was full. The operator revoked the stale
-CI-minted certificates the same morning and the re-run (`31359895269`) went
-green. The mechanism and the routine for next time are in
-`INTEGRATIONS_PENDING.md`. The only user-visible difference between builds 6
-and 7 is the Face ID lock screen's language (Spanish → main's English).
+`WebTab.url` built each tab's address with `appendingPathComponent`, which
+treats its argument as one path segment and therefore percent-encodes anything
+illegal in one — including `#`. 1.1 was the release that moved the tabs off
+standalone pages and onto the ERP shell's hash routes, so it was the first
+release with a `#` for that call to bite on:
+
+    what shipped    /workspace/erp.html%23tower   → 404
+    what was meant  /workspace/erp.html           → 200, shell opens #tower
+
+Guide survived because it is the only tab whose path has no fragment. Build 8
+resolves the path with `URL(string:relativeTo:)`, which treats a fragment as a
+fragment and never sends it to the server. `tests/ios-routes/coverage.mjs` now
+guards it on every push — in Node rather than Swift, because what usually breaks
+a tab is a page renamed in `site/`, which is not an iOS change and would never
+trigger the macOS build.
+
+Two earlier steps are worth keeping for the record. Build 6 (04:43, from the
+programme branch head `136b131`) was the first post-S15 shell. The first rebuild
+from `main` failed on Apple's certificate cap — each CI run mints a fresh
+signing certificate and the account was full; the operator revoked the stale
+CI-minted ones and the re-run went green as build 7, whose only visible change
+was the Face ID lock screen's language (Spanish → main's English). The
+certificate mechanism and the routine for next time are in
+`INTEGRATIONS_PENDING.md`.
 
 ## Going back to v100
 
