@@ -2556,3 +2556,33 @@ different decisions, so these ten arrived colliding. They are renumbered from
   the outcome of is a trapdoor. On a desktop the same four are one click away
   in the create menu, so the button would only be in the way.
   **Reversible: yes.**
+
+- **#143 — S15: the workbook coverage guard resolves fields against a real
+  dataset, not against the engine's source text (2026-08-10).** Grepping
+  `erp-engine.js` for an identifier would pass on a field that appears only in
+  a comment. The guard builds the shipped demo through the engine and requires
+  each claimed field to be present on at least one record of the collection its
+  section names. It asserts existence only — not a value, a type or a count —
+  because «Notas» is a real column that is usually blank, and what the table
+  promises is a place to put the customer's data. Verified by breaking a claim
+  on purpose and watching it fail. **Reversible: yes.**
+
+- **#144 — S15: `labourReconciliation()` with no argument reconciles the last
+  month whose payroll ran (2026-08-10).** Reconciling the month in progress
+  reports every hour booked so far as unpaid — on the 5th that is a calendar
+  fact dressed up as an alarm, and it was the demo's own headline figure. The
+  last closed payroll is the last month there is an answer for, and it is the
+  month somebody asking the question means. Passing a month still works
+  unchanged. **Reversible: yes.**
+
+- **#145 — S15: the seed grew where the newer screens were thin, and nowhere
+  else (2026-08-10).** Five screens built between S10 and S13 read things this
+  dataset barely had: no wage ever left the bank, so ADM-04's reconciliation
+  opened at −100%; `accountLedger` returned two rows for seven months, so
+  ADM-09's P&L and the gestoría roll-up were empty; the day sheet is a grid of
+  workers and there were two. Three workers, four months of weekdays, twenty
+  filed overhead invoices and monthly payroll were added — with `docRef` on the
+  invoices, because twenty undocumented bills would hand the gestoría screen
+  twenty blocking exceptions and say the demo is careless rather than that the
+  screen is strict. `SEED_VERSION` is bumped to 3, so the app offers a reload
+  rather than reseeding over anybody's records. **Reversible: yes.**

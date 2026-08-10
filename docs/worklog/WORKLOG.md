@@ -67,24 +67,24 @@ tracks it. The 22 decisions behind it (the doc wins except on Financials and
 physical progress · keep the factory · hash routing survives · English code,
 trilingual UI · server-first, always) are recorded with the plan.
 
-| #   | Session                                              | Status      | Commit(s)                          |
-| --- | ---------------------------------------------------- | ----------- | ---------------------------------- |
-| S0  | Mapping & the doc's six open questions               | done        | a5f44a0, 35d1aa5, f6bf40f, 1ea2e90 |
-| S0b | OCR spike — measure before committing to an approach | done        | 5874964                            |
-| S1a | Integrate `main`; one history again                  | done        | 6aec167, 0180732, 34c0267, 952e2a7 |
-| S1b | Navigation restructure + English rename + removals   | done        | f3fdb9c, d924da9                   |
-| S1c | DMC-08 Usuarios and the role model                   | done        | c5e50da, 963ef1c, 00917e7          |
-| S2  | DMT-01…04 Datos Maestros                             | done        | 03fc246, fa580b1, 0572cf8          |
-| S3  | DMC-01…07 Configuración + Catalan                    | done        | 8e190d2, 27a1c0f, 3e34598, 23df2ce |
-| S4  | COM-01 Leads + COM-02 Visita                         | done        | 03dcd5d, b758f6e                   |
-| S5  | COM-03 Presupuestador                                | done        | b0250f7, 5eb0d21                   |
-| S6  | OCR pipeline                                         | done        | 5890c58, 63dee70, 80dbe2a          |
-| S7  | ADM-03 Facturas de proveedores + ADM-02 Compras      | done        | (this session)                     |
-| S8  | PRY-01 integration + PRY-02 Avance Económico         | done        | (this session)                     |
-| S9  | COM-04 Contrato + PRY-03 Adicionales                 | done        | (this session)                     |
-| S10 | ADM-01 Facturación                                   | done        | (this session)                     |
-| S11 | ADM-05 Banco + ADM-06 Caja + `accountCode`           | done        | (this session)                     |
-| S12 | ADM-04 Horas + ADM-07 Gestoría + ADM-08 Flujo        | done        | (this session)                     |
-| S13 | ADM-09 Datos Financieros integration                 | done        | (this session)                     |
-| S14 | Mobile — cards, bottom bar, three-tap site actions   | done        | (this session)                     |
-| S15 | Seed rebuild + workbook coverage test + hardening    | not started | —                                  |
+| #   | Session                                              | Status | Commit(s)                          |
+| --- | ---------------------------------------------------- | ------ | ---------------------------------- |
+| S0  | Mapping & the doc's six open questions               | done   | a5f44a0, 35d1aa5, f6bf40f, 1ea2e90 |
+| S0b | OCR spike — measure before committing to an approach | done   | 5874964                            |
+| S1a | Integrate `main`; one history again                  | done   | 6aec167, 0180732, 34c0267, 952e2a7 |
+| S1b | Navigation restructure + English rename + removals   | done   | f3fdb9c, d924da9                   |
+| S1c | DMC-08 Usuarios and the role model                   | done   | c5e50da, 963ef1c, 00917e7          |
+| S2  | DMT-01…04 Datos Maestros                             | done   | 03fc246, fa580b1, 0572cf8          |
+| S3  | DMC-01…07 Configuración + Catalan                    | done   | 8e190d2, 27a1c0f, 3e34598, 23df2ce |
+| S4  | COM-01 Leads + COM-02 Visita                         | done   | 03dcd5d, b758f6e                   |
+| S5  | COM-03 Presupuestador                                | done   | b0250f7, 5eb0d21                   |
+| S6  | OCR pipeline                                         | done   | 5890c58, 63dee70, 80dbe2a          |
+| S7  | ADM-03 Facturas de proveedores + ADM-02 Compras      | done   | (this session)                     |
+| S8  | PRY-01 integration + PRY-02 Avance Económico         | done   | (this session)                     |
+| S9  | COM-04 Contrato + PRY-03 Adicionales                 | done   | (this session)                     |
+| S10 | ADM-01 Facturación                                   | done   | (this session)                     |
+| S11 | ADM-05 Banco + ADM-06 Caja + `accountCode`           | done   | (this session)                     |
+| S12 | ADM-04 Horas + ADM-07 Gestoría + ADM-08 Flujo        | done   | (this session)                     |
+| S13 | ADM-09 Datos Financieros integration                 | done   | (this session)                     |
+| S14 | Mobile — cards, bottom bar, three-tap site actions   | done   | (this session)                     |
+| S15 | Seed rebuild + workbook coverage test + hardening    | done   | (this session)                     |

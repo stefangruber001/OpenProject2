@@ -1291,6 +1291,40 @@ guard · bundle safety · lint, boundaries, types, unit tests, build,
 
 **Next:** S15 — seed rebuild, workbook coverage test, hardening. The last one.
 
+## S15 — making the claims checkable (2026-08-10)
+
+- **The field dictionary stopped being a promise.** §4 of the mapping says the
+  customer's 100 workbook columns fit the model, and it is a markdown table
+  nothing checked. `tests/workbook/coverage.mjs` builds the shipped demo
+  through the engine and requires every claimed field to be present on a real
+  record — not grepped from the source, where a comment would pass. It asserts
+  existence only, because «Notas» is a real column that is usually blank and
+  what the table promises is a place to put the data. It runs in `make gates`
+  and in CI, and it was verified by breaking a claim on purpose.
+- **The demo could not exercise the screens built for it.** No wage had ever
+  left the bank, so ADM-04's reconciliation opened at −100%; `accountLedger`
+  returned two rows for seven months, so ADM-09's P&L was blank; the day sheet
+  is a grid of workers and there were two. Three workers, four months of
+  weekdays, twenty filed overhead invoices and monthly payroll close all three.
+- **The overhead invoices carry a document reference**, because twenty
+  undocumented bills would hand the gestoría screen twenty blocking exceptions
+  — which would say the demo is careless, not that the screen is strict.
+- **`labourReconciliation()` now defaults to the last month whose payroll
+  ran.** Reconciling the month in progress reports every hour booked so far as
+  unpaid; on the 5th that is a calendar fact dressed up as an alarm.
+- **`SEED_VERSION` is 3**, so an existing install is offered a reload rather
+  than reseeded over. Reseeding real records to make a demo look better is data
+  loss.
+
+Verified: site E2E 331/331 · manageability 226/226 · workbook 4/4 (new) ·
+migrations 48/48 · year 149/149 · import 25/25 · scheduling 30/30 · i18n
+coverage (EN 100%, CA ceiling 1301 held) · site-sync 17/17 · ownership guard ·
+bundle safety · lint, boundaries, types, unit tests, build, `make gates`,
+`make demo`.
+
+**Next:** the fifteen coding sessions are complete. What remains is the iOS
+app rebuild against this build.
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-
