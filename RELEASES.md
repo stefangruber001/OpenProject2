@@ -11,7 +11,19 @@ re-pointing that tag**, which is what `deploy.yml` was built around.
 
 v101 was promoted by deploy run `31358917862`: both images built, the `smoke`
 job ran the migrations and drove the ERP end to end inside the published image,
-and only then did `promote` re-point `:main`. The server is serving v101.
+and only then did `promote` re-point `:main`.
+
+**Promotion is not arrival.** The VPS was later found still serving an image
+from before the workspace era — every `/workspace/*` page answered the Next.js
+404, which no code path in v100 or v101 can produce (logged out you get the
+login page, logged in you get the screen; both were re-proven by running the
+v101 standalone build locally with the server's configuration: 307 → `/login` →
+password → 200 on every workspace page). So the box's every-minute pull loop
+had been failing silently, exactly the failure `ops/deploy-now.sh` exists for.
+The remedy is on the operator's machine: `./ops/deploy-now.sh`, preceded by
+`./ops/set-ghcr-token.sh` if the pull reports an auth failure. The check that
+settles it from any phone: `https://<host>/api/health` must report
+`"revision": "6ba1850…"`.
 
 ## The iOS app against v101
 
