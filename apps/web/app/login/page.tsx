@@ -72,6 +72,13 @@ export default async function LoginPage({
 }) {
   const params = await searchParams;
   const failed = params.error !== undefined;
+  // Being told to wait is a different situation from getting the password
+  // wrong, and saying so is not a leak: whoever is locked out already knows
+  // they have been trying. Telling them "incorrect password" while silently
+  // refusing to check it is the version that wastes an honest person's evening.
+  const rateLimited = params.error === "rate";
+  const retryAfter = Number(typeof params.retry === "string" ? params.retry : 0) || 0;
+  const retryMinutes = Math.max(1, Math.ceil(retryAfter / 60));
   const nextRaw = typeof params.next === "string" ? params.next : "/";
   // Same rule as the route handler: only ever a path on this site.
   const nextPath = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/";
@@ -225,7 +232,15 @@ export default async function LoginPage({
                 marginBottom: 18,
               }}
             >
-              Incorrect email or password.
+              {/* Rate limiting came from the v4 branch; the English came from
+                  main, which moved this screen to English on purpose. Keeping
+                  the feature and dropping its Spanish is the resolution that
+                  loses neither side's work. */}
+              {rateLimited
+                ? `Too many attempts. Try again in ${retryMinutes} ${
+                    retryMinutes === 1 ? "minute" : "minutes"
+                  }.`
+                : "Incorrect email or password."}
             </div>
           )}
 

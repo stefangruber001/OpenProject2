@@ -1389,6 +1389,1229 @@ SERVER_SSH_KEY`. The browser-ops path has never had its credentials, so it has n
     accents. The real pages declare `<meta charset>` so production was never
     affected; the range is now `\u`-escaped anyway, because correctness that
     depends on every future page remembering a meta tag is not correctness.
+
+## The programme branch's own decisions, renumbered (merged 2026-08-09)
+
+`main` and the programme branch both kept numbering from #48, for entirely
+different decisions, so these ten arrived colliding. They are renumbered from
+#91 and carry their original number, because the session worklogs cite it.
+
+- **#91 (was #48 on the programme branch) — CANEI session 4: one workspace, three panels, and four screens retired (2026-07-31).**
+  Spec §1 replaces the flat side menu with sections → subsections → content, adds a global bar
+  (universal search, contextual create, alert bell, period selector, profile/help) and states that
+  the old home page "ceases to exist as an intermediate screen". **Decisions:** (a) the hash stays
+  the _subsection_ key, unchanged from the flat menu, so every deep link — including both native
+  shells' tabs, the e2e suite and printed links — still lands where it did; the section is derived
+  from the subsection, never routed to. (b) `index.html`, `dashboard.html`, `clientes.html` and
+  `frontend.html` become redirect stubs rather than deletions: the site root, GitHub Pages and the
+  shells' cached tabs all resolve to files that must keep existing, and a stub is the most
+  reversible retirement. They use `location.replace`, so a retired screen never sits in history.
+  `index.html` is retired too even though the session brief only listed the other three — §1 is
+  explicit that the system opens straight on the control tower. (c) Subsections the spec defines
+  but the code cannot serve yet (compras, subcontratos, seguimiento técnico/económico,
+  modificaciones, conciliación, comunicaciones, reportes) render a short "en preparación" card
+  saying what will live there and linking to where that data is managed today. A menu entry that
+  opens a blank panel is worse than one that explains itself. (d) The period selector defaults to
+  **year**, and its reference date is the dataset's `today`, not the wall clock: this dataset lives
+  in its own exercise year, so a wall-clock period would empty every table for reasons the user
+  cannot see. Every filtered table prints how many rows it is hiding. (e) The period lives in the
+  store's `meta` object store, **never in the state blob** — it is a preference, not business data,
+  so it needs no schema migration and can never collide with an engine key. (f) "+ Crear" calls the
+  engine's own `addOpportunity` / `createQuickProject` / `addTask` / `addParty`, so every validation
+  and audit-log entry applies exactly as it does elsewhere: the bar is a shortcut to existing rules,
+  never a way around them. (g) The spec says "eight sections" but enumerates seven (chapters 2-8);
+  seven are implemented, and the eighth is not invented here. **Ownership:** `three-panel-shell`
+  moves `unbuilt` → `engine` with `engineSection: null` — it is view-layer only, and the schema has
+  no "view" owner value. Reversible: the retired pages' previous content is one `git revert` away
+  and no engine code changed.
+- **#92 (was #49 on the programme branch) — CANEI session 5: the planning engine, and where a calendar is allowed to live (2026-07-31).**
+  Spec §3.3 wants a Gantt with FS/SS/FF dependencies, positive and negative lag, a working calendar
+  with closures, automatic movement of the finish date, a critical path and a baseline frozen at
+  approval. Session 5 built all of that as domain code in `@repo/capability-scheduling`; the chart
+  itself is session 6. **Decisions:** (a) the working calendar is **data**, not knowledge —
+  `workingWeekdays` + `nonWorkingDates` arrive from the host, and the fallback for a plan with no
+  calendar is a **seven-day** week. Defaulting to Monday-Friday would have put a jurisdiction
+  assumption inside a capability, which the architecture forbids and the forbidden-literal linter
+  cannot catch. (b) Float and baseline drift are counted in **working days**: a plan crossing a
+  two-week closure has not slipped two weeks, and saying it has sends someone to a site meeting
+  with the wrong number. (c) Dragging a task sets a **start-no-earlier-than pin**, not a fixed
+  date — it holds the position a human chose but still moves when a predecessor pushes it later,
+  because the alternative is a chart that silently produces impossible plans. (d) **FS, SS and FF
+  only.** The spec names those three; start-to-finish is left unimplemented rather than
+  half-implemented. (e) Every new `Task`/`Plan` field is **optional**, so the hand-built plans
+  `site/erp-bridge.js` produces (no calendar, no durations, no links) still schedule — durations
+  are read back off the dates — and no persisted data needed migrating. There is a test pinned to
+  exactly that legacy shape. (f) The calendar walkers are **bounded** (3660 days): a config with no
+  working weekday is one typo away and would otherwise hang the scheduler instead of failing it.
+  (g) `scheduling-gantt` stays **`unbuilt`** in `site/erp-ownership.json` even though the domain now
+  exists and ships in the bundle — an area becomes `factory` when `erp.html` genuinely goes through
+  the bridge for it, and anything else makes that file describe intentions instead of code.
+  (h) `SURFACE_VERSION` 1 → 2, and the engine is reached as `service` rather than through named
+  passthroughs: wrapping an API before its caller exists is how a surface collects methods nobody
+  calls. **New guard:** `tests/simulation/scheduling-sim.mjs` drives the engine through the
+  **committed** `site/erp-factory.cjs`, keeping "the capability is correct" and "the artifact the
+  phones load is correct" as two separately-proven claims. Reversible: the capability's previous
+  API is untouched and nothing in `site/` calls the new code yet.
+- **#93 (was #50 on the programme branch) — CANEI session 6: the chart, and keeping the arithmetic out of it (2026-07-31).**
+  Spec §3.3 asks for a Gantt with FS/SS/FF dependencies, lead/lag, a working calendar with
+  closures, a finish date that moves by itself, a visible critical path, the contract's payment
+  milestones on the same timeline, a baseline frozen at approval, and "interacción simple:
+  arrastrar para mover, tirar del borde para alargar, y unir tareas con el ratón". Session 6
+  built exactly that in `erp.html` (Proyectos → Seguimiento técnico) over session 5's engine.
+  **Decisions:** (a) **the view computes no dates.** Bar positions, floats, the critical path, the
+  finish and baseline drift are all asked of `@repo/capability-scheduling` through
+  `ErpBridge.scheduling.plans`; the only arithmetic in the chart is pixels ↔ _calendar_ days for
+  the axis and for turning a drag into a date, and working-day questions go back to the engine's
+  own calendar helpers (newly exposed on the browser surface, `SURFACE_VERSION` 2 → 3). A second
+  implementation of working-day maths in the view would disagree with the engine the first time
+  someone added a closure. (b) **Plans persist in `state.plans` (schema v3)**, one per project:
+  a capability-owned value riding inside the engine's blob, which `erp-engine.js` neither writes
+  nor knows about. Cheaper and more reversible than a second IndexedDB store, and it is the
+  strangler seam working as designed. (c) **Dragging sets the engine's start-no-earlier-than pin**
+  rather than a fixed date, so successors still follow and the plan stays possible. (d) **Payment
+  milestones are drawn, never scheduled** — they belong to the contract, and letting the planner
+  move them would let a chart edit a contract. (e) **`seedFromChapters` is explicitly a seed**;
+  session 10a owns the real budget→plan derivation. It exists so a chart opened on a real project
+  is not an empty grid, and only runs when the user asks. (f) **The default five-day calendar
+  lives in `erp-bridge.js`**, a host file allowed to hold local convention; the capability keeps
+  its seven-day neutrality and tenant config will replace that one constant. (g) **Gestures use
+  Pointer Events**, one path for mouse, pen and touch — the ERP runs in two WebViews and a
+  mouse-only chart would be useless on the site visit it is for. (h) `scheduling-gantt` →
+  **`factory`**: the first area the capability layer owns end to end.
+  **A trap worth recording:** SVG geometry attributes are overridable by CSS in Chromium, so the
+  chart's `class="bar"` inherited the table progress-bar rule `.bar{height:7px}` and silently
+  flattened every bar. All chart classes are now `g`-prefixed and the e2e asserts bar height, so
+  it cannot come back. Reversible: no engine code changed, and the migration only adds an empty
+  object.
+- **#94 (was #51 on the programme branch) — CANEI session 7: the reader, and where a country's paperwork conventions live (2026-08-01).**
+  Spec §5.2 (Improvement #2) wants a photographed supplier invoice to pre-fill a received-invoice
+  record: issuer and tax id, number, dates, base, tax — several rates allowed — withholding, total,
+  payment details and an order reference, each with a confidence, each traceable back to the part of
+  the image it came from, and nothing taken as true without explicit human confirmation. Session 7
+  built the reading half. **Decisions:** (a) `ExtractionResult.confirmed` is the **literal type
+  `false`**, not a boolean — a caller cannot accidentally persist a confirmed-looking extraction,
+  which is the strongest form CAP-04 can take in a type system. (b) All locale knowledge sits behind
+  a **required** port, `extraction-profile@1`: number and date notation, tax-id shapes and their
+  check characters, the words that announce each field, and which tax rates were law on a given
+  date. Required rather than optional because an extractor with no profile silently reads nothing,
+  and resolve-time failure is exactly what a required port buys. (c) The profile is an **adapter,
+  not config**: it carries behaviour (parsers, checksum algorithms), and adapters are how behaviour
+  crosses a layer boundary here. (d) **An unlabelled amount is never the answer** — every number on
+  a page looks like every other, and only a word beside it says which is the net and which the
+  total; unlabelled amounts are offered as alternatives instead. The first version got this wrong
+  and nominated a random number as the withholding on documents that have none, which contradicted
+  the arithmetic and dragged every other field's confidence down with it. (e) A **failed check
+  character caps confidence at 0.5**, applied after every other bonus, so a beautifully labelled
+  wrong tax id still reaches a human. (f) `recheck()` lives in the capability so the validation
+  screen re-runs the _same_ arithmetic rather than a second copy in the view. (g) The Spanish
+  profile resolves expected rates from the pack's **effective-dated** tables, and declines to guess
+  for a date before the earliest encoded era. (h) `extraction-ocr` stays **`unbuilt`** in the
+  ownership file: the domain exists and is composed into tenant #1, but no screen reaches it until
+  session 8. **Tooling earned its keep:** the boundary linter rejected a rate-like literal in my own
+  doc-comment inside the capability, and a fabricated CIF in a fixture was caught by the very
+  control-character algorithm the session added. Reversible: nothing in `site/` changed, the browser
+  bundle is untouched, and the capability is additive.
+
+- **#95 (was #52 on the programme branch) — CANEI session 9: the constructor, and pictures that stay out of the table (2026-08-02).**
+  Spec §3.3 asks for a three-zone budget constructor and, as Improvement #1, a graphic annex:
+  pictures attached to a line but printed at the end of the document rather than in its row.
+  **Decisions:** (a) **The constructor computes no money.** Every figure it shows — line amounts,
+  chapter subtotals, base, tax, withholding, total, margin, the value of lines still pending a
+  price — is asked of `erp.budgetTotals()`, the same function the emitted document uses, so the
+  "live" panel is genuinely live rather than an optimistic copy that drifts from the document by a
+  cent and is discovered by a customer. `budgets-versions` therefore stays `engine`: the
+  constructor is a view. (b) **The annex layout is a capability** —
+  `@repo/capability-docs/annex.ts` — because grouping, ordering, correlative numbering, pagination
+  and which rows carry a mark are generic document composition with no sector or jurisdiction in
+  them. It is reached only through `ErpBridge.docs.annex`, and its tests use groups and items, not
+  chapters and lines. (c) **Annex options are an argument, not tenant config,** so they are plain
+  values with plain defaults rather than a zod schema: importing the schema into the browser
+  surface pulled all of zod into the committed bundle and took it from 23 KB to 152 KB, to validate
+  two numbers in a bundle that ships to a mobile WebView. (d) They are **repaired, not rejected** —
+  a stored `imagesPerPage: 40` clamps to 12 rather than making a customer's quotation unprintable
+  over a formatting preference. (e) **Default: annex on, two per page.** On costs nothing when no
+  line has a picture, and two is what stays readable on a portrait page. (f) **Issuing a version
+  snapshots the annex settings onto it.** The images were already frozen (a version deep-copies its
+  chapters), but the settings live on the budget and would otherwise keep changing under a document
+  that was already sent. (g) **Internal-only images are dropped by `renderBudgetDoc`,** beside cost
+  and margin: a value that never enters the customer document cannot leak out of one. (h) **A
+  deleted image does not delete its blob** — an earlier frozen version may still reference it, and
+  orphaning a sent document's picture to reclaim a few kilobytes is the wrong trade. (i) **The seed
+  gained a fifth budget, left in draft.** Every other seeded budget is issued or accepted, hence
+  frozen, which made the constructor impossible to see or test; a real pipeline always has one
+  budget in preparation. Its four demo pictures are _drawn_ on a canvas at first run, so no binary
+  enters the repository and nothing is fetched over the network. (j) **Keystrokes do not reach the
+  audit trail.** The grid writes through on every keystroke so the totals are real, and logs once
+  when a field is committed — an audit entry per character is a trail nobody reads. Reversible: the
+  annex is switchable per budget and off means no pages and no marks; the schema step (v4) is
+  additive and idempotent, and the constructor is an alternative view of data the engine already
+  owned.
+
+- **#96 (was #53 on the programme branch) — CANEI session 10a: what a plan is derived from, and what a cost is heading for (2026-08-03).**
+  Spec §4 asks for one project as the context of every subsection; §4.3 for a Gantt built from the
+  accepted budget, progress recorded by executed quantity, planned-vs-actual-vs-projected and a
+  deviations panel; §4.4 for per-chapter budgeted/committed/actual/**projected** with the margin
+  that results. **Decisions:** (a) **The plan is derived, not seeded.** Session 6's placeholder gave
+  every chapter five days; the real derivation reads the accepted version's lines, and each
+  duration is quantity ÷ the daily output of that unit in that chapter. The division is the
+  capability's, the rates are the **vertical pack's** — put them in the capability and the planner
+  works for exactly one trade in one country. (b) **Derived task ids come from the caller's own
+  references, not a generator.** That is what makes re-deriving after a quote change a merge rather
+  than a reset: progress, pinned dates and frozen baselines survive for every line that survived.
+  (c) **The actual-progress curve is drawn from an append-only progress log**, never from today's
+  percentages. Dates and the critical path recompute from the network whenever you like; "how much
+  was done by the end of March" exists only if somebody wrote it down in March, and a curve that
+  drew today's figure backwards would make every past week look like it went to plan. Where the log
+  is empty the actual line is `null`, not zero — "nobody recorded anything" and "nothing was done"
+  are different claims. (d) **The projected line is labelled an extrapolation** and its
+  `performanceIndex` is returned, so what it rests on is visible. (e) **A cost forecast never comes
+  in below what is already spent or committed**, and a chapter with _nothing booked_ keeps its
+  budget whatever its progress says: finished-with-no-bill overwhelmingly means the bill has not
+  arrived, not that the work was free, and forecasting zero there hands the project a profit it is
+  about to lose. This was caught by driving the seeded data, not by reading the code — two of the
+  five chapters forecast €0. (f) **A manual adjustment requires a reason and never replaces the
+  calculation**: both figures are reported, because the reason is the only reviewable part of a
+  judgement call. (g) **Progress is written to both records in one action.** The budget's chapters
+  feed certification and the economics; the plan feeds the chart and the curve. Letting a user
+  update one is how a job comes to be 80 % done on one screen and 40 % on another, so the bridge
+  writes both — a projection concern, not a rule, which is why it lives there. (h) **The project
+  context is the section's, not a screen's.** One selector above every subsection, with favourites
+  and recents in `meta`; `gProject` was promoted from the chart's local dropdown. (i) **The browser
+  bundle now composes a PACK.** `@repo/erp-browser` is a host and may; the import is the pack's
+  zod-free `rates` subpath, because a validation library has no business travelling into a phone to
+  look up a number in a table. (j) `project-economics` and `scheduling-gantt` are **`factory`**;
+  `projects` stays **`engine`** — the baselines, numbering and cost ledger are correct where they
+  are, and only the two derivations that did not exist anywhere moved. Reversible: the derivation is
+  a button the user presses, the schema step (v5) is additive and idempotent, and every new figure
+  is a read-side derivation over data the engine already owned.
+
+- **#97 (was #54 on the programme branch) — CANEI session 10b: what "comprometido" actually means, and where a block earns its place over an alert (2026-08-03).**
+  Spec §4.1 (Compras), §4.2 (Subcontratos), §4.5 (Modificaciones Contractuales) and §4.6 (Personal y
+  Horas). **Decisions:** (a) **A purchase order's lifecycle is derived, never stored as its own
+  field.** `purchaseStatus(pu)` reads `sentAt`/`acceptedAt`/`receipts`/`status.delivered`/
+  `status.invoicedBillId`/`status.paid`/`cancelledAt` and computes draft→sent→accepted→partial→
+  received→invoiced→paid — a status string that forgets to update when, say, a payment is voided
+  is a worse bug than any of the fields it would replace. (b) **"Comprometido" includes awarded
+  subcontracts, not just purchase orders.** `committedByChapter`/`committedCostCents` were
+  purchases-only since session 10a; §4.1 and §4.4 both define comprometido as "órdenes y
+  subcontratos adjudicados", and the economics screen would have quietly undercounted every
+  project with a subcontract on it. A terminated subcontract counts only what was actually
+  certified, never the full award — the rest was never going to be spent. (c) **Starting work on
+  site is BLOCKED, not merely alerted, on expired or missing mandatory documentation** (insurance,
+  PRL, Social Security registration) — the one rule in this session that took the harder of the
+  two available forms on purpose, because §4.2 says so explicitly ("bloqueo ... si está vencida")
+  and because letting an uninsured trade start is the kind of thing a dashboard tile should not be
+  the only defence against. (d) **Recording hours against a closed project is refused outright**,
+  for the same reason: it makes the spec's own "horas imputadas a un proyecto cerrado" alert
+  structurally impossible going forward rather than a thing to notice after the fact — a stronger
+  guarantee than an alert is, wherever prevention is cheap enough to build. (e) **`priceChange`
+  gained a `scheduleImpactDays` parameter inserted BEFORE `user`**, not after: every existing
+  caller (the seed, year-sim) passes exactly three positional arguments and has never passed
+  `user`, so the new parameter could go in the one slot that changes nothing for them. (f) **A
+  change order's schedule effect is applied to the Gantt through an explicit, separate action**
+  (`ErpBridge.scheduling.plans.applyChapterDelay`), not automatically inside `approveChange` — the
+  engine's approval only ever touches the budget's numbers, and folding a Gantt mutation into that
+  call would make one action responsible for two systems of record. The baseline is "conserved" for
+  free, because a baseline is a frozen snapshot `setDuration` never touches. (g) **The adenda
+  document has no cost or margin field**, the same QUO-10/PRE-08 rule the budget document already
+  follows, for the same reason. (h) **The weekly hours grid deletes a cell's entry when its value
+  is set to zero**, rather than leaving a stray zero-hour row — "corregir y eliminar" for a grid is
+  one gesture, not two. (i) A grid cell that already carries more than one entry (hours split
+  across chapters by hand) is rendered read-only with a note pointing at the register table below,
+  rather than the grid silently collapsing a split day into one number. Reversible: every new
+  method is additive over existing collections, schema v6 backfills every new field to its
+  pre-existing default, and nothing here removed or renamed anything session 1-10a built.
+
+- **#98 (was #55 on the programme branch) — CANEI session 11: where a suggestion earns trust, and the three refusals of Administración (2026-08-03).**
+  Spec §5.3 (Conciliación bancaria), §5.4 (Banco y caja), §5.6 (Gestoría) and §5.7 (Comunicaciones).
+  **Decisions:** (a) **Every match suggestion carries its reasons, and the screen renders them.**
+  `@repo/capability-reconciliation` returns `{confidence, reasons, differenceCents, combination}`
+  rather than a bare score, because a person is being asked to accept or reject a proposal and
+  "0,99" gives them nothing to judge on. A confidence with no argument behind it trains people to
+  click accept without reading, which is the exact failure the screen exists to prevent. (b)
+  **Direction is a gate, not a weight.** A credit can never be explained by a supplier bill, so a
+  wrong-direction candidate is excluded outright instead of scoring low and surfacing under a
+  thin threshold. For the same reason an amount outside tolerance returns nothing rather than a
+  weak guess: a suggestion nobody should accept is worse than no suggestion. (c) **A single
+  document outranks a combination of equal confidence**, and combinations stop at three — beyond
+  that the search finds coincidences, not explanations. (d) **Allocation was removed from the
+  Banco screen entirely** (§5.4's "retirando la parte de asignación"). Casar un movimiento con su
+  documento y repartirlo entre obras is one gesture; doing it in two screens produced movements
+  assigned to a job with no invoice behind them. Banco keeps position, movements and forecast, and
+  links across. (e) **`quarterlyPackage` now REFUSES**, naming up to four outstanding items rather
+  than counting them. §5.6 allows exactly two ways past — the list is empty, or every item has been
+  justified by name — so `acceptException(quarter, key, reason, user)` requires a written reason and
+  there is no third route. A `force` flag was written during this session and then deliberately
+  removed: an override nobody ever takes back out is how the check stops meaning anything. The
+  year-sim was updated to justify each exception, which is what a real quarter-end does. (f) **The
+  completeness traffic light is per block, not one number** — the eight blocks fail independently
+  (an empty cash register in a quarter with no petty cash is fine; an empty issued-invoice register
+  in a quarter that billed is not) and an aggregate hides which one. (g) **Late documents are amber,
+  never red**: an extemporaneous document is a fact to declare in its own block, not an error to
+  fix, and §5.6's goal is that the block shrinks over time, which needs it visible rather than
+  alarming. (h) **The communications rule default is `mode:"draft"`** — the single most consequential
+  default in the session. An ERP that mails customers by itself is one bad rule away from an apology,
+  so a rule prepares a message and a person releases it; "Aprobar" and "Registrar envío" are labelled
+  honestly as the two different things they do, and nothing on the screen sends. (i) **`commsEvents()`
+  is a projection, not an append-only log**, recomputed from current state so a rule added today
+  still sees the invoice that went overdue last week — which is what somebody adding "chase at 3
+  days" expects; an event log would only ever apply to the future. (j) **Editing a template mints a
+  new version and retires the old with `supersededBy`**, so "which wording did the customer receive"
+  stays answerable after somebody improves it. (k) **`closeBankPeriod` refuses while anything in the
+  range is unreconciled**, and reopening requires a reason: a closed period whose whole value is
+  that it contains no open question cannot be allowed to contain one. Reversible: the capability is
+  a new package nothing else depends on, schema v7 is additive and idempotent, `quarterlyPackage`
+  stayed callable in its old `(quarter, user)` shape, and every engine addition is new methods over
+  existing collections — nothing sessions 1–10b built was removed or renamed.
+
+- **#99 (was #56 on the programme branch) — CANEI session 12: a threshold lives in one place, and "real data" for Recorrido means a link, not a rewrite (2026-08-03).**
+  Spec §2.1 (Torre de Control), §2.2 (Mi Día) and §2.3 (Recorrido completo, Improvement #3).
+  **Decisions:** (a) **Every alert condition gained a stable `code` and a `type`**
+  (económica/técnica/documental/fiscal) via a single `ALERT_META` table, so classification lives in
+  one place rather than being repeated at each of alerts()'s ~28 call sites. (b) **A card's colour
+  dot reuses the SAME number the card already shows** (negative result, overdrawn balance, a
+  payment week bigger than cash on hand) instead of a second per-tile threshold store — "el umbral
+  de cada indicador" already has a home in the alert rules, and a second, parallel configuration
+  surface for the same idea is exactly the kind of thing that drifts out of sync with what it
+  duplicates. (c) **`managedAlerts()` layers assign/due-date/snooze/resolve-with-note-and-evidence/
+  convert-to-task over the pure `alerts()` projection**, keyed by `code + JSON(ref)` — the same
+  shape session 11 used for gestoría's justified exceptions and the comms queue: a computed list
+  recomputed fresh every time, plus a keyed overrides map for what a person did about each item,
+  never a mutated copy of the list itself. (d) **Only the alerts §3.2 and §2.1 explicitly call
+  "configurable" got a numeric threshold** in the rule editor (opportunity-stale days, quote-expiry
+  days, subcontract-unbilled days, warranty-expiry days, contract-start-at-risk days); the margin
+  threshold keeps using the existing `state.config.marginThresholdBp` rather than gaining a
+  competing copy. Every other rule still gets enabled/recipient/channel, satisfying the spec's
+  "condición, umbral, destinatario y canal" without inventing thresholds for booleans that don't
+  have one (a signed-or-not contract has no "days" to tune). (e) **The quarterly gestoría-package
+  reminder (`GES-PACKAGE-DUE`) is explicitly advisory, not a legal filing deadline** — no AEAT date
+  is asserted anywhere in the engine; the configurable number is "days after quarter-end this
+  tenant wants the package sent by," a self-imposed target, not a regulatory one. A one-line
+  clarifying entry was added to `LEGAL_REVIEW.md` §5 so nobody mistakes it for asserted tax law
+  later. (f) **`upcomingMilestones()` reads every calendar date off the record that already owns
+  it** — project dates, contract installments, bill due dates, purchase arrivals, guarantee expiry,
+  subcontract/worker doc expiry, open tasks — rather than a second, calendar-specific copy of any of
+  them; visits are deliberately excluded because they are logged AFTER they happen (VIS-01), so
+  there is no future date to put on a calendar for one. (g) **Card order/visibility and the Mi Día
+  legend filter are browser preferences, stored in `ErpStore` meta**, not engine state — a
+  dashboard's layout is a viewing choice, not business data, and a second browser on the same
+  tenant is allowed a different one. (h) **`exportar la vista a PDF/Excel` became a real CSV
+  download plus the browser's own print dialog for PDF** — both genuinely produce the artifact named,
+  neither is a fake behind a port, and building a real XLSX writer or a server-rendered PDF for a
+  dashboard export was judged not worth the weight next to those two. (i) **Recorrido's "Proyecto
+  existente" is read-only and reuses the real screens rather than re-implementing thirteen stages
+  of editing UI a second time.** journey.html's existing "Crear nuevo proyecto" walkthrough (its own
+  sample data, its own `caneiJourney` IndexedDB) is completely untouched and stays the default,
+  exactly as §2.3 asks ("se mantiene ... tal como está hoy"). The addition reads the SAME `caneiERP`
+  database erp.html writes; each of the thirteen stages shows a real status
+  (completa/en curso/pendiente) and a real summary derived straight from the record that owns it,
+  with a link into the actual erp.html screen — the spec's own framing ("acceso directo a la
+  pantalla real correspondiente ... de modo que el recorrido sirva también como lista de puesta en
+  marcha del proyecto") taken at its word rather than read as "clone every screen inline." (j) The
+  unsaved-changes confirm on switching project applies **only when leaving an in-progress demo
+  walkthrough** — a read-only real view has nothing local to lose, so switching between two real
+  projects never blocks. (k) **Duplicating a real project makes one real `createQuickProject` call**
+  (same customer, same estimated value, prefixed as a copy) rather than deep-cloning a frozen budget
+  baseline, which the real `presupuestos` screen this stage links to already does more carefully.
+  (l) **Downloading a real project's folder reuses the demo's existing `zipStore`/`download`
+  plumbing**, producing one summary text file per stage instead of captured photos — a second ZIP
+  implementation for the same button would be the bug. Reversible: schema v8 is additive
+  (`alertRules`, `alertOverrides`, `opportunity.decidedAt` backfilled from the existing creation
+  date, `project.priority` defaulted false), `controlTower()` only gained new fields (`cards`,
+  `series`, `lastCalculatedAt`) — nothing existing callers (year-sim, migrations-sim) already read
+  was renamed or removed, and no packages/capability changed, so the committed browser bundle is
+  untouched this session.
+
+- **#100 (was #57 on the programme branch) — CANEI Clientes rework: a customer registry that a person can actually work in (2026-08-03).**
+  Spec §3.1 (Clientes / gestión de terceros), driven by direct operator annotations on the live
+  screen rather than by a session of the twelve-session plan.
+  **Decisions:** (a) **`Clientes` is now a customer-only registry.** The Roles column and the role
+  selector on the create drawer are gone, because a screen titled "Clientes" that lists suppliers
+  and industriales is lying about what it is; the underlying party record still carries `roles`, so
+  a supplier/industrial screen remains a pure UI addition whenever it is asked for, with no data
+  change. (b) **`party.activityLine` was removed outright — the one deliberate deletion in the whole
+  migration ladder (v9).** A línea de actividad describes the work, not the person paying for it, so
+  it belongs on budgets and projects (where `profitability("activityLine")` still reads it) and was
+  a weaker duplicate on the customer that could disagree with the job's own line. The additive-only
+  guard in `migrations-sim.mjs` was NOT loosened: it grew an explicit `INTENTIONAL_REMOVALS` set
+  with this one path and the argument for it, so the guard still fails on every other dropped key
+  and the removal is a change record rather than an escape hatch. (c) **Fields the operator asked
+  for that had no home were added to the record, not faked in the view** — `contactPerson`,
+  `landline` and `createdAt`. v9 backfills `createdAt` to **`null`, never to today**: a migration
+  that stamps today's date on a customer created two years ago is inventing a fact, and the list
+  renders "—" for it honestly. (d) **Deleting a customer is guarded by the documents that reference
+  it, not by a soft flag.** `deleteParty()` walks budgets, contracts, projects, invoices, receipts,
+  bills, collections, subcontracts and purchases and refuses by naming up to four blocking
+  documents; the UI then offers deactivation instead. Silently deleting a party that a filed
+  invoice points at is the failure mode this exists to prevent. (e) **Search, paging and page size
+  are view state.** The name/code filter and the page number reset on every visit; only the chosen
+  page size (10 default, 10/20/50) is persisted, in `ErpStore` meta alongside the other UI
+  preferences — never in the state blob, because how many rows fit a screen is a property of the
+  screen, not of the tenant. (f) **Export writes a genuine `.xlsx`, reversing #56(h).** That entry
+  judged a real XLSX writer not worth the weight _for a dashboard of eight indicators_; a customer
+  registry is a table people take to a gestoría, and a CSV renamed `.xlsx` is the kind of small lie
+  that gets found out in front of someone else. The writer is ~60 lines of ZIP + SpreadsheetML with
+  no dependency (a page served from a bare static host cannot pull a library), and **every cell is
+  an inline string on purpose**: postal codes, phone numbers and client codes are text, and letting
+  Excel guess turns `08960` into `8960`. (g) **One `CLI_COLS` table drives the table head and both
+  exports**, so a column can never be added to the screen and go quietly missing from the file.
+  (h) **Export sends every row the filter matched, not the page on screen** — exporting ten of
+  seventeen because ten happened to be visible is a surprise the moment anyone uses the result.
+  (i) **The fit-all-columns-to-width table sizing was built, shown, and reverted at the operator's
+  request**; the list keeps natural column widths and scrolls horizontally. Reversible: v9 is the
+  only non-additive step and is documented as such in both the ladder and the guard; everything
+  else is UI, and no packages/capability changed, so the committed browser bundle is untouched.
+
+- **#101 — S1b: six secciones, English routes, and the four things that were
+  removed (2026-08-09).** The v4 specification replaces the seven-section menu
+  with six, and the programme adds three subsecciones to its twenty-six
+  (Comunicaciones, Alertas, Usuarios move into Configuración rather than being
+  deleted) — so the shipped shape is **6 × 29**, asserted in the e2e suite so it
+  cannot drift unnoticed. **Decisions:** (a) route keys become **English**, and
+  `ROUTE_ALIASES` maps every retired hash to its replacement with `go()`, boot
+  and `hashchange` all resolving through it — a rename that breaks a bookmark
+  silently is not a rename, it is a bug with a changelog entry. The address bar
+  is normalised with `replaceState`, so Back never bounces between the old name
+  and the new. (b) The doc merges six built screens into three (PRY-01, ADM-03,
+  ADM-05); each merged route is a **tab strip over the existing bodies** rather
+  than a rewrite, because rewriting them to the layouts the doc specifies is
+  S7/S8/S11's job and doing it here would put two large changes in one commit.
+  The chosen tab is remembered per route and deliberately **not persisted** —
+  which tab you last looked at is not company data. (c) The Torre goes from
+  eight indicators to the doc's four, and **computes none of them**: each is
+  asked of the module that owns it, so the Torre cannot become a second,
+  disagreeing source of truth. It is read-only, five alert rows ordered by
+  severity, no control that writes — because the doc says twice that it reads
+  the whole chain and writes nothing. (d) Everything one _does_ to an alert
+  moves to **DMC-07 Alertas**, reading `managedAlerts()` rather than `alerts()`
+  so a snoozed alert is not still sitting there with buttons on it. (e) The
+  subcontract lifecycle **screens** go, the data and rules stay — but those
+  screens were the only thing exercising the rules, so the coverage **moved down
+  a layer** into `manageability-sim` (48 → 57 checks) rather than disappearing
+  with the UI. That is the difference between retiring a screen and quietly
+  un-testing an engine. (f) **No schema migration.** The plan expected v10 to
+  carry removals and key renames; there are none — what changed are route keys
+  and view code, and the two preferences involved live in the store's `meta`,
+  not the state blob. An empty migration is a version bump that claims a change
+  nobody made. (g) The mobile bar carries **five icons** as the doc requires, so
+  Configuración leaves it for the profile menu; an e2e check enforces the count
+  and the absence of horizontal scroll. (h) Both native shells now address
+  sections by route key instead of the four redirect stubs they were pointed
+  at — the tabs resolved, but through two hops and onto whichever screen the
+  stub forwarded to rather than the one the tab was named after. (i) The
+  language toggle reaches the **breadcrumb** for the first time: it was built as
+  one text node, `"ERP › Torre de control"`, which is a string no dictionary can
+  hold. **Reversible:** the removed screens are one `git revert` away and no
+  engine code was deleted.
+
+- **#102 — S1c: accounts become rows, and a role becomes a permission
+  (2026-08-09).** Accounts lived in `ERP_USERS` in the server's `.env`, the file
+  that also holds the database password — so adding a colleague meant handing
+  over the keys, and the pilot write-up's "any limit on what a visitor may do:
+  NONE" was literally true. **Decisions:** (a) `erp_users` and `erp_user_tokens`
+  are tenant-scoped with FORCED row-level security like every other table, and
+  the RLS test for them runs as the RESTRICTED role — a superuser bypasses RLS
+  regardless of FORCE, so proving it as the owner proves nothing. (b) **The
+  admin never learns the password**: creating a user mints a single-use,
+  time-limited token, stores only its SHA-256, and the invited person chooses
+  their own. The script this replaces generated a password and printed it to the
+  admin, who then knew a credential somebody else was responsible for. SHA-256
+  rather than scrypt for the token because 32 random bytes have nothing to
+  guess; the slow hash would only make the activation page feel broken. (c)
+  **Disable, never delete** — the audit trail has to keep resolving who did
+  what — and disabling **moves `sessionsValidFrom` forward**, which is what
+  actually ends that person's sessions: tokens are signed and stateless, so the
+  only previous lever was rotating `SESSION_SECRET`, which signs out the whole
+  company to remove one person. (d) **Roles grant opaque permission strings**,
+  so a screen asks `may(session, "user.manage")` rather than testing
+  `role === "admin"`; gestoría's exclusion from margins and commercial prices is
+  expressed as an absent permission and asserted in a test, because that
+  exclusion is the reason the role exists. (e) **The last admin cannot lock the
+  system** — no stepping down, no disabling themselves, and a disabled admin
+  counts as none. (f) **`ERP_USERS` still works, as the bootstrap**: a server
+  with no rows must still let somebody in to create the first account, and those
+  accounts read as admin/active because they are the people who held the keys
+  before there was a screen. A row wins over an environment entry for the same
+  address. (g) **The session check lives in the middleware, not in
+  `requireUser`** — seven of fourteen tenant routes never call `requireUser`,
+  because they only read, so the check placed there left a disabled colleague
+  reading the register. (h) **A database that cannot be reached does not lock
+  anybody out**: the signature was still valid, so an outage stays an outage
+  rather than becoming a lockout. (i) **The login form is rate-limited**, by
+  network address and by the address being tried, since either alone has a hole.
+  It is an in-process counter and says so — right for one container, wrong
+  behind several. (j) **SMTP is deferred by operator decision.** With it the
+  invitation is mailed; without it the admin gets a copyable link and the screen
+  says plainly that no mail was sent. The fallback is a working path, not a
+  degraded one — what is never acceptable is a success message for a message
+  nobody will receive.
+
+- **#103 — S2: DMT-01…04 Datos Maestros, a shared list primitive, and closing
+  gaps 1–4 (2026-08-09).** Clientes was the only master-data screen; Proveedores
+  and Subcontratas were placeholders, and Personal interno had no registry at
+  all — a timesheet needed only a worker's name. **Decisions:** (a) **The CIF
+  check digit is now verified, not just the shape.** `validTaxId`'s CIF branch
+  used to `return true` on a regex match alone; it now runs the same
+  odd-positions-doubled-and-summed algorithm the DNI/NIE branches already used
+  for their own check letter. Nine pre-existing fixture/seed tax ids across
+  `year-sim.mjs`, `import-sim.mjs`, `manageability-sim.mjs`, `erp-seed.js`,
+  `erp-history.js` and `apps/web/lib/erp-engine.test.ts` had only ever satisfied
+  the old structure-only regex and were corrected to the nearest valid check
+  character, preserving every other digit for traceability. (b) **A shared list
+  primitive** (`renderMasterList`) replaces the Clientes-only
+  toolbar/table/pagination/export code, so DMT-02/03/04 — and every list screen
+  after them — inherit it instead of retyping it. Page sizes correct to
+  **10/25/50, 25 default**, fixing the 10/20/50 Clientes shipped with; the
+  50-scan `.mlist` CSS rule is a first phone-card rendering, not the full
+  verification S14 owns. (c) **Proveedores and Subcontratas are the same party
+  file, filtered by role** — not a new collection — reusing
+  `newPartyDrawer`/`partyDrawer`/`editPartyDrawer` rather than building
+  duplicate screens. `editPartyDrawer` gains `businessLine`/`category`/`aliases`
+  fields (gaps 1/2/4); `sourceSystem` (gap 3) is provenance, set by import, not
+  hand-edited. (d) **Personal interno (DMT-04) is `state.workers`, its own
+  registry** — list, create, edit, append-only tarifa history, documentación
+  (reusing the existing `workerDocDrawer`), deactivate-never-delete. The engine
+  gained `updateWorker`/`deactivateWorker` (there was no way to edit or retire a
+  worker before this session) and a taxId check-digit validation on
+  `addWorker`/`updateWorker`, matching parties. **Known limitation, not fixed
+  here:** two rates dated the same day break the tie by array order, not by
+  which was added last — real for a same-day correction, out of scope for this
+  session. (e) **`searchAll()`'s "Proveedores" group routed every hit — supplier
+  AND subcontractor — to `k:"customers"`** (adjacent to audit F-020): a search
+  hit on a subcontracted industrial opened the customer screen. Split into two
+  groups routing to their own DMT-02/03 screens. (f) **`findDuplicateParty`'s
+  result is now surfaced**, not silently discarded: `newPartyDrawer` shows which
+  earlier record a new one may collide with instead of a plain "created"
+  toast — the engine already computed `duplicateSuspect` on every `addParty`,
+  nothing read it. (g) **The 480px-with-tabs drawer layout the spec describes is
+  not built this session.** The existing single-scroll party and worker drawers
+  are reused and extended in place; only the global `.drawer` width moved to
+  480px. Rebuilding the drawer as a tabbed panel (Identification/Contact,
+  role-specific Precios/Compras/Documentos/Tarifas tabs) is real UI work with
+  real regression risk across every existing drawer flow across 29 screens —
+  deferred rather than rushed, and not silently dropped: it is the reason S2 is
+  scoped as "screens landed, tabs deferred" rather than "DMT-01…04 done" in
+  `docs/CANEI-V4-MAPPING.md`. (h) **`GET /api/~/session`** is new — the
+  workspace is a static file with no server-side render, so it is the only way
+  a screen can know its own permissions. It gates the IBAN field in
+  `editPartyDrawer` behind `party.bank.read`, verified live against a real
+  Postgres and the standalone Next build (`server-e2e` 27/27). **This is
+  masking, not enforcement** — both the route's own doc-comment and the
+  client's `SESSION` variable say so explicitly, and it is recorded here again
+  for visibility: **server-side per-command RBAC on `/erp/command` does not
+  exist yet.** Today every signed-in identity can issue every command the
+  engine accepts; `party.bank.read` only decides whether the workspace SHOWS the
+  field, not whether a direct API call could set it. Closing that gap is a
+  distinct, larger piece of work (a permission check per command name) and is
+  logged here as the follow-up rather than attempted piecemeal inside a
+  UI session. **Reversible:** every list screen change is additive (new
+  `VIEWS` entries, a new shared function); the CIF fixture repairs are
+  git-diffable single-character corrections; the session endpoint is a new,
+  independent route.
+
+- **#104 — S3: the company's vocabulary leaves the code, and the interface
+  learns a third language (2026-08-09).** Four reference lists were compiled
+  into the engine, DMC-01/02 had no way to create anything, and the language
+  toggle was ES⇄EN in a product built for a Catalan-speaking region.
+  **Decisions:** (a) **Only vocabulary moves into `state.lists`** — units, lead
+  sources, loss reasons, payment methods, and (for DMC-01) the catalogue's
+  chapter tree. The rest of `LISTS` stays compiled in, because invoice kinds,
+  document statuses and movement classes are keys the engine BRANCHES on: an
+  owner renaming one would not be configuration, it would be a bug. (b) **A
+  code is permanent, a label is editable.** Records store the code forever, so
+  `updateListEntry` patches `es`/`ca` and nothing else — offering to rename a
+  code is offering to break every record already carrying it. This also fixed
+  a real display bug: a customer's origin rendered as its raw English key
+  (`referrer`) because the list had codes and no field to put a label in. (c)
+  **Retiring is never blocked by usage.** A list is retired precisely BECAUSE
+  it is no longer how the company works; `listLabel` keeps resolving it on
+  records that already carry it, so the usage count informs rather than
+  blocks. The one refusal is emptying a list entirely. (d) **A record whose
+  code has since been retired keeps it**, marked, in the picker. Dropping it
+  would silently rewrite the record to whatever happens to be first the next
+  time somebody opens the drawer and saves. (e) **`state.lists.itemChapters`
+  is a list, not a derived set** of the distinct chapters on items: a tree the
+  owner can drag needs somewhere to keep that order, and a chapter with
+  nothing in it yet still has to be visible or it can never be filled. The
+  array order IS the display order, so no second sort field can disagree with
+  what is on screen. (f) **Migration v11 rather than more keys in v10.** v10
+  had already been written to blobs by the time DMC-01 needed the catalogue
+  fields, and a blob stamped 10 never re-runs 10 — appending to it would have
+  meant the documents that most needed the keys were exactly the ones that
+  never got them. (g) **DMC-02 has no edit path, deliberately.** Prices are
+  append-only (SUP-05) because a budget written last month has to keep
+  explaining itself with the price that applied then; the detail drawer says
+  so and offers "record a new one". An unstated IVA stays `null` rather than
+  becoming 0%, and a supplier with no price reads «sin precio» rather than
+  0,00 € — rendering a blank as zero makes the supplier who never quoted look
+  like the cheapest, which is how a purchase order goes to the wrong company.
+  (h) **`master-data.html` stays.** DMC-01 supersedes only its partidas half;
+  it still owns company, branches and other registers the engine has no home
+  for, and the legacy import path reads its localStorage. (i) **Spanish is the
+  i18n hub.** Entries are triples keyed on the Spanish form, so EN → CA is one
+  lookup instead of two hops through Spanish losing whatever the first missed.
+  Catalan lives in its own file because it is the column most likely to be
+  corrected by somebody who is not editing the application. (j) **The Catalan
+  guard is a ratchet, and this is the honest part of the entry.** 466 of 1792
+  entries are translated — the whole navigation, shell, launchpad and the main
+  screen headings, i.e. what a Catalan user reads first. The remaining **1326
+  are NOT translated**, are recorded as `CA_BACKLOG` in
+  `tests/i18n/coverage.mjs`, and the check fails if that number grows. So
+  every string from S3 onward must ship with Catalan, while the historical
+  backlog is counted in the open rather than hidden behind a check scoped
+  small enough to pass. Translating it is content work a native speaker should
+  review, not a side effect of a feature session; English, by contrast, is at
+  100% and enforced absolutely. (k) The guard immediately found a real
+  pre-existing bug — **11 duplicate Spanish keys, 4 with different English** —
+  where only the first was ever reachable, so `Pendiente de cobro` rendered
+  "Pending collection" everywhere the second entry intended "Receivable". The
+  shadowed copies were removed; keeping the first preserves today's rendering
+  exactly. **Reversible:** the lists are data with a seeded migration, so
+  reverting the screens leaves the vocabulary intact; the Catalan file is
+  additive and can be deleted without touching the ES/EN spine.
+
+- **#105 — S4: a lead had no lifecycle, and the coverage guard proved it only
+  checks the dictionary (2026-08-09).** COM-01/COM-02 needed an actual visit
+  lifecycle — `addVisit` had always been a single unconditional write, with no
+  way to schedule one first and capture it later. **Decisions:** (a) **Two
+  engine methods, not a status field bolted onto the old one.**
+  `scheduleVisit(v,user)` creates a `status:"scheduled"` record with nothing
+  captured yet; `completeVisit(id,patch,user)` writes the capture fields once,
+  refuses a second call on an already-`"done"` visit (the existing
+  `validateVisit` is the correction path for that, unchanged), and flips the
+  owning opportunity from `awaitingVisit` to `awaitingBudget`. `addVisit`
+  keeps its old one-step signature for the 6 seed/history call sites — a
+  second lifecycle is not owed to code that only ever wrote finished visits.
+  (b) **`renderMasterList` grew three flags instead of a second, duplicate
+  pagination implementation**: `fixedSize` pins the page size and hides the
+  size selector, `noExport`/`noNew` drop the buttons — needed because COM-02
+  is two fixed-height blocks (Programadas/Realizadas) sharing one `state.visits`
+  collection filtered by status, not two different kinds of record. Verified
+  against every S2/S3 screen that already uses the primitive: no regression.
+  (c) **The handoff to a presupuesto stops at a bare budget header.** COM-03
+  (S5) owns the real builder; `visitDetailDrawer` creates the header via the
+  existing `createBudget`, links it back with `validateVisit(visitId,
+{budgetId})`, and navigates to `#quotes` — proven in e2e by asserting the
+  hash actually changes, not just that a function was called. (d) **The
+  server command whitelist (`apps/web/lib/erp-commands.ts`) is untouched,
+  matching S2/S3 exactly.** `site/erp.html` persists through
+  `ErpStore.saveState()` → `/api/<tenant>/erp/state`, a whole-document sync
+  that already covers every mutation in this file including brand-new ones;
+  the granular `COMMANDS` whitelist backs a separate, narrower surface
+  (`apps/web`'s server-rendered tenant pages) that neither S2 nor S3 extended
+  for their own new engine methods either. Extending it for `scheduleVisit`/
+  `completeVisit` here would be new scope invented mid-session, not a gap S4
+  introduced. (e) **The i18n coverage guard caught two real misses, and
+  proved something about itself in the process.** First pass: 29 new
+  ES/EN/CA triples covered every new sentence, label and button — the guard
+  (`tests/i18n/coverage.mjs`) was green, and it was still wrong. Adding a
+  real-browser check that visits the new screens under CA/EN (rather than
+  only asking the dictionary "does an entry exist") found (i) the row-count
+  tag ("N oportunidades", "N visitas programadas/realizadas") never
+  translates at all — the same dynamic noun-splice pattern `clientes`/
+  `proveedores`/`registros` already use, fixed for EN with the same
+  `rxEs2En`/`rxEn2Es` regex-pair convention those use, left as pre-existing
+  CA backlog because CA has _no_ regex coverage for any such count today,
+  clientes and proveedores included — a decision 20 says is allowed to be a
+  ratchet, not zero; and (ii) the "Programadas"/"Realizadas"/"Sin crear"
+  strings, which are plural/distinct forms of words that WERE in the
+  dictionary ("Programada", "Realizada"), so the coverage guard's exact-string
+  check saw no gap while the screen showed raw Spanish under CA and EN both.
+  Fixed with three more triples. **The lesson, stated plainly: the dictionary
+  coverage guard proves entries exist, not that a specific screen renders
+  them — a real-browser assertion per new screen is the only check that
+  catches a translated-looking string that is actually a different string.**
+  **Reversible:** the two engine methods are additive (old `addVisit` callers
+  unaffected); the `renderMasterList` flags default to their old behavior
+  when omitted; the i18n additions are dictionary entries only.
+
+- **#106 — S5: the presupuestador leaves the shell, and the document stops
+  speaking the operator's language (2026-08-09).** COM-03 is the screen the
+  business runs on and it was a three-pane card layout inside the normal page,
+  with no way to reorder anything, no way to number a row by hand, and — this
+  was the surprise — **no way to send a presupuesto or record the customer's
+  answer at all**: `issueVersion` and `acceptVersion` had exactly zero callers
+  outside `erp-seed.js` and `erp-history.js`. **Decisions:** (a) **Free
+  numbering is a flag on the row, not a mode on the screen.** `_renumber`
+  assigns positional numbers to every row EXCEPT those carrying `manualNum`,
+  so a number a person typed survives every later insert, delete and drag,
+  while a number the system assigned belongs to the position and moves with
+  it. Duplicates are refused, because the number is the reader's only index
+  into the document and into the graphic annex. (b) **The five stages are
+  derived, not stored.** `budgetStage` computes draft/issued/accepted/
+  rejected/expired from the record. Expiry is the reason: it is not something
+  done to a record on a date, it just becomes true, and a stored status can
+  never know that without a nightly job nobody has written — the shipped data
+  proved it, with four seeded budgets long past their validity still stored as
+  `issued`. (c) **`rejectVersion` was missing and had to exist**, or the v4
+  register could not have a «Rechazados» group at all; it takes a loss-reason
+  CODE from DMC-04 so refusals stay countable alongside `loseOpportunity`, and
+  free text goes in `notes`. Testing it immediately exposed a real defect in
+  the code that was already there: **`acceptVersion` never checked for an
+  existing customer response**, so a refused version could be accepted
+  afterwards, overwriting the refusal and flipping the opportunity from lost
+  back to won with no trace of which answer the customer gave. Both now refuse
+  a version that already has an answer; a customer who changes their mind gets
+  a new version. (d) **Full screen is opt-in per render, cleared by
+  `render()`** rather than turned off on the way out, so no exit path can
+  strand the next screen without its navigation. (e) **"Guardar" is in the bar
+  because §3.2 puts it there, and does the only honest thing left**: §3.1 says
+  nothing waits for a save and this screen already writes every keystroke
+  through, so the button flushes the 140 ms debounce and reports the real
+  outcome (`persistNow`), including failure — which the fire-and-forget path
+  deliberately swallows. It never claims to have saved something that was not
+  already saved. (f) **The customer's document is not interface.** It is
+  written in `budget.language`, a field set per customer, and marked
+  `translate="no"` — which `i18n.js` now honours for a whole subtree. This
+  fixed a real pre-existing bug rather than only enabling Catalan: "Base
+  imponible", "Validez", "Opcionales (aparte)" and "Total por m²" are all in
+  the dictionary, so a Spanish presupuesto previewed by an operator working in
+  English came out partly English. The document label table (`DOCL`) is
+  deliberately NOT in the i18n dictionary, because those two ideas must not
+  share a switch. (g) **The visit panel falls back to the customer's last
+  capture when no visit is linked, and says so in a pill.** Only S4-era
+  budgets carry `visit.budgetId`, so a strict reading would have shown an
+  empty tab on every historical presupuesto; a labelled guess is more useful
+  than nothing and safer than an unlabelled one. Nothing on that tab writes,
+  and nothing is copied into a line — the mapping's own row 2 says the visit
+  does not inherit into the presupuesto. (h) **Two count labels were rebuilt
+  as separate text nodes instead of being given regex rules.** "Borradores ·
+  1" is one text node and no dictionary entry can reach it; a regex would have
+  fixed English only, since Catalan has no regex coverage for any such count.
+  Splitting the label from the number fixes all three languages with no rules
+  at all, and is the general answer to the class of bug S4 recorded. Found by
+  the real-browser render check, exactly as #105 said it would be, and not by
+  the dictionary guard, which was green throughout. **Reversible:** every
+  engine method is additive; `body.fs` is one class on one screen; the
+  document label table can be deleted to return every presupuesto to Spanish.
+
+- **#107 — S6: the OCR pipeline, and the rule that a dot has to be earned
+  (2026-08-09).** `extraction-ocr` was the one `unbuilt` area: session 7 built
+  the interpretation half and nothing could reach it. **Decisions:** (a) **The
+  recognition half is host infrastructure, not domain, and lives in
+  `site/erp-ocr.js`.** pdf.js and tesseract.js are ~7 MB that know nothing
+  about invoices; what the text MEANS stays in
+  `@repo/capability-extraction`, which is why the meaning is still tested
+  against a jurisdiction that does not exist while the recognition is tested
+  against a real browser. (b) **Green only where a validator vouched for the
+  value** — a check digit that computes, a real calendar date, arithmetic that
+  balances — **never on confidence**, however high. This is the memo's whole
+  point: the spike's scanned NIF came back `A08912907` for `A08932907`, read
+  with perfect confidence. A consequence stated rather than hidden: fields
+  with no validator available (issuer name, document number, order reference)
+  are **always amber**, matching the spike never once reading a document
+  number correctly off a raster. `needsReview` became the amber list, so the
+  dots and the review list are two readings of one decision instead of two
+  decisions that can disagree. (c) **A typed correction is re-checked, not
+  believed.** Typing is exactly where a NIF acquires a transposed digit, and a
+  check digit does not care who produced the number. (d) **The runtime is
+  vendored under `site/vendor` (7.23 MB, `tools/vendor-ocr.mjs`)** because
+  `pages.yml` publishes `site/**` from a bare checkout with no Node, and both
+  a bare static host and offline capture forbid the CDN these libraries reach
+  for by default. A script rather than a one-time copy, so the provenance of
+  7 MB of binaries is a command anybody can re-run and diff. (e) **Nothing
+  loads until it is needed**, and `prepareOffline()` is an explicit
+  user-pressed pre-fetch — 7 MB must never land on somebody's mobile data on a
+  site because a screen opened. (f) **`captureDocument` is called at the END**,
+  by a person pressing Confirmar, so CAP-04 is enforced by the flow as well as
+  by the capability's `confirmed: false` type. The machine's reading is stored
+  beside the confirmed values rather than instead of them. (g) **Provenance is
+  the LINE, not a pixel box.** The capability records character offsets into
+  the recognised text, not image coordinates, so the honest rendering of the
+  doc's "highlight the area of the image it came from" is to show the lines
+  and highlight the one a value was read off. Claiming a pixel box we do not
+  have would be a nicer screen and a lie. **Three real defects were found by
+  driving a browser rather than by reading code**, all in this session's own
+  new code: tesseract's default `blob:` worker gives its Emscripten core no
+  script directory, so the `.wasm` resolved to a bare filename and the promise
+  never settled (`workerBlobURL:false`); the image's object URL was revoked in
+  `onload` before tesseract read `img.src`; and `logger: undefined` throws once
+  per progress tick because tesseract calls it unchecked. **Reversible:** the
+  vendored runtime is inert until a file is handed over, and deleting
+  `site/erp-ocr.js` leaves the capture screen offering manual entry, which it
+  already does when the reader is unavailable. (h) **A fourth defect was found
+  by CI rather than by the local gates, and the guard moved because of it.**
+  `createExtraction` called `extractionConfigSchema.parse()` and pulled zod
+  into the browser bundle — 90 KB to 217 KB, to validate a config the browser
+  never parses. Fixing it took two changes: literal defaults on the surface,
+  AND moving the schema out of `model.ts`, whose runtime constants force that
+  module into the bundle where a top-level `z.object(...)` cannot be proven
+  side-effect-free. **This repository has hit that wall three times now** (the
+  `rates` subpath, the earlier 23 KB → 152 KB regression, and this one), and
+  writing it down twice did not prevent the third — because the assertion was
+  inline bash in `ci.yml` that no local gate run could execute. It is now
+  `tests/parity/bundle-safety.mjs`, run by CI **and** `make gates`, and it
+  names both causes when it fires. The lesson is general: a rule that only
+  exists on the server is one you learn about after pushing.
+
+- **#108 — S7: what puts a document on the left of ADM-03, and what a counter
+  counts (2026-08-09).** The v4 document specifies ADM-03 as two zones — a 372
+  column of 96 px cards beside a 756 validated list — and ADM-02 as three
+  counters over a list, with the order opening full screen beside the
+  supplier's quote. **Decisions:** (a) **The left column is what still needs a
+  person, and "needs a person" means UNALLOCATED, not "unvalidated".** S6
+  confirms a document at capture time, so a split on status would leave the
+  inbox permanently empty and the screen would be two zones in name only. The
+  question somebody opens this screen to answer is "what have I not filed
+  yet", and the answer is: nobody has said who pays for it. (b) **Newest
+  first.** A worklist that appends to the bottom asks the person who has just
+  photographed a delivery note to scroll past everything they already dealt
+  with to reach it. (c) **Allocation offers ONE destination select holding
+  both kinds of answer** — a project or an overhead category. The engine
+  refuses a line naming both (rule 4 of the mapping's entity model: every cost
+  lands on a project _or_ an account), and a screen that lets somebody tick
+  two boxes and then says no is a screen that asked the question badly.
+  (d) **The split arithmetic is asserted only against a CONFIRMED total.** An
+  unconfirmed document has no total to check against, and deriving one from
+  the split itself would make the check agree with whatever it was handed — so
+  filing an unread photograph stays possible and stays honest. (e) **The
+  three ADM-02 stages are derived from `purchaseStatus`, not stored beside
+  it.** The seven-state lifecycle is what the record knows; oferta/pedido/
+  facturado is the coarser reading the screen is organised around. Two stored
+  fields that must agree about one order is exactly how they stop agreeing.
+  A **cancelled order is in none of the three** — shown in the list, counted
+  nowhere, because a counter that includes work nobody will do has to be
+  explained every time it is read. (f) **"No goods receipt" is read as "receipt
+  is not a STAGE", not "delete the receipt".** The engine keeps
+  `receivePurchase` and `purchaseReconciliation`; the action moved into the
+  480 record pane and the order reads _Pedido · Recibida_ — stage and status,
+  both true. Deleting the evidence a delivery note gives because a screen
+  stopped counting by it would be the mistake S1b named when the subcontract
+  screens went. (g) **ADM-02's left zone links an already-CAPTURED document
+  rather than uploading a second copy**, so the reading, the date and the
+  file's origin are the same object on both screens. (h) **`updateCapture` is
+  separate from `confirmCapture`.** The three archive fields say nothing about
+  what the document contains, so adding a note must not re-derive the standard
+  name or re-run duplicate detection — a filed invoice that renames itself
+  because somebody typed a note is a lost document. **Reversible:** every one
+  of these is a derived reading or an additive field; the stored shape gains
+  three strings (v14) and nothing was renamed or dropped.
+
+- **#109 — S7: purchase orders stay single-line, deliberately (2026-08-09).**
+  §3.2 gives ADM-02's record pane a _line table_, and the pane renders one —
+  over the single description, quantity and unit price a purchase order
+  actually stores. **Multi-line orders were not built.** The reason is not the
+  table: it is that `receivePurchase` completes an order when the received
+  quantity reaches the ordered quantity, and there is no honest single
+  quantity for an order whose lines are in different units. Making the table
+  multi-line without answering that would leave receiving quietly wrong on
+  exactly the orders it was extended for. The pane is written to render
+  however many rows it is handed, so adding lines later is data and an engine
+  decision about completion, not a second rewrite of the screen. **Reversible:
+  yes — nothing was removed to make this true.**
+
+- **#110 — S7: ADM-03 keeps a second tab for the payables register
+  (2026-08-09).** S1b left `supplier-invoices` as a tab strip and said S7 would
+  rewrite it. The first tab is now the doc's screen — bandeja and registro side
+  by side — and the tab strip stays, holding _Facturas registradas_: partial
+  supplier payments and one payment across several invoices are engine rules
+  with no screen in the v4 document, and retiring the only interface that
+  exercises them would un-cover them. Same reasoning as decision 5 over the
+  subcontract screens, and the same remedy is available if the tab ever does
+  go: move the checks down into `manageability-sim` first. **Reversible: yes.**
+
+- **#111 — S7: Necesidades and the arrivals calendar survive the ADM-02
+  rewrite (2026-08-09).** The v4 document describes ADM-02 as counters plus a
+  list and could be read as removing both blocks. They are kept, below the
+  list: Necesidades is the only place the budget's committed-versus-pending
+  figure per capítulo is visible, and an order created from an open need
+  arrives already knowing its capítulo. Removing them would move real work back
+  into somebody's head to satisfy a document that never argued against them.
+  **Reversible: yes — they are two blocks in one view function.**
+
+- **#112 — S8: the centre panel, and what closing it has to remember
+  (2026-08-09).** §3.1's third shared surface: opening a record compresses the
+  list to 372 and puts a 780 panel beside it, and **the list never
+  disappears**. **Decisions:** (a) **The compressed list does not hide columns
+  with CSS — it does not build them.** A 372 column with seven columns inside
+  it is a horizontal scrollbar over six columns nobody can reach; the doc says
+  "code + client only" and that is what is rendered. (b) **Closing restores
+  width, page AND scroll.** Page comes free, because the list keeps rendering
+  through `renderMasterList` and that primitive already holds page state per
+  id — closing the panel is a grid change, not a navigation. Scroll does not,
+  so it is captured on open and restored on close. (c) **`openId` is not
+  persisted**, the same call S1b made for the tab strips: which record somebody
+  last looked at is not company data. (d) **A record that has gone closes the
+  panel** rather than leaving the list compressed against an empty pane.
+  **Reversible: yes** — it is one wrapper function and a grid class.
+
+- **#113 — S8: the Gantt is full screen, not a 780 panel (2026-08-09).**
+  §3.2 puts Programación in a tab of PRY-01's panel; §3.1 names the Gantt as
+  one of exactly four surfaces that hide the side menu. Both are honoured by
+  making the **tab** state the plan in figures — task count, projected finish,
+  critical path, baseline drift, tasks past their date — and open the chart
+  **outside the shell**. Squeezing an SVG timeline with drag, resize and
+  linking into 780 px would have been the literal reading of one sentence at
+  the cost of another, and of the feature. `_projectSchedule` became
+  `_ganttBody` and is otherwise untouched, so nothing about the chart's own
+  behaviour changed in this session. **Reversible: yes.**
+
+- **#114 — S8: item 14 was a gap, and the fix is a button (2026-08-09).**
+  The v4 document asks whether moving a payment milestone's date moves the
+  expected cash. It did not: `cashForecast` has always read
+  `installment.expectedDate` and **nothing has ever written it after the
+  contract was drawn up**, so a job whose plan slipped three weeks kept
+  forecasting the same money in the same week — wrong in the optimistic
+  direction, with nothing on screen admitting it. **Decisions:** (a) **The
+  derivation is in the bridge, the rule is in the engine.** Reading a schedule
+  is scheduling's job and the engine knows nothing about schedules;
+  `installmentDatesFromPlan` proposes dates, `setInstallmentDates` decides
+  which may be applied. (b) **Only `planned` milestones move, and never a
+  `fixedDate` one** — that is what the trigger's name means, and a date the
+  customer agreed to in writing is not the planner's to revise. An invoiced
+  milestone is history and history does not move because a plan did. (c) **It
+  is a button, not an automatic write.** A cash forecast that changes on its
+  own while somebody is reading it is a forecast they stop trusting; the panel
+  states every move before it happens. (d) **The reason is stored beside the
+  date** (`expectedDateSource`, `expectedDateSetAt`): a figure that changed on
+  its own with nothing saying what moved it is worse than the stale figure it
+  replaced. **Reversible: yes — additive fields, and the button is opt-in.**
+
+- **#115 — S8: an hours entry goes to ONE capítulo (2026-08-09).** PRY-02's
+  assignment panel splits a cost across capítulos, because one supplier invoice
+  routinely covers three and refusing to split it is how a chapter ends up
+  carrying a bathroom's tiles and a kitchen's. A **labour** row is the
+  exception and the engine refuses to split it: it is one person's hours on one
+  day, and dividing it here would be inventing a second timesheet nobody
+  signed. The panel says so rather than offering an «＋ Otro capítulo» button
+  that then fails. **Reversible: yes** — the alternative (splitting the
+  timesheet entry itself) is a Horas change, not this screen's.
+
+- **#116 — S8: the retired project drawer, and what kept its rules
+  (2026-08-09).** `projectDrawer` is gone: its economics became PRY-02's panel,
+  its per-chapter buttons became PRY-01's three-state control, its Ficha
+  content is that panel's third tab. Two things it carried were checked before
+  deleting it, in line with S1b's rule that retiring a screen is not the same
+  as un-testing an engine — **approving an extra** has always also lived on
+  Modificaciones, which is where the e2e drives it, and **the manual forecast
+  override** (`setForecastOverride`, whose only interface was the old
+  economics table) kept its «Ajustar» button in the new per-capítulo table.
+  Universal search now opens the job on PRY-01 rather than in a drawer over
+  whatever screen the search was used from. **Reversible: yes.**
+
+- **#117 — S9: the contract's document is rendered from data, not uploaded
+  (2026-08-09).** §3.2 puts a PDF **760 wide** on the left of COM-04's viewer.
+  There is no contract PDF anywhere in this system, and there does not need to
+  be one: **CON-03 made the terms structured on purpose**, so requiring somebody
+  to attach a scan of what the database already knows would be asking for the
+  same contract twice and then trusting the copy. `renderContractDoc` builds it
+  the way `renderBudgetDoc` has built the presupuesto since session 9 — issuer,
+  customer, economic terms, milestones, guarantees, penalties, signature — and
+  the viewer sets it as a document rather than as interface. A signed scan,
+  when there is one, is a **captured document** and belongs beside this rather
+  than instead of it; S7's `attachPurchaseDocument` is the pattern if that is
+  ever wanted. **Reversible: yes** — nothing was removed and the renderer is
+  additive.
+
+- **#118 — S9: the contract document is outside the language toggle
+  (2026-08-09).** Same rule S5 established for the customer's presupuesto, and
+  for the same reason: `contract.language` is a field an estimator sets **per
+  customer**, while the toggle is a preference of **whoever is at the screen**.
+  The document carries `translate="no"` and its fixed labels come from a small
+  per-language table inside the view, deliberately **not** from the i18n
+  dictionary — otherwise «Importe vigente» and «Hitos de pago» would be
+  translated inside a document a Catalan customer is about to sign in Spanish.
+  The panel beside it is interface and does follow the toggle. **Reversible:
+  yes.**
+
+- **#119 — S9: what «vigente» means in COM-04's two tabs (2026-08-09).** The
+  doc gives the register Active and Inactive tabs without saying what decides.
+  Taken as **whether the contract still governs work**, not whether it is
+  signed: a draft is active because somebody is still working on it, and a
+  cancelled one is not, whatever its signature says. So `active` is
+  `status ∉ {completed, cancelled}` and the signature is its own column.
+  **Reversible: yes — one predicate in `contractsView`.**
+
+- **#120 — S9: `sent` folds into «valorado» in PRY-03's counters
+  (2026-08-09).** The doc counts by five stages — identificado · valorado ·
+  aprobado · ejecutado · facturado — and the record has eight statuses. The
+  mapping is one-to-one except for `sent`, which folds into **valorado**:
+  from the site's point of view an extra that has been priced and one already
+  with the customer are the same thing — priced, not yet agreed — and the
+  difference is visible in the row's own status pill. A **rejected or
+  cancelled** extra is counted in **none** of the five, for the reason a
+  cancelled purchase order is in none of ADM-02's three: a counter that
+  includes work nobody will do has to be explained every time it is read.
+  **Reversible: yes — `changeStage` is derived, nothing is stored.**
+
+- **#121 — S9: an extra's photograph became a real file (2026-08-09).** §3.2
+  puts a **40 × 40 thumbnail** in every PRY-03 row. `change.photoRef` has been
+  a typed file name since session 10b — «extra-01.jpg» — which renders as
+  nothing. It is now a blob key written through `ErpStore.putBlob`, the same
+  path every picture has taken since S6, and the photograph is stored **before
+  the record is written** so a failed upload cannot leave an extra pointing at
+  a picture that is not there. A `photoRef` that is not a blob (everything the
+  seed wrote) stays the camera icon rather than showing a broken image — the
+  same fallback-by-letting-it-fail that ADM-03's cards use, and the only test
+  that works for both the local and the served path. **Reversible: yes — the
+  field still holds a string and old values still read.**
+
+- **#122 — S9: `contractControlView` stays beside `contractsView`
+  (2026-08-09).** COM-04 needed a richer row than CON-13's control view — both
+  money columns, the annex count, the project code, the active predicate — so
+  `contractsView` is new rather than a widening of the old one. The old one is
+  kept because **`year-sim` drives it as CON-13's own trace evidence**, and
+  widening a method a simulation asserts against would have changed what that
+  evidence means. Two views of one collection is a smell; it is logged here so
+  the next person can retire the first once CON-13's evidence has somewhere
+  else to live. **Reversible: yes.**
+
+- **#123 — S10: ADM-01's counters are derived from the register they sit over
+  (2026-08-09).** Four counters — emitido · cobrado · pendiente · vencido — all
+  computed by `invoicingSummary` from the same `invoiceRegister` the rows are
+  drawn from, so a strip of totals over a table cannot tell a different story
+  from the table. **Decisions:** (a) **«Vencido» is a SUBSET of «pendiente»,
+  not a fifth bucket beside it** — money that is late is still money that is
+  owed, and a red counter that double-counts is the worst possible thing to
+  paint red. The sim asserts `collected + outstanding = issued` and
+  `overdue ≤ outstanding` so the two can never drift. (b) **Red only when
+  non-zero**, as the doc says: a counter that is always red is a counter nobody
+  looks at. (c) **Days overdue are red from day one.** Not from a week, not
+  from a grace period; the engine already computed `daysOverdue` that way and
+  the screen now shows it, with a sim check on both sides of the due date.
+  (d) **A settled invoice shows «—», not 0,00 €** in the balance column: a zero
+  in a money column reads as a figure somebody calculated. **Reversible: yes —
+  every figure is derived and nothing was stored.**
+
+- **#124 — S10: the extras question was already answered correctly
+  (2026-08-09).** S9's handover flagged a three-way consistency risk: does
+  ADM-01 bill against the contract's ORIGINAL amount or its CURRENT one, given
+  CON-12's annex chain and CHG-04's billability rule? Traced rather than
+  changed — `projectBilling` reads `projectEconomics().currentRevenueCents`,
+  which is the frozen baseline **plus approved changes**, so it has always
+  billed against the current value and CHG-04 has always refused the
+  unapproved ones. **Nothing was changed; a check was added** asserting the
+  relationship, because an invariant nobody tests is an invariant that survives
+  by luck. Recorded here so the next person does not re-open a question that
+  already has an answer in code.
+
+- **#125 — S11: gap 13, and why the chart of accounts is a LIST
+  (2026-08-09).** Rule 07 says every cost lands on a project **or an account**;
+  the account half had no field, and the chart lived in a separate page's own
+  dataset. **Decisions:** (a) **The chart is `state.lists.accounts`**, which
+  does three things at once — gives the resolver something to validate
+  against, makes the chart owner-maintainable through the same screen as units
+  and payment terms, and keeps the codes out of code. (b) **The mapping lives
+  on the account** (`overhead`, `cost`) rather than in a second table that has
+  to be kept in step with the first. (c) **Precedence is the rule**: an
+  explicit code wins, then the overhead category, then the project's cost
+  kind, then nothing. An allocation that resolves to nothing is reported by
+  `accountLedger` under `unassigned` rather than dropped or given a plausible
+  code — a roll-up that quietly loses money is worse than one that admits it.
+  (d) **Migration v15 RESOLVES rather than defaults**: every existing
+  allocation already knew which account it belonged to; what it could not do
+  was say so. **Reversible: yes — additive field, derived resolver.**
+
+- **#126 — S11: the engine silently swallowed a duplicate method
+  (2026-08-09).** ADM-06 needed a way to record cash, so this session wrote
+  `recordCashMovement` — and the class already had one, 280 lines further
+  down. **A later definition of the same name in a class body silently wins**,
+  so the new method was dead the moment it was written and the tests failed
+  against behaviour nobody could find. S1a recorded this hazard after hitting
+  it once; recording it once was demonstrably not enough, so it is now a
+  comment at the site of the mistake as well. **Before adding a method to
+  `erp-engine.js`, grep for its name.** The pre-existing BNK-07 method is also
+  the better rule — it flags a movement with no `supportingDocRef`, which asks
+  about the evidence rather than about the sign of the amount.
+
+- **#127 — S11: an unbounded cash count starts at the opening balance
+  (2026-08-09).** `cashCount`'s opening window was first written
+  `!from || m.accountingDate < from`, which made **every** movement "before"
+  the period on an unbounded call and folded the whole history into the
+  opening figure. **It still balanced** — opening + in − out = closing held
+  perfectly — which is exactly what made it dangerous and why the arqueo is now
+  asserted against `accountBalanceCents`. A count that does not agree with the
+  balance is decoration.
+
+- **#128 — S11: correcting S10's record (2026-08-09).** S10's commit message,
+  `PROGRESS.md` entry and session pack all claimed a `bootedShell()` e2e helper
+  had been added. **It had not** — the edit failed silently and S10's green run
+  was green by timing rather than by the fix. The helper is added here with
+  both call sites wired, and the S10 entries carry a correction rather than a
+  quiet rewrite: a session pack that edits its own history is a session pack
+  nobody can trust. Three intermittent reds in this programme have now come
+  from the same cause — a check that measures a page a fixed number of
+  milliseconds after `goto`.
+
+- **#129 — S11: ADM-05 brings assignment back into the row, deliberately
+  (2026-08-09).** Session 11 of the _first_ programme moved allocation out of
+  the banco screen into Conciliación, because assigning a movement to a job
+  without a document behind it produced movements allocated to an obra with no
+  invoice. §3.2 of the v4 document asks for classification **and** assignment
+  edited in the row, and this session obliges — but through the same
+  `splitMovement` Conciliación calls, not through the old free-text input. The
+  e2e asserts both halves: the old input must stay gone, the row control must
+  be there. **Reversible: yes.**
+
+- **#130 — S12: the day sheet spans every project, not the one in the project
+  bar (2026-08-09).** §3.2 gives ADM-04's day grid a **Proyecto** column, which
+  only makes sense if more than one can appear. An hour is recorded by the
+  person who worked it, and that person moved between two jobs on Tuesday; a
+  sheet scoped to one job asks them to remember which screen they were on.
+  Approval stays per worker per **week**, because that is what payroll and the
+  law care about, so the lock button sits on the worker's row and locks the
+  week containing the selected day. **Reversible: yes** — scoping back to one
+  project is a filter, not a rewrite.
+
+- **#131 — S12: the monthly labour reconciliation reports a difference, it
+  does not demand a zero (2026-08-09).** Hours cost is an accrual booked to
+  jobs on the day the work happened; wages are cash leaving on payday, and they
+  also pay for holidays, sick days, office staff and time nobody logged. The
+  two are not supposed to match, so the block states `unbookedCents` and its
+  percentage of the wage bill rather than flagging every month red. The
+  interesting case is a **negative** difference — more hours booked than wages
+  paid — which means an unimported payroll run or hours in the wrong month.
+  **Reversible: yes.**
+
+- **#132 — S12: ADM-08's forecast opens from real cash and absorbs what is
+  already overdue (2026-08-09).** The cumulative row starts at
+  `cashPositionAsOf(yesterday)`, not zero, because "what is the net of the next
+  13 weeks" is never the question — "do we run out, and when" is. And anything
+  past its date lands in the first bucket rather than being dropped: a forecast
+  that discards overdue money gets rosier the later you are, which is the one
+  direction a forecast must never drift. **Reversible: yes** — both are single
+  expressions in `cashFlowGrid`.
+
+- **#133 — S12: the forecast grid uses a fixed table layout at a computed
+  width (2026-08-09).** §3.2 fixes the label column at 240 and each period
+  column at 96. An auto-layout table distributes spare container width across
+  its columns, which silently turned 96 into 106; the table therefore declares
+  `table-layout: fixed` and an inline width of `240 + 96 × periods`, and the
+  card scrolls horizontally. A money figure longer than 96 px will overflow its
+  cell rather than be truncated — a clipped amount is worse than an untidy one.
+  **Reversible: yes.**
+
+- **#134 — S12: the "unbuilt subsección" probe inverts rather than retires
+  (2026-08-09).** It has moved four times as its subject got built (Reportes,
+  `units`, `visits`, `petty-cash`) and `cash-flow` was the last candidate. The
+  e2e now walks **every** entry in the menu and fails if any lands on the
+  dead-link fallback, and `PLACEHOLDERS` is gone: a route that resolves to
+  nothing says «Ruta desconocida», because promising a screen nobody planned is
+  a worse lie than admitting a stale bookmark. **Reversible: yes.**
+
+- **#135 — S13: ADM-09 stays a separate page, but stops holding its own data
+  (2026-08-10).** The v4 doc says «already built — integrate, do not rebuild»,
+  and the mapping's decision 1 keeps the page. What it could not keep is its
+  own dataset: receivables lived in `caneiFinance` and in the ERP at the same
+  time, so the two screens could disagree about the same invoice and nothing
+  said which was right. Six panels — receivables, payables, bank, VAT, the
+  chart of accounts and the monthly ledger — are now **derived** from the
+  engine and read-only, each naming the ERP screen that owns it. Budgets,
+  loans, opening balances and drivers stay editable, because the engine
+  genuinely does not hold them. **Reversible: yes** — `applyFeed()` is one
+  call at boot; not making it leaves the page exactly as it was.
+
+- **#136 — S13: the page still renders without an ERP (2026-08-10).** `erp` is
+  null when there is no state to read — a fresh browser, or the page opened on
+  its own — and the seed then stands, with a banner saying the figures are the
+  page's own demo. A screen that refuses to render because the ERP is empty is
+  worse than one that shows its demo and admits it. **Reversible: yes.**
+
+- **#137 — S13: the page keeps the roll-up line and the budget, the ERP keeps
+  the code and the name (2026-08-10).** An account's code and label are
+  operational and belong in `state.lists.accounts`; which P&L line it rolls
+  into, and what it was budgeted at, are reporting decisions and belong here.
+  The split is stored as `DATA.accountMeta`, keyed by code, so re-reading the
+  chart never loses a budget somebody typed. **Reversible: yes.**
+
+- **#138 — S13: every e2e navigation to `erp.html` now waits for the shell
+  (2026-08-10).** A fourth intermittent red (COM-04's tab check reporting 0
+  contracts, immediately followed by passing assertions over the same page)
+  came from the same cause as the previous three: a fixed sleep after `goto`.
+  `bootedShell()` was applied at the 13 remaining call sites rather than at the
+  one that failed, because the next flake would otherwise be somewhere else.
+  **Reversible: yes.**
+
+- **#139 — S14: the card fallback is a runtime pass, not a per-screen template
+  change (2026-08-10).** §3 says «tables become two-line cards», and the app has
+  more than thirty tables across twenty-nine screens. Labelling each one by hand
+  would be thirty chances to miss one and thirty places to drift. `autoCards()`
+  runs once after every render, copies the table's own `thead` labels onto each
+  `td[data-th]`, and adds the class the phone stylesheet keys off. A screen
+  written next month gets cards without knowing the function exists.
+  **Reversible: yes** — not calling it leaves every table exactly as it was.
+
+- **#140 — S14: three tables opt out, and the reason is that a grid is not a
+  list (2026-08-10).** The forecast, the Gantt and the week calendar carry
+  `data-nocards`. Turning a period column into a labelled line destroys the
+  shape across time those layouts exist to show, so they keep their columns and
+  scroll inside their own container — which they already did. Opting out is
+  explicit and by name, so a fourth one cannot happen by accident.
+  **Reversible: yes.**
+
+- **#141 — S14: a headerless table becomes cards only from three columns up
+  (2026-08-10).** With no `thead` there is no label to put on a line, which is
+  fine for a five-column receipts table (five short lines beat a squeezed
+  five-column grid) and wrong for a two-column key/value row, which already
+  reads as one line and would become two. The threshold is the honest place to
+  draw it. **Reversible: yes.**
+
+- **#142 — S14: the site-action button carries four actions and exists on
+  phones only (2026-08-10).** §3 asks for «a floating button for frequent site
+  actions». The test for what belongs is not "is it useful" — everything on
+  twenty-nine screens is useful — it is «would somebody standing on a roof in
+  the rain reach for it». That gives four: photo and progress, today's hours,
+  capture an expense, new task. 56 px target, 48 px rows, and each action lands
+  on the screen where the result is visible, because a shortcut you cannot see
+  the outcome of is a trapdoor. On a desktop the same four are one click away
+  in the create menu, so the button would only be in the way.
+  **Reversible: yes.**
+
+- **#143 — S15: the workbook coverage guard resolves fields against a real
+  dataset, not against the engine's source text (2026-08-10).** Grepping
+  `erp-engine.js` for an identifier would pass on a field that appears only in
+  a comment. The guard builds the shipped demo through the engine and requires
+  each claimed field to be present on at least one record of the collection its
+  section names. It asserts existence only — not a value, a type or a count —
+  because «Notas» is a real column that is usually blank, and what the table
+  promises is a place to put the customer's data. Verified by breaking a claim
+  on purpose and watching it fail. **Reversible: yes.**
+
+- **#144 — S15: `labourReconciliation()` with no argument reconciles the last
+  month whose payroll ran (2026-08-10).** Reconciling the month in progress
+  reports every hour booked so far as unpaid — on the 5th that is a calendar
+  fact dressed up as an alarm, and it was the demo's own headline figure. The
+  last closed payroll is the last month there is an answer for, and it is the
+  month somebody asking the question means. Passing a month still works
+  unchanged. **Reversible: yes.**
+
+- **#145 — S15: the seed grew where the newer screens were thin, and nowhere
+  else (2026-08-10).** Five screens built between S10 and S13 read things this
+  dataset barely had: no wage ever left the bank, so ADM-04's reconciliation
+  opened at −100%; `accountLedger` returned two rows for seven months, so
+  ADM-09's P&L and the gestoría roll-up were empty; the day sheet is a grid of
+  workers and there were two. Three workers, four months of weekdays, twenty
+  filed overhead invoices and monthly payroll were added — with `docRef` on the
+  invoices, because twenty undocumented bills would hand the gestoría screen
+  twenty blocking exceptions and say the demo is careless rather than that the
+  screen is strict. `SEED_VERSION` is bumped to 3, so the app offers a reload
+  rather than reseeding over anybody's records. **Reversible: yes.**
+
+- **#146 — the iOS update reads the user-agent marker rather than sniffing the
+  platform (2026-08-10).** The app has appended `CaneiApp/` since 1.0 and
+  nothing read it; after S14 that omission stacked three bars at the bottom of a
+  phone inside the app. The web now matches on the `CaneiApp/` **prefix**, never
+  the version, so an older build keeps working against a newer site. Plain
+  Mobile Safari on an iPhone is deliberately unaffected — it has no native tab
+  bar, and taking the web one away would strand somebody with no route to a
+  section. **Reversible: yes** — removing one class removes the whole
+  adaptation.
+
+- **#147 — inside the shell the rail stays and only the icon strip is hidden
+  (2026-08-10).** Panel 2 (the subsection list) is positioned against the rail;
+  hiding the rail takes the twenty-nine subsecciones with it. The rail is
+  therefore kept, lifted clear of the native tab bar, made transparent and
+  non-interactive, and the breadcrumb opens the panel it carries. Found by
+  measuring the panel's height in a real browser rather than by reading the
+  CSS. **Reversible: yes.**
+
+- **#148 — the iOS shell is version-bumped but not built here (2026-08-10).**
+  `MARKETING_VERSION` 1.1 / build 2 in both `project.yml` and the checked-in
+  Xcode project, and the marker updated. Compiling, signing and uploading to
+  TestFlight need macOS and the Apple Developer account, neither of which this
+  environment has — `ios-testflight.yml` runs that on a macOS runner. The web
+  half of the change is fully tested here, which is where the behaviour
+  actually lives. **Reversible: yes.**
 - **#91 — The mailbox is somewhere to PUT A DRAFT, never somewhere to send from
   (2026-08-08).** The operator asked to link `if@2iberia.com` so the ERP's
   generated emails use it, showed the provider's IMAP/SMTP page, and said not to

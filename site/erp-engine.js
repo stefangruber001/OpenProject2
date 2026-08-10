@@ -32,6 +32,17 @@
   };
   const quarterOf = (isoDate) =>
     isoDate.slice(0, 4) + "-Q" + (Math.floor((+isoDate.slice(5, 7) - 1) / 3) + 1);
+  // First day of the calendar month containing dateIso, and the month after it.
+  // The forecast grid buckets by month as well as by week, and a month is the
+  // one bucket whose length is not a constant.
+  const monthStartOf = (isoDate) => isoDate.slice(0, 7) + "-01";
+  const addMonths = (isoDate, n) => {
+    const y = +isoDate.slice(0, 4),
+      m = +isoDate.slice(5, 7) - 1 + n;
+    const ny = y + Math.floor(m / 12),
+      nm = ((m % 12) + 12) % 12;
+    return `${ny}-${String(nm + 1).padStart(2, "0")}-01`;
+  };
   // Inverse of quarterOf: the last calendar day of a "YYYY-Qn" label.
   const quarterEndDate = (q) => {
     const [y, qn] = q.split("-Q");
@@ -60,9 +71,44 @@
       const n = { X: "0", Y: "1", Z: "2" }[v[0]] + v.slice(1, 8);
       return NIF_L[parseInt(n, 10) % 23] === v[8]; // NIE
     }
-    if (/^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$/.test(v)) return true; // CIF structure
+    if (/^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$/.test(v)) return cifControlOk(v); // CIF, digit checked
     if (/^[A-Z]{2}[0-9A-Z]{2,13}$/.test(v)) return true; // EU VAT (structural)
     return false;
+  }
+  /**
+   * CIF check digit (MDM-03: "validated for format and check digit").
+   *
+   * The DNI/NIE branches above compute their own check letter; this one used
+   * to accept anything of the right shape. That gap is what let a scanned
+   * NIF come back wrong-but-plausible during the S0b OCR spike — a corrupted
+   * character in a mixed letter/digit code produces something that still
+   * matches the regex, and only the check digit catches it.
+   *
+   * The seven digits are summed with the odd positions (1st, 3rd, 5th, 7th)
+   * doubled and digit-summed first; the total's last digit gives a control
+   * digit, which is looked up as a letter for organisation types that require
+   * one. Verified against the workbook during the spike: 166 of 170
+   * CIF-shaped values passed, a rate consistent with occasional scanning
+   * errors rather than a wrong algorithm.
+   */
+  function cifControlOk(v) {
+    const letter = v[0],
+      digits = v.slice(1, 8),
+      control = v[8];
+    let sum = 0;
+    for (let i = 0; i < 7; i++) {
+      let d = +digits[i];
+      if (i % 2 === 0) {
+        d *= 2;
+        if (d > 9) d -= 9;
+      }
+      sum += d;
+    }
+    const controlDigit = (10 - (sum % 10)) % 10;
+    const controlLetter = "JABCDEFGHI"[controlDigit];
+    if (/[ABEH]/.test(letter)) return control === String(controlDigit); // digit-only orgs
+    if (/[NPQRSW]/.test(letter)) return control === controlLetter; // letter-only orgs
+    return control === String(controlDigit) || control === controlLetter; // either is accepted
   }
   function validIban(v) {
     v = String(v || "")
@@ -182,6 +228,159 @@
     employmentKinds: ["employee", "selfEmployed", "subcontractorStaff"], // LAB-04
     alertTypes: ["economica", "tecnica", "documental", "fiscal"], // DAS-06 grouping
   };
+
+  /* ---------------- owner-maintained lists (DMC-03/04/05) ----------------
+   *
+   * Four of the lists above are not the system's business at all — they are
+   * the company's vocabulary, and the company changes it. A new payment term,
+   * a lead source that only this owner uses, a unit their suppliers quote in:
+   * each of those was a code edit and a deploy, which is the definition of a
+   * list nobody maintains.
+   *
+   * So these four move into `state.lists`, where the owner edits them from
+   * DMC-03/04/05, and what stays here is only the SEED a new company starts
+   * from. The rest of LISTS above is genuinely structural — invoice kinds,
+   * document statuses, movement classes are keys the engine branches on, and
+   * an owner renaming one would not be configuration, it would be a bug.
+   *
+   * The shape is `{code, es, ca, active}`, and the distinction matters:
+   *
+   *   code   what records store, forever. Never edited — a record written
+   *          last year has to keep resolving, so renaming the LABEL is the
+   *          supported operation and renaming the key is not offered.
+   *   es/ca  what a person reads. Both, from the first day: the doc requires
+   *          unit names in Spanish and Catalan regardless of the interface
+   *          language, and a list that only carries one of them makes the
+   *          Catalan interface fall back to Spanish silently (decision 20).
+   *   active deactivate, never delete — the system-wide rule. A retired
+   *          entry leaves the pickers and keeps resolving on the records
+   *          that already carry it.
+   */
+  const LIST_DEFAULTS = {
+    // CAT-02. The code IS the abbreviation shown in a table cell; es/ca are
+    // the full names a picker and the printed document need.
+    units: [
+      { code: "ud", es: "unidad", ca: "unitat" },
+      { code: "pa", es: "partida alzada", ca: "partida alçada" },
+      { code: "m", es: "metro", ca: "metre" },
+      { code: "ml", es: "metro lineal", ca: "metre lineal" },
+      { code: "m2", es: "metro cuadrado", ca: "metre quadrat" },
+      { code: "m3", es: "metro cúbico", ca: "metre cúbic" },
+      { code: "h", es: "hora", ca: "hora" },
+      { code: "kg", es: "kilogramo", ca: "quilogram" },
+      { code: "l", es: "litro", ca: "litre" },
+      { code: "%", es: "porcentaje", ca: "percentatge" },
+    ],
+    // MDM-06. These used to render as their raw English key in the Spanish
+    // interface ("referrer" in a customer record) — nobody had a label to show
+    // because there was no field to put one in.
+    leadSources: [
+      { code: "referrer", es: "Prescriptor", ca: "Prescriptor" },
+      { code: "leadPlatform", es: "Plataforma de leads", ca: "Plataforma de leads" },
+      { code: "searchEngine", es: "Buscador", ca: "Cercador" },
+      { code: "website", es: "Web propia", ca: "Web pròpia" },
+      { code: "socialMedia", es: "Redes sociales", ca: "Xarxes socials" },
+      { code: "wordOfMouth", es: "Boca a boca", ca: "Boca-orella" },
+      { code: "propertyManager", es: "Administrador de fincas", ca: "Administrador de finques" },
+      { code: "repeatCustomer", es: "Cliente recurrente", ca: "Client recurrent" },
+      { code: "other", es: "Otros", ca: "Altres" },
+    ],
+    // CRM-05. Shown beside the sources on DMC-04, because "where did it come
+    // from" and "why was it lost" are the same conversation.
+    lossReasons: [
+      { code: "price", es: "Precio", ca: "Preu" },
+      { code: "timing", es: "Plazos", ca: "Terminis" },
+      { code: "scope", es: "Alcance", ca: "Abast" },
+      { code: "competitor", es: "Competencia", ca: "Competència" },
+      { code: "noResponse", es: "Sin respuesta", ca: "Sense resposta" },
+      { code: "withdrew", es: "Desistió", ca: "Va desistir" },
+    ],
+    // DMC-01. The catalogue's chapter tree, and the reason it is a LIST and
+    // not a derived set of the distinct values on items: a tree the owner can
+    // drag into order needs somewhere to keep that order, and a chapter with
+    // nothing in it yet still has to be visible or it can never be filled.
+    itemChapters: [
+      { code: "DEM", es: "Demoliciones", ca: "Enderrocs" },
+      { code: "ALB", es: "Albañilería", ca: "Paleteria" },
+      { code: "FON", es: "Fontanería", ca: "Lampisteria" },
+      { code: "ELE", es: "Electricidad", ca: "Electricitat" },
+      { code: "CLI", es: "Climatización", ca: "Climatització" },
+      { code: "REV", es: "Revestimientos", ca: "Revestiments" },
+      { code: "CAR", es: "Carpintería", ca: "Fusteria" },
+      { code: "PIN", es: "Pintura", ca: "Pintura" },
+      { code: "SAN", es: "Sanitarios y grifería", ca: "Sanitaris i aixetes" },
+      { code: "VAR", es: "Varios", ca: "Diversos" },
+    ],
+    // MDM-07 / PAY-01.
+    paymentMethods: [
+      { code: "cash", es: "Efectivo", ca: "Efectiu" },
+      { code: "transfer", es: "Transferencia", ca: "Transferència" },
+      { code: "transfer30", es: "Transferencia 30 días", ca: "Transferència 30 dies" },
+      { code: "transfer60", es: "Transferencia 60 días", ca: "Transferència 60 dies" },
+      { code: "transfer90", es: "Transferencia 90 días", ca: "Transferència 90 dies" },
+      { code: "directDebit", es: "Domiciliación", ca: "Domiciliació" },
+      { code: "card", es: "Tarjeta", ca: "Targeta" },
+      { code: "onAccount", es: "A cuenta", ca: "A compte" },
+      { code: "oneOff", es: "Pago único", ca: "Pagament únic" },
+    ],
+    /**
+     * GAP 13 — the chart of accounts, and the reason it is a LIST.
+     *
+     * Rule 07 of the specification says every cost lands on a project **or an
+     * account**. The account half had no field anywhere in the model, and the
+     * chart itself lived in a separate page's own dataset that the engine had
+     * never heard of. Bringing it in as `state.lists.accounts` does three
+     * things at once: it gives the resolver something to validate against, it
+     * makes the chart owner-maintainable through the same DMC-03/04/05 screen
+     * as every other reference list, and it keeps the codes out of code.
+     *
+     * `overhead` names which overhead category defaults to this account, so
+     * the mapping is a property of the account rather than a second table that
+     * has to be kept in step with this one.
+     */
+    accounts: [
+      { code: "600", es: "Compras de material", ca: "Compres de material", cost: "material" },
+      { code: "601", es: "Subcontratas", ca: "Subcontractes", cost: "subcontract" },
+      { code: "602", es: "Mano de obra de obra", ca: "Mà d'obra d'obra", cost: "labour" },
+      { code: "629", es: "Otros costes de obra", ca: "Altres costos d'obra", cost: "other" },
+      { code: "621", es: "Alquileres", ca: "Lloguers", overhead: "rent" },
+      { code: "624", es: "Vehículos", ca: "Vehicles", overhead: "vehicles" },
+      {
+        code: "628",
+        es: "Combustible y suministros",
+        ca: "Combustible i subministraments",
+        overhead: "fuel",
+      },
+      { code: "625", es: "Seguros", ca: "Assegurances", overhead: "insurance" },
+      { code: "629.1", es: "Oficina", ca: "Oficina", overhead: "office" },
+      {
+        code: "623",
+        es: "Servicios profesionales",
+        ca: "Serveis professionals",
+        overhead: "accountingFirm",
+      },
+      { code: "627", es: "Marketing", ca: "Màrqueting", overhead: "marketing" },
+      { code: "662", es: "Gastos financieros", ca: "Despeses financeres", overhead: "financial" },
+      { code: "631", es: "Otros tributos", ca: "Altres tributs", overhead: "taxes" },
+      { code: "218", es: "Inmovilizado", ca: "Immobilitzat", overhead: "fixedAsset" },
+      { code: "621.1", es: "Renting", ca: "Rènting", overhead: "renting" },
+      {
+        code: "629.9",
+        es: "Otros gastos generales",
+        ca: "Altres despeses generals",
+        overhead: "otherOverhead",
+      },
+    ],
+  };
+  /** The four kinds DMC-03/04/05 maintain, in the order those screens show them. */
+  const LIST_KINDS = Object.keys(LIST_DEFAULTS);
+  /** A fresh copy — callers mutate what they get back, seeds must not drift. */
+  function seedLists() {
+    const out = {};
+    for (const kind of LIST_KINDS)
+      out[kind] = LIST_DEFAULTS[kind].map((e) => Object.assign({ active: true }, e));
+    return out;
+  }
 
   /*
    * DAS-06 — one entry per alert CONDITION alerts() can raise, keyed by a
@@ -326,6 +525,23 @@
         invoiceEvents: [], // ORG-07 / VFU-01
         alertRules: [], // DAS-06: enabled/threshold/recipient/channel per alert code
         alertOverrides: {}, // DAS-07: assign/due/snooze/resolve/task-link, keyed by alertKey()
+        // Declared here, not created lazily on first write. The migration
+        // ladder already promises these to a restored blob, so leaving them out
+        // of a NEW engine made the two shapes disagree — and it defeated the
+        // backfill in from(), which can only restore collections it can see on
+        // a fresh instance.
+        feedback: [],
+        supplierPerf: [],
+        assignments: [],
+        recurring: [],
+        importConflicts: [],
+        imports: {},
+        plans: {},
+        // DMC-03/04/05: the company's own vocabulary, not the engine's. Seeded
+        // rather than empty — a new company that had to type its own units
+        // before it could write a line would be worse off than one with a
+        // starting list it can edit.
+        lists: seedLists(),
         seq: { id: 1 },
       };
     }
@@ -345,6 +561,15 @@
       // feature. Cheap here, very expensive to diagnose there.
       for (const k of Object.keys(fresh))
         if (Array.isArray(fresh[k]) && !Array.isArray(e.state[k])) e.state[k] = [];
+      // `lists` is an object, not an array, so the loop above cannot restore
+      // it — and a blob without it has no units and no payment terms, which is
+      // every picker in the application empty. The v10 migration is the real
+      // owner; this is the belt-and-braces for a blob that reached `from()`
+      // without passing through the ladder (a direct construction in a test,
+      // a fixture written by hand).
+      if (!e.state.lists || typeof e.state.lists !== "object") e.state.lists = seedLists();
+      for (const kind of LIST_KINDS)
+        if (!Array.isArray(e.state.lists[kind])) e.state.lists[kind] = seedLists()[kind];
       return e;
     }
 
@@ -360,6 +585,135 @@
     }
     get today() {
       return this.state.today;
+    }
+
+    /* ============ DMC-03/04/05 — the lists the owner maintains ============
+     *
+     * Four reference lists that used to be code. Everything here is about one
+     * distinction: a CODE is what records store and is therefore permanent,
+     * a LABEL is what people read and is therefore editable. Offering to
+     * rename a code would be offering to break every record already carrying
+     * it, so it is not offered — `updateListEntry` patches labels and nothing
+     * else.
+     */
+    /** Every entry of a kind, retired ones included — what DMC-03/04/05 edit. */
+    listAll(kind) {
+      if (!LIST_KINDS.includes(kind)) throw new Error("Unknown list: " + kind);
+      if (!Array.isArray(this.state.lists[kind])) this.state.lists[kind] = seedLists()[kind];
+      return this.state.lists[kind];
+    }
+    /** The entries a picker should offer: active only, in the owner's order. */
+    listActive(kind) {
+      return this.listAll(kind).filter((e) => e.active !== false);
+    }
+    /**
+     * The label to show for a stored code.
+     *
+     * A code with no entry returns the code itself rather than an empty
+     * string: a record written before the entry was retired — or one carrying
+     * a code from an import nobody has curated yet — must still render as
+     * SOMETHING a person can read and act on. A blank cell in a customer's
+     * "origen" is indistinguishable from a customer who never had one.
+     */
+    listLabel(kind, code, lang) {
+      const hit = this.listAll(kind).find((e) => e.code === code);
+      if (!hit) return String(code || "");
+      return (lang === "ca" ? hit.ca : hit.es) || hit.es || hit.code;
+    }
+    addListEntry(kind, entry, user) {
+      const rows = this.listAll(kind);
+      const code = String((entry && entry.code) || "").trim();
+      if (!code) throw new Error("A list entry needs a code");
+      if (rows.some((e) => e.code === code))
+        throw new Error("That code already exists in " + kind + ": " + code);
+      const es = String((entry && entry.es) || "").trim();
+      if (!es) throw new Error("A list entry needs a Spanish name");
+      const rec = {
+        code,
+        es,
+        // Catalan falls back to the Spanish name rather than to empty, so a
+        // half-filled entry degrades to a readable interface instead of a
+        // blank one. The coverage guard is what stops that being permanent.
+        ca: String((entry && entry.ca) || "").trim() || es,
+        active: true,
+      };
+      rows.push(rec);
+      this._log(user, "addListEntry", kind + "/" + code);
+      return rec;
+    }
+    updateListEntry(kind, code, patch, user) {
+      const hit = this.listAll(kind).find((e) => e.code === code);
+      if (!hit) throw new Error("No such entry in " + kind + ": " + code);
+      // `code` is deliberately absent from what a patch may touch — see the
+      // block comment above.
+      if (patch && typeof patch.es === "string") {
+        const es = patch.es.trim();
+        if (!es) throw new Error("A list entry needs a Spanish name");
+        hit.es = es;
+      }
+      if (patch && typeof patch.ca === "string") hit.ca = patch.ca.trim() || hit.es;
+      this._log(user, "updateListEntry", kind + "/" + code);
+      return hit;
+    }
+    /**
+     * Retire an entry. Deactivate, never delete — the system-wide rule.
+     *
+     * Deliberately NOT refused when the code is still in use: a list is
+     * retired precisely BECAUSE it is no longer how the company works, and
+     * every record already carrying it keeps resolving through `listLabel`.
+     * Blocking on use would mean the only lists you can tidy are the ones
+     * nobody ever used.
+     */
+    setListEntryActive(kind, code, active, user) {
+      const hit = this.listAll(kind).find((e) => e.code === code);
+      if (!hit) throw new Error("No such entry in " + kind + ": " + code);
+      if (!active && this.listActive(kind).length <= 1 && hit.active !== false)
+        throw new Error("A list cannot be left with no active entries");
+      hit.active = !!active;
+      this._log(user, active ? "activateListEntry" : "deactivateListEntry", kind + "/" + code);
+      return hit;
+    }
+    /**
+     * Move an entry within its list. The array order IS the display order,
+     * which is what makes DMC-01's chapter tree draggable without a second
+     * "sortIndex" field that could disagree with it.
+     */
+    moveListEntry(kind, code, toIndex, user) {
+      const rows = this.listAll(kind);
+      const from = rows.findIndex((e) => e.code === code);
+      if (from < 0) throw new Error("No such entry in " + kind + ": " + code);
+      const to = Math.max(0, Math.min(rows.length - 1, toIndex));
+      if (to === from) return rows;
+      rows.splice(to, 0, rows.splice(from, 1)[0]);
+      this._log(user, "moveListEntry", kind + "/" + code + "→" + to);
+      return rows;
+    }
+    /** How many stored records still carry this code — shown before retiring one. */
+    listEntryUsage(kind, code) {
+      const S = this.state;
+      if (kind === "itemChapters") return S.catalogue.filter((i) => i.chapter === code).length;
+      if (kind === "leadSources")
+        return (
+          S.parties.filter((p) => p.leadSource === code).length +
+          S.opportunities.filter((o) => o.source === code).length
+        );
+      if (kind === "lossReasons")
+        return S.opportunities.filter((o) => o.lossReason === code).length;
+      if (kind === "units")
+        return (
+          S.catalogue.filter((i) => i.unit === code).length +
+          sum(S.budgets, (b) =>
+            sum(b.versions, (v) =>
+              sum(v.chapters, (c) => c.lines.filter((l) => l.unit === code).length),
+            ),
+          )
+        );
+      if (kind === "paymentMethods")
+        return (
+          S.contracts.filter((c) => c.paymentMethod === code).length +
+          S.invoices.filter((i) => i.paymentMethod === code).length
+        );
+      return 0;
     }
 
     /* =========================== ORG — entity & series =========================== */
@@ -460,6 +814,11 @@
           // budgets and projects (where profitability("activityLine") reads it)
           // and was removed from the party model. Schema v9 drops it from
           // stored records too.
+          businessLine: "", // DMT-01 "Línea de negocio" — which BUSINESS, not which job (v4 plan gap 1)
+          category: "", // DMT-02 "Categoría" — a supplier's own classification (gap 2)
+          sourceSystem: "", // "Fuente" — where this record's data originally came from (gap 3)
+          aliases: [], // "Nombres originales" — every name this party was ever filed under; the
+          // only way to re-match it against a future re-upload (gap 4)
           createdAt: this.state.today, // MDM-01: when this record entered the file
           paymentMethod: "transfer",
           paymentTermsDays: 30,
@@ -477,14 +836,34 @@
       rec.accountingCode = rec.accountingCode || "43" + rec.code.replace(/\D/g, ""); // MDM-09 aligned pair
       if (rec.taxId && !validTaxId(rec.taxId))
         throw new Error("Invalid tax identifier: " + rec.taxId); // MDM-03
+      this._assertTaxIdFree(rec.taxId, rec.id); // MDM-03, hard rule
       const dup = this.findDuplicateParty(rec);
-      if (dup && rec.taxId && dup.taxId === rec.taxId)
-        throw new Error("Duplicate active party for tax id " + rec.taxId); // MDM-03
       rec.duplicateSuspect = dup ? dup.id : null;
       this.state.parties.push(rec);
       this._log(user, "addParty", rec.code);
       return rec;
     }
+    /**
+     * MDM-03 as a hard rule: no two ACTIVE parties may share a tax identifier.
+     *
+     * This cannot be expressed through findDuplicateParty, which matches on tax
+     * id OR name OR phone and returns the FIRST hit — so a genuine duplicate
+     * slipped through whenever an unrelated party matched first on a shared
+     * phone number. On a system holding tax records that splits one customer's
+     * invoices across two records and makes the filing built from them wrong.
+     *
+     * Deliberately scoped to active parties: deactivation is how this system
+     * retires a record, and a retired holder must not block a legitimate
+     * re-registration under the same identifier.
+     */
+    _assertTaxIdFree(taxId, selfId) {
+      if (!taxId) return;
+      const clash = this.state.parties.find(
+        (x) => x.active && x.id !== selfId && x.taxId === taxId,
+      );
+      if (clash) throw new Error("Duplicate active party for tax id " + taxId);
+    }
+    /** Soft warning at capture time — a suspect, not a refusal. */
     findDuplicateParty(rec) {
       // MDM-03: on taxId, name, phone
       const norm = (s) =>
@@ -506,6 +885,7 @@
     updateParty(id, patch, user) {
       const p = this.party(id);
       if (patch.taxId && !validTaxId(patch.taxId)) throw new Error("Invalid tax identifier");
+      if (patch.taxId) this._assertTaxIdFree(patch.taxId, p.id); // MDM-03 on edit too
       if (patch.bank && patch.bank.iban && !validIban(patch.bank.iban))
         throw new Error("Invalid IBAN");
       if (patch.bank) this._log(user, "partyBankChange", p.code); // MDM-08 change-logged
@@ -612,7 +992,11 @@
       const missing = MANDATORY_TO_INVOICE.filter((f) => !String(p[f] || "").trim());
       if (p.taxId && !validTaxId(p.taxId)) missing.push("taxId(valid)");
       if (!p.mobile && !p.landline) missing.push("telephone");
-      const extras = ["email", "leadSource", "activityLine"].filter(
+      // "activityLine" here used to reference a field that left the party
+      // model in v9 (see addParty) — every party read as permanently missing
+      // it, which quietly deflated everyone's completeness percentage for a
+      // field nobody could ever fill in. businessLine is its DMT replacement.
+      const extras = ["email", "leadSource", "businessLine"].filter(
         (f) => !String(p[f] || "").trim(),
       );
       const total =
@@ -704,27 +1088,107 @@
         .map((o) => ({ ...o, ageDays: daysBetween(t, o.date) }));
     }
     addVisit(v, user) {
-      // VIS-01/02/03/06
+      // VIS-01/02/03/06. Creates an already-COMPLETED visit in one step —
+      // kept exactly as it was (seed/history call it this way six times) for
+      // backfilling historical captures where scheduling was never a real
+      // event. COM-02's own screen uses scheduleVisit/completeVisit below,
+      // which is the two-step path a person actually lives through.
       const rec = Object.assign(
         {
           id: this._id("vis"),
           opportunityId: null,
+          propertyId: null,
           date: this.state.today,
+          status: "done",
+          scheduledAt: this.state.today,
+          completedAt: this.state.today,
+          owner: "operations",
           measurements: [],
           photos: [],
           notes: "",
           assumptions: [],
           exclusions: [],
           handwrittenEstimateRef: null,
+          budgetId: null,
           lines: [], // lines → budget without retype (VIS-06)
         },
         v,
       );
+      // date is still the field callers pass; keep the derived stamps
+      // aligned with it unless the caller overrode them explicitly.
+      if (!("scheduledAt" in v)) rec.scheduledAt = rec.date;
+      if (!("completedAt" in v)) rec.completedAt = rec.date;
       this.state.visits.push(rec);
       const o = this.state.opportunities.find((x) => x.id === rec.opportunityId);
       if (o && o.status === "awaitingVisit") o.status = "awaitingBudget";
       this._log(user, "addVisit", rec.id);
       return rec;
+    }
+    /**
+     * COM-02's "programada" half. A visit that has not happened yet — no
+     * measurements, no photos, just when and for whom. Kept as its own
+     * record (not a field on the opportunity) because a visit has its own
+     * lifecycle: it can be rescheduled, and once it happens it is completed
+     * with a full capture, exactly like a visit created directly ever was.
+     */
+    scheduleVisit(v, user) {
+      // VIS-01: date/time, client, address and who is going.
+      if (!v || !v.opportunityId) throw new Error("A visit needs an opportunity");
+      if (!v.scheduledAt) throw new Error("A visit needs a date");
+      const rec = Object.assign(
+        {
+          id: this._id("vis"),
+          opportunityId: null,
+          propertyId: null,
+          scheduledAt: this.state.today,
+          scheduledTime: "",
+          owner: "operations",
+          status: "scheduled",
+          date: null, // set by completeVisit — this visit has not happened
+          completedAt: null,
+          measurements: [],
+          photos: [],
+          notes: "",
+          assumptions: [],
+          exclusions: [],
+          handwrittenEstimateRef: null,
+          budgetId: null,
+          lines: [],
+        },
+        v,
+      );
+      this.state.visits.push(rec);
+      this._log(user, "scheduleVisit", rec.id);
+      return rec;
+    }
+    /**
+     * The capture step. Refuses on an already-completed visit — a finished
+     * visit is corrected through `validateVisit` (VIS-08, back office), not
+     * re-completed, so there is exactly one place a capture is first
+     * recorded and exactly one place it is amended afterward.
+     */
+    completeVisit(id, patch, user) {
+      const v = this.state.visits.find((x) => x.id === id);
+      if (!v) throw new Error("Visit not found");
+      if (v.status === "done")
+        throw new Error("Visit is already completed — use validateVisit to correct it");
+      const CAPTURE = [
+        "measurements",
+        "photos",
+        "notes",
+        "assumptions",
+        "exclusions",
+        "handwrittenEstimateRef",
+        "lines",
+      ];
+      for (const k of CAPTURE) if (patch && k in patch) v[k] = patch[k];
+      v.status = "done";
+      v.date = this.state.today;
+      v.completedAt = this.state.today;
+      const o = this.state.opportunities.find((x) => x.id === v.opportunityId);
+      if (o && o.status === "awaitingVisit") o.status = "awaitingBudget";
+      this._log(user, "completeVisit", v.id);
+      return v;
     }
 
     /* =========================== CAT — catalogue & packages =========================== */
@@ -743,12 +1207,30 @@
           imageRefs: [],
           defaultCostCents: 0,
           defaultPriceCents: 0,
+          // DMC-01. What the customer is actually getting: the same "punto de
+          // agua" at two qualities is two different jobs and two different
+          // prices, and an argument on site months later is settled by what
+          // the presupuesto said the brand and model were.
+          brand: "",
+          model: "",
+          quality: "",
         },
         it,
       );
       this.state.catalogue.push(rec);
       this._log(user, "addCatalogueItem", rec.code);
       return rec;
+    }
+    /** DMC-01's edit path. `code` is excluded: budget lines store it. */
+    updateCatalogueItem(id, patch, user) {
+      const it = this.state.catalogue.find((x) => x.id === id);
+      if (!it) throw new Error("Catalogue item not found");
+      const clean = Object.assign({}, patch);
+      delete clean.id;
+      delete clean.code;
+      Object.assign(it, clean);
+      this._log(user, "updateCatalogueItem", it.code);
+      return it;
     }
     addWorkPackage(wp, user) {
       // CAT-04: yield, min purchase, container size
@@ -807,6 +1289,15 @@
           transportCents: 0,
           validUntil: null,
           dims: null, // SUP-09 {pieces,lengthMm,widthMm}
+          // DMC-02 detail (v4 plan gaps 6-9). taxRateBp and minOrder default to
+          // null rather than 0: "no rate recorded" and "0% tax" are different
+          // facts, and so are "no minimum" and "a minimum of nothing".
+          taxRateBp: null, // gap 6 — «IVA %» on the price row
+          supplierRef: "", // gap 7 — «Código art.», the SUPPLIER's code, not ours
+          wasteCents: 0, // gap 8 — waste-management charge, alongside transport
+          minOrder: null, // gap 8 — minimum order quantity
+          projectRef: "", // gap 9 — «Proyecto» the price was quoted for
+          notes: "", // gap 9 — «Notas»
         },
         pr,
       );
@@ -944,6 +1435,7 @@
         {
           id: this._id("chp"),
           num: String(v.chapters.length + 1),
+          manualNum: false, // COM-03 free numbering — see _renumber
           name: "",
           section: "base",
           order: v.chapters.length,
@@ -963,6 +1455,7 @@
         {
           id: this._id("lin"),
           num: c.num + "." + (c.lines.length + 1),
+          manualNum: false, // COM-03 free numbering — see _renumber
           code: "",
           itemId: null,
           desc: "",
@@ -981,6 +1474,13 @@
           progressPct: 0,
           imageRefs: [],
           notes: "",
+          // Provenance for a line that arrived from an uploaded workbook
+          // (v4 plan gap 12, decision 10). Empty on a line typed here, which
+          // is the honest answer — and the reason a later filtered upload can
+          // still be re-matched against what is already on file.
+          sourceFile: "",
+          sourceSheet: "",
+          chapterOriginal: "",
         },
         ln,
       );
@@ -1051,15 +1551,38 @@
       return found.line;
     }
 
+    /**
+     * Assign positional numbers across a whole version — EXCEPT to rows whose
+     * number was typed by a person (`manualNum`).
+     *
+     * That exception is the whole of "free numbering" (v4 COM-03). The
+     * automatic scheme is what most rows want: a number is the reader's index
+     * into the document and into the graphic annex, so it has to stay
+     * contiguous when rows are added, deleted or dragged. But a presupuesto is
+     * sometimes written against a numbering the customer or the architect
+     * already uses, and a system that silently renumbers those rows is a system
+     * the estimator has to fight. So: a number you typed is yours and survives
+     * every reorder; a number the system assigned belongs to the position and
+     * moves with it. Clearing a manual number hands the row back to automatic.
+     */
+    _renumber(version) {
+      version.chapters.forEach((c, i) => {
+        c.order = i;
+        if (!c.manualNum) c.num = String(i + 1);
+        c.lines.forEach((l, j) => {
+          if (!l.manualNum) l.num = c.num + "." + (j + 1);
+        });
+      });
+      return version;
+    }
+
     /** Delete a line addressed by its id alone, renumbering what remains. */
     deleteLine(budgetId, lineId, user) {
       const v = this._editableVersion(budgetId);
       const found = this.findLine(budgetId, lineId, v.id);
       if (!found) throw new Error("Line not found");
       found.chapter.lines = found.chapter.lines.filter((l) => l.id !== lineId);
-      // Line numbers are the reader's index into the document — and into the
-      // graphic annex — so they are renumbered to stay contiguous.
-      found.chapter.lines.forEach((l, i) => (l.num = found.chapter.num + "." + (i + 1)));
+      this._renumber(v);
       this._log(user, "deleteLine", this.budget(budgetId).number + " " + found.line.num);
       return found.chapter;
     }
@@ -1067,13 +1590,108 @@
     removeChapter(budgetId, chapterId) {
       const v = this._editableVersion(budgetId);
       v.chapters = v.chapters.filter((c) => c.id !== chapterId);
-      v.chapters.forEach((c, i) => {
-        const num = String(i + 1);
-        c.num = num;
-        c.order = i;
-        c.lines.forEach((l, j) => (l.num = num + "." + (j + 1)));
-      });
+      this._renumber(v);
       return v;
+    }
+
+    /* ---- COM-03: reordering. The builder's tree and grid are dragged, and a
+       drag has to mean something to the document, not just to the screen — so
+       both of these renumber through _renumber and the emitted document follows
+       automatically. Both go through _editableVersion, so a sent presupuesto
+       cannot be quietly re-sequenced under the customer's copy. ---- */
+
+    /** Move a chapter to a new position among its siblings. */
+    moveChapter(budgetId, chapterId, toIndex, user) {
+      const v = this._editableVersion(budgetId);
+      const i = v.chapters.findIndex((c) => c.id === chapterId);
+      if (i < 0) throw new Error("Chapter not found");
+      const j = Math.max(0, Math.min(v.chapters.length - 1, Math.round(Number(toIndex))));
+      if (i !== j) v.chapters.splice(j, 0, v.chapters.splice(i, 1)[0]);
+      this._renumber(v);
+      this._log(user, "moveChapter", this.budget(budgetId).number + " c" + v.chapters[j].num);
+      return v.chapters;
+    }
+
+    /**
+     * Move a line within its chapter, or into another one.
+     *
+     * Moving BETWEEN chapters is the point: a line put under the wrong capítulo
+     * lands in the wrong subtotal and, if that chapter is `optional` or
+     * `outOfScope`, in the wrong section of the customer's document — so the
+     * estimator must be able to correct it by dragging rather than by retyping
+     * the line somewhere else and deleting the original.
+     */
+    moveLine(budgetId, lineId, toChapterId, toIndex, user) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      const dest = v.chapters.find((c) => c.id === (toChapterId || found.chapter.id));
+      if (!dest) throw new Error("Chapter not found");
+      found.chapter.lines.splice(found.chapter.lines.indexOf(found.line), 1);
+      const n = dest.lines.length;
+      const j = toIndex == null ? n : Math.max(0, Math.min(n, Math.round(Number(toIndex))));
+      dest.lines.splice(j, 0, found.line);
+      this._renumber(v);
+      this._log(user, "moveLine", this.budget(budgetId).number + " " + found.line.num);
+      return found.line;
+    }
+
+    /** Give a line the number a person typed, or "" to hand it back to automatic. */
+    setLineNumber(budgetId, lineId, num, user) {
+      const v = this._editableVersion(budgetId);
+      const found = this.findLine(budgetId, lineId, v.id);
+      if (!found) throw new Error("Line not found");
+      const wanted = String(num == null ? "" : num).trim();
+      if (!wanted) {
+        found.line.manualNum = false;
+        this._renumber(v);
+      } else {
+        this._requireFreeNumber(v, wanted, lineId);
+        found.line.num = wanted;
+        found.line.manualNum = true;
+      }
+      this._log(user, "setLineNumber", this.budget(budgetId).number + " " + found.line.num);
+      return found.line;
+    }
+
+    /** The same for a chapter. Its lines follow unless they are manual too. */
+    setChapterNumber(budgetId, chapterId, num, user) {
+      const v = this._editableVersion(budgetId);
+      const c = v.chapters.find((x) => x.id === chapterId);
+      if (!c) throw new Error("Chapter not found");
+      const wanted = String(num == null ? "" : num).trim();
+      if (!wanted) {
+        c.manualNum = false;
+      } else {
+        this._requireFreeNumber(v, wanted, chapterId);
+        c.num = wanted;
+        c.manualNum = true;
+      }
+      this._renumber(v);
+      this._log(user, "setChapterNumber", this.budget(budgetId).number + " c" + c.num);
+      return c;
+    }
+
+    /**
+     * Two rows may not answer to one number: it is the reader's only index.
+     *
+     * The error carries a `code`, unlike most in this class, because this is
+     * the one failure here a USER causes in normal work — mistyping a number
+     * that is already taken — and an interface should answer that in the
+     * language it is speaking, not echo an English sentence written for a
+     * developer. Everything unexpected still surfaces as its raw message,
+     * which is what makes an unexpected failure visible at all.
+     */
+    _requireFreeNumber(version, wanted, exceptId) {
+      const clash = (what) => {
+        const e = new Error("That number is already used by a " + what);
+        e.code = "DUPLICATE_NUMBER";
+        return e;
+      };
+      for (const c of version.chapters) {
+        if (c.id !== exceptId && c.num === wanted) throw clash("chapter");
+        for (const l of c.lines) if (l.id !== exceptId && l.num === wanted) throw clash("line");
+      }
     }
 
     /* ---- PRE-10 / CAT-08 / DOC-02: images on a line.
@@ -1279,7 +1897,13 @@
         throw new Error(
           "Budget fails validation: " + blocks.map((x) => x.line + " " + x.msg).join("; "),
         );
-      this._requireComplete(b.partyId, "budget"); // MDM-10 (budget needs identified party)
+      // No completeness block here (decision 21): a presupuesto is a commercial
+      // offer, not a fiscal document, and it must proceed with whatever data
+      // exists on the party — the RD 1619/2012 requirement for a full NIF and
+      // address is specific to the factura, and to the contrato that precedes
+      // it (see createContract and issueInvoice, which still call
+      // _requireComplete). Only the channel-specific check below stands: you
+      // cannot email a document to an address that does not exist.
       const ch = channel || "email";
       if (ch === "email" && !validEmail(this.party(b.partyId).email))
         throw new Error("Email required to send electronically (MDM-04)");
@@ -1419,6 +2043,12 @@
       const v = this.version(budgetId, versionId);
       if (!v.issued) throw new Error("Only an issued version can be accepted");
       if (b.acceptedVersionId) throw new Error("A version is already accepted");
+      // Symmetric with rejectVersion: one version, one answer. Without this a
+      // refused version could be accepted afterwards, overwriting the refusal
+      // and flipping the opportunity from lost back to won with no trace of
+      // which answer the customer actually gave. A customer who changes their
+      // mind gets a NEW version, which is what newVersion is for.
+      if (v.customerResponse) throw new Error("This version already has the customer's answer");
       v.customerResponse = {
         accepted: true,
         date: this.state.today,
@@ -1437,6 +2067,66 @@
       }
       this._log(user, "acceptVersion", b.number + " v" + v.vNumber);
       return v;
+    }
+
+    /**
+     * The customer said no. The mirror of acceptVersion, and it exists because
+     * without it a refused presupuesto is indistinguishable from one nobody has
+     * answered yet — which is precisely the difference the v4 list is grouped
+     * by (Enviados vs Rechazados), and precisely the difference between a lead
+     * worth chasing and one that is over.
+     *
+     * `reason` is a loss-reason CODE from the owner-maintained list (DMC-04),
+     * the same vocabulary loseOpportunity records, so refusals stay countable
+     * across both paths. Anything the customer actually said goes in `notes`,
+     * which is free text and stays on the version.
+     */
+    rejectVersion(budgetId, versionId, { reason, notes, evidenceRef } = {}, user) {
+      const b = this.budget(budgetId);
+      const v = this.version(budgetId, versionId);
+      if (!v) throw new Error("Version not found");
+      if (!v.issued) throw new Error("Only an issued version can be refused");
+      if (b.acceptedVersionId) throw new Error("A version is already accepted");
+      if (v.customerResponse) throw new Error("This version already has the customer's answer");
+      v.customerResponse = {
+        accepted: false,
+        date: this.state.today,
+        reason: reason || "",
+        notes: notes || "",
+        evidenceRef: evidenceRef || null,
+      };
+      v.frozen = true;
+      b.status = "rejected";
+      const o = this.state.opportunities.find(
+        (x) => x.partyId === b.partyId && !["won", "lost"].includes(x.status),
+      );
+      if (o) {
+        o.status = "lost";
+        o.lossReason = reason || "";
+        o.decidedAt = this.state.today;
+      }
+      this._log(user, "rejectVersion", b.number + " v" + v.vNumber);
+      return v;
+    }
+
+    /**
+     * The one status a person recognises, derived rather than stored.
+     *
+     * `budget.status` is a stored field that only ever moves forward when
+     * something is DONE to the record. Expiry is not done to a record — it just
+     * becomes true on a date — so a stored status can never be trusted to know
+     * about it without a nightly job nobody has written. Deriving all five
+     * keeps them consistent by construction: draft · issued · accepted ·
+     * rejected · expired, which is exactly the grouping the v4 list uses.
+     */
+    budgetStage(budgetOrId) {
+      const b = typeof budgetOrId === "string" ? this.budget(budgetOrId) : budgetOrId;
+      if (b.acceptedVersionId) return "accepted";
+      if (b.versions.some((v) => v.customerResponse && !v.customerResponse.accepted))
+        return "rejected";
+      if (!b.versions.some((v) => v.issued)) return "draft";
+      if (b.validityDate && b.validityDate < this.state.today) return "expired";
+      return "issued";
     }
 
     /* =========================== CON — contracts =========================== */
@@ -1531,6 +2221,50 @@
       this._log(user, "signContract", c.number);
       return c;
     }
+    /**
+     * Move the expected dates of a contract's payment milestones — item 14 of
+     * the money chain, which the v4 document asks about and which did not
+     * exist.
+     *
+     * `cashForecast` has always read `installment.expectedDate`, and nothing
+     * has ever written it after the contract was drawn up. So a job whose
+     * plan slipped three weeks kept forecasting the same money in the same
+     * week, and the forecast was wrong in the one direction that matters —
+     * optimistic — with nothing on screen admitting it.
+     *
+     * What moves and what does not is the whole rule:
+     *
+     *   - only `planned` installments. An invoiced one is history, and history
+     *     does not move because a plan did.
+     *   - never a `fixedDate` trigger. That is what the name means, and a
+     *     date the customer agreed to in writing is not the planner's to
+     *     revise.
+     *   - the reason is stored beside the date. A figure in a cash forecast
+     *     that changed on its own, with nothing saying what moved it, is
+     *     worse than the stale figure it replaced.
+     *
+     * The DATES are computed by the caller, because deriving them means
+     * reading a schedule and this class knows nothing about scheduling. This
+     * method owns the rule about which of them may be applied.
+     */
+    setInstallmentDates(contractId, byIdx, user, reason) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const moved = [];
+      c.installments.forEach((i, idx) => {
+        const next = byIdx[idx];
+        if (!next) return;
+        if (i.status !== "planned") return;
+        if (i.trigger === "fixedDate") return;
+        if (i.expectedDate === next) return;
+        moved.push({ idx, from: i.expectedDate || null, to: next, trigger: i.trigger });
+        i.expectedDate = next;
+        i.expectedDateSource = reason || "schedule";
+        i.expectedDateSetAt = this.state.today;
+      });
+      if (moved.length) this._log(user, "setInstallmentDates", c.number + " ×" + moved.length);
+      return { contractId, moved };
+    }
     recordFirstPayment(contractId) {
       // CON-05: derive committed dates
       const c = this.state.contracts.find((x) => x.id === contractId);
@@ -1558,6 +2292,116 @@
         signed: !!c.signature.customerSignedAt,
         status: c.status,
       }));
+    }
+    /**
+     * The contract's ORIGINAL value and what it is worth today — COM-04's two
+     * money columns, and the reason the second one goes amber when it differs.
+     *
+     * Both are the taxable base, not the gross: an annex records a net price
+     * (`change.priceCents`), so adding it to a VAT-inclusive figure would
+     * produce a number that is neither one thing nor the other. A difference
+     * between the two means annexes exist, which is exactly what the screen
+     * is trying to say without making anybody open the contract to find out.
+     */
+    contractValue(contractId) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const annexCents = sum(c.annexes || [], (a) => a.valueCents);
+      return {
+        originalCents: c.valueCents,
+        annexCents,
+        currentCents: c.valueCents + annexCents,
+        annexes: (c.annexes || []).length,
+        differs: annexCents !== 0,
+      };
+    }
+    /**
+     * Contracts as COM-04 lists them, split the way its two tabs split them.
+     *
+     * "Active" is about whether the contract still governs work, not about
+     * whether it is signed: a draft is active because somebody is still
+     * working on it, and a cancelled one is not, whatever its signature says.
+     */
+    contractsView() {
+      return this.state.contracts.map((c) => {
+        const v = this.contractValue(c.id);
+        const project = this.state.projects.find((p) => p.contractId === c.id) || null;
+        return {
+          id: c.id,
+          number: c.number,
+          party: this.party(c.partyId).name,
+          projectCode: project ? project.code : null,
+          date: c.date,
+          originalCents: v.originalCents,
+          currentCents: v.currentCents,
+          differs: v.differs,
+          annexes: v.annexes,
+          installments: c.installments.length,
+          signed: !!c.signature.customerSignedAt,
+          status: c.status,
+          active: !["completed", "cancelled"].includes(c.status),
+        };
+      });
+    }
+    /**
+     * The customer's contract document, from data.
+     *
+     * There is no uploaded PDF anywhere in this system and there does not need
+     * to be: CON-03 made the terms structured on purpose, so the document is
+     * rendered the same way the presupuesto is (QUO-05/DOC-01) rather than
+     * requiring somebody to attach a scan of what the database already knows.
+     * A signed scan, when there is one, is a captured document and belongs
+     * beside this rather than instead of it.
+     */
+    renderContractDoc(contractId) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const cfg = this.state.config;
+      const project = this.state.projects.find((p) => p.contractId === c.id) || null;
+      const v = this.contractValue(c.id);
+      return {
+        docType: "CONTRATO",
+        number: c.number,
+        date: c.date,
+        language: c.language,
+        issuer: {
+          legalName: cfg.legalName,
+          taxId: cfg.taxId,
+          address: `${cfg.street}, ${cfg.postalCode} ${cfg.city}`,
+          phone: cfg.phone,
+          email: cfg.email,
+          iban: cfg.iban,
+        },
+        customer: (({ name, taxId, billStreet, billPostalCode, billCity }) => ({
+          name,
+          taxId,
+          address: `${billStreet}, ${billPostalCode} ${billCity}`,
+        }))(this.party(c.partyId)),
+        projectCode: project ? project.code : null,
+        budgetNumber: c.budgetNumber,
+        originalCents: v.originalCents,
+        currentCents: v.currentCents,
+        vatBp: c.vatBp,
+        installments: c.installments.map((i, idx) => ({
+          idx,
+          trigger: i.trigger,
+          pct: i.pct != null ? i.pct : null,
+          amountCents: i.amountCents,
+          expectedDate: i.expectedDate || null,
+          // S8 made this date movable; the document has to say who moved it,
+          // or the honesty that session bought is lost one screen along.
+          expectedDateSource: i.expectedDateSource || null,
+          status: i.status,
+          invoiceId: i.invoicedInvoiceId || null,
+        })),
+        initiation: clone(c.initiation),
+        duration: clone(c.duration),
+        penalties: clone(c.penalties),
+        guarantees: clone(c.guarantees),
+        annexes: clone(c.annexes || []),
+        signature: clone(c.signature),
+        status: c.status,
+      };
     }
 
     /* =========================== PRJ — projects =========================== */
@@ -1971,6 +2815,60 @@
         ), // CHG-04 visible
       };
     }
+    /**
+     * The five PRY-03 counts by — identificado · valorado · aprobado ·
+     * ejecutado · facturado — each with a count AND an amount.
+     *
+     * Derived from `status`, like every other stage reading in this engine,
+     * and mapped rather than renamed: the doc's five and the record's eight
+     * are different vocabularies for the same lifecycle. `sent` folds into
+     * **valorado** because from the site's point of view a priced extra and
+     * one already with the customer are the same thing — priced, not yet
+     * agreed — and the difference is visible in the row's own status pill.
+     *
+     * `rejected` and `cancelled` are in none of the five, for the reason a
+     * cancelled purchase order is in none of ADM-02's three: a counter that
+     * includes work nobody will do has to be explained every time it is read.
+     */
+    changeStageSummary(projectId) {
+      const STAGE = {
+        identified: "identified",
+        priced: "priced",
+        sent: "priced",
+        approved: "approved",
+        executed: "executed",
+        invoiced: "invoiced",
+      };
+      const out = {
+        identified: { count: 0, amountCents: 0 },
+        priced: { count: 0, amountCents: 0 },
+        approved: { count: 0, amountCents: 0 },
+        executed: { count: 0, amountCents: 0 },
+        invoiced: { count: 0, amountCents: 0 },
+      };
+      this.state.changes
+        .filter((c) => c.projectId === projectId)
+        .forEach((c) => {
+          const stage = STAGE[c.status];
+          if (!stage) return; // rejected · cancelled
+          out[stage].count += 1;
+          out[stage].amountCents += c.priceCents || 0;
+        });
+      return out;
+    }
+    /** Which of the five a single extra is in — "" for rejected/cancelled. */
+    changeStage(change) {
+      return (
+        {
+          identified: "identified",
+          priced: "priced",
+          sent: "priced",
+          approved: "approved",
+          executed: "executed",
+          invoiced: "invoiced",
+        }[change.status] || ""
+      );
+    }
 
     /* =========================== PUR — purchases =========================== */
     addPurchase(pu, user) {
@@ -2029,6 +2927,75 @@
       if (pu.acceptedAt) return "accepted";
       if (pu.sentAt) return "sent";
       return "draft";
+    }
+    /**
+     * The three the v4 screen counts by: oferta · pedido · facturado.
+     *
+     * Derived from `purchaseStatus`, not stored beside it. The seven-state
+     * lifecycle above is what the record actually knows and it stays — this
+     * is the coarser reading ADM-02 is built around, and two stored fields
+     * that must agree about the same order is precisely how they stop
+     * agreeing. A cancelled order is deliberately in none of the three: it is
+     * shown in the list and counted nowhere, because a counter that includes
+     * work nobody will do is a counter that has to be explained.
+     */
+    purchaseStage(pu) {
+      const st = this.purchaseStatus(pu);
+      if (st === "cancelled") return "cancelled";
+      if (st === "invoiced" || st === "paid") return "invoiced";
+      if (st === "draft") return "offer";
+      return "order";
+    }
+    /** Count and committed amount per stage — the three counters of ADM-02. */
+    purchaseStageSummary(projectId) {
+      const out = {
+        offer: { count: 0, amountCents: 0 },
+        order: { count: 0, amountCents: 0 },
+        invoiced: { count: 0, amountCents: 0 },
+      };
+      this.state.purchases
+        .filter((p) => !projectId || p.projectId === projectId)
+        .forEach((p) => {
+          const stage = this.purchaseStage(p);
+          if (!out[stage]) return; // cancelled
+          out[stage].count += 1;
+          out[stage].amountCents += p.totalCents - (p.status.returnedCents || 0);
+        });
+      return out;
+    }
+    /**
+     * Put the supplier's own paperwork beside the order — the left zone of
+     * ADM-02's detail. The document is a captured one, so the picture, the
+     * reading and the provenance all come with it rather than being uploaded
+     * a second time under a different name.
+     */
+    attachPurchaseDocument(purchaseId, capId, user) {
+      const pu = this.state.purchases.find((x) => x.id === purchaseId);
+      if (!pu) throw new Error("Purchase not found");
+      const c = this.state.captured.find((x) => x.id === capId);
+      if (!c) throw new Error("Captured document not found: " + capId);
+      pu.docRefs = pu.docRefs || [];
+      if (!pu.docRefs.includes(capId)) pu.docRefs.push(capId);
+      this._log(user, "attachPurchaseDocument", pu.number + " " + capId);
+      return pu;
+    }
+    detachPurchaseDocument(purchaseId, capId, user) {
+      const pu = this.state.purchases.find((x) => x.id === purchaseId);
+      if (!pu) throw new Error("Purchase not found");
+      pu.docRefs = (pu.docRefs || []).filter((x) => x !== capId);
+      this._log(user, "detachPurchaseDocument", pu.number + " " + capId);
+      return pu;
+    }
+    /**
+     * Base, tax and total for one order, as the foot of the record pane
+     * states them. The order stores a net unit price, so the tax is computed
+     * rather than read — a stored tax amount that disagrees with the rate is
+     * one more thing that can be wrong on a document somebody pays from.
+     */
+    purchaseTotals(pu) {
+      const baseCents = pu.totalCents - (pu.status.returnedCents || 0);
+      const vatCents = pctOf(baseCents, pu.vatBp || 0);
+      return { baseCents, vatBp: pu.vatBp || 0, vatCents, totalCents: baseCents + vatCents };
     }
     /** Send the order to the supplier by email — PDF + template (PUR-...). */
     sendPurchase(id, user) {
@@ -2385,6 +3352,16 @@
           allocations: [],
           billId: null,
           keyFields: doc.keyFields || {}, // CAP-10 manual key fields for photos with no text
+          // Gaps 10 and 11 of the workbook mapping. `sourcePath` is where the
+          // file came from before it was ours — the "Ruta completa" column of
+          // a folder tree nobody wants to lose the trail of; `reference` is
+          // the number the supplier's own paperwork carries (an order ref, a
+          // job number) and `notes` is what the person who filed it wanted the
+          // next person to know. None of the three is derivable from the
+          // document, which is exactly why they are stored.
+          sourcePath: doc.sourcePath || "",
+          reference: doc.reference || "",
+          notes: doc.notes || "",
         },
         {},
       );
@@ -2418,19 +3395,65 @@
       this._log(user, "confirmCapture", capId);
       return c;
     }
+    /**
+     * The three text fields a person adds to a filed document — the two
+     * workbook columns the model had nowhere to put, plus the free note.
+     *
+     * Deliberately separate from `confirmCapture`: that method records what
+     * the document SAYS and is the moment a reading becomes a fact, so it
+     * re-derives the standard name and re-runs duplicate detection. These
+     * three say nothing about the document's content and must not disturb
+     * either — renaming a filed invoice because somebody added a note would
+     * be a surprise, and a surprise in an archive is a lost document.
+     */
+    updateCapture(capId, patch, user) {
+      const c = this.state.captured.find((x) => x.id === capId);
+      if (!c) throw new Error("Captured document not found: " + capId);
+      ["sourcePath", "reference", "notes"].forEach((k) => {
+        if (patch[k] !== undefined) c[k] = String(patch[k] ?? "");
+      });
+      this._log(user, "updateCapture", capId);
+      return c;
+    }
     allocateCapture(capId, allocations, user) {
       // CAP-03/07: one project, split, or overhead
       const c = this.state.captured.find((x) => x.id === capId);
-      const total = c.confirmed ? c.confirmed.totalCents : sum(allocations, (a) => a.amountCents);
-      if (Math.abs(sum(allocations, (a) => a.amountCents) - total) > 1)
+      if (!c) throw new Error("Captured document not found: " + capId);
+      const rows = Array.isArray(allocations) ? allocations : [];
+      if (!rows.length) throw new Error("A document must be allocated to something");
+      rows.forEach((a) => {
+        // Rule 4 of the mapping's entity model: every cost lands on a project
+        // OR an account. "Both" is not a third option — it is two answers to
+        // one question, and whichever one a later report happens to read
+        // first decides where the money went.
+        if (!!a.projectId === !!a.overheadCategory)
+          throw new Error("Each line goes to a project or to an overhead category, not both");
+        if (a.projectId) this.project(a.projectId); // throws with the id if it is gone
+        if (a.overheadCategory && !LISTS.overheadCategories.includes(a.overheadCategory))
+          throw new Error("Unknown overhead category: " + a.overheadCategory);
+        if (a.kind && !LISTS.costKinds.includes(a.kind))
+          throw new Error("Unknown cost kind: " + a.kind);
+        if (!(Math.round(a.amountCents) > 0)) throw new Error("Every line needs a positive amount");
+      });
+      // A confirmed document has a total to check the split against. An
+      // unconfirmed one does not, and inventing one from the split itself
+      // would make the check agree with whatever it was handed — so the
+      // arithmetic is only asserted where there is something to assert it
+      // against, and filing an unread photograph stays possible.
+      const total = c.confirmed ? c.confirmed.totalCents : sum(rows, (a) => a.amountCents);
+      if (Math.abs(sum(rows, (a) => a.amountCents) - total) > 1)
         throw new Error("Split must total the document amount"); // 7.4
-      c.allocations = allocations.map((a) => ({
-        projectId: a.projectId || null,
-        overheadCategory: a.overheadCategory || null,
-        chapterNum: a.chapterNum || null,
-        kind: a.kind || "material",
-        amountCents: a.amountCents,
-      }));
+      c.allocations = rows.map((a) =>
+        // Gap 13: the account is resolved at the moment the cost is filed, so
+        // a later report never has to guess what somebody meant.
+        this.withAccountCode({
+          projectId: a.projectId || null,
+          overheadCategory: a.overheadCategory || null,
+          chapterNum: a.chapterNum || null,
+          kind: a.kind || "material",
+          amountCents: Math.round(a.amountCents),
+        }),
+      );
       c.status = "allocated";
       this._log(user, "allocateCapture", capId);
       return c;
@@ -2572,8 +3595,17 @@
       );
       return inv.kind === "creditNote" ? 0 : inv.totalCents - collected - credited;
     }
-    receivables() {
-      // AR-08 follow-up list
+    /**
+     * Every issued invoice with its settlement state — the register a screen
+     * lists, including the ones already collected.
+     *
+     * This used to be what receivables() returned, because its final filter
+     * ended in `|| true` and so filtered nothing. The two lists answer
+     * different questions and one of them was missing, so callers asking
+     * "what is still owed" had to re-filter and the ones that forgot chased
+     * paid invoices.
+     */
+    invoiceRegister() {
       const t = this.state.today;
       return this.state.invoices
         .filter((i) => i.kind !== "creditNote")
@@ -2590,8 +3622,46 @@
             dueDate: i.dueDate,
             daysOverdue: out > 0 ? Math.max(0, daysBetween(t, i.dueDate)) : 0,
           };
-        })
-        .filter((x) => x.outstandingCents > 0.005 || true);
+        });
+    }
+    /**
+     * ADM-01's four counters: emitido · cobrado · pendiente · vencido.
+     *
+     * Every figure is derived from the register above rather than accumulated
+     * separately, so the counters and the rows underneath them cannot tell
+     * different stories — which is the failure mode a strip of totals over a
+     * table exists to avoid, and the reason none of these is stored.
+     *
+     * `overdue` is a SUBSET of `outstanding`, not a fifth bucket beside it:
+     * money that is late is still money that is owed. The doc paints that
+     * counter red when it is non-zero, and a red counter that double-counts
+     * would be the worst possible thing to paint red.
+     */
+    invoicingSummary(filter) {
+      const rows = this.invoiceRegister().filter((r) => (filter ? filter(r) : true));
+      const issuedCents = sum(rows, (r) => r.totalCents);
+      const outstandingCents = sum(rows, (r) => r.outstandingCents);
+      const overdue = rows.filter((r) => r.daysOverdue > 0);
+      return {
+        issued: { count: rows.length, amountCents: issuedCents },
+        collected: {
+          count: rows.filter((r) => r.outstandingCents <= 0).length,
+          amountCents: issuedCents - outstandingCents,
+        },
+        outstanding: {
+          count: rows.filter((r) => r.outstandingCents > 0).length,
+          amountCents: outstandingCents,
+        },
+        overdue: {
+          count: overdue.length,
+          amountCents: sum(overdue, (r) => r.outstandingCents),
+        },
+      };
+    }
+    /** AR-08 follow-up list: what is still owed. A settled invoice belongs in
+        the register, not in the chase list. */
+    receivables() {
+      return this.invoiceRegister().filter((x) => x.outstandingCents > 0);
     }
     projectBilling(projectId) {
       // AR-09
@@ -2646,7 +3716,11 @@
           irpfBp,
           irpfCents,
           totalCents: baseCents + vatCents - irpfCents,
-          allocations: b.allocations || [], // AP-02 {projectId|overheadCategory, chapterNum, kind, amountCents}
+          // AP-02 {projectId|overheadCategory, chapterNum, kind, amountCents,
+          // accountCode}. Gap 13's field is resolved here so a bill registered
+          // with its allocations already on it is filed as completely as one
+          // allocated afterwards through `allocateBill`.
+          allocations: (b.allocations || []).map((a) => this.withAccountCode(a)),
           docRef: b.docRef || null,
           capId: b.capId || null,
           status: "registered",
@@ -2854,11 +3928,134 @@
       const m = this.state.movements.find((x) => x.id === movId);
       if (Math.abs(sum(allocations, (a) => a.amountCents) - Math.abs(m.amountCents)) > 1)
         throw new Error("Split must total the movement");
-      m.allocations = allocations;
+      m.allocations = allocations.map((a) => this.withAccountCode(a));
       m.class = "projectCost";
       m.status = "allocated";
       this._log(user, "splitMovement", movId);
       return m;
+    }
+    /* =========================== GAP 13 — costs that land on an account ====
+       §6's money chain has carried one ✗ since S0: a cost can reach an
+       ACCOUNT rather than a project — insurance, utilities, marketing, fees,
+       vehicles, rent — and no field carried it. The rest of the chain closed
+       long ago; this is the last structural break in it. */
+
+    /** The account a cost belongs to, resolved from where it was allocated. */
+    resolveAccountCode(alloc) {
+      // An explicit code always wins. Somebody who has typed one has looked at
+      // the invoice; a rule has only looked at a category.
+      if (alloc.accountCode) return alloc.accountCode;
+      const accounts = this.listAll("accounts");
+      if (alloc.overheadCategory) {
+        const byOverhead = accounts.find((a) => a.overhead === alloc.overheadCategory);
+        return byOverhead ? byOverhead.code : null;
+      }
+      if (alloc.projectId) {
+        const byKind = accounts.find((a) => a.cost === (alloc.kind || "material"));
+        return byKind ? byKind.code : null;
+      }
+      return null;
+    }
+    /** The same allocation with its account resolved onto it. */
+    withAccountCode(alloc) {
+      const code = this.resolveAccountCode(alloc);
+      return code ? { ...alloc, accountCode: code } : { ...alloc };
+    }
+    /**
+     * Cost by account over a period — the roll-up that proves the wiring, and
+     * the thing the gestoría package and ADM-09 both want.
+     *
+     * Reads bills, captured documents and bank/till movements together,
+     * because rule 07 is about every cost and those are the three doors a cost
+     * comes in through. A row with no resolvable account is reported under
+     * `unassigned` rather than dropped: an account roll-up that quietly loses
+     * money is worse than one that admits it.
+     */
+    accountLedger(from, to) {
+      const inRange = (d) => (!from || d >= from) && (!to || d <= to);
+      const byCode = {};
+      let unassignedCents = 0;
+      const add = (alloc, date, amountCents) => {
+        if (!inRange(date)) return;
+        const code = this.resolveAccountCode(alloc);
+        if (!code) {
+          unassignedCents += amountCents;
+          return;
+        }
+        byCode[code] = (byCode[code] || 0) + amountCents;
+      };
+      for (const b of this.state.bills)
+        for (const a of b.allocations)
+          add(a, b.date, b.creditNoteFor ? -a.amountCents : a.amountCents);
+      for (const c of this.state.captured)
+        for (const a of c.allocations)
+          add(a, (c.confirmed && c.confirmed.date) || c.capturedAt, a.amountCents);
+      for (const m of this.state.movements) {
+        if (m.excludedFromPL) continue;
+        for (const a of m.allocations || []) add(a, m.accountingDate, a.amountCents);
+      }
+      const accounts = this.listAll("accounts");
+      return {
+        rows: Object.keys(byCode)
+          .sort()
+          .map((code) => {
+            const acc = accounts.find((a) => a.code === code);
+            return { code, name: acc ? acc.es : code, amountCents: byCode[code] };
+          }),
+        unassignedCents,
+        totalCents: Object.values(byCode).reduce((s, v) => s + v, 0),
+      };
+    }
+    /* =========================== ADM-06 — petty cash ======================
+       The simplest screen in the document, and the one that most rewards not
+       being clever: a till is a bank account whose statement nobody imports,
+       so entries are typed and the count at the foot is what proves them. */
+
+    /* ADM-06 records cash through the EXISTING `recordCashMovement` further
+       down this class (BNK-07), not through a second one added here.
+
+       This session briefly shipped a duplicate, and the class swallowed it
+       without a word: a later definition of the same name silently wins, so
+       the new method was dead the moment it was written and the tests failed
+       against behaviour nobody could find. S1a wrote this hazard down after
+       hitting it once; it is written down again here because writing it down
+       once was demonstrably not enough. Before adding a method to this class,
+       grep for its name. */
+    /**
+     * The arqueo at the foot of ADM-06: opening, in, out, closing.
+     *
+     * `closing` is computed from the opening balance and the period's
+     * movements rather than read from anywhere, because that IS the count —
+     * a stored closing balance is a number nobody counted.
+     */
+    cashCount(accountId, from, to) {
+      const acc = this.state.bankAccounts.find((a) => a.id === accountId);
+      if (!acc) throw new Error("Account not found");
+      const movs = this.state.movements.filter((m) => m.accountId === accountId);
+      // With no `from`, NOTHING is before: an unbounded count starts at the
+      // account's opening balance. Writing this as `!from || …` made every
+      // movement "before" the period and folded the whole history into the
+      // opening figure — the count still balanced, which is what made it
+      // dangerous.
+      const before = from ? movs.filter((m) => m.accountingDate < from) : [];
+      const inPeriod = movs.filter(
+        (m) => (!from || m.accountingDate >= from) && (!to || m.accountingDate <= to),
+      );
+      const openingCents = (acc.openingCents || 0) + before.reduce((s, m) => s + m.amountCents, 0);
+      const inCents = inPeriod
+        .filter((m) => m.amountCents > 0)
+        .reduce((s, m) => s + m.amountCents, 0);
+      const outCents = inPeriod
+        .filter((m) => m.amountCents < 0)
+        .reduce((s, m) => s + Math.abs(m.amountCents), 0);
+      return {
+        openingCents,
+        inCents,
+        outCents,
+        closingCents: openingCents + inCents - outCents,
+        awaitingDoc: inPeriod.filter((m) => m.needsDoc).length,
+        count: inPeriod.length,
+      };
     }
     classifyMovement(movId, klass, user) {
       // BNK-03
@@ -3193,6 +4390,124 @@
       };
     }
     /**
+     * ADM-08's forecast grid: one column per period, rows grouped into money
+     * in and money out, and a cumulative balance along the foot.
+     *
+     * Three deliberate choices, because a forecast is only useful if you can
+     * say what it does and does not claim:
+     *
+     * 1. It opens from `cashPositionAsOf(today)` — the money that is actually
+     *    there — rather than from zero. A cumulative line that starts at zero
+     *    answers "what is the net of the next 13 weeks", which is never the
+     *    question. The question is "do we run out, and when".
+     * 2. Every row is an EXPECTATION with a date somebody committed to: an
+     *    outstanding invoice on its due date, a planned contract instalment on
+     *    its expected date, an outstanding bill on its due date. Nothing is
+     *    extrapolated from an average, because an average has no due date and
+     *    cannot be chased.
+     * 3. Anything already overdue lands in the FIRST bucket rather than being
+     *    dropped for being in the past. Money that was due last week is still
+     *    coming or still owed; a forecast that silently discards it is a
+     *    forecast that gets rosier the later you are.
+     *
+     * `projectId` narrows all three rows to one job. A bill counts by the part
+     * of its allocations that names that project, not by its whole total —
+     * a shared bill belongs to several jobs and to none of them entirely.
+     */
+    cashFlowGrid(opts) {
+      const o = opts || {};
+      const mode = o.mode === "month" ? "month" : "week";
+      const count = Math.max(1, Math.min(52, o.periods || (mode === "month" ? 6 : 13)));
+      const projectId = o.projectId || null;
+      const t = this.state.today;
+
+      const periods = [];
+      if (mode === "week") {
+        for (let i = 0; i < count; i++) {
+          const from = addDays(t, i * 7);
+          periods.push({ from, to: addDays(from, 6) });
+        }
+      } else {
+        const first = monthStartOf(t);
+        for (let i = 0; i < count; i++) {
+          const from = addMonths(first, i);
+          periods.push({ from: i === 0 ? t : from, to: addDays(addMonths(first, i + 1), -1) });
+        }
+      }
+      // Bucket 0 absorbs everything already due — see note 3 above.
+      const bucketOf = (dateIso) => {
+        if (dateIso <= periods[0].to) return 0;
+        for (let i = 1; i < periods.length; i++)
+          if (dateIso >= periods[i].from && dateIso <= periods[i].to) return i;
+        return -1;
+      };
+      const empty = () => periods.map(() => 0);
+      const put = (cells, dateIso, amountCents) => {
+        const i = bucketOf(dateIso);
+        if (i >= 0) cells[i] += amountCents;
+      };
+
+      const invoiceCells = empty();
+      for (const r of this.receivables())
+        if (r.outstandingCents > 0 && (!projectId || r.projectId === projectId))
+          put(invoiceCells, r.dueDate, r.outstandingCents);
+
+      const milestoneCells = empty();
+      for (const c of this.state.contracts) {
+        if (projectId && c.projectId !== projectId) continue;
+        for (const i of c.installments)
+          if (i.status === "planned" && i.expectedDate)
+            put(milestoneCells, i.expectedDate, i.amountCents);
+      }
+
+      const billCells = empty();
+      for (const b of this.state.bills) {
+        if (b.creditNoteFor) continue;
+        const outstanding = this.billOutstandingCents(b.id);
+        if (outstanding <= 0) continue;
+        let share = outstanding;
+        if (projectId) {
+          const allocated = sum(b.allocations, (a) => a.amountCents);
+          const mine = sum(
+            b.allocations.filter((a) => a.projectId === projectId),
+            (a) => a.amountCents,
+          );
+          if (!mine) continue;
+          // Pro-rate what is still owed by the project's share of the base:
+          // a part-paid bill owes each job a part of what is left, not all.
+          share = allocated ? Math.round((outstanding * mine) / allocated) : outstanding;
+        }
+        put(billCells, b.dueDate, share);
+      }
+
+      const rowsIn = [
+        { key: "invoices", label: "Facturas emitidas pendientes", cells: invoiceCells },
+        { key: "milestones", label: "Hitos de contrato previstos", cells: milestoneCells },
+      ];
+      const rowsOut = [{ key: "bills", label: "Facturas recibidas pendientes", cells: billCells }];
+      const totalOf = (rows) => periods.map((_, i) => sum(rows, (r) => r.cells[i]));
+      const inTotals = totalOf(rowsIn),
+        outTotals = totalOf(rowsOut);
+      const netCents = periods.map((_, i) => inTotals[i] - outTotals[i]);
+
+      const openingCents = this.cashPositionAsOf(addDays(t, -1));
+      let running = openingCents;
+      const cumulativeCents = netCents.map((n) => (running += n));
+
+      return {
+        mode,
+        projectId,
+        periods,
+        openingCents,
+        groups: [
+          { key: "in", label: "Entradas", rows: rowsIn, totals: inTotals },
+          { key: "out", label: "Salidas", rows: rowsOut, totals: outTotals },
+        ],
+        netCents,
+        cumulativeCents,
+      };
+    }
+    /**
      * "Resultado operativo del mes/trimestre en curso: Ingresos − Gastos"
      * (§2.1) — issued revenue (net of credit notes) minus received-invoice
      * cost, both on their document date (accrual, not cash), plus overhead/
@@ -3232,14 +4547,50 @@
 
     /* =========================== LAB — labour hours =========================== */
     addWorker(w, user) {
-      // LAB-04/05
+      // LAB-04/05. DMT-04: personal interno is master data in its own right,
+      // not just a name on the hours grid — the fields below are what a
+      // registry screen needs that a timesheet never did.
       const rec = Object.assign(
-        { id: this._id("wkr"), name: "", kind: "employee", rateHistory: [], docs: [] },
+        {
+          id: this._id("wkr"),
+          code: "P-" + String(this.state.workers.length + 1).padStart(4, "0"),
+          name: "",
+          kind: "employee",
+          taxId: "",
+          phone: "",
+          email: "",
+          active: true,
+          rateHistory: [],
+          docs: [],
+        },
         w,
       ); // rateHistory {from, rateCentsPerHour}; docs {kind, expiresOn, docRef}
+      if (rec.taxId && !validTaxId(rec.taxId))
+        throw new Error("Invalid tax identifier: " + rec.taxId);
       this.state.workers.push(rec);
       this._log(user, "addWorker", rec.name);
       return rec;
+    }
+    /** DMT-04: the fields a registry screen edits after creation. Rates and
+        documents are append-only history, not patchable here — addWorkerRate
+        and addWorkerDoc own those. */
+    updateWorker(id, patch, user) {
+      const w = this.state.workers.find((x) => x.id === id);
+      if (!w) throw new Error("Worker not found");
+      if (patch.taxId && !validTaxId(patch.taxId))
+        throw new Error("Invalid tax identifier: " + patch.taxId);
+      Object.assign(w, patch);
+      this._log(user, "updateWorker", w.name);
+      return w;
+    }
+    /** Deactivate, never delete (system-wide invariant) — a worker's recorded
+        hours and rate history must stay explainable after they leave. */
+    deactivateWorker(id, user) {
+      const w = this.state.workers.find((x) => x.id === id);
+      if (!w) throw new Error("Worker not found");
+      w.active = false;
+      this._log(user, "deactivateWorker", w.name);
+      return w;
     }
     workerRateCents(workerId, date) {
       // LAB-05 with history
@@ -3318,6 +4669,122 @@
         hours: l.hoursMilli / 1000,
         costCents: l.costCents,
       }));
+    }
+    /**
+     * ADM-04's Resumen tab: hours and their cost per project, broken down by
+     * the chapter each entry was booked to. Entries with no chapter are kept
+     * under a null chapter rather than dropped — an hour nobody assigned is
+     * the thing the summary exists to surface.
+     */
+    hoursSummary(from, to, projectId) {
+      const rows = this.state.labour.filter(
+        (l) =>
+          (!from || l.date >= from) &&
+          (!to || l.date <= to) &&
+          (!projectId || l.projectId === projectId),
+      );
+      const byProject = new Map();
+      for (const l of rows) {
+        if (!byProject.has(l.projectId))
+          byProject.set(l.projectId, { projectId: l.projectId, chapters: new Map() });
+        const p = byProject.get(l.projectId);
+        const key = l.chapterNum || "";
+        if (!p.chapters.has(key))
+          p.chapters.set(key, { chapterNum: l.chapterNum || null, hoursMilli: 0, costCents: 0 });
+        const c = p.chapters.get(key);
+        c.hoursMilli += l.hoursMilli;
+        c.costCents += l.costCents;
+      }
+      const projects = [...byProject.values()].map((p) => {
+        const pr = p.projectId ? this.state.projects.find((x) => x.id === p.projectId) : null;
+        const chapters = [...p.chapters.values()].sort((a, b) =>
+          String(a.chapterNum || "~").localeCompare(String(b.chapterNum || "~")),
+        );
+        for (const c of chapters) {
+          const bc =
+            pr && pr.baseline && (pr.baseline.chapters || []).find((x) => x.num === c.chapterNum);
+          c.name = bc ? bc.name : null;
+        }
+        return {
+          projectId: p.projectId,
+          code: pr ? pr.code : null,
+          name: pr ? pr.name : null,
+          chapters,
+          hoursMilli: sum(chapters, (c) => c.hoursMilli),
+          costCents: sum(chapters, (c) => c.costCents),
+        };
+      });
+      projects.sort((a, b) => String(a.code || "~").localeCompare(String(b.code || "~")));
+      return {
+        from: from || null,
+        to: to || null,
+        projects,
+        totalHoursMilli: sum(projects, (p) => p.hoursMilli),
+        totalCostCents: sum(projects, (p) => p.costCents),
+      };
+    }
+    /**
+     * ADM-04's monthly reconciliation block: what the month's hours cost the
+     * jobs, against what actually left the bank as wages.
+     *
+     * These two numbers are NOT supposed to be equal, and the block is honest
+     * about that rather than painting a red flag every month. Hours cost is an
+     * accrual booked to jobs on the day the work happened; wages are cash
+     * leaving on payday, and they also pay for holidays, sick days, office
+     * staff and the time nobody logged. So the difference is reported as
+     * `unbookedCents` — labour that was paid for but never landed on a job —
+     * and the useful reading is its trend and its size relative to the wage
+     * bill, which is why `unbookedPctBp` comes back with it.
+     *
+     * A negative difference is the interesting one: more hours booked to jobs
+     * than wages paid means either a payroll run that has not been imported
+     * yet or hours recorded against the wrong month, and both are worth
+     * knowing before the figures reach a job's margin.
+     */
+    labourReconciliation(monthIso) {
+      // With no month named, reconcile the last month that has a wage payment
+      // in it rather than the current one. A month whose payroll has not run
+      // yet cannot be reconciled — on the 5th it would report every hour
+      // booked so far as unpaid, which is a calendar fact dressed up as an
+      // alarm. The last closed payroll is the last month there is an answer
+      // for, and it is the month somebody asking this question means.
+      if (!monthIso) {
+        const paid = this.state.movements
+          .filter((m) => m.class === "salary")
+          .map((m) => m.accountingDate)
+          .sort();
+        monthIso = paid.length ? paid[paid.length - 1] : this.state.today;
+      }
+      const from = monthStartOf(monthIso);
+      const to = addDays(addMonths(from, 1), -1);
+      const entries = this.state.labour.filter((l) => l.date >= from && l.date <= to);
+      const bookedCents = sum(entries, (l) => l.costCents);
+      const wages = this.state.movements.filter(
+        (m) => m.class === "salary" && m.accountingDate >= from && m.accountingDate <= to,
+      );
+      // Wages leave the account, so they arrive here negative; the block reads
+      // in positive money because "nóminas pagadas: −4.200 €" helps nobody.
+      const wagesCents = Math.abs(sum(wages, (m) => m.amountCents));
+      const unbookedCents = wagesCents - bookedCents;
+      return {
+        month: from.slice(0, 7),
+        from,
+        to,
+        bookedCents,
+        bookedHoursMilli: sum(entries, (l) => l.hoursMilli),
+        wagesCents,
+        wagesCount: wages.length,
+        unbookedCents,
+        unbookedPctBp: wagesCents ? Math.round((unbookedCents * 10000) / wagesCents) : 0,
+        approvedHoursMilli: sum(
+          entries.filter((l) => l.locked),
+          (l) => l.hoursMilli,
+        ),
+        openHoursMilli: sum(
+          entries.filter((l) => !l.locked),
+          (l) => l.hoursMilli,
+        ),
+      };
     }
     /**
      * The weekly grid §4.6 asks for: worker × day, with totals. Rows are every
@@ -3527,6 +4994,124 @@
         actualCents: actualByCh[c.num] || 0,
         overrun: (actualByCh[c.num] || 0) > c.costCents,
       }));
+    }
+    /**
+     * Money that reached this project and stopped there — allocated to the job
+     * but to no capítulo (PRY-02's pending-assignment block).
+     *
+     * `chapterEconomics` above silently skips exactly these rows: a bill line
+     * with a `projectId` and no `chapterNum` contributes to the project's
+     * actual cost and to none of its chapters, so the per-capítulo table adds
+     * up to less than the project does and nothing on screen says why. This
+     * method is that difference, itemised.
+     *
+     * The row id is a composite of source, record and index rather than a new
+     * stored key: these rows are a view of other records, they come and go as
+     * those records are assigned, and minting ids for them would be inventing
+     * a collection that has to be kept in step with three others.
+     */
+    unassignedChapterCosts(projectId) {
+      this.project(projectId);
+      const rows = [];
+      for (const b of this.state.bills)
+        b.allocations.forEach((a, i) => {
+          if (a.projectId !== projectId || a.chapterNum) return;
+          rows.push({
+            id: "bill:" + b.id + ":" + i,
+            source: "bill",
+            ref: b.number,
+            party: b.supplierId ? this.party(b.supplierId).name : "",
+            date: b.date,
+            amountCents: b.creditNoteFor ? -a.amountCents : a.amountCents,
+            kind: a.kind || "material",
+          });
+        });
+      for (const l of this.state.labour) {
+        if (l.projectId !== projectId || l.chapterNum) continue;
+        rows.push({
+          id: "labour:" + l.id + ":0",
+          source: "labour",
+          ref: l.date,
+          party: l.workerId
+            ? (this.state.workers.find((w) => w.id === l.workerId) || {}).name || ""
+            : "",
+          date: l.date,
+          amountCents: l.costCents,
+          kind: "labour",
+        });
+      }
+      for (const c of this.state.captured)
+        c.allocations.forEach((a, i) => {
+          if (a.projectId !== projectId || a.chapterNum) return;
+          rows.push({
+            id: "capture:" + c.id + ":" + i,
+            source: "capture",
+            ref: c.stdName || c.reference || c.id,
+            party: (c.confirmed && c.confirmed.issuerName) || "",
+            date: (c.confirmed && c.confirmed.date) || c.capturedAt,
+            amountCents: a.amountCents,
+            kind: a.kind || "material",
+          });
+        });
+      return rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    }
+    /**
+     * Split one of those rows across capítulos — the only place in the product
+     * where a cost acquires a chapter (§3.2, PRY-02).
+     *
+     * A split writes SIBLING allocations rather than editing one in place, so
+     * the amount that reached the project is conserved by construction: the
+     * row is replaced by rows that add up to it. Every capítulo has to exist
+     * in the project's frozen baseline, because a chapter number nothing
+     * recognises is a cost that has left the project's own accounting without
+     * leaving the project.
+     */
+    assignChapterSplit(projectId, rowId, splits, user) {
+      const p = this.project(projectId);
+      const parts = Array.isArray(splits) ? splits : [];
+      if (!parts.length) throw new Error("A cost must be split into at least one chapter");
+      const known = new Set((p.baseline.chapters || []).map((c) => String(c.num)));
+      parts.forEach((s) => {
+        if (!known.has(String(s.chapterNum)))
+          throw new Error("Unknown chapter for this project: " + s.chapterNum);
+        if (!(Math.round(s.amountCents) > 0))
+          throw new Error("Every chapter line needs a positive amount");
+      });
+      const [source, recId, idxRaw] = String(rowId).split(":");
+      const idx = Number(idxRaw);
+      const collection =
+        source === "bill" ? this.state.bills : source === "capture" ? this.state.captured : null;
+      if (source === "labour") {
+        const l = this.state.labour.find((x) => x.id === recId);
+        if (!l || l.projectId !== projectId) throw new Error("Cost not found on this project");
+        // Hours are one entry against one worker on one day; they are not
+        // divisible without inventing a second timesheet row, so a labour
+        // cost takes ONE chapter and says so rather than pretending.
+        if (parts.length !== 1)
+          throw new Error("An hours entry goes to a single chapter — split the timesheet instead");
+        if (Math.abs(parts[0].amountCents - l.costCents) > 1)
+          throw new Error("Split must total the cost");
+        l.chapterNum = String(parts[0].chapterNum);
+        this._log(user, "assignChapterSplit", rowId);
+        return l;
+      }
+      if (!collection) throw new Error("Unknown cost source: " + source);
+      const rec = collection.find((x) => x.id === recId);
+      if (!rec) throw new Error("Cost not found on this project");
+      const alloc = rec.allocations[idx];
+      if (!alloc || alloc.projectId !== projectId || alloc.chapterNum)
+        throw new Error("That cost is no longer waiting for a chapter");
+      const total = Math.abs(alloc.amountCents);
+      if (Math.abs(sum(parts, (s) => Math.round(s.amountCents)) - total) > 1)
+        throw new Error("Split must total the cost");
+      const replacement = parts.map((s) => ({
+        ...clone(alloc),
+        chapterNum: String(s.chapterNum),
+        amountCents: Math.round(s.amountCents),
+      }));
+      rec.allocations.splice(idx, 1, ...replacement);
+      this._log(user, "assignChapterSplit", rowId);
+      return rec;
     }
     unallocatedSummary() {
       // FIN-04: quantified
@@ -5546,7 +7131,29 @@
       const cur = this.currentVersion(id);
       if (b.acceptedVersionId || (cur && cur.issued))
         throw new Error("Budget is issued/accepted — create a new version instead");
-      const allowed = ["internalRef", "propertyId", "discountCents", "vatBp", "validityDays"];
+      // validityDate, not validityDays — the budget record has never held a
+      // day count, so the old name silently dropped every edit to the one
+      // header field an owner most often corrects.
+      //
+      // The second row is COM-03's conditions bar: everything the customer
+      // reads under the totals, plus the two fields that change what the
+      // totals mean (`surfaceM2` drives the per-m² figure, `irpfBp` the
+      // withholding). `language` is the CUSTOMER's language for the emitted
+      // document — deliberately not the operator's interface language, which
+      // is a separate choice made by a separate person.
+      const allowed = [
+        "internalRef",
+        "propertyId",
+        "discountCents",
+        "vatBp",
+        "validityDate",
+        "language",
+        "surfaceM2",
+        "irpfBp",
+        "paymentConditions",
+        "exclusions",
+        "assumptions",
+      ];
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
       Object.assign(b, patch);
       this._log(user, "updateBudget", b.number);
@@ -5589,7 +7196,7 @@
       const ch = this._editableChapter(budgetId, chapterRef);
       const ln = this._findLine(ch, lineRef);
       ch.lines.splice(ch.lines.indexOf(ln), 1);
-      ch.lines.forEach((l, idx) => (l.num = ch.num + "." + (idx + 1)));
+      this._renumber(this.currentVersion(budgetId));
       this._log(user, "removeLine", this.budget(budgetId).number + " " + ln.num);
     }
     resolvePendingLine(budgetId, chapterRef, lineRef, { priceCents, costCents }, user) {
@@ -5645,7 +7252,13 @@
     }
     resolveRequirement(projectId, reqId, status, user) {
       const p = this.project(projectId);
-      const r = (p.requirements || []).find((x) => x.id === reqId);
+      // addProjectRequirement files by type: permits and safety documents go to
+      // p.permits, everything else to p.dependencies. Nothing ever wrote a
+      // p.requirements collection, so looking only there meant this method
+      // could never resolve anything it had itself created.
+      const r = [...(p.permits || []), ...(p.dependencies || []), ...(p.requirements || [])].find(
+        (x) => x.id === reqId,
+      );
       if (!r) throw new Error("Requirement not found");
       r.status = status || "resolved";
       r.resolvedAt = this.state.today;
@@ -5683,6 +7296,10 @@
       if (ch.status !== "approved")
         throw new Error("Only an approved extra can be marked executed");
       ch.executed = { date: this.state.today };
+      // Without this the "executed" status in LISTS.changeStatuses was
+      // unreachable: the date was stamped but the record still read "approved",
+      // so every screen filtering on status showed executed work as pending.
+      ch.status = "executed";
       this._log(user, "markChangeExecuted", id);
       return ch;
     }
@@ -5776,10 +7393,12 @@
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
       Object.assign(b, patch);
       b.vatCents = Math.round((b.baseCents * (b.vatBp || 0)) / 10000);
-      b.irpfCents =
-        b.irpfCents && b.irpfRateBp
-          ? Math.round((b.baseCents * b.irpfRateBp) / 10000)
-          : b.irpfCents;
+      // The rate lives on the bill as irpfBp — registerBill copies it from the
+      // supplier profile. Reading irpfRateBp (the field name on the PARTY) made
+      // this condition permanently false, so correcting the base recomputed the
+      // tax and left the withholding stale, and the total was wrong by the
+      // difference.
+      b.irpfCents = b.irpfBp ? Math.round((b.baseCents * b.irpfBp) / 10000) : b.irpfCents;
       b.totalCents = b.baseCents + b.vatCents - (b.irpfCents || 0);
       this._log(user, "correctBill", b.number);
       return b;
@@ -5790,7 +7409,7 @@
       const s = sum(allocations, (a) => a.amountCents);
       if (Math.abs(s - b.baseCents) > 1)
         throw new Error("Allocations must equal the bill base amount");
-      b.allocations = allocations;
+      b.allocations = allocations.map((a) => this.withAccountCode(a));
       this._log(user, "allocateBill", b.number);
       return b;
     }
@@ -5834,12 +7453,16 @@
     updateRecurring(id, patch, user) {
       const r = (this.state.recurring || []).find((x) => x.id === id);
       if (!r) throw new Error("Recurring template not found");
+      // Named after the record addRecurringInvoice actually builds: desc,
+      // cadenceMonths and nextDate. "concept" and "dayOfMonth" exist nowhere,
+      // so editing the description or the cadence did nothing at all.
       const allowed = [
         "baseCents",
         "vatBp",
-        "concept",
+        "desc",
         "active",
-        "dayOfMonth",
+        "cadenceMonths",
+        "nextDate",
         "partyId",
         "projectId",
       ];
@@ -5944,7 +7567,7 @@
         workPackage: "packages",
         price: "prices",
         purchase: "purchases",
-        capture: "captures",
+        capture: "captured",
         task: "tasks",
         worker: "workers",
         bankAccount: "bankAccounts",
@@ -5976,6 +7599,8 @@
   return {
     ERP,
     LISTS,
+    LIST_DEFAULTS,
+    LIST_KINDS,
     validTaxId,
     validIban,
     validEmail,

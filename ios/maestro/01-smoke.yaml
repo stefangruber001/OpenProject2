@@ -24,34 +24,46 @@ appId: com.caneisubirats.erp
 # … and the web content loaded (the offline fallback is NOT showing).
 - assertNotVisible: "You're offline"
 
-# Native tab bar (VoiceOver labels from TabBar.swift).
-- assertVisible: "Home"
-- assertVisible: "Project"
-- assertVisible: "Control Tower"
+# Native tab bar (VoiceOver labels from TabBar.swift). The tabs address the
+# ERP shell's own v4 sections now, not the standalone pages the app was born
+# with — those are redirect stubs.
+- assertVisible: "Tower"
+- assertVisible: "Projects"
+- assertVisible: "Sales"
 - assertVisible: "Guide"
-- takeScreenshot: 01-home
+- takeScreenshot: 01-tower
 
 # Best-effort web-content check (Maestro's WKWebView text reading is limited).
 - assertVisible:
-    text: "enquiry|renovation|five-star|thread"
+    text: "Torre|Tower|Margen|Margin|Proyectos|Projects"
     optional: true
 
 # Walk the tabs; each should navigate without dropping to the offline screen.
-- tapOn: "Project"
+- tapOn: "Projects"
 - waitForAnimationToEnd
 - assertNotVisible: "You're offline"
-- takeScreenshot: 02-project
+- takeScreenshot: 02-projects
 
-- tapOn: "Control Tower"
+- tapOn: "Sales"
 - waitForAnimationToEnd
 - assertNotVisible: "You're offline"
-- takeScreenshot: 03-tower
+- takeScreenshot: 03-sales
+
+- tapOn: "Admin"
+- waitForAnimationToEnd
+- assertNotVisible: "You're offline"
+- takeScreenshot: 04-admin
+
+- tapOn: "Master data"
+- waitForAnimationToEnd
+- assertNotVisible: "You're offline"
+- takeScreenshot: 05-master-data
 
 - tapOn: "Guide"
 - waitForAnimationToEnd
 - assertNotVisible: "You're offline"
-- takeScreenshot: 04-guide
+- takeScreenshot: 06-guide
 
-- tapOn: "Home"
+- tapOn: "Tower"
 - assertVisible: "Canei Subirats"
-- takeScreenshot: 05-home-again
+- takeScreenshot: 07-tower-again

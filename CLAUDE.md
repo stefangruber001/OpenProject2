@@ -61,7 +61,7 @@ code.
 
 `packages/factory`, `packages/erp-browser`, `packages/db`, `packages/ui` and
 `apps/web` are **hosts**: the linter does not classify them, so they may
-compose capabilities *and* packs and may hold infrastructure concerns. That is
+compose capabilities _and_ packs and may hold infrastructure concerns. That is
 deliberate — composition has to happen somewhere. It is not a licence for
 business rules: a rule in a host is a rule in neither a capability nor a pack,
 which is the worst of both. Push it down.
@@ -86,7 +86,14 @@ CI rebuilds and diffs them, so never edit them by hand. See
 
 ## Git rules
 
-- Branch: `claude/orin-project-status-1q50dt`. Never push elsewhere.
+- Branch: whichever the session mandate designates. Sessions 1-3 used
+  `claude/orin-project-status-1q50dt`; the v4 programme uses
+  `claude/candi-programme-session-4-07amo8`. Never push elsewhere.
+- **Never content-copy `site/` between branches.** Merge, or port file by file
+  against a diff you have read. Copying is silent: the screens arrive, the
+  branch you copied _from_ stays green, and the work you overwrote on the branch
+  you copied _to_ only surfaces as its own tests failing. That is exactly how
+  `main` spent five commits red — see `docs/worklog/SESSION-S1A.md`.
 - Small green commits; push with `git push -u origin <branch>` (retry w/
   backoff on network failure). **No force-push, no history rewrite, no branch
   deletion** (mandate §3).

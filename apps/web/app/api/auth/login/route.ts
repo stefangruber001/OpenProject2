@@ -6,9 +6,11 @@
  * needed, which keeps the login page working in the phone app's web view even
  * if something else on the page fails to load.
  */
-import { authenticate, isSharedPassword, loginConfigured } from "@/lib/auth";
-import { sharedAccessEnabled } from "@/lib/access";
+import { isSharedPassword, loginConfigured } from "@/lib/auth";
+import { defaultTenant, sharedAccessEnabled } from "@/lib/access";
+import { authenticateUser } from "@/lib/user-admin";
 import { sessionCookie, signSession } from "@/lib/session-token";
+import { check, clientKey, recordFailure, recordSuccess } from "@/lib/rate-limit";
 import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
@@ -76,6 +78,22 @@ export async function POST(req: Request): Promise<Response> {
   const password = String(form.get("password") ?? "");
   const next = safeNext(String(form.get("next") ?? "/"));
 
+  // Slow an automated attempt. Counted against the network address AND the
+  // address being tried, because either alone has a hole: by-email lets one
+  // password be sprayed across many accounts, by-network locks out a whole
+  // office when one person forgets their password.
+  const keys = [`ip:${clientKey(req)}`, `email:${email.trim().toLowerCase() || "(shared)"}`];
+  const verdict = check(keys);
+  if (!verdict.allowed) {
+    // Refused before the password is checked, so a locked-out attacker cannot
+    // even measure how long the check took.
+    return back({
+      error: "rate",
+      retry: String(verdict.retryAfter),
+      ...(next !== "/" ? { next } : {}),
+    });
+  }
+
   // The shared password, with no address at all — that is the whole point: a
   // link and a password, nothing to set up per person. Reachable only when no
   // address was typed, so somebody with a named account never falls into a
@@ -84,6 +102,7 @@ export async function POST(req: Request): Promise<Response> {
     // A short random label per session. Several people use one password, and an
     // audit trail reading "invitado" twelve times cannot be followed;
     // "invitado-4f2a" at least tells one tester's changes from another's.
+    recordSuccess(keys);
     const label = `invitado-${randomUUID().slice(0, 4)}`;
     const token = await signSession(
       label,
@@ -94,12 +113,16 @@ export async function POST(req: Request): Promise<Response> {
     return redirect(next, [["Set-Cookie", sessionCookie(token, isSecureRequest(req), "shared")]]);
   }
 
-  const who = await authenticate(email, password);
+  // Rows first, environment second — otherwise an account created through the
+  // screen can be invited, can set a password, and still cannot sign in.
+  const who = await authenticateUser(defaultTenant(), email, password);
   if (!who) {
+    recordFailure(keys);
     // One message for both "no such account" and "wrong password". Which one it
     // was is exactly what somebody guessing wants to learn.
     return back({ error: "1", ...(next !== "/" ? { next } : {}) });
   }
+  recordSuccess(keys);
 
   const token = await signSession(
     who,

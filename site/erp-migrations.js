@@ -333,7 +333,279 @@
         return s;
       },
     },
+    {
+      to: 10,
+      name: "owner-maintained lists, price detail, line provenance (S3)",
+      /*
+       *   state.lists           added — units, leadSources, lossReasons and
+       *                         paymentMethods move out of code and into the
+       *                         document, so DMC-03/04/05 can maintain them.
+       *                         Seeded from the engine's own defaults (see
+       *                         listSeed below) rather than left empty: a
+       *                         company that migrated must come out with the
+       *                         same vocabulary it had five minutes ago, not
+       *                         with four empty pickers.
+       *   prices[].taxRateBp    added, gaps 6-9. taxRateBp is null, NOT 0 —
+       *   prices[].supplierRef  a historic price row genuinely does not record
+       *   prices[].wasteCents   which rate applied, and stamping 0% would be a
+       *   prices[].minOrder     confident wrong answer on every one of them.
+       *   prices[].projectRef   The screen renders null as "—".
+       *   prices[].notes        wasteCents defaults to 0 because it is an
+       *                         amount that was genuinely absent, not unknown.
+       *   line.sourceFile       added, gap 12 — provenance for a line that
+       *   line.sourceSheet      came from an uploaded workbook. Empty string
+       *   line.chapterOriginal  on every existing line, which is the truth:
+       *                         they were typed here, not imported.
+       */
+      up: function (s) {
+        if (!s.lists || typeof s.lists !== "object" || Array.isArray(s.lists)) s.lists = {};
+        var seed = listSeed();
+        Object.keys(seed).forEach(function (kind) {
+          if (!Array.isArray(s.lists[kind])) s.lists[kind] = seed[kind];
+        });
+
+        (Array.isArray(s.prices) ? s.prices : []).forEach(function (p) {
+          if (!("taxRateBp" in p)) p.taxRateBp = null;
+          if (typeof p.supplierRef !== "string") p.supplierRef = "";
+          if (typeof p.wasteCents !== "number") p.wasteCents = 0;
+          if (!("minOrder" in p)) p.minOrder = null;
+          if (typeof p.projectRef !== "string") p.projectRef = "";
+          if (typeof p.notes !== "string") p.notes = "";
+        });
+
+        (Array.isArray(s.budgets) ? s.budgets : []).forEach(function (b) {
+          (Array.isArray(b.versions) ? b.versions : []).forEach(function (v) {
+            (Array.isArray(v.chapters) ? v.chapters : []).forEach(function (c) {
+              (Array.isArray(c.lines) ? c.lines : []).forEach(function (l) {
+                if (typeof l.sourceFile !== "string") l.sourceFile = "";
+                if (typeof l.sourceSheet !== "string") l.sourceSheet = "";
+                if (typeof l.chapterOriginal !== "string") l.chapterOriginal = "";
+              });
+            });
+          });
+        });
+        return s;
+      },
+    },
+    {
+      to: 11,
+      name: "catalogue: chapter tree, brand/model/quality (S3, DMC-01)",
+      /*
+       * A separate step rather than more keys inside v10, because v10 had
+       * already been written to blobs by the time DMC-01 needed these. A blob
+       * stamped 10 never re-runs 10, so anything appended to it afterwards
+       * would silently never reach the documents that most needed it — which
+       * is the exact failure the ladder exists to prevent.
+       *
+       *   lists.itemChapters       added — DMC-01's chapter tree, seeded from
+       *                            the engine's defaults. Its ARRAY ORDER is
+       *                            the display order, which is what makes the
+       *                            tree draggable without a second sort field
+       *                            that could disagree with it.
+       *   catalogue[].brand        added, empty. Empty is the truth: nobody
+       *   catalogue[].model        recorded a brand for these, and inventing
+       *   catalogue[].quality      one would put a claim in a document that
+       *                            is used to settle arguments on site.
+       */
+      up: function (s) {
+        if (!s.lists || typeof s.lists !== "object" || Array.isArray(s.lists)) s.lists = {};
+        if (!Array.isArray(s.lists.itemChapters)) {
+          var seed = listSeed();
+          s.lists.itemChapters = seed.itemChapters || [];
+        }
+        (Array.isArray(s.catalogue) ? s.catalogue : []).forEach(function (i) {
+          if (typeof i.brand !== "string") i.brand = "";
+          if (typeof i.model !== "string") i.model = "";
+          if (typeof i.quality !== "string") i.quality = "";
+        });
+        return s;
+      },
+    },
+    {
+      to: 12,
+      name: "visits get a lifecycle: scheduled vs. done (S4, COM-02)",
+      /*
+       * Every visit that reached this blob was created by the OLD addVisit —
+       * an already-completed capture in one step, because there was no
+       * screen that could schedule one first. COM-02 needs to tell a
+       * scheduled visit from a done one, so every existing visit is
+       * backfilled as "done" (the true state of every visit written before
+       * this session) rather than left ambiguous.
+       *
+       *   status        "done" — never "scheduled": nothing before this
+       *                 session could produce a scheduled-but-not-yet-done
+       *                 visit, since the concept did not exist.
+       *   scheduledAt   backfilled to `date`. It is the closest honest
+       *   completedAt   answer — the visit's own record IS when it was
+       *                 captured, and stamping both to that day is a fact,
+       *                 not a guess, for a visit that was always same-day.
+       *   owner         "operations" — every existing visit's actual owner
+       *                 by convention (site staff go on visits); not
+       *                 recorded per-visit until this session.
+       *   propertyId    null — was never captured on the visit itself
+       *                 before now (only on the opportunity).
+       *   budgetId      null — no visit has ever been linked to the budget
+       *                 it produced; that link is new in this session.
+       */
+      up: function (s) {
+        (Array.isArray(s.visits) ? s.visits : []).forEach(function (v) {
+          if (typeof v.status !== "string") v.status = "done";
+          if (typeof v.scheduledAt !== "string") v.scheduledAt = v.date || null;
+          if (typeof v.completedAt !== "string") v.completedAt = v.date || null;
+          if (typeof v.owner !== "string") v.owner = "operations";
+          if (!("propertyId" in v)) v.propertyId = null;
+          if (!("budgetId" in v)) v.budgetId = null;
+        });
+        return s;
+      },
+    },
+    {
+      to: 13,
+      name: "budget rows record whether their number was typed (S5, COM-03)",
+      /*
+       * COM-03 lets an estimator type a chapter's or a line's number and keeps
+       * it through every later reorder (`_renumber` skips rows flagged
+       * `manualNum`). Every row that reached this blob was numbered
+       * automatically — there was no way to type one — so they are all
+       * backfilled `false`, which is a fact about them rather than a default.
+       *
+       * It matters that this is explicit. `undefined` is falsy and would
+       * behave identically today, but a row with no field cannot be told from
+       * a row someone answered "no" for, and the next person to read a stored
+       * document should not have to know which build wrote it.
+       *
+       * EVERY version, not just the current one: a frozen version is still
+       * rendered — reissued, diffed, printed — and a document whose rows have
+       * a different shape depending on when it was sent is exactly the kind of
+       * quiet inconsistency this ladder exists to prevent.
+       */
+      up: function (s) {
+        (Array.isArray(s.budgets) ? s.budgets : []).forEach(function (b) {
+          (Array.isArray(b.versions) ? b.versions : []).forEach(function (v) {
+            (Array.isArray(v.chapters) ? v.chapters : []).forEach(function (c) {
+              if (typeof c.manualNum !== "boolean") c.manualNum = false;
+              (Array.isArray(c.lines) ? c.lines : []).forEach(function (l) {
+                if (typeof l.manualNum !== "boolean") l.manualNum = false;
+              });
+            });
+          });
+        });
+        return s;
+      },
+    },
+    {
+      to: 14,
+      name: "captured documents carry their origin, their reference and a note (S7, gaps 10-11)",
+      /*
+       * Three fields the workbook has columns for and the model had nowhere to
+       * put: where the file came from ("Ruta completa"), the reference the
+       * supplier's own paperwork carries, and whatever the person who filed it
+       * wanted the next person to know.
+       *
+       * Backfilled to "" rather than left absent, for the same reason v13
+       * spelled out: an empty string is a document nobody has told us about,
+       * and it reads identically whichever build wrote the record. A missing
+       * key is a question about the build.
+       *
+       * `docRefs` on purchases is normalised here too. It has been in
+       * `addPurchase`'s defaults since session 10b and nothing ever wrote to
+       * it, so orders that predate that default have no array at all — and
+       * ADM-02 now reads it on every render to decide whether the supplier's
+       * quote can be shown.
+       */
+      up: function (s) {
+        (Array.isArray(s.captured) ? s.captured : []).forEach(function (c) {
+          if (typeof c.sourcePath !== "string") c.sourcePath = "";
+          if (typeof c.reference !== "string") c.reference = "";
+          if (typeof c.notes !== "string") c.notes = "";
+        });
+        (Array.isArray(s.purchases) ? s.purchases : []).forEach(function (p) {
+          if (!Array.isArray(p.docRefs)) p.docRefs = [];
+        });
+        return s;
+      },
+    },
+    {
+      to: 15,
+      name: "every allocated cost names its account (S11, gap 13)",
+      /*
+       * Rule 07 of the specification: every cost lands on a project OR an
+       * account. The account half had no field, so §6's money chain has
+       * carried one ✗ since S0 — this closes it.
+       *
+       * The backfill RESOLVES rather than defaults: an allocation to an
+       * overhead category already knew which account it belonged to (the
+       * chart names the mapping), and one to a project knows it from its cost
+       * kind. What it could not do before was say so, which is why a report by
+       * account was impossible and not merely empty.
+       *
+       * A row that resolves to nothing is left without the field rather than
+       * given a wrong one. `accountLedger` reports those under `unassigned`,
+       * which is a number somebody can act on; an invented account code is a
+       * number nobody can.
+       */
+      up: function (s) {
+        var accounts = (s.lists && s.lists.accounts) || [];
+        function resolve(a) {
+          if (!a || a.accountCode) return a && a.accountCode;
+          var hit = null;
+          if (a.overheadCategory)
+            hit = accounts.filter(function (x) {
+              return x.overhead === a.overheadCategory;
+            })[0];
+          else if (a.projectId)
+            hit = accounts.filter(function (x) {
+              return x.cost === (a.kind || "material");
+            })[0];
+          return hit ? hit.code : null;
+        }
+        function walk(list, key) {
+          (Array.isArray(list) ? list : []).forEach(function (rec) {
+            (Array.isArray(rec[key]) ? rec[key] : []).forEach(function (a) {
+              var code = resolve(a);
+              if (code) a.accountCode = code;
+            });
+          });
+        }
+        walk(s.bills, "allocations");
+        walk(s.captured, "allocations");
+        walk(s.movements, "allocations");
+        return s;
+      },
+    },
   ];
+
+  /**
+   * The seed for `state.lists`, taken from the engine rather than copied.
+   *
+   * Two copies of this data would drift, and the failure mode is quiet: a
+   * migrated company and a new one would start with different units and
+   * nobody would notice until a printed document disagreed. `erp-engine.js`
+   * loads before this file in the browser and is `require`-able in Node, so
+   * there is no ordering problem to work around — only a fallback for the
+   * case where it genuinely is not there, which keeps the ladder runnable in
+   * isolation rather than throwing mid-migration.
+   */
+  function listSeed() {
+    var E = null;
+    try {
+      E =
+        (typeof module === "object" && module.exports && require("./erp-engine.js")) ||
+        (typeof globalThis !== "undefined" && globalThis.ErpEngine) ||
+        null;
+    } catch (e) {
+      E = typeof globalThis !== "undefined" ? globalThis.ErpEngine || null : null;
+    }
+    var defaults = E && E.LIST_DEFAULTS;
+    if (!defaults) return { units: [], leadSources: [], lossReasons: [], paymentMethods: [] };
+    var out = {};
+    Object.keys(defaults).forEach(function (kind) {
+      out[kind] = defaults[kind].map(function (e) {
+        return { code: e.code, es: e.es, ca: e.ca, active: true };
+      });
+    });
+    return out;
+  }
 
   var CURRENT_VERSION = MIGRATIONS.reduce(function (max, m) {
     return Math.max(max, m.to);

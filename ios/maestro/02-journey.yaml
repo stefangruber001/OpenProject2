@@ -9,10 +9,10 @@ appId: com.caneisubirats.erp
 - launchApp:
     clearState: true
 
-- tapOn: "Project"
+- tapOn: "Projects"
 - waitForAnimationToEnd
 - assertNotVisible: "You're offline"
-- takeScreenshot: journey-project
+- takeScreenshot: projects-tab
 
 # Native pull-to-refresh gesture reloads the live page.
 - swipe:

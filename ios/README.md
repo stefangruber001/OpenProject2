@@ -16,6 +16,25 @@ automatically — on the next launch or pull‑to‑refresh. No App Store review
 needed for content, pricing, catalogue, or workflow changes. You only ship a
 new build when you change the _native shell_ (rare).
 
+### The one contract between the two (since 1.1)
+
+The web view's user agent carries `CaneiApp/` (see `Config.userAgentMarker`),
+and the web app reads it. Inside the shell it hides **its own** five-icon
+section bar, because the native tab bar does that job better, and turns the
+breadcrumb into the opener for the subsection list — the one thing a six-tab
+native bar cannot reach.
+
+Without that contract a phone inside the app showed three things stacked at the
+bottom of the screen: the web's section bar, this app's floating tab bar over
+it, and the web's site-action button positioned to clear the bar that was no
+longer the one in front.
+
+The match is on the `CaneiApp/` **prefix**, never the version, so an older build
+keeps working against a newer site. Plain Mobile Safari is deliberately
+unaffected — it has no native tab bar, so taking the web one away would strand
+somebody with no route to a section. `tests/site-e2e/run.mjs` asserts both
+halves by spoofing each user agent.
+
 ```
 Native shell (this app)         Web app (../site → GitHub Pages)
   splash / tab bar / haptics       Home · Project · Control Tower · Guide

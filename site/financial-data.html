@@ -147,12 +147,22 @@
   @media(max-width:560px){.topbar{padding:12px 14px}.tb-actions .lbl{display:none}}
 </style>
 <script src="i18n-dict.js"></script>
+<script src="i18n-dict-ca.js"></script>
 <script src="i18n.js"></script>
 <!-- erp-sync.js must load BEFORE the stores: they register their
      documents with it as soon as the first read comes back. Without it
      the page still works, it just never notices a change made elsewhere. -->
 <script src="erp-sync.js"></script>
 <script src="erp-docs.js"></script>
+<!-- S13: the ERP's own engine and store. This page used to hold a dataset the
+     engine had never heard of, which meant the receivables here and the
+     receivables in ADM-01 could disagree and nobody would know which was
+     right. The engine is loaded so the panels it can answer are DERIVED from
+     it; the ones it genuinely cannot (budgets, loans, drivers, opening
+     balances) stay editable here, which is what this page is for. -->
+<script src="erp-engine.js"></script>
+<script src="erp-migrations.js"></script>
+<script src="erp-store.js"></script>
 </head>
 <body>
   <div class="topbar">
@@ -213,7 +223,11 @@ const pctf=(n,d=1)=>(n==null||isNaN(n))?'—':Number(n).toFixed(d)+'%';
 const esc=s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 const fmtDate=iso=>{if(!iso)return'';const p=String(iso).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;};
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),1900);}
-const AS_OF=new Date().toISOString().slice(0,10); // today — valuation date for aging
+/* Valuation date for the aging buckets. It follows the ERP's own `today` once
+   the state is loaded (see boot): aging computed against the browser clock
+   while the ERP thinks it is a different day is precisely the disagreement
+   S13 exists to remove. Without an ERP it falls back to the real date. */
+let AS_OF=new Date().toISOString().slice(0,10);
 const daysBetween=(a,b)=>Math.round((new Date(a)-new Date(b))/86400000);
 
 /* ============ periods ============ */
@@ -303,18 +317,23 @@ const ENT={
 };
 
 /* ============ nav model ============ */
+/* §3.2 names the four groups: Resumen · Estados financieros · Capital
+   circulante · Libros. The last was "Ledgers (inputs)", which stopped being
+   true in S13 — half of it is read from the ERP now — so the honest split is
+   by subject, with each panel saying for itself whether it is an input or a
+   feed. */
 const NAV=[
- {grp:"Overview",items:[{key:"kpis",label:"KPI cockpit",icon:"📊",view:1}]},
- {grp:"Statements",items:[
+ {grp:"Resumen",items:[{key:"kpis",label:"KPI cockpit",icon:"📊",view:1}]},
+ {grp:"Estados financieros",items:[
    {key:"pnl",label:"Profit & Loss",icon:"📈",view:1},
    {key:"balance",label:"Balance sheet",icon:"⚖️",view:1},
    {key:"cashflow",label:"Cash flow",icon:"💧",view:1}]},
- {grp:"Working capital",items:[
+ {grp:"Capital circulante",items:[
    {key:"aging",label:"AR / AP aging",icon:"⏳",view:1},
    {key:"arOpen",label:"Receivables",icon:"📥"},
    {key:"apOpen",label:"Payables",icon:"📤"},
    {key:"vat",label:"VAT & tax",icon:"🧾"}]},
- {grp:"Ledgers (inputs)",items:[
+ {grp:"Libros",items:[
    {key:"accounts",label:"Chart of accounts",icon:"📓"},
    {key:"pl",label:"P&L ledger",icon:"🧮"},
    {key:"bs",label:"Balance sheet input",icon:"📗"},
@@ -442,12 +461,115 @@ function aging(rows){
  b.total=b.cur+b.b30+b.b60+b.b90+b.b90p;return {b,items};
 }
 
+/* ============ the ERP feed (S13) ============
+   Four of this page's ledgers are answers the ERP already has, and typing them
+   again here is how two screens end up disagreeing about the same invoice.
+   They are now DERIVED — read-only, with the screen that owns them named on
+   the panel — and the ones the engine genuinely does not hold stay editable,
+   because that is what this page is for.
+
+   `erp` is null when there is no ERP state to read (a fresh browser, or this
+   page opened on its own). Everything then falls back to the page's own seed,
+   exactly as before: a screen that refuses to render because the ERP is empty
+   is worse than one that shows its demo and says so. */
+let erp=null;
+/* entity key → [what it is read from, which ERP screen owns it] */
+const DERIVED={
+ arOpen:["invoiceRegister","ADM-01 Facturación"],
+ apOpen:["payables","ADM-03 Facturas de proveedores"],
+ bank:["bankAccounts","ADM-05 Banco · ADM-06 Caja"],
+ vat:["vatSummary / irpfSummary","ADM-07 Reporte a gestoría"],
+ accounts:["lists.accounts","Configuración"],
+ pl:["accountLedger + facturas","el ERP entero"],
+};
+const isDerived=k=>!!erp&&!!DERIVED[k];
+const c2=cents=>(cents||0)/100;
+const monthEnd=m=>{const [y,mm]=m.split('-').map(Number);
+ return new Date(Date.UTC(mm===12?y+1:y,mm===12?0:mm,0)).toISOString().slice(0,10);};
+
+function feedAr(){
+ return erp.invoiceRegister().filter(r=>r.outstandingCents>0).map(r=>({
+  doc:r.number,customer:r.party,due:r.dueDate,amount:c2(r.outstandingCents),
+  status:r.outstandingCents<r.totalCents?"Part-paid":"Open"}));
+}
+function feedAp(){
+ return erp.payables().filter(b=>b.outstandingCents>0).map(b=>({
+  doc:b.number,supplier:b.supplier,due:b.dueDate,amount:c2(b.outstandingCents),
+  status:b.status==="disputed"?"Query":b.outstandingCents<b.totalCents?"Part-paid":"Open"}));
+}
+function feedBank(){
+ return erp.state.bankAccounts.map(a=>({
+  code:a.kind==="till"?"CAJA":String(a.iban||a.name).slice(-4).toUpperCase(),
+  name:a.name,balance:c2(erp.accountBalanceCents(a.id))}));
+}
+/* One row per quarter that has any document in it. A quarter with nothing in
+   it is not a zero return, it is a quarter that has not happened. */
+function feedVat(){
+ const qs=[...new Set([...erp.state.invoices.map(i=>ErpEngine.quarterOf(i.date)),
+   ...erp.state.bills.map(b=>ErpEngine.quarterOf(b.date))])].sort();
+ const out=[];
+ for(const q of qs){
+  const v=erp.vatSummary(q),r=erp.irpfSummary(q);
+  out.push({period:q,kind:"IVA (303)",output:c2(v.outputVatCents),input:c2(v.inputVatCents)});
+  if(r.retainedCents) out.push({period:q,kind:"IRPF (111)",output:c2(r.retainedCents),input:0});
+ }
+ return out;
+}
+/* The chart the ERP maintains, plus the statement/roll-up/budget metadata this
+   page adds on top. The ERP owns code and name; this page owns which line an
+   account rolls into and what it was budgeted at, because neither is an
+   operational fact and neither belongs in the operating state. */
+function feedAccounts(){
+ const meta=new Map((DATA.accountMeta||[]).map(m=>[m.code,m]));
+ const fromSeed=new Map((seed().accounts||[]).map(a=>[a.code,a]));
+ return erp.listAll("accounts").map(a=>{
+  const m=meta.get(a.code)||fromSeed.get(a.code)||{};
+  return {code:a.code,name:a.es,stmt:m.stmt||"PL",
+    line:m.line||(a.code[0]==="7"?"revenue":a.code<"610"?"cogs":"opex"),
+    budget:m.budget||0};
+ });
+}
+/* Monthly actuals: cost from the account ledger — which is where gap 13's
+   accountCode lands — and revenue from issued invoices net of credit notes.
+   Both on the document date, because this is an accrual statement. */
+function feedPl(){
+ const rows=[];
+ const revenueCode=(erp.listAll("accounts").find(a=>a.code[0]==="7")||{}).code||"700";
+ for(const m of MONTHS){
+  const from=m+"-01",to=monthEnd(m),inRange=d=>d>=from&&d<=to;
+  for(const r of erp.accountLedger(from,to).rows)
+   if(r.amountCents) rows.push({period:m,code:r.code,actual:c2(r.amountCents)});
+  const rev=erp.state.invoices.filter(i=>i.kind!=="creditNote"&&inRange(i.date)).reduce((s,i)=>s+i.baseCents,0)
+   -erp.state.invoices.filter(i=>i.kind==="creditNote"&&inRange(i.date)).reduce((s,i)=>s+i.baseCents,0);
+  if(rev) rows.push({period:m,code:revenueCode,actual:c2(rev)});
+ }
+ return rows;
+}
+/** Overwrite the derived ledgers in DATA. Called once, at boot. */
+function applyFeed(){
+ if(!erp) return;
+ DATA.accountMeta=(DATA.accounts||[]).map(a=>({code:a.code,stmt:a.stmt,line:a.line,budget:a.budget}));
+ DATA.accounts=feedAccounts();
+ DATA.arOpen=feedAr();
+ DATA.apOpen=feedAp();
+ DATA.bank=feedBank();
+ DATA.vat=feedVat();
+ DATA.pl=feedPl();
+}
+
 /* ============ state ============ */
 let DATA={},cur="kpis",editIdx=-1;
 async function boot(){
  DATA=(await idbGet(KEY))||seed();
  Object.keys(ENT).forEach(k=>{if(!Array.isArray(DATA[k])&&k!=='drivers')DATA[k]=[];});
  if(!Array.isArray(DATA.drivers))DATA.drivers=[{}];
+ // The ERP state is optional. Without it the seed above stands and the banner
+ // says so, rather than the page refusing to render.
+ try{ const loaded=await ErpStore.loadState();
+      if(loaded&&loaded.state) erp=ErpEngine.ERP.from(loaded.state); }
+ catch(e){ erp=null; }
+ if(erp) AS_OF=erp.today;
+ applyFeed();
  const ps=$('#period');ps.innerHTML=PERIODS.map(p=>`<option value="${p.id}">${p.label}</option>`).join('');ps.value=periodId;
  buildNav();render();
 }
@@ -466,10 +588,22 @@ function render(){
  const it=NAVITEM[cur];
  document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('on',b.dataset.k===cur));
  $('#crumb').textContent=it.label;$('#ttl').textContent=it.label;
- $('#btnAdd').style.display=it.view?'none':'';
+ // A derived ledger has no Add button: the row it would add is overwritten the
+ // next time the page reads the ERP, and an input that silently does nothing
+ // is worse than no input at all.
+ $('#btnAdd').style.display=(it.view||isDerived(cur))?'none':'';
  const v=$('#view');
  if(it.view){$('#sub').textContent='';VIEWS[cur](v);}
  else{$('#sub').textContent=ENT[cur].desc;renderEntity(v);}
+}
+
+/** Where a derived panel's figures come from, and who owns them. */
+function provenanceBanner(k){
+ if(!isDerived(k)) return '';
+ const [src,owner]=DERIVED[k];
+ return `<div class="banner" id="prov"><div class="bi">🔗</div><div><b>Del ERP.</b>`+
+  `<span>&nbsp;Estas filas se leen de <code>${esc(src)}</code>: se corrigen en <b>${esc(owner)}</b>, no aquí. `+
+  `Un dato que el ERP ya conoce no se teclea dos veces.</span></div></div>`;
 }
 
 /* ============ views ============ */
@@ -501,7 +635,9 @@ const VIEWS={
         <tr><td class="k">Net debt / EBITDA</td><td class="num">${k.ebitda?((k.netDebt)/(k.ebitda*12/7)).toFixed(2):'—'}×</td></tr>
        </tbody></table></div></div>
    </div>
-   <div class="banner"><div class="bi">🤖</div><div><b>Automation-ready.</b><span>&nbsp;These KPIs, statements and aging are derived, not typed — the same engine can push month-end alerts, covenant checks and cash-runway warnings. <b>Export</b> ships the full dataset as JSON.</span></div></div>`;
+   ${erp
+     ?`<div class="banner" id="fedBanner"><div class="bi">🔗</div><div><b>Conectado al ERP.</b><span>&nbsp;Cobros, pagos, bancos, IVA, plan de cuentas y el libro mensual se leen del ERP y se corrigen allí. Presupuestos, préstamos, saldos de apertura y drivers se introducen aquí, porque el ERP no los conoce.</span></div></div>`
+     :`<div class="banner" id="fedBanner"><div class="bi">⚠️</div><div><b>Sin datos del ERP.</b><span>&nbsp;Esta sesión no tiene estado del ERP cargado, así que las cifras que se ven son las de demostración de esta página.</span></div></div>`}`;
  },
  pnl(v){
   const p=P(),a=pnl(p.months,p.n,false),bud=pnl(p.months,p.n,true);
@@ -610,7 +746,7 @@ function cellVal(f,v){
 }
 function renderEntity(v){
  const e=ENT[cur],c=cols(e);
- v.innerHTML=`<div class="banner"><div class="bi">${e.icon}</div><div><b>${esc(e.label)}.</b><span>&nbsp;${esc(e.desc)} Editing any figure re-computes every statement and KPI instantly.</span></div></div>
+ v.innerHTML=(provenanceBanner(cur)||`<div class="banner"><div class="bi">${e.icon}</div><div><b>${esc(e.label)}.</b><span>&nbsp;${esc(e.desc)} Editing any figure re-computes every statement and KPI instantly.</span></div></div>`)+`
   <div class="toolbar"><label class="search"><span>🔎</span><input id="q" type="search" placeholder="Search…" autocomplete="off"></label><span class="count" id="count"></span></div>
   <div class="card rowedit"><div class="scroll"><table><thead><tr>${c.map(f=>`<th class="${['money','pct','num','date'].includes(f.type)?'num':''}">${esc(f.label)}</th>`).join('')}<th></th></tr></thead><tbody id="tbody"></tbody></table></div></div>`;
  $('#q').oninput=()=>drawRows();drawRows();
@@ -620,8 +756,15 @@ function drawRows(){
  const e=ENT[cur],c=cols(e),q=($('#q')?$('#q').value.trim():'');
  const rows=(DATA[cur]||[]).map((r,i)=>({r,i})).filter(x=>matches(x.r,q));
  const tb=$('#tbody');if(!tb)return;tb.innerHTML='';
- if(!rows.length){tb.innerHTML=`<tr><td colspan="${c.length+1}"><div class="empty"><b>No rows.</b> Click <b>Add</b> to create one.</div></td></tr>`;}
- rows.forEach(({r,i})=>{const tr=el('tr');tr.innerHTML=c.map(f=>`<td>${cellVal(f,r[f.k])}</td>`).join('')+'<td class="num" style="color:var(--faint)">✎</td>';tr.onclick=()=>openEditor(i);tb.appendChild(tr);});
+ if(!rows.length){tb.innerHTML=`<tr><td colspan="${c.length+1}"><div class="empty">${isDerived(cur)
+   ?'<b>Nada que mostrar.</b> El ERP todavía no tiene ningún dato para este panel.'
+   :'<b>No rows.</b> Click <b>Add</b> to create one.'}</div></td></tr>`;}
+  const ro=isDerived(cur);
+ rows.forEach(({r,i})=>{const tr=el('tr');
+   tr.innerHTML=c.map(f=>`<td>${cellVal(f,r[f.k])}</td>`).join('')
+     +`<td class="num" style="color:var(--faint)">${ro?'🔗':'✎'}</td>`;
+   if(!ro) tr.onclick=()=>openEditor(i);
+   tb.appendChild(tr);});
  if($('#count'))$('#count').textContent=`${rows.length} row${rows.length===1?'':'s'}`;
 }
 

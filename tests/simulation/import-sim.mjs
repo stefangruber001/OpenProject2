@@ -27,7 +27,7 @@ function freshErp() {
   const erp = new ERP("2026-05-05");
   erp.configureEntity({
     legalName: "Canei Subirats, S.L.",
-    taxId: "B66666666",
+    taxId: "B66666660",
     street: "Creu 74",
     postalCode: "08960",
     city: "SJD",
@@ -80,7 +80,7 @@ const legacy = {
       code: "C-002",
       legalName: "Cliente Inactivo S.L.",
       type: "B2B",
-      nif: "B66000000",
+      nif: "B66000001",
       status: "Inactive",
     },
   ],
@@ -95,10 +95,7 @@ assert(r1.ran === true, "first import runs");
 assert(r1.rows === 4, "saw every legacy row", r1.rows);
 assert(r1.imported === 2, "imported the two mappable rows", r1.imported);
 assert(r1.conflicts === 2, "flagged the two unmappable rows", r1.conflicts);
-assert(
-  JSON.stringify(legacy) === JSON.stringify(before),
-  "the legacy source is never mutated",
-);
+assert(JSON.stringify(legacy) === JSON.stringify(before), "the legacy source is never mutated");
 
 const roca = erp.state.parties.find((p) => p.name === "Familia Roca Puig");
 assert(!!roca, "the clean row became a party");
@@ -122,7 +119,9 @@ assert(
   "every conflict names its source",
 );
 assert(
-  erp.state.importConflicts.some((c) => c.reason === "rechazado" && /tax identifier/i.test(c.detail || "")),
+  erp.state.importConflicts.some(
+    (c) => c.reason === "rechazado" && /tax identifier/i.test(c.detail || ""),
+  ),
   "the engine's own rejection reason is preserved for the operator",
 );
 
@@ -132,8 +131,7 @@ assert(r2.ran === false, "a second import is a no-op");
 assert(erp.state.parties.length === 2, "no duplicate parties on re-run", erp.state.parties.length);
 assert(erp.state.importConflicts.length === 2, "conflicts are not re-appended");
 assert(
-  !!erp.state.imports["caneiMasterData"] &&
-    erp.state.imports["caneiMasterData"].imported === 2,
+  !!erp.state.imports["caneiMasterData"] && erp.state.imports["caneiMasterData"].imported === 2,
   "the import is recorded in state.imports",
 );
 
@@ -156,7 +154,10 @@ assert(
 {
   const e3 = freshErp();
   const r = Store.applyLegacyCustomers(e3, null);
-  assert(r.ran === true && r.imported === 0 && r.conflicts === 0, "absent legacy store imports nothing");
+  assert(
+    r.ran === true && r.imported === 0 && r.conflicts === 0,
+    "absent legacy store imports nothing",
+  );
   assert(e3.state.parties.length === 0, "and creates no parties");
 }
 

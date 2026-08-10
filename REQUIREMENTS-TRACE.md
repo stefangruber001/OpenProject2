@@ -80,34 +80,34 @@ BRD's own §11 phasing (justification given per item). MISSING: none remain.
 
 ## CHG
 
-| ID     | Status      | Evidence / justification                                                                                                                                |
-| ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CHG-01 | IMPLEMENTED | erp-engine.js addChange(): desc, reason, priceCents, costCents, scheduleImpactDays, status per change                                                   |
-| CHG-02 | PARTIAL     | addChange photoRef + priceChange() later (year-sim.mjs:550-555); erp.html has no site-capture form for extras, only approve                             |
-| CHG-03 | IMPLEMENTED | projectEconomics() adds approved change price/cost; baseline Object.freeze (PRJ); approveChange() creates contract annex CTR-…-An                       |
-| CHG-04 | IMPLEMENTED | issueInvoice throws 'Unapproved extra is not billable'; extrasRegister.unapprovedValueCents; Control Tower tile; sim negative test line 938             |
-| CHG-05 | PARTIAL     | extrasRegister() counts identified/priced/approved/invoiced + per-item status, but no code path ever sets 'executed' and register has no executed count |
-| CHG-06 | PARTIAL     | approveChange evidenceRef + photoRef + annexNumber on change record; no attachment slot for revised documents (single evidence ref only)                |
-| CHG-07 | PARTIAL     | projectDrawer shows base + approved extras = current revenue with values and value-weighted progressPct; completed scope not shown as a euro value      |
+| ID     | Status      | Evidence / justification                                                                                                                                                                  |
+| ------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CHG-01 | IMPLEMENTED | erp-engine.js addChange(): desc, reason, priceCents, costCents, scheduleImpactDays, status per change                                                                                     |
+| CHG-02 | PARTIAL     | addChange photoRef + priceChange() later (year-sim.mjs:550-555); erp.html has no site-capture form for extras, only approve                                                               |
+| CHG-03 | IMPLEMENTED | projectEconomics() adds approved change price/cost; baseline Object.freeze (PRJ); approveChange() creates contract annex CTR-…-An                                                         |
+| CHG-04 | IMPLEMENTED | issueInvoice throws 'Unapproved extra is not billable'; extrasRegister.unapprovedValueCents; Control Tower tile; PRY-03 marks every unapproved row with a pill AND a 3 px amber rule (S9) |
+| CHG-05 | PARTIAL     | changeStageSummary() counts and totals the doc's five stages incl. executed (S9); no code path ever sets 'executed', so that counter is structurally present and always zero              |
+| CHG-06 | PARTIAL     | approveChange evidenceRef + photoRef + annexNumber on change record; no attachment slot for revised documents (single evidence ref only)                                                  |
+| CHG-07 | PARTIAL     | projectDrawer shows base + approved extras = current revenue with values and value-weighted progressPct; completed scope not shown as a euro value                                        |
 
 ## CON
 
-| ID     | Status      | Evidence / justification                                                                                                                                                                        |
-| ------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CON-01 | PARTIAL     | createContract requires acceptedVersionId, pulls totals from it, single entity config; but no contract DOCUMENT render carrying logo/fiscal data (only budget doc)                              |
-| CON-02 | IMPLEMENTED | createContract: nextNumber('contract'), partyId/propertyId/budgetNumber/acceptedVersionId links, scopeAnnexRef from accepted version                                                            |
-| CON-03 | IMPLEMENTED | createContract holds value/vat/total, installments, initiation, duration, penalties, guarantees, language, signature as data; contractControlView reports across all                            |
-| CON-04 | IMPLEMENTED | installments {pct\|amount,trigger,expectedDate}, auto amounts+rounding, status planned→invoiced (issueInvoice), feed cashForecast, backOfficeDay & overdue alerts; sim test 20                  |
-| CON-05 | PARTIAL     | initiation{scheduleWithinDays,startWithinDays}; recordFirstPayment derives committedStartDate; at-risk alert. But calendar days (addDays), not working days; scheduleWithinDays never monitored |
-| CON-06 | IMPLEMENTED | createContract throws if !duration.estimatedDays; planned/actual start/finish + deviationReason fields; startWorks/closeProject set actuals                                                     |
-| CON-07 | IMPLEMENTED | penalties{latePaymentInterestPctYear, delayPenaltyCentsPerWeek, capCents, graceDays, suspendingEvents} — all stated elements structured (erp-engine.js ~1045)                                   |
-| CON-08 | IMPLEMENTED | guarantees per category (3 categories in LISTS); closeProject dates start/expiry; alerts() warns expiry ≤30d; sim test 21 asserts warranty register dated                                       |
-| CON-09 | PARTIAL     | clauseBlocks with effectiveFrom/version snapshot on contract (ids only); but no add/edit function or UI, filter takes ALL effective blocks not latest, wording not frozen                       |
-| CON-10 | PARTIAL     | contract.language carried from budget (CON-10 tag, line 1056); no Catalan legal wording exists anywhere in the build                                                                            |
-| CON-11 | IMPLEMENTED | signContract stores both signature dates+method; startWorks throws if unsigned; issueInvoice blocks first invoice unsigned; alert 'obra iniciada sin contrato firmado'                          |
-| CON-12 | IMPLEMENTED | approveChange creates annex CTR-…-A{n} on contract.annexes referencing changeId/value/date; projectEconomics chains baseline→current value                                                      |
-| CON-13 | PARTIAL     | 6 statuses + contractControlView has all 8 attributes, but erp.html contratos table omits the penalties and language columns from the business view                                             |
-| CON-14 | PARTIAL     | terms are data (clauseBlocks, defaults) and issued contracts snapshot clause ids; but no business-facing maintenance UI/function — blocks only seedable in code (erp-seed.js:27)                |
+| ID     | Status      | Evidence / justification                                                                                                                                                                                                                    |
+| ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CON-01 | PARTIAL     | createContract requires acceptedVersionId, pulls totals from it, single entity config; but no contract DOCUMENT render carrying logo/fiscal data (only budget doc)                                                                          |
+| CON-02 | IMPLEMENTED | createContract: nextNumber('contract'), partyId/propertyId/budgetNumber/acceptedVersionId links, scopeAnnexRef from accepted version                                                                                                        |
+| CON-03 | IMPLEMENTED | createContract holds value/vat/total, installments, initiation, duration, penalties, guarantees, language, signature as data; contractControlView reports across all                                                                        |
+| CON-04 | IMPLEMENTED | installments {pct\|amount,trigger,expectedDate}, auto amounts+rounding, status planned→invoiced (issueInvoice), feed cashForecast; since S8 setInstallmentDates moves a planned non-fixed date to follow the plan, with its source recorded |
+| CON-05 | PARTIAL     | initiation{scheduleWithinDays,startWithinDays}; recordFirstPayment derives committedStartDate; at-risk alert. But calendar days (addDays), not working days; scheduleWithinDays never monitored                                             |
+| CON-06 | IMPLEMENTED | createContract throws if !duration.estimatedDays; planned/actual start/finish + deviationReason fields; startWorks/closeProject set actuals                                                                                                 |
+| CON-07 | IMPLEMENTED | penalties{latePaymentInterestPctYear, delayPenaltyCentsPerWeek, capCents, graceDays, suspendingEvents} — all stated elements structured (erp-engine.js ~1045)                                                                               |
+| CON-08 | IMPLEMENTED | guarantees per category (3 categories in LISTS); closeProject dates start/expiry; alerts() warns expiry ≤30d; sim test 21 asserts warranty register dated                                                                                   |
+| CON-09 | PARTIAL     | clauseBlocks with effectiveFrom/version snapshot on contract (ids only); but no add/edit function or UI, filter takes ALL effective blocks not latest, wording not frozen                                                                   |
+| CON-10 | PARTIAL     | contract.language carried from budget (CON-10 tag, line 1056); no Catalan legal wording exists anywhere in the build                                                                                                                        |
+| CON-11 | IMPLEMENTED | signContract stores both signature dates+method; startWorks throws if unsigned; issueInvoice blocks first invoice unsigned; alert 'obra iniciada sin contrato firmado'                                                                      |
+| CON-12 | IMPLEMENTED | approveChange creates annex CTR-…-A{n} on contract.annexes referencing changeId/value/date; projectEconomics chains baseline→current value                                                                                                  |
+| CON-13 | IMPLEMENTED | contractsView() + COM-04: two tabs, original vs current amount (amber when annexes exist), annex count, signature and status; the full-screen viewer carries penalties, guarantees and language on its Datos tab and in the document (S9)   |
+| CON-14 | PARTIAL     | terms are data (clauseBlocks, defaults) and issued contracts snapshot clause ids; but no business-facing maintenance UI/function — blocks only seedable in code (erp-seed.js:27)                                                            |
 
 ## CRM
 
@@ -139,8 +139,8 @@ BRD's own §11 phasing (justification given per item). MISSING: none remain.
 | ID     | Status      | Evidence / justification                                                                                                                                                                                       |
 | ------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | DOC-01 | PARTIAL     | renderBudgetDoc() issuer block with logoRef+fiscal data (shown in budgetDrawer); no rendered invoice/receipt/contract doc with logo                                                                            |
-| DOC-02 | PARTIAL     | captured docs allocate to project/overhead, capId on bills, partyHistory(); no cross-retrieval from property/contract/payment                                                                                  |
-| DOC-03 | PARTIAL     | docTypes list + imageRef/photos/handwrittenEstimateRef modeled, but all are string refs — no actual file upload/storage of PDFs/scans                                                                          |
+| DOC-02 | PARTIAL     | ADM-03 allocates a captured doc to obra(s) and/or overhead from a 480 panel; sourcePath/reference/notes searchable; capId on bills, partyHistory(); no cross-retrieval from property/contract/payment          |
+| DOC-03 | IMPLEMENTED | imageRef is a real blob key since S6 (ErpStore.putBlob); ADM-03 renders the picture as an inbox thumbnail and ADM-02 renders the linked PDF/image at 620 with zoom                                             |
 | DOC-04 | IMPLEMENTED | confirmCapture() builds stdName; _docName() standardizes issued-doc names; original imageRef kept unaltered                                                                                                    |
 | DOC-05 | IMPLEMENTED | newVersion() marks prev.superseded/frozen, currentVersionId/acceptedVersionId identify latest; versions never deleted                                                                                          |
 | DOC-06 | PARTIAL     | acceptVersion customerResponse{date,evidenceRef}, v.sent{date,channel}, approveChange approvedAt; channel+responsible person not on decision record                                                            |
@@ -149,17 +149,17 @@ BRD's own §11 phasing (justification given per item). MISSING: none remain.
 
 ## FIN
 
-| ID     | Status      | Evidence / justification                                                                                                                      |
-| ------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| FIN-01 | IMPLEMENTED | erp-engine.js projectEconomics(): baselineRevenueCents, approvedChangesCents, currentRevenueCents; final at closeProject()                    |
-| FIN-02 | PARTIAL     | projectEconomics(): baseline/committed/actual/forecast cost; no per-project PAID cost figure; selected-supplier cost only per line            |
-| FIN-03 | PARTIAL     | projectEconomics + budgetTotals give amount+% at project level; chapterEconomics has cost only — no chapter forecast/final margin %           |
-| FIN-04 | PARTIAL     | unallocatedSummary() quantifies bills/movements/labour in cents; captures count-only, purchases and machinery not identified                  |
-| FIN-05 | IMPLEMENTED | alerts(): chapter overruns, negative/low margin, extras with cost; validateBudget blocks negative-margin chapters; pendingEstCents quantifies |
-| FIN-06 | PARTIAL     | cashForecast(weeks) + erp.html banco 6-week table; no by-month view, committed purchase orders not in outflows                                |
-| FIN-07 | IMPLEMENTED | overheadCents() + overheadCategories, bill/movement overhead classes kept out of actualCostCents; overhead never charged to projects          |
-| FIN-08 | PARTIAL     | profitability('customer'\|'activityLine') + revenue perM2Cents; no supplier/period grouping, no cost/margin per m2                            |
-| FIN-09 | IMPLEMENTED | erp-engine.js receivablesSpecial() — retentions/guarantees split out of standard receivables                                                  |
+| ID     | Status      | Evidence / justification                                                                                                                                                               |
+| ------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FIN-01 | IMPLEMENTED | erp-engine.js projectEconomics(): baselineRevenueCents, approvedChangesCents, currentRevenueCents; final at closeProject()                                                             |
+| FIN-02 | PARTIAL     | projectEconomics(): baseline/committed/actual/forecast cost; no per-project PAID cost figure; selected-supplier cost only per line                                                     |
+| FIN-03 | PARTIAL     | projectEconomics + budgetTotals give amount+% at project level; chapterEconomics has cost only — no chapter forecast/final margin %                                                    |
+| FIN-04 | PARTIAL     | unallocatedSummary() quantifies bills/movements/labour; unassignedChapterCosts() itemises cost that reached a project with no chapter (PRY-02); purchases and machinery not identified |
+| FIN-05 | IMPLEMENTED | alerts(): chapter overruns, negative/low margin, extras with cost; validateBudget blocks negative-margin chapters; pendingEstCents quantifies                                          |
+| FIN-06 | PARTIAL     | cashForecast(weeks) + erp.html banco 6-week table; no by-month view, committed purchase orders not in outflows                                                                         |
+| FIN-07 | IMPLEMENTED | overheadCents() + overheadCategories, bill/movement overhead classes kept out of actualCostCents; overhead never charged to projects                                                   |
+| FIN-08 | PARTIAL     | profitability('customer'\|'activityLine') + revenue perM2Cents; no supplier/period grouping, no cost/margin per m2                                                                     |
+| FIN-09 | IMPLEMENTED | erp-engine.js receivablesSpecial() — retentions/guarantees split out of standard receivables                                                                                           |
 
 ## GES
 
@@ -229,7 +229,7 @@ BRD's own §11 phasing (justification given per item). MISSING: none remain.
 | NFR-15 | PLANNED     | BRD §11: offline-first sync deferred; IndexedDB persistence covers offline reads today. No compression/retention handling; photos are string refs only — real file storage management needs infrastructure this build lacks |
 | NFR-16 | PARTIAL     | Data-driven engine scales in design, but single JSON blob in IndexedDB with full recompute per render limits years of history                                                                                               |
 | NFR-17 | PARTIAL     | master-data.html edits catalogue, series, VAT codes, price lists, templates — but on a separate dataset not wired to the ERP engine; no clause-block UI                                                                     |
-| NFR-18 | PARTIAL     | GDPR consent flags (clientes.html/master-data.html), deactivateParty (MDM-12), export; no retention policy or data-subject request workflow                                                                                 |
+| NFR-18 | PARTIAL     | GDPR consent flags (master-data.html; clientes.html retired into erp.html#clientes), deactivateParty (MDM-12), export; no retention policy or data-subject request workflow                                                 |
 | NFR-19 | IMPLEMENTED | Recurring vs build cost statement documented in REQUIREMENTS-TRACE.md §Cost of ownership                                                                                                                                    |
 
 ## ORG
@@ -305,18 +305,18 @@ BRD's own §11 phasing (justification given per item). MISSING: none remain.
 
 ## PUR
 
-| ID     | Status      | Evidence / justification                                                                                                                               |
-| ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| PUR-01 | PARTIAL     | addPurchase() covers needs arising in execution; no derivation of material/subcontract requirements from project scope                                 |
-| PUR-02 | IMPLEMENTED | addPurchase(): supplierId, projectId, date, desc, qtyMilli, unitCents, vatBp, totalCents, chapterNum link                                              |
-| PUR-03 | PARTIAL     | purchase.status{ordered,delivered,returnedCents,invoicedBillId,paid}; 'requested'/'credited' absent, no setter ever flips delivered/paid               |
-| PUR-04 | IMPLEMENTED | purchase.orderRef; registerBill matches by orderRef→invoicedBillId; matchMovement links bank/card movement to the bill                                 |
-| PUR-05 | PARTIAL     | purchase.docRefs field only (never used); captured delivery notes/receipts attach to bills via capId, not to purchases; no attach UI                   |
-| PUR-06 | IMPLEMENTED | committedCostCents()+actualCostCents() move with real prices while frozen project.baseline stays intact; proven in year-sim                            |
-| PUR-07 | PARTIAL     | multi-project/overhead splits with sum check on registerBill/allocateCapture/splitMovement; bill allocations irreversible, purchase.allocations unused |
-| PUR-08 | PARTIAL     | engine: minimal addPurchase with urgent flag + ticket captureDocument then reconcile; no quick site-entry UI exists                                    |
-| PUR-09 | IMPLEMENTED | recordReturn() nets committedCostCents; creditNoteFor bills subtract in actualCostCents/chapterEconomics and stay linked to the original               |
-| PUR-10 | PARTIAL     | alerts() warns chapter actual>budget and low margin via forecast(committed); no committed-vs-budget warning per item/chapter/supplier package          |
+| ID     | Status      | Evidence / justification                                                                                                                                            |
+| ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PUR-01 | PARTIAL     | addPurchase() covers needs arising in execution; no derivation of material/subcontract requirements from project scope                                              |
+| PUR-02 | IMPLEMENTED | addPurchase(): supplierId, projectId, date, desc, qtyMilli, unitCents, vatBp, totalCents, chapterNum link                                                           |
+| PUR-03 | PARTIAL     | purchase.status{ordered,delivered,returnedCents,invoicedBillId,paid}; 'requested'/'credited' absent, no setter ever flips delivered/paid                            |
+| PUR-04 | IMPLEMENTED | purchase.orderRef; registerBill matches by orderRef→invoicedBillId; matchMovement links bank/card movement to the bill                                              |
+| PUR-05 | IMPLEMENTED | attachPurchaseDocument()/detachPurchaseDocument() write purchase.docRefs; ADM-02 shows the linked captured document at 620 with zoom beside the record              |
+| PUR-06 | IMPLEMENTED | committedCostCents()+actualCostCents() move with real prices while frozen project.baseline stays intact; proven in year-sim                                         |
+| PUR-07 | PARTIAL     | multi-project/overhead splits on registerBill/allocateCapture/splitMovement, and PRY-02's assignChapterSplit finally writes chapterNum; purchase.allocations unused |
+| PUR-08 | PARTIAL     | engine: minimal addPurchase with urgent flag + ticket captureDocument then reconcile; no quick site-entry UI exists                                                 |
+| PUR-09 | IMPLEMENTED | recordReturn() nets committedCostCents; creditNoteFor bills subtract in actualCostCents/chapterEconomics and stay linked to the original                            |
+| PUR-10 | PARTIAL     | alerts() warns chapter actual>budget and low margin via forecast(committed); no committed-vs-budget warning per item/chapter/supplier package                       |
 
 ## QUO
 

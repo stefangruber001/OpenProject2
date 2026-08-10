@@ -41,6 +41,7 @@
   var rates = available && F.createRates ? F.createRates() : null;
   var recon = available && F.createReconciliation ? F.createReconciliation() : null;
   var comms = available && F.createComms ? F.createComms() : null;
+  var extraction = available && F.createExtraction ? F.createExtraction() : null;
 
   /* ------------------------------------------------------------------ *
    * Projections: engine state -> capability values
@@ -404,12 +405,39 @@
    * Call surface
    * ------------------------------------------------------------------ */
 
-  return {
+  var api = {
     /** False when the bundle failed to load; callers must degrade, not throw. */
     available: available,
 
     /** Surface version of the bundle, or null. Lets callers detect a stale artifact. */
     surfaceVersion: available ? F.SURFACE_VERSION : null,
+
+    /* ---------------------------------------------------------------- *
+     * Document capture — the INTERPRETATION half.
+     *
+     * `site/erp-ocr.js` turns a file into text; this turns that text into
+     * candidate fields with a dot each. The split is deliberate: recognition
+     * is 7 MB of browser infrastructure with no business meaning, and meaning
+     * is domain code that must stay testable without a browser at all.
+     *
+     * Null when the bundle is missing, like every other surface here — a
+     * capture screen must be able to say "manual entry only" rather than
+     * throw.
+     * ---------------------------------------------------------------- */
+    extraction: extraction && {
+      /** Recognised text in; fields, dots, provenance and checks out. */
+      read: function (text, assumeIssueDate) {
+        return extraction.read(text, assumeIssueDate);
+      },
+      /** Re-check after a person edits a value. Typed values are checked too. */
+      recheck: function (result, corrections) {
+        return extraction.recheck(result, corrections);
+      },
+      /** Which jurisdiction profile is bound. */
+      profile: function () {
+        return extraction.profile();
+      },
+    },
 
     scheduling: {
       /**
@@ -462,6 +490,68 @@
         } catch (e) {
           return [];
         }
+      },
+
+      /**
+       * What each payment milestone's expected date WOULD be if it followed
+       * the plan — money-chain item 14, the half that has to read a schedule.
+       *
+       * The mapping from a trigger to a date is the whole content:
+       *
+       *   atWorksStart  the plan's earliest planned start
+       *   atStage       the end of the task the milestone names in `stageRef`
+       *   onCompletion  the plan's finish
+       *   onSignature   nothing — it is an event, not a date on a chart
+       *   fixedDate     nothing — the engine refuses to move it anyway
+       *
+       * Returns a plain {idx: "YYYY-MM-DD"} map and writes nothing. Deciding
+       * which of these may be applied belongs to `setInstallmentDates`, so a
+       * proposal computed here can be shown to a person before it lands.
+       */
+      installmentDatesFromPlan: function (erp, projectId) {
+        var out = {};
+        try {
+          if (!scheduling) return out;
+          var project = erp.project(projectId);
+          if (!project.contractId) return out;
+          var contract = erp.state.contracts.find(function (c) {
+            return c.id === project.contractId;
+          });
+          if (!contract) return out;
+          // `api` rather than the ErpBridge global: this file is also
+          // require()d in Node, where that global does not exist and the
+          // ReferenceError would be swallowed by the catch below — a method
+          // that silently returns nothing is worse than one that throws.
+          var plan = api.scheduling.plans.get(erp.state, projectId);
+          if (!plan || !plan.tasks || !plan.tasks.length) return out;
+          var sch = api.scheduling.plans.schedule(plan);
+          if (!sch) return out;
+          var byId = {};
+          (sch.tasks || plan.tasks).forEach(function (t) {
+            byId[t.id] = t;
+          });
+          var starts = plan.tasks
+            .map(function (t) {
+              return (byId[t.id] && byId[t.id].plannedStart) || t.plannedStart;
+            })
+            .filter(Boolean)
+            .sort();
+          var start = starts[0] || null;
+          contract.installments.forEach(function (i, idx) {
+            if (i.trigger === "atWorksStart" && start) out[idx] = start;
+            else if (i.trigger === "onCompletion" && sch.finish) out[idx] = sch.finish;
+            else if (i.trigger === "atStage" && i.stageRef) {
+              var t = plan.tasks.find(function (x) {
+                return x.id === i.stageRef || x.sourceRef === i.stageRef;
+              });
+              var end = t && ((byId[t.id] && byId[t.id].plannedEnd) || t.plannedEnd);
+              if (end) out[idx] = end;
+            }
+          });
+        } catch (e) {
+          return out;
+        }
+        return out;
       },
 
       /* ---------------------------------------------------------------- *
@@ -787,4 +877,6 @@
       projectValue: projectValue,
     },
   };
+
+  return api;
 });

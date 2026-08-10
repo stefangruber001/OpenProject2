@@ -1,4 +1,4 @@
-/* Canei Subirats — bilingual layer (ES ⇄ EN).
+/* Canei Subirats — trilingual layer (ES · CA · EN).
  *
  * Every page declares its base language in <html lang="…">. The visitor's
  * choice is stored in localStorage ("caneiLang", default "es").
@@ -15,11 +15,25 @@
  *   - a MutationObserver keeps dynamically rendered content translated
  *   - window.CANEI_I18N.translateNode(root) lets generated documents
  *     (print windows, previews) opt in with one call
- * A floating ES | EN toggle is injected on every page.
+ * A floating ES | CA | EN toggle is injected on every page.
+ *
+ * WHY SPANISH IS THE HUB (S3, decision 20). The dictionary is a set of
+ * TRIPLES keyed on the Spanish string: `pairs` carries [es, en] and `ca`
+ * carries es → ca. Any direction is then one lookup — including EN → CA,
+ * which is the pairing that has no dictionary of its own and would otherwise
+ * have to translate twice, through Spanish, and lose everything the first
+ * hop failed to match. Spanish is the language the application is written
+ * in, so it is the only key every string is guaranteed to have.
+ *
+ * A missing Catalan entry falls back to Spanish rather than to the raw key.
+ * That is a deliberate degradation and not a licence: `tests/i18n/coverage.mjs`
+ * fails the build on a string that has no Catalan, precisely because a silent
+ * fallback is invisible to the person who introduced it.
  */
 (function () {
   "use strict";
 
+  var LANGS = ["es", "ca", "en"];
   var LS_KEY = "caneiLang";
   var target = "es";
   try {
@@ -27,26 +41,45 @@
   } catch (e) {
     /* storage unavailable → stay on base */
   }
-  if (target !== "es" && target !== "en") target = "es";
+  if (LANGS.indexOf(target) < 0) target = "es";
 
   var base = (document.documentElement.getAttribute("lang") || "en").slice(0, 2);
+  if (LANGS.indexOf(base) < 0) base = "en";
   var active = target !== base; // do we need to translate this page?
 
   /* ---------- dictionary ---------- */
   var D = (typeof window !== "undefined" && window.CANEI_DICT) || {
     pairs: [],
+    ca: {},
     rxEs2En: [],
     rxEn2Es: [],
+    rxEs2Ca: [],
   };
+  var CA = D.ca || {};
   var map = new Map();
   var rx = [];
   if (active) {
+    // One pass over the triples, building a direct base → target map. The
+    // Spanish form of each entry is the join key; `pairs` supplies English
+    // and `ca` supplies Catalan, each falling back to Spanish when absent so
+    // a partial entry degrades to a readable interface rather than a blank.
     for (var i = 0; i < D.pairs.length; i++) {
-      var p = D.pairs[i];
-      if (target === "en") map.set(p[0], p[1]);
-      else map.set(p[1], p[0]);
+      var es = D.pairs[i][0];
+      var forms = { es: es, en: D.pairs[i][1] || es, ca: CA[es] || es };
+      var from = forms[base];
+      var to = forms[target];
+      // Never map a string onto itself, and never let a language that has no
+      // entry of its own overwrite a real one already in the map.
+      if (from && to && from !== to && !map.has(from)) map.set(from, to);
     }
-    rx = target === "en" ? D.rxEs2En || [] : D.rxEn2Es || [];
+    rx =
+      base === "es"
+        ? target === "en"
+          ? D.rxEs2En || []
+          : D.rxEs2Ca || []
+        : target === "es"
+          ? D.rxEn2Es || []
+          : []; // EN → CA has no interpolation rules of its own; exact matches only
   }
 
   function tr(text) {
@@ -81,6 +114,22 @@
   var ATTRS = ["placeholder", "title", "aria-label", "alt"];
   var SKIP = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, CODE: 1, PRE: 0 };
 
+  /**
+   * `translate="no"` — the standard HTML opt-out, honoured for the subtree.
+   *
+   * It exists here for one specific and important case: a document addressed
+   * to somebody else. A presupuesto is written in the CUSTOMER's language,
+   * which is a field on the record; the toggle is the OPERATOR's language,
+   * which is a preference of whoever happens to be at the screen. Without
+   * this, a Spanish back-office user reading their interface in English would
+   * see — and print — an English presupuesto for a Catalan customer. Marking
+   * the document keeps the two ideas apart.
+   */
+  function noTranslate(node) {
+    var el = node.nodeType === 1 ? node : node.parentNode;
+    return !!(el && el.closest && el.closest('[translate="no"]'));
+  }
+
   function translateNode(root) {
     if (!active || !root) return;
     var doc = root.ownerDocument || root;
@@ -89,6 +138,7 @@
     while ((n = walker.nextNode())) {
       var pn = n.parentNode && n.parentNode.nodeName;
       if (pn && SKIP[pn]) continue;
+      if (noTranslate(n)) continue;
       var out = tr(n.nodeValue);
       if (out !== null) n.nodeValue = out;
     }
@@ -101,6 +151,7 @@
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
       if (SKIP[el.nodeName]) continue;
+      if (noTranslate(el)) continue;
       for (var a = 0; a < ATTRS.length; a++) {
         var v = el.getAttribute && el.getAttribute(ATTRS[a]);
         if (v) {
@@ -150,13 +201,16 @@
           for (var i = 0; i < muts.length; i++) {
             var m = muts[i];
             if (m.type === "characterData") {
+              if (noTranslate(m.target)) continue;
               var out = tr(m.target.nodeValue);
               if (out !== null) m.target.nodeValue = out;
             } else if (m.type === "attributes") {
+              if (noTranslate(m.target)) continue;
               translateAttr(m.target, m.attributeName);
             } else {
               for (var j = 0; j < m.addedNodes.length; j++) {
                 var node = m.addedNodes[j];
+                if (noTranslate(node)) continue;
                 if (node.nodeType === 3) {
                   var o = tr(node.nodeValue);
                   if (o !== null) node.nodeValue = o;
@@ -198,8 +252,8 @@
     var pill = document.createElement("div");
     pill.id = "canei-lang-pill";
     pill.setAttribute("role", "group");
-    pill.setAttribute("aria-label", "Idioma / Language");
-    ["es", "en"].forEach(function (lang) {
+    pill.setAttribute("aria-label", "Idioma / Idioma / Language");
+    LANGS.forEach(function (lang) {
       var b = document.createElement("button");
       b.type = "button";
       b.textContent = lang.toUpperCase();

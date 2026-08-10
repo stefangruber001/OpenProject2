@@ -66,6 +66,21 @@ interface Payload {
   exp: number;
   /** Absent in tokens minted before roles existed — read as "staff". */
   role?: SessionRole;
+  /**
+   * When this token was issued, seconds since the epoch.
+   *
+   * This is what makes disabling somebody mean anything. There is no session
+   * table to delete a row from, so each user carries a `sessionsValidFrom`
+   * stamp instead and a token issued before it is refused. Moving that stamp
+   * forward ends one person's sessions everywhere; rotating SESSION_SECRET,
+   * the only lever that existed before, ends everybody's.
+   *
+   * Absent in tokens minted before this existed. Those read as issued at 0,
+   * which means the first time anybody is disabled or resets a password, the
+   * pre-existing tokens for THAT PERSON stop working — correct, and the safe
+   * direction to be wrong in.
+   */
+  iat?: number;
 }
 
 export interface SessionClaims {
@@ -73,6 +88,8 @@ export interface SessionClaims {
   role: SessionRole;
   /** Unix seconds. Exposed so a caller can renew a session before it lapses. */
   exp: number;
+  /** Unix seconds. 0 for a token minted before issue times were recorded. */
+  iat: number;
 }
 
 const enc = new TextEncoder();
@@ -112,7 +129,7 @@ export async function signSession(
   nowSeconds: number,
   role: SessionRole = "staff",
 ): Promise<string> {
-  const payload: Payload = { sub: email, exp: nowSeconds + ttlFor(role), role };
+  const payload: Payload = { sub: email, exp: nowSeconds + ttlFor(role), role, iat: nowSeconds };
   const body = b64url(enc.encode(JSON.stringify(payload)));
   const sig = await crypto.subtle.sign("HMAC", await key(secret), enc.encode(body));
   return `${body}.${b64url(new Uint8Array(sig))}`;
@@ -158,7 +175,8 @@ export async function readSession(
   // value nobody wrote is how a typo becomes an authorisation decision.
   const role = payload.role === undefined ? "staff" : payload.role;
   if (role !== "staff" && role !== "shared") return null;
-  return { sub: payload.sub, role, exp: payload.exp };
+  const iat = typeof payload.iat === "number" && payload.iat >= 0 ? payload.iat : 0;
+  return { sub: payload.sub, role, exp: payload.exp, iat };
 }
 
 /**

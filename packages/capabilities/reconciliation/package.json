@@ -1,0 +1,28 @@
+{
+  "name": "@repo/capability-reconciliation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "Generic bank-reconciliation capability: scores candidate documents against a bank movement by amount, date and reference, proposes combinations for partial reconciliation, and spots internal transfers. Knows nothing about invoices, projects, jurisdictions or sectors — only amounts, dates and text.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@repo/kernel": "workspace:*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2",
+    "vitest": "^3.0.5"
+  }
+}
