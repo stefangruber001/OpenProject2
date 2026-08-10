@@ -76,6 +76,7 @@ async function main() {
     await testProjectTracking(browser, base);
     await testInvoicing(browser, base);
     await testCashFlow(browser, base);
+    await testFinancials(browser, base);
     await testBankAndCash(browser, base);
     await testContract(browser, base);
     await testProcurement(browser, base);
@@ -188,6 +189,7 @@ async function openGantt(pg, base) {
     await pg.waitForTimeout(500);
   } else if ((await pg.locator("#prgQ").count()) === 0) {
     await pg.goto(`${base}/erp.html#progress`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
     await pg.waitForTimeout(700);
   }
   if (await pg.locator("#view [data-ctrclose]").count()) {
@@ -448,6 +450,7 @@ async function testNoOverflow(browser, base) {
   // which is what it did before.
   try {
     await page.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
+    await bootedShell(page);
     await page.waitForTimeout(700);
     const bar = await page.evaluate(() => {
       const items = [...document.querySelectorAll("#p1 .secitem")];
@@ -1073,6 +1076,7 @@ async function testCapture(browser, base) {
   attachConsole(pg, errs);
   try {
     await pg.goto(`${base}/erp.html#supplier-invoices`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
     await pg.waitForTimeout(900);
 
     const wired = await pg.evaluate(() => ({
@@ -1398,6 +1402,7 @@ async function testPresupuestador(browser, base) {
   });
   try {
     await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
     await pg.waitForTimeout(900);
 
     // ---- the register, grouped by the five stages -------------------------
@@ -1701,6 +1706,7 @@ async function testProjectTracking(browser, base) {
   attachConsole(pg, errs);
   try {
     await pg.goto(`${base}/erp.html#progress`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
     await pg.waitForTimeout(900);
 
     // ---- the persistent selector and its fixed header ----
@@ -2220,6 +2226,107 @@ async function testBankAndCash(browser, base) {
 
 // ── ADM-01 Facturación (§3.2) — four counters over the register, and the one
 //    row treatment the doc is explicit about: days overdue red FROM DAY ONE.
+async function testFinancials(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    // ADM-09 lives on its own page, so the ERP state has to exist before it is
+    // opened — which is the whole point of the session: the two now read the
+    // same document instead of two datasets that could disagree.
+    await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(1500);
+    const truth = await pg.evaluate(() => ({
+      ar: erp.invoiceRegister().filter((r) => r.outstandingCents > 0).length,
+      arCents: erp
+        .invoiceRegister()
+        .filter((r) => r.outstandingCents > 0)
+        .reduce((s, r) => s + r.outstandingCents, 0),
+      ap: erp.payables().filter((b) => b.outstandingCents > 0).length,
+      accounts: erp.listAll("accounts").length,
+      banks: erp.state.bankAccounts.length,
+      today: erp.today,
+    }));
+
+    await pg.goto(`${base}/financial-data.html`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(1800);
+    const fed = await pg.evaluate(() => ({
+      connected: !!erp,
+      banner: (document.querySelector("#fedBanner") || {}).innerText || "",
+      ar: (DATA.arOpen || []).length,
+      arCents: Math.round((DATA.arOpen || []).reduce((s, r) => s + r.amount, 0) * 100),
+      ap: (DATA.apOpen || []).length,
+      accounts: (DATA.accounts || []).length,
+      banks: (DATA.bank || []).length,
+      asOf: AS_OF,
+      groups: [...document.querySelectorAll("#nav .grp")].map((x) => x.textContent),
+    }));
+
+    if (fed.connected && /Conectado al ERP/.test(fed.banner))
+      ok("ADM-09: the financial page reads the ERP's own state");
+    else bad("ADM-09: connected", JSON.stringify(fed).slice(0, 200));
+
+    // The figure that used to be typed twice, asserted to the cent.
+    if (fed.ar === truth.ar && fed.arCents === truth.arCents && fed.ap === truth.ap)
+      ok(`ADM-09: receivables and payables agree with ADM-01 to the cent (${fed.ar}/${fed.ap})`);
+    else bad("ADM-09: AR/AP agree", JSON.stringify({ truth, fed }).slice(0, 220));
+
+    if (fed.accounts === truth.accounts && fed.banks === truth.banks)
+      ok("ADM-09: the chart of accounts and the bank list come from the ERP too");
+    else bad("ADM-09: chart and banks", JSON.stringify({ truth, fed }).slice(0, 200));
+
+    // Aging measured against the ERP's today, not the browser's clock.
+    if (fed.asOf === truth.today)
+      ok("ADM-09: aging is valued on the ERP's date, not the browser's");
+    else bad("ADM-09: valuation date", `${fed.asOf} vs ${truth.today}`);
+
+    // §3.2's four groups, by their names in the document.
+    if (
+      JSON.stringify(fed.groups) ===
+      JSON.stringify(["Resumen", "Estados financieros", "Capital circulante", "Libros"])
+    )
+      ok("ADM-09: the four groups the document names");
+    else bad("ADM-09: nav groups", JSON.stringify(fed.groups));
+
+    // A derived ledger cannot be edited here: the row would be overwritten on
+    // the next read, and an input that silently does nothing is worse than none.
+    const ro = await pg.evaluate(() => {
+      cur = "arOpen";
+      render();
+      return {
+        prov: !!document.querySelector("#prov"),
+        add: document.querySelector("#btnAdd").style.display,
+        clickable:
+          !!document.querySelector("#tbody tr") && !!document.querySelector("#tbody tr").onclick,
+      };
+    });
+    if (ro.prov && ro.add === "none" && !ro.clickable)
+      ok("ADM-09: a derived ledger says where it comes from and refuses to be typed over");
+    else bad("ADM-09: derived read-only", JSON.stringify(ro));
+
+    // …while the ones the ERP genuinely does not hold stay editable.
+    const rw = await pg.evaluate(() => {
+      cur = "loans";
+      render();
+      return {
+        prov: !!document.querySelector("#prov"),
+        add: document.querySelector("#btnAdd").style.display,
+      };
+    });
+    if (!rw.prov && rw.add !== "none")
+      ok("ADM-09: loans, budgets and drivers are still inputs — the ERP does not know them");
+    else bad("ADM-09: inputs still editable", JSON.stringify(rw));
+
+    if (errs.length === 0) ok("ADM-09: no console errors");
+    else bad("ADM-09: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("ADM-09 datos financieros", String(e).slice(0, 220));
+  } finally {
+    await pg.close();
+  }
+}
+
 async function testCashFlow(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
   const errs = [];
@@ -2335,6 +2442,7 @@ async function testInvoicing(browser, base) {
   attachConsole(pg, errs);
   try {
     await pg.goto(`${base}/erp.html#invoicing`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
     await pg.waitForTimeout(800);
 
     const strip = await pg.evaluate(() => {
@@ -2463,6 +2571,7 @@ async function testContract(browser, base) {
   attachConsole(pg, errs);
   try {
     await pg.goto(`${base}/erp.html#contracts`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
     await pg.waitForTimeout(800);
 
     const tabs = await pg.locator("#view .tabstrip [data-ctab]").allInnerTexts();
@@ -2589,6 +2698,7 @@ async function testProcurement(browser, base) {
   try {
     // ---- Compras: needs → new order → send → accept → receive ----
     await pg.goto(`${base}/erp.html#purchasing`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
     await pg.waitForTimeout(800);
     const needBtn = pg.locator("[data-need]").first();
     if ((await needBtn.count()) === 0) {
@@ -2943,6 +3053,7 @@ async function testAdmin(browser, base) {
   try {
     // ---- §5.3 Conciliación: suggestion + reasons → accept → transfers → close refuses
     await pg.goto(`${base}/erp.html#banking`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
     await pg.waitForTimeout(900);
     await openTab(pg, "banking", "_reconcile");
     const openBefore = await pg.locator(".movrow").count();
@@ -3154,6 +3265,7 @@ async function testControlTowerAndDay(browser, base) {
   });
   try {
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
     await pg.waitForTimeout(900);
 
     // TC-01: four indicators, no sparkline, no customiser. The doc is explicit
@@ -3738,6 +3850,7 @@ async function testJourneyRealMode(browser, base) {
     // tenant data before journey.html asks for it — real mode reads the
     // SAME "caneiERP" database, not a fixture of its own.
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
     await pg.waitForTimeout(900);
 
     await pg.goto(`${base}/journey.html`, { waitUntil: "networkidle" });
@@ -3839,6 +3952,7 @@ async function testErp(browser, base) {
   attachConsole(pg, eerr);
   try {
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
     await pg.waitForTimeout(700);
     const kpiText = await pg.locator("#view").innerText();
     if (/€/.test(kpiText) && /Necesita atención/.test(kpiText))
@@ -4076,6 +4190,7 @@ async function testI18n(browser, base) {
   try {
     // The workspace is the entry screen now, so the toggle is exercised there.
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
     await pg.waitForTimeout(600);
     const pill = await pg.locator("#canei-lang-pill button").count();
     if (pill === 3) ok("i18n: the toggle offers all three languages (ES · CA · EN)");
