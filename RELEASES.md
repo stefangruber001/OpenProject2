@@ -25,6 +25,10 @@ The remedy is on the operator's machine: `./ops/deploy-now.sh`, preceded by
 settles it from any phone: `https://<host>/api/health` must report
 `"revision": "6ba1850…"`.
 
+_Cleared 2026-08-10 06:07Z_ — `/api/health` over the public address reported
+`status ok`, `database connected`, and revision `6ba1850…`. **The VPS serves
+v101.**
+
 ## The iOS app against v101
 
 TestFlight holds **v1.1 build 7**, uploaded 2026-08-10 05:53 from `main`
