@@ -1221,6 +1221,42 @@ unit tests, build, `make gates`, `make demo`.
 
 **Next:** S13 — ADM-09 Datos Financieros, the last screen in the document.
 
+## S13 — the page that held its own truth (2026-08-10)
+
+- **ADM-09 stopped holding its own receivables.** The financial page is a good
+  screen with fourteen working panels, and it stored open invoices in its own
+  database while ADM-01 read the engine's. Two screens, one question, two
+  answers, and nothing in the product could say which was right. Six panels —
+  receivables, payables, bank, VAT, the chart of accounts and the monthly
+  ledger — are now read from the engine.
+- **Derived, or an input. Never both.** A derived panel is read-only, has no
+  Add button, and names the ERP screen that owns it. Budgets, loans, opening
+  balances and drivers stay editable, because the engine genuinely does not
+  hold them. A field that accepts a value and discards it on the next read is
+  worse than a field that is not there.
+- **The one split that needed care**: an account's code and name are
+  operational and live in the engine; the P&L line it rolls into and its budget
+  are reporting decisions and live here, keyed by code, so re-reading the chart
+  never loses a budget somebody typed.
+- **The page still renders with no ERP at all**, falling back to its own seed
+  with a banner saying so. Aging is now valued on the ERP's `today` rather than
+  the browser clock — two screens disagreeing about the date would have been a
+  new version of the bug this session removes.
+- **A fourth intermittent red, fixed at all thirteen remaining call sites.**
+  COM-04's tab check reported 0 contracts and the next assertion over the same
+  page passed — the same signature as S9's, S10's and S11's. `bootedShell()`
+  now guards every navigation to `erp.html`, not just the check that failed.
+  Three consecutive clean runs afterwards.
+
+Verified: site E2E 322/322 (8 new checks) · manageability 225/225 · migrations
+48/48 (no schema change) · year 149/149 · import 25/25 · scheduling 30/30 ·
+i18n coverage (EN 100%, CA ceiling 1301 held) · site-sync 17/17 · ownership
+guard · bundle safety · lint, boundaries, types, unit tests, build,
+`make gates`, `make demo`.
+
+**Next:** S14 — mobile: cards below the breakpoint, a five-icon bottom bar and
+three-tap site actions.
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

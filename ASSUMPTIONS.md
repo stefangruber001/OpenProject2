@@ -2488,3 +2488,36 @@ different decisions, so these ten arrived colliding. They are renumbered from
   dead-link fallback, and `PLACEHOLDERS` is gone: a route that resolves to
   nothing says «Ruta desconocida», because promising a screen nobody planned is
   a worse lie than admitting a stale bookmark. **Reversible: yes.**
+
+- **#135 — S13: ADM-09 stays a separate page, but stops holding its own data
+  (2026-08-10).** The v4 doc says «already built — integrate, do not rebuild»,
+  and the mapping's decision 1 keeps the page. What it could not keep is its
+  own dataset: receivables lived in `caneiFinance` and in the ERP at the same
+  time, so the two screens could disagree about the same invoice and nothing
+  said which was right. Six panels — receivables, payables, bank, VAT, the
+  chart of accounts and the monthly ledger — are now **derived** from the
+  engine and read-only, each naming the ERP screen that owns it. Budgets,
+  loans, opening balances and drivers stay editable, because the engine
+  genuinely does not hold them. **Reversible: yes** — `applyFeed()` is one
+  call at boot; not making it leaves the page exactly as it was.
+
+- **#136 — S13: the page still renders without an ERP (2026-08-10).** `erp` is
+  null when there is no state to read — a fresh browser, or the page opened on
+  its own — and the seed then stands, with a banner saying the figures are the
+  page's own demo. A screen that refuses to render because the ERP is empty is
+  worse than one that shows its demo and admits it. **Reversible: yes.**
+
+- **#137 — S13: the page keeps the roll-up line and the budget, the ERP keeps
+  the code and the name (2026-08-10).** An account's code and label are
+  operational and belong in `state.lists.accounts`; which P&L line it rolls
+  into, and what it was budgeted at, are reporting decisions and belong here.
+  The split is stored as `DATA.accountMeta`, keyed by code, so re-reading the
+  chart never loses a budget somebody typed. **Reversible: yes.**
+
+- **#138 — S13: every e2e navigation to `erp.html` now waits for the shell
+  (2026-08-10).** A fourth intermittent red (COM-04's tab check reporting 0
+  contracts, immediately followed by passing assertions over the same page)
+  came from the same cause as the previous three: a fixed sleep after `goto`.
+  `bootedShell()` was applied at the 13 remaining call sites rather than at the
+  one that failed, because the next flake would otherwise be somewhere else.
+  **Reversible: yes.**

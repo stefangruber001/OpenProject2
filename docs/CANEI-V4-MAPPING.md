@@ -99,7 +99,7 @@ Verdict key: **KEEP** (built ≥ doc, integrate only) · **ADAPT** (exists, resh
 | ADM-06 | Caja Chica               | `#petty-cash`                                                        | **BUILT (S11)** — entradas, salidas y arqueo                                             |
 | ADM-07 | Reporte a Gestoría       | `#gestoria`                                                          | **BUILT (S12)** — three steps behind a 48 indicator, step 3 gated on exceptions          |
 | ADM-08 | Flujo de Caja            | `#cash-flow`                                                         | **BUILT (S12)** — 240 + 96×n grid, week/month, company or one job                        |
-| ADM-09 | Datos Financieros        | `financial-data.html`, 14 panels                                     | **KEEP** (decision 1) — feed + ledger import                                             |
+| ADM-09 | Datos Financieros        | `financial-data.html`, 14 panels                                     | **BUILT (S13)** — six panels fed from the engine, the rest stay inputs                   |
 | DMT-01 | Clientes                 | `#customers`                                                         | **ADAPTED (S2)** — refactored onto the shared list primitive                             |
 | DMT-02 | Proveedores              | `#suppliers`                                                         | **BUILT (S2)**                                                                           |
 | DMT-03 | Subcontratos             | `#subcontractors`                                                    | **BUILT (S2)** as master data; lifecycle data retained, screens dropped (decision 5)     |
