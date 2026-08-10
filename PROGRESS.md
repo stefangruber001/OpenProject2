@@ -1257,6 +1257,40 @@ guard · bundle safety · lint, boundaries, types, unit tests, build,
 **Next:** S14 — mobile: cards below the breakpoint, a five-icon bottom bar and
 three-tap site actions.
 
+## S14 — the phone (2026-08-10)
+
+- **The card fallback stopped applying to one table and started applying to all
+  of them.** S2 built it for the master-list primitive and left a note saying
+  S14 would verify the rest; the rest were still scrolling sideways.
+  `autoCards()` runs once after every render, copies each table's own header
+  onto its cells, and adds the class the phone stylesheet keys off. A screen
+  written next month gets cards without knowing the function exists.
+- **A grid is not a list.** The forecast, the Gantt and the week calendar opt
+  out by name. Turning a period column into a labelled line destroys the shape
+  across time those layouts exist to show, so they keep their columns and
+  scroll inside their own container.
+- **A headerless table becomes cards only from three columns up.** Five short
+  lines beat a squeezed five-column grid; a two-column key/value row already
+  reads as one line and would become two.
+- **The site-action button asks a narrower question than "is it useful".**
+  Everything on twenty-nine screens is useful; the test is whether somebody
+  standing on a roof in the rain would reach for it. That gives four. Each one
+  navigates to the screen where the result is visible before opening anything,
+  because a shortcut whose outcome you cannot see is a trapdoor.
+- **The bottom bar was already right** and was not touched. S1b built it, and
+  `testNoOverflow` has guarded the five-icon rule since.
+- **The suite now walks eighteen routes at 390 × 844** and fails if any table
+  is neither cards nor a declared grid — stronger than checking a handful, and
+  what keeps `autoCards()` honest as screens change.
+
+Verified: site E2E 331/331 (9 new checks) · manageability 225/225 · migrations
+48/48 (no schema change) · year 149/149 · import 25/25 · scheduling 30/30 ·
+i18n coverage (EN 100%, CA ceiling 1301 held) · site-sync 17/17 · ownership
+guard · bundle safety · lint, boundaries, types, unit tests, build,
+`make gates`, `make demo`.
+
+**Next:** S15 — seed rebuild, workbook coverage test, hardening. The last one.
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

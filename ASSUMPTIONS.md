@@ -2521,3 +2521,38 @@ different decisions, so these ten arrived colliding. They are renumbered from
   `bootedShell()` was applied at the 13 remaining call sites rather than at the
   one that failed, because the next flake would otherwise be somewhere else.
   **Reversible: yes.**
+
+- **#139 — S14: the card fallback is a runtime pass, not a per-screen template
+  change (2026-08-10).** §3 says «tables become two-line cards», and the app has
+  more than thirty tables across twenty-nine screens. Labelling each one by hand
+  would be thirty chances to miss one and thirty places to drift. `autoCards()`
+  runs once after every render, copies the table's own `thead` labels onto each
+  `td[data-th]`, and adds the class the phone stylesheet keys off. A screen
+  written next month gets cards without knowing the function exists.
+  **Reversible: yes** — not calling it leaves every table exactly as it was.
+
+- **#140 — S14: three tables opt out, and the reason is that a grid is not a
+  list (2026-08-10).** The forecast, the Gantt and the week calendar carry
+  `data-nocards`. Turning a period column into a labelled line destroys the
+  shape across time those layouts exist to show, so they keep their columns and
+  scroll inside their own container — which they already did. Opting out is
+  explicit and by name, so a fourth one cannot happen by accident.
+  **Reversible: yes.**
+
+- **#141 — S14: a headerless table becomes cards only from three columns up
+  (2026-08-10).** With no `thead` there is no label to put on a line, which is
+  fine for a five-column receipts table (five short lines beat a squeezed
+  five-column grid) and wrong for a two-column key/value row, which already
+  reads as one line and would become two. The threshold is the honest place to
+  draw it. **Reversible: yes.**
+
+- **#142 — S14: the site-action button carries four actions and exists on
+  phones only (2026-08-10).** §3 asks for «a floating button for frequent site
+  actions». The test for what belongs is not "is it useful" — everything on
+  twenty-nine screens is useful — it is «would somebody standing on a roof in
+  the rain reach for it». That gives four: photo and progress, today's hours,
+  capture an expense, new task. 56 px target, 48 px rows, and each action lands
+  on the screen where the result is visible, because a shortcut you cannot see
+  the outcome of is a trapdoor. On a desktop the same four are one click away
+  in the create menu, so the button would only be in the way.
+  **Reversible: yes.**

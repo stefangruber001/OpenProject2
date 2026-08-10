@@ -244,8 +244,10 @@ Only what is particular to each screen; everything else inherits from 3.1.
   different one to each of the five. Three of the five are on it: ADM-02 at 360 (S7), PRY-03 at
   216 (S9), ADM-01 at 270 (S10).
 - **The status colour code is global** and must be a single token set, not per-screen colours.
-- Mobile: **tables become two-line cards and the menu becomes a five-icon bottom bar** — the
-  current app scrolls tables horizontally instead, which the doc replaces.
+- Mobile: **tables become two-line cards and the menu becomes a five-icon bottom bar** — done in
+  S14. The bottom bar existed since S1b; the card fallback existed only for the master-list
+  primitive and now runs over every table through `autoCards()`, with three grids opting out by
+  name because a grid is not a list.
 
 ---
 
