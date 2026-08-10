@@ -3413,6 +3413,62 @@
         }
       }
 
+      /* ---------- Inside the native shell (S15) ----------
+     The iOS app is a shell around these pages and appends `CaneiApp/…` to its
+     user agent so they can tell. Until now nothing read it, which meant a
+     phone inside the app showed THREE things stacked at the bottom: the web's
+     own five-icon bar, the native floating tab bar over it, and — since S14 —
+     the site-action button positioned to clear the web bar that is no longer
+     the one in front.
+
+     Under `.native` the web bar stands down, because the native tab bar does
+     the same job better (it is native, it has haptics, and it survives a page
+     load). What the native bar cannot do is reach the twenty-nine
+     subsecciones, so the breadcrumb becomes the opener for panel 2 — one tap,
+     from anywhere, to the same list the web bar used to show. */
+      /* The five-icon strip stands down; the rail itself does NOT, because it
+     is what panel 2 is positioned against — hiding it takes the subsection
+     list with it. It is lifted clear of the native tab bar and made
+     transparent to taps, so only the panel it carries is interactive. */
+      body.native .p1 {
+        display: none;
+      }
+      body.native .rail {
+        bottom: calc(84px + env(safe-area-inset-bottom));
+        border-top: 0;
+        background: transparent;
+        pointer-events: none;
+      }
+      body.native .p2 {
+        pointer-events: auto;
+      }
+      body.native .crumbs {
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px 12px;
+        background: var(--paper);
+      }
+      body.native .crumbs:after {
+        content: "▾";
+        color: var(--muted);
+        font-size: 11px;
+      }
+      /* Room for the native tab bar, and a site-action button that clears it
+     rather than the bar that is no longer there. */
+      body.native main {
+        padding-bottom: calc(104px + env(safe-area-inset-bottom));
+      }
+      body.native .fab {
+        bottom: calc(104px + env(safe-area-inset-bottom));
+      }
+      body.native .fabmenu {
+        bottom: calc(168px + env(safe-area-inset-bottom));
+      }
+
       /* ---------- Site actions (S14) ----------
      §3 asks for «a floating button for frequent site actions». The constraint
      is not screen width, it is that the person pressing it is standing on a
@@ -4214,6 +4270,19 @@
           .forEach((b) => b.classList.toggle("on", b.dataset.sec === curSec));
       }
       $("#subscrim").onclick = closeSection;
+
+      /* The native shell announces itself in the user agent (see Config.swift).
+     Reading it here rather than sniffing the platform is deliberate: Safari on
+     an iPhone is NOT the app, and giving it the app's chrome would strand
+     somebody who opened the site in a browser with no way back to the
+     sections. */
+      const IN_NATIVE_SHELL = / CaneiApp\//.test(navigator.userAgent);
+      if (IN_NATIVE_SHELL) {
+        document.body.classList.add("native");
+        $("#crumbs").setAttribute("role", "button");
+        $("#crumbs").setAttribute("tabindex", "0");
+        $("#crumbs").onclick = () => toggleSection(SUBMAP[cur] ? SUBMAP[cur].sec.k : "tower");
+      }
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") closeSection();
       });

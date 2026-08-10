@@ -66,6 +66,7 @@ async function main() {
     await testJourney(browser, base);
     await testNoOverflow(browser, base);
     await testMobile(browser, base);
+    await testNativeShell(browser, base);
     await testSmoke(browser, base);
     await testDataTabs(browser, base);
     await testRetired(browser, base);
@@ -651,6 +652,89 @@ async function testMobile(browser, base) {
     bad("mobile (§3)", String(e).slice(0, 220));
   } finally {
     await pg.close();
+  }
+}
+
+// ── The native shell (S15). The iOS app is a WKWebView around these pages and
+//    marks its user agent so they can tell. Before it was read, a phone inside
+//    the app stacked three things at the bottom: the web's own section bar, the
+//    native tab bar over it, and the site-action button positioned to clear the
+//    wrong one. Spoofing the marker is exactly what the app does, so this is
+//    testable here rather than only on a device.
+async function testNativeShell(browser, base) {
+  const UA_NATIVE =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 CaneiApp/1.1 (iOS; native-shell)";
+  const UA_SAFARI =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile Safari/605.1.15";
+  const measure = async (userAgent) => {
+    const pg = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 3,
+      userAgent,
+    });
+    const errs = [];
+    attachConsole(pg, errs);
+    await pg.goto(`${base}/erp.html#invoicing`, { waitUntil: "networkidle" });
+    // `attached`, not visible: under the native marker the section bar is
+    // rendered and then hidden, which is the thing being tested. Waiting for it
+    // to be VISIBLE would time out on exactly the case that is working.
+    await pg.waitForSelector("#p1 .secitem", { state: "attached", timeout: 15000 });
+    await pg.waitForTimeout(900);
+    const shape = await pg.evaluate(() => ({
+      native: document.body.classList.contains("native"),
+      bar: getComputedStyle(document.querySelector("#p1")).display,
+      fab: getComputedStyle(document.querySelector("#fab")).bottom,
+      pad: getComputedStyle(document.querySelector("main")).paddingBottom,
+      sw: document.documentElement.scrollWidth,
+    }));
+    return { pg, errs, shape };
+  };
+  try {
+    const nat = await measure(UA_NATIVE);
+    const saf = await measure(UA_SAFARI);
+
+    if (nat.shape.native && nat.shape.bar === "none")
+      ok("native shell: the web's own section bar stands down for the native tab bar");
+    else bad("native shell: bar stands down", JSON.stringify(nat.shape));
+
+    // Safari on an iPhone is NOT the app. Giving it the app's chrome would
+    // strand somebody who opened the site in a browser with no way to a
+    // section, so the marker is read rather than the platform sniffed.
+    if (!saf.shape.native && saf.shape.bar !== "none")
+      ok(
+        "native shell: plain Mobile Safari keeps the web bar — the marker is read, not the platform",
+      );
+    else bad("native shell: safari unaffected", JSON.stringify(saf.shape));
+
+    // The site-action button clears the bar that is actually in front.
+    if (parseInt(nat.shape.fab, 10) > parseInt(saf.shape.fab, 10))
+      ok(`native shell: the site-action button clears the native tab bar (${nat.shape.fab})`);
+    else bad("native shell: FAB offset", `${nat.shape.fab} vs ${saf.shape.fab}`);
+
+    // The one thing a six-tab native bar cannot do is reach 29 subsecciones.
+    await nat.pg.locator("#crumbs").click();
+    await nat.pg.waitForTimeout(600);
+    const subs = await nat.pg.evaluate(() => {
+      const p2 = document.querySelector("#p2");
+      const r = p2.getBoundingClientRect();
+      return {
+        on: p2.classList.contains("on"),
+        items: p2.querySelectorAll("button, a").length,
+        onScreen: r.height > 0 && r.top < window.innerHeight && r.bottom > 0,
+      };
+    });
+    if (subs.on && subs.items >= 5 && subs.onScreen)
+      ok(`native shell: the breadcrumb opens the subsection list on screen (${subs.items} items)`);
+    else bad("native shell: subsections reachable", JSON.stringify(subs));
+
+    if (nat.errs.length === 0 && saf.errs.length === 0)
+      ok("native shell: no console errors under either user agent");
+    else bad("native shell: console errors", [...nat.errs, ...saf.errs].slice(0, 3).join(" | "));
+
+    await nat.pg.close();
+    await saf.pg.close();
+  } catch (e) {
+    bad("native shell", String(e).slice(0, 220));
   }
 }
 

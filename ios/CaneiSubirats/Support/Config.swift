@@ -34,9 +34,20 @@ enum Config {
     static let appTagline = "ERP for reformas"
 
     /// A short marker appended to the WKWebView user-agent so the web app can
-    /// detect it is running inside the native shell (e.g. to hide its own top
-    /// chrome, enable haptics, or use the native share sheet).
-    static let userAgentMarker = "CaneiApp/1.0 (iOS; native-shell)"
+    /// detect it is running inside the native shell.
+    ///
+    /// As of 1.1 the web app actually READS it. Until then nothing did, which
+    /// meant a phone inside this app stacked three things at the bottom of the
+    /// screen: the web app's own five-icon section bar, this app's floating tab
+    /// bar over the top of it, and the web app's site-action button positioned
+    /// to clear the bar that was no longer the one in front. Under the marker
+    /// the web bar stands down — the native tab bar does that job — and the
+    /// breadcrumb becomes the opener for the subsection list, which is the one
+    /// thing a six-tab native bar cannot reach.
+    ///
+    /// The web app matches on `CaneiApp/` and not on the version, so an older
+    /// build keeps working against a newer site. Keep the prefix.
+    static let userAgentMarker = "CaneiApp/1.1 (iOS; native-shell)"
 
     /// The tabs of the app. Each maps to a page of the web app.
     /// Reordering / renaming here restyles the whole app without touching views.
