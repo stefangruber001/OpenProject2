@@ -2965,6 +2965,11 @@ window.CANEI_DICT = {
       "Se adjunta un documento ya capturado, no se sube otra copia: así la lectura, la fecha y el origen del archivo siguen siendo los mismos en las dos pantallas.",
       "An already-captured document is attached rather than a second copy uploaded, so the reading, the date and the file's origin stay the same on both screens.",
     ],
+    // ── S14: the four frequent site actions behind the floating button.
+    ["Foto y avance de obra", "Site photo and progress"],
+    ["Parte de horas de hoy", "Today's hours sheet"],
+    ["Capturar un gasto", "Capture an expense"],
+    ["Acciones de obra", "Site actions"],
     // ── S12: ADM-04 Horas, ADM-07 Gestoría, ADM-08 Flujo de caja. Every
     //    string on the three new surfaces, shipped with Catalan in the same
     //    commit — the rule that has caught a gap in eight sessions running.

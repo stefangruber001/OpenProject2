@@ -1033,6 +1033,11 @@ window.CANEI_DICT.ca = {
   Registro: "Registre",
   Empleado: "Empleat",
   Autónomo: "Autònom",
+  // ── S14: the site-action button.
+  "Foto y avance de obra": "Foto i avanç d'obra",
+  "Parte de horas de hoy": "Part d'hores d'avui",
+  "Capturar un gasto": "Capturar una despesa",
+  "Acciones de obra": "Accions d'obra",
 };
 window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Programar visita — (.+)$"), "Programar visita — $1"],

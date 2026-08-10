@@ -3348,47 +3348,136 @@
         }
       }
 
-      /* Shared master-data list primitive (S2, decision 15): one row template
-     for both table (desktop) and card (phone) — the phone rule below turns
-     each row into a labelled card via the td[data-th] the primitive already
-     emits, so there is nothing bespoke per screen to keep in sync. Full
-     verification against every DMT screen is S14; this is the base case. */
+      /* Cards on a phone (§3, decision 15). S2 built this for the master-list
+     primitive alone; S14 generalises it to EVERY table, because the document
+     says «tables become two-line cards» and it does not mean only the ones
+     that happen to share a helper. The label on each line comes from
+     `td[data-th]`, which `autoCards()` fills in at render time from the
+     table's own header — so a new screen gets cards for free and there is
+     nothing per-screen to keep in sync.
+
+     Opting out is explicit and rare: a GRID is not a list. The forecast, the
+     Gantt and the week calendar carry `data-nocards`, because turning a
+     period column into a labelled line destroys the one thing those layouts
+     exist to show — the shape across time. Those scroll sideways inside their
+     own container, which they already do. */
       @media (max-width: 700px) {
-        table.mlist thead {
+        table.cards thead {
           display: none;
         }
-        table.mlist,
-        table.mlist tbody,
-        table.mlist tr,
-        table.mlist td {
+        table.cards,
+        table.cards tbody,
+        table.cards tr,
+        table.cards td {
           display: block;
           width: 100%;
         }
-        table.mlist tr {
+        table.cards tr {
           border: 1px solid var(--line);
           border-radius: 11px;
           margin-bottom: 8px;
           padding: 9px 11px;
         }
-        table.mlist td {
+        table.cards tr.tot,
+        table.cards tr.grouphd {
+          background: var(--hair);
+        }
+        table.cards td {
           border: 0;
           padding: 2px 0;
           display: flex;
           justify-content: space-between;
           gap: 10px;
           font-size: 13px;
+          height: auto;
+          text-align: left;
+          white-space: normal;
         }
-        table.mlist td:before {
+        table.cards td:before {
           content: attr(data-th);
           color: var(--muted);
           font: 600 10.5px var(--sans);
           flex: 0 0 auto;
         }
-        table.mlist td.k {
+        /* A cell with no header and no content is a spacer on desktop and
+       noise on a phone — an empty labelled line people have to read past. */
+        table.cards td:empty {
+          display: none;
+        }
+        table.cards td.k {
           font-size: 14px;
         }
-        table.mlist td.k:before {
+        table.cards td.k:before,
+        table.cards td[data-th=""]:before {
           display: none;
+        }
+      }
+
+      /* ---------- Site actions (S14) ----------
+     §3 asks for «a floating button for frequent site actions». The constraint
+     is not screen width, it is that the person pressing it is standing on a
+     roof in gloves: 56 px target, three taps to done, and only the four things
+     somebody on site actually does. It exists on phones only — on a desktop
+     the same four are one click away in the create menu, and a floating button
+     over a full-width screen is just a button in the way. */
+      .fab {
+        display: none;
+        position: fixed;
+        right: 16px;
+        bottom: calc(74px + env(safe-area-inset-bottom));
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        border: 0;
+        z-index: 60;
+        font-size: 24px;
+        color: #fff;
+        background: linear-gradient(120deg, var(--greenDeep), var(--green) 70%);
+        box-shadow: 0 10px 26px -8px rgba(20, 26, 14, 0.55);
+        cursor: pointer;
+      }
+      .fab:active {
+        transform: scale(0.94);
+      }
+      .fabmenu {
+        display: none;
+        position: fixed;
+        right: 16px;
+        bottom: calc(138px + env(safe-area-inset-bottom));
+        z-index: 60;
+        min-width: 220px;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: 0 18px 40px -18px rgba(20, 26, 14, 0.45);
+        padding: 6px;
+      }
+      .fabmenu.on {
+        display: block;
+      }
+      .fabmenu button {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 48px;
+        border: 0;
+        background: none;
+        font: inherit;
+        font-size: 14px;
+        color: var(--ink);
+        text-align: left;
+        padding: 0 10px;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      .fabmenu button:active {
+        background: var(--greenSoft);
+      }
+      @media (max-width: 860px) {
+        .fab {
+          display: grid;
+          place-items: center;
         }
       }
 
@@ -3590,6 +3679,10 @@
       </div>
       <div class="db" id="dbody"></div>
     </aside>
+    <!-- §3's floating button for frequent site actions. Phones only; see the
+         .fab rule for why. -->
+    <button class="fab" id="fab" aria-label="Acciones de obra" aria-haspopup="true">＋</button>
+    <div class="fabmenu" id="fabMenu" role="menu"></div>
     <div class="toast" id="toast"></div>
 
     <script src="erp-engine.js"></script>
@@ -4170,6 +4263,46 @@
         document.body.classList.remove("fs");
         if (VIEWS[cur]) VIEWS[cur](v);
         else unknownRouteView(cur, v);
+        autoCards(v);
+      }
+
+      /* ---------- Cards on a phone (S14) ----------
+   The CSS turns a table into cards; this fills in the label each line needs.
+   Doing it once here, after the view has rendered, rather than in twenty-nine
+   template literals, is the whole point: a screen written next month gets
+   cards without knowing this exists, and no screen can drift out of sync by
+   forgetting a `data-th`.
+
+   Three tables opt out with `data-nocards`, and the reason is the same each
+   time: they are GRIDS, not lists. Turning the forecast's period columns, the
+   Gantt's days or the week calendar into labelled lines destroys the shape
+   across time that is the only reason those layouts exist. They scroll
+   sideways inside their own container instead, which they already do. */
+      function autoCards(root) {
+        root.querySelectorAll("table").forEach((t) => {
+          if (t.hasAttribute("data-nocards")) return;
+          const heads = [...t.querySelectorAll("thead th")].map((th) => th.textContent.trim());
+          // A headerless table still becomes cards, but only from three columns
+          // up: a two-column key/value row already reads as one line, and
+          // splitting it in two makes it longer without making it clearer.
+          // With no header the lines carry no label, which is correct — there
+          // was never a column name to show.
+          const widest = Math.max(
+            0,
+            ...[...t.querySelectorAll("tbody tr")].map((tr) => tr.children.length),
+          );
+          if (!heads.length && widest < 3) return;
+          t.classList.add("cards");
+          t.querySelectorAll("tbody tr").forEach((tr) => {
+            // A row that spans the table (a group heading, an empty state) is
+            // already one line; labelling it would invent a column name.
+            const tds = [...tr.children];
+            if (tds.length === 1 && tds[0].hasAttribute("colspan")) return;
+            tds.forEach((td, i) => {
+              if (!td.hasAttribute("data-th")) td.setAttribute("data-th", heads[i] || "");
+            });
+          });
+        });
       }
 
       /* =============================== global bar (spec §1) ==============================
@@ -4487,6 +4620,68 @@
         ],
         settings: [],
       };
+      /* ---------- Site actions (S14) ----------
+   Four things, and no more. The test for what belongs here is not "is it
+   useful" — everything on twenty-nine screens is useful — it is «would
+   somebody standing on a roof in the rain reach for it», which is a much
+   shorter list. Each one is THREE taps to done: the button, the action, and
+   the one control the action puts in front of you.
+
+   `go()` before opening the drawer is deliberate: the drawer needs the screen
+   behind it to have the right project loaded, and arriving somewhere you can
+   see what you just recorded is the difference between a shortcut and a
+   trapdoor. */
+      const SITE_ACTIONS = [
+        [
+          "📸",
+          "Foto y avance de obra",
+          () => {
+            go("progress");
+          },
+        ],
+        [
+          "⏱️",
+          "Parte de horas de hoy",
+          () => {
+            hDay = erp.today;
+            hTab = "sheet";
+            go("labour");
+          },
+        ],
+        [
+          "🧾",
+          "Capturar un gasto",
+          () => {
+            go("supplier-invoices");
+          },
+        ],
+        ["🗒️", "Nueva tarea", () => newTaskDrawer()],
+      ];
+      function renderSiteActions() {
+        const m = $("#fabMenu");
+        m.innerHTML = "";
+        SITE_ACTIONS.forEach(([ic, lab, fn]) => {
+          const b = el("button", null, `<span>${ic}</span><span>${esc(lab)}</span>`);
+          b.setAttribute("role", "menuitem");
+          b.onclick = () => {
+            m.classList.remove("on");
+            fn();
+          };
+          m.appendChild(b);
+        });
+      }
+      $("#fab").onclick = (e) => {
+        e.stopPropagation();
+        const m = $("#fabMenu");
+        if (!m.children.length) renderSiteActions();
+        m.classList.toggle("on");
+      };
+      document.addEventListener("click", (e) => {
+        const m = $("#fabMenu");
+        if (m.classList.contains("on") && !m.contains(e.target) && e.target.id !== "fab")
+          m.classList.remove("on");
+      });
+
       function renderCreateMenu() {
         const secKey = SUBMAP[cur] ? SUBMAP[cur].sec.k : "tower";
         const items = CREATE[secKey] || [];
@@ -14600,7 +14795,7 @@
 
    <div class="card"><div class="ch"><h3>Previsión</h3>
      <span class="tag">${cfProject ? esc(erp.project(cfProject).code) : "toda la empresa"}</span></div>
-    <div class="fcast"><table id="cfGrid" style="width:${240 + 96 * g.periods.length}px"><thead><tr><th class="lab">Concepto</th>
+    <div class="fcast"><table id="cfGrid" data-nocards style="width:${240 + 96 * g.periods.length}px"><thead><tr><th class="lab">Concepto</th>
      ${g.periods.map((p, i) => `<th title="${p.from} → ${p.to}">${label(p, i)}</th>`).join("")}</tr></thead><tbody>
      ${g.groups
        .map(
