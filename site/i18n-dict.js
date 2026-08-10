@@ -2379,6 +2379,22 @@ window.CANEI_DICT = {
     ["Fin de obra", "Works finish"],
     ["Línea base", "Baseline"],
     ["＋ Tarea", "＋ Task"],
+    // The rest of the "＋ …" action buttons in erp.html. They were missing, so
+    // with English as the default the workspace showed English everywhere and
+    // Spanish on its primary actions — the worst of both, and exactly the kind
+    // of gap a coverage check with a hand-written word list will flatter.
+    // Terms follow the entries already in this file: Presupuesto → Quotation,
+    // Oportunidad → Lead, Subcontrata → Subcontract.
+    ["＋ Asignar trabajador", "＋ Assign worker"],
+    ["＋ Factura", "＋ Invoice"],
+    ["＋ Hito/recordatorio", "＋ Milestone/reminder"],
+    ["＋ Nueva orden de compra", "＋ New purchase order"],
+    ["＋ Nueva regla", "＋ New rule"],
+    ["＋ Nueva subcontrata", "＋ New subcontract"],
+    ["＋ Nuevo", "＋ New"],
+    ["＋ OC", "＋ PO"],
+    ["＋ Oportunidad/visita", "＋ Lead/visit"],
+    ["＋ Presupuesto", "＋ Quotation"],
     ["◆ Hito", "◆ Milestone"],
     ["◆ Hitos de cobro", "◆ Payment milestones"],
     ["Generar desde los capítulos", "Generate from the chapters"],
@@ -2869,7 +2885,6 @@ window.CANEI_DICT = {
     ["Filas por pantalla", "Rows per screen"],
     ["‹ Anterior", "‹ Previous"],
     ["Siguiente ›", "Next ›"],
-    ["＋ Nuevo", "＋ New"],
     // ── ADM-02's two surviving blocks, shipped untranslated in session 10b.
     ["Necesidades", "Requirements"],
     [
@@ -2879,8 +2894,6 @@ window.CANEI_DICT = {
     ["Calendario de llegadas", "Arrivals calendar"],
     ["Sin llegadas previstas.", "No arrivals expected."],
     ["Todos los capítulos están comprometidos.", "Every chapter is committed."],
-    ["＋ Nueva orden de compra", "＋ New purchase order"],
-    ["＋ OC", "＋ PO"],
     // ── ADM-03 the inbox beside the register, ADM-02 compras (S7).
     ["Documentos", "Documents"],
     ["Bandeja", "Inbox"],

@@ -10,7 +10,7 @@ import SwiftUI
 /// The confirmation frame is the part that was asked for by name. iOS shows its
 /// own tick inside the system sheet and then takes it away instantly, which
 /// leaves the operator with an app that simply opened — no evidence of what
-/// opened it. Holding a branded "Face ID verificado" for three quarters of a
+/// opened it. Holding a branded "Face ID verified" for three quarters of a
 /// second is the difference between a door that swung open and a door somebody
 /// unlocked for you.
 struct LockView: View {
@@ -130,21 +130,21 @@ struct LockView: View {
     private var caption: String {
         switch phase {
         case .confirmed:
-            return kind == .passcode ? "Verificado" : "\(kind.title) verificado"
+            return kind == .passcode ? "Verified" : "\(kind.title) verified"
         case .checking:
-            return kind == .passcode ? "Introduce el código del dispositivo" : "Comprobando \(kind.title)…"
+            return kind == .passcode ? "Enter the device passcode" : "Checking \(kind.title)…"
         case .locked(let message):
             if let message = message { return message }
             return kind == .passcode
-                ? "Introduce el código para continuar"
-                : "Desbloquea con \(kind.title) para continuar"
+                ? "Enter the passcode to continue"
+                : "Unlock with \(kind.title) to continue"
         case .open:
             return ""
         }
     }
 
     private var buttonTitle: String {
-        kind == .passcode ? "Desbloquear" : "Desbloquear con \(kind.title)"
+        kind == .passcode ? "Unlock" : "Unlock with \(kind.title)"
     }
 }
 

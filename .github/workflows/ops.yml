@@ -32,6 +32,7 @@ on:
           - deploy-now
           - sync-server
           - backup-now
+          - set-email
           - list-ssh-allowed
 
 concurrency:
@@ -118,6 +119,40 @@ jobs:
       - name: sync-server
         if: inputs.action == 'sync-server'
         run: bash ops/sync-server.sh
+
+      # Connect the company mailbox so the ERP can file its drafts in it.
+      #
+      # This is the one place a password travels through a workflow, and it is
+      # a deliberate exception to the rule that kept add-user out of here. The
+      # difference is that this one is a repository SECRET, which GitHub masks
+      # in logs and never puts in an input box — whereas add-user would have had
+      # to take the password as a workflow input, which persists in plain text
+      # on the run for anyone with read access. The trade is also bounded by
+      # what is already true: this repository holds the production SSH key,
+      # which is strictly more powerful than a mailbox password.
+      #
+      # IMAP_HOST is set explicitly. Deriving it from the address would give
+      # imap.2iberia.com, and the mailbox is hosted elsewhere — the provider's
+      # own instructions say imap.hostinger.com. A derived default that happens
+      # to be wrong is worse than no default.
+      - name: set-email
+        if: inputs.action == 'set-email'
+        env:
+          MAIL_PASSWORD: ${{ secrets.ERP_MAIL_PASSWORD }}
+          IMAP_HOST: ${{ vars.ERP_MAIL_IMAP_HOST || 'imap.hostinger.com' }}
+        run: |
+          if [ -z "$MAIL_PASSWORD" ]; then
+            echo "::error::Repository secret ERP_MAIL_PASSWORD is not set. Add it in"
+            echo "::error::Settings -> Secrets and variables -> Actions, then run this again."
+            exit 1
+          fi
+          # sync-server first, always. The mailbox variables are read from the
+          # compose file ON THE SERVER, which is not part of the released image,
+          # so a machine still running last month's stack definition would store
+          # the password and pass it to nothing. Idempotent, so running it when
+          # it is already current costs a few seconds.
+          bash ops/sync-server.sh
+          bash ops/set-email.sh "${{ vars.ERP_MAIL_ADDRESS || 'if@2iberia.com' }}"
 
       - name: backup-now
         if: inputs.action == 'backup-now'

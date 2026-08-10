@@ -722,7 +722,7 @@ function readme(root){
 
 /* ---------- premium branded email + PDF (unchanged CI) ---------- */
 const BRAND = { name:"Canei Subirats", legal:"Canei Subirats, S.L.", slogan:"Renovations, simply complex.",
-  from:"hola@caneisubirats.com", address:"Carrer de la Creu 74, 08960 Sant Just Desvern, Barcelona", phone:"659 87 67 00",
+  from:"if@2iberia.com", address:"Carrer de la Creu 74, 08960 Sant Just Desvern, Barcelona", phone:"659 87 67 00",
   cif:"CIF: B-00000000", iban:"ES00 0000 0000 0000 0000 0000",
   green:"#48733c", greenLt:"#6ba85a", ink:"#14160f", body:"#54574c", soft:"#eef4ea", line:"#eceae4", spark:"#f2c230" };
 const today = ()=>new Date().toLocaleDateString("es-ES");
@@ -986,6 +986,33 @@ function download(name,mime,data){
   const url=URL.createObjectURL(blob); const a=document.createElement("a");
   a.href=url; a.download=name; document.body.append(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+
+/* Also put the draft in the company mailbox, when there is one.
+   IN ADDITION TO the download, never instead of it: the file is what works on a
+   published copy, on a machine with no session, and on the day the mail server
+   is unreachable. This is the same message, filed where the operator can open
+   it from a phone.
+   Every outcome reaches the activity feed. A draft the operator believes is in
+   their mailbox and is not would be the worst of the three possible results, so
+   silence is not one of the options. */
+let mailboxNoticed=false;
+function fileInMailbox(eml){
+  /* No server (published read-only copy, or the files opened directly) means
+     nothing to file into, and nothing worth saying about it. */
+  if(typeof ErpDocs==="undefined"||!ErpDocs.isRemote()) return;
+  fetch("/api/~/erp/draft",{method:"POST",credentials:"same-origin",
+    headers:{"content-type":"message/rfc822"},body:eml})
+    .then(r=>r.json().then(b=>({ok:r.ok,status:r.status,b})).catch(()=>({ok:r.ok,status:r.status,b:{}})))
+    .then(({ok,status,b})=>{
+      if(ok&&b.delivered){ log("Draft filed in the mailbox ("+(b.from||"company mailbox")+")"); return; }
+      if(status===503){ /* Not connected yet. Said once per session, not on every draft. */
+        if(!mailboxNoticed){ mailboxNoticed=true;
+          log("No mailbox connected — the draft was downloaded only. Connect one at /settings/email"); }
+        return; }
+      log("⚠ Could not file the draft in the mailbox: "+((b&&b.message)||("HTTP "+status)));
+    })
+    .catch(()=>{ log("⚠ Could not reach the server to file the draft. It was downloaded."); });
 }
 
 function log(msg){ const f=$("#feed"); if(f.dataset.clean!=="1"){f.innerHTML="";f.dataset.clean="1";} f.prepend(el("div",null,msg)); }
@@ -1760,9 +1787,15 @@ function renderStage(){
     // customer email — download the draft and send it from your mail client.
     const send=el("button","btn sm","✓ Mark as sent");
     const dl=el("button","btn sm ghost",(c.attach?"⤓ Outlook draft + PDF (.eml)":"⤓ Outlook draft (.eml)"));
+    /* Merge of main's mailbox filing with the branch's wording. The button
+       records a send by hand — it makes no network call — so it says "marked",
+       not "sent". Downloading DOES now file the draft in the company mailbox,
+       which is main's new capability and is kept whole. */
     send.onclick=()=>{ send.textContent="✓ Marked sent"; send.disabled=true; log("Marked as sent by hand → "+S.email); };
-    dl.onclick=()=>{ download("Canei-"+f.email.kind+".eml","message/rfc822",buildEml(c)); log("Outlook draft downloaded — "+f.email.kind); };
-    bar.append(send,dl,el("span","safe","Drafted here · sent from your mail client")); box.append(bar);
+    dl.onclick=()=>{ const eml=buildEml(c);
+      download("Canei-"+f.email.kind+".eml","message/rfc822",eml); log("Outlook draft downloaded — "+f.email.kind);
+      fileInMailbox(eml); };
+    bar.append(send,dl,el("span","safe","Drafted for review — sent on your say-so")); box.append(bar);
     wrap.append(box);
   }
 

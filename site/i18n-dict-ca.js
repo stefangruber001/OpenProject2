@@ -1038,6 +1038,16 @@ window.CANEI_DICT.ca = {
   "Parte de horas de hoy": "Part d'hores d'avui",
   "Capturar un gasto": "Capturar una despesa",
   "Acciones de obra": "Accions d'obra",
+  // ── Merged from main: the planning screen's strings and the reports note,
+  //    which arrived on the ES/EN spine without Catalan. Translated here
+  //    rather than raising the ceiling — the backlog only ever falls.
+  "Ruta crítica — un día perdido aquí es un día perdido en la obra": "Ruta crítica — un dia perdut aquí és un dia perdut a l'obra",
+  "Sin tareas planificadas. Añade una tarea o genera la planificación desde los capítulos del proyecto.": "Sense tasques planificades. Afegeix una tasca o genera la planificació des dels capítols del projecte.",
+  "Ninguna. Arrastra el punto de otra barra hasta ésta para crear una.": "Cap. Arrossega el punt d'una altra barra fins a aquesta per crear-ne una.",
+  "Planificación de obra con dependencias, ruta crítica y línea base. Arrastra una barra para moverla, tira del borde derecho para alargarla y arrastra el punto de una barra a otra para crear una dependencia.": "Planificació d'obra amb dependències, ruta crítica i línia base. Arrossega una barra per moure-la, estira la vora dreta per allargar-la i arrossega el punt d'una barra a una altra per crear una dependència.",
+  "Una línea base guarda la planificación tal como está hoy. No se puede modificar después: es la referencia contra la que se mide el avance real.": "Una línia base desa la planificació tal com és avui. No es pot modificar després: és la referència amb què es mesura l'avanç real.",
+  "La planificación necesita el módulo de capacidades, que no se ha cargado. Recarga la página.": "La planificació necessita el mòdul de capacitats, que no s'ha carregat. Torna a carregar la pàgina.",
+  "No se desarrolla por ahora. Los informes se construirán sobre datos ya registrados, sin pedir información nueva.": "De moment no es desenvolupa. Els informes es construiran sobre dades ja registrades, sense demanar informació nova.",
 };
 window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Programar visita — (.+)$"), "Programar visita — $1"],

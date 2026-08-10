@@ -34,7 +34,7 @@ enum BiometricKind: Equatable {
         switch self {
         case .faceID:      return "Face ID"
         case .touchID:     return "Touch ID"
-        case .passcode:    return "Código"
+        case .passcode:    return "Passcode"
         case .unavailable: return ""
         }
     }
@@ -67,7 +67,7 @@ private func describeBiometricFailure(_ error: Error?) -> BiometricOutcome {
     var code: LAError.Code?
     if let laError = error as? LAError { code = laError.code }
 
-    var message: String? = "No se pudo verificar. Inténtalo de nuevo."
+    var message: String? = "Could not verify. Please try again."
     if let code = code {
         switch code {
         case .userCancel, .systemCancel, .appCancel:
@@ -75,7 +75,7 @@ private func describeBiometricFailure(_ error: Error?) -> BiometricOutcome {
             // would be noise printed over a deliberate act.
             message = nil
         case .biometryLockout:
-            message = "Demasiados intentos. Usa el código del dispositivo."
+            message = "Too many attempts. Use the device passcode."
         default:
             break
         }
@@ -198,7 +198,7 @@ final class BiometricLock: ObservableObject {
 
         phase = .checking
         let outcome = await Self.evaluate(
-            reason: "Desbloquea Canei Subirats para ver el trabajo de la empresa."
+            reason: "Unlock Canei Subirats to see the company's work."
         )
 
         if outcome.ok {
@@ -256,7 +256,7 @@ final class BiometricLock: ObservableObject {
         // The system Face ID sheet makes the app `.inactive` while it is up, so
         // dismissing it sends us straight back through `.active`. A rule that
         // re-asks whenever it finds the gate locked would therefore re-present
-        // the sheet the instant the operator tapped Cancelar, and again, and
+        // the sheet the instant the operator tapped Cancel, and again, and
         // again — a loop with no way out but force-quitting the app.
         //
         // Once the gate is locked and the operator has seen it, the next move is
@@ -295,7 +295,7 @@ final class BiometricLock: ObservableObject {
         // without asking anybody — the gate would appear to work and would in
         // fact be open.
         let context = LAContext()
-        context.localizedCancelTitle = "Cancelar"
+        context.localizedCancelTitle = "Cancel"
 
         return await withCheckedContinuation { (continuation: CheckedContinuation<BiometricOutcome, Never>) in
             context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { ok, error in

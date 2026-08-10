@@ -36,6 +36,12 @@ jobs:
       - name: Type-check
         run: pnpm check-types
 
+      # The draft mailbox adapter, against a stub IMAP server. No credentials and
+      # no network: it asserts what we SAY to a mail server, which is the half
+      # that can be wrong in ways that look like success.
+      - name: Draft mailbox adapter
+        run: pnpm test:mailbox
+
       - name: Unit tests
         run: pnpm test
 

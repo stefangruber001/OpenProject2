@@ -2612,3 +2612,119 @@ different decisions, so these ten arrived colliding. They are renumbered from
   environment has — `ios-testflight.yml` runs that on a macOS runner. The web
   half of the change is fully tested here, which is where the behaviour
   actually lives. **Reversible: yes.**
+- **#91 — The mailbox is somewhere to PUT A DRAFT, never somewhere to send from
+  (2026-08-08).** The operator asked to link `if@2iberia.com` so the ERP's
+  generated emails use it, showed the provider's IMAP/SMTP page, and said not to
+  change UI or logic.
+  **Built the IMAP half and deliberately not the SMTP half.** IMAP APPEND writes
+  a finished message into the Drafts folder of a mailbox the company owns; it
+  appears in Gmail, Outlook or Apple Mail on any device, and a person presses
+  send after reading it. Nothing is transmitted to a customer, so the mandate's
+  "no real emails" rule is intact and the product's on-screen promise —
+  "nothing is sent without you" — stays literally true. SMTP is not in the
+  codebase at all, which is a stronger guarantee than a flag that could be
+  flipped.
+  **The `.eml` download is untouched**, because changing it would be a UI change.
+  What changed is the sender it carries, which is the request itself.
+  **The sender is enforced twice, and that is deliberate**, not an oversight: the
+  page's constant so a downloaded draft is right, and a server-side rewrite of
+  the `From` header so an appended draft is right no matter what composed it. A
+  draft in a mailbox with an address that account cannot send as is confusing at
+  best and rejected by some servers at worst.
+  **Not configured is never a silent success.** With no credential the endpoint
+  answers 503 with a reason rather than 200. The temptation is to return "fine"
+  and log a warning; this project has been bitten repeatedly by things that
+  reported success while doing nothing, and a draft the operator believes is in
+  their mailbox and is not has a customer on the other end of it.
+  **Two ordering traps, both closed before shipping.** The mailbox variables are
+  read from `docker-compose.prod.yml`, which lives on the SERVER and is not part
+  of the released image — so a machine still running an older stack definition
+  would store the password and pass it to nothing, reporting "unconfigured" with
+  a perfectly good credential beside it. `set-email.sh` now refuses unless the
+  server's compose file knows the variables, and the Ops workflow runs
+  `sync-server` first. Separately, `imap.2iberia.com` is NOT the mail host — the
+  provider's own page says `imap.hostinger.com` — so the derived default is
+  overridden explicitly rather than left to be discovered as a login failure.
+  **Verified against a stub IMAP server**, because the real password is the
+  operator's and belongs in neither a repository nor a test. Sixteen assertions
+  cover what we SAY to a mail server: that we authenticate, ask which folder is
+  Drafts and believe the answer, set `\Draft` so clients file it as a draft
+  rather than as received mail, and rewrite the sender without touching the body.
+  **One finding worth keeping:** the client's `path` is a DERIVED value and came
+  back as `INBOX.Sent.INBOX.Borradores` for a mailbox actually called
+  `INBOX.Borradores`. `pathAsListed` is the literal string the server put on the
+  wire, which is by definition a name it understands, so that is what the adapter
+  uses now.
+- **#92 — Mailbox setup moved into the app, because the operator's time is the
+  scarce thing (2026-08-08).** The first design needed a GitHub secret and a
+  workflow run. That is two minutes, once — but the operator said this mailbox
+  is a temporary test and a different one follows, which turns "two minutes,
+  once" into a recurring errand in a place they do not otherwise go.
+  **So: a single authenticated page at `/settings/email`.** Type the address and
+  the password, press Save. No GitHub, no SSH, no shell. The environment path
+  (`ops/set-email.sh`) still exists and still WINS over the stored value, because
+  it is the channel someone reaches for when things are wrong and they need
+  certainty about what the server is using.
+  **Saving proves the credential before storing it.** The route opens a real IMAP
+  connection and files a "mailbox connected" draft; only if the mail server
+  accepts does anything get written down. A saved-but-wrong mailbox is worse than
+  an unsaved one, because every screen then reports itself configured — and the
+  discovery comes when somebody expects a draft that never arrived.
+  **The password is encrypted at rest** (AES-256-GCM, key derived per-secret from
+  SESSION_SECRET with scrypt). Honest about the ceiling: this means a stolen
+  database dump is not a stolen mailbox, since the key lives in the server's
+  environment and not in the database. It does NOT protect against someone who
+  already has the running server, because that machine must be able to decrypt to
+  work at all. That is the ceiling for any credential a program uses unattended.
+  Rotating SESSION_SECRET makes stored secrets unopenable, so the error says
+  exactly that rather than failing as a login problem.
+  **The draft button looks identical and behaves as it did.** It still downloads
+  the `.eml`; it now ALSO files the same message in the mailbox. In addition to,
+  never instead of — the file is what works on a published copy, on a machine
+  with no session, and on the day the mail server is unreachable.
+  **Every outcome reaches the activity feed**, including "no mailbox connected"
+  (said once per session, not on every draft) and a failed append. Silence was
+  not one of the options: a draft the operator believes is in their mailbox and
+  is not has a customer on the other end of it.
+
+- **#93 — Sending was switched from impossible to possible, and the guarantee
+  that replaced "there is no code for it" is four rails, not one flag.**
+  Operator asked twice how to activate SMTP. #91 recorded the opposite decision
+  — drafts only, no send path anywhere — and the strength of that decision was
+  structural: the guarantee "this cannot email a customer" held because no
+  sending code existed to misconfigure. That guarantee is spent now, permanently,
+  and it cannot be won back by deleting the feature later; a reviewer will always
+  have to read the config instead of the dependency list.
+  **The credential question the operator kept asking has no new answer, and that
+  is the point.** SMTP reuses the mailbox credential already sealed in
+  `erp_state` — same address, same password, port 465 instead of 993. Nothing is
+  hand-edited on the server, nothing travels through chat or a side-channel, and
+  the submission host is derived from the IMAP host (`imap.X` → `smtp.X`, with
+  the handful of providers that break the pattern named). Turning sending on
+  introduces no second secret and no second place to keep one.
+  **What replaces the structural guarantee, in `lib/mail-send.ts`:**
+  1. _Off by default._ `enabled === true` and nothing else, so a stored `"yes"`,
+     `1` or `"false"` cannot enable it by being truthy. Deploying does not turn
+     it on; a person does, on a screen that says what it means.
+  2. _An allowlist, where empty means nobody._ The safe reading of "I did not
+     say" is "you may not". An operator who enables sending and does not think
+     about recipients has a system that can write to its own mailbox and no one
+     else. Entries are a whole address or `@domain`; the `@` anchor is what stops
+     `@cliente.es` matching `bob@evilcliente.es`, and there is a test for it.
+  3. _A rate limit (20/hour)._ The failure that costs a company its mail
+     reputation is never one wrong email, it is four hundred, and that is always
+     a loop.
+  4. _An explicit act per message._ `POST …/erp/send?confirm=yes`. The parameter
+     has no purpose except to be typed on purpose, so no code path can drift into
+     sending while meaning to save. `/draft` is unchanged and remains the default.
+     **Every attempt is logged, refusals included** — who, when, to whom, which
+     subject, and why not — bounded to the last 500 so an audit trail cannot grow a
+     settings row without limit. `by` is the fact nobody can reconstruct afterwards.
+     **Refusals get distinct HTTP statuses** (403 off, 422 recipient, 429 rate,
+     400 no recipient). One 400 for all of them would make a safety rail look like a
+     programming mistake, which is how rails get routed around.
+     **The honest ceiling:** this makes a bad send hard, not impossible. Anyone who
+     can sign in can enable sending and add a recipient. The rails are against
+     accident and against loops, not against a person with credentials deciding to
+     email someone. Ranking that risk against the customer's own inbox is the
+     owner's call, and they made it.

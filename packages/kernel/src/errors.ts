@@ -23,7 +23,12 @@ export type FactoryErrorCode =
   | "BAD_REQUEST"
   // Nobody proved who they are. Distinct from BAD_REQUEST because the caller's
   // recovery is completely different — not "fix your payload" but "log in".
-  | "UNAUTHENTICATED";
+  | "UNAUTHENTICATED"
+  // A system we depend on but do not control refused or failed — a mail server,
+  // a payment gateway, a tax authority. Deliberately distinct from BAD_REQUEST:
+  // the caller's payload was fine and there is nothing for them to fix, so
+  // telling them "bad request" sends them to look in the wrong place entirely.
+  | "INTEGRATION_FAILED";
 
 /**
  * Single error type for the whole factory. `code` is stable API; message is

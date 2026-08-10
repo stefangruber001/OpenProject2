@@ -1,0 +1,406 @@
+/**
+ * Connect the company mailbox — the whole setup, on one screen.
+ *
+ * This exists so nobody has to touch GitHub secrets, SSH, or a shell to change
+ * where the ERP files its drafts. The operator opens a link on their phone,
+ * types the address and the password, and presses Save. The server proves the
+ * credential against the real mail server before storing it, so "saved" means
+ * "working" rather than "written down".
+ *
+ * No client JavaScript, and the same visual language as the sign-in page, for
+ * the same reason: this is a screen that asks for a password, and it must work
+ * even if nothing else on the page does.
+ *
+ * BOTH LANGUAGES, SIDE BY SIDE, and deliberately NOT through the site's ES/EN
+ * machinery. Two people set this up between them and they do not read the same
+ * language; a toggle would mean one of them arrives to find the wrong one
+ * chosen. It is one short screen, used once, so showing both costs a few lines
+ * and removes a step. Nothing here reads or writes the language preference.
+ *
+ * IT IS DELIBERATELY NOT IN THE ERP's NAVIGATION. Mailbox setup is something
+ * done once and then forgotten; putting it in the tab bar would spend permanent
+ * space on it, and the operator was explicit that the workspace UI should not
+ * change. It is reachable by its address.
+ */
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { mailFrom, mailboxFromEnv } from "@/lib/draft-mailbox";
+import { loadMailSettings } from "@/lib/erp-runtime";
+import { policyFrom } from "@/lib/mail-send";
+import { defaultTenant } from "@/lib/access";
+import { SESSION_COOKIE, readSession } from "@/lib/session-token";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const GREEN = "#48733c";
+const GREEN_DEEP = "#31532a";
+const SPARK = "#f2c230";
+const INK = "#14160f";
+const BODY = "#4f5347";
+const MUTED = "#8b8f80";
+const LINE = "#dde5d6";
+const SERIF = '"Roboto Serif", Georgia, "Times New Roman", serif';
+const SANS = 'Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif';
+
+const FIELD: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "13px 14px",
+  fontSize: 16, // 16 exactly, or iOS zooms the page on focus
+  fontFamily: SANS,
+  color: INK,
+  background: "#fff",
+  border: `1px solid ${LINE}`,
+  borderRadius: 11,
+  outlineColor: GREEN,
+};
+
+/** English on the label line, Spanish beneath it in the muted weight. */
+function Bi({ en, es, htmlFor }: { en: string; es: string; htmlFor: string }) {
+  return (
+    <label htmlFor={htmlFor} style={{ display: "block", marginBottom: 7 }}>
+      <span
+        style={{
+          display: "block",
+          font: `600 11.5px ${SANS}`,
+          letterSpacing: ".08em",
+          textTransform: "uppercase",
+          color: MUTED,
+        }}
+      >
+        {en}
+      </span>
+      <span style={{ display: "block", font: `400 12px ${SANS}`, color: MUTED, marginTop: 2 }}>
+        {es}
+      </span>
+    </label>
+  );
+}
+
+export default async function MailSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const status = typeof params.status === "string" ? params.status : "";
+  const detail = typeof params.detail === "string" ? params.detail : "";
+
+  // Same gate as everything else. A form that stores a mailbox password must
+  // not be reachable by anyone who happens to know the address.
+  const secret = process.env.SESSION_SECRET?.trim();
+  if (secret) {
+    const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    const claims = await readSession(token, secret, Math.floor(Date.now() / 1000));
+    if (!claims) redirect("/login?next=%2Fsettings%2Femail");
+  }
+
+  const fromEnv = mailboxFromEnv();
+  // Loaded even when the environment supplies the mailbox: the sending policy
+  // lives in the stored settings either way, and reading it only in one of the
+  // two cases would make the screen lie about the state of a switch.
+  const stored = (await loadMailSettings(defaultTenant()).catch(() => null)) as {
+    user?: string;
+    host?: string;
+    send?: unknown;
+  } | null;
+  const sending = policyFrom(stored?.send);
+
+  const currentAddress = fromEnv ? fromEnv.user : stored?.user || "";
+  const currentHost = fromEnv ? fromEnv.host : stored?.host || "";
+  const connected = Boolean(currentAddress);
+
+  return (
+    <main
+      style={{
+        fontFamily: SANS,
+        minHeight: "100dvh",
+        display: "grid",
+        placeItems: "center",
+        padding: "24px 20px calc(24px + env(safe-area-inset-bottom, 0px))",
+        color: BODY,
+        background: `
+          radial-gradient(1200px 620px at 88% -14%, rgba(72,115,60,.20), transparent 58%),
+          radial-gradient(820px 460px at -6% 4%, rgba(242,194,48,.14), transparent 55%),
+          #eef3ea`,
+      }}
+    >
+      <div style={{ width: "min(100%, 440px)" }}>
+        <div style={{ marginBottom: 18, paddingLeft: 2 }}>
+          <div style={{ font: `600 20px/1.1 ${SERIF}`, color: INK, letterSpacing: "-.02em" }}>
+            Canei Subirats
+          </div>
+          <div
+            style={{
+              font: `600 10px ${SANS}`,
+              letterSpacing: ".14em",
+              textTransform: "uppercase",
+              color: GREEN,
+              marginTop: 4,
+            }}
+          >
+            Draft mailbox · Buzón para borradores
+          </div>
+        </div>
+
+        <form
+          method="post"
+          action="/api/mail-settings"
+          style={{
+            background: "#fff",
+            border: `1px solid ${LINE}`,
+            borderRadius: 18,
+            padding: "26px 24px 24px",
+            boxShadow: "0 1px 2px rgba(24,32,16,.04), 0 30px 60px -32px rgba(24,32,16,.34)",
+          }}
+        >
+          <div
+            aria-hidden
+            style={{
+              height: 3,
+              width: 46,
+              borderRadius: 999,
+              background: `linear-gradient(90deg, ${GREEN}, ${SPARK})`,
+              marginBottom: 18,
+            }}
+          />
+
+          {status === "ok" && (
+            <Banner tone="good">
+              Connected. A test draft was left in <b>{detail || "your drafts folder"}</b>.
+              <br />
+              <span style={{ opacity: 0.75 }}>
+                Conectado. Se ha dejado un borrador de prueba en{" "}
+                {detail || "la carpeta de borradores"}.
+              </span>
+            </Banner>
+          )}
+          {status === "failed" && (
+            <Banner tone="bad">
+              The mail server did not accept these details, so nothing was saved.
+              <br />
+              <span style={{ opacity: 0.75 }}>
+                El servidor de correo no aceptó estos datos, así que no se ha guardado nada.
+              </span>
+              {/* On its own line, not in parentheses: this is now a sentence
+                  telling the operator which field to change, and the useful
+                  half of it was the half that got buried. */}
+              {detail && (
+                <div style={{ marginTop: 8, font: `400 12.5px/1.5 ${SANS}` }}>{detail}</div>
+              )}
+            </Banner>
+          )}
+          {status === "bad" && <Banner tone="bad">{detail || "Check the details."}</Banner>}
+
+          {connected && !status && (
+            <Banner tone="info">
+              Current mailbox: <b>{currentAddress}</b>
+              {currentHost ? ` · ${currentHost}` : ""}
+              {fromEnv ? " (fixed on the server)" : ""}
+            </Banner>
+          )}
+
+          <p style={{ font: `400 13px/1.55 ${SANS}`, color: BODY, margin: "0 0 18px" }}>
+            The ERP will leave its emails as <b>drafts</b> in this mailbox. It never sends anything
+            — you review them and send from your own mail app.
+          </p>
+          <p style={{ font: `400 12.5px/1.55 ${SANS}`, color: MUTED, margin: "-10px 0 18px" }}>
+            El ERP dejará sus emails como <b>borradores</b> en este buzón. Nunca envía nada: usted
+            los revisa y los envía desde su propio correo.
+          </p>
+
+          <Bi htmlFor="address" en="Email address" es="Dirección de correo" />
+          <input
+            id="address"
+            name="address"
+            type="email"
+            autoComplete="username"
+            inputMode="email"
+            required
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            defaultValue={currentAddress}
+            placeholder="if@2iberia.com"
+            style={{ ...FIELD, marginBottom: 16 }}
+          />
+
+          <Bi htmlFor="password" en="Mailbox password" es="Contraseña del buzón" />
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            style={{ ...FIELD, marginBottom: 6 }}
+          />
+          <p style={{ font: `400 12px/1.5 ${SANS}`, color: MUTED, margin: "0 0 16px" }}>
+            Stored encrypted on the server. Never shown again.
+            <br />
+            Se guarda cifrada en el servidor. No se muestra nunca más.
+          </p>
+
+          <details style={{ marginBottom: 18 }}>
+            <summary style={{ font: `600 12.5px ${SANS}`, color: GREEN, cursor: "pointer" }}>
+              Advanced settings · Ajustes avanzados
+            </summary>
+            <div style={{ paddingTop: 12 }}>
+              <Bi htmlFor="host" en="IMAP server" es="Servidor IMAP" />
+              <input
+                id="host"
+                name="host"
+                type="text"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                defaultValue={currentHost}
+                // Empty is the normal case: the server finds this from the
+                // domain's MX records. Naming a provider here would suggest it
+                // has to be filled in.
+                placeholder="(found automatically)"
+                style={{ ...FIELD, marginBottom: 12 }}
+              />
+              <Bi htmlFor="drafts" en="Drafts folder" es="Carpeta de borradores" />
+              <input
+                id="drafts"
+                name="drafts"
+                type="text"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="(detected automatically)"
+                style={FIELD}
+              />
+            </div>
+          </details>
+
+          {/* SENDING. Off unless someone deliberately turns it on, and the
+              screen says what turning it on means rather than presenting it as
+              another checkbox. A draft is an edit; a sent email is a
+              conversation with a customer. */}
+          <details style={{ marginBottom: 18 }} open={sending.enabled}>
+            <summary style={{ font: `600 12.5px ${SANS}`, color: GREEN, cursor: "pointer" }}>
+              Sending · Envío {sending.enabled ? "— ON · ACTIVADO" : "— off · desactivado"}
+            </summary>
+            <div style={{ paddingTop: 12 }}>
+              <p style={{ font: `400 12.5px/1.5 ${SANS}`, color: BODY, margin: "0 0 12px" }}>
+                Normally the ERP only files drafts and you press send yourself. Switch this on and
+                it can send directly — which cannot be undone.
+                <br />
+                <span style={{ opacity: 0.75 }}>
+                  Normalmente el ERP solo deja borradores y usted los envía. Si lo activa, podrá
+                  enviar directamente, y eso no se puede deshacer.
+                </span>
+              </p>
+
+              <label
+                htmlFor="sendEnabled"
+                style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 14 }}
+              >
+                <input
+                  id="sendEnabled"
+                  name="sendEnabled"
+                  type="checkbox"
+                  value="yes"
+                  defaultChecked={sending.enabled}
+                  style={{ width: 20, height: 20, marginTop: 1, accentColor: GREEN }}
+                />
+                <span style={{ font: `600 13px/1.4 ${SANS}`, color: INK }}>
+                  Allow the ERP to send email
+                  <br />
+                  <span style={{ font: `400 12.5px ${SANS}`, color: MUTED }}>
+                    Permitir que el ERP envíe correos
+                  </span>
+                </span>
+              </label>
+
+              <Bi
+                htmlFor="allowlist"
+                en="Approved recipients — one per line"
+                es="Destinatarios permitidos — uno por línea"
+              />
+              <textarea
+                id="allowlist"
+                name="allowlist"
+                rows={3}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                defaultValue={sending.allowlist.join("\n")}
+                placeholder={"cliente@example.com\n@caneisubirats.com"}
+                style={{ ...FIELD, resize: "vertical" }}
+              />
+              <p style={{ font: `400 12px/1.5 ${SANS}`, color: MUTED, margin: "6px 0 0" }}>
+                An address, or <b>@domain</b> for everyone there. Empty means the ERP may only write
+                to this mailbox itself — never to a customer.
+                <br />
+                Una dirección, o <b>@dominio</b> para todos. Vacío significa que el ERP solo puede
+                escribirse a sí mismo, nunca a un cliente.
+              </p>
+            </div>
+          </details>
+
+          <button
+            type="submit"
+            style={{
+              width: "100%",
+              padding: "15px 16px",
+              font: `700 15.5px ${SANS}`,
+              color: "#fff",
+              background: `linear-gradient(120deg, ${GREEN_DEEP}, ${GREEN} 72%)`,
+              border: "none",
+              borderRadius: 12,
+              cursor: "pointer",
+              boxShadow: "0 10px 22px -12px rgba(49,83,42,.9)",
+            }}
+          >
+            Save and test · Guardar y probar
+          </button>
+
+          <p
+            style={{
+              font: `400 12px/1.5 ${SANS}`,
+              color: MUTED,
+              textAlign: "center",
+              margin: "16px 0 0",
+            }}
+          >
+            Checked against the mail server before saving.
+            <br />
+            Se comprueba con el servidor de correo antes de guardar.
+          </p>
+        </form>
+
+        <p style={{ font: `400 12px/1.5 ${SANS}`, color: MUTED, margin: "14px 2px 0" }}>
+          Sending from {mailFrom() || currentAddress || "—"}
+        </p>
+      </div>
+    </main>
+  );
+}
+
+function Banner({ tone, children }: { tone: "good" | "bad" | "info"; children: React.ReactNode }) {
+  const palette = {
+    good: { bg: "#e7f0e1", border: "#bcd4b1", color: "#31532a" },
+    bad: { bg: "#f6e3df", border: "#e3b7ae", color: "#8f2d1b" },
+    info: { bg: "#eef3ea", border: "#dde5d6", color: "#4f5347" },
+  }[tone];
+  return (
+    <div
+      role={tone === "bad" ? "alert" : undefined}
+      style={{
+        background: palette.bg,
+        border: `1px solid ${palette.border}`,
+        color: palette.color,
+        borderRadius: 11,
+        padding: "11px 13px",
+        font: `500 13px/1.45 ${SANS}`,
+        marginBottom: 16,
+        wordBreak: "break-word",
+      }}
+    >
+      {children}
+    </div>
+  );
+}

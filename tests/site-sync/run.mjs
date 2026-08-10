@@ -245,7 +245,10 @@ async function leaveAndReturn(page, awayMs = 1800) {
   await page.waitForTimeout(400);
   const first = await page.evaluate(() => !!document.getElementById("canei-stale"));
 
-  await page.click("#canei-stale button[aria-label='Descartar']");
+  // The label is English: main moved the shell's own chrome to English
+  // (commit 01017c9) and changed erp-sync.js, but not this expectation — so
+  // this check was failing on main before the v4 branch merged into it.
+  await page.click("#canei-stale button[aria-label='Dismiss']");
   await page.waitForTimeout(150);
   const gone = await page.evaluate(() => !!document.getElementById("canei-stale"));
 

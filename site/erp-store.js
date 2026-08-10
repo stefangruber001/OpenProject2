@@ -144,10 +144,10 @@
       );
       var msg = document.createElement("span");
       msg.innerHTML =
-        "⚠️ <b>" + title + "</b> " + (detail || "") + " Sus últimos cambios NO están guardados.";
+        "⚠️ <b>" + title + "</b> " + (detail || "") + " Your latest changes are NOT saved.";
       bar.appendChild(msg);
       var again = document.createElement("button");
-      again.textContent = "Recargar";
+      again.textContent = "Reload";
       again.setAttribute(
         "style",
         "background:#fff;color:#8f2d1b;border:0;font-weight:800;padding:7px 14px;" +
@@ -209,16 +209,13 @@
         }
         if (res.status === 409) {
           saveFailed(
-            "Otra persona ha guardado antes que usted.",
-            "Recargue para ver sus cambios y vuelva a introducir los suyos.",
+            "Somebody else saved before you.",
+            "Reload to see their changes, then enter yours again.",
           );
         } else if (res.status === 401) {
-          saveFailed("Su sesión ha caducado.", "Vuelva a iniciar sesión.");
+          saveFailed("Your session has expired.", "Please sign in again.");
         } else {
-          saveFailed(
-            "No se ha podido guardar en el servidor.",
-            (res.body && res.body.message) || "",
-          );
+          saveFailed("Could not save to the server.", (res.body && res.body.message) || "");
         }
         throw new Error("save refused: HTTP " + res.status);
       })
@@ -227,7 +224,7 @@
         // there is a response at all — so it is caught here rather than being
         // mistaken for a successful save.
         if (String(e && e.message).indexOf("save refused") !== 0) {
-          saveFailed("Sin conexión con el servidor.", "");
+          saveFailed("No connection to the server.", "");
         }
         throw e;
       });
@@ -274,7 +271,7 @@
       .catch(function (e) {
         // Loud, because the alternative is a photograph the operator believes
         // they filed. The line referencing it would still save.
-        saveFailed("No se ha podido subir la imagen.", (e && e.message) || "");
+        saveFailed("Could not upload the image.", (e && e.message) || "");
         throw e;
       });
   }

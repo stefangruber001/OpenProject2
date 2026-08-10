@@ -23,7 +23,8 @@
     "prepare": "husky",
     "test:sync": "node tests/site-sync/run.mjs",
     "test:i18n": "node tests/i18n/coverage.mjs",
-    "test:workbook": "node tests/workbook/coverage.mjs"
+    "test:workbook": "node tests/workbook/coverage.mjs",
+    "test:mailbox": "tsx tests/mailbox/run.mts"
   },
   "devDependencies": {
     "@tesseract.js-data/cat": "^1.0.0",

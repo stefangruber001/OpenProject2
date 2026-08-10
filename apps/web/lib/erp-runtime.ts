@@ -114,6 +114,36 @@ export function isAuxDocument(name: string): boolean {
 }
 
 /**
+ * The mailbox settings, kept per company.
+ *
+ * Stored in the same versioned document table as everything else, under its own
+ * key, so it inherits the tenant isolation already proven there rather than
+ * inventing a second way to keep a company's things apart. The password inside
+ * is sealed by lib/secret-box before it ever reaches this layer — nothing here
+ * ever sees it in the clear, which is why this function does not need to be
+ * careful with it.
+ *
+ * Version handling is deliberately swallowed: two people racing to save mailbox
+ * settings is not a case worth a conflict dialogue, and the last one wins the
+ * way it would in any settings screen.
+ */
+export async function loadMailSettings(tenantId: string): Promise<Record<string, unknown> | null> {
+  const store = await stateStore(tenantId, "mail-settings");
+  const { state } = await store.load<Record<string, unknown>>();
+  return state ?? null;
+}
+
+export async function saveMailSettings(
+  tenantId: string,
+  settings: Record<string, unknown>,
+  user: string,
+): Promise<void> {
+  const store = await stateStore(tenantId, "mail-settings");
+  const { version } = await store.load();
+  await store.save(settings, version, user);
+}
+
+/**
  * The store for binary attachments (site photographs).
  *
  * Same tenant assertion and same DATABASE_URL requirement as the documents: a
