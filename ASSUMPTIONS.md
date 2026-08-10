@@ -2638,6 +2638,9 @@ different decisions, so these ten arrived colliding. They are renumbered from
   is the post-S15 shell and loads `site/` from the server, so it started serving
   v101 the moment deploy promoted it. What is frozen is the Face ID lock
   screen's wording, and only that. **Reversible: yes — nothing was done.**
+  _Closed the same morning:_ the operator revoked the stale CI-minted
+  certificates themselves and the re-run uploaded v1.1 build 7 from `main`
+  (run `31359895269`), so the shell now matches `main` exactly.
 - **#91 — The mailbox is somewhere to PUT A DRAFT, never somewhere to send from
   (2026-08-08).** The operator asked to link `if@2iberia.com` so the ERP's
   generated emails use it, showed the provider's IMAP/SMTP page, and said not to

@@ -15,19 +15,21 @@ and only then did `promote` re-point `:main`. The server is serving v101.
 
 ## The iOS app against v101
 
-TestFlight holds **v1.1 build 6**, uploaded 2026-08-10 04:43 from `136b131` —
-the programme branch head, i.e. the complete post-S15 native shell. The app
-loads `site/` from the server rather than bundling it, so **it is already
-showing v101**: the promote above changed what build 6 renders, without a new
-build.
+TestFlight holds **v1.1 build 7**, uploaded 2026-08-10 05:53 from `main`
+(`a06fd0f`, whose `ios/` tree is byte-identical to v101 — the commits after
+`6ba1850` touch only documentation). The native shell now matches `main`
+exactly; nothing in the shipped app diverges from the repository.
 
-A rebuild from `main` was attempted (run `31359028265`) and failed in Apple's
-account, not in this repo — see the certificate section of
-`INTEGRATIONS_PENDING.md`. What that rebuild would have changed is two files:
-`LockView.swift` and `BiometricLock.swift`, where main's English chrome pass
-translated the Face ID lock screen. So the divergence is one screen's wording
-(shipped: Spanish; main's source: English) and nothing else — `Config.swift`,
-the base URL and the native-shell user-agent marker are identical on both.
+The path there had one detour worth recording. Build 6 (04:43, from the
+programme branch head `136b131`) was the first post-S15 shell, and because the
+app loads `site/` from the server rather than bundling it, build 6 was already
+showing v101 the moment the promote above ran. The first rebuild attempt from
+`main` then failed on Apple's certificate cap — each CI run mints a fresh
+signing certificate and the account was full. The operator revoked the stale
+CI-minted certificates the same morning and the re-run (`31359895269`) went
+green. The mechanism and the routine for next time are in
+`INTEGRATIONS_PENDING.md`. The only user-visible difference between builds 6
+and 7 is the Face ID lock screen's language (Spanish → main's English).
 
 ## Going back to v100
 

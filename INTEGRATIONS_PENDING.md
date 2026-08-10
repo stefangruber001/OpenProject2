@@ -61,9 +61,14 @@ fails SPF/DKIM land in spam, which looks exactly like the feature not working.
 | `brand-assets@1` (Canei Subirats)        | typographic wordmark stand-in                               | real logo SVGs (`logo-Caneisubirats-2.svg`, `_blanc-1.svg`, `caneisubirats_verd.png`, `picto-groc.png`) from their WP media library                                                            | see docs/clients/canei-subirats/BRAND.md; swap at handover                                                                                                                                                                                  |
 | `google-play-publishing@1` (Android)     | CI builds debug-signed `.aab` artifact                      | signed upload + Play API release via `android-play.yml` (secrets: ANDROID_KEYSTORE_*, PLAY_SERVICE_ACCOUNT_JSON)                                                                               | needs owner: Play account ($25), upload keystore, service account — PLAY-SETUP.md has the 30-min checklist; pipeline already runs end to end without them                                                                                   |
 
-## Apple signing certificates — the TestFlight lane has run out of them
+## Apple signing certificates — the TestFlight lane mints one per run
 
-**Status:** blocked in Apple's account, not in this repo. Nothing to build.
+**Status:** RESOLVED for now (2026-08-10) — the operator revoked the stale
+CI-minted certificates in the developer account, and the re-run
+(`31359895269`) archived, signed and uploaded **v1.1 build 7** from `main`
+cleanly. The section stays because the mechanism that filled the account is
+still in place: each CI run mints a fresh certificate, so the cap will be hit
+again after roughly a dozen builds. The durable fix below is still unwired.
 
 `ios/fastlane/Fastfile`'s `beta` lane signs with Xcode **cloud-managed**
 signing: `build_app` passes `-allowProvisioningUpdates` plus the App Store
@@ -85,10 +90,14 @@ cannot be undone by re-running anything, and revoking the wrong one breaks
 signing on the operator's own Mac. Under the autonomy contract that is the less
 reversible option, so it is written down rather than done.
 
-**What unblocks it (2 minutes, once):** developer.apple.com → Certificates,
-Identifiers & Profiles → Certificates, revoke the stale _Apple Distribution_
-certificates — the cloud-managed ones minted by earlier CI runs, which no
-machine holds a private key for. Then re-run `ios-testflight.yml`.
+**What unblocks it (2 minutes, each time it refills):** developer.apple.com →
+Certificates, Identifiers & Profiles → Certificates, revoke every certificate
+whose _Created By_ is the CI API key (`0d2a52f8-…`) — those were minted on
+throwaway runners whose private keys no longer exist anywhere, so revoking
+them can break nothing. Keep the operator's own certificates (Created By the
+operator's name) and the _Distribution Managed_ one, whose key Apple holds.
+Then re-run `ios-testflight.yml`. Done exactly this way on 2026-08-10 and the
+next run went green.
 
 **The durable fix,** if the app is going to ship often: give CI one certificate
 to reuse instead of minting one per run — either fastlane `match` with a
@@ -96,7 +105,7 @@ private cert repo (needs the repo and a `MATCH_PASSWORD` secret) or a
 distribution `.p12` exported once and imported from a secret. Both need a Mac
 and the account owner, which is why neither is wired.
 
-**What is NOT blocked:** the app in TestFlight already runs the current build.
-It loads `site/` from the server, so it picked up v101 when deploy promoted it.
-Only the native shell is frozen at `136b131`, and the only thing that differs
-there is the Face ID lock screen's wording — see `RELEASES.md`.
+**Why even the blocked window was harmless:** the app loads `site/` from the
+server, so build 6 started showing v101 the moment deploy promoted it. The only
+thing the cap ever froze was the native shell — in practice one screen's
+wording — and build 7 closed that gap. See `RELEASES.md`.
