@@ -24,6 +24,7 @@
     "test:sync": "node tests/site-sync/run.mjs",
     "test:i18n": "node tests/i18n/coverage.mjs",
     "test:workbook": "node tests/workbook/coverage.mjs",
+    "test:ios-routes": "node tests/ios-routes/coverage.mjs",
     "test:mailbox": "tsx tests/mailbox/run.mts"
   },
   "devDependencies": {

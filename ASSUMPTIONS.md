@@ -2757,3 +2757,27 @@ different decisions, so these ten arrived colliding. They are renumbered from
      accident and against loops, not against a person with credentials deciding to
      email someone. Ranking that risk against the customer's own inbox is the
      owner's call, and they made it.
+- **#151 — a tab's URL is resolved as a URL, and the guard for it lives in Node
+  (2026-08-10).** Every screen in the phone app answered 404 while the server
+  was demonstrably healthy — `/api/health` reporting the release commit and a
+  connected database. `WebTab.url` built its address with
+  `appendingPathComponent`, which treats its argument as one path segment and
+  percent-encodes anything illegal in one, including `#`. The tabs had just
+  moved onto the shell's hash routes, so five of six asked the server for a file
+  called `erp.html#tower`. Guide survived because it is the only path with no
+  fragment. **Fixed with `URL(string:relativeTo:)`**, which treats a fragment as
+  a fragment and never sends it to the server.
+  **The guard is deliberately not a Swift test.** The Xcode project builds on a
+  macOS runner, so a test living there runs after the decision to ship, and only
+  when someone touches `ios/`. What breaks a tab is a page being renamed in
+  `site/` or a section key changing — neither of which is an iOS change at all,
+  and both of which are plain text. `tests/ios-routes/coverage.mjs` therefore
+  runs on every push next to the site it points at, and checks the file exists,
+  the fragment is a route the shell declares, and the URL is not built the way
+  that broke it. Verified by reintroducing the bug and watching it fail.
+  **What this cost:** the wrong diagnosis first. A 404 on every screen reads as
+  a stale server, the deploy history made that plausible, and the operator was
+  sent to run a deploy script for a server that was already current. The lesson
+  worth keeping is that `/api/health` answers that question in one request and
+  should be the FIRST thing checked, not the confirmation of a theory.
+  **Reversible: yes.**
