@@ -146,6 +146,14 @@ jobs:
       - name: i18n coverage (no untranslated user-visible string)
         run: node tests/i18n/coverage.mjs
 
+      # The mapping's field dictionary is the strongest claim in the governance
+      # set — "the data you have today fits the system you are buying" — and it
+      # is a markdown table, so nothing but this stops it drifting away from the
+      # engine. Resolves every field the table claims against the real seeded
+      # dataset, not against the source text.
+      - name: Workbook coverage (the field dictionary is still true)
+        run: node tests/workbook/coverage.mjs
+
   persistence:
     name: Durable adapters (Postgres + RLS contract tests)
     runs-on: ubuntu-latest

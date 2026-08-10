@@ -1689,6 +1689,19 @@ assert(
     "…over the whole calendar month it names",
     JSON.stringify([rec.month, rec.from, rec.to]),
   );
+  // With no month named it reconciles the last month whose payroll actually
+  // ran. Reconciling a month still in progress reports every hour booked so
+  // far as unpaid — a calendar fact dressed up as an alarm.
+  erp
+    .importMovements(erp.state.bankAccounts[0].id, [
+      { accountingDate: "2026-02-26", concept: "NOMINAS SIM", amountCents: -100000 },
+    ])
+    .forEach((m) => erp.classifyMovement(m.id, "salary", "sim"));
+  assert(
+    erp.labourReconciliation().month === "2026-02",
+    "with no month named, the reconciliation is of the last payroll that ran",
+    erp.labourReconciliation().month,
+  );
 }
 
 const failed = checks.filter((c) => !c.pass);

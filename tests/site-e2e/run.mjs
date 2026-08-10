@@ -3191,7 +3191,7 @@ async function testProcurement(browser, base) {
     await pg.locator('[data-htab="summary"]').click();
     await pg.waitForTimeout(600);
     const summary = await pg.evaluate(() => {
-      const rec = erp.labourReconciliation(erp.today);
+      const rec = erp.labourReconciliation();
       return {
         table: !!document.querySelector("#hSum"),
         recBlock: !!document.querySelector("#hRec"),
