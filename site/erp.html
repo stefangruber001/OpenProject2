@@ -6865,7 +6865,7 @@
       function horasSummary() {
         const r = periodRange();
         const s = erp.hoursSummary(r.from, r.to, null);
-        const rec = erp.labourReconciliation(hDay);
+        const rec = erp.labourReconciliation();
         const h = (m) => (m / 1000).toLocaleString("es-ES");
         const off = rec.unbookedCents;
         return `

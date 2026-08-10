@@ -4742,7 +4742,20 @@
      * knowing before the figures reach a job's margin.
      */
     labourReconciliation(monthIso) {
-      const from = monthStartOf(monthIso || this.state.today);
+      // With no month named, reconcile the last month that has a wage payment
+      // in it rather than the current one. A month whose payroll has not run
+      // yet cannot be reconciled — on the 5th it would report every hour
+      // booked so far as unpaid, which is a calendar fact dressed up as an
+      // alarm. The last closed payroll is the last month there is an answer
+      // for, and it is the month somebody asking this question means.
+      if (!monthIso) {
+        const paid = this.state.movements
+          .filter((m) => m.class === "salary")
+          .map((m) => m.accountingDate)
+          .sort();
+        monthIso = paid.length ? paid[paid.length - 1] : this.state.today;
+      }
+      const from = monthStartOf(monthIso);
       const to = addDays(addMonths(from, 1), -1);
       const entries = this.state.labour.filter((l) => l.date >= from && l.date <= to);
       const bookedCents = sum(entries, (l) => l.costCents);

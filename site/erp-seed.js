@@ -12,7 +12,7 @@
   const { ERP, addDays } = E;
 
   /* Demo-dataset version. See the assignment at the end of build(). */
-  const SEED_VERSION = 2;
+  const SEED_VERSION = 3;
 
   function build(today) {
     const erp = new ERP("2026-03-02");
@@ -1183,7 +1183,7 @@
           amountCents: -23470,
           card: "V-1234",
         }, // unallocated → exception
-        { accountingDate: "2026-04-28", concept: "NOMINAS", amountCents: -860000 },
+        { accountingDate: "2026-04-28", concept: "NOMINAS", amountCents: -1240000 },
         { accountingDate: "2026-04-30", concept: "TRASPASO A CAJA", amountCents: -20000 },
       ])
       .forEach((m, i) => {
@@ -1464,6 +1464,140 @@
         );
       erp.updateAlertRule("AR-OVERDUE", { recipient: "backoffice", channel: "email" }, "seed");
     }
+
+    /* ---- S15: the year the newer screens need ---------------------------
+       Five screens built between S10 and S13 read things this dataset barely
+       had. ADM-04's reconciliation opened at −100% because no wage ever left
+       the bank; ADM-09's P&L and the gestoría roll-up read `accountLedger`,
+       which returned two rows for seven months; the day sheet is a grid of
+       workers and there were two.
+
+       Nothing here is decoration. A demo that cannot exercise the screen it is
+       demonstrating is worse than an empty one, because an empty screen says
+       "no data" and a thin one says "this is what it looks like". */
+    const w3 = erp.addWorker({
+      name: "Encarregat — Nuria",
+      kind: "employee",
+      rateHistory: [
+        { from: "2024-01-01", rateCentsPerHour: 2100 },
+        { from: "2026-01-01", rateCentsPerHour: 2300 },
+      ],
+    });
+    const w4 = erp.addWorker({
+      name: "Oficial 2ª — Karim",
+      kind: "employee",
+      rateHistory: [
+        { from: "2024-01-01", rateCentsPerHour: 1550 },
+        { from: "2026-01-01", rateCentsPerHour: 1650 },
+      ],
+    });
+    const w5 = erp.addWorker({
+      name: "Pintor autònom — Dani",
+      kind: "selfEmployed",
+      rateHistory: [{ from: "2024-01-01", rateCentsPerHour: 2400 }],
+    });
+
+    /* Overheads. The chart of accounts has fifteen entries and the ledger used
+       two of them, so the roll-up that gap 13 was closed for had nothing to
+       roll up. Five recurring suppliers, one bill a month, each allocated to
+       the overhead category that resolves to its account. */
+    const ovhSuppliers = [
+      ["Immobiliària Creu 74, S.L.", "B00000018", "rent", 95000],
+      ["Assegurances Baix, S.A.", "B00000026", "insurance", 31000],
+      ["Gestoria Subirats i Fills", "B00000034", "accountingFirm", 42000],
+      ["Carburants Llobregat", "B00000042", "fuel", 27000],
+      ["Papereria i Oficina SJD", "B00000059", "office", 9000],
+    ].map(([name, taxId, cat, cents]) => ({
+      party: erp.addParty({
+        roles: ["supplier"],
+        partyType: "company",
+        name,
+        taxId,
+        billStreet: "Polígon Sud 1",
+        billPostalCode: "08960",
+        billCity: "Sant Just Desvern",
+        billProvince: "Barcelona",
+        paymentTermsDays: 30,
+        leadSource: "other",
+      }),
+      cat,
+      cents,
+    }));
+    const MONTHS_2026 = ["01", "02", "03", "04"];
+    MONTHS_2026.forEach((mm, mi) => {
+      ovhSuppliers.forEach((o, si) => {
+        erp.registerBill({
+          supplierId: o.party.id,
+          number: `G-2026-${mm}${String(si + 1).padStart(2, "0")}`,
+          date: `2026-${mm}-05`,
+          dueDate: `2026-${mm}-28`,
+          baseCents: o.cents,
+          vatBp: 2100,
+          allocations: [{ overheadCategory: o.cat, amountCents: o.cents }],
+          // A recurring overhead invoice arrives as a PDF and is filed with
+          // it. Registering twenty of them with no document would hand the
+          // gestoría screen twenty blocking exceptions, which says the demo is
+          // careless rather than that the screen is strict.
+          docRef: `gastos/2026-${mm}/${o.party.taxId}.pdf`,
+        });
+      });
+      /* Wages leave the bank on the 28th. Without them ADM-04's reconciliation
+         compares the month's hours against nothing and reports every euro as
+         unbooked, which is the screen's headline figure reading as an alarm
+         when the truth is simply that the payroll was never loaded.
+
+         April already has its NOMINAS line further up — the one §5.3 uses to
+         demonstrate classification — and adding a second would show the month
+         paying its crew twice. */
+      if (mm !== "04")
+        erp
+          .importMovements(bank.id, [
+            {
+              accountingDate: `2026-${mm}-28`,
+              concept: "NOMINAS " + mm + "/2026",
+              amountCents: -(1180000 + mi * 20000),
+            },
+          ])
+          .forEach((m) => erp.classifyMovement(m.id, "salary"));
+    });
+
+    /* The crew works every weekday, or the reconciliation has a wage bill
+       against almost no hours and reports 70% of the payroll as unbooked —
+       which reads as an alarm when the truth is that the demo was thin. With
+       four months of real days the difference lands where it should: a modest
+       margin for holidays, sick days and the office. */
+    for (const mm of MONTHS_2026) {
+      for (let d = 1; d <= 28; d++) {
+        const date = `2026-${mm}-${String(d).padStart(2, "0")}`;
+        const dow = new Date(date + "T00:00:00Z").getUTCDay();
+        if (dow === 0 || dow === 6) continue;
+        [w3, w4, w5].forEach((w) => {
+          erp.recordHours({
+            workerId: w.id,
+            projectId: prjB.id,
+            chapterNum: "1",
+            hoursMilli: 8000,
+            date,
+          });
+        });
+      }
+    }
+
+    /* Two more documents in the inbox, so ADM-03's card column is a column. */
+    erp.captureDocument({
+      docType: "supplierInvoice",
+      imageRef: "factura-immobiliaria.jpg",
+      machineReadable: true,
+      sourcePath: "/Dropbox/Facturas/2026/04/immobiliaria.pdf",
+      keyFields: { concepto: "Lloguer nau abril" },
+    });
+    erp.captureDocument({
+      docType: "deliveryNote",
+      imageRef: "albaran-pintures.jpg",
+      machineReadable: false,
+      reference: "ALB-2026-4471",
+      keyFields: { concepto: "Pintures i imprimació" },
+    });
 
     /* Bump whenever this file or erp-history.js changes what the demo
        contains. The app compares it with what is stored and offers a reload
