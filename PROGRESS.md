@@ -1325,6 +1325,38 @@ bundle safety · lint, boundaries, types, unit tests, build, `make gates`,
 **Next:** the fifteen coding sessions are complete. What remains is the iOS
 app rebuild against this build.
 
+## iOS app — updated to the post-S15 build (2026-08-10)
+
+The app is a native shell around these pages, so everything S7–S15 added
+reaches it on the next launch. One thing did not flow automatically, and it
+took S14 to make it visible: the shell has appended `CaneiApp/` to its user
+agent since 1.0 and **nothing read it**, so a phone inside the app stacked
+three things at the bottom of the screen — the web's own five-icon section bar,
+the native floating tab bar over it, and the site-action button positioned to
+clear the bar that was no longer the one in front.
+
+- The web app now reads the marker. Inside the shell its section bar stands
+  down and the breadcrumb opens the subsection list, which is the one thing a
+  six-tab native bar cannot reach.
+- The **rail** stays — panel 2 is positioned against it, so hiding it takes the
+  twenty-nine subsecciones with it. It is lifted clear of the native tab bar and
+  made transparent to taps instead. That was found by measuring the panel in a
+  real browser, not by reading the CSS.
+- The match is on the `CaneiApp/` prefix, never the version, so an older build
+  keeps working against a newer site. Plain Mobile Safari is deliberately
+  unaffected: it has no native tab bar, and taking the web one away would
+  strand somebody with no route to a section.
+- Shell at **1.1 / build 2**, marker updated, README documents the contract.
+
+Verified: site E2E 336/336 (5 new checks, both user agents spoofed) · workbook
+4/4 · manageability 226/226 · migrations 48/48 · year 149/149 · import 25/25 ·
+scheduling 30/30 · i18n · site-sync 17/17 · `make gates` · `make demo`.
+
+**Not done here, and deliberately:** compiling, signing and uploading to
+TestFlight need macOS and the Apple Developer account. `ios-testflight.yml`
+runs that on a macOS runner; this environment has neither. The web half — where
+the behaviour actually lives — is fully tested.
+
 ## Branch & discipline
 
 Work lands on the branch designated for the session — `claude/orin-project-

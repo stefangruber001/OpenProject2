@@ -2586,3 +2586,29 @@ different decisions, so these ten arrived colliding. They are renumbered from
   twenty blocking exceptions and say the demo is careless rather than that the
   screen is strict. `SEED_VERSION` is bumped to 3, so the app offers a reload
   rather than reseeding over anybody's records. **Reversible: yes.**
+
+- **#146 — the iOS update reads the user-agent marker rather than sniffing the
+  platform (2026-08-10).** The app has appended `CaneiApp/` since 1.0 and
+  nothing read it; after S14 that omission stacked three bars at the bottom of a
+  phone inside the app. The web now matches on the `CaneiApp/` **prefix**, never
+  the version, so an older build keeps working against a newer site. Plain
+  Mobile Safari on an iPhone is deliberately unaffected — it has no native tab
+  bar, and taking the web one away would strand somebody with no route to a
+  section. **Reversible: yes** — removing one class removes the whole
+  adaptation.
+
+- **#147 — inside the shell the rail stays and only the icon strip is hidden
+  (2026-08-10).** Panel 2 (the subsection list) is positioned against the rail;
+  hiding the rail takes the twenty-nine subsecciones with it. The rail is
+  therefore kept, lifted clear of the native tab bar, made transparent and
+  non-interactive, and the breadcrumb opens the panel it carries. Found by
+  measuring the panel's height in a real browser rather than by reading the
+  CSS. **Reversible: yes.**
+
+- **#148 — the iOS shell is version-bumped but not built here (2026-08-10).**
+  `MARKETING_VERSION` 1.1 / build 2 in both `project.yml` and the checked-in
+  Xcode project, and the marker updated. Compiling, signing and uploading to
+  TestFlight need macOS and the Apple Developer account, neither of which this
+  environment has — `ios-testflight.yml` runs that on a macOS runner. The web
+  half of the change is fully tested here, which is where the behaviour
+  actually lives. **Reversible: yes.**
