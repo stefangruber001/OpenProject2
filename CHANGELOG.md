@@ -7,6 +7,51 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Banco (ADM-05) classifies and assigns a movement **in the row** — the class and
+  the destination are selects on the line, because deciding where forty card
+  payments belong is forty two-second decisions and a drawer per movement turns
+  that into forty interruptions. Reconciliation keeps its own tab and both write
+  through the same allocation.
+- Caja chica (ADM-06) exists: entries, payments out, the balance strip and the
+  arqueo at the foot. The closing figure is computed and reconciled against the
+  account balance, because a stored closing balance is a number nobody counted.
+- Every cost now resolves to an **account code**. The chart of accounts is an
+  owner-maintained list like units and payment terms; an explicit code wins, then
+  the overhead category, then the job's cost kind, and anything left over is
+  reported under «sin asignar» rather than dropped — a roll-up that quietly loses
+  money is worse than one that admits it.
+- Flujo de caja (ADM-08) opens the forecast by period and by job. It starts from
+  the money actually in the accounts rather than from zero, every figure comes
+  from a document with a committed date behind it, anything already overdue lands
+  in the first period rather than disappearing, and the cumulative balance turns
+  red the period it goes negative.
+- Horas (ADM-04) becomes a day sheet with the week's totals beside it, spanning
+  every job rather than one, plus a summary per job and chapter and a **monthly
+  reconciliation** of hours booked against wages actually paid. The two are not
+  supposed to match; the screen reports the difference instead of demanding a
+  zero, and the reading worth acting on is a negative one.
+- Reporte a gestoría (ADM-07) becomes a three-step wizard. The engine's refusal
+  to send a package with unjustified exceptions is unchanged — what changed is
+  that you find out on arrival rather than at the end, and exceptions group by
+  type with each group linking to the screen where that kind is fixed.
+- Datos financieros (ADM-09) reads the ERP instead of its own copy. Receivables,
+  payables, bank balances, VAT, the chart of accounts and the monthly ledger are
+  derived and read-only, each naming the screen that owns them; budgets, loans,
+  opening balances and drivers stay editable, because the engine does not hold
+  them.
+- On a phone every table becomes two-line cards, driven by one pass over the
+  rendered page rather than per-screen markup, with the forecast, the Gantt and
+  the week calendar keeping their columns because a grid is not a list. A
+  floating button carries the four things somebody on site actually reaches for,
+  three taps from done.
+- The iOS shell (1.1) and the web app now have a contract: the shell marks its
+  user agent, and inside it the web's own section bar stands down for the native
+  tab bar while the breadcrumb opens the subsection list. Plain Mobile Safari is
+  deliberately unaffected.
+- A guard that checks the field dictionary rather than asserting it: every model
+  field the mapping claims for the customer's workbook columns must be present on
+  a real record of the shipped dataset. Runs in `make gates` and CI.
+
 - Facturación (ADM-01) is organised around four counters — issued, collected,
   outstanding and overdue, the last one red only when there is something to be
   red about — and the register now carries a balance and a days column, with
