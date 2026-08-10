@@ -2612,6 +2612,32 @@ different decisions, so these ten arrived colliding. They are renumbered from
   environment has — `ios-testflight.yml` runs that on a macOS runner. The web
   half of the change is fully tested here, which is where the behaviour
   actually lives. **Reversible: yes.**
+- **#149 — v101 goes to `main` by merge, and the previous state is named v100
+  rather than tagged (2026-08-10).** The operator asked for the programme to
+  land on `main`, for the pre-existing state to be recoverable as "v100", and
+  for `main` to become "v101". `main` had gained nine commits of its own, so the
+  merge ran into the branch first and its six conflicts were each resolved on
+  the merits — never "take theirs" — and the whole suite re-run on the merged
+  tree before the PR went in. Git tags could not be pushed (the environment's
+  git proxy answers 403 on tag refs), so the versions are recorded in
+  `RELEASES.md` against full commit SHAs instead, with the tag commands for a
+  machine that can push them. **The rollback lever is not the tag anyway**: every
+  build publishes a `sha-<full-sha>` image, so going back is re-pointing `:main`
+  at v100's image — two commands, verified to exist before the merge. The one
+  schema change is additive, so the database needs no undoing.
+  **Reversible: yes — that was the acceptance criterion, and it was checked
+  before the merge rather than asserted after it.**
+- **#150 — the Apple certificate cap is documented, not cleared (2026-08-10).**
+  The TestFlight rebuild from `main` failed because the developer account has
+  reached its certificate limit; cloud-managed signing mints a new one per CI
+  run and run 16 took the last slot. Apple's own remedy is to revoke a
+  certificate, which is irreversible and lands on the operator's account — the
+  wrong one breaks signing on their own machine. So it is written up in
+  `INTEGRATIONS_PENDING.md` with the two-minute fix and the durable one, and
+  nothing was revoked. **The app is not stranded by this**: TestFlight build 6
+  is the post-S15 shell and loads `site/` from the server, so it started serving
+  v101 the moment deploy promoted it. What is frozen is the Face ID lock
+  screen's wording, and only that. **Reversible: yes — nothing was done.**
 - **#91 — The mailbox is somewhere to PUT A DRAFT, never somewhere to send from
   (2026-08-08).** The operator asked to link `if@2iberia.com` so the ERP's
   generated emails use it, showed the provider's IMAP/SMTP page, and said not to

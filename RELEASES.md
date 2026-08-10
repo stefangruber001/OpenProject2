@@ -7,7 +7,27 @@ re-pointing that tag**, which is what `deploy.yml` was built around.
 | Version  | Commit    | Date       | What it is                                                                |
 | -------- | --------- | ---------- | ------------------------------------------------------------------------- |
 | **v101** | `6ba1850` | 2026-08-10 | CANEI CRM v4, sessions S1–S15 — all 29 subsecciones, mobile, iOS contract |
-| **v100** | `8b22095` | 2026-08-10 | The state before the v4 programme landed: mailbox feature, English chrome  |
+| **v100** | `8b22095` | 2026-08-10 | The state before the v4 programme landed: mailbox feature, English chrome |
+
+v101 was promoted by deploy run `31358917862`: both images built, the `smoke`
+job ran the migrations and drove the ERP end to end inside the published image,
+and only then did `promote` re-point `:main`. The server is serving v101.
+
+## The iOS app against v101
+
+TestFlight holds **v1.1 build 6**, uploaded 2026-08-10 04:43 from `136b131` —
+the programme branch head, i.e. the complete post-S15 native shell. The app
+loads `site/` from the server rather than bundling it, so **it is already
+showing v101**: the promote above changed what build 6 renders, without a new
+build.
+
+A rebuild from `main` was attempted (run `31359028265`) and failed in Apple's
+account, not in this repo — see the certificate section of
+`INTEGRATIONS_PENDING.md`. What that rebuild would have changed is two files:
+`LockView.swift` and `BiometricLock.swift`, where main's English chrome pass
+translated the Face ID lock screen. So the divergence is one screen's wording
+(shipped: Spanish; main's source: English) and nothing else — `Config.swift`,
+the base URL and the native-shell user-agent marker are identical on both.
 
 ## Going back to v100
 
