@@ -65,6 +65,7 @@ async function main() {
   try {
     await testJourney(browser, base);
     await testNoOverflow(browser, base);
+    await testMobile(browser, base);
     await testSmoke(browser, base);
     await testDataTabs(browser, base);
     await testRetired(browser, base);
@@ -477,6 +478,182 @@ async function testNoOverflow(browser, base) {
 }
 
 // ── Smoke: each app-surfaced page loads with a title and no errors.
+// ── S14 · Mobile (§3). Tables become two-line cards, the side menu is already
+//    a five-icon bottom bar (see testNoOverflow), and frequent site actions sit
+//    behind a floating button that is three taps from done.
+async function testMobile(browser, base) {
+  const pg = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+  });
+  const errs = [];
+  attachConsole(pg, errs);
+  const ROUTES = [
+    "tower",
+    "customers",
+    "suppliers",
+    "invoicing",
+    "banking",
+    "labour",
+    "accountant",
+    "cash-flow",
+    "purchasing",
+    "supplier-invoices",
+    "contracts",
+    "progress",
+    "economics",
+    "variations",
+    "petty-cash",
+    "quotes",
+    "leads",
+    "items",
+  ];
+  try {
+    await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(1200);
+
+    // Every table on every screen is either cards, a deliberate grid, or a
+    // single-cell empty state. The point of asserting it across ALL of them is
+    // that the fallback is one function — a screen that drifts out of the rule
+    // is a screen somebody wrote a bespoke table for.
+    const offenders = [];
+    let carded = 0,
+      grids = 0,
+      overflow = [];
+    for (const r of ROUTES) {
+      await pg.evaluate((x) => (location.hash = x), r);
+      await pg.waitForTimeout(400);
+      const info = await pg.evaluate(() => ({
+        sw: document.documentElement.scrollWidth,
+        tables: [...document.querySelectorAll("#view table")].map((t) => ({
+          cards: t.classList.contains("cards"),
+          nocards: t.hasAttribute("data-nocards"),
+          cells: Math.max(
+            0,
+            ...[...t.querySelectorAll("tbody tr")].map((tr) => tr.children.length),
+          ),
+        })),
+      }));
+      if (info.sw > 391) overflow.push(`${r}:${info.sw}`);
+      for (const t of info.tables) {
+        if (t.cards) carded++;
+        else if (t.nocards) grids++;
+        else if (t.cells >= 3) offenders.push(`${r}(${t.cells} cols)`);
+      }
+    }
+    if (!offenders.length && carded >= 15)
+      ok(
+        `mobile: every table across ${ROUTES.length} screens is cards or a declared grid (${carded} carded, ${grids} grids)`,
+      );
+    else bad("mobile: tables become cards", `carded=${carded} offenders=${offenders.join()}`);
+    if (!overflow.length) ok(`mobile: no screen scrolls sideways at 390 (${ROUTES.length} routes)`);
+    else bad("mobile: no sideways scroll", overflow.join());
+
+    // A card is only a card if the header labels moved onto the lines.
+    await pg.evaluate(() => (location.hash = "customers"));
+    await pg.waitForTimeout(500);
+    const card = await pg.evaluate(() => {
+      const tr = document.querySelector("#view table.cards tbody tr.click");
+      const th = document.querySelector("#view table.cards thead");
+      return {
+        headHidden: th ? getComputedStyle(th).display === "none" : null,
+        stacked: tr ? getComputedStyle(tr.children[1]).display : null,
+        labelled: tr ? [...tr.children].filter((td) => td.getAttribute("data-th")).length : 0,
+        cells: tr ? tr.children.length : 0,
+      };
+    });
+    if (card.headHidden && card.stacked === "flex" && card.labelled === card.cells)
+      ok(`mobile: the header moves onto each line and the row stacks (${card.cells} labelled)`);
+    else bad("mobile: card shape", JSON.stringify(card));
+
+    // A grid is NOT a list: the forecast keeps its columns and scrolls inside
+    // its own container, which is the whole reason it opts out.
+    await pg.evaluate(() => (location.hash = "cash-flow"));
+    await pg.waitForTimeout(600);
+    const grid = await pg.evaluate(() => {
+      const t = document.querySelector("#cfGrid");
+      const host = document.querySelector(".fcast");
+      return {
+        optedOut: t.hasAttribute("data-nocards") && !t.classList.contains("cards"),
+        scrollsInside: host.scrollWidth > host.clientWidth + 1,
+        pageWide: document.documentElement.scrollWidth,
+      };
+    });
+    if (grid.optedOut && grid.scrollsInside && grid.pageWide <= 391)
+      ok("mobile: the forecast keeps its columns and scrolls inside its own card");
+    else bad("mobile: grid opt-out", JSON.stringify(grid));
+
+    // §3's floating button: 56 px target, four actions, 48 px rows.
+    const fab = await pg.evaluate(() => {
+      const f = document.querySelector("#fab");
+      const r = f.getBoundingClientRect();
+      return {
+        display: getComputedStyle(f).display,
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+      };
+    });
+    if (fab.display !== "none" && fab.w === 56 && fab.h === 56)
+      ok("mobile: the site-actions button is a 56 px target");
+    else bad("mobile: FAB size", JSON.stringify(fab));
+
+    await pg.locator("#fab").click();
+    await pg.waitForTimeout(300);
+    const menu = await pg.evaluate(() => ({
+      open: document.querySelector("#fabMenu").classList.contains("on"),
+      n: document.querySelectorAll("#fabMenu button").length,
+      small: [...document.querySelectorAll("#fabMenu button")].filter(
+        (b) => b.getBoundingClientRect().height < 48,
+      ).length,
+    }));
+    if (menu.open && menu.n === 4 && menu.small === 0)
+      ok("mobile: four site actions, none below a 48 px row");
+    else bad("mobile: site actions menu", JSON.stringify(menu));
+
+    // The site actions ship with Catalan like every other string — the rule
+    // that has caught a gap in ten consecutive sessions. The language is a
+    // stored preference read at boot, so this reloads rather than poking the
+    // translator, which is how a real user changes it.
+    await pg.evaluate(() => localStorage.setItem("caneiLang", "ca"));
+    await pg.reload({ waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+    await pg.locator("#fab").click();
+    await pg.waitForTimeout(500);
+    const caMenu = await pg.locator("#fabMenu").innerText();
+    if (/Part d'hores/i.test(caMenu) && !/Parte de horas/.test(caMenu))
+      ok("i18n: CA translates the site-action button");
+    else bad("i18n: CA site actions", caMenu.replace(/\n/g, " ").slice(0, 140));
+    await pg.evaluate(() => localStorage.removeItem("caneiLang"));
+    await pg.reload({ waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+    await pg.locator("#fab").click();
+    await pg.waitForTimeout(400);
+
+    // Three taps to done: the button, the action, and the control it lands on.
+    await pg.locator("#fabMenu button").nth(1).click();
+    await pg.waitForTimeout(800);
+    const landed = await pg.evaluate(() => ({
+      hash: location.hash,
+      day: typeof hDay !== "undefined" ? hDay : null,
+      today: erp.today,
+      control: !!document.querySelector(".hsheet") || !!document.querySelector("#hAdd"),
+    }));
+    if (landed.hash === "#labour" && landed.day === landed.today && landed.control)
+      ok("mobile: two taps land on today's hours sheet with the control in reach");
+    else bad("mobile: three-tap site action", JSON.stringify(landed));
+
+    if (errs.length === 0) ok("mobile: no console errors at 390px");
+    else bad("mobile: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("mobile (§3)", String(e).slice(0, 220));
+  } finally {
+    await pg.close();
+  }
+}
+
 async function testSmoke(browser, base) {
   const pages = [
     "journey.html",
