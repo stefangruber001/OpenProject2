@@ -2728,3 +2728,31 @@ different decisions, so these ten arrived colliding. They are renumbered from
      accident and against loops, not against a person with credentials deciding to
      email someone. Ranking that risk against the customer's own inbox is the
      owner's call, and they made it.
+
+- **#149 — the browser's own prompt(), confirm() and alert() are gone from the whole site (2026-08-11).**
+  Package 1's slide 3 says the boxes are "muy malas" and asks for the review to
+  cover **every** dialog of that kind across the site, so this is not a screen
+  fix. All 36 native dialogs are replaced: 27 in `erp.html`, 4 in
+  `master-data.html`, 3 in `journey.html`, 2 in `financial-data.html`.
+  **Decisions:** (a) the replacement lives in its own file,
+  `site/erp-modal.js`, rather than inline in `erp.html` — the same boxes appear
+  on four pages, and a question box copied four times is one that only ever
+  gets fixed once. It takes its colours from the host page's CSS variables, so
+  it always belongs to the page that opened it. (b) The API is promise-based
+  (`await askText(...)`) rather than callback-based, because all 36 call sites
+  were written as `const x = prompt(); if (!x) return;` and `await` keeps that
+  shape, guard clause included; converting to callbacks would have turned every
+  handler inside out. (c) **Cancel now aborts.** Eight call sites read
+  `prompt("Motivo…") || ""`, so backing out of the question still performed the
+  action with an empty reason — anulaciones and rescisiones among them. The new
+  ones return null and the handler stops. (d) Questions that belong together
+  are now asked together: posponer (fecha + motivo), resolver (nota +
+  evidencia) and reasignar un parte (proyecto + capítulo) were two consecutive
+  boxes each. (e) Reasignar and the loss reason became **lists instead of typed
+  codes** — the loss reason was asking for a code by quoting the list inside
+  the question text, and its "motivo no reconocido" branch existed only because
+  a text box could not offer the six answers it would accept. `lossReasons` was
+  already an owner-maintained list in the engine; nothing new was added for it.
+  (f) Escape is handled in the module in the **capture phase** so it closes the
+  question and not the drawer underneath it, which is where most of these are
+  asked from.

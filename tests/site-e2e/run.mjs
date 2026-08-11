@@ -141,6 +141,58 @@ function attachConsole(page, errors) {
   page.on("pageerror", (e) => errors.push(String(e)));
 }
 
+/** Answer the application's own question box, in the background.
+ *
+ *  The screens used to ask with prompt() and confirm(), which Playwright
+ *  intercepts as `dialog` events — four suites carried a `pg.on("dialog")`
+ *  handler with a chain of regexes over the question text. Those questions are
+ *  now real DOM (see site/erp-modal.js), so nothing intercepts them and a run
+ *  that clicks "Anular" simply waits forever for a person.
+ *
+ *  This replaces all four handlers with one poller that behaves like a
+ *  cooperative user: fill anything empty, choose the first option when a list
+ *  demands a choice, then press the primary button. `answers` overrides the
+ *  text for a given question, keyed by a substring of its title — used only
+ *  where the VALUE matters to a later assertion, not to get past the box.
+ *
+ *  It is deliberately generic. The old regex chains had to be edited every
+ *  time a question was reworded, and a missed rewording showed up as a
+ *  mystery timeout rather than as a failed assertion.
+ */
+async function autoAnswerModals(pg, answers = {}) {
+  await pg.addInitScript((rules) => {
+    const fire = (el2, type) => el2.dispatchEvent(new Event(type, { bubbles: true }));
+    setInterval(() => {
+      const scrim = document.getElementById("mscrim");
+      if (!scrim || !scrim.classList.contains("on")) return;
+      const box = scrim.querySelector(".modal");
+      if (!box) return;
+      const title = (box.querySelector("#mttl") || {}).textContent || "";
+      let answer = "Respuesta E2E";
+      for (const key in rules)
+        if (title.includes(key)) {
+          answer = rules[key];
+          break;
+        }
+      box.querySelectorAll("input, textarea, select").forEach((f) => {
+        if (f.type === "radio") return;
+        if (f.tagName === "SELECT") return; // a select always has a valid value
+        if (f.value) return; // a prefilled date or default text is the answer
+        f.value = f.type === "date" ? "2026-05-20" : answer;
+        fire(f, "input");
+        fire(f, "change");
+      });
+      const radios = box.querySelectorAll('.mopts input[type="radio"]');
+      if (radios.length && !box.querySelector('.mopts input[type="radio"]:checked')) {
+        const wanted = [...radios].find((r) => r.value === answer) || radios[0];
+        wanted.click();
+      }
+      const ok = box.querySelector(".ma .btn.primary");
+      if (ok) ok.click();
+    }, 80);
+  }, answers);
+}
+
 /** Three v4 screens are merges of two built ones and carry a tab strip
     (PRY-01, ADM-03, ADM-05). Navigating to the route lands on the first tab,
     so a check that wants the other one has to ask for it — the same click a
@@ -1655,11 +1707,9 @@ async function testPresupuestador(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
   const errs = [];
   attachConsole(pg, errs);
-  pg.on("dialog", async (d) => {
-    const m = d.message() || "";
-    if (/^Nombre del capítulo/.test(m)) await d.accept("Capítulo E2E");
-    else if (/^Motivo de la nueva versión/.test(m)) await d.accept("Revisión E2E");
-    else await d.accept("");
+  await autoAnswerModals(pg, {
+    "Nuevo capítulo": "Capítulo E2E",
+    "Nueva versión": "Revisión E2E",
   });
   try {
     await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
@@ -3306,10 +3356,9 @@ async function testAdmin(browser, base) {
   const errs = [];
   attachConsole(pg, errs);
   // Both screens ask for free text before doing anything irreversible; answer
-  // whatever they ask so the run never blocks on a modal.
-  pg.on("dialog", async (d) => {
-    const m = d.message();
-    await d.accept(/envía/.test(m) ? "Gestoría Subirats" : "Justificado por el E2E");
+  // whatever they ask so the run never blocks on a question.
+  await autoAnswerModals(pg, {
+    "Enviar el paquete": "Gestoría Subirats",
   });
   try {
     // ---- §5.3 Conciliación: suggestion + reasons → accept → transfers → close refuses
@@ -3512,17 +3561,10 @@ async function testControlTowerAndDay(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
   const errs = [];
   attachConsole(pg, errs);
-  pg.on("dialog", async (d) => {
-    const m = d.message();
-    if (/A quién/.test(m)) await d.accept("backoffice");
-    else if (/Fecha límite/.test(m)) await d.accept("2026-05-20");
-    else if (/Posponer hasta/.test(m)) await d.accept("2026-05-15");
-    else if (/^Motivo de la pérdida/.test(m)) await d.accept("price");
-    else if (/^Motivo/.test(m)) await d.accept("");
-    else if (/Nota de resoluci/.test(m)) await d.accept("Resuelto en el E2E");
-    else if (/^Evidencia/.test(m)) await d.accept("");
-    else if (/^Vence/.test(m)) await d.accept("2026-05-10");
-    else await d.accept("");
+  await autoAnswerModals(pg, {
+    "Asignar la alerta": "backoffice",
+    "Resolver la alerta": "Resuelto en el E2E",
+    perdido: "price", // the loss reason is a list now; pick that code
   });
   try {
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
@@ -4105,7 +4147,7 @@ async function testJourneyRealMode(browser, base) {
   });
   const errs = [];
   attachConsole(pg, errs);
-  pg.on("dialog", async (d) => await d.accept());
+  await autoAnswerModals(pg);
   try {
     // Visit erp.html first so this browser context's IndexedDB has real
     // tenant data before journey.html asks for it — real mode reads the

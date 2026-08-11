@@ -88,3 +88,25 @@ trilingual UI · server-first, always) are recorded with the plan.
 | S13 | ADM-09 Datos Financieros integration                 | done   | (this session)                     |
 | S14 | Mobile — cards, bottom bar, three-tap site actions   | done   | (this session)                     |
 | S15 | Seed rebuild + workbook coverage test + hardening    | done   | (this session)                     |
+
+## Package 1 — operator feedback on the shipped app (2026-08-11)
+
+Thirteen changes across ten slides, all raised against the live preview. The
+first is done; the rest are scheduled below and carry the operator's own
+answers to the four questions the deck left open.
+
+| #   | What                                                                                     | State    |
+| --- | ---------------------------------------------------------------------------------------- | -------- |
+| P1  | The browser's prompt/confirm/alert replaced across the whole site                        | **done** |
+| P2  | Visita: date/time defaults, real camera, the notes-wiped bug, photo viewer               | next     |
+| P3  | Lead → visita flow: pick the lead, second visit, complete a client inline                | next     |
+| P4  | Configurable lists: próximas acciones, condiciones de pago (lossReasons already existed) | next     |
+| P5  | Presupuestador: catalogue picker, chapter dropdown, columns, Siguiente paso              | next     |
+
+**Answers carried forward** (operator, in the thread): the line grid reads
+DESCRIPCIÓN · UD · COSTE UNIT. · MARGEN % · CANTIDAD · P. VENTA UNIT. ·
+PRECIO TOTAL, with the units checked explicitly; margin is margin **over the
+sale price, everywhere**, not only in the builder; a second visit is allowed
+and labelled _seguimiento_ rather than blocked; and creating a partida that the
+search cannot find **opens the existing «＋ Nueva partida» form** rather than a
+second one written for the popup.

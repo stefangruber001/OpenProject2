@@ -1,741 +1,2419 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="icon" type="image/svg+xml" href="favicon.svg" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<meta name="robots" content="noindex" />
-<title>Canei Subirats — Master Data</title>
-<style>
-  :root{
-    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a; --greenSoft:#e7f0e1; --greenPale:#dce8d4; --spark:#f2c230;
-    --ink:#14160f; --body:#4f5347; --muted:#8b8f80; --faint:#aab0a0;
-    --line:#dde5d6; --hair:#e7eee1; --bg:#eef3ea; --paper:#fff;
-    --danger:#b4402f; --dangerSoft:#f6e3df;
-    --shadow:0 1px 2px rgba(24,32,16,.03), 0 18px 40px -24px rgba(24,32,16,.18);
-    --shadow-lg:0 2px 4px rgba(24,32,16,.04), 0 40px 80px -40px rgba(24,32,16,.3);
-    --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
-    --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
-    --mono:ui-monospace,Menlo,monospace;
-    color-scheme:light;
-  }
-  *{box-sizing:border-box}
-  html{touch-action:manipulation;-webkit-text-size-adjust:100%;overflow-x:hidden}
-  body{margin:0;color:var(--body);font:15px/1.55 var(--sans);letter-spacing:-.005em;min-height:100vh;overflow-x:hidden;
-    background:
-      radial-gradient(1200px 600px at 88% -14%, rgba(72,115,60,.16), transparent 58%),
-      radial-gradient(820px 460px at -6% 2%, rgba(242,194,48,.10), transparent 55%),
-      var(--bg);
-    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-  h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:600;margin:0;letter-spacing:-.02em}
-  a{color:var(--green);text-decoration:none}
-  .native-app .topbar{padding-top:max(14px,env(safe-area-inset-top))}
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="robots" content="noindex" />
+    <title>Canei Subirats — Master Data</title>
+    <style>
+      :root {
+        --green: #48733c;
+        --greenLt: #6ba85a;
+        --greenDeep: #31532a;
+        --greenSoft: #e7f0e1;
+        --greenPale: #dce8d4;
+        --spark: #f2c230;
+        --ink: #14160f;
+        --body: #4f5347;
+        --muted: #8b8f80;
+        --faint: #aab0a0;
+        --line: #dde5d6;
+        --hair: #e7eee1;
+        --bg: #eef3ea;
+        --paper: #fff;
+        --danger: #b4402f;
+        --dangerSoft: #f6e3df;
+        --shadow: 0 1px 2px rgba(24, 32, 16, 0.03), 0 18px 40px -24px rgba(24, 32, 16, 0.18);
+        --shadow-lg: 0 2px 4px rgba(24, 32, 16, 0.04), 0 40px 80px -40px rgba(24, 32, 16, 0.3);
+        --serif: "Roboto Serif", Georgia, "Times New Roman", serif;
+        --sans: Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+        --mono: ui-monospace, Menlo, monospace;
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        touch-action: manipulation;
+        -webkit-text-size-adjust: 100%;
+        overflow-x: hidden;
+      }
+      body {
+        margin: 0;
+        color: var(--body);
+        font: 15px/1.55 var(--sans);
+        letter-spacing: -0.005em;
+        min-height: 100vh;
+        overflow-x: hidden;
+        background:
+          radial-gradient(1200px 600px at 88% -14%, rgba(72, 115, 60, 0.16), transparent 58%),
+          radial-gradient(820px 460px at -6% 2%, rgba(242, 194, 48, 0.1), transparent 55%),
+          var(--bg);
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: var(--serif);
+        color: var(--ink);
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+      a {
+        color: var(--green);
+        text-decoration: none;
+      }
+      .native-app .topbar {
+        padding-top: max(14px, env(safe-area-inset-top));
+      }
 
-  /* ---- top bar ---- */
-  .topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    padding:14px 20px;background:rgba(255,255,255,.82);backdrop-filter:saturate(1.4) blur(14px);
-    border-bottom:1px solid var(--line)}
-  .brand{display:flex;align-items:center;gap:10px;min-width:0}
-  .brand .nm{font-family:var(--serif);font-weight:600;font-size:16px;color:var(--ink);line-height:1;white-space:nowrap}
-  .brand .nm small{display:block;font-family:var(--sans);font-weight:600;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);margin-top:3px}
-  .tb-spacer{flex:1 1 auto}
-  .tb-actions{display:flex;gap:8px;flex-wrap:wrap}
-  .btn{display:inline-flex;align-items:center;gap:7px;font:600 13px var(--sans);border-radius:11px;padding:9px 14px;
-    border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;transition:.15s;white-space:nowrap}
-  .btn:hover{border-color:color-mix(in srgb,var(--green) 40%,var(--line));transform:translateY(-1px);box-shadow:var(--shadow)}
-  .btn.primary{background:linear-gradient(120deg,var(--greenDeep),var(--green) 70%);color:#fff;border-color:transparent}
-  .btn.ghost{background:transparent}
-  .btn.sm{padding:6px 10px;font-size:12px;border-radius:9px}
-  .btn.danger{color:var(--danger);border-color:var(--dangerSoft)}
-  .btn.danger:hover{border-color:var(--danger)}
+      /* ---- top bar ---- */
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        padding: 14px 20px;
+        background: rgba(255, 255, 255, 0.82);
+        backdrop-filter: saturate(1.4) blur(14px);
+        border-bottom: 1px solid var(--line);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+      .brand .nm {
+        font-family: var(--serif);
+        font-weight: 600;
+        font-size: 16px;
+        color: var(--ink);
+        line-height: 1;
+        white-space: nowrap;
+      }
+      .brand .nm small {
+        display: block;
+        font-family: var(--sans);
+        font-weight: 600;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--green);
+        margin-top: 3px;
+      }
+      .tb-spacer {
+        flex: 1 1 auto;
+      }
+      .tb-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font: 600 13px var(--sans);
+        border-radius: 11px;
+        padding: 9px 14px;
+        border: 1px solid var(--line);
+        background: var(--paper);
+        color: var(--ink);
+        cursor: pointer;
+        transition: 0.15s;
+        white-space: nowrap;
+      }
+      .btn:hover {
+        border-color: color-mix(in srgb, var(--green) 40%, var(--line));
+        transform: translateY(-1px);
+        box-shadow: var(--shadow);
+      }
+      .btn.primary {
+        background: linear-gradient(120deg, var(--greenDeep), var(--green) 70%);
+        color: #fff;
+        border-color: transparent;
+      }
+      .btn.ghost {
+        background: transparent;
+      }
+      .btn.sm {
+        padding: 6px 10px;
+        font-size: 12px;
+        border-radius: 9px;
+      }
+      .btn.danger {
+        color: var(--danger);
+        border-color: var(--dangerSoft);
+      }
+      .btn.danger:hover {
+        border-color: var(--danger);
+      }
 
-  /* ---- layout ---- */
-  .shell{display:grid;grid-template-columns:246px 1fr;gap:0;max-width:1280px;margin:0 auto;align-items:start}
-  aside{position:sticky;top:64px;align-self:start;height:calc(100vh - 64px);overflow-y:auto;padding:18px 12px 40px;border-right:1px solid var(--line)}
-  aside .grp{font:700 10.5px var(--sans);letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin:16px 10px 6px}
-  aside .grp:first-child{margin-top:2px}
-  .navitem{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;cursor:pointer;
-    font:600 13.5px var(--sans);color:var(--body);padding:8px 10px;border-radius:10px;transition:.12s}
-  .navitem .ic{width:22px;text-align:center;font-size:15px;flex:none}
-  .navitem .ct{margin-left:auto;font:600 11px var(--sans);color:var(--faint);background:var(--hair);border-radius:999px;padding:1px 7px;min-width:20px;text-align:center}
-  .navitem:hover{background:var(--greenSoft);color:var(--ink)}
-  .navitem.on{background:var(--greenSoft);color:var(--greenDeep)}
-  .navitem.on .ct{background:var(--greenPale);color:var(--greenDeep)}
+      /* ---- layout ---- */
+      .shell {
+        display: grid;
+        grid-template-columns: 246px 1fr;
+        gap: 0;
+        max-width: 1280px;
+        margin: 0 auto;
+        align-items: start;
+      }
+      aside {
+        position: sticky;
+        top: 64px;
+        align-self: start;
+        height: calc(100vh - 64px);
+        overflow-y: auto;
+        padding: 18px 12px 40px;
+        border-right: 1px solid var(--line);
+      }
+      aside .grp {
+        font: 700 10.5px var(--sans);
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: var(--faint);
+        margin: 16px 10px 6px;
+      }
+      aside .grp:first-child {
+        margin-top: 2px;
+      }
+      .navitem {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        text-align: left;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        font: 600 13.5px var(--sans);
+        color: var(--body);
+        padding: 8px 10px;
+        border-radius: 10px;
+        transition: 0.12s;
+      }
+      .navitem .ic {
+        width: 22px;
+        text-align: center;
+        font-size: 15px;
+        flex: none;
+      }
+      .navitem .ct {
+        margin-left: auto;
+        font: 600 11px var(--sans);
+        color: var(--faint);
+        background: var(--hair);
+        border-radius: 999px;
+        padding: 1px 7px;
+        min-width: 20px;
+        text-align: center;
+      }
+      .navitem:hover {
+        background: var(--greenSoft);
+        color: var(--ink);
+      }
+      .navitem.on {
+        background: var(--greenSoft);
+        color: var(--greenDeep);
+      }
+      .navitem.on .ct {
+        background: var(--greenPale);
+        color: var(--greenDeep);
+      }
 
-  main{padding:22px 24px 80px;min-width:0}
-  .crumbs{font-size:12px;color:var(--muted);margin-bottom:6px}
-  .head{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:4px}
-  .head h1{font-size:clamp(22px,3.2vw,30px)}
-  .head .sub{font-size:13.5px;color:var(--body);max-width:64ch;margin-top:6px}
-  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0 12px}
-  .search{flex:1 1 220px;display:flex;align-items:center;gap:8px;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:8px 12px;min-width:0}
-  .search input{border:0;outline:0;font:14px var(--sans);color:var(--ink);width:100%;background:transparent}
-  .count{font-size:12.5px;color:var(--muted);white-space:nowrap}
+      main {
+        padding: 22px 24px 80px;
+        min-width: 0;
+      }
+      .crumbs {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .head {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 4px;
+      }
+      .head h1 {
+        font-size: clamp(22px, 3.2vw, 30px);
+      }
+      .head .sub {
+        font-size: 13.5px;
+        color: var(--body);
+        max-width: 64ch;
+        margin-top: 6px;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 16px 0 12px;
+      }
+      .search {
+        flex: 1 1 220px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        padding: 8px 12px;
+        min-width: 0;
+      }
+      .search input {
+        border: 0;
+        outline: 0;
+        font: 14px var(--sans);
+        color: var(--ink);
+        width: 100%;
+        background: transparent;
+      }
+      .count {
+        font-size: 12.5px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
 
-  .banner{display:flex;gap:12px;align-items:flex-start;background:linear-gradient(120deg,var(--greenSoft),#fff 90%);
-    border:1px solid var(--greenPale);border-left:3px solid var(--green);border-radius:0 14px 14px 0;padding:12px 16px;margin-bottom:6px}
-  .banner .bi{font-size:18px}
-  .banner b{color:var(--ink)}
-  .banner span{font-size:12.5px;color:var(--body)}
+      .banner {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        background: linear-gradient(120deg, var(--greenSoft), #fff 90%);
+        border: 1px solid var(--greenPale);
+        border-left: 3px solid var(--green);
+        border-radius: 0 14px 14px 0;
+        padding: 12px 16px;
+        margin-bottom: 6px;
+      }
+      .banner .bi {
+        font-size: 18px;
+      }
+      .banner b {
+        color: var(--ink);
+      }
+      .banner span {
+        font-size: 12.5px;
+        color: var(--body);
+      }
 
-  /* ---- table ---- */
-  .tablewrap{background:var(--paper);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
-  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  table{border-collapse:collapse;width:100%;min-width:520px;font-size:13.5px}
-  thead th{position:sticky;top:0;text-align:left;font:700 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;
-    color:var(--muted);background:var(--greenSoft);padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
-  tbody td{padding:11px 14px;border-bottom:1px solid var(--hair);color:var(--body);vertical-align:top}
-  tbody tr{cursor:pointer;transition:background .1s}
-  tbody tr:hover{background:var(--greenSoft)}
-  tbody tr:last-child td{border-bottom:0}
-  td .k{font-weight:600;color:var(--ink)}
-  .pill{display:inline-block;font:600 11px var(--sans);border-radius:999px;padding:2px 9px;background:var(--hair);color:var(--body);white-space:nowrap}
-  .pill.g{background:var(--greenSoft);color:var(--greenDeep)}
-  .pill.y{background:#fbf0cf;color:#8a6d12}
-  .pill.r{background:var(--dangerSoft);color:var(--danger)}
-  .num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
-  .empty{padding:46px 20px;text-align:center;color:var(--muted)}
-  .empty .bigic{font-size:34px;opacity:.6}
+      /* ---- table ---- */
+      .tablewrap {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 520px;
+        font-size: 13.5px;
+      }
+      thead th {
+        position: sticky;
+        top: 0;
+        text-align: left;
+        font: 700 11px var(--sans);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        background: var(--greenSoft);
+        padding: 11px 14px;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+      tbody td {
+        padding: 11px 14px;
+        border-bottom: 1px solid var(--hair);
+        color: var(--body);
+        vertical-align: top;
+      }
+      tbody tr {
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      tbody tr:hover {
+        background: var(--greenSoft);
+      }
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+      td .k {
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .pill {
+        display: inline-block;
+        font: 600 11px var(--sans);
+        border-radius: 999px;
+        padding: 2px 9px;
+        background: var(--hair);
+        color: var(--body);
+        white-space: nowrap;
+      }
+      .pill.g {
+        background: var(--greenSoft);
+        color: var(--greenDeep);
+      }
+      .pill.y {
+        background: #fbf0cf;
+        color: #8a6d12;
+      }
+      .pill.r {
+        background: var(--dangerSoft);
+        color: var(--danger);
+      }
+      .num {
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        white-space: nowrap;
+      }
+      .empty {
+        padding: 46px 20px;
+        text-align: center;
+        color: var(--muted);
+      }
+      .empty .bigic {
+        font-size: 34px;
+        opacity: 0.6;
+      }
 
-  /* ---- drawer / editor ---- */
-  .scrim{position:fixed;inset:0;background:rgba(20,26,14,.34);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:.2s;z-index:60}
-  .scrim.on{opacity:1;pointer-events:auto}
-  .drawer{position:fixed;top:0;right:0;height:100%;width:min(560px,94vw);background:var(--bg);z-index:70;
-    box-shadow:-30px 0 80px -40px rgba(20,26,14,.5);transform:translateX(102%);transition:transform .24s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
-  .drawer.on{transform:none}
-  .drawer .dh{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);background:var(--paper)}
-  .drawer .dh h3{font-size:17px}
-  .drawer .db{overflow-y:auto;padding:16px 20px 30px;flex:1}
-  .drawer .df{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--line);background:var(--paper)}
-  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
-  .field{display:flex;flex-direction:column;gap:5px;min-width:0}
-  .field.full{grid-column:1/-1}
-  .field label{font:600 11.5px var(--sans);color:var(--muted);letter-spacing:.02em}
-  .field .hint{font-size:11px;color:var(--faint)}
-  .field input,.field select,.field textarea{font:14px var(--sans);color:var(--ink);background:var(--paper);
-    border:1px solid var(--line);border-radius:10px;padding:9px 11px;outline:0;width:100%;transition:.12s}
-  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--greenSoft)}
-  .field textarea{resize:vertical;min-height:66px}
-  .field .pre{display:flex;align-items:center}
-  .field .pre span{color:var(--muted);font-size:13px;padding:0 4px 0 0}
-  .sech{font:700 10.5px var(--sans);letter-spacing:.13em;text-transform:uppercase;color:var(--green);margin:20px 0 2px;grid-column:1/-1}
-  .sech:first-child{margin-top:0}
+      /* ---- drawer / editor ---- */
+      .scrim {
+        position: fixed;
+        inset: 0;
+        background: rgba(20, 26, 14, 0.34);
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        pointer-events: none;
+        transition: 0.2s;
+        z-index: 60;
+      }
+      .scrim.on {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: min(560px, 94vw);
+        background: var(--bg);
+        z-index: 70;
+        box-shadow: -30px 0 80px -40px rgba(20, 26, 14, 0.5);
+        transform: translateX(102%);
+        transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+      }
+      .drawer.on {
+        transform: none;
+      }
+      .drawer .dh {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line);
+        background: var(--paper);
+      }
+      .drawer .dh h3 {
+        font-size: 17px;
+      }
+      .drawer .db {
+        overflow-y: auto;
+        padding: 16px 20px 30px;
+        flex: 1;
+      }
+      .drawer .df {
+        display: flex;
+        gap: 10px;
+        padding: 14px 20px;
+        border-top: 1px solid var(--line);
+        background: var(--paper);
+      }
+      .fgrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px 14px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-width: 0;
+      }
+      .field.full {
+        grid-column: 1/-1;
+      }
+      .field label {
+        font: 600 11.5px var(--sans);
+        color: var(--muted);
+        letter-spacing: 0.02em;
+      }
+      .field .hint {
+        font-size: 11px;
+        color: var(--faint);
+      }
+      .field input,
+      .field select,
+      .field textarea {
+        font: 14px var(--sans);
+        color: var(--ink);
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 9px 11px;
+        outline: 0;
+        width: 100%;
+        transition: 0.12s;
+      }
+      .field input:focus,
+      .field select:focus,
+      .field textarea:focus {
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px var(--greenSoft);
+      }
+      .field textarea {
+        resize: vertical;
+        min-height: 66px;
+      }
+      .field .pre {
+        display: flex;
+        align-items: center;
+      }
+      .field .pre span {
+        color: var(--muted);
+        font-size: 13px;
+        padding: 0 4px 0 0;
+      }
+      .sech {
+        font: 700 10.5px var(--sans);
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: var(--green);
+        margin: 20px 0 2px;
+        grid-column: 1/-1;
+      }
+      .sech:first-child {
+        margin-top: 0;
+      }
 
-  .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);opacity:0;pointer-events:none;transition:.2s;z-index:90;
-    background:var(--ink);color:#fff;font:600 13px var(--sans);padding:11px 18px;border-radius:12px;box-shadow:var(--shadow-lg)}
-  .toast.on{opacity:1;transform:translate(-50%,0)}
+      .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        transform: translate(-50%, 20px);
+        opacity: 0;
+        pointer-events: none;
+        transition: 0.2s;
+        z-index: 90;
+        background: var(--ink);
+        color: #fff;
+        font: 600 13px var(--sans);
+        padding: 11px 18px;
+        border-radius: 12px;
+        box-shadow: var(--shadow-lg);
+      }
+      .toast.on {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
 
-  .mobsel{display:none}
-  @media (max-width:860px){
-    .shell{grid-template-columns:1fr}
-    aside{display:none}
-    main{padding:18px 16px 90px}
-    .mobsel{display:block;margin:6px 0 2px}
-    .mobsel select{width:100%;font:600 14px var(--sans);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
-    .fgrid{grid-template-columns:1fr}
-  }
-  @media (max-width:560px){
-    .topbar{padding:12px 14px}
-    .brand .nm{font-size:15px}
-    .tb-actions .lbl{display:none}
-    .btn{padding:9px 11px}
-  }
-</style>
-<script src="i18n-dict.js"></script>
-<script src="i18n-dict-ca.js"></script>
-<script src="i18n.js"></script>
-<!-- erp-sync.js must load BEFORE the stores: they register their
+      .mobsel {
+        display: none;
+      }
+      @media (max-width: 860px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+        aside {
+          display: none;
+        }
+        main {
+          padding: 18px 16px 90px;
+        }
+        .mobsel {
+          display: block;
+          margin: 6px 0 2px;
+        }
+        .mobsel select {
+          width: 100%;
+          font: 600 14px var(--sans);
+          color: var(--ink);
+          background: var(--paper);
+          border: 1px solid var(--line);
+          border-radius: 12px;
+          padding: 11px 12px;
+        }
+        .fgrid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 560px) {
+        .topbar {
+          padding: 12px 14px;
+        }
+        .brand .nm {
+          font-size: 15px;
+        }
+        .tb-actions .lbl {
+          display: none;
+        }
+        .btn {
+          padding: 9px 11px;
+        }
+      }
+    </style>
+    <script src="i18n-dict.js"></script>
+    <script src="i18n-dict-ca.js"></script>
+    <script src="i18n.js"></script>
+    <!-- erp-sync.js must load BEFORE the stores: they register their
      documents with it as soon as the first read comes back. Without it
      the page still works, it just never notices a change made elsewhere. -->
-<script src="erp-sync.js"></script>
-<script src="erp-docs.js"></script>
-</head>
-<body>
-  <div class="topbar">
-    <div class="brand">
-      <svg width="30" height="30" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
-        <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c"/>
-        <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230"/>
-      </svg>
-      <span class="nm">Canei Subirats<small>Master Data</small></span>
+    <script src="erp-modal.js"></script>
+    <script src="erp-sync.js"></script>
+    <script src="erp-docs.js"></script>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="brand">
+        <svg width="30" height="30" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
+          <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c" />
+          <path
+            d="M11 21.5 L20 13 L29 21.5"
+            stroke="#fff"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M13.5 20 V28.5 H26.5 V20"
+            stroke="#fff"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230" />
+        </svg>
+        <span class="nm">Canei Subirats<small>Master Data</small></span>
+      </div>
+      <span class="tb-spacer"></span>
+      <div class="tb-actions">
+        <a class="btn ghost sm" href="erp.html#torre">← ERP</a>
+        <button class="btn sm" id="btnImport"><span>⇪</span><span class="lbl">Import</span></button>
+        <button class="btn sm" id="btnExport">
+          <span>⤓</span><span class="lbl">Export JSON</span>
+        </button>
+        <button class="btn primary sm" id="btnAdd">
+          <span>＋</span><span class="lbl">Add record</span>
+        </button>
+      </div>
     </div>
-    <span class="tb-spacer"></span>
-    <div class="tb-actions">
-      <a class="btn ghost sm" href="erp.html#torre">← ERP</a>
-      <button class="btn sm" id="btnImport"><span>⇪</span><span class="lbl">Import</span></button>
-      <button class="btn sm" id="btnExport"><span>⤓</span><span class="lbl">Export JSON</span></button>
-      <button class="btn primary sm" id="btnAdd"><span>＋</span><span class="lbl">Add record</span></button>
-    </div>
-  </div>
 
-  <div class="shell">
-    <aside id="nav"></aside>
-    <main>
-      <div class="crumbs">Master Data ›&nbsp;<span id="crumb">—</span></div>
-      <div class="head">
-        <div>
-          <h1 id="ttl">—</h1>
-          <div class="sub" id="sub"></div>
+    <div class="shell">
+      <aside id="nav"></aside>
+      <main>
+        <div class="crumbs">Master Data ›&nbsp;<span id="crumb">—</span></div>
+        <div class="head">
+          <div>
+            <h1 id="ttl">—</h1>
+            <div class="sub" id="sub"></div>
+          </div>
         </div>
-      </div>
 
-      <div class="banner">
-        <div class="bi">🤖</div>
-        <div><b>One source of truth, built for automation.</b>
-        <span>&nbsp;Every record has a stable code and typed fields. Quoting, purchasing, invoicing, collections, scheduling and the reminder/review flows all read from here — nothing is entered twice. <b>Export JSON</b> hands the whole dataset to any downstream automation.</span></div>
-      </div>
-
-      <div class="mobsel"><select id="mnav"></select></div>
-
-      <div class="toolbar">
-        <label class="search"><span>🔎</span><input id="q" type="search" placeholder="Search records…" autocomplete="off"></label>
-        <span class="count" id="count"></span>
-        <button class="btn sm" id="btnSeed" title="Load the starter data set">↻ Starter data</button>
-      </div>
-
-      <div class="tablewrap">
-        <div class="scroll">
-          <table>
-            <thead><tr id="thead"></tr></thead>
-            <tbody id="tbody"></tbody>
-          </table>
+        <div class="banner">
+          <div class="bi">🤖</div>
+          <div>
+            <b>One source of truth, built for automation.</b>
+            <span
+              >&nbsp;Every record has a stable code and typed fields. Quoting, purchasing,
+              invoicing, collections, scheduling and the reminder/review flows all read from here —
+              nothing is entered twice. <b>Export JSON</b> hands the whole dataset to any downstream
+              automation.</span
+            >
+          </div>
         </div>
+
+        <div class="mobsel"><select id="mnav"></select></div>
+
+        <div class="toolbar">
+          <label class="search"
+            ><span>🔎</span
+            ><input id="q" type="search" placeholder="Search records…" autocomplete="off"
+          /></label>
+          <span class="count" id="count"></span>
+          <button class="btn sm" id="btnSeed" title="Load the starter data set">
+            ↻ Starter data
+          </button>
+        </div>
+
+        <div class="tablewrap">
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr id="thead"></tr>
+              </thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div class="scrim" id="scrim"></div>
+    <aside class="drawer" id="drawer" aria-hidden="true">
+      <div class="dh">
+        <h3 id="dttl">Edit</h3>
+        <span class="tb-spacer" style="flex: 1"></span>
+        <button class="btn ghost sm" id="dClose">Close</button>
       </div>
-    </main>
-  </div>
+      <div class="db"><div class="fgrid" id="form"></div></div>
+      <div class="df">
+        <button class="btn danger" id="dDelete">Delete</button>
+        <span style="flex: 1"></span>
+        <button class="btn" id="dCancel">Cancel</button>
+        <button class="btn primary" id="dSave">Save record</button>
+      </div>
+    </aside>
 
-  <div class="scrim" id="scrim"></div>
-  <aside class="drawer" id="drawer" aria-hidden="true">
-    <div class="dh">
-      <h3 id="dttl">Edit</h3><span class="tb-spacer" style="flex:1"></span>
-      <button class="btn ghost sm" id="dClose">Close</button>
-    </div>
-    <div class="db"><div class="fgrid" id="form"></div></div>
-    <div class="df">
-      <button class="btn danger" id="dDelete">Delete</button>
-      <span style="flex:1"></span>
-      <button class="btn" id="dCancel">Cancel</button>
-      <button class="btn primary" id="dSave">Save record</button>
-    </div>
-  </aside>
+    <div class="toast" id="toast"></div>
 
-  <div class="toast" id="toast"></div>
-
-<script>
-/* =================== persistence (IndexedDB) =================== */
-const DB="caneiMasterData", STORE="kv", KEY="data";
-function idb(){return null;}
-/* Storage moved behind ErpDocs: the server when this copy is served by it,
+    <script>
+      /* =================== persistence (IndexedDB) =================== */
+      const DB = "caneiMasterData",
+        STORE = "kv",
+        KEY = "data";
+      function idb() {
+        return null;
+      }
+      /* Storage moved behind ErpDocs: the server when this copy is served by it,
    IndexedDB otherwise. Same three calls, same shapes, so nothing above changes. */
-const _docs=ErpDocs.open(DB,STORE);
-async function idbGet(k){return _docs.get(k);}
-async function idbSet(k,v){return _docs.set(k,v);}
-let saveT; function persistSoon(){clearTimeout(saveT);saveT=setTimeout(()=>idbSet(KEY,DATA).catch(()=>{}),150);}
+      const _docs = ErpDocs.open(DB, STORE);
+      async function idbGet(k) {
+        return _docs.get(k);
+      }
+      async function idbSet(k, v) {
+        return _docs.set(k, v);
+      }
+      let saveT;
+      function persistSoon() {
+        clearTimeout(saveT);
+        saveT = setTimeout(() => idbSet(KEY, DATA).catch(() => {}), 150);
+      }
 
-/* =================== helpers =================== */
-const $=s=>document.querySelector(s), el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
-const euro=n=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(n)||0);
-const pct=n=>(n==null||n==='')?'':(Number(n)).toLocaleString('es-ES')+'%';
-const esc=s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-const fmtDate=iso=>{if(!iso)return'';const p=String(iso).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;};
-function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),1900);}
-function pillClass(v){const s=String(v).toLowerCase();
-  if(/(active|approved|paid|current|in stock|preferred|yes|won|signed)/.test(s))return'g';
-  if(/(pending|draft|hold|low|review|prospect|partial|due)/.test(s))return'y';
-  if(/(inactive|blocked|expired|overdue|lost|out of stock|no)/.test(s))return'r';return'';}
+      /* =================== helpers =================== */
+      const $ = (s) => document.querySelector(s),
+        el = (t, c, h) => {
+          const e = document.createElement(t);
+          if (c) e.className = c;
+          if (h != null) e.innerHTML = h;
+          return e;
+        };
+      const euro = (n) =>
+        new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(
+          Number(n) || 0,
+        );
+      const pct = (n) => (n == null || n === "" ? "" : Number(n).toLocaleString("es-ES") + "%");
+      const esc = (s) =>
+        String(s ?? "").replace(
+          /[&<>"]/g,
+          (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[m],
+        );
+      const fmtDate = (iso) => {
+        if (!iso) return "";
+        const p = String(iso).split("-");
+        return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+      };
+      function toast(m) {
+        const t = $("#toast");
+        t.textContent = m;
+        t.classList.add("on");
+        clearTimeout(t._t);
+        t._t = setTimeout(() => t.classList.remove("on"), 1900);
+      }
+      function pillClass(v) {
+        const s = String(v).toLowerCase();
+        if (/(active|approved|paid|current|in stock|preferred|yes|won|signed)/.test(s)) return "g";
+        if (/(pending|draft|hold|low|review|prospect|partial|due)/.test(s)) return "y";
+        if (/(inactive|blocked|expired|overdue|lost|out of stock|no)/.test(s)) return "r";
+        return "";
+      }
 
-/* =================== MODEL — the master-data schema =====================
+      /* =================== MODEL — the master-data schema =====================
    Each entity: {key,label,icon,desc, fields:[{k,label,type,opts?,hint?,col?,req?,unit?,sec?}]}
    type: text|num|money|pct|select|date|tel|email|textarea|tags|bool|iban
    col:true → shown as a table column. sec → section header in editor.       */
-const MODEL=[
- {grp:"Organisation", entities:[
-  {key:"company", label:"Company / Legal entity", icon:"🏛️", single:true,
-   desc:"The tenant's own legal, fiscal and banking identity — the root every document is issued from.",
-   fields:[
-    {k:"legalName",label:"Legal name",type:"text",col:1,req:1,sec:"Identity"},
-    {k:"tradeName",label:"Trade name",type:"text",col:1},
-    {k:"cif",label:"CIF / NIF",type:"text",col:1,req:1},
-    {k:"vatId",label:"EU VAT ID",type:"text"},
-    {k:"cnae",label:"CNAE activity code",type:"text"},
-    {k:"regMercantil",label:"Mercantile registry",type:"text"},
-    {k:"shareCapital",label:"Share capital",type:"money"},
-    {k:"address",label:"Registered address",type:"text",sec:"Address"},
-    {k:"city",label:"City",type:"text"},{k:"pc",label:"Postal code",type:"text"},
-    {k:"province",label:"Province",type:"text"},{k:"country",label:"Country",type:"text"},
-    {k:"phone",label:"Phone",type:"tel",sec:"Contact"},{k:"email",label:"Email",type:"email"},
-    {k:"web",label:"Website",type:"text"},
-    {k:"iban",label:"Default IBAN",type:"iban",sec:"Banking & fiscal"},{k:"bic",label:"BIC / SWIFT",type:"text"},
-    {k:"taxRegime",label:"Tax regime",type:"select",opts:["General","Recargo de equivalencia","Módulos","Grupo IVA"]},
-    {k:"irpfDefault",label:"Default IRPF %",type:"pct"},
-    {k:"fyEnd",label:"Fiscal year end",type:"text",hint:"e.g. 31/12"},
-    {k:"currency",label:"Base currency",type:"select",opts:["EUR"]},
-    {k:"insurer",label:"Liability insurer",type:"text",sec:"Compliance"},
-    {k:"policyNo",label:"Policy number",type:"text"},{k:"policyExpiry",label:"Policy expiry",type:"date"},
-   ]},
-  {key:"branches", label:"Branches / Locations", icon:"🏢",
-   desc:"Physical offices, yards and stores of the company.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1},{k:"name",label:"Name",type:"text",col:1,req:1},
-    {k:"type",label:"Type",type:"select",opts:["Office","Warehouse","Yard","Showroom"],col:1},
-    {k:"address",label:"Address",type:"text",col:1},{k:"city",label:"City",type:"text"},
-    {k:"phone",label:"Phone",type:"tel"},{k:"manager",label:"Manager",type:"text"},
-   ]},
-  {key:"bankAccounts", label:"Bank accounts", icon:"🏦",
-   desc:"Company bank accounts used for collections and payments.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1},{k:"bank",label:"Bank",type:"text",col:1,req:1},
-    {k:"iban",label:"IBAN",type:"iban",col:1},{k:"bic",label:"BIC",type:"text"},
-    {k:"currency",label:"Currency",type:"select",opts:["EUR"],col:1},
-    {k:"purpose",label:"Purpose",type:"select",opts:["Operating","Collections","Payroll","Tax","Savings"]},
-    {k:"opening",label:"Opening balance",type:"money"},
-   ]},
-  {key:"numbering", label:"Numbering sequences", icon:"🔢",
-   desc:"Document series that automation increments — quotes, invoices, POs, rectificativas.",
-   fields:[
-    {k:"docType",label:"Document type",type:"select",opts:["Quote","Invoice","Rectificativa","Purchase order","Delivery note","Credit note"],col:1,req:1},
-    {k:"prefix",label:"Prefix",type:"text",col:1,hint:"e.g. FRA-2026-"},
-    {k:"next",label:"Next number",type:"num",col:1},{k:"pad",label:"Digits (padding)",type:"num"},
-    {k:"resetPolicy",label:"Reset",type:"select",opts:["Never","Yearly","Monthly"],col:1},
-   ]},
- ]},
- {grp:"Commercial", entities:[
-  {key:"customers", label:"Customers", icon:"👥",
-   desc:"Everyone you sell to — billing identity, terms, price list and consent that drive quoting, invoicing and collections.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1,sec:"Identity"},
-    {k:"legalName",label:"Legal / full name",type:"text",col:1,req:1},
-    {k:"type",label:"Type",type:"select",opts:["B2C","B2B","Public sector"],col:1},
-    {k:"nif",label:"NIF / CIF",type:"text",col:1},
-    {k:"contact",label:"Primary contact",type:"text",sec:"Contact"},
-    {k:"email",label:"Email",type:"email",col:1},{k:"phone",label:"Phone",type:"tel",col:1},
-    {k:"lang",label:"Language",type:"select",opts:["es-ES","ca-ES","en"]},
-    {k:"billAddress",label:"Billing address",type:"text",sec:"Addresses"},
-    {k:"billCity",label:"City",type:"text"},{k:"billPc",label:"Postal code",type:"text"},
-    {k:"siteAddress",label:"Default site address",type:"text"},
-    {k:"terms",label:"Payment terms",type:"select",opts:["Immediate","15 days","30 days","30/60","60 days","50% up-front"],sec:"Commercial"},
-    {k:"method",label:"Payment method",type:"select",opts:["Transfer","SEPA direct debit","Card","Cash","Financing"]},
-    {k:"iban",label:"IBAN (for SEPA)",type:"iban"},
-    {k:"sepaMandate",label:"SEPA mandate ref",type:"text"},
-    {k:"priceList",label:"Price list",type:"text",hint:"code from Price lists"},
-    {k:"discount",label:"Standing discount %",type:"pct"},
-    {k:"creditLimit",label:"Credit limit",type:"money"},
-    {k:"source",label:"Lead source",type:"select",opts:["Referral","Web","Instagram","Google","Repeat","Architect","Other"]},
-    {k:"gdpr",label:"GDPR consent",type:"bool",sec:"Governance"},
-    {k:"status",label:"Status",type:"select",opts:["Active","Prospect","Inactive","Blocked"],col:1},
-    {k:"tags",label:"Tags",type:"tags"},{k:"notes",label:"Notes",type:"textarea"},
-   ]},
-  {key:"contacts", label:"Contacts", icon:"📇",
-   desc:"Named people at customers or partners, with role and channel.",
-   fields:[
-    {k:"name",label:"Name",type:"text",col:1,req:1},{k:"org",label:"Organisation / customer code",type:"text",col:1},
-    {k:"role",label:"Role",type:"text",col:1},{k:"email",label:"Email",type:"email",col:1},
-    {k:"phone",label:"Phone",type:"tel"},{k:"primary",label:"Primary",type:"bool"},
-   ]},
-  {key:"leads", label:"Leads / Pipeline", icon:"🎯",
-   desc:"Opportunities in the sales pipeline with stage, value and next action for follow-up automation.",
-   fields:[
-    {k:"code",label:"Ref",type:"text",col:1,req:1},{k:"customer",label:"Customer / prospect",type:"text",col:1,req:1},
-    {k:"channel",label:"Channel",type:"select",opts:["Referral","Web","Instagram","Google","Repeat","Architect"],col:1},
-    {k:"stage",label:"Stage",type:"select",opts:["New","Qualified","Site visit","Quoted","Won","Lost"],col:1},
-    {k:"value",label:"Est. value",type:"money",col:1},{k:"owner",label:"Owner",type:"text"},
-    {k:"nextAction",label:"Next action",type:"text"},{k:"nextDate",label:"Next date",type:"date"},
-   ]},
- ]},
- {grp:"Supply", entities:[
-  {key:"suppliers", label:"Suppliers & Subcontractors", icon:"🚚",
-   desc:"Everyone you buy from — materials vendors and autónomo subcontractors — with terms and IRPF retention profile.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1,sec:"Identity"},
-    {k:"legalName",label:"Legal name",type:"text",col:1,req:1},
-    {k:"category",label:"Category",type:"select",opts:["Material supplier","Subcontractor (autónomo)","Subcontractor (company)","Service","Equipment hire"],col:1},
-    {k:"cif",label:"CIF / NIF",type:"text",col:1},
-    {k:"trades",label:"Trades / goods",type:"tags",sec:"Capability"},
-    {k:"contact",label:"Contact",type:"text",sec:"Contact"},
-    {k:"email",label:"Email",type:"email",col:1},{k:"phone",label:"Phone",type:"tel"},
-    {k:"address",label:"Address",type:"text"},{k:"city",label:"City",type:"text"},
-    {k:"terms",label:"Payment terms",type:"select",opts:["Immediate","15 days","30 days","30/60","60 days"],col:1,sec:"Commercial"},
-    {k:"irpfProfile",label:"IRPF profile",type:"select",opts:["No retention (empresarial)","Professional 15%","New professional 7%","Módulos 1%"]},
-    {k:"retention",label:"Retention %",type:"pct"},
-    {k:"iban",label:"IBAN",type:"iban"},
-    {k:"leadTime",label:"Lead time (days)",type:"num"},
-    {k:"rating",label:"Rating",type:"select",opts:["A — preferred","B — approved","C — occasional","On hold"],col:1,sec:"Governance"},
-    {k:"insExpiry",label:"Insurance / RC expiry",type:"date"},
-    {k:"status",label:"Status",type:"select",opts:["Active","Inactive","Blocked"]},
-    {k:"notes",label:"Notes",type:"textarea"},
-   ]},
-  {key:"paymentTerms", label:"Payment terms", icon:"⏱️",
-   desc:"Reusable payment-term definitions referenced by customers, suppliers and documents.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1},{k:"name",label:"Name",type:"text",col:1,req:1},
-    {k:"netDays",label:"Net days",type:"num",col:1},{k:"discPct",label:"Early-pay disc %",type:"pct"},
-    {k:"discDays",label:"Disc. within days",type:"num"},{k:"notes",label:"Notes",type:"text"},
-   ]},
- ]},
- {grp:"Catalogue & Pricing", entities:[
-  {key:"items", label:"Items — materials & works", icon:"📦",
-   desc:"The price-book. Every material, labour rate, equipment and subcontract line quoting and purchasing draw from.",
-   fields:[
-    {k:"sku",label:"SKU",type:"text",col:1,req:1,sec:"Item"},
-    {k:"desc",label:"Description",type:"text",col:1,req:1},
-    {k:"chapter",label:"Chapter",type:"text",col:1,hint:"code from Chapters"},
-    {k:"type",label:"Type",type:"select",opts:["Material","Labour","Equipment","Subcontract"],col:1},
-    {k:"uom",label:"Unit",type:"select",opts:["ud","m","m²","m³","kg","h","día","tanto alzado","ml"],col:1,sec:"Pricing"},
-    {k:"cost",label:"Unit cost",type:"money",col:1},
-    {k:"price",label:"Sell price / rate",type:"money",col:1},
-    {k:"margin",label:"Margin %",type:"pct"},
-    {k:"vatClass",label:"VAT class",type:"select",opts:["General 21%","Reducido 10%","Superreducido 4%","Exento"]},
-    {k:"prefSupplier",label:"Preferred supplier",type:"text",hint:"supplier code",sec:"Sourcing"},
-    {k:"barcode",label:"Barcode / EAN",type:"text"},
-    {k:"reorder",label:"Reorder point",type:"num"},{k:"leadTime",label:"Lead time (days)",type:"num"},
-    {k:"status",label:"Status",type:"select",opts:["Active","Discontinued"]},
-   ]},
-  {key:"chapters", label:"Chapters (partidas)", icon:"🗂️",
-   desc:"Cost structure of a reforma — the chapters budgets, quotes and margin-by-chapter roll up to.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1},{k:"name",label:"Name",type:"text",col:1,req:1},
-    {k:"defMargin",label:"Default margin %",type:"pct",col:1},{k:"order",label:"Sort order",type:"num"},
-   ]},
-  {key:"priceLists", label:"Price lists / Rate cards", icon:"🏷️",
-   desc:"Named, effective-dated price sets assigned to customer groups; the resolver picks the right one per quote.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1},{k:"name",label:"Name",type:"text",col:1,req:1},
-    {k:"currency",label:"Currency",type:"select",opts:["EUR"],col:1},
-    {k:"validFrom",label:"Valid from",type:"date",col:1},{k:"validTo",label:"Valid to",type:"date"},
-    {k:"markup",label:"Markup %",type:"pct"},{k:"group",label:"Customer group",type:"text"},
-   ]},
-  {key:"vatCodes", label:"VAT / Tax codes", icon:"🧾",
-   desc:"Effective-dated VAT and retention codes; the jurisdiction rule decides which applies per line.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1},{k:"rate",label:"Rate %",type:"pct",col:1,req:1},
-    {k:"kind",label:"Kind",type:"select",opts:["IVA general","IVA reducido","IVA superreducido","Exento","IRPF retención","Recargo equivalencia"],col:1},
-    {k:"effFrom",label:"Effective from",type:"date",col:1},
-    {k:"reverse",label:"Reverse charge (ISP)",type:"bool"},{k:"notes",label:"Notes",type:"text"},
-   ]},
-  {key:"uom", label:"Units of measure", icon:"📐",
-   desc:"Canonical units used across items, stock and documents.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1},{k:"name",label:"Name",type:"text",col:1,req:1},
-    {k:"category",label:"Category",type:"select",opts:["Count","Length","Area","Volume","Weight","Time","Lump sum"],col:1},
-   ]},
- ]},
- {grp:"Operations & Resources", entities:[
-  {key:"warehouses", label:"Warehouses / Stores", icon:"🏬",
-   desc:"Stocking locations for materials valuation and availability.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1},{k:"name",label:"Name",type:"text",col:1,req:1},
-    {k:"type",label:"Type",type:"select",opts:["Main store","Van stock","Site store","Yard"],col:1},
-    {k:"address",label:"Address",type:"text"},{k:"manager",label:"Keeper",type:"text"},
-   ]},
-  {key:"stock", label:"Stock / Inventory", icon:"📊",
-   desc:"On-hand quantities and valuation per item and location — feeds purchasing and job material issue.",
-   fields:[
-    {k:"warehouse",label:"Warehouse",type:"text",col:1,req:1},{k:"sku",label:"Item SKU",type:"text",col:1,req:1},
-    {k:"onHand",label:"On hand",type:"num",col:1},{k:"reserved",label:"Reserved",type:"num",col:1},
-    {k:"min",label:"Min",type:"num"},{k:"max",label:"Max",type:"num"},
-    {k:"bin",label:"Bin / location",type:"text"},{k:"unitCost",label:"Unit cost (valuation)",type:"money",col:1},
-    {k:"lastCount",label:"Last count",type:"date"},
-   ]},
-  {key:"employees", label:"Team / Resources", icon:"👷",
-   desc:"People and their cost/charge rates, skills and PRL certification for scheduling and job costing.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1},{k:"name",label:"Name",type:"text",col:1,req:1},
-    {k:"role",label:"Role",type:"select",opts:["Owner","Project manager","Foreman","Oficial 1ª","Peón","Admin","Sales"],col:1},
-    {k:"costRate",label:"Cost rate €/h",type:"money",col:1},{k:"chargeRate",label:"Charge rate €/h",type:"money",col:1},
-    {k:"skills",label:"Skills",type:"tags"},{k:"prl",label:"PRL cert",type:"select",opts:["Valid","Expiring","Missing","N/A"]},
-    {k:"prlExpiry",label:"PRL expiry",type:"date"},
-    {k:"phone",label:"Phone",type:"tel"},{k:"email",label:"Email",type:"email"},
-    {k:"color",label:"Calendar colour",type:"text",hint:"hex, e.g. #48733c"},
-    {k:"status",label:"Status",type:"select",opts:["Active","Leave","Inactive"],col:1},
-   ]},
-  {key:"equipment", label:"Equipment & Vehicles", icon:"🚐",
-   desc:"Owned assets — plant, tools and vans — with value and maintenance for depreciation and availability.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1},{k:"desc",label:"Description",type:"text",col:1,req:1},
-    {k:"type",label:"Type",type:"select",opts:["Vehicle","Machine","Tool","IT"],col:1},
-    {k:"plate",label:"Plate / serial",type:"text",col:1},{k:"purchaseDate",label:"Purchased",type:"date"},
-    {k:"value",label:"Value",type:"money",col:1},{k:"maintDue",label:"Maintenance / ITV due",type:"date"},
-    {k:"status",label:"Status",type:"select",opts:["In service","Repair","Retired"]},
-   ]},
-  {key:"projects", label:"Projects / Sites", icon:"🏗️",
-   desc:"The register of jobs — links customer, site and status; the journey and financials attach here.",
-   fields:[
-    {k:"code",label:"Code",type:"text",col:1,req:1},{k:"name",label:"Name",type:"text",col:1,req:1},
-    {k:"customer",label:"Customer",type:"text",col:1,hint:"customer code"},
-    {k:"site",label:"Site address",type:"text"},
-    {k:"type",label:"Type",type:"select",opts:["Integral","Kitchen","Bathroom","Commercial","Facade","Extension"],col:1},
-    {k:"pm",label:"Project manager",type:"text"},
-    {k:"status",label:"Status",type:"select",opts:["Lead","Quoted","Won","In progress","On hold","Complete","Closed"],col:1},
-    {k:"start",label:"Start",type:"date"},{k:"end",label:"Target end",type:"date"},
-    {k:"contract",label:"Contract value",type:"money",col:1},
-   ]},
- ]},
- {grp:"Governance & Automation", entities:[
-  {key:"documents", label:"Documents & compliance", icon:"📁",
-   desc:"Registry of certificates, licences and insurances with expiry — automation warns before they lapse.",
-   fields:[
-    {k:"name",label:"Document",type:"text",col:1,req:1},
-    {k:"type",label:"Type",type:"select",opts:["Insurance","Licence","Certificate","PRL","Contract","Guarantee"],col:1},
-    {k:"owner",label:"Applies to",type:"text",col:1,hint:"entity code"},
-    {k:"issued",label:"Issued",type:"date"},{k:"expiry",label:"Expiry",type:"date",col:1},
-    {k:"status",label:"Status",type:"select",opts:["Valid","Expiring","Expired"],col:1},
-    {k:"ref",label:"Reference",type:"text"},
-   ]},
-  {key:"automation", label:"Automation rules", icon:"⚙️",
-   desc:"The triggers and cadences the ERP runs unattended — reminders, review requests, reorder alerts, escalations.",
-   fields:[
-    {k:"key",label:"Key",type:"text",col:1,req:1},{k:"trigger",label:"Trigger",type:"text",col:1,req:1,hint:"e.g. invoice.overdue"},
-    {k:"action",label:"Action",type:"select",opts:["Send email","Create task","Notify owner","Raise PO","Flag"],col:1},
-    {k:"template",label:"Template / message",type:"text"},
-    {k:"cadence",label:"Cadence",type:"text",col:1,hint:"e.g. +7d, then +14d"},
-    {k:"owner",label:"Owner",type:"text"},
-    {k:"enabled",label:"Enabled",type:"bool",col:1},
-   ]},
- ]},
-];
-const ENT={}; MODEL.forEach(g=>g.entities.forEach(e=>ENT[e.key]=e));
+      const MODEL = [
+        {
+          grp: "Organisation",
+          entities: [
+            {
+              key: "company",
+              label: "Company / Legal entity",
+              icon: "🏛️",
+              single: true,
+              desc: "The tenant's own legal, fiscal and banking identity — the root every document is issued from.",
+              fields: [
+                {
+                  k: "legalName",
+                  label: "Legal name",
+                  type: "text",
+                  col: 1,
+                  req: 1,
+                  sec: "Identity",
+                },
+                { k: "tradeName", label: "Trade name", type: "text", col: 1 },
+                { k: "cif", label: "CIF / NIF", type: "text", col: 1, req: 1 },
+                { k: "vatId", label: "EU VAT ID", type: "text" },
+                { k: "cnae", label: "CNAE activity code", type: "text" },
+                { k: "regMercantil", label: "Mercantile registry", type: "text" },
+                { k: "shareCapital", label: "Share capital", type: "money" },
+                { k: "address", label: "Registered address", type: "text", sec: "Address" },
+                { k: "city", label: "City", type: "text" },
+                { k: "pc", label: "Postal code", type: "text" },
+                { k: "province", label: "Province", type: "text" },
+                { k: "country", label: "Country", type: "text" },
+                { k: "phone", label: "Phone", type: "tel", sec: "Contact" },
+                { k: "email", label: "Email", type: "email" },
+                { k: "web", label: "Website", type: "text" },
+                { k: "iban", label: "Default IBAN", type: "iban", sec: "Banking & fiscal" },
+                { k: "bic", label: "BIC / SWIFT", type: "text" },
+                {
+                  k: "taxRegime",
+                  label: "Tax regime",
+                  type: "select",
+                  opts: ["General", "Recargo de equivalencia", "Módulos", "Grupo IVA"],
+                },
+                { k: "irpfDefault", label: "Default IRPF %", type: "pct" },
+                { k: "fyEnd", label: "Fiscal year end", type: "text", hint: "e.g. 31/12" },
+                { k: "currency", label: "Base currency", type: "select", opts: ["EUR"] },
+                { k: "insurer", label: "Liability insurer", type: "text", sec: "Compliance" },
+                { k: "policyNo", label: "Policy number", type: "text" },
+                { k: "policyExpiry", label: "Policy expiry", type: "date" },
+              ],
+            },
+            {
+              key: "branches",
+              label: "Branches / Locations",
+              icon: "🏢",
+              desc: "Physical offices, yards and stores of the company.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1 },
+                { k: "name", label: "Name", type: "text", col: 1, req: 1 },
+                {
+                  k: "type",
+                  label: "Type",
+                  type: "select",
+                  opts: ["Office", "Warehouse", "Yard", "Showroom"],
+                  col: 1,
+                },
+                { k: "address", label: "Address", type: "text", col: 1 },
+                { k: "city", label: "City", type: "text" },
+                { k: "phone", label: "Phone", type: "tel" },
+                { k: "manager", label: "Manager", type: "text" },
+              ],
+            },
+            {
+              key: "bankAccounts",
+              label: "Bank accounts",
+              icon: "🏦",
+              desc: "Company bank accounts used for collections and payments.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1 },
+                { k: "bank", label: "Bank", type: "text", col: 1, req: 1 },
+                { k: "iban", label: "IBAN", type: "iban", col: 1 },
+                { k: "bic", label: "BIC", type: "text" },
+                { k: "currency", label: "Currency", type: "select", opts: ["EUR"], col: 1 },
+                {
+                  k: "purpose",
+                  label: "Purpose",
+                  type: "select",
+                  opts: ["Operating", "Collections", "Payroll", "Tax", "Savings"],
+                },
+                { k: "opening", label: "Opening balance", type: "money" },
+              ],
+            },
+            {
+              key: "numbering",
+              label: "Numbering sequences",
+              icon: "🔢",
+              desc: "Document series that automation increments — quotes, invoices, POs, rectificativas.",
+              fields: [
+                {
+                  k: "docType",
+                  label: "Document type",
+                  type: "select",
+                  opts: [
+                    "Quote",
+                    "Invoice",
+                    "Rectificativa",
+                    "Purchase order",
+                    "Delivery note",
+                    "Credit note",
+                  ],
+                  col: 1,
+                  req: 1,
+                },
+                { k: "prefix", label: "Prefix", type: "text", col: 1, hint: "e.g. FRA-2026-" },
+                { k: "next", label: "Next number", type: "num", col: 1 },
+                { k: "pad", label: "Digits (padding)", type: "num" },
+                {
+                  k: "resetPolicy",
+                  label: "Reset",
+                  type: "select",
+                  opts: ["Never", "Yearly", "Monthly"],
+                  col: 1,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          grp: "Commercial",
+          entities: [
+            {
+              key: "customers",
+              label: "Customers",
+              icon: "👥",
+              desc: "Everyone you sell to — billing identity, terms, price list and consent that drive quoting, invoicing and collections.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1, sec: "Identity" },
+                { k: "legalName", label: "Legal / full name", type: "text", col: 1, req: 1 },
+                {
+                  k: "type",
+                  label: "Type",
+                  type: "select",
+                  opts: ["B2C", "B2B", "Public sector"],
+                  col: 1,
+                },
+                { k: "nif", label: "NIF / CIF", type: "text", col: 1 },
+                { k: "contact", label: "Primary contact", type: "text", sec: "Contact" },
+                { k: "email", label: "Email", type: "email", col: 1 },
+                { k: "phone", label: "Phone", type: "tel", col: 1 },
+                { k: "lang", label: "Language", type: "select", opts: ["es-ES", "ca-ES", "en"] },
+                { k: "billAddress", label: "Billing address", type: "text", sec: "Addresses" },
+                { k: "billCity", label: "City", type: "text" },
+                { k: "billPc", label: "Postal code", type: "text" },
+                { k: "siteAddress", label: "Default site address", type: "text" },
+                {
+                  k: "terms",
+                  label: "Payment terms",
+                  type: "select",
+                  opts: ["Immediate", "15 days", "30 days", "30/60", "60 days", "50% up-front"],
+                  sec: "Commercial",
+                },
+                {
+                  k: "method",
+                  label: "Payment method",
+                  type: "select",
+                  opts: ["Transfer", "SEPA direct debit", "Card", "Cash", "Financing"],
+                },
+                { k: "iban", label: "IBAN (for SEPA)", type: "iban" },
+                { k: "sepaMandate", label: "SEPA mandate ref", type: "text" },
+                {
+                  k: "priceList",
+                  label: "Price list",
+                  type: "text",
+                  hint: "code from Price lists",
+                },
+                { k: "discount", label: "Standing discount %", type: "pct" },
+                { k: "creditLimit", label: "Credit limit", type: "money" },
+                {
+                  k: "source",
+                  label: "Lead source",
+                  type: "select",
+                  opts: ["Referral", "Web", "Instagram", "Google", "Repeat", "Architect", "Other"],
+                },
+                { k: "gdpr", label: "GDPR consent", type: "bool", sec: "Governance" },
+                {
+                  k: "status",
+                  label: "Status",
+                  type: "select",
+                  opts: ["Active", "Prospect", "Inactive", "Blocked"],
+                  col: 1,
+                },
+                { k: "tags", label: "Tags", type: "tags" },
+                { k: "notes", label: "Notes", type: "textarea" },
+              ],
+            },
+            {
+              key: "contacts",
+              label: "Contacts",
+              icon: "📇",
+              desc: "Named people at customers or partners, with role and channel.",
+              fields: [
+                { k: "name", label: "Name", type: "text", col: 1, req: 1 },
+                { k: "org", label: "Organisation / customer code", type: "text", col: 1 },
+                { k: "role", label: "Role", type: "text", col: 1 },
+                { k: "email", label: "Email", type: "email", col: 1 },
+                { k: "phone", label: "Phone", type: "tel" },
+                { k: "primary", label: "Primary", type: "bool" },
+              ],
+            },
+            {
+              key: "leads",
+              label: "Leads / Pipeline",
+              icon: "🎯",
+              desc: "Opportunities in the sales pipeline with stage, value and next action for follow-up automation.",
+              fields: [
+                { k: "code", label: "Ref", type: "text", col: 1, req: 1 },
+                { k: "customer", label: "Customer / prospect", type: "text", col: 1, req: 1 },
+                {
+                  k: "channel",
+                  label: "Channel",
+                  type: "select",
+                  opts: ["Referral", "Web", "Instagram", "Google", "Repeat", "Architect"],
+                  col: 1,
+                },
+                {
+                  k: "stage",
+                  label: "Stage",
+                  type: "select",
+                  opts: ["New", "Qualified", "Site visit", "Quoted", "Won", "Lost"],
+                  col: 1,
+                },
+                { k: "value", label: "Est. value", type: "money", col: 1 },
+                { k: "owner", label: "Owner", type: "text" },
+                { k: "nextAction", label: "Next action", type: "text" },
+                { k: "nextDate", label: "Next date", type: "date" },
+              ],
+            },
+          ],
+        },
+        {
+          grp: "Supply",
+          entities: [
+            {
+              key: "suppliers",
+              label: "Suppliers & Subcontractors",
+              icon: "🚚",
+              desc: "Everyone you buy from — materials vendors and autónomo subcontractors — with terms and IRPF retention profile.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1, sec: "Identity" },
+                { k: "legalName", label: "Legal name", type: "text", col: 1, req: 1 },
+                {
+                  k: "category",
+                  label: "Category",
+                  type: "select",
+                  opts: [
+                    "Material supplier",
+                    "Subcontractor (autónomo)",
+                    "Subcontractor (company)",
+                    "Service",
+                    "Equipment hire",
+                  ],
+                  col: 1,
+                },
+                { k: "cif", label: "CIF / NIF", type: "text", col: 1 },
+                { k: "trades", label: "Trades / goods", type: "tags", sec: "Capability" },
+                { k: "contact", label: "Contact", type: "text", sec: "Contact" },
+                { k: "email", label: "Email", type: "email", col: 1 },
+                { k: "phone", label: "Phone", type: "tel" },
+                { k: "address", label: "Address", type: "text" },
+                { k: "city", label: "City", type: "text" },
+                {
+                  k: "terms",
+                  label: "Payment terms",
+                  type: "select",
+                  opts: ["Immediate", "15 days", "30 days", "30/60", "60 days"],
+                  col: 1,
+                  sec: "Commercial",
+                },
+                {
+                  k: "irpfProfile",
+                  label: "IRPF profile",
+                  type: "select",
+                  opts: [
+                    "No retention (empresarial)",
+                    "Professional 15%",
+                    "New professional 7%",
+                    "Módulos 1%",
+                  ],
+                },
+                { k: "retention", label: "Retention %", type: "pct" },
+                { k: "iban", label: "IBAN", type: "iban" },
+                { k: "leadTime", label: "Lead time (days)", type: "num" },
+                {
+                  k: "rating",
+                  label: "Rating",
+                  type: "select",
+                  opts: ["A — preferred", "B — approved", "C — occasional", "On hold"],
+                  col: 1,
+                  sec: "Governance",
+                },
+                { k: "insExpiry", label: "Insurance / RC expiry", type: "date" },
+                {
+                  k: "status",
+                  label: "Status",
+                  type: "select",
+                  opts: ["Active", "Inactive", "Blocked"],
+                },
+                { k: "notes", label: "Notes", type: "textarea" },
+              ],
+            },
+            {
+              key: "paymentTerms",
+              label: "Payment terms",
+              icon: "⏱️",
+              desc: "Reusable payment-term definitions referenced by customers, suppliers and documents.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1 },
+                { k: "name", label: "Name", type: "text", col: 1, req: 1 },
+                { k: "netDays", label: "Net days", type: "num", col: 1 },
+                { k: "discPct", label: "Early-pay disc %", type: "pct" },
+                { k: "discDays", label: "Disc. within days", type: "num" },
+                { k: "notes", label: "Notes", type: "text" },
+              ],
+            },
+          ],
+        },
+        {
+          grp: "Catalogue & Pricing",
+          entities: [
+            {
+              key: "items",
+              label: "Items — materials & works",
+              icon: "📦",
+              desc: "The price-book. Every material, labour rate, equipment and subcontract line quoting and purchasing draw from.",
+              fields: [
+                { k: "sku", label: "SKU", type: "text", col: 1, req: 1, sec: "Item" },
+                { k: "desc", label: "Description", type: "text", col: 1, req: 1 },
+                {
+                  k: "chapter",
+                  label: "Chapter",
+                  type: "text",
+                  col: 1,
+                  hint: "code from Chapters",
+                },
+                {
+                  k: "type",
+                  label: "Type",
+                  type: "select",
+                  opts: ["Material", "Labour", "Equipment", "Subcontract"],
+                  col: 1,
+                },
+                {
+                  k: "uom",
+                  label: "Unit",
+                  type: "select",
+                  opts: ["ud", "m", "m²", "m³", "kg", "h", "día", "tanto alzado", "ml"],
+                  col: 1,
+                  sec: "Pricing",
+                },
+                { k: "cost", label: "Unit cost", type: "money", col: 1 },
+                { k: "price", label: "Sell price / rate", type: "money", col: 1 },
+                { k: "margin", label: "Margin %", type: "pct" },
+                {
+                  k: "vatClass",
+                  label: "VAT class",
+                  type: "select",
+                  opts: ["General 21%", "Reducido 10%", "Superreducido 4%", "Exento"],
+                },
+                {
+                  k: "prefSupplier",
+                  label: "Preferred supplier",
+                  type: "text",
+                  hint: "supplier code",
+                  sec: "Sourcing",
+                },
+                { k: "barcode", label: "Barcode / EAN", type: "text" },
+                { k: "reorder", label: "Reorder point", type: "num" },
+                { k: "leadTime", label: "Lead time (days)", type: "num" },
+                { k: "status", label: "Status", type: "select", opts: ["Active", "Discontinued"] },
+              ],
+            },
+            {
+              key: "chapters",
+              label: "Chapters (partidas)",
+              icon: "🗂️",
+              desc: "Cost structure of a reforma — the chapters budgets, quotes and margin-by-chapter roll up to.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1 },
+                { k: "name", label: "Name", type: "text", col: 1, req: 1 },
+                { k: "defMargin", label: "Default margin %", type: "pct", col: 1 },
+                { k: "order", label: "Sort order", type: "num" },
+              ],
+            },
+            {
+              key: "priceLists",
+              label: "Price lists / Rate cards",
+              icon: "🏷️",
+              desc: "Named, effective-dated price sets assigned to customer groups; the resolver picks the right one per quote.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1 },
+                { k: "name", label: "Name", type: "text", col: 1, req: 1 },
+                { k: "currency", label: "Currency", type: "select", opts: ["EUR"], col: 1 },
+                { k: "validFrom", label: "Valid from", type: "date", col: 1 },
+                { k: "validTo", label: "Valid to", type: "date" },
+                { k: "markup", label: "Markup %", type: "pct" },
+                { k: "group", label: "Customer group", type: "text" },
+              ],
+            },
+            {
+              key: "vatCodes",
+              label: "VAT / Tax codes",
+              icon: "🧾",
+              desc: "Effective-dated VAT and retention codes; the jurisdiction rule decides which applies per line.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1 },
+                { k: "rate", label: "Rate %", type: "pct", col: 1, req: 1 },
+                {
+                  k: "kind",
+                  label: "Kind",
+                  type: "select",
+                  opts: [
+                    "IVA general",
+                    "IVA reducido",
+                    "IVA superreducido",
+                    "Exento",
+                    "IRPF retención",
+                    "Recargo equivalencia",
+                  ],
+                  col: 1,
+                },
+                { k: "effFrom", label: "Effective from", type: "date", col: 1 },
+                { k: "reverse", label: "Reverse charge (ISP)", type: "bool" },
+                { k: "notes", label: "Notes", type: "text" },
+              ],
+            },
+            {
+              key: "uom",
+              label: "Units of measure",
+              icon: "📐",
+              desc: "Canonical units used across items, stock and documents.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1 },
+                { k: "name", label: "Name", type: "text", col: 1, req: 1 },
+                {
+                  k: "category",
+                  label: "Category",
+                  type: "select",
+                  opts: ["Count", "Length", "Area", "Volume", "Weight", "Time", "Lump sum"],
+                  col: 1,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          grp: "Operations & Resources",
+          entities: [
+            {
+              key: "warehouses",
+              label: "Warehouses / Stores",
+              icon: "🏬",
+              desc: "Stocking locations for materials valuation and availability.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1 },
+                { k: "name", label: "Name", type: "text", col: 1, req: 1 },
+                {
+                  k: "type",
+                  label: "Type",
+                  type: "select",
+                  opts: ["Main store", "Van stock", "Site store", "Yard"],
+                  col: 1,
+                },
+                { k: "address", label: "Address", type: "text" },
+                { k: "manager", label: "Keeper", type: "text" },
+              ],
+            },
+            {
+              key: "stock",
+              label: "Stock / Inventory",
+              icon: "📊",
+              desc: "On-hand quantities and valuation per item and location — feeds purchasing and job material issue.",
+              fields: [
+                { k: "warehouse", label: "Warehouse", type: "text", col: 1, req: 1 },
+                { k: "sku", label: "Item SKU", type: "text", col: 1, req: 1 },
+                { k: "onHand", label: "On hand", type: "num", col: 1 },
+                { k: "reserved", label: "Reserved", type: "num", col: 1 },
+                { k: "min", label: "Min", type: "num" },
+                { k: "max", label: "Max", type: "num" },
+                { k: "bin", label: "Bin / location", type: "text" },
+                { k: "unitCost", label: "Unit cost (valuation)", type: "money", col: 1 },
+                { k: "lastCount", label: "Last count", type: "date" },
+              ],
+            },
+            {
+              key: "employees",
+              label: "Team / Resources",
+              icon: "👷",
+              desc: "People and their cost/charge rates, skills and PRL certification for scheduling and job costing.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1 },
+                { k: "name", label: "Name", type: "text", col: 1, req: 1 },
+                {
+                  k: "role",
+                  label: "Role",
+                  type: "select",
+                  opts: [
+                    "Owner",
+                    "Project manager",
+                    "Foreman",
+                    "Oficial 1ª",
+                    "Peón",
+                    "Admin",
+                    "Sales",
+                  ],
+                  col: 1,
+                },
+                { k: "costRate", label: "Cost rate €/h", type: "money", col: 1 },
+                { k: "chargeRate", label: "Charge rate €/h", type: "money", col: 1 },
+                { k: "skills", label: "Skills", type: "tags" },
+                {
+                  k: "prl",
+                  label: "PRL cert",
+                  type: "select",
+                  opts: ["Valid", "Expiring", "Missing", "N/A"],
+                },
+                { k: "prlExpiry", label: "PRL expiry", type: "date" },
+                { k: "phone", label: "Phone", type: "tel" },
+                { k: "email", label: "Email", type: "email" },
+                { k: "color", label: "Calendar colour", type: "text", hint: "hex, e.g. #48733c" },
+                {
+                  k: "status",
+                  label: "Status",
+                  type: "select",
+                  opts: ["Active", "Leave", "Inactive"],
+                  col: 1,
+                },
+              ],
+            },
+            {
+              key: "equipment",
+              label: "Equipment & Vehicles",
+              icon: "🚐",
+              desc: "Owned assets — plant, tools and vans — with value and maintenance for depreciation and availability.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1 },
+                { k: "desc", label: "Description", type: "text", col: 1, req: 1 },
+                {
+                  k: "type",
+                  label: "Type",
+                  type: "select",
+                  opts: ["Vehicle", "Machine", "Tool", "IT"],
+                  col: 1,
+                },
+                { k: "plate", label: "Plate / serial", type: "text", col: 1 },
+                { k: "purchaseDate", label: "Purchased", type: "date" },
+                { k: "value", label: "Value", type: "money", col: 1 },
+                { k: "maintDue", label: "Maintenance / ITV due", type: "date" },
+                {
+                  k: "status",
+                  label: "Status",
+                  type: "select",
+                  opts: ["In service", "Repair", "Retired"],
+                },
+              ],
+            },
+            {
+              key: "projects",
+              label: "Projects / Sites",
+              icon: "🏗️",
+              desc: "The register of jobs — links customer, site and status; the journey and financials attach here.",
+              fields: [
+                { k: "code", label: "Code", type: "text", col: 1, req: 1 },
+                { k: "name", label: "Name", type: "text", col: 1, req: 1 },
+                { k: "customer", label: "Customer", type: "text", col: 1, hint: "customer code" },
+                { k: "site", label: "Site address", type: "text" },
+                {
+                  k: "type",
+                  label: "Type",
+                  type: "select",
+                  opts: ["Integral", "Kitchen", "Bathroom", "Commercial", "Facade", "Extension"],
+                  col: 1,
+                },
+                { k: "pm", label: "Project manager", type: "text" },
+                {
+                  k: "status",
+                  label: "Status",
+                  type: "select",
+                  opts: ["Lead", "Quoted", "Won", "In progress", "On hold", "Complete", "Closed"],
+                  col: 1,
+                },
+                { k: "start", label: "Start", type: "date" },
+                { k: "end", label: "Target end", type: "date" },
+                { k: "contract", label: "Contract value", type: "money", col: 1 },
+              ],
+            },
+          ],
+        },
+        {
+          grp: "Governance & Automation",
+          entities: [
+            {
+              key: "documents",
+              label: "Documents & compliance",
+              icon: "📁",
+              desc: "Registry of certificates, licences and insurances with expiry — automation warns before they lapse.",
+              fields: [
+                { k: "name", label: "Document", type: "text", col: 1, req: 1 },
+                {
+                  k: "type",
+                  label: "Type",
+                  type: "select",
+                  opts: ["Insurance", "Licence", "Certificate", "PRL", "Contract", "Guarantee"],
+                  col: 1,
+                },
+                { k: "owner", label: "Applies to", type: "text", col: 1, hint: "entity code" },
+                { k: "issued", label: "Issued", type: "date" },
+                { k: "expiry", label: "Expiry", type: "date", col: 1 },
+                {
+                  k: "status",
+                  label: "Status",
+                  type: "select",
+                  opts: ["Valid", "Expiring", "Expired"],
+                  col: 1,
+                },
+                { k: "ref", label: "Reference", type: "text" },
+              ],
+            },
+            {
+              key: "automation",
+              label: "Automation rules",
+              icon: "⚙️",
+              desc: "The triggers and cadences the ERP runs unattended — reminders, review requests, reorder alerts, escalations.",
+              fields: [
+                { k: "key", label: "Key", type: "text", col: 1, req: 1 },
+                {
+                  k: "trigger",
+                  label: "Trigger",
+                  type: "text",
+                  col: 1,
+                  req: 1,
+                  hint: "e.g. invoice.overdue",
+                },
+                {
+                  k: "action",
+                  label: "Action",
+                  type: "select",
+                  opts: ["Send email", "Create task", "Notify owner", "Raise PO", "Flag"],
+                  col: 1,
+                },
+                { k: "template", label: "Template / message", type: "text" },
+                {
+                  k: "cadence",
+                  label: "Cadence",
+                  type: "text",
+                  col: 1,
+                  hint: "e.g. +7d, then +14d",
+                },
+                { k: "owner", label: "Owner", type: "text" },
+                { k: "enabled", label: "Enabled", type: "bool", col: 1 },
+              ],
+            },
+          ],
+        },
+      ];
+      const ENT = {};
+      MODEL.forEach((g) => g.entities.forEach((e) => (ENT[e.key] = e)));
 
-/* =================== starter data (replace with your own) =================== */
-function seed(){return {
- company:[{legalName:"Canei Subirats, S.L.",tradeName:"Canei Subirats",cif:"B00000000",vatId:"ESB00000000",cnae:"4332",shareCapital:3006,
-   address:"Carrer de la Creu, 74",city:"Sant Just Desvern",pc:"08960",province:"Barcelona",country:"España",
-   phone:"659 87 67 00",email:"hola@caneisubirats.com",web:"caneisubirats.com",iban:"ES00 0000 0000 0000 0000 0000",bic:"XXXXESB1",
-   taxRegime:"General",irpfDefault:15,fyEnd:"31/12",currency:"EUR",insurer:"—",policyNo:"RC-—",policyExpiry:"2026-12-31"}],
- branches:[{code:"OFI",name:"Oficina Sant Just",type:"Office",address:"Carrer de la Creu, 74",city:"Sant Just Desvern",phone:"659 87 67 00",manager:"—"},
-   {code:"ALM",name:"Almacén",type:"Warehouse",address:"Pol. Ind. —",city:"Sant Just Desvern",phone:"",manager:"—"}],
- bankAccounts:[{code:"OP",bank:"Banc principal",iban:"ES00 0000 0000 0000 0000 0000",bic:"XXXXESB1",currency:"EUR",purpose:"Operating",opening:42000}],
- numbering:[{docType:"Quote",prefix:"PRE-2026-",next:24,pad:4,resetPolicy:"Yearly"},
-   {docType:"Invoice",prefix:"FRA-2026-",next:57,pad:4,resetPolicy:"Yearly"},
-   {docType:"Purchase order",prefix:"OC-2026-",next:88,pad:4,resetPolicy:"Yearly"}],
- customers:[
-   {code:"C-001",legalName:"Familia Roca Puig",type:"B2C",nif:"46000000X",contact:"Marta Roca",email:"marta.roca@example.com",phone:"600 111 222",lang:"ca-ES",
-    billAddress:"Av. Barcelona 10",billCity:"Sant Just Desvern",billPc:"08960",siteAddress:"Av. Barcelona 10, 3º",terms:"50% up-front",method:"Transfer",
-    priceList:"PL-RETAIL",discount:0,creditLimit:0,source:"Referral",gdpr:true,status:"Active",tags:["reforma integral"],notes:"Kitchen + 2 baños."},
-   {code:"C-002",legalName:"Comunidad Prop. Balmes 120",type:"B2B",nif:"H08000000",contact:"Admin. Finques Vives",email:"vives@fincas.example",phone:"934 000 000",lang:"es-ES",
-    billAddress:"C/ Balmes 120",billCity:"Barcelona",billPc:"08008",siteAddress:"C/ Balmes 120",terms:"30 days",method:"Transfer",priceList:"PL-STD",discount:5,creditLimit:20000,source:"Architect",gdpr:true,status:"Active",tags:["comunidad","fachada"]},
-   {code:"C-003",legalName:"Nou Local Gràcia S.L.",type:"B2B",nif:"B66000000",contact:"Jordi Nadal",email:"jordi@noulocal.example",phone:"620 333 444",lang:"ca-ES",
-    billAddress:"C/ Verdi 22",billCity:"Barcelona",billPc:"08012",siteAddress:"C/ Verdi 22 bajos",terms:"30/60",method:"Transfer",priceList:"PL-STD",discount:0,creditLimit:35000,source:"Web",gdpr:true,status:"Prospect",tags:["local comercial"]},
- ],
- contacts:[{name:"Marta Roca",org:"C-001",role:"Owner",email:"marta.roca@example.com",phone:"600 111 222",primary:true},
-   {name:"Jordi Nadal",org:"C-003",role:"Administrador",email:"jordi@noulocal.example",phone:"620 333 444",primary:true}],
- leads:[{code:"L-014",customer:"Nou Local Gràcia S.L.",channel:"Web",stage:"Quoted",value:38000,owner:"Ignacio",nextAction:"Follow up on quote",nextDate:"2026-07-24"},
-   {code:"L-015",customer:"Pau Ferrer",channel:"Instagram",stage:"Site visit",value:15000,owner:"Ignacio",nextAction:"Book visit",nextDate:"2026-07-22"}],
- suppliers:[
-   {code:"S-001",legalName:"Materiales Vallès S.A.",category:"Material supplier",cif:"A08000000",trades:["obra","cemento","yeso"],contact:"Ventas",email:"ventas@matvalles.example",phone:"937 000 000",address:"Pol. Ind. Can Roca",city:"Rubí",terms:"30 days",irpfProfile:"No retention (empresarial)",retention:0,iban:"ES00 1111 1111 1111 1111 1111",leadTime:2,rating:"A — preferred",insExpiry:"2027-01-31",status:"Active"},
-   {code:"S-002",legalName:"Josep Maria Solé (Fontanería)",category:"Subcontractor (autónomo)",cif:"39000000Y",trades:["fontanería"],contact:"Josep M. Solé",email:"jm.sole@example.com",phone:"610 555 666",address:"—",city:"Molins de Rei",terms:"15 days",irpfProfile:"No retention (empresarial)",retention:0,iban:"ES00 2222 2222 2222 2222 2222",leadTime:5,rating:"A — preferred",insExpiry:"2026-11-30",status:"Active"},
-   {code:"S-003",legalName:"ElectroBaix S.L.",category:"Subcontractor (company)",cif:"B60000000",trades:["electricidad"],contact:"Oficina",email:"info@electrobaix.example",phone:"936 111 222",address:"—",city:"Sant Feliu",terms:"30 days",irpfProfile:"No retention (empresarial)",retention:0,iban:"ES00 3333 3333 3333 3333 3333",leadTime:7,rating:"B — approved",insExpiry:"2026-09-15",status:"Active"},
- ],
- paymentTerms:[{code:"T00",name:"Immediate",netDays:0,discPct:0,discDays:0,notes:""},
-   {code:"T15",name:"15 days",netDays:15,discPct:0,discDays:0,notes:""},
-   {code:"T30",name:"30 days",netDays:30,discPct:0,discDays:0,notes:""},
-   {code:"T3060",name:"30/60 split",netDays:60,discPct:0,discDays:0,notes:"50% at 30, 50% at 60"}],
- items:[
-   {sku:"ALB-001",desc:"Demolición de tabique de ladrillo",chapter:"01",type:"Labour",uom:"m²",cost:9.5,price:16,margin:40,vatClass:"Reducido 10%",prefSupplier:"",barcode:"",reorder:0,leadTime:0,status:"Active"},
-   {sku:"FON-014",desc:"Punto de agua empotrado (alta/baja)",chapter:"04",type:"Subcontract",uom:"ud",cost:48,price:82,margin:41,vatClass:"Reducido 10%",prefSupplier:"S-002",barcode:"",reorder:0,leadTime:5,status:"Active"},
-   {sku:"ELE-020",desc:"Punto de luz / enchufe empotrado",chapter:"05",type:"Subcontract",uom:"ud",cost:26,price:46,margin:43,vatClass:"Reducido 10%",prefSupplier:"S-003",barcode:"",reorder:0,leadTime:7,status:"Active"},
-   {sku:"ALI-101",desc:"Alicatado gres porcelánico (material)",chapter:"07",type:"Material",uom:"m²",cost:18,price:0,margin:0,vatClass:"General 21%",prefSupplier:"S-001",barcode:"8400000000017",reorder:40,leadTime:2,status:"Active"},
-   {sku:"MO-001",desc:"Mano de obra oficial 1ª",chapter:"00",type:"Labour",uom:"h",cost:19,price:34,margin:44,vatClass:"Reducido 10%",prefSupplier:"",barcode:"",reorder:0,leadTime:0,status:"Active"},
- ],
- chapters:[{code:"00",name:"Generales / mano de obra",defMargin:40,order:0},{code:"01",name:"Demoliciones",defMargin:38,order:1},
-   {code:"02",name:"Albañilería",defMargin:35,order:2},{code:"03",name:"Solados y alicatados",defMargin:34,order:3},
-   {code:"04",name:"Fontanería",defMargin:40,order:4},{code:"05",name:"Electricidad",defMargin:42,order:5},
-   {code:"06",name:"Carpintería",defMargin:33,order:6},{code:"07",name:"Revestimientos",defMargin:34,order:7},
-   {code:"08",name:"Pintura",defMargin:45,order:8}],
- priceLists:[{code:"PL-STD",name:"Standard 2026",currency:"EUR",validFrom:"2026-01-01",validTo:"2026-12-31",markup:0,group:"All"},
-   {code:"PL-RETAIL",name:"Retail (B2C)",currency:"EUR",validFrom:"2026-01-01",validTo:"2026-12-31",markup:5,group:"B2C"}],
- vatCodes:[{code:"IVA21",rate:21,kind:"IVA general",effFrom:"2012-09-01",reverse:false,notes:"General"},
-   {code:"IVA10",rate:10,kind:"IVA reducido",effFrom:"2012-09-01",reverse:false,notes:"Reforma vivienda (art.91)"},
-   {code:"IVA4",rate:4,kind:"IVA superreducido",effFrom:"2012-09-01",reverse:false,notes:""},
-   {code:"IRPF15",rate:15,kind:"IRPF retención",effFrom:"2015-07-12",reverse:false,notes:"Profesional general"}],
- uom:[{code:"ud",name:"Unidad",category:"Count"},{code:"m",name:"Metro",category:"Length"},{code:"m²",name:"Metro cuadrado",category:"Area"},
-   {code:"m³",name:"Metro cúbico",category:"Volume"},{code:"kg",name:"Kilogramo",category:"Weight"},{code:"h",name:"Hora",category:"Time"},{code:"PA",name:"Tanto alzado",category:"Lump sum"}],
- warehouses:[{code:"ALM",name:"Almacén central",type:"Main store",address:"Pol. Ind. —",manager:"—"},{code:"VAN1",name:"Furgoneta 1",type:"Van stock",address:"—",manager:"Oficial 1ª"}],
- stock:[{warehouse:"ALM",sku:"ALI-101",onHand:120,reserved:40,min:40,max:300,bin:"A-12",unitCost:18,lastCount:"2026-06-30"},
-   {warehouse:"ALM",sku:"MO-001",onHand:0,reserved:0,min:0,max:0,bin:"",unitCost:0,lastCount:""}],
- employees:[{code:"E-001",name:"Ignacio (socio)",role:"Owner",costRate:0,chargeRate:0,skills:["gestión","ventas"],prl:"Valid",prlExpiry:"2027-03-01",phone:"",email:"",color:"#31532a",status:"Active"},
-   {code:"E-002",name:"Oficial 1ª — Albañilería",role:"Oficial 1ª",costRate:19,chargeRate:34,skills:["albañilería","alicatado"],prl:"Valid",prlExpiry:"2026-10-01",phone:"",email:"",color:"#48733c",status:"Active"},
-   {code:"E-003",name:"Peón",role:"Peón",costRate:14,chargeRate:26,skills:["ayuda","demolición"],prl:"Expiring",prlExpiry:"2026-08-15",phone:"",email:"",color:"#6ba85a",status:"Active"}],
- equipment:[{code:"VE-01",desc:"Furgoneta Renault Kangoo",type:"Vehicle",plate:"0000-XXX",purchaseDate:"2023-04-10",value:16000,maintDue:"2026-09-01",status:"In service"},
-   {code:"MA-01",desc:"Martillo demoledor",type:"Machine",plate:"—",purchaseDate:"2022-02-01",value:900,maintDue:"",status:"In service"}],
- projects:[{code:"P-2026-014",name:"Reforma integral Roca",customer:"C-001",site:"Av. Barcelona 10, 3º",type:"Integral",pm:"Ignacio",status:"In progress",start:"2026-06-01",end:"2026-08-15",contract:41000},
-   {code:"P-2026-011",name:"Fachada Balmes 120",customer:"C-002",site:"C/ Balmes 120",type:"Facade",pm:"Ignacio",status:"Won",start:"2026-08-20",end:"2026-10-10",contract:62000}],
- documents:[{name:"Seguro Responsabilidad Civil",type:"Insurance",owner:"Canei",issued:"2026-01-01",expiry:"2026-12-31",status:"Valid",ref:"RC-—"},
-   {name:"PRL Oficial 1ª",type:"PRL",owner:"E-002",issued:"2024-10-01",expiry:"2026-10-01",status:"Valid",ref:""},
-   {name:"PRL Peón",type:"PRL",owner:"E-003",issued:"2024-08-15",expiry:"2026-08-15",status:"Expiring",ref:""}],
- automation:[{key:"inv-reminder",trigger:"invoice.overdue",action:"Send email",template:"Reminder — friendly",cadence:"+3d, +10d, +20d",owner:"Admin",enabled:true},
-   {key:"review-request",trigger:"project.closed",action:"Send email",template:"Ask for 5★ review",cadence:"+2d",owner:"Ignacio",enabled:true},
-   {key:"stock-reorder",trigger:"stock.belowReorder",action:"Raise PO",template:"",cadence:"immediate",owner:"Almacén",enabled:true},
-   {key:"cert-expiry",trigger:"document.expiring",action:"Notify owner",template:"Renew before expiry",cadence:"-30d",owner:"Admin",enabled:true}],
-};}
+      /* =================== starter data (replace with your own) =================== */
+      function seed() {
+        return {
+          company: [
+            {
+              legalName: "Canei Subirats, S.L.",
+              tradeName: "Canei Subirats",
+              cif: "B00000000",
+              vatId: "ESB00000000",
+              cnae: "4332",
+              shareCapital: 3006,
+              address: "Carrer de la Creu, 74",
+              city: "Sant Just Desvern",
+              pc: "08960",
+              province: "Barcelona",
+              country: "España",
+              phone: "659 87 67 00",
+              email: "hola@caneisubirats.com",
+              web: "caneisubirats.com",
+              iban: "ES00 0000 0000 0000 0000 0000",
+              bic: "XXXXESB1",
+              taxRegime: "General",
+              irpfDefault: 15,
+              fyEnd: "31/12",
+              currency: "EUR",
+              insurer: "—",
+              policyNo: "RC-—",
+              policyExpiry: "2026-12-31",
+            },
+          ],
+          branches: [
+            {
+              code: "OFI",
+              name: "Oficina Sant Just",
+              type: "Office",
+              address: "Carrer de la Creu, 74",
+              city: "Sant Just Desvern",
+              phone: "659 87 67 00",
+              manager: "—",
+            },
+            {
+              code: "ALM",
+              name: "Almacén",
+              type: "Warehouse",
+              address: "Pol. Ind. —",
+              city: "Sant Just Desvern",
+              phone: "",
+              manager: "—",
+            },
+          ],
+          bankAccounts: [
+            {
+              code: "OP",
+              bank: "Banc principal",
+              iban: "ES00 0000 0000 0000 0000 0000",
+              bic: "XXXXESB1",
+              currency: "EUR",
+              purpose: "Operating",
+              opening: 42000,
+            },
+          ],
+          numbering: [
+            { docType: "Quote", prefix: "PRE-2026-", next: 24, pad: 4, resetPolicy: "Yearly" },
+            { docType: "Invoice", prefix: "FRA-2026-", next: 57, pad: 4, resetPolicy: "Yearly" },
+            {
+              docType: "Purchase order",
+              prefix: "OC-2026-",
+              next: 88,
+              pad: 4,
+              resetPolicy: "Yearly",
+            },
+          ],
+          customers: [
+            {
+              code: "C-001",
+              legalName: "Familia Roca Puig",
+              type: "B2C",
+              nif: "46000000X",
+              contact: "Marta Roca",
+              email: "marta.roca@example.com",
+              phone: "600 111 222",
+              lang: "ca-ES",
+              billAddress: "Av. Barcelona 10",
+              billCity: "Sant Just Desvern",
+              billPc: "08960",
+              siteAddress: "Av. Barcelona 10, 3º",
+              terms: "50% up-front",
+              method: "Transfer",
+              priceList: "PL-RETAIL",
+              discount: 0,
+              creditLimit: 0,
+              source: "Referral",
+              gdpr: true,
+              status: "Active",
+              tags: ["reforma integral"],
+              notes: "Kitchen + 2 baños.",
+            },
+            {
+              code: "C-002",
+              legalName: "Comunidad Prop. Balmes 120",
+              type: "B2B",
+              nif: "H08000000",
+              contact: "Admin. Finques Vives",
+              email: "vives@fincas.example",
+              phone: "934 000 000",
+              lang: "es-ES",
+              billAddress: "C/ Balmes 120",
+              billCity: "Barcelona",
+              billPc: "08008",
+              siteAddress: "C/ Balmes 120",
+              terms: "30 days",
+              method: "Transfer",
+              priceList: "PL-STD",
+              discount: 5,
+              creditLimit: 20000,
+              source: "Architect",
+              gdpr: true,
+              status: "Active",
+              tags: ["comunidad", "fachada"],
+            },
+            {
+              code: "C-003",
+              legalName: "Nou Local Gràcia S.L.",
+              type: "B2B",
+              nif: "B66000000",
+              contact: "Jordi Nadal",
+              email: "jordi@noulocal.example",
+              phone: "620 333 444",
+              lang: "ca-ES",
+              billAddress: "C/ Verdi 22",
+              billCity: "Barcelona",
+              billPc: "08012",
+              siteAddress: "C/ Verdi 22 bajos",
+              terms: "30/60",
+              method: "Transfer",
+              priceList: "PL-STD",
+              discount: 0,
+              creditLimit: 35000,
+              source: "Web",
+              gdpr: true,
+              status: "Prospect",
+              tags: ["local comercial"],
+            },
+          ],
+          contacts: [
+            {
+              name: "Marta Roca",
+              org: "C-001",
+              role: "Owner",
+              email: "marta.roca@example.com",
+              phone: "600 111 222",
+              primary: true,
+            },
+            {
+              name: "Jordi Nadal",
+              org: "C-003",
+              role: "Administrador",
+              email: "jordi@noulocal.example",
+              phone: "620 333 444",
+              primary: true,
+            },
+          ],
+          leads: [
+            {
+              code: "L-014",
+              customer: "Nou Local Gràcia S.L.",
+              channel: "Web",
+              stage: "Quoted",
+              value: 38000,
+              owner: "Ignacio",
+              nextAction: "Follow up on quote",
+              nextDate: "2026-07-24",
+            },
+            {
+              code: "L-015",
+              customer: "Pau Ferrer",
+              channel: "Instagram",
+              stage: "Site visit",
+              value: 15000,
+              owner: "Ignacio",
+              nextAction: "Book visit",
+              nextDate: "2026-07-22",
+            },
+          ],
+          suppliers: [
+            {
+              code: "S-001",
+              legalName: "Materiales Vallès S.A.",
+              category: "Material supplier",
+              cif: "A08000000",
+              trades: ["obra", "cemento", "yeso"],
+              contact: "Ventas",
+              email: "ventas@matvalles.example",
+              phone: "937 000 000",
+              address: "Pol. Ind. Can Roca",
+              city: "Rubí",
+              terms: "30 days",
+              irpfProfile: "No retention (empresarial)",
+              retention: 0,
+              iban: "ES00 1111 1111 1111 1111 1111",
+              leadTime: 2,
+              rating: "A — preferred",
+              insExpiry: "2027-01-31",
+              status: "Active",
+            },
+            {
+              code: "S-002",
+              legalName: "Josep Maria Solé (Fontanería)",
+              category: "Subcontractor (autónomo)",
+              cif: "39000000Y",
+              trades: ["fontanería"],
+              contact: "Josep M. Solé",
+              email: "jm.sole@example.com",
+              phone: "610 555 666",
+              address: "—",
+              city: "Molins de Rei",
+              terms: "15 days",
+              irpfProfile: "No retention (empresarial)",
+              retention: 0,
+              iban: "ES00 2222 2222 2222 2222 2222",
+              leadTime: 5,
+              rating: "A — preferred",
+              insExpiry: "2026-11-30",
+              status: "Active",
+            },
+            {
+              code: "S-003",
+              legalName: "ElectroBaix S.L.",
+              category: "Subcontractor (company)",
+              cif: "B60000000",
+              trades: ["electricidad"],
+              contact: "Oficina",
+              email: "info@electrobaix.example",
+              phone: "936 111 222",
+              address: "—",
+              city: "Sant Feliu",
+              terms: "30 days",
+              irpfProfile: "No retention (empresarial)",
+              retention: 0,
+              iban: "ES00 3333 3333 3333 3333 3333",
+              leadTime: 7,
+              rating: "B — approved",
+              insExpiry: "2026-09-15",
+              status: "Active",
+            },
+          ],
+          paymentTerms: [
+            { code: "T00", name: "Immediate", netDays: 0, discPct: 0, discDays: 0, notes: "" },
+            { code: "T15", name: "15 days", netDays: 15, discPct: 0, discDays: 0, notes: "" },
+            { code: "T30", name: "30 days", netDays: 30, discPct: 0, discDays: 0, notes: "" },
+            {
+              code: "T3060",
+              name: "30/60 split",
+              netDays: 60,
+              discPct: 0,
+              discDays: 0,
+              notes: "50% at 30, 50% at 60",
+            },
+          ],
+          items: [
+            {
+              sku: "ALB-001",
+              desc: "Demolición de tabique de ladrillo",
+              chapter: "01",
+              type: "Labour",
+              uom: "m²",
+              cost: 9.5,
+              price: 16,
+              margin: 40,
+              vatClass: "Reducido 10%",
+              prefSupplier: "",
+              barcode: "",
+              reorder: 0,
+              leadTime: 0,
+              status: "Active",
+            },
+            {
+              sku: "FON-014",
+              desc: "Punto de agua empotrado (alta/baja)",
+              chapter: "04",
+              type: "Subcontract",
+              uom: "ud",
+              cost: 48,
+              price: 82,
+              margin: 41,
+              vatClass: "Reducido 10%",
+              prefSupplier: "S-002",
+              barcode: "",
+              reorder: 0,
+              leadTime: 5,
+              status: "Active",
+            },
+            {
+              sku: "ELE-020",
+              desc: "Punto de luz / enchufe empotrado",
+              chapter: "05",
+              type: "Subcontract",
+              uom: "ud",
+              cost: 26,
+              price: 46,
+              margin: 43,
+              vatClass: "Reducido 10%",
+              prefSupplier: "S-003",
+              barcode: "",
+              reorder: 0,
+              leadTime: 7,
+              status: "Active",
+            },
+            {
+              sku: "ALI-101",
+              desc: "Alicatado gres porcelánico (material)",
+              chapter: "07",
+              type: "Material",
+              uom: "m²",
+              cost: 18,
+              price: 0,
+              margin: 0,
+              vatClass: "General 21%",
+              prefSupplier: "S-001",
+              barcode: "8400000000017",
+              reorder: 40,
+              leadTime: 2,
+              status: "Active",
+            },
+            {
+              sku: "MO-001",
+              desc: "Mano de obra oficial 1ª",
+              chapter: "00",
+              type: "Labour",
+              uom: "h",
+              cost: 19,
+              price: 34,
+              margin: 44,
+              vatClass: "Reducido 10%",
+              prefSupplier: "",
+              barcode: "",
+              reorder: 0,
+              leadTime: 0,
+              status: "Active",
+            },
+          ],
+          chapters: [
+            { code: "00", name: "Generales / mano de obra", defMargin: 40, order: 0 },
+            { code: "01", name: "Demoliciones", defMargin: 38, order: 1 },
+            { code: "02", name: "Albañilería", defMargin: 35, order: 2 },
+            { code: "03", name: "Solados y alicatados", defMargin: 34, order: 3 },
+            { code: "04", name: "Fontanería", defMargin: 40, order: 4 },
+            { code: "05", name: "Electricidad", defMargin: 42, order: 5 },
+            { code: "06", name: "Carpintería", defMargin: 33, order: 6 },
+            { code: "07", name: "Revestimientos", defMargin: 34, order: 7 },
+            { code: "08", name: "Pintura", defMargin: 45, order: 8 },
+          ],
+          priceLists: [
+            {
+              code: "PL-STD",
+              name: "Standard 2026",
+              currency: "EUR",
+              validFrom: "2026-01-01",
+              validTo: "2026-12-31",
+              markup: 0,
+              group: "All",
+            },
+            {
+              code: "PL-RETAIL",
+              name: "Retail (B2C)",
+              currency: "EUR",
+              validFrom: "2026-01-01",
+              validTo: "2026-12-31",
+              markup: 5,
+              group: "B2C",
+            },
+          ],
+          vatCodes: [
+            {
+              code: "IVA21",
+              rate: 21,
+              kind: "IVA general",
+              effFrom: "2012-09-01",
+              reverse: false,
+              notes: "General",
+            },
+            {
+              code: "IVA10",
+              rate: 10,
+              kind: "IVA reducido",
+              effFrom: "2012-09-01",
+              reverse: false,
+              notes: "Reforma vivienda (art.91)",
+            },
+            {
+              code: "IVA4",
+              rate: 4,
+              kind: "IVA superreducido",
+              effFrom: "2012-09-01",
+              reverse: false,
+              notes: "",
+            },
+            {
+              code: "IRPF15",
+              rate: 15,
+              kind: "IRPF retención",
+              effFrom: "2015-07-12",
+              reverse: false,
+              notes: "Profesional general",
+            },
+          ],
+          uom: [
+            { code: "ud", name: "Unidad", category: "Count" },
+            { code: "m", name: "Metro", category: "Length" },
+            { code: "m²", name: "Metro cuadrado", category: "Area" },
+            { code: "m³", name: "Metro cúbico", category: "Volume" },
+            { code: "kg", name: "Kilogramo", category: "Weight" },
+            { code: "h", name: "Hora", category: "Time" },
+            { code: "PA", name: "Tanto alzado", category: "Lump sum" },
+          ],
+          warehouses: [
+            {
+              code: "ALM",
+              name: "Almacén central",
+              type: "Main store",
+              address: "Pol. Ind. —",
+              manager: "—",
+            },
+            {
+              code: "VAN1",
+              name: "Furgoneta 1",
+              type: "Van stock",
+              address: "—",
+              manager: "Oficial 1ª",
+            },
+          ],
+          stock: [
+            {
+              warehouse: "ALM",
+              sku: "ALI-101",
+              onHand: 120,
+              reserved: 40,
+              min: 40,
+              max: 300,
+              bin: "A-12",
+              unitCost: 18,
+              lastCount: "2026-06-30",
+            },
+            {
+              warehouse: "ALM",
+              sku: "MO-001",
+              onHand: 0,
+              reserved: 0,
+              min: 0,
+              max: 0,
+              bin: "",
+              unitCost: 0,
+              lastCount: "",
+            },
+          ],
+          employees: [
+            {
+              code: "E-001",
+              name: "Ignacio (socio)",
+              role: "Owner",
+              costRate: 0,
+              chargeRate: 0,
+              skills: ["gestión", "ventas"],
+              prl: "Valid",
+              prlExpiry: "2027-03-01",
+              phone: "",
+              email: "",
+              color: "#31532a",
+              status: "Active",
+            },
+            {
+              code: "E-002",
+              name: "Oficial 1ª — Albañilería",
+              role: "Oficial 1ª",
+              costRate: 19,
+              chargeRate: 34,
+              skills: ["albañilería", "alicatado"],
+              prl: "Valid",
+              prlExpiry: "2026-10-01",
+              phone: "",
+              email: "",
+              color: "#48733c",
+              status: "Active",
+            },
+            {
+              code: "E-003",
+              name: "Peón",
+              role: "Peón",
+              costRate: 14,
+              chargeRate: 26,
+              skills: ["ayuda", "demolición"],
+              prl: "Expiring",
+              prlExpiry: "2026-08-15",
+              phone: "",
+              email: "",
+              color: "#6ba85a",
+              status: "Active",
+            },
+          ],
+          equipment: [
+            {
+              code: "VE-01",
+              desc: "Furgoneta Renault Kangoo",
+              type: "Vehicle",
+              plate: "0000-XXX",
+              purchaseDate: "2023-04-10",
+              value: 16000,
+              maintDue: "2026-09-01",
+              status: "In service",
+            },
+            {
+              code: "MA-01",
+              desc: "Martillo demoledor",
+              type: "Machine",
+              plate: "—",
+              purchaseDate: "2022-02-01",
+              value: 900,
+              maintDue: "",
+              status: "In service",
+            },
+          ],
+          projects: [
+            {
+              code: "P-2026-014",
+              name: "Reforma integral Roca",
+              customer: "C-001",
+              site: "Av. Barcelona 10, 3º",
+              type: "Integral",
+              pm: "Ignacio",
+              status: "In progress",
+              start: "2026-06-01",
+              end: "2026-08-15",
+              contract: 41000,
+            },
+            {
+              code: "P-2026-011",
+              name: "Fachada Balmes 120",
+              customer: "C-002",
+              site: "C/ Balmes 120",
+              type: "Facade",
+              pm: "Ignacio",
+              status: "Won",
+              start: "2026-08-20",
+              end: "2026-10-10",
+              contract: 62000,
+            },
+          ],
+          documents: [
+            {
+              name: "Seguro Responsabilidad Civil",
+              type: "Insurance",
+              owner: "Canei",
+              issued: "2026-01-01",
+              expiry: "2026-12-31",
+              status: "Valid",
+              ref: "RC-—",
+            },
+            {
+              name: "PRL Oficial 1ª",
+              type: "PRL",
+              owner: "E-002",
+              issued: "2024-10-01",
+              expiry: "2026-10-01",
+              status: "Valid",
+              ref: "",
+            },
+            {
+              name: "PRL Peón",
+              type: "PRL",
+              owner: "E-003",
+              issued: "2024-08-15",
+              expiry: "2026-08-15",
+              status: "Expiring",
+              ref: "",
+            },
+          ],
+          automation: [
+            {
+              key: "inv-reminder",
+              trigger: "invoice.overdue",
+              action: "Send email",
+              template: "Reminder — friendly",
+              cadence: "+3d, +10d, +20d",
+              owner: "Admin",
+              enabled: true,
+            },
+            {
+              key: "review-request",
+              trigger: "project.closed",
+              action: "Send email",
+              template: "Ask for 5★ review",
+              cadence: "+2d",
+              owner: "Ignacio",
+              enabled: true,
+            },
+            {
+              key: "stock-reorder",
+              trigger: "stock.belowReorder",
+              action: "Raise PO",
+              template: "",
+              cadence: "immediate",
+              owner: "Almacén",
+              enabled: true,
+            },
+            {
+              key: "cert-expiry",
+              trigger: "document.expiring",
+              action: "Notify owner",
+              template: "Renew before expiry",
+              cadence: "-30d",
+              owner: "Admin",
+              enabled: true,
+            },
+          ],
+        };
+      }
 
-/* =================== state =================== */
-let DATA={}; let cur="customers"; let editIdx=-1;
+      /* =================== state =================== */
+      let DATA = {};
+      let cur = "customers";
+      let editIdx = -1;
 
-async function boot(){
-  DATA = (await idbGet(KEY)) || seed();
-  // ensure every entity key exists
-  Object.keys(ENT).forEach(k=>{if(!Array.isArray(DATA[k]))DATA[k]=[];});
-  buildNav(); renderAll();
-}
+      async function boot() {
+        DATA = (await idbGet(KEY)) || seed();
+        // ensure every entity key exists
+        Object.keys(ENT).forEach((k) => {
+          if (!Array.isArray(DATA[k])) DATA[k] = [];
+        });
+        buildNav();
+        renderAll();
+      }
 
-/* =================== nav =================== */
-function counts(k){return (DATA[k]||[]).length;}
-function buildNav(){
-  const nav=$('#nav'); nav.innerHTML=''; const msel=$('#mnav'); msel.innerHTML='';
-  MODEL.forEach(g=>{
-    nav.appendChild(el('div','grp',g.grp));
-    const og=el('optgroup'); og.label=g.grp;
-    g.entities.forEach(e=>{
-      const b=el('button','navitem'+(e.key===cur?' on':''));
-      b.innerHTML=`<span class="ic">${e.icon}</span><span>${e.label}</span><span class="ct">${counts(e.key)}</span>`;
-      b.onclick=()=>{cur=e.key;editIdx=-1;renderAll();};
-      b.dataset.k=e.key; nav.appendChild(b);
-      const o=el('option'); o.value=e.key; o.textContent=`${g.grp} — ${e.label}`; if(e.key===cur)o.selected=true; og.appendChild(o);
-    });
-    msel.appendChild(og);
-  });
-  msel.onchange=()=>{cur=msel.value;editIdx=-1;renderAll();};
-}
-function refreshCounts(){document.querySelectorAll('.navitem').forEach(b=>{const c=b.querySelector('.ct');if(c)c.textContent=counts(b.dataset.k);});}
+      /* =================== nav =================== */
+      function counts(k) {
+        return (DATA[k] || []).length;
+      }
+      function buildNav() {
+        const nav = $("#nav");
+        nav.innerHTML = "";
+        const msel = $("#mnav");
+        msel.innerHTML = "";
+        MODEL.forEach((g) => {
+          nav.appendChild(el("div", "grp", g.grp));
+          const og = el("optgroup");
+          og.label = g.grp;
+          g.entities.forEach((e) => {
+            const b = el("button", "navitem" + (e.key === cur ? " on" : ""));
+            b.innerHTML = `<span class="ic">${e.icon}</span><span>${e.label}</span><span class="ct">${counts(e.key)}</span>`;
+            b.onclick = () => {
+              cur = e.key;
+              editIdx = -1;
+              renderAll();
+            };
+            b.dataset.k = e.key;
+            nav.appendChild(b);
+            const o = el("option");
+            o.value = e.key;
+            o.textContent = `${g.grp} — ${e.label}`;
+            if (e.key === cur) o.selected = true;
+            og.appendChild(o);
+          });
+          msel.appendChild(og);
+        });
+        msel.onchange = () => {
+          cur = msel.value;
+          editIdx = -1;
+          renderAll();
+        };
+      }
+      function refreshCounts() {
+        document.querySelectorAll(".navitem").forEach((b) => {
+          const c = b.querySelector(".ct");
+          if (c) c.textContent = counts(b.dataset.k);
+        });
+      }
 
-/* =================== table render =================== */
-function cols(e){return e.fields.filter(f=>f.col);}
-function cellVal(f,v){
-  if(v==null||v==='')return'<span style="color:var(--faint)">—</span>';
-  if(f.type==='money')return `<span class="num">${euro(v)}</span>`;
-  if(f.type==='pct')return `<span class="num">${pct(v)}</span>`;
-  if(f.type==='num')return `<span class="num">${Number(v).toLocaleString('es-ES')}</span>`;
-  if(f.type==='date')return fmtDate(v);
-  if(f.type==='bool')return v?'<span class="pill g">Yes</span>':'<span class="pill">No</span>';
-  if(f.type==='tags')return (Array.isArray(v)?v:String(v).split(',')).filter(Boolean).map(t=>`<span class="pill">${esc(t.trim())}</span>`).join(' ')||'—';
-  if(f.type==='select'&&/(status|stage|rating|prl)/i.test(f.k))return `<span class="pill ${pillClass(v)}">${esc(v)}</span>`;
-  return `<span class="${f.k==='code'||f.k==='sku'||f.k==='legalName'||f.k==='name'?'k':''}">${esc(v)}</span>`;
-}
-function renderAll(){
-  const e=ENT[cur];
-  document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('on',b.dataset.k===cur));
-  $('#crumb').textContent=e.label; $('#ttl').textContent=e.label; $('#sub').textContent=e.desc;
-  const c=cols(e);
-  $('#thead').innerHTML=c.map(f=>`<th${['money','pct','num'].includes(f.type)?' style="text-align:right"':''}>${esc(f.label)}</th>`).join('')+'<th></th>';
-  drawRows();
-  $('#btnAdd').lastChild.textContent = e.single ? ' '+(counts(cur)?'Edit':'Add') : ' Add record';
-}
-function matches(row,q){if(!q)return true;q=q.toLowerCase();return Object.values(row).some(v=>String(Array.isArray(v)?v.join(' '):v).toLowerCase().includes(q));}
-function drawRows(){
-  const e=ENT[cur], c=cols(e), q=$('#q').value.trim();
-  const rows=(DATA[cur]||[]).map((r,i)=>({r,i})).filter(x=>matches(x.r,q));
-  const tb=$('#tbody'); tb.innerHTML='';
-  if(!rows.length){
-    tb.innerHTML=`<tr><td colspan="${c.length+1}"><div class="empty"><div class="bigic">${e.icon}</div>
-      <p><b>No records yet.</b><br>${q?'Nothing matches your search.':'Click <b>Add record</b> to create the first one.'}</p></div></td></tr>`;
-    $('#count').textContent=`0 of ${counts(cur)}`; return;
-  }
-  rows.forEach(({r,i})=>{
-    const tr=el('tr');
-    tr.innerHTML=c.map(f=>`<td>${cellVal(f,r[f.k])}</td>`).join('')+'<td class="num" style="color:var(--faint)">✎</td>';
-    tr.onclick=()=>openEditor(i);
-    tb.appendChild(tr);
-  });
-  $('#count').textContent = q ? `${rows.length} of ${counts(cur)}` : `${counts(cur)} record${counts(cur)===1?'':'s'}`;
-}
+      /* =================== table render =================== */
+      function cols(e) {
+        return e.fields.filter((f) => f.col);
+      }
+      function cellVal(f, v) {
+        if (v == null || v === "") return '<span style="color:var(--faint)">—</span>';
+        if (f.type === "money") return `<span class="num">${euro(v)}</span>`;
+        if (f.type === "pct") return `<span class="num">${pct(v)}</span>`;
+        if (f.type === "num")
+          return `<span class="num">${Number(v).toLocaleString("es-ES")}</span>`;
+        if (f.type === "date") return fmtDate(v);
+        if (f.type === "bool")
+          return v ? '<span class="pill g">Yes</span>' : '<span class="pill">No</span>';
+        if (f.type === "tags")
+          return (
+            (Array.isArray(v) ? v : String(v).split(","))
+              .filter(Boolean)
+              .map((t) => `<span class="pill">${esc(t.trim())}</span>`)
+              .join(" ") || "—"
+          );
+        if (f.type === "select" && /(status|stage|rating|prl)/i.test(f.k))
+          return `<span class="pill ${pillClass(v)}">${esc(v)}</span>`;
+        return `<span class="${f.k === "code" || f.k === "sku" || f.k === "legalName" || f.k === "name" ? "k" : ""}">${esc(v)}</span>`;
+      }
+      function renderAll() {
+        const e = ENT[cur];
+        document
+          .querySelectorAll(".navitem")
+          .forEach((b) => b.classList.toggle("on", b.dataset.k === cur));
+        $("#crumb").textContent = e.label;
+        $("#ttl").textContent = e.label;
+        $("#sub").textContent = e.desc;
+        const c = cols(e);
+        $("#thead").innerHTML =
+          c
+            .map(
+              (f) =>
+                `<th${["money", "pct", "num"].includes(f.type) ? ' style="text-align:right"' : ""}>${esc(f.label)}</th>`,
+            )
+            .join("") + "<th></th>";
+        drawRows();
+        $("#btnAdd").lastChild.textContent = e.single
+          ? " " + (counts(cur) ? "Edit" : "Add")
+          : " Add record";
+      }
+      function matches(row, q) {
+        if (!q) return true;
+        q = q.toLowerCase();
+        return Object.values(row).some((v) =>
+          String(Array.isArray(v) ? v.join(" ") : v)
+            .toLowerCase()
+            .includes(q),
+        );
+      }
+      function drawRows() {
+        const e = ENT[cur],
+          c = cols(e),
+          q = $("#q").value.trim();
+        const rows = (DATA[cur] || []).map((r, i) => ({ r, i })).filter((x) => matches(x.r, q));
+        const tb = $("#tbody");
+        tb.innerHTML = "";
+        if (!rows.length) {
+          tb.innerHTML = `<tr><td colspan="${c.length + 1}"><div class="empty"><div class="bigic">${e.icon}</div>
+      <p><b>No records yet.</b><br>${q ? "Nothing matches your search." : "Click <b>Add record</b> to create the first one."}</p></div></td></tr>`;
+          $("#count").textContent = `0 of ${counts(cur)}`;
+          return;
+        }
+        rows.forEach(({ r, i }) => {
+          const tr = el("tr");
+          tr.innerHTML =
+            c.map((f) => `<td>${cellVal(f, r[f.k])}</td>`).join("") +
+            '<td class="num" style="color:var(--faint)">✎</td>';
+          tr.onclick = () => openEditor(i);
+          tb.appendChild(tr);
+        });
+        $("#count").textContent = q
+          ? `${rows.length} of ${counts(cur)}`
+          : `${counts(cur)} record${counts(cur) === 1 ? "" : "s"}`;
+      }
 
-/* =================== editor drawer =================== */
-function fieldHTML(f,val){
-  const id='f_'+f.k;
-  const label=`<label for="${id}">${esc(f.label)}${f.req?' *':''}</label>`;
-  const hint=f.hint?`<span class="hint">${esc(f.hint)}</span>`:'';
-  let ctrl='';
-  if(f.type==='select'){
-    ctrl=`<select id="${id}"><option value=""></option>${(f.opts||[]).map(o=>`<option${String(val)===String(o)?' selected':''}>${esc(o)}</option>`).join('')}</select>`;
-  }else if(f.type==='textarea'){
-    ctrl=`<textarea id="${id}">${esc(val??'')}</textarea>`;
-  }else if(f.type==='bool'){
-    ctrl=`<select id="${id}"><option value="false"${!val?' selected':''}>No</option><option value="true"${val?' selected':''}>Yes</option></select>`;
-  }else if(f.type==='tags'){
-    ctrl=`<input id="${id}" value="${esc(Array.isArray(val)?val.join(', '):(val??''))}" placeholder="comma, separated">`;
-  }else if(f.type==='money'){
-    ctrl=`<div class="pre"><span>€</span><input id="${id}" inputmode="decimal" value="${val??''}"></div>`;
-  }else if(f.type==='pct'){
-    ctrl=`<div class="pre"><input id="${id}" inputmode="decimal" value="${val??''}"><span>&nbsp;%</span></div>`;
-  }else{
-    const t=f.type==='num'?'number':f.type==='date'?'date':f.type==='email'?'email':f.type==='tel'?'tel':'text';
-    ctrl=`<input id="${id}" type="${t}" value="${esc(val??'')}">`;
-  }
-  return `<div class="field ${['textarea','tags'].includes(f.type)||f.full?'full':''}">${label}${ctrl}${hint}</div>`;
-}
-function openEditor(idx){
-  const e=ENT[cur]; editIdx=idx;
-  const row = idx>=0 ? DATA[cur][idx] : {};
-  $('#dttl').textContent = (idx>=0?'Edit ':'New ')+e.label.replace(/s$/,'');
-  let html=''; let lastSec=null;
-  e.fields.forEach(f=>{ if(f.sec&&f.sec!==lastSec){html+=`<div class="sech">${esc(f.sec)}</div>`;lastSec=f.sec;} html+=fieldHTML(f,row[f.k]); });
-  $('#form').innerHTML=html;
-  $('#dDelete').style.display = idx>=0 ? '' : 'none';
-  $('#scrim').classList.add('on'); $('#drawer').classList.add('on'); $('#drawer').setAttribute('aria-hidden','false');
-}
-function closeEditor(){$('#scrim').classList.remove('on');$('#drawer').classList.remove('on');$('#drawer').setAttribute('aria-hidden','true');}
-function readForm(){
-  const e=ENT[cur], out={};
-  e.fields.forEach(f=>{
-    const n=document.getElementById('f_'+f.k); if(!n)return; let v=n.value;
-    if(f.type==='num'||f.type==='money'||f.type==='pct'){v=v===''?'':Number(String(v).replace(',','.'));if(Number.isNaN(v))v='';}
-    else if(f.type==='bool'){v=v==='true';}
-    else if(f.type==='tags'){v=v.split(',').map(s=>s.trim()).filter(Boolean);}
-    out[f.k]=v;
-  });
-  return out;
-}
-function saveEditor(){
-  const e=ENT[cur], rec=readForm();
-  const reqMissing=e.fields.filter(f=>f.req&&(rec[f.k]===''||rec[f.k]==null)).map(f=>f.label);
-  if(reqMissing.length){toast('Required: '+reqMissing.join(', '));return;}
-  // Duplicate guard: warn if another record already uses this code/SKU/NIF.
-  const keyF=(e.fields.find(f=>['code','sku'].includes(f.k))||{}).k;
-  if(keyF && rec[keyF]!=null && rec[keyF]!==''){
-    const dup=(DATA[cur]||[]).some((r,i)=>i!==editIdx && String(r[keyF]).trim().toLowerCase()===String(rec[keyF]).trim().toLowerCase());
-    if(dup && !confirm(`Another ${e.label.replace(/s$/,'').toLowerCase()} already uses ${keyF.toUpperCase()} "${rec[keyF]}". Save a duplicate anyway?`))return;
-  }
-  if(e.single){DATA[cur]=[rec];}
-  else if(editIdx>=0){DATA[cur][editIdx]=rec;} else {DATA[cur].push(rec);}
-  persistSoon(); closeEditor(); refreshCounts(); drawRows(); toast('Saved ✓');
-}
-function deleteEditor(){
-  if(editIdx<0)return;
-  if(!confirm('Delete this record? This cannot be undone.'))return;
-  DATA[cur].splice(editIdx,1); persistSoon(); closeEditor(); refreshCounts(); drawRows(); toast('Deleted');
-}
+      /* =================== editor drawer =================== */
+      function fieldHTML(f, val) {
+        const id = "f_" + f.k;
+        const label = `<label for="${id}">${esc(f.label)}${f.req ? " *" : ""}</label>`;
+        const hint = f.hint ? `<span class="hint">${esc(f.hint)}</span>` : "";
+        let ctrl = "";
+        if (f.type === "select") {
+          ctrl = `<select id="${id}"><option value=""></option>${(f.opts || []).map((o) => `<option${String(val) === String(o) ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
+        } else if (f.type === "textarea") {
+          ctrl = `<textarea id="${id}">${esc(val ?? "")}</textarea>`;
+        } else if (f.type === "bool") {
+          ctrl = `<select id="${id}"><option value="false"${!val ? " selected" : ""}>No</option><option value="true"${val ? " selected" : ""}>Yes</option></select>`;
+        } else if (f.type === "tags") {
+          ctrl = `<input id="${id}" value="${esc(Array.isArray(val) ? val.join(", ") : (val ?? ""))}" placeholder="comma, separated">`;
+        } else if (f.type === "money") {
+          ctrl = `<div class="pre"><span>€</span><input id="${id}" inputmode="decimal" value="${val ?? ""}"></div>`;
+        } else if (f.type === "pct") {
+          ctrl = `<div class="pre"><input id="${id}" inputmode="decimal" value="${val ?? ""}"><span>&nbsp;%</span></div>`;
+        } else {
+          const t =
+            f.type === "num"
+              ? "number"
+              : f.type === "date"
+                ? "date"
+                : f.type === "email"
+                  ? "email"
+                  : f.type === "tel"
+                    ? "tel"
+                    : "text";
+          ctrl = `<input id="${id}" type="${t}" value="${esc(val ?? "")}">`;
+        }
+        return `<div class="field ${["textarea", "tags"].includes(f.type) || f.full ? "full" : ""}">${label}${ctrl}${hint}</div>`;
+      }
+      function openEditor(idx) {
+        const e = ENT[cur];
+        editIdx = idx;
+        const row = idx >= 0 ? DATA[cur][idx] : {};
+        $("#dttl").textContent = (idx >= 0 ? "Edit " : "New ") + e.label.replace(/s$/, "");
+        let html = "";
+        let lastSec = null;
+        e.fields.forEach((f) => {
+          if (f.sec && f.sec !== lastSec) {
+            html += `<div class="sech">${esc(f.sec)}</div>`;
+            lastSec = f.sec;
+          }
+          html += fieldHTML(f, row[f.k]);
+        });
+        $("#form").innerHTML = html;
+        $("#dDelete").style.display = idx >= 0 ? "" : "none";
+        $("#scrim").classList.add("on");
+        $("#drawer").classList.add("on");
+        $("#drawer").setAttribute("aria-hidden", "false");
+      }
+      function closeEditor() {
+        $("#scrim").classList.remove("on");
+        $("#drawer").classList.remove("on");
+        $("#drawer").setAttribute("aria-hidden", "true");
+      }
+      function readForm() {
+        const e = ENT[cur],
+          out = {};
+        e.fields.forEach((f) => {
+          const n = document.getElementById("f_" + f.k);
+          if (!n) return;
+          let v = n.value;
+          if (f.type === "num" || f.type === "money" || f.type === "pct") {
+            v = v === "" ? "" : Number(String(v).replace(",", "."));
+            if (Number.isNaN(v)) v = "";
+          } else if (f.type === "bool") {
+            v = v === "true";
+          } else if (f.type === "tags") {
+            v = v
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
+          }
+          out[f.k] = v;
+        });
+        return out;
+      }
+      async function saveEditor() {
+        const e = ENT[cur],
+          rec = readForm();
+        const reqMissing = e.fields
+          .filter((f) => f.req && (rec[f.k] === "" || rec[f.k] == null))
+          .map((f) => f.label);
+        if (reqMissing.length) {
+          toast("Required: " + reqMissing.join(", "));
+          return;
+        }
+        // Duplicate guard: warn if another record already uses this code/SKU/NIF.
+        const keyF = (e.fields.find((f) => ["code", "sku"].includes(f.k)) || {}).k;
+        if (keyF && rec[keyF] != null && rec[keyF] !== "") {
+          const dup = (DATA[cur] || []).some(
+            (r, i) =>
+              i !== editIdx &&
+              String(r[keyF]).trim().toLowerCase() === String(rec[keyF]).trim().toLowerCase(),
+          );
+          if (
+            dup &&
+            !(await askConfirm("Duplicado", {
+              body: `Another ${e.label.replace(/s$/, "").toLowerCase()} already uses ${keyF.toUpperCase()} "${rec[keyF]}". Save a duplicate anyway?`,
+              okLabel: "Save anyway",
+            }))
+          )
+            return;
+        }
+        if (e.single) {
+          DATA[cur] = [rec];
+        } else if (editIdx >= 0) {
+          DATA[cur][editIdx] = rec;
+        } else {
+          DATA[cur].push(rec);
+        }
+        persistSoon();
+        closeEditor();
+        refreshCounts();
+        drawRows();
+        toast("Saved ✓");
+      }
+      async function deleteEditor() {
+        if (editIdx < 0) return;
+        if (
+          !(await askConfirm("Delete this record?", {
+            body: "This cannot be undone.",
+            okLabel: "Delete",
+            danger: true,
+          }))
+        )
+          return;
+        DATA[cur].splice(editIdx, 1);
+        persistSoon();
+        closeEditor();
+        refreshCounts();
+        drawRows();
+        toast("Deleted");
+      }
 
-/* =================== import / export =================== */
-function exportJSON(){
-  const payload={_meta:{app:"Canei Subirats — Master Data",schemaVersion:1,exportedFrom:location.href},data:DATA};
-  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-  const a=el('a');a.href=URL.createObjectURL(blob);a.download='canei-master-data.json';a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1500); toast('Exported canei-master-data.json');
-}
-function importJSON(){
-  const inp=el('input');inp.type='file';inp.accept='application/json,.json';
-  inp.onchange=()=>{const f=inp.files[0];if(!f)return;
-    if(!confirm('Import replaces the current records with the file’s contents. Export a backup first if unsure. Continue?'))return;
-    const r=new FileReader();
-    r.onload=()=>{try{const j=JSON.parse(r.result);const d=j.data||j;
-      Object.keys(ENT).forEach(k=>{if(Array.isArray(d[k]))DATA[k]=d[k];else if(!Array.isArray(DATA[k]))DATA[k]=[];});
-      persistSoon();buildNav();renderAll();toast('Imported ✓');}catch(e){toast('Invalid JSON file');}};
-    r.readAsText(f);};
-  inp.click();
-}
-function reseed(){ if(!confirm('Load the starter data set? This replaces everything currently entered.'))return;
-  DATA=seed();Object.keys(ENT).forEach(k=>{if(!Array.isArray(DATA[k]))DATA[k]=[];});persistSoon();buildNav();renderAll();toast('Sample data loaded'); }
+      /* =================== import / export =================== */
+      function exportJSON() {
+        const payload = {
+          _meta: {
+            app: "Canei Subirats — Master Data",
+            schemaVersion: 1,
+            exportedFrom: location.href,
+          },
+          data: DATA,
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        const a = el("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "canei-master-data.json";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+        toast("Exported canei-master-data.json");
+      }
+      function importJSON() {
+        const inp = el("input");
+        inp.type = "file";
+        inp.accept = "application/json,.json";
+        inp.onchange = async () => {
+          const f = inp.files[0];
+          if (!f) return;
+          if (
+            !(await askConfirm("Import records", {
+              body: "Import replaces the current records with the file’s contents. Export a backup first if unsure.",
+              okLabel: "Import",
+              danger: true,
+            }))
+          )
+            return;
+          const r = new FileReader();
+          r.onload = () => {
+            try {
+              const j = JSON.parse(r.result);
+              const d = j.data || j;
+              Object.keys(ENT).forEach((k) => {
+                if (Array.isArray(d[k])) DATA[k] = d[k];
+                else if (!Array.isArray(DATA[k])) DATA[k] = [];
+              });
+              persistSoon();
+              buildNav();
+              renderAll();
+              toast("Imported ✓");
+            } catch (e) {
+              toast("Invalid JSON file");
+            }
+          };
+          r.readAsText(f);
+        };
+        inp.click();
+      }
+      async function reseed() {
+        if (
+          !(await askConfirm("Load the starter data set?", {
+            body: "This replaces everything currently entered.",
+            okLabel: "Load",
+            danger: true,
+          }))
+        )
+          return;
+        DATA = seed();
+        Object.keys(ENT).forEach((k) => {
+          if (!Array.isArray(DATA[k])) DATA[k] = [];
+        });
+        persistSoon();
+        buildNav();
+        renderAll();
+        toast("Sample data loaded");
+      }
 
-/* =================== wire up =================== */
-$('#btnAdd').onclick=()=>{const e=ENT[cur];openEditor(e.single&&counts(cur)?0:-1);};
-$('#dClose').onclick=closeEditor; $('#dCancel').onclick=closeEditor; $('#scrim').onclick=closeEditor;
-$('#dSave').onclick=saveEditor; $('#dDelete').onclick=deleteEditor;
-$('#btnExport').onclick=exportJSON; $('#btnImport').onclick=importJSON; $('#btnSeed').onclick=reseed;
-$('#q').oninput=drawRows;
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEditor();});
-boot();
-</script>
-</body>
+      /* =================== wire up =================== */
+      $("#btnAdd").onclick = () => {
+        const e = ENT[cur];
+        openEditor(e.single && counts(cur) ? 0 : -1);
+      };
+      $("#dClose").onclick = closeEditor;
+      $("#dCancel").onclick = closeEditor;
+      $("#scrim").onclick = closeEditor;
+      $("#dSave").onclick = saveEditor;
+      $("#dDelete").onclick = deleteEditor;
+      $("#btnExport").onclick = exportJSON;
+      $("#btnImport").onclick = importJSON;
+      $("#btnSeed").onclick = reseed;
+      $("#q").oninput = drawRows;
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeEditor();
+      });
+      boot();
+    </script>
+  </body>
 </html>

@@ -3025,6 +3025,9 @@
         cursor: pointer;
       }
 
+      /* The question box lives in erp-modal.js — see that file for why it is
+         not the browser's own prompt(). Its styles come with it. */
+
       .scrim {
         position: fixed;
         inset: 0;
@@ -3741,6 +3744,7 @@
     <div class="fabmenu" id="fabMenu" role="menu"></div>
     <div class="toast" id="toast"></div>
 
+    <script src="erp-modal.js"></script>
     <script src="erp-engine.js"></script>
     <!-- erp-history.js must load BEFORE erp-seed.js: the seed calls into it to
      back-fill 2024-06…2025-12 before staging its own 2026 records. -->
@@ -6046,8 +6050,15 @@
             puWork = null;
           }, "Orden duplicada"),
         );
-        on("pa_cancel", () => {
-          const reason = prompt("Motivo de la anulación") || "";
+        on("pa_cancel", async () => {
+          const reason = await askText("Anular la orden de compra", {
+            label: "Motivo de la anulación",
+            body: "Queda registrado en la orden y no se puede deshacer.",
+            required: true,
+            okLabel: "Anular",
+            danger: true,
+          });
+          if (reason === null) return;
           mutate(() => erp.cancelPurchase(pu.id, reason, "backoffice"), "Orden anulada");
         });
         on("pa_return", () =>
@@ -6297,8 +6308,14 @@
             }, "Fecha ampliada");
         const term = $("#x_term");
         if (term)
-          term.onclick = () => {
-            const reason = prompt("Motivo de la rescisión") || "";
+          term.onclick = async () => {
+            const reason = await askText("Rescindir la subcontrata", {
+              label: "Motivo de la rescisión",
+              required: true,
+              okLabel: "Rescindir",
+              danger: true,
+            });
+            if (reason === null) return;
             mutate(() => {
               erp.terminateSubcontract(id, reason, "backoffice");
               closeDrawer();
@@ -6469,9 +6486,14 @@
           );
         document.querySelectorAll("[data-reject]").forEach(
           (b) =>
-            (b.onclick = () => {
-              const reason = prompt("Motivo del rechazo");
-              if (reason == null) return;
+            (b.onclick = async () => {
+              const reason = await askText("Rechazar la modificación", {
+                label: "Motivo del rechazo",
+                required: true,
+                okLabel: "Rechazar",
+                danger: true,
+              });
+              if (reason === null) return;
               mutate(
                 () => erp.rejectChange(b.dataset.reject, reason, "backoffice"),
                 "Modificación rechazada",
@@ -6480,8 +6502,14 @@
         );
         document.querySelectorAll("[data-cancel]").forEach(
           (b) =>
-            (b.onclick = () => {
-              const reason = prompt("Motivo de la anulación") || "";
+            (b.onclick = async () => {
+              const reason = await askText("Anular la modificación", {
+                label: "Motivo de la anulación",
+                required: true,
+                okLabel: "Anular",
+                danger: true,
+              });
+              if (reason === null) return;
               mutate(
                 () => erp.cancelChange(b.dataset.cancel, reason, "backoffice"),
                 "Modificación anulada",
@@ -7010,15 +7038,37 @@
       function wireLabourRegisterAll() {
         document.querySelectorAll("[data-reassign]").forEach(
           (b) =>
-            (b.onclick = () => {
+            (b.onclick = async () => {
               const l = erp.state.labour.find((x) => x.id === b.dataset.reassign);
-              const code = prompt(
-                "Proyecto (código) — deja igual para no cambiar",
-                erp.project(l.projectId).code,
+              // Both questions at once, and the project as a list rather than a
+              // code typed from memory — "Proyecto no encontrado: P-2026-0001 "
+              // was only ever a typo the screen refused to help with.
+              const r = await ask(
+                "Reasignar el parte",
+                [
+                  {
+                    key: "code",
+                    label: "Proyecto",
+                    type: "select",
+                    value: erp.project(l.projectId).code,
+                    options: erp.state.projects.map((p) => ({
+                      value: p.code,
+                      label: p.code + " — " + erp.party(p.partyId).name,
+                    })),
+                  },
+                  {
+                    key: "chap",
+                    label: "Capítulo",
+                    value: l.chapterNum || "",
+                    placeholder: "Sin capítulo",
+                    hint: "Déjalo en blanco para dejar el parte sin capítulo asignado.",
+                  },
+                ],
+                { okLabel: "Reasignar" },
               );
-              if (code == null) return;
-              const chap = prompt("Capítulo", l.chapterNum || "");
-              if (chap == null) return;
+              if (r === null) return;
+              const code = r.code,
+                chap = r.chap;
               mutate(() => {
                 const patch = { chapterNum: chap || null };
                 if (code && code !== erp.project(l.projectId).code) {
@@ -7658,9 +7708,14 @@
           mutate(() => erp.closeBankPeriod(r.from, r.to, "backoffice"), "Periodo cerrado");
         v.querySelectorAll("[data-reopen]").forEach(
           (b) =>
-            (b.onclick = () => {
-              const reason = prompt("Motivo de la reapertura");
-              if (reason == null) return;
+            (b.onclick = async () => {
+              const reason = await askText("Reabrir el periodo", {
+                label: "Motivo de la reapertura",
+                body: "Reabrir un periodo cerrado queda registrado con su motivo.",
+                required: true,
+                okLabel: "Reabrir",
+              });
+              if (reason === null) return;
               mutate(
                 () => erp.reopenBankPeriod(b.dataset.reopen, reason, "backoffice"),
                 "Periodo reabierto",
@@ -8453,16 +8508,27 @@
         $("#aRules")?.addEventListener("click", () => alertRulesDrawer());
         document.querySelectorAll("[data-assign]").forEach(
           (b) =>
-            (b.onclick = () => {
-              const who = prompt("¿A quién se asigna esta alerta?");
+            (b.onclick = async () => {
+              const who = await askText("Asignar la alerta", {
+                label: "¿A quién se asigna?",
+                placeholder: "Nombre o puesto",
+                required: true,
+                okLabel: "Asignar",
+              });
               if (who === null) return;
               mutate(() => erp.assignAlert(b.dataset.assign, who, "backoffice"), "Alerta asignada");
             }),
         );
         document.querySelectorAll("[data-due]").forEach(
           (b) =>
-            (b.onclick = () => {
-              const d = prompt("Fecha límite (AAAA-MM-DD):", erp.today);
+            (b.onclick = async () => {
+              const d = await askText("Fecha límite", {
+                label: "Vence el",
+                type: "date",
+                value: erp.today,
+                required: true,
+                okLabel: "Guardar",
+              });
               if (d === null) return;
               mutate(
                 () => erp.setAlertDue(b.dataset.due, d, "backoffice"),
@@ -8472,10 +8538,26 @@
         );
         document.querySelectorAll("[data-snooze]").forEach(
           (b) =>
-            (b.onclick = () => {
-              const d = prompt("Posponer hasta (AAAA-MM-DD):");
-              if (d === null || !d) return;
-              const reason = prompt("Motivo (opcional):") || "";
+            (b.onclick = async () => {
+              // Date and reason together: postponing without saying why is how a
+              // list of alerts quietly becomes a list of things nobody looked at.
+              const r = await ask(
+                "Posponer la alerta",
+                [
+                  { key: "d", label: "Hasta el", type: "date", value: erp.today, required: true },
+                  {
+                    key: "reason",
+                    label: "Motivo",
+                    type: "textarea",
+                    placeholder: "Opcional, pero es lo que explica la espera…",
+                    rows: 3,
+                  },
+                ],
+                { okLabel: "Posponer" },
+              );
+              if (r === null) return;
+              const d = r.d,
+                reason = r.reason || "";
               mutate(
                 () => erp.snoozeAlert(b.dataset.snooze, d, reason, "backoffice"),
                 "Alerta pospuesta",
@@ -8484,10 +8566,29 @@
         );
         document.querySelectorAll("[data-resolve]").forEach(
           (b) =>
-            (b.onclick = () => {
-              const note = prompt("Nota de resolución (obligatoria):");
-              if (note === null || !note.trim()) return;
-              const ev = prompt("Evidencia (descripción; opcional):") || "";
+            (b.onclick = async () => {
+              const r = await ask(
+                "Resolver la alerta",
+                [
+                  {
+                    key: "note",
+                    label: "Nota de resolución",
+                    type: "textarea",
+                    rows: 3,
+                    required: true,
+                    requiredMsg: "Una alerta no se cierra sin decir cómo se resolvió.",
+                  },
+                  {
+                    key: "ev",
+                    label: "Evidencia",
+                    placeholder: "Nº de factura, documento, referencia… (opcional)",
+                  },
+                ],
+                { okLabel: "Resolver" },
+              );
+              if (r === null) return;
+              const note = r.note,
+                ev = r.ev || "";
               mutate(
                 () =>
                   erp.resolveAlert(
@@ -8502,10 +8603,16 @@
         );
         document.querySelectorAll("[data-totask]").forEach((b) => {
           if (b.disabled) return;
-          b.onclick = () => {
+          b.onclick = async () => {
             const row = b.closest(".alrow");
             const msg = row.querySelector("[data-goref]").textContent;
-            const due = prompt("Vence (AAAA-MM-DD):", erp.today);
+            const due = await askText("Convertir en tarea", {
+              label: "Vence el",
+              type: "date",
+              value: erp.today,
+              required: true,
+              okLabel: "Crear tarea",
+            });
             if (due === null) return;
             mutate(
               () => erp.convertAlertToTask(b.dataset.totask, msg, "backoffice", due, "backoffice"),
@@ -9331,12 +9438,18 @@
         $("#bBack").onclick = () => go("quotes");
         const addChap = $("#bAddChap");
         if (addChap)
-          addChap.onclick = () =>
+          addChap.onclick = async () => {
+            const name = await askText("Nuevo capítulo", {
+              label: "Nombre",
+              value: "Nuevo capítulo",
+              required: true,
+              okLabel: "Añadir",
+            });
+            if (name === null) return;
             mutate(() => {
-              const name = prompt("Nombre del capítulo", "Nuevo capítulo");
-              if (name == null) return;
-              bChapter = erp.addChapter(id, { name: name || "Nuevo capítulo" }).id;
+              bChapter = erp.addChapter(id, { name }).id;
             }, "Capítulo añadido");
+          };
         $("#bPreview").onclick = () => budgetDrawer(id, vsel);
         // "Guardar" is in the bar because the specification's own layout puts it
         // there — but §3.1 is equally explicit that nothing waits for it, and this
@@ -9355,15 +9468,20 @@
         if (answer) answer.onclick = () => budgetResponseDrawer(id, vsel);
         const nv = $("#bNewVer");
         if (nv)
-          nv.onclick = () =>
+          nv.onclick = async () => {
+            const reason = await askText("Nueva versión", {
+              label: "Motivo",
+              value: "Revisión",
+              body: "La versión enviada se conserva intacta; los cambios van en la nueva.",
+              required: true,
+              okLabel: "Crear versión",
+            });
+            if (reason === null) return;
             mutate(
-              () =>
-                erp.newVersion(id, {
-                  reason: prompt("Motivo de la nueva versión", "Revisión") || "Revisión",
-                  author: "backoffice",
-                }),
+              () => erp.newVersion(id, { reason, author: "backoffice" }),
               "Nueva versión creada",
             );
+          };
         $("#bValidate").onclick = () => {
           const issues = erp.validateBudget(id);
           toast(
@@ -10989,7 +11107,7 @@
         );
         v.querySelectorAll("[data-ltoggle]").forEach(
           (b) =>
-            (b.onclick = () => {
+            (b.onclick = async () => {
               const kind = b.dataset.ltoggle,
                 code = b.dataset.lc,
                 turningOn = b.dataset.lon === "1";
@@ -10997,9 +11115,10 @@
               if (
                 !turningOn &&
                 used &&
-                !confirm(
-                  `«${erp.listLabel(kind, code)}» se usa en ${used} registro${used === 1 ? "" : "s"}.\n\nRetirarla la quita de los desplegables; los registros que ya la llevan la conservan y se siguen viendo con su nombre. ¿Continuar?`,
-                )
+                !(await askConfirm(`Retirar «${erp.listLabel(kind, code)}»`, {
+                  body: `Se usa en ${used} registro${used === 1 ? "" : "s"}. Retirarla la quita de los desplegables; los registros que ya la llevan la conservan y se siguen viendo con su nombre.`,
+                  okLabel: "Retirar",
+                }))
               )
                 return;
               mutate(
@@ -13122,8 +13241,14 @@
           // it here rather than accepting a blank keeps the audit trail worth reading.
           v.querySelectorAll("[data-acc]").forEach(
             (b) =>
-              (b.onclick = () => {
-                const r = prompt("¿Por qué puede enviarse el paquete con esta excepción?");
+              (b.onclick = async () => {
+                const r = await askText("Justificar la excepción", {
+                  label: "¿Por qué puede enviarse el paquete así?",
+                  type: "textarea",
+                  rows: 3,
+                  required: true,
+                  okLabel: "Justificar",
+                });
                 if (r === null) return;
                 mutate(
                   () => erp.acceptException(q, b.dataset.acc, r, "backoffice"),
@@ -13133,8 +13258,14 @@
           );
           v.querySelectorAll("[data-rq]").forEach(
             (b) =>
-              (b.onclick = () => {
-                const r = prompt("Respuesta de la gestoría:");
+              (b.onclick = async () => {
+                const r = await askText("Respuesta de la gestoría", {
+                  label: "Qué han contestado",
+                  type: "textarea",
+                  rows: 3,
+                  required: true,
+                  okLabel: "Registrar",
+                });
                 if (r === null) return;
                 mutate(
                   () => erp.resolveGestoriaQuery(b.dataset.rq, r, "backoffice"),
@@ -13143,20 +13274,36 @@
               }),
           );
           if ($("#bQuery"))
-            $("#bQuery").onclick = () => {
-              const t = prompt("¿Qué se pregunta a la gestoría sobre " + q + "?");
+            $("#bQuery").onclick = async () => {
+              const t = await askText("Consulta a la gestoría", {
+                label: "¿Qué se pregunta sobre " + q + "?",
+                type: "textarea",
+                rows: 3,
+                required: true,
+                okLabel: "Enviar consulta",
+              });
               if (t === null || !t.trim()) return;
               mutate(() => erp.addGestoriaQuery(q, t, "backoffice"), "Consulta registrada");
             };
           if ($("#bReopen"))
-            $("#bReopen").onclick = () => {
-              const r = prompt("Motivo para reabrir " + q + " (queda registrado):");
+            $("#bReopen").onclick = async () => {
+              const r = await askText("Reabrir " + q, {
+                label: "Motivo",
+                body: "Queda registrado en el trimestre.",
+                required: true,
+                okLabel: "Reabrir",
+              });
               if (r === null) return;
               mutate(() => erp.reopenQuarter(q, r, "backoffice"), "Trimestre " + q + " reabierto");
             };
           if ($("#bSend"))
-            $("#bSend").onclick = () => {
-              const to = prompt("¿A quién se envía el paquete " + q + "?", "Gestoría Subirats");
+            $("#bSend").onclick = async () => {
+              const to = await askText("Enviar el paquete " + q, {
+                label: "Destinatario",
+                value: "Gestoría Subirats",
+                required: true,
+                okLabel: "Enviar",
+              });
               if (to === null) return;
               mutate(
                 () => erp.quarterlyPackage(q, { recipient: to }, "backoffice"),
@@ -13418,7 +13565,7 @@
           tabs.forEach(([lab, key]) => {
             const b = el("button", "tab" + (key === active ? " on" : ""), lab);
             b.dataset.tab = key;
-            b.onclick = () => {
+            b.onclick = async () => {
               tabState[route] = key;
               render();
             };
@@ -13431,6 +13578,9 @@
           VIEWS[active](body);
         };
       }
+
+      /* ask() / askText() / askChoice() / askConfirm() / say() come from
+         erp-modal.js, loaded before this script. */
 
       /* =============================== drawers =============================== */
       function openDrawer(title) {
@@ -13446,7 +13596,12 @@
       $("#dClose").onclick = closeDrawer;
       $("#scrim").onclick = closeDrawer;
       document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") closeDrawer();
+        if (e.key !== "Escape") return;
+        // A modal opened from inside a drawer is on top of it, so Escape has to
+        // dismiss the question and leave the panel that asked it standing.
+        // erp-modal.js already swallowed this event in its capture-phase
+        // handler if a question was open, so reaching here means there is none.
+        closeDrawer();
       });
 
       function partyDrawer(id) {
@@ -13551,11 +13706,13 @@
      and it cannot be if the customer behind it is gone. The engine refuses
      and names what is in the way; this offers the honest alternative rather
      than leaving the user at a dead end. */
-        $("#e_del").onclick = () => {
+        $("#e_del").onclick = async () => {
           if (
-            !confirm(
-              `¿Eliminar definitivamente a ${p.name}?\n\nSólo es posible si no tiene documentos económicos asociados. Esta acción no se puede deshacer.`,
-            )
+            !(await askConfirm(`¿Eliminar definitivamente a ${p.name}?`, {
+              body: "Sólo es posible si no tiene documentos económicos asociados. Esta acción no se puede deshacer.",
+              okLabel: "Eliminar",
+              danger: true,
+            }))
           )
             return;
           try {
@@ -13566,11 +13723,12 @@
             toast("Cliente eliminado");
           } catch (e) {
             if (
-              confirm(
-                "⚠ " +
+              await askConfirm("No se puede eliminar", {
+                body:
                   e.message +
-                  "\n\n¿Desactivarlo en su lugar? Se conserva todo el histórico y deja de aparecer en la lista.",
-              )
+                  " ¿Desactivarlo en su lugar? Se conserva todo el histórico y deja de aparecer en la lista.",
+                okLabel: "Desactivar",
+              })
             )
               mutate(() => {
                 erp.deactivateParty(id, "backoffice");
@@ -13845,20 +14003,21 @@
             }, "Próxima acción actualizada");
         const lose = $("#opp_lose");
         if (lose)
-          lose.onclick = () => {
-            const reason = prompt(
-              "Motivo de la pérdida (código: " +
-                erp
-                  .listActive("lossReasons")
-                  .map((r) => r.code)
-                  .join(", ") +
-                ")",
+          lose.onclick = async () => {
+            // The reasons are configuration (Configuración → Motivos de pérdida),
+            // so the question shows them rather than asking for a code out of a
+            // list quoted in the question itself. Nothing typed means nothing to
+            // reject: the "motivo no reconocido" branch stopped being reachable.
+            const reason = await askChoice(
+              "¿Por qué se ha perdido?",
+              erp.listActive("lossReasons").map((r) => ({ value: r.code, label: r.es || r.code })),
+              {
+                body: "Queda registrado en la oportunidad y alimenta el análisis de pérdidas.",
+                okLabel: "Marcar como perdida",
+                danger: true,
+              },
             );
-            if (reason == null) return;
-            if (!erp.listAll("lossReasons").some((r) => r.code === reason)) {
-              toast("⚠ Motivo no reconocido");
-              return;
-            }
+            if (reason === null) return;
             mutate(() => {
               erp.loseOpportunity(id, reason, "backoffice");
               closeDrawer();
@@ -15371,22 +15530,25 @@
    guard there), so a device that already holds records keeps them until a
    person asks for this. That is also why a richer seed does not appear on its
    own after an update — you have to press this. */
-      function resetData() {
+      async function resetData() {
         // On the server this is not "reload the demo on this device" — the document
         // is the company's, so it would replace the real register, for everyone, from
         // one click behind one confirm box. The wording of that box ("en este
         // dispositivo") would also be a lie. Refused outright rather than confirmed
         // harder: there is no version of this that is safe against live data.
         if (ErpStore.isRemote()) {
-          alert(
-            "Estos son los datos reales de la empresa, en el servidor.\n\nNo se pueden sustituir por datos de demostración desde aquí.",
+          await say(
+            "Datos reales en el servidor",
+            "Estos son los datos reales de la empresa. No se pueden sustituir por datos de demostración desde aquí.",
           );
           return;
         }
         if (
-          !confirm(
-            "¿Recargar los datos de demostración?\n\nSe sustituye TODO lo que haya ahora en este dispositivo por el conjunto de ejemplo: dos años de actividad (2024-2025) más la situación actual de 2026.",
-          )
+          !(await askConfirm("¿Recargar los datos de demostración?", {
+            body: "Se sustituye TODO lo que haya ahora en este dispositivo por el conjunto de ejemplo: dos años de actividad (2024-2025) más la situación actual de 2026.",
+            okLabel: "Recargar",
+            danger: true,
+          }))
         )
           return;
         erp = ErpSeed.build();
