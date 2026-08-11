@@ -111,12 +111,13 @@ and labelled _seguimiento_ rather than blocked; and creating a partida that the
 search cannot find **opens the existing «＋ Nueva partida» form** rather than a
 second one written for the popup.
 
-**Owed, and named so it is not forgotten:** the strings the new questions and
-the photo viewer introduce are Spanish only. `tests/i18n/coverage.mjs` checks
-that the dictionary is consistent across the three languages, not that every
-literal is in it — deliberately, see the note at the top of that file — so
-these pass the gate and still fall back to Spanish in CA and EN. They belong
-in `i18n-dict.js` and `i18n-dict-ca.js` before this package is called finished.
+**Closed (2026-08-11):** the strings the new questions and the photo viewer
+introduced were Spanish only. `tests/i18n/coverage.mjs` checks that the
+dictionary is consistent across the three languages, not that every literal
+is in it — deliberately, see the note at the top of that file — so P1–P5
+passed the gate while still falling back to Spanish in CA and EN. Backfilled:
+108 ES→EN pairs, 112 ES→CA pairs, 9 regex rules per side for the strings that
+carry a variable. See ASSUMPTIONS.md #153 for what was and was not in scope.
 
 **One part of slide 9 is deliberately not done, and it is not a small
 omission.** The note asks for the catalogue search on _"ambos, Partidas o

@@ -2865,3 +2865,31 @@ different decisions, so these ten arrived colliding. They are renumbered from
   terms, the exclusions, the validation and the send, in that order.
   Validation runs on OPEN rather than behind its own button: a check somebody
   has to remember to press is a check that gets skipped.
+
+- **#153 — i18n backfill for P1–P5 (2026-08-11).** P1–P5 introduced new
+  Spanish-only strings (the modal system's own labels, the visit screen's
+  camera/photo-viewer chrome, the two new configurable lists' UI, the
+  presupuestador rework) that `tests/i18n/coverage.mjs` did not catch, because
+  that gate checks the dictionary's own internal EN/CA consistency rather than
+  scraping the app for every literal. Closed by writing 108 new ES→EN pairs
+  into `i18n-dict.js` and 112 ES→CA pairs into `i18n-dict-ca.js` (108 shared +
+  4 that already had an EN entry but no CA one), plus 9 regex rules on each
+  side for the strings that carry a variable (visit-title suffixes, the
+  gestoría reopen/query prompts, item counts). Wrote **both** EN and CA now
+  rather than leaving CA to fall back to Spanish, per the file's own stated
+  intent that Catalan is a column reviewable by a native speaker independent
+  of the ES/EN spine — an untranslated CA entry sits in the backlog exactly
+  like every other pre-existing one, not as fresh debt. `CA_BACKLOG` in the
+  coverage test dropped from 1301 to 1297 to hold the new floor. Two things
+  were deliberately left out of scope, both consistent with how the rest of
+  the app already behaves rather than a shortcut: (a) the seed values of the
+  two new owner-maintained lists (`nextActions`, `paymentConditions`) — no
+  owner list in the app, old or new, is translated by the interface toggle,
+  because `erp.listLabel(kind, code, lang)` is never called with a `lang`
+  argument from `erp.html`; translating only the new lists would be the
+  inconsistent choice; (b) the multi-paragraph `.cfghelp` bodies on the two
+  new config screens — each is one HTML block split by inline `<b>` tags into
+  several text nodes, so a correct translation needs one dict entry per
+  fragment for background prose an admin reads rarely, not primary workflow
+  chrome; their one-line `sub` intros are translated, only the long help
+  bodies are not.

@@ -1041,15 +1041,168 @@ window.CANEI_DICT.ca = {
   // ── Merged from main: the planning screen's strings and the reports note,
   //    which arrived on the ES/EN spine without Catalan. Translated here
   //    rather than raising the ceiling — the backlog only ever falls.
-  "Ruta crítica — un día perdido aquí es un día perdido en la obra": "Ruta crítica — un dia perdut aquí és un dia perdut a l'obra",
-  "Sin tareas planificadas. Añade una tarea o genera la planificación desde los capítulos del proyecto.": "Sense tasques planificades. Afegeix una tasca o genera la planificació des dels capítols del projecte.",
-  "Ninguna. Arrastra el punto de otra barra hasta ésta para crear una.": "Cap. Arrossega el punt d'una altra barra fins a aquesta per crear-ne una.",
-  "Planificación de obra con dependencias, ruta crítica y línea base. Arrastra una barra para moverla, tira del borde derecho para alargarla y arrastra el punto de una barra a otra para crear una dependencia.": "Planificació d'obra amb dependències, ruta crítica i línia base. Arrossega una barra per moure-la, estira la vora dreta per allargar-la i arrossega el punt d'una barra a una altra per crear una dependència.",
-  "Una línea base guarda la planificación tal como está hoy. No se puede modificar después: es la referencia contra la que se mide el avance real.": "Una línia base desa la planificació tal com és avui. No es pot modificar després: és la referència amb què es mesura l'avanç real.",
-  "La planificación necesita el módulo de capacidades, que no se ha cargado. Recarga la página.": "La planificació necessita el mòdul de capacitats, que no s'ha carregat. Torna a carregar la pàgina.",
-  "No se desarrolla por ahora. Los informes se construirán sobre datos ya registrados, sin pedir información nueva.": "De moment no es desenvolupa. Els informes es construiran sobre dades ja registrades, sense demanar informació nova.",
+  "Ruta crítica — un día perdido aquí es un día perdido en la obra":
+    "Ruta crítica — un dia perdut aquí és un dia perdut a l'obra",
+  "Sin tareas planificadas. Añade una tarea o genera la planificación desde los capítulos del proyecto.":
+    "Sense tasques planificades. Afegeix una tasca o genera la planificació des dels capítols del projecte.",
+  "Ninguna. Arrastra el punto de otra barra hasta ésta para crear una.":
+    "Cap. Arrossega el punt d'una altra barra fins a aquesta per crear-ne una.",
+  "Planificación de obra con dependencias, ruta crítica y línea base. Arrastra una barra para moverla, tira del borde derecho para alargarla y arrastra el punto de una barra a otra para crear una dependencia.":
+    "Planificació d'obra amb dependències, ruta crítica i línia base. Arrossega una barra per moure-la, estira la vora dreta per allargar-la i arrossega el punt d'una barra a una altra per crear una dependència.",
+  "Una línea base guarda la planificación tal como está hoy. No se puede modificar después: es la referencia contra la que se mide el avance real.":
+    "Una línia base desa la planificació tal com és avui. No es pot modificar després: és la referència amb què es mesura l'avanç real.",
+  "La planificación necesita el módulo de capacidades, que no se ha cargado. Recarga la página.":
+    "La planificació necessita el mòdul de capacitats, que no s'ha carregat. Torna a carregar la pàgina.",
+  "No se desarrolla por ahora. Los informes se construirán sobre datos ya registrados, sin pedir información nueva.":
+    "De moment no es desenvolupa. Els informes es construiran sobre dades ja registrades, sense demanar informació nova.",
+  // P1-P5 i18n backfill.
+  Aceptar: "Accepta",
+  "Anular la modificación": "Anul·la la modificació",
+  "Anular la orden de compra": "Anul·la la comanda de compra",
+  "Asignar la alerta": "Assigna l'alerta",
+  "Añadida a la lista": "Afegida a la llista",
+  "Buscar en el catálogo": "Cerca al catàleg",
+  "Completar los datos ahora": "Completa les dades ara",
+  "Consulta a la gestoría": "Consulta a la gestoria",
+  Continuar: "Continua",
+  "Convertir en tarea": "Converteix en tasca",
+  "Corrige los bloqueos de arriba y vuelve a abrir este paso.":
+    "Corregeix els bloquejos de dalt i torna a obrir aquest pas.",
+  "Crear versión": "Crea versió",
+  "Cómo se cobra (formas de pago) y en qué reparto (condiciones de pago). El vencimiento real lo calcula cada documento; aquí se mantienen las listas.":
+    "Com es cobra (formes de pagament) i en quin repartiment (condicions de pagament). El venciment real el calcula cada document; aquí es mantenen les llistes.",
+  "Datos reales en el servidor": "Dades reals al servidor",
+  "De dónde llegan los clientes, qué toca hacer con cada oportunidad y por qué se pierden. Las tres listas alimentan los informes de origen y de conversión.":
+    "D'on arriben els clients, què toca fer amb cada oportunitat i per què es perden. Les tres llistes alimenten els informes d'origen i de conversió.",
+  "Del catálogo": "Del catàleg",
+  Destinatario: "Destinatari",
+  "Déjalo en blanco para dejar el parte sin capítulo asignado.":
+    "Deixa-ho en blanc per deixar el part sense capítol assignat.",
+  "Encuadra y dispara": "Enquadra i dispara",
+  Entendido: "Entesos",
+  "Enviar consulta": "Envia la consulta",
+  "Esta versión ya está congelada: se conserva tal como se envió.":
+    "Aquesta versió ja està congelada: es conserva tal com es va enviar.",
+  "Este dispositivo no ofrece cámara al navegador":
+    "Aquest dispositiu no ofereix càmera al navegador",
+  "Estos son los datos reales de la empresa. No se pueden sustituir por datos de demostración desde aquí.":
+    "Aquestes són les dades reals de l'empresa. No es poden substituir per dades de demostració des d'aquí.",
+  Evidencia: "Evidència",
+  "Faltan datos del cliente": "Falten dades del client",
+  "Fecha límite": "Data límit",
+  "Fuera del catálogo": "Fora del catàleg",
+  "Hacer la foto": "Fes la foto",
+  "Hay partidas que bloquean el envío": "Hi ha partides que bloquegen l'enviament",
+  Justificar: "Justifica",
+  "Justificar la excepción": "Justifica l'excepció",
+  "La versión enviada se conserva intacta; los cambios van en la nueva.":
+    "La versió enviada es conserva intacta; els canvis van a la nova.",
+  "La visita se captura igual — pero sin estos datos no se puede emitir ni contrato ni factura.":
+    "La visita es captura igual — però sense aquestes dades no es pot emetre ni contracte ni factura.",
+  "Llamar la semana que viene": "Truca la setmana que ve",
+  "Los capítulos salen del catálogo para que se llamen igual en todos los presupuestos.":
+    "Els capítols surten del catàleg perquè es diguin igual a tots els pressupostos.",
+  "Los que aún no se han visitado van primero, y dentro de cada grupo los que llevan más tiempo esperando.":
+    "Els que encara no s'han visitat van primer, i dins de cada grup els que porten més temps esperant.",
+  "Marcar como perdida": "Marca com a perduda",
+  "Margen sobre el precio de venta. Al escribirlo, el precio unitario se recalcula.":
+    "Marge sobre el preu de venda. En escriure'l, es recalcula el preu unitari.",
+  "Margen unit. %": "Marge unit. %",
+  "Motivo de la anulación": "Motiu de l'anul·lació",
+  "Motivo de la reapertura": "Motiu de la reobertura",
+  "Motivo de la rescisión": "Motiu de la rescissió",
+  "Motivo del rechazo": "Motiu del rebuig",
+  "Nada que corregir: todas las partidas tienen cantidad, precio y coste coherentes.":
+    "Res a corregir: totes les partides tenen quantitat, preu i cost coherents.",
+  "No se ha dado permiso de cámara. Puedes autorizarlo en el candado de la barra de direcciones.":
+    "No s'ha donat permís de càmera. Ho pots autoritzar des del cadenat de la barra d'adreces.",
+  "No se puede eliminar": "No es pot eliminar",
+  "No se puede programar una visita en una fecha pasada":
+    "No es pot programar una visita en una data passada",
+  "Nom (CA)": "Nom (CA)",
+  "Nombre (ES)": "Nom (ES)",
+  "Nombre del capítulo": "Nom del capítol",
+  "Nombre o puesto": "Nom o càrrec",
+  "Nota de resolución": "Nota de resolució",
+  "Nueva entrada": "Nova entrada",
+  "Nueva partida": "Nova partida",
+  "Nuevo capítulo": "Nou capítol",
+  "Nº de factura, documento, referencia… (opcional)":
+    "Núm. de factura, document, referència… (opcional)",
+  "Opcional, pero es lo que explica la espera…": "Opcional, però és el que explica l'espera…",
+  "Otro nombre…": "Un altre nom…",
+  "P. unitario venta": "P. unitari venda",
+  "Partida tomada del catálogo": "Partida agafada del catàleg",
+  "Por código, descripción o cómo se le dice al cliente.":
+    "Per codi, descripció o com se li diu al client.",
+  Posponer: "Posposa",
+  "Posponer la alerta": "Posposa l'alerta",
+  "Precio total": "Preu total",
+  Programar: "Programa",
+  "Programar seguimiento": "Programa seguiment",
+  "Próximas acciones": "Pròximes accions",
+  "Queda registrado en el trimestre.": "Queda registrat al trimestre.",
+  "Queda registrado en la oportunidad y alimenta el análisis de pérdidas.":
+    "Queda registrat a l'oportunitat i alimenta l'anàlisi de pèrdues.",
+  "Queda registrado en la orden y no se puede deshacer.":
+    "Queda registrat a la comanda i no es pot desfer.",
+  "Qué han contestado": "Què han contestat",
+  Reabrir: "Reobre",
+  "Reabrir el periodo": "Reobre el període",
+  "Reabrir un periodo cerrado queda registrado con su motivo.":
+    "Reobrir un període tancat queda registrat amb el seu motiu.",
+  Reasignar: "Reassigna",
+  "Reasignar el parte": "Reassigna el part",
+  Recargar: "Recarrega",
+  Rechazar: "Rebutja",
+  "Rechazar la modificación": "Rebutja la modificació",
+  Rescindir: "Rescindeix",
+  "Rescindir la subcontrata": "Rescindeix la subcontracta",
+  Resolver: "Resol",
+  "Resolver la alerta": "Resol l'alerta",
+  "Respuesta de la gestoría": "Resposta de la gestoria",
+  Retirar: "Retira",
+  "Retirar una entrada": "Retira una entrada",
+  "Se sustituye TODO lo que haya ahora en este dispositivo por el conjunto de ejemplo: dos años de actividad (2024-2025) más la situación actual de 2026.":
+    "Se substitueix TOT el que hi hagi ara en aquest dispositiu pel conjunt d'exemple: dos anys d'activitat (2024-2025) més la situació actual de 2026.",
+  "Siguiente paso": "Següent pas",
+  "Siguiente paso →": "Següent pas →",
+  "Sin visita todavía": "Sense visita encara",
+  "Sólo es posible si no tiene documentos económicos asociados. Esta acción no se puede deshacer.":
+    "Només és possible si no té documents econòmics associats. Aquesta acció no es pot desfer.",
+  "Sólo para un capítulo que no se va a repetir. Si se va a usar más veces, añádelo al catálogo en Configuración → Partidas.":
+    "Només per a un capítol que no es tornarà a fer servir. Si s'ha d'utilitzar més vegades, afegeix-lo al catàleg a Configuració → Partides.",
+  "Una alerta no se cierra sin decir cómo se resolvió.":
+    "Una alerta no es tanca sense dir com s'ha resolt.",
+  "Vence el": "Venç el",
+  "Ya visitados — sería un seguimiento": "Ja visitats — seria un seguiment",
+  seguimiento: "seguiment",
+  "sin capítulo": "sense capítol",
+  "sin partidas todavía": "sense partides encara",
+  "¿A quién se asigna?": "A qui s'assigna?",
+  "¿Para qué lead?": "Per a quin lead?",
+  "¿Por qué puede enviarse el paquete así?": "Per què es pot enviar el paquet així?",
+  "¿Por qué se ha perdido?": "Per què s'ha perdut?",
+  "¿Recargar los datos de demostración?": "Recarregar les dades de demostració?",
+  "⤓ Descargar": "⤓ Descarrega",
+  "＋ Nueva partida": "＋ Nova partida",
+  "＋ Nueva…": "＋ Nova…",
+  "＋ Programar visita de seguimiento": "＋ Programar visita de seguiment",
+  "Condiciones de pago": "Condicions de pagament",
+  "Coste unitario": "Cost unitari",
+  "sin precio": "sense preu",
+  Unidad: "Unitat",
 };
 window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Programar visita — (.+)$"), "Programar visita — $1"],
   [new RegExp("^Visita — (.+)$"), "Visita — $1"],
+  // P1-P5 i18n backfill: dynamic strings that carry a variable.
+  [new RegExp("^Programar visita de seguimiento — (.+)$"), "Programar visita de seguiment — $1"],
+  [new RegExp("^Enviar el paquete (.+)$"), "Envia el paquet $1"],
+  [new RegExp("^Reabrir (.+)$"), "Reobre $1"],
+  [new RegExp("^¿Qué se pregunta sobre (.+)\\?$"), "Què es pregunta sobre $1?"],
+  [new RegExp("^Ya hay (\\d+) visitas$"), "Ja hi ha $1 visites"],
+  [new RegExp("^Ya hay (\\d+) visita$"), "Ja hi ha $1 visita"],
+  [new RegExp("^(\\d+) partidas$"), "$1 partides"],
+  [new RegExp("^(\\d+) partida$"), "$1 partida"],
 ];
