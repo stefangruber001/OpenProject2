@@ -3022,7 +3022,15 @@
      *                     Package 2 slide 8's "respaldo" for the anexo this
      *                     approval generates.
      */
-    approveChange(changeId, { evidenceRef, evidence } = {}, user) {
+    approveChange(changeId, opts, user) {
+      // The options object is NOT defaulted in the signature, deliberately: a
+      // parameter with a default stops counting towards `Function.length`,
+      // and `apps/web/lib/erp-commands.ts` pins each whitelisted method's
+      // arity against exactly that — the server reads positional arguments
+      // off a request body, so the count is part of the wire contract, not a
+      // style choice. Defaulting it here silently changed approveChange's
+      // declared arity from 3 to 1.
+      const { evidenceRef, evidence } = opts || {};
       // CHG-03/04 + CON-12. Accepts "priced" too — sending to the client first
       // is a real step this spec adds, but skipping straight to acceptance
       // (a verbal yes, a signature on the spot) is common enough on site that

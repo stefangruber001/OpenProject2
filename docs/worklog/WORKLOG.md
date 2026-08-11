@@ -339,3 +339,23 @@ rejected contract left a permanent hole in a series ORG-04 requires to be
 gap-free. Nothing exercised it before, because nothing could create a
 contract. Both paths now validate before the number is minted, and the E2E
 asserts the series and the contract count stay equal across a refusal.
+
+### A verification gap, found by CI and worth naming
+
+PK2-C went out with real CI red. The local sweep for these sessions ran
+`boundaries`, `lint`, `check-types`, the two simulations, the i18n gate and
+site E2E — but **not `pnpm test`**, which is where the vitest suites live.
+`apps/web/lib/erp-commands.test.ts` pins each whitelisted engine method's
+`Function.length` against the arity the server API declares, because the
+server reads positional arguments off a request body: the count is part of
+the wire contract.
+
+PK2-C changed `approveChange(changeId, evidenceRef, user)` to take an options
+object **with a default** — and a parameter with a default stops counting
+towards `Function.length`, so the declared arity silently fell from 3 to 1.
+Nothing in the browser noticed; the whitelist test did.
+
+Fixed by not defaulting the parameter (`approveChange(changeId, opts, user)`,
+destructured inside), which keeps the arity the API advertises. The lesson is
+the checklist: **`pnpm test` belongs in every session's sweep**, alongside
+the gates already run. `CLAUDE.md` lists it; these sessions skipped it.
