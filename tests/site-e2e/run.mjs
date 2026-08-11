@@ -87,6 +87,7 @@ async function main() {
     await testVisitCapture(browser, base);
     await testConfigurableLists(browser, base);
     await testPresupuestadorRework(browser, base);
+    await testEvidence(browser, base);
     await testJourneyRealMode(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
@@ -4318,6 +4319,221 @@ async function testPresupuestadorRework(browser, base) {
     else ok("presupuestador: no console errors");
   } catch (e) {
     bad("presupuestador (rework): suite completed", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/* Package 2 slide 3 (PK2-A): the backing document behind a decision is a FILE
+   now, not a typed filename. "correo-aceptacion.pdf" in a text box proved
+   nothing and could not be reopened.
+
+   This exercises the shared primitive three later screens depend on: the
+   drop-or-browse field, the record it produces, the acceptance date and
+   person that travel with it, and the viewer that reads a PDF as well as a
+   photograph. */
+/** A structurally valid one-page PDF, xref table included, built here rather
+    than committed as a fixture so the bytes are readable next to the test. */
+function minimalPdf() {
+  const objs = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+    null,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  const stream = "BT /F1 18 Tf 20 100 Td (Aceptado) Tj ET";
+  objs[3] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+  let out = "%PDF-1.4\n";
+  const off = [];
+  objs.forEach((body, i) => {
+    off.push(out.length);
+    out += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+  off.forEach((o) => (out += String(o).padStart(10, "0") + " 00000 n \n"));
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return out;
+}
+
+async function testEvidence(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+
+    // An issued version nobody has answered yet is the one state in which the
+    // customer's answer can still be recorded.
+    const opened = await pg.evaluate(() => {
+      const b = erp.state.budgets.find(
+        (x) =>
+          !x.acceptedVersionId && (x.versions || []).some((v) => v.issued && !v.customerResponse),
+      );
+      if (!b) return null;
+      go("quotes", b.id);
+      // Whether this customer had an open opportunity decides what the
+      // acceptance is allowed to move; without one there is nothing to date.
+      return {
+        id: b.id,
+        hadOpp: !!erp.state.opportunities.find(
+          (x) => x.partyId === b.partyId && !["won", "lost"].includes(x.status),
+        ),
+      };
+    });
+    if (!opened) {
+      bad("evidence: an issued unanswered version exists to answer", "none in the seed");
+      return;
+    }
+    await pg.waitForTimeout(800);
+    await pg.click("#bAnswer");
+    await pg.waitForTimeout(500);
+
+    // ---- the justificante is a dropzone, not a text box --------------------
+    const field = await pg.evaluate(() => ({
+      zone: !!document.querySelector("#brEvid .evz"),
+      file: !!document.querySelector("#brEvid input[type=file]"),
+      accept: document.querySelector("#brEvid input[type=file]")?.accept || "",
+      oldTextBox: document.querySelector("#brEvid")?.tagName === "INPUT",
+      date: document.querySelector("#brDate")?.value || "",
+      maxDate: document.querySelector("#brDate")?.max || "",
+      who: !!document.querySelector("#brWho"),
+    }));
+    if (field.zone && field.file && !field.oldTextBox)
+      ok("evidence: the justificante is a drop-or-browse field, not a text box");
+    else bad("evidence: justificante is a real upload", JSON.stringify(field));
+    if (/pdf/.test(field.accept) && /image/.test(field.accept))
+      ok("evidence: it accepts a PDF as well as an image");
+    else bad("evidence: accepts pdf and image", field.accept);
+    // Slide 3 asks for the acceptance date and the person, and the date has to
+    // allow a past day — the answer arrives before anyone records it.
+    if (field.date && field.maxDate === field.date && field.who)
+      ok("evidence: acceptance carries a date (today, backdatable) and who accepted it");
+    else bad("evidence: date + person fields", JSON.stringify(field));
+
+    // ---- attaching a real PDF ---------------------------------------------
+    // A genuine, structurally valid PDF — xref table and all. A fake byte
+    // string would prove the upload and hide a broken viewer behind it.
+    await pg.setInputFiles("#brEvid input[type=file]", {
+      name: "correo-aceptacion.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from(minimalPdf(), "latin1"),
+    });
+    await pg.waitForTimeout(700);
+    const attached = await pg.evaluate(() => ({
+      chip: !!document.querySelector("#brEvid .evfile"),
+      name: document.querySelector("#brEvid .evnm")?.textContent || "",
+      see: !!document.querySelector("#brEvid [data-ev=see]"),
+      drop: !!document.querySelector("#brEvid [data-ev=drop]"),
+    }));
+    if (attached.chip && attached.name === "correo-aceptacion.pdf" && attached.see && attached.drop)
+      ok("evidence: the attached file shows as a named chip with «Ver» and «Quitar»");
+    else bad("evidence: attached chip", JSON.stringify(attached));
+
+    // ---- what is actually persisted ---------------------------------------
+    await pg.fill("#brWho", "Marta Roca · propietaria");
+    const backdate = await pg.evaluate(() => {
+      const d = new Date(erp.today + "T00:00:00");
+      d.setDate(d.getDate() - 3);
+      const iso = d.toISOString().slice(0, 10);
+      document.querySelector("#brDate").value = iso;
+      return iso;
+    });
+    await pg.click("#brOk");
+    await pg.waitForTimeout(800);
+    const saved = await pg.evaluate((bid) => {
+      const b = erp.budget(bid);
+      const v = erp.version(bid, b.acceptedVersionId);
+      const r = (v && v.customerResponse) || {};
+      const o = erp.state.opportunities.find((x) => x.partyId === b.partyId && x.status === "won");
+      return {
+        accepted: !!r.accepted,
+        date: r.date || "",
+        by: r.acceptedBy || "",
+        key: (r.evidence && r.evidence.storageKey) || "",
+        type: (r.evidence && r.evidence.type) || "",
+        fname: (r.evidence && r.evidence.name) || "",
+        size: (r.evidence && r.evidence.size) || 0,
+        decidedAt: (o && o.decidedAt) || "",
+      };
+    }, opened.id);
+    if (saved.accepted && saved.key && saved.type === "application/pdf" && saved.size > 0)
+      ok("evidence: the record stores the file itself — key, type and size");
+    else bad("evidence: persisted evidence record", JSON.stringify(saved));
+    if (saved.date === backdate && saved.by === "Marta Roca · propietaria")
+      ok("evidence: the backdated answer and the person who gave it are kept");
+    else bad("evidence: backdated date + person persisted", JSON.stringify(saved));
+    // A backdated acceptance must land in the quarter it happened — but only
+    // where there was an open opportunity for it to decide.
+    if (opened.hadOpp) {
+      if (saved.decidedAt === backdate)
+        ok("evidence: the opportunity is decided on the answer's day, not on today");
+      else bad("evidence: decidedAt follows the answer", JSON.stringify(saved));
+    }
+    // The blob is really in the store, not merely referenced.
+    const stored = await pg.evaluate(
+      async (k) => (await ErpStore.getBlob(k)) instanceof Blob,
+      saved.key,
+    );
+    if (stored) ok("evidence: the file is in the blob store, not only pointed at");
+    else bad("evidence: blob present in store", saved.key);
+
+    // ---- it can be reopened afterwards ------------------------------------
+    const panel = await pg.evaluate(() => {
+      const side = document.querySelector("#bSide")?.textContent || "";
+      return {
+        shows: side.includes("Aceptación"),
+        link: !!document.querySelector("#bSide [data-evidence]"),
+      };
+    });
+    if (panel.shows && panel.link)
+      ok("evidence: the acceptance and its document are reachable from the builder afterwards");
+    else bad("evidence: acceptance panel", JSON.stringify(panel));
+
+    // ---- the viewer reads a PDF, not only photographs ----------------------
+    await pg.click("#bSide [data-evidence]");
+    await pg.waitForTimeout(2500);
+    const viewer = await pg.evaluate(() => {
+      const v = document.querySelector(".pview");
+      if (!v) return { open: false };
+      const ext = v.querySelector("[data-pv=ext]");
+      return {
+        open: true,
+        canvas: !!v.querySelector("canvas"),
+        // The escape hatch, for a browser too old for the bundled pdf.js.
+        ext: !!ext && /^blob:/.test(ext.href || ""),
+        dl: v.querySelector("[data-pv=dl]")?.getAttribute("download") || "",
+      };
+    });
+    if (viewer.open && viewer.canvas) ok("evidence: the viewer renders the PDF itself, in the app");
+    // Not a soft assertion. pdf.js 6.2 needs a very recent engine, and the
+    // requirement is that the document is ALWAYS reachable — drawn here when
+    // the browser can, handed to the browser's own reader when it cannot.
+    // A dead end is the only failing outcome.
+    else if (viewer.open && viewer.ext)
+      ok("evidence: where the PDF cannot be drawn, the viewer still opens the real file");
+    else bad("evidence: the pdf is reachable from the viewer", JSON.stringify(viewer));
+    if (viewer.dl === "correo-aceptacion.pdf")
+      ok("evidence: it downloads under the name it was uploaded with");
+    else bad("evidence: download name", JSON.stringify(viewer));
+    // Escape closes the document and leaves the builder standing.
+    await pg.keyboard.press("Escape");
+    await pg.waitForTimeout(300);
+    const after = await pg.evaluate(() => ({
+      viewer: !!document.querySelector(".pview"),
+      builder: !!document.querySelector(".pb"),
+    }));
+    if (!after.viewer && after.builder)
+      ok("evidence: Escape closes the document without closing what opened it");
+    else bad("evidence: escape scoping", JSON.stringify(after));
+
+    if (errs.length) bad("evidence: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("evidence: no console errors");
+  } catch (e) {
+    bad("evidence: suite completed", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }

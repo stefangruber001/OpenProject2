@@ -2088,7 +2088,28 @@
           : 0,
       };
     }
-    acceptVersion(budgetId, versionId, { evidenceRef, acceptedOptions } = {}, user) {
+    /**
+     * @param evidenceRef  legacy free-text note naming the backing document.
+     *                     Kept because records written before a file could be
+     *                     attached carry one, and a typed filename is still
+     *                     better than nothing when that is all there is.
+     * @param evidence     the backing document itself —
+     *                     { storageKey, name, type, size, uploadedAt }.
+     * @param date         when the customer actually answered. Defaults to
+     *                     today, and may be EARLIER: the answer usually
+     *                     arrives before anyone sits down to record it. A
+     *                     future date is refused — nothing can be accepted
+     *                     tomorrow.
+     * @param acceptedBy   who on the customer's side gave the answer, by name
+     *                     or by role. Free text, because the customer's staff
+     *                     are not users of this system.
+     */
+    acceptVersion(
+      budgetId,
+      versionId,
+      { evidenceRef, evidence, date, acceptedBy, acceptedOptions } = {},
+      user,
+    ) {
       // QUO-04/09 + PRJ-01
       const b = this.budget(budgetId);
       const v = this.version(budgetId, versionId);
@@ -2100,10 +2121,14 @@
       // which answer the customer actually gave. A customer who changes their
       // mind gets a NEW version, which is what newVersion is for.
       if (v.customerResponse) throw new Error("This version already has the customer's answer");
+      const when = date || this.state.today;
+      if (when > this.state.today) throw new Error("The answer cannot be dated in the future");
       v.customerResponse = {
         accepted: true,
-        date: this.state.today,
+        date: when,
         evidenceRef: evidenceRef || null,
+        evidence: evidence || null,
+        acceptedBy: acceptedBy || null,
         acceptedOptions: acceptedOptions || [],
       };
       v.frozen = true;
@@ -2114,7 +2139,11 @@
       );
       if (o) {
         o.status = "won";
-        o.decidedAt = this.state.today; // DAS-01: "contratadas/perdidas últimos 12 meses"
+        // The day the customer answered, not the day somebody typed it in:
+        // a backdated acceptance must land in the quarter it happened, or
+        // DAS-01's "contratadas/perdidas últimos 12 meses" counts it twice
+        // over — once where it belongs and never where it is.
+        o.decidedAt = when; // DAS-01: "contratadas/perdidas últimos 12 meses"
       }
       this._log(user, "acceptVersion", b.number + " v" + v.vNumber);
       return v;

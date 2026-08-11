@@ -2893,3 +2893,40 @@ different decisions, so these ten arrived colliding. They are renumbered from
   fragment for background prose an admin reads rarely, not primary workflow
   chrome; their one-line `sub` intros are translated, only the long help
   bodies are not.
+
+- **#154 — the backing document becomes a file, and one viewer reads both
+  kinds (Package 2 slide 3, PK2-A · 2026-08-11).** Slide 3 asked for the
+  acceptance justificante to be an uploadable, reopenable document with a date
+  and a person, instead of the free-text box that held `correo-aceptacion.pdf`
+  and proved nothing. Decisions taken: (a) **the primitive is built where the
+  photo viewer already lives, not extracted into its own module.** `erp-modal.js`
+  was extracted because four pages ask questions; every consumer of evidence —
+  the client response, the contract upload, the anexo backup, the cash
+  justificante — is in `erp.html`. Two viewers, one in a module and one inline,
+  would drift exactly as CLAUDE.md warns; extracting later, when a second page
+  needs it, is the more reversible move. (b) **The photo viewer was generalised
+  rather than duplicated.** It reads a PDF page by page as well as a
+  photograph, and non-image attachments are delegated through `data-evidence`
+  the same way pictures already were through `data-blob`, so arrows and Escape
+  behave identically for both. (c) **The file reaches the blob store the moment
+  it is chosen**, before the surrounding form is saved. The cost is an orphaned
+  blob if the person abandons the form — storage the browser reclaims; the
+  alternative cost is losing the file they just attached, which is their time.
+  For the same reason **"Quitar" does not delete the blob**: on an already-saved
+  record it would destroy the real file if the edit were then abandoned.
+  (d) **The acceptance date may be backdated but not postdated**, and the
+  opportunity's `decidedAt` follows it rather than today — otherwise an answer
+  recorded a week late lands in the wrong quarter on DAS-01. A future date is
+  refused: nothing can be accepted tomorrow. (e) **`evidenceRef` was kept
+  beside the new `evidence` record** rather than migrated. The old value was a
+  typed filename with no file behind it; rewriting it into a record shape would
+  fabricate an attachment that never existed, so old rows keep their note,
+  displayed as the plain text it is, and new rows carry the document.
+  (f) **Where pdf.js cannot draw the document, the viewer hands the real file
+  to the browser's own reader** instead of stopping at "no se ha podido
+  mostrar". The bundled pdf.js 6.2.108 needs `Map.prototype.getOrInsertComputed`,
+  which Chromium 141 does not have — an office machine a few versions behind
+  lands there, and a dead end at the moment somebody wants the evidence is the
+  one outcome this feature cannot have. The two older PDF panes (purchase
+  comparison, captured document) still show that dead end and are recorded as
+  owed in `docs/worklog/WORKLOG.md`.

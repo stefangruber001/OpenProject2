@@ -1192,6 +1192,32 @@ window.CANEI_DICT.ca = {
   "Coste unitario": "Cost unitari",
   "sin precio": "sense preu",
   Unidad: "Unitat",
+  // PK2-A: the evidence field and the viewer that reads a PDF.
+  "Abriendo el documento…": "Obrint el document…",
+  "Abrir en una pestaña": "Obre en una pestanya",
+  "Buscar el archivo": "Cerca el fitxer",
+  "Guardando el archivo…": "Desant el fitxer…",
+  "No se ha podido dibujar el documento aquí.": "No s'ha pogut dibuixar el document aquí.",
+  "Página ›": "Pàgina ›",
+  "‹ Página": "‹ Pàgina",
+  Quién: "Qui",
+  "Quién lo ha aceptado": "Qui ho ha acceptat",
+  Rechazo: "Rebuig",
+  Ver: "Veure",
+  "sin adjuntar": "sense adjuntar",
+  "Ver el documento": "Veure el document",
+  "Arrastra aquí el PDF o la imagen, o búscalo en el dispositivo.":
+    "Arrossega aquí el PDF o la imatge, o cerca'l al dispositiu.",
+  "Arrastra aquí el correo o el documento de aceptación (PDF o imagen), o búscalo en el dispositivo.":
+    "Arrossega aquí el correu o el document d'acceptació (PDF o imatge), o cerca'l al dispositiu.",
+  "⚠ Sólo se puede adjuntar un PDF o una imagen": "⚠ Només es pot adjuntar un PDF o una imatge",
+  "⚠ No se ha podido guardar el archivo": "⚠ No s'ha pogut desar el fitxer",
+  Aceptación: "Acceptació",
+  Fecha: "Data",
+  "Fecha de aceptación": "Data d'acceptació",
+  Justificante: "Justificant",
+  Quitar: "Treu",
+  Documento: "Document",
 };
 window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Programar visita — (.+)$"), "Programar visita — $1"],

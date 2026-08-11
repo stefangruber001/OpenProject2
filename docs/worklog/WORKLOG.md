@@ -132,3 +132,58 @@ the deck does not describe. It needs a decision from the operator about what a
 subpartida is for in this product before it is worth building — measurement
 detail (which is what the data model currently implies) or a catalogue
 hierarchy (which is what the note implies).
+
+## Package 2 — the operator's second pass (2026-08-11)
+
+Eight slides, thirteen notes, all on the presupuesto→contrato half of the
+system. They do not divide into one session: four of them need a way to
+attach and reopen a real FILE, which does not exist yet, so that comes first
+and the rest build on it.
+
+| #     | Session                                                                      | Model    | Effort |
+| ----- | ---------------------------------------------------------------------------- | -------- | ------ |
+| PK2-A | Shared evidence upload + viewer primitive · slide 3 as its first consumer    | Opus 5   | high   |
+| PK2-B | Send drawer: WhatsApp, real email, manual date/time, PDF download · versions | Sonnet 5 | medium |
+| PK2-C | Contract detail layout + the untranslated `garantías` keys · anexo viewer    | Sonnet 5 | medium |
+| PK2-D | Contracts list: create/upload a contract by hand                             | Opus 5   | medium |
+
+### PK2-A — **done**
+
+Slide 3 asked for the acceptance justificante to be a document you can upload
+and reopen, with the date it was accepted and who accepted it. The narrow
+answer would have been a file input on one drawer. The wider one is what
+landed, because slides 4 and 8 ask for the same thing on contracts and anexos:
+
+- **`evidenceField(host, opts)`** — drop **or** browse, PDF or image, stored to
+  the existing blob store the moment it is chosen (a file left in an `<input>`
+  does not survive the next repaint — the lesson the visit drawer already
+  learned). Produces `{ storageKey, name, type, size, uploadedAt }`.
+- **The photo viewer became the evidence viewer.** It reads a PDF as well as a
+  photograph, page by page, and every attachment chip carries `data-evidence`
+  so it is delegated from the document like `img[data-blob]` already was. One
+  viewer rather than two, so the arrows and Escape cannot work in one and not
+  the other.
+- **`acceptVersion` takes the file, a date and a person.** The date may be
+  earlier than today — the answer arrives before anyone records it — and the
+  opportunity's `decidedAt` follows the answer's day rather than today's, or a
+  backdated acceptance lands in the wrong quarter on DAS-01.
+- **The acceptance is readable afterwards**, in the builder's totals pane:
+  date, person, and the document itself behind one click. Writing it and then
+  hiding it would have been the same "a filename proves nothing" failure in a
+  new place.
+
+**Two real bugs fixed on the way, both pre-existing.** `GlobalWorkerOptions
+.workerSrc` is set in exactly one place — `erp-ocr.js`'s private `loadPdfjs`
+— and two screens bypassed it with a bare `import()`, so the purchase
+comparison pane and the captured-document pane could only render a PDF if the
+capture screen happened to have run first; otherwise the first render threw.
+`loadPdfjs` is published now and all three callers use it.
+
+**Owed, and named so it is not forgotten:** the bundled pdf.js (6.2.108) needs
+a browser new enough for `Map.prototype.getOrInsertComputed`; Chromium 141
+does not have it, so rendering fails there. The evidence viewer handles that
+honestly — it offers the real file to the browser's own reader instead of a
+dead "no se ha podido mostrar" — but **the two older panes do not**, and still
+show that dead end on such a browser. They should get the same escape hatch,
+or the vendored pdf.js should be pinned to a version that matches the browsers
+the operator actually runs.

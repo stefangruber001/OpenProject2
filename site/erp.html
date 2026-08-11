@@ -3143,6 +3143,7 @@
         padding: 16px;
       }
       .pvimg img,
+      .pvimg canvas,
       .cvstage video {
         max-width: 100%;
         max-height: 100%;
@@ -3150,9 +3151,107 @@
         box-shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.8);
         background: #000;
       }
+      /* A rendered PDF page is white paper, not a photograph: the black
+         backdrop the images want makes a document look like a mistake. */
+      .pvimg canvas {
+        background: #fff;
+      }
+      .pvimg .pvwait {
+        font: 600 12px var(--sans);
+        color: rgba(255, 255, 255, 0.82);
+        letter-spacing: 0.04em;
+      }
       /* A picture is a button now — say so before it is clicked. */
-      img[data-blob] {
+      img[data-blob],
+      [data-evidence] {
         cursor: zoom-in;
+      }
+
+      /* ------------------------- evidence dropzone -------------------------
+         The backing document for something that was agreed: an acceptance
+         email, a signed contract, the photograph of a delivery note. It is a
+         FILE, not a typed filename — "correo-aceptacion.pdf" in a text box
+         proves nothing and cannot be reopened.
+
+         Drag and browse both, because both are how the file actually
+         arrives: dragged from the mail client on a laptop, chosen from the
+         camera roll on a phone. */
+      .evz {
+        border: 1.5px dashed var(--line);
+        border-radius: 11px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: center;
+        text-align: center;
+        background: var(--paper);
+        transition: 0.14s;
+      }
+      .evz.over {
+        border-color: var(--green);
+        background: var(--hair);
+      }
+      .evz .evhint {
+        font: 12px var(--sans);
+        color: var(--muted);
+        line-height: 1.4;
+      }
+      .evz .evrow {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: center;
+        width: 100%;
+      }
+      .evfile {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px;
+        background: var(--paper);
+        text-align: left;
+      }
+      .evfile .evth {
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        background: var(--hair);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 19px;
+        overflow: hidden;
+      }
+      .evfile .evth img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      /* Block, so the name can actually be clipped: text-overflow does nothing
+         on an inline box, and a long attachment name would push the buttons
+         off the chip instead of ending in an ellipsis. */
+      .evfile .evnm {
+        display: block;
+        font: 600 12.5px var(--sans);
+        color: var(--ink);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .evfile .evsz {
+        display: block;
+        font: 11px var(--sans);
+        color: var(--muted);
+      }
+      .evfile .evb {
+        display: flex;
+        gap: 6px;
       }
       @media print {
         .pview,
@@ -6065,9 +6164,7 @@
             }
             return blob
               .arrayBuffer()
-              .then((buf) =>
-                import(ErpOcr.vendorBase() + "pdfjs/pdf.min.mjs").then((m) => ({ m, buf })),
-              )
+              .then((buf) => ErpOcr.loadPdfjs().then((m) => ({ m, buf })))
               .then(({ m, buf }) => m.getDocument({ data: new Uint8Array(buf) }).promise)
               .then((doc) => doc.getPage(1))
               .then((page) => {
@@ -9479,17 +9576,27 @@
         });
       }
 
-      /* ---------------------------- photo viewer ----------------------------
+      /* -------------------------- evidence viewer ---------------------------
    A thumbnail 90 px wide is proof that a photograph exists, not a look at
    what it shows — and the whole point of photographing a damp patch is that
-   somebody looks at it later. Clicking any picture in the workspace opens it
-   full size, steps through the others in the same group with the arrow keys,
-   and offers the original file for download.
+   somebody looks at it later. The same is true of the PDF behind an
+   acceptance or a signed contract: a filename is not a document. Clicking
+   any picture or attachment in the workspace opens it full size, steps
+   through the others in the same group with the arrow keys, and offers the
+   original file for download.
+
+   It handles BOTH kinds because a viewer that only knew about images would
+   mean a second viewer for documents, and two of them drift: the arrows work
+   in one and not the other, Escape closes the drawer behind one of them.
+   A PDF is rendered page by page through the pdf.js already vendored for the
+   capture screen — lazily, so a workspace that never opens a document never
+   pays for the loader.
 
    It is delegated from the document rather than wired per screen: every
-   picture the application renders already carries `data-blob`, so visits,
-   adicionales, presupuesto annexes and captured documents all inherit this
-   without another line each. */
+   picture the application renders already carries `data-blob`, and every
+   attachment chip carries `data-evidence`, so visits, adicionales,
+   presupuesto annexes, captured documents and backing files all inherit
+   this without another line each. */
       let PV = null;
       function closePhotoViewer() {
         if (!PV) return;
@@ -9497,41 +9604,132 @@
         PV.node.remove();
         PV = null;
       }
-      async function openPhotoViewer(keys, index) {
+      /** True when the stored blob is a PDF rather than a picture. The record
+    carries the type it was stored with; a bare key (every photograph before
+    this existed) is an image, which is what it always was. */
+      function evidenceIsPdf(item) {
+        return !!(item && typeof item === "object" && /pdf/i.test(item.type || ""));
+      }
+      function evidenceKey(item) {
+        return typeof item === "string" ? item : item && item.storageKey;
+      }
+      /* Rendered PDF pages, kept for as long as the viewer is open. Re-rendering
+     on every arrow press would re-decode the file each time; the cache is
+     bounded by the pages of the one document being read. */
+      async function renderPdfPage(key, pageNo) {
+        const blob = await ErpStore.getBlob(key);
+        if (!blob) return null;
+        const buf = await blob.arrayBuffer();
+        // ErpOcr's loader, not a bare import: it is the only place the worker
+        // path is set, and without it the first render throws.
+        const m = await ErpOcr.loadPdfjs();
+        const doc = await m.getDocument({ data: new Uint8Array(buf) }).promise;
+        const n = Math.max(1, Math.min(pageNo || 1, doc.numPages));
+        const page = await doc.getPage(n);
+        const vp = page.getViewport({ scale: 2 });
+        const c = document.createElement("canvas");
+        c.width = Math.round(vp.width);
+        c.height = Math.round(vp.height);
+        await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+        return { canvas: c, pages: doc.numPages };
+      }
+      async function openPhotoViewer(items, index) {
         closePhotoViewer();
         const node = el("div", "pview");
         node.innerHTML = `<div class="pvbar">
    <span class="pvn"></span><span style="flex:1"></span>
+   <button class="btn sm" data-pv="pprev">‹ Página</button>
+   <span class="pvn" data-pv="pnum"></span>
+   <button class="btn sm" data-pv="pnext">Página ›</button>
    <button class="btn sm" data-pv="prev">‹ Anterior</button>
    <button class="btn sm" data-pv="next">Siguiente ›</button>
    <a class="btn sm" data-pv="dl" download>⤓ Descargar</a>
    <button class="btn sm" data-pv="close">Cerrar</button>
-  </div><div class="pvimg"><img alt=""></div>`;
+  </div><div class="pvimg"></div>`;
         document.body.appendChild(node);
-        let i = Math.max(0, Math.min(index || 0, keys.length - 1));
+        let i = Math.max(0, Math.min(index || 0, items.length - 1));
+        let page = 1,
+          pages = 1;
+        const stage = node.querySelector(".pvimg");
         const show = async () => {
-          const key = keys[i];
-          const u = await imageUrl(key);
-          const img = node.querySelector("img");
-          if (u) img.src = u;
-          else img.alt = "(imagen no disponible)";
+          const item = items[i];
+          const key = evidenceKey(item);
+          const pdf = evidenceIsPdf(item);
           const dl = node.querySelector("[data-pv=dl]");
-          dl.href = u || "#";
           // The stored key is not a filename anyone wants in their downloads
-          // folder, so the file arrives named after what it is.
-          dl.setAttribute("download", "foto-" + (i + 1) + ".jpg");
+          // folder, so the file arrives named after what it is — the name it
+          // was uploaded under when there is one, and what it is when not.
+          const name =
+            (item && typeof item === "object" && item.name) ||
+            (pdf ? "documento-" + (i + 1) + ".pdf" : "foto-" + (i + 1) + ".jpg");
           node.querySelector(".pvn").textContent =
-            keys.length > 1 ? i + 1 + " de " + keys.length : "";
+            items.length > 1 ? i + 1 + " de " + items.length : "";
           node.querySelectorAll("[data-pv=prev],[data-pv=next]").forEach((b) => {
-            b.style.display = keys.length > 1 ? "" : "none";
+            b.style.display = items.length > 1 ? "" : "none";
           });
+          if (pdf) {
+            stage.innerHTML = '<div class="pvwait">Abriendo el documento…</div>';
+            // A PDF has no object URL until its bytes are read, so the download
+            // link is built from the blob rather than from the image cache.
+            const blob = await ErpStore.getBlob(key);
+            dl.href = blob ? URL.createObjectURL(blob) : "#";
+            if (!blob) {
+              stage.innerHTML = '<div class="pvwait">El archivo no está en este dispositivo.</div>';
+            } else {
+              try {
+                const r = await renderPdfPage(key, page);
+                pages = r.pages;
+                stage.innerHTML = "";
+                stage.appendChild(r.canvas);
+              } catch (e) {
+                /* The document is HERE — it just could not be drawn. That is a
+               real case, not a theoretical one: the bundled pdf.js needs a
+               recent browser, and an office machine that is a few versions
+               behind lands exactly here. Saying "no se ha podido mostrar" and
+               stopping would put the evidence one click out of reach at the
+               only moment anybody wanted it, so the file is always offered
+               instead — the browser's own PDF plugin can open what ours
+               cannot draw. */
+                stage.innerHTML = `<div class="pvwait" style="display:flex;flex-direction:column;gap:10px;align-items:center">
+       <span>No se ha podido dibujar el documento aquí.</span>
+       <a class="btn sm" data-pv="ext" target="_blank" rel="noopener">Abrir en una pestaña</a></div>`;
+                const ext = stage.querySelector("[data-pv=ext]");
+                if (ext) ext.href = dl.href;
+              }
+            }
+          } else {
+            pages = 1;
+            const u = await imageUrl(key);
+            stage.innerHTML = "";
+            const img = new Image();
+            img.alt = u ? "" : "(imagen no disponible)";
+            if (u) img.src = u;
+            stage.appendChild(img);
+            dl.href = u || "#";
+          }
+          dl.setAttribute("download", name);
+          // Page controls belong to a multi-page document and nothing else.
+          node.querySelectorAll("[data-pv=pprev],[data-pv=pnext],[data-pv=pnum]").forEach((b) => {
+            b.style.display = pdf && pages > 1 ? "" : "none";
+          });
+          const pn = node.querySelector("[data-pv=pnum]");
+          if (pn) pn.textContent = pdf && pages > 1 ? page + " / " + pages : "";
         };
         const step = (d) => {
-          i = (i + d + keys.length) % keys.length;
+          i = (i + d + items.length) % items.length;
+          page = 1;
+          show();
+        };
+        const stepPage = (d) => {
+          const next = page + d;
+          if (next < 1 || next > pages) return;
+          page = next;
           show();
         };
         node.querySelector("[data-pv=prev]").onclick = () => step(-1);
         node.querySelector("[data-pv=next]").onclick = () => step(1);
+        node.querySelector("[data-pv=pprev]").onclick = () => stepPage(-1);
+        node.querySelector("[data-pv=pnext]").onclick = () => stepPage(1);
         node.querySelector("[data-pv=close]").onclick = closePhotoViewer;
         node.onclick = (e) => {
           if (e.target === node || e.target.classList.contains("pvimg")) closePhotoViewer();
@@ -9540,8 +9738,11 @@
           if (e.key === "Escape") {
             e.stopPropagation();
             closePhotoViewer();
-          } else if (e.key === "ArrowLeft") step(-1);
-          else if (e.key === "ArrowRight") step(1);
+          }
+          // Inside a multi-page document the arrows read the document; between
+          // documents they step the group. Reading is the commoner intent.
+          else if (e.key === "ArrowLeft") pages > 1 ? stepPage(-1) : step(-1);
+          else if (e.key === "ArrowRight") pages > 1 ? stepPage(1) : step(1);
         };
         // Capture phase, ahead of the drawer's own Escape handler: closing the
         // photograph must not also close the panel it was opened from.
@@ -9560,6 +9761,179 @@
         e.stopPropagation();
         openPhotoViewer(keys, keys.indexOf(im.dataset.blob));
       });
+      /* An attachment that is not a picture has no thumbnail to click, so the
+     chip itself opens it. The record travels on the element as JSON because
+     the viewer needs the type and the name, not only the key. */
+      document.addEventListener("click", (e) => {
+        const n = e.target.closest && e.target.closest("[data-evidence]");
+        if (!n) return;
+        let rec = null;
+        try {
+          rec = JSON.parse(n.dataset.evidence);
+        } catch (err) {
+          rec = null;
+        }
+        if (!rec || !rec.storageKey) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openPhotoViewer([rec], 0);
+      });
+
+      /* --------------------------- evidence field ---------------------------
+   The other half of the viewer: getting the file IN. Wherever the
+   application asks for the document behind a decision — the email that
+   accepted a presupuesto, the signed contract, the delivery note behind an
+   extra — it asks for a FILE, through this.
+
+   Both ways of giving it, because both are how it actually arrives: dragged
+   out of the mail client on a laptop, chosen from the camera roll on a
+   phone. Images are compressed on the way in, exactly as visit photographs
+   are; a PDF is stored byte for byte, because a document that has been
+   re-encoded is no longer the document that was signed.
+
+   The file reaches the blob store IMMEDIATELY, before the surrounding form
+   is saved. That is deliberate and it is the same rule the visit drawer
+   learned: a file left in an <input> does not survive the next repaint. The
+   cost is an orphaned blob if the person then abandons the form, which is
+   storage the browser reclaims; the alternative cost is the person losing
+   the file they just attached, which is their time. */
+      const EV_ACCEPT = "image/*,application/pdf";
+      function evidenceSize(n) {
+        if (!n && n !== 0) return "";
+        return n < 1024 * 1024
+          ? Math.max(1, Math.round(n / 1024)) + " KB"
+          : (n / 1024 / 1024).toFixed(1).replace(".", ",") + " MB";
+      }
+      /**
+       * Renders an attach-a-file control into `host` and returns a handle on what
+       * it is holding.
+       *
+       * opts.value   — an existing record to start from, or null
+       * opts.prefix  — storage-key prefix, so a key says what it belongs to
+       * opts.hint    — the line under the buttons; the default suits a document
+       * opts.onChange— called with the record (or null) whenever it changes
+       *
+       * Returns { value, set, clear } — `value()` is the record to persist:
+       * { storageKey, name, type, size, uploadedAt } or null.
+       */
+      function evidenceField(host, opts) {
+        const o = opts || {};
+        let rec = o.value || null;
+        const emit = () => {
+          if (typeof o.onChange === "function") o.onChange(rec);
+        };
+        const paint = () => {
+          if (rec) {
+            const pdf = /pdf/i.test(rec.type || "");
+            host.innerHTML = `<div class="evfile">
+     <span class="evth">${pdf ? "📄" : `<img data-blob="${esc(rec.storageKey)}" alt="">`}</span>
+     <span style="min-width:0">
+      <span class="evnm">${esc(rec.name || "Documento")}</span>
+      <span class="evsz">${esc(evidenceSize(rec.size))}</span></span>
+     <span class="evb">
+      <button class="btn sm" data-ev="see">Ver</button>
+      <button class="btn sm" data-ev="drop">Quitar</button></span>
+    </div>`;
+            // The picture chip paints through the same path every other
+            // thumbnail does; the PDF chip has no image to paint.
+            if (!pdf) paintImages(host);
+            host.querySelector("[data-ev=see]").onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openPhotoViewer([rec], 0);
+            };
+            host.querySelector("[data-ev=drop]").onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // The blob is left where it is. Deleting it here would destroy
+              // the file behind an ALREADY SAVED record if the person opens
+              // the form, removes the attachment and then abandons the edit.
+              rec = null;
+              paint();
+              emit();
+            };
+            return;
+          }
+          host.innerHTML = `<div class="evz">
+    <div class="evrow">
+     <label class="btn sm">Buscar el archivo<input type="file" data-ev="file" accept="${EV_ACCEPT}" hidden></label>
+    </div>
+    <div class="evhint">${esc(o.hint || "Arrastra aquí el PDF o la imagen, o búscalo en el dispositivo.")}</div>
+   </div>`;
+          const zone = host.querySelector(".evz");
+          const input = host.querySelector("[data-ev=file]");
+          input.onchange = () => {
+            const f = input.files && input.files[0];
+            if (f) take(f);
+          };
+          // dragover must be cancelled or the browser navigates to the file.
+          ["dragenter", "dragover"].forEach((ev) =>
+            zone.addEventListener(ev, (e) => {
+              e.preventDefault();
+              zone.classList.add("over");
+            }),
+          );
+          ["dragleave", "drop"].forEach((ev) =>
+            zone.addEventListener(ev, (e) => {
+              e.preventDefault();
+              zone.classList.remove("over");
+            }),
+          );
+          zone.addEventListener("drop", (e) => {
+            const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (f) take(f);
+          });
+        };
+        const take = async (f) => {
+          const isImg = /^image\//.test(f.type || "");
+          const isPdf = /pdf/i.test(f.type || "");
+          if (!isImg && !isPdf) {
+            toast("⚠ Sólo se puede adjuntar un PDF o una imagen");
+            return;
+          }
+          host.innerHTML = '<div class="evz"><div class="evhint">Guardando el archivo…</div></div>';
+          try {
+            let blob = f;
+            if (isImg && typeof ErpBridge !== "undefined" && ErpBridge.docs) {
+              const c = await ErpBridge.docs.compressImage(f);
+              if (c && c.blob) blob = c.blob;
+            }
+            const key =
+              (o.prefix || "ev") +
+              "_" +
+              Date.now().toString(36) +
+              "_" +
+              Math.random().toString(36).slice(2, 9);
+            await ErpStore.putBlob(key, blob);
+            rec = {
+              storageKey: key,
+              name: f.name || (isPdf ? "documento.pdf" : "imagen.jpg"),
+              type: isPdf ? "application/pdf" : blob.type || f.type || "image/jpeg",
+              size: blob.size || f.size || 0,
+              uploadedAt: erp.today,
+            };
+            paint();
+            emit();
+          } catch (e) {
+            toast("⚠ No se ha podido guardar el archivo");
+            paint();
+          }
+        };
+        paint();
+        return {
+          value: () => rec,
+          set: (r) => {
+            rec = r || null;
+            paint();
+            emit();
+          },
+          clear: () => {
+            rec = null;
+            paint();
+            emit();
+          },
+        };
+      }
 
       /* ------------------------------ camera --------------------------------
    `<input type="file" capture="environment">` opens the camera on a phone and
@@ -10352,6 +10726,12 @@
 
       function builderTotalsPanel(b, id, vsel, t) {
         const imgs = erp.budgetImages(id, vsel).length;
+        // What the customer answered, once they have. Without this the
+        // acceptance is written and then invisible: the date, the person and
+        // above all the backing document would be unreachable from the screen
+        // that recorded them, which is the "a filename proves nothing" problem
+        // again in a new place.
+        const resp = (erp.version(id, vsel) || {}).customerResponse;
         const SEC = [
           ["baseCents", "Base"],
           ["optionsCents", "Opcionales (aparte)"],
@@ -10387,7 +10767,26 @@
          : "Ninguna partida tiene imágenes todavía."
      }</div>
     </div>
-   </div>`;
+   </div>
+   ${
+     resp
+       ? `<div style="margin-top:14px">
+    <div class="pbh" style="position:static;padding-left:0;border:0">${resp.accepted ? "Aceptación" : "Rechazo"}</div>
+    <div class="bside" style="position:static">
+     <div class="row"><span>Fecha</span><b>${esc(fmtD(resp.date))}</b></div>
+     ${resp.acceptedBy ? `<div class="row"><span>Quién</span><b>${esc(resp.acceptedBy)}</b></div>` : ""}
+     ${
+       resp.evidence && resp.evidence.storageKey
+         ? `<div class="row"><span>Justificante</span>
+       <b><a href="#" data-evidence="${esc(JSON.stringify(resp.evidence))}">${esc(resp.evidence.name || "Ver el documento")}</a></b></div>`
+         : resp.evidenceRef
+           ? `<div class="row mut"><span>Justificante</span><b>${esc(resp.evidenceRef)}</b></div>`
+           : `<div class="row mut"><span>Justificante</span><b>sin adjuntar</b></div>`
+     }
+    </div>
+   </div>`
+       : ""
+   }`;
       }
 
       /* The visit, beside the presupuesto being written from it — the whole reason
@@ -10862,9 +11261,7 @@
           host.innerHTML = '<div class="empty">Preparando la vista…</div>';
           w.file
             .arrayBuffer()
-            .then((buf) =>
-              import(ErpOcr.vendorBase() + "pdfjs/pdf.min.mjs").then((m) => ({ m, buf })),
-            )
+            .then((buf) => ErpOcr.loadPdfjs().then((m) => ({ m, buf })))
             .then(({ m, buf }) => m.getDocument({ data: new Uint8Array(buf) }).promise)
             .then((doc) => doc.getPage(1))
             .then((page) => {
@@ -11174,7 +11571,12 @@
         db.innerHTML = `
    <div class="card"><div class="ch"><h3>Aceptar</h3></div><div class="daylist" style="gap:9px">
     <div class="it">Aceptar crea el proyecto y da la oportunidad por ganada. La versión queda cerrada.</div>
-    <div class="it"><label class="opt">Justificante <input id="brEvid" placeholder="correo-aceptacion.pdf" style="margin-left:auto"></label></div>
+    <div class="it" style="display:block"><label class="opt" style="margin-bottom:6px">Justificante</label>
+     <div id="brEvid"></div></div>
+    <div class="it"><label class="opt">Fecha de aceptación
+      <input id="brDate" type="date" value="${esc(erp.today)}" max="${esc(erp.today)}" style="margin-left:auto"></label></div>
+    <div class="it"><label class="opt">Quién lo ha aceptado
+      <input id="brWho" placeholder="Nombre o puesto" style="margin-left:auto"></label></div>
     <div class="it"><button class="btn primary" id="brOk">Marcar como aceptado</button></div>
    </div></div>
    <div class="card"><div class="ch"><h3>Rechazar</h3></div><div class="daylist" style="gap:9px">
@@ -11184,12 +11586,22 @@
     <div class="it"><label class="opt">Qué dijo <input id="brNotes" placeholder="Opcional" style="margin-left:auto"></label></div>
     <div class="it"><button class="btn danger" id="brNo"${reasons.length ? "" : " disabled"}>Marcar como rechazado</button></div>
    </div></div>`;
+        // The backing document is a file now, not a typed filename — see the
+        // evidence field for why the blob is written before this form is saved.
+        const evid = evidenceField($("#brEvid"), {
+          prefix: "acc",
+          hint: "Arrastra aquí el correo o el documento de aceptación (PDF o imagen), o búscalo en el dispositivo.",
+        });
         $("#brOk").onclick = () =>
           mutate(() => {
             erp.acceptVersion(
               id,
               versionId,
-              { evidenceRef: $("#brEvid").value || null },
+              {
+                evidence: evid.value(),
+                date: $("#brDate").value || null,
+                acceptedBy: $("#brWho").value.trim() || null,
+              },
               "backoffice",
             );
             closeDrawer();
