@@ -140,12 +140,18 @@ system. They do not divide into one session: four of them need a way to
 attach and reopen a real FILE, which does not exist yet, so that comes first
 and the rest build on it.
 
-| #     | Session                                                                      | Model    | Effort |
-| ----- | ---------------------------------------------------------------------------- | -------- | ------ |
-| PK2-A | Shared evidence upload + viewer primitive · slide 3 as its first consumer    | Opus 5   | high   |
-| PK2-B | Send drawer: WhatsApp, real email, manual date/time, PDF download · versions | Sonnet 5 | medium |
-| PK2-C | Contract detail layout + the untranslated `garantías` keys · anexo viewer    | Sonnet 5 | medium |
-| PK2-D | Contracts list: create/upload a contract by hand                             | Opus 5   | medium |
+| #     | Session                                                                      | Model    | Effort | State    |
+| ----- | ---------------------------------------------------------------------------- | -------- | ------ | -------- |
+| PK2-A | Shared evidence upload + viewer primitive · slide 3 as its first consumer    | Opus 5   | high   | **done** |
+| PK2-B | Send drawer: WhatsApp, real email, manual date/time, PDF download · versions | Sonnet 5 | medium | **done** |
+| PK2-C | Contract detail layout + the untranslated `garantías` keys · anexo viewer    | Sonnet 5 | medium | **done** |
+| PK2-D | Contracts list: create/upload a contract by hand                             | Opus 5   | medium | **done** |
+
+All eight slides are answered. Two of the four sessions turned out to be
+covering for a bug rather than a missing feature — slide 6's raw
+`executionAndFinishes` on the customer's contract, and slide 4's "no option
+to create a contract", which was true of the whole application and not just
+of that screen.
 
 ### PK2-A — **done**
 
@@ -282,3 +288,54 @@ was or reopen its backup.
   UI call) were updated to the new `{ evidenceRef, evidence }` options
   object — no back-compat shim, since every caller was in this repository
   and could just be changed.
+
+### PK2-D — **done**
+
+Slide 4: _"No hay opción de crear/subir nuevo contrato"_. It was more literal
+than it read. **No contract could be created from this application at all** —
+not by hand, and not even from an accepted presupuesto. Every contract in the
+system existed because the seed built it, so both halves of CON-01 were
+missing at once. The session therefore delivers the normal path as well as
+the one the slide asks for.
+
+- **`＋ Nuevo contrato` on the Contratos list**, opening one drawer with two
+  sources: **from an accepted presupuesto** (CON-02's own path — amount, IVA
+  and customer come from the budget, never typed twice) and **signed outside
+  this system** (on paper, by a lawyer, or before this ERP existed). One
+  drawer rather than two buttons, because the choice is the first question
+  the operator has to answer, not a decision they can make before they see
+  what it means.
+- **`registerExternalContract`**, deliberately not `createContract` with a
+  null budget. CON-02 is a real rule and stays enforced for contracts this
+  system draws up; recording one that already exists is a different fact.
+  `origin: "generated" | "external"` carries the distinction.
+- **The distinction is load-bearing, not cosmetic.** An externally-signed
+  contract shows **the file the customer signed**; printing this system's own
+  «CONTRATO DE OBRA» over the top of somebody else's contract would be
+  inventing a document nobody agreed to. The structured data is still there
+  in the panel beside it — that is what makes importe vigente, the anexos and
+  ADM-08's cash forecast work — but it is an index of the contract, not the
+  contract.
+- **Payment milestones as rows**, not a parsed sentence: trigger + % + date,
+  footing to 100% with an amber tag when they do not. "40% a la firma, 60% a
+  la entrega" reads well and cannot be turned into dates and amounts without
+  guessing, and these feed the cash forecast — a guess there is worse than a
+  blank.
+- **Dates may be backdated, never postdated** — contract date, signature date
+  — the rule PK2-A and PK2-B already established. `signContract` takes a date
+  now instead of always stamping today.
+- **The completeness block offers a way through.** A contract is one of the
+  two documents that block on an incomplete tercero (decision 21 / RD
+  1619/2012), so rather than refusing and stopping, the drawer opens the
+  client editor and comes back with everything already typed — the file
+  included, since the blob is already in the store and only the record has to
+  travel.
+
+**A real bug fixed on the way, pre-existing and invisible until now.**
+`nextNumber` is a side effect: it appends to `series.contract.issued` and
+advances the counter whether or not the record survives. `createContract`
+validated the mandatory execution term AFTER minting the number, so a
+rejected contract left a permanent hole in a series ORG-04 requires to be
+gap-free. Nothing exercised it before, because nothing could create a
+contract. Both paths now validate before the number is minted, and the E2E
+asserts the series and the contract count stay equal across a refusal.

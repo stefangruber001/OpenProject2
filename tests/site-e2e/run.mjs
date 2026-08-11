@@ -82,6 +82,7 @@ async function main() {
     await testBankAndCash(browser, base);
     await testContract(browser, base);
     await testChangeApprovalEvidence(browser, base);
+    await testContractCreation(browser, base);
     await testProcurement(browser, base);
     await testAdmin(browser, base);
     await testControlTowerAndDay(browser, base);
@@ -3141,6 +3142,255 @@ async function testChangeApprovalEvidence(browser, base) {
     else ok("anexo evidence: no console errors");
   } catch (e) {
     bad("anexo evidence: suite completed", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/* Package 2 slide 4 (PK2-D): "No hay opción de crear/subir nuevo contrato" —
+   and it was literal. NO contract could be created from this application at
+   all; every one in the system came from the seed, so both halves of CON-01
+   were missing: drawing one up from an accepted presupuesto, and recording
+   one that was signed on paper.
+
+   The load-bearing assertion here is the last one. A contract signed
+   elsewhere must show the FILE the customer signed, never this system's own
+   generated «CONTRATO DE OBRA» — printing that over the top of somebody
+   else's contract invents a document nobody agreed to. */
+async function testContractCreation(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#contracts`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+
+    if (await pg.evaluate(() => !!document.querySelector("#conNew")))
+      ok("COM-04: the contract list offers «＋ Nuevo contrato»");
+    else bad("COM-04: new-contract button exists", "no #conNew");
+
+    // ---- a contract signed outside this system ----------------------------
+    await pg.click("#conNew");
+    await pg.waitForTimeout(500);
+    await pg.evaluate(() => {
+      const r = [...document.querySelectorAll('input[name="cnmode"]')].find(
+        (x) => x.value === "external",
+      );
+      r.checked = true;
+      r.dispatchEvent(new Event("change"));
+    });
+    await pg.waitForTimeout(400);
+    const form = await pg.evaluate(() => ({
+      party: !!document.querySelector("#cn_party"),
+      base: !!document.querySelector("#cn_base"),
+      dropzone: !!document.querySelector("#cn_doc .evz"),
+      dateMax: document.querySelector("#cn_date")?.max || "",
+      today: erp.today,
+    }));
+    if (form.party && form.base && form.dropzone && form.dateMax === form.today)
+      ok("COM-04: the manual path asks for the data and the signed file, and cannot be postdated");
+    else bad("COM-04: manual contract form", JSON.stringify(form));
+
+    const picked = await pg.evaluate(() => {
+      const p = erp.state.parties.find(
+        (x) => x.active && x.roles.includes("customer") && erp.partyCompleteness(x.id).ok,
+      );
+      if (!p) return null;
+      const sel = document.querySelector("#cn_party");
+      sel.value = p.id;
+      sel.dispatchEvent(new Event("change"));
+      return p.id;
+    });
+    if (!picked) {
+      bad("COM-04: a complete customer exists to contract with", "none in the seed");
+      return;
+    }
+    await pg.fill("#cn_base", "12500");
+    await pg.fill("#cn_ref", "EXT-2026-77");
+    await pg.fill("#cn_days", "45");
+    const backdate = await pg.evaluate(() => {
+      const d = new Date(erp.today + "T00:00:00");
+      d.setDate(d.getDate() - 10);
+      const iso = d.toISOString().slice(0, 10);
+      document.querySelector("#cn_date").value = iso;
+      document.querySelector("#cn_signed").value = iso;
+      return iso;
+    });
+    await pg.setInputFiles("#cn_doc input[type=file]", {
+      name: "contrato-firmado.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from(minimalPdf(), "latin1"),
+    });
+    await pg.waitForTimeout(700);
+    // Two milestones, entered as rows — they feed ADM-08's cash forecast.
+    await pg.click("#cn_addh");
+    await pg.waitForTimeout(300);
+    await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("[data-hrow]")];
+      rows[0].querySelector("[data-hpct]").value = "40";
+      rows[0].querySelector("[data-hpct]").dispatchEvent(new Event("input"));
+      rows[1].querySelector("[data-htrig]").value = "onCompletion";
+      rows[1].querySelector("[data-hpct]").value = "60";
+      rows[1].querySelector("[data-hpct]").dispatchEvent(new Event("input"));
+    });
+    await pg.waitForTimeout(200);
+    await pg.click("#cn_save");
+    await pg.waitForTimeout(900);
+
+    const saved = await pg.evaluate(() => {
+      const c = erp.state.contracts[erp.state.contracts.length - 1];
+      return {
+        origin: c.origin,
+        value: c.valueCents,
+        total: c.totalCents,
+        date: c.date,
+        ref: c.externalRef,
+        docType: (c.document || {}).type || "",
+        signed: c.signature.customerSignedAt,
+        inst: c.installments.map((i) => i.amountCents),
+        days: c.duration.estimatedDays,
+      };
+    });
+    if (saved.origin === "external" && saved.value === 1250000 && saved.days === 45)
+      ok("COM-04: a contract signed elsewhere can be recorded with its own amount and term");
+    else bad("COM-04: external contract saved", JSON.stringify(saved));
+    if (saved.date === backdate && saved.signed === backdate && saved.ref === "EXT-2026-77")
+      ok(
+        "COM-04: it keeps the real contract date, signature date and the customer's own reference",
+      );
+    else bad("COM-04: external contract dates/ref", JSON.stringify({ saved, backdate }));
+    if (saved.docType === "application/pdf")
+      ok("COM-04: the signed file itself is stored on the contract");
+    else bad("COM-04: signed file stored", JSON.stringify(saved));
+    // 40/60 of 13.750 (12.500 + 10% IVA) — the milestones foot to the total.
+    if (saved.inst.length === 2 && saved.inst[0] + saved.inst[1] === saved.total)
+      ok("COM-04: the payment milestones foot to the contracted total");
+    else bad("COM-04: milestones foot", JSON.stringify(saved));
+
+    // THE point of `origin`: show what was signed, not what we would print.
+    await pg.waitForTimeout(500);
+    const pane = await pg.evaluate(() => {
+      const t = document.querySelector("#conDoc")?.innerText || "";
+      return {
+        generated: /CONTRATO DE OBRA/.test(t),
+        saysExternal: /firmado fuera de este sistema/i.test(t),
+        reachable:
+          !!document.querySelector("#conDoc canvas") ||
+          !!document.querySelector("#conDoc a[download]"),
+      };
+    });
+    if (!pane.generated && pane.saysExternal && pane.reachable)
+      ok("COM-04: an externally-signed contract shows the signed file, not a generated document");
+    else bad("COM-04: external contract document pane", JSON.stringify(pane));
+
+    // ---- the normal path: from an accepted presupuesto ---------------------
+    await pg.evaluate(() => {
+      conWork = null;
+      go("contracts");
+    });
+    await pg.waitForTimeout(600);
+    // Free one accepted budget from its seeded contract so the path is live.
+    const freed = await pg.evaluate(() => {
+      const c = erp.state.contracts.find((x) => x.budgetId);
+      if (!c) return null;
+      const bid = c.budgetId;
+      c.budgetId = null;
+      return bid;
+    });
+    if (!freed) {
+      bad("COM-04: an accepted budget exists to contract from", "none in the seed");
+      return;
+    }
+    await pg.click("#conNew");
+    await pg.waitForTimeout(500);
+    const budgetMode = await pg.evaluate(() => {
+      const r = [...document.querySelectorAll('input[name="cnmode"]')].find(
+        (x) => x.value === "budget",
+      );
+      return {
+        enabled: !r.disabled,
+        checked: r.checked,
+        sel: !!document.querySelector("#cn_budget"),
+      };
+    });
+    if (budgetMode.enabled && budgetMode.checked && budgetMode.sel)
+      ok("COM-04: an accepted presupuesto is offered as the default source");
+    else bad("COM-04: budget mode default", JSON.stringify(budgetMode));
+
+    await pg.fill("#cn_days", "60");
+    await pg.click("#cn_save");
+    await pg.waitForTimeout(900);
+    const fromBudget = await pg.evaluate(() => {
+      const c = erp.state.contracts[erp.state.contracts.length - 1];
+      return {
+        origin: c.origin,
+        budgetNumber: c.budgetNumber,
+        value: c.valueCents,
+        generated: /CONTRATO DE OBRA/.test(document.querySelector("#conDoc")?.innerText || ""),
+      };
+    });
+    if (fromBudget.origin === "generated" && fromBudget.budgetNumber && fromBudget.value > 0)
+      ok("COM-04: a contract can be drawn up from an accepted presupuesto, amounts and all");
+    else bad("COM-04: budget-derived contract", JSON.stringify(fromBudget));
+    if (fromBudget.generated)
+      ok("COM-04: a contract this system drew up still renders as its own document");
+    else bad("COM-04: generated contract renders its document", JSON.stringify(fromBudget));
+
+    // ---- an incomplete customer blocks, without burning a number ----------
+    await pg.evaluate(() => {
+      conWork = null;
+      go("contracts");
+    });
+    await pg.waitForTimeout(600);
+    await pg.click("#conNew");
+    await pg.waitForTimeout(500);
+    await pg.evaluate(() => {
+      const r = [...document.querySelectorAll('input[name="cnmode"]')].find(
+        (x) => x.value === "external",
+      );
+      r.checked = true;
+      r.dispatchEvent(new Event("change"));
+    });
+    await pg.waitForTimeout(400);
+    const incomplete = await pg.evaluate(() => {
+      const p = erp.state.parties.find(
+        (x) => x.active && x.roles.includes("customer") && !erp.partyCompleteness(x.id).ok,
+      );
+      if (!p) return null;
+      const sel = document.querySelector("#cn_party");
+      sel.value = p.id;
+      sel.dispatchEvent(new Event("change"));
+      return p.id;
+    });
+    if (incomplete) {
+      await pg.fill("#cn_base", "3300");
+      await pg.fill("#cn_days", "20");
+      const before = await pg.evaluate(() => ({
+        contracts: erp.state.contracts.length,
+        issued: erp.state.series.contract.issued.length,
+      }));
+      await pg.click("#cn_save");
+      await pg.waitForTimeout(700);
+      const after = await pg.evaluate(() => ({
+        contracts: erp.state.contracts.length,
+        issued: erp.state.series.contract.issued.length,
+        drawer: document.querySelector("#dttl")?.textContent || "",
+      }));
+      if (after.contracts === before.contracts && /Editar/i.test(after.drawer))
+        ok("COM-04: an incomplete customer blocks the contract and offers the missing fields");
+      else bad("COM-04: incomplete-party block", JSON.stringify({ before, after }));
+      // ORG-04: the series is gap-free, so a refused contract must not have
+      // consumed a number on its way to being refused.
+      if (after.issued === before.issued && after.issued === after.contracts)
+        ok("COM-04: a refused contract burns no number — the series stays gap-free");
+      else bad("COM-04: series gapless after refusal", JSON.stringify({ before, after }));
+    }
+
+    if (errs.length) bad("COM-04 creation: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("COM-04 creation: no console errors");
+  } catch (e) {
+    bad("COM-04 creation: suite completed", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }

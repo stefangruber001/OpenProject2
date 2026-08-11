@@ -2223,17 +2223,171 @@
     }
 
     /* =========================== CON — contracts =========================== */
+    /**
+     * The parts of a contract record that do not depend on WHERE it came
+     * from, so the budget-derived path and the externally-signed one cannot
+     * drift apart in what a contract is.
+     *
+     * @param origin  "generated" — this system drew it up from an accepted
+     *                budget, and `renderContractDoc` IS the contract.
+     *                "external" — it was signed elsewhere and is being
+     *                recorded; the uploaded file is the contract and the
+     *                structured data is our index of it.
+     */
+    _contractRecord({ origin, partyId, propertyId, valueCents, vatBp, language, date }) {
+      const vatCents = pctOf(valueCents, vatBp);
+      return {
+        id: this._id("con"),
+        number: this.nextNumber("contract"),
+        date: date || this.state.today,
+        origin,
+        partyId,
+        propertyId: propertyId || null,
+        budgetId: null,
+        budgetNumber: null,
+        acceptedVersionId: null,
+        // The signed file itself, for an external contract. PK2-A's evidence
+        // shape: { storageKey, name, type, size, uploadedAt }.
+        document: null,
+        valueCents,
+        vatBp,
+        vatCents,
+        totalCents: valueCents + vatCents, // CON-03 structured
+        installments: [], // CON-04 {pct|amountCents, trigger, stageRef, expectedDate, invoicedInvoiceId, status}
+        initiation: {
+          scheduleWithinDays: 7,
+          startWithinDays: 15,
+          firstPaymentDate: null,
+          committedStartDate: null,
+        }, // CON-05
+        duration: {
+          estimatedDays: null,
+          plannedStart: null,
+          plannedFinish: null,
+          actualStart: null,
+          actualFinish: null,
+          deviationReason: null,
+        }, // CON-06
+        penalties: {
+          latePaymentInterestPctYear: 8,
+          delayPenaltyCentsPerWeek: 0,
+          capCents: 0,
+          graceDays: 7,
+          suspendingEvents: ["customer delay", "force majeure", "approved change"],
+        }, // CON-07
+        guarantees: [], // CON-08 {category, months, startDate, expiryDate}
+        clauseBlockVersions: this.state.clauseBlocks
+          .filter((cb) => cb.effectiveFrom <= this.state.today)
+          .map((cb) => cb.id), // CON-09
+        language: language || "es", // CON-10
+        signature: { customerSignedAt: null, companySignedAt: null, method: null }, // CON-11
+        status: "draft",
+        annexes: [],
+        scopeAnnexRef: null,
+      };
+    }
+    /**
+     * Normalise and validate the terms both contract paths accept, then file
+     * the record. Shared so a milestone entered by hand and one written by
+     * the seed are checked identically.
+     */
+    /**
+     * Everything that can refuse a contract, checked BEFORE a number is
+     * minted.
+     *
+     * `nextNumber` is a side effect: it appends to `series.contract.issued`
+     * and advances the counter whether or not the record it was minted for
+     * survives. Validating afterwards therefore left a permanent hole in a
+     * series ORG-04 requires to be gap-free — type a contract, forget the
+     * duration, and CTR-YYYY-nnnn was gone for good. Both paths call this
+     * first, and `_finishContract` keeps the same assertion as a backstop.
+     */
+    _validateContractTerms(terms) {
+      const d = (terms || {}).duration || {};
+      if (!d.estimatedDays) throw new Error("Execution duration is mandatory (CON-06)");
+    }
+    _finishContract(rec, user, logAs) {
+      if (!rec.duration.estimatedDays) throw new Error("Execution duration is mandatory (CON-06)");
+      const instSum = sum(rec.installments, (i) =>
+        i.pct != null ? pctOf(rec.totalCents, i.pct * 100) : i.amountCents,
+      );
+      if (rec.installments.length && Math.abs(instSum - rec.totalCents) > rec.installments.length)
+        // cent-rounding tolerance
+        rec.installments[rec.installments.length - 1].adjustCents = rec.totalCents - instSum;
+      rec.installments.forEach((i, idx) => {
+        i.idx = idx;
+        i.status = "planned";
+        i.amountCents =
+          (i.pct != null ? pctOf(rec.totalCents, i.pct * 100) : i.amountCents) +
+          (i.adjustCents || 0);
+      });
+      this.state.contracts.push(rec);
+      this._log(user, logAs, rec.number);
+      return rec;
+    }
+    /**
+     * Record a contract that was signed OUTSIDE this system — on paper, by a
+     * lawyer, or before this ERP existed (Package 2 slide 4).
+     *
+     * Deliberately not `createContract` with a null budget. CON-02's rule
+     * ("a contract requires an accepted budget version") is real and stays
+     * enforced for contracts this system DRAWS UP; what this method records
+     * is a different kind of fact — one that already happened elsewhere —
+     * and marking it `origin:"external"` is what lets the screen show the
+     * signed file as the contract instead of printing a generated document
+     * that nobody ever signed.
+     *
+     * Completeness is still required (decision 21 / RD 1619/2012): a contract
+     * is one of the two documents that block on an incomplete tercero, and
+     * recording one from paper does not change what the law needs before it
+     * can be invoiced. The screen offers the missing fields inline rather
+     * than sending the operator away.
+     */
+    registerExternalContract(data, user) {
+      const d = data || {};
+      if (!d.partyId) throw new Error("A contract needs a customer");
+      if (!(d.valueCents > 0)) throw new Error("A contract needs an amount");
+      if (d.date && d.date > this.state.today)
+        throw new Error("A contract cannot be dated in the future");
+      this._requireComplete(d.partyId, "contract"); // 7.5 parties control
+      this._validateContractTerms(d); // before nextNumber — see the note there
+      const rec = Object.assign(
+        this._contractRecord({
+          origin: "external",
+          partyId: d.partyId,
+          propertyId: d.propertyId,
+          valueCents: d.valueCents,
+          // Same default a new budget takes, so a hand-entered contract and a
+          // quoted one start from the same rate rather than two different ones.
+          vatBp: d.vatBp != null ? d.vatBp : 1000,
+          language: d.language,
+          date: d.date,
+        }),
+        // Only the parts a person types; id/number/origin/totals stay ours.
+        {
+          installments: d.installments || [],
+          duration: Object.assign({ estimatedDays: null }, d.duration || {}),
+          guarantees: d.guarantees || [],
+          document: d.document || null,
+          externalRef: d.externalRef || null,
+        },
+      );
+      return this._finishContract(rec, user, "registerExternalContract");
+    }
     createContract(budgetId, terms, user) {
       // CON-01..14
       const b = this.budget(budgetId);
       if (!b.acceptedVersionId) throw new Error("Contract requires an accepted budget version"); // CON-02
       this._requireComplete(b.partyId, "contract"); // 7.5 parties control
+      this._validateContractTerms(terms); // before nextNumber — see the note there
       const t = this.budgetTotals(budgetId, b.acceptedVersionId);
       const rec = Object.assign(
         {
           id: this._id("con"),
           number: this.nextNumber("contract"),
           date: this.state.today,
+          origin: "generated",
+          document: null,
           partyId: b.partyId,
           propertyId: b.propertyId,
           budgetId,
@@ -2281,30 +2435,22 @@
         },
         terms || {},
       );
-      if (!rec.duration.estimatedDays) throw new Error("Execution duration is mandatory (CON-06)");
-      const instSum = sum(rec.installments, (i) =>
-        i.pct != null ? pctOf(rec.totalCents, i.pct * 100) : i.amountCents,
-      );
-      if (rec.installments.length && Math.abs(instSum - rec.totalCents) > rec.installments.length)
-        // cent-rounding tolerance
-        rec.installments[rec.installments.length - 1].adjustCents = rec.totalCents - instSum;
-      rec.installments.forEach((i, idx) => {
-        i.idx = idx;
-        i.status = "planned";
-        i.amountCents =
-          (i.pct != null ? pctOf(rec.totalCents, i.pct * 100) : i.amountCents) +
-          (i.adjustCents || 0);
-      });
-      this.state.contracts.push(rec);
-      this._log(user, "createContract", rec.number);
-      return rec;
+      return this._finishContract(rec, user, "createContract");
     }
-    signContract(id, { method } = {}, user) {
+    /**
+     * @param date  when it was actually signed. Defaults to today and may be
+     *              EARLIER — a contract registered from paper was signed
+     *              before anybody typed it in. A future date is refused, the
+     *              same rule acceptVersion and issueVersion already apply.
+     */
+    signContract(id, { method, date } = {}, user) {
       // CON-11
       const c = this.state.contracts.find((x) => x.id === id);
+      const when = date || this.state.today;
+      if (when > this.state.today) throw new Error("A signature cannot be dated in the future");
       c.signature = {
-        customerSignedAt: this.state.today,
-        companySignedAt: this.state.today,
+        customerSignedAt: when,
+        companySignedAt: when,
         method: method || "physical",
       };
       c.status = "signed";
@@ -2433,6 +2579,7 @@
           signed: !!c.signature.customerSignedAt,
           status: c.status,
           active: !["completed", "cancelled"].includes(c.status),
+          origin: c.origin || "generated",
         };
       });
     }
@@ -2494,6 +2641,13 @@
         annexes: clone(c.annexes || []),
         signature: clone(c.signature),
         status: c.status,
+        // Where this contract came from, and the signed file when it came
+        // from outside. A screen showing an externally-signed contract must
+        // show THAT file rather than the document rendered below it, which
+        // nobody ever signed — see registerExternalContract.
+        origin: c.origin || "generated",
+        document: c.document ? clone(c.document) : null,
+        externalRef: c.externalRef || null,
       };
     }
 

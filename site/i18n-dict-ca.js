@@ -1234,6 +1234,42 @@ window.CANEI_DICT.ca = {
   "Arrastra aquí el respaldo de la aprobación (WhatsApp, correo, adenda firmada…), o búscalo en el dispositivo.":
     "Arrossega aquí el respatller de l'aprovació (WhatsApp, correu, addenda signada…), o cerca'l al dispositiu.",
   "Modificación aprobada — adenda generada": "Modificació aprovada — addenda generada",
+  // PK2-D: creating a contract, and recording one signed elsewhere.
+  "Nuevo contrato": "Nou contracte",
+  "＋ Nuevo contrato": "＋ Nou contracte",
+  "¿De dónde sale este contrato?": "D'on surt aquest contracte?",
+  "De un presupuesto aceptado": "D'un pressupost acceptat",
+  "Firmado fuera de este sistema": "Signat fora d'aquest sistema",
+  "Datos del contrato": "Dades del contracte",
+  "Importe sin IVA (€)": "Import sense IVA (€)",
+  "Fecha del contrato": "Data del contracte",
+  "Referencia externa": "Referència externa",
+  "Plazo de ejecución (días)": "Termini d'execució (dies)",
+  "Firmado el": "Signat el",
+  "Déjalo en blanco si todavía no está firmado.": "Deixa-ho en blanc si encara no està signat.",
+  "＋ Añadir hito": "＋ Afegeix una fita",
+  "Sin hitos de pago.": "Sense fites de pagament.",
+  "Crear contrato": "Crea el contracte",
+  "Contrato creado": "Contracte creat",
+  "Contrato registrado": "Contracte registrat",
+  "Contrato firmado": "Contracte signat",
+  "Contrato firmado fuera de este sistema.": "Un contracte signat fora d'aquest sistema.",
+  "No se ha adjuntado el contrato firmado. Los datos están en el panel de al lado.":
+    "No s'ha adjuntat el contracte signat. Les dades són al plafó del costat.",
+  "En papel, por un abogado, o antes de usar este programa. Se guarda el archivo firmado y sus datos.":
+    "En paper, per un advocat, o abans d'utilitzar aquest programa. Es desa el fitxer signat i les seves dades.",
+  "El importe, el IVA y el cliente salen del presupuesto: no se teclean dos veces.":
+    "L'import, l'IVA i el client surten del pressupost: no es teclegen dues vegades.",
+  "No hay ningún presupuesto aceptado sin contrato todavía.":
+    "Encara no hi ha cap pressupost acceptat sense contracte.",
+  "firmado fuera": "signat fora",
+  "Inicio comprometido": "Inici compromès",
+  Cliente: "Client",
+  Inmueble: "Immoble",
+  IVA: "IVA",
+  Presupuesto: "Pressupost",
+  Referencia: "Referència",
+  Ejecución: "Execució",
 };
 window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Programar visita — (.+)$"), "Programar visita — $1"],

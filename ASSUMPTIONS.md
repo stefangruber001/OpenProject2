@@ -3007,3 +3007,46 @@ different decisions, so these ten arrived colliding. They are renumbered from
   backwards-compatibility shim, since every one of its six call sites (two
   simulations, two seed builders, the history generator, the one real UI
   site) is in this repository and was updated directly.
+
+- **#157 — creating a contract, and recording one signed elsewhere (Package 2
+  slide 4, PK2-D · 2026-08-11).** The slide reports there is no way to
+  create or upload a contract; investigation found that literally **no
+  contract could be created from the application at all** — every one came
+  from the seed — so this session had to deliver CON-01's normal path as well
+  as the manual one. Decisions taken: (a) **`registerExternalContract` is a
+  separate method, not `createContract` with a null budget.** CON-02 ("a
+  contract requires an accepted budget version") is a real rule that should
+  keep failing loudly for contracts this system draws up; a contract signed
+  on paper is a different kind of fact, not an exception to that rule, and
+  giving it its own entry point keeps the invariant intact instead of
+  weakening it for every caller. (b) **`origin` decides what the screen
+  shows, and this is the point of the field.** A generated contract renders
+  the document this system produces; an external one renders **the uploaded
+  file**, because printing our own «CONTRATO DE OBRA» over a contract drafted
+  by somebody else's lawyer would be presenting a document nobody signed as
+  though it were the agreement. The structured data still exists beside it —
+  importe vigente, anexos and the cash forecast all need it — but it is
+  explicitly an index of the contract rather than the contract. (c) **Both
+  sources live in one drawer**, chosen by a radio at the top, because "where
+  does this contract come from" is the first thing the operator must answer;
+  two separate buttons would ask them to decide before the difference is on
+  screen. (d) **Milestones are entered as rows (trigger · % · date), not as
+  the `paymentConditions` free-text list.** That list says "40% a la firma,
+  60% a la entrega", which reads well and cannot be turned into dates and
+  amounts without guessing — and these rows feed ADM-08's cash forecast,
+  where a guess is worse than a blank. The total shows amber when it does not
+  reach 100%, but does not refuse: a contract really can be part-scheduled.
+  (e) **Completeness still blocks (decision 21 / RD 1619/2012) but offers a
+  way through**: the drawer opens the client editor and returns with
+  everything already typed, the attached file included — the blob is already
+  in the store, so only the record travels. Recording a contract from paper
+  does not change what the law needs before it can be invoiced, so no
+  loophole was introduced. (f) **The default VAT for a hand-entered contract
+  is 10%**, matching what a new budget takes, so a quoted job and a
+  hand-typed one start from the same rate rather than two different ones.
+  (g) **A pre-existing bug was fixed rather than worked around**: both
+  contract paths now validate before `nextNumber` mints a number, because
+  minting is a side effect on a gap-free series (ORG-04) and validating
+  afterwards left a permanent hole whenever a contract was refused. It was
+  unreachable before this session only because nothing could create a
+  contract.
