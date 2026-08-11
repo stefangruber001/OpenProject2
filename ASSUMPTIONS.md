@@ -2820,3 +2820,48 @@ different decisions, so these ten arrived colliding. They are renumbered from
   a trailing lone table the full row rather than leaving it at half width
   with empty space beside it — general for any odd count, so a screen with an
   even number of lists is unaffected.
+
+- **#152 — the presupuestador reworked around cost and margin (Package 1
+  slides 8 and 9, 2026-08-11).** Five complaints about "the heart of the
+  system", and they share a premise: the grid was arranged around what gets
+  STORED rather than around how a price is decided. **Decisions:** (a) the
+  columns run **descripción · unidad · coste unitario · margen unit. % ·
+  cantidad · p. unitario venta · precio total**, which is the order the work
+  is done in, and puts cost and margin BEFORE the sale price because the sale
+  price is derived from them. The operator's list wrote "UNIDADES" twice; they
+  confirmed the first is the unit of measure and the second the quantity. (b)
+  **The margin is stored nowhere.** It is `(venta − coste) / venta`, computed
+  from the two figures the line already carries, so no migration is needed and
+  the percentage can never drift out of step with the money beside it. That is
+  the same definition `budgetTotals.marginBasePct` and
+  `projectEconomics.marginForecastPct` already used, so the operator's "keep it
+  like this, everywhere" needed no change anywhere else — a line, a
+  presupuesto and a job now all mean the same thing by "40%". (c) **Editing
+  cost or margin recomputes the price, holding the other steady**; editing the
+  price back-solves the margin. The price stays typeable even though it is
+  "automatic" — quoting a round number is ordinary, and refusing it would lose
+  a direction the operator has today. A margin of 100% cannot produce a finite
+  price, so `bPriceFromMargin` returns null above 99.95% and the edit is
+  ignored rather than writing an infinity. (d) **The unit became a select over
+  DMC-03** — "OJO CON LAS UNIDADES" was the operator flagging that a free-text
+  unit is how `m2`, `M2` and `m²` end up in one budget. (e) **The catalogue
+  picker opens on the whole catalogue**, not pre-filtered by the line's
+  description: "Nueva partida" matches nothing, and a picker that opens empty
+  reads as a broken picker. Not finding one opens
+  `catalogueItemDrawer` — the SAME "＋ Nueva partida" form Configuración uses,
+  at the operator's own suggestion, rather than a second form that would drift
+  out of step with it. A picked partida with no reference price arrives marked
+  **pendiente** rather than priced at zero, matching what the catalogue screen
+  already says about a blank price. (f) **Chapters come from the catalogue's
+  own chapter list**, with already-used ones hidden (a second "Albañilería" in
+  one budget is a mistake, not a choice) and an "Otro nombre…" escape for a
+  genuine one-off. (g) **Superficie is gone entirely** — the input, the "Por
+  m²" row in the totals panel and the per-m² line in the customer document —
+  at the operator's request. `surfaceM2` stays on the record and on the
+  inmueble, so nothing already stored is lost and the property keeps its own
+  area, which is a fact about the building rather than a budget input. (h)
+  **"Siguiente paso" replaces three scattered endings** (Exclusiones, Validar,
+  and a separate Enviar in the header) with one drawer holding the money
+  terms, the exclusions, the validation and the send, in that order.
+  Validation runs on OPEN rather than behind its own button: a check somebody
+  has to remember to press is a check that gets skipped.

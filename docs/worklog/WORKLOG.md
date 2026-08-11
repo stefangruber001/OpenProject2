@@ -91,9 +91,9 @@ trilingual UI · server-first, always) are recorded with the plan.
 
 ## Package 1 — operator feedback on the shipped app (2026-08-11)
 
-Thirteen changes across ten slides, all raised against the live preview. The
-first is done; the rest are scheduled below and carry the operator's own
-answers to the four questions the deck left open.
+Thirteen changes across ten slides, all raised against the live preview. All
+five work items are done; they carry the operator's own answers to the four
+questions the deck left open.
 
 | #   | What                                                                                     | State    |
 | --- | ---------------------------------------------------------------------------------------- | -------- |
@@ -101,7 +101,7 @@ answers to the four questions the deck left open.
 | P2  | Visita: date/time defaults, real camera, the notes-wiped bug, photo viewer               | **done** |
 | P3  | Lead → visita flow: pick the lead, second visit, complete a client inline                | **done** |
 | P4  | Configurable lists: próximas acciones, condiciones de pago (lossReasons already existed) | **done** |
-| P5  | Presupuestador: catalogue picker, chapter dropdown, columns, Siguiente paso              | next     |
+| P5  | Presupuestador: catalogue picker, chapter dropdown, columns, Siguiente paso              | **done** |
 
 **Answers carried forward** (operator, in the thread): the line grid reads
 DESCRIPCIÓN · UD · COSTE UNIT. · MARGEN % · CANTIDAD · P. VENTA UNIT. ·
@@ -117,3 +117,17 @@ that the dictionary is consistent across the three languages, not that every
 literal is in it — deliberately, see the note at the top of that file — so
 these pass the gate and still fall back to Spanish in CA and EN. They belong
 in `i18n-dict.js` and `i18n-dict-ca.js` before this package is called finished.
+
+**One part of slide 9 is deliberately not done, and it is not a small
+omission.** The note asks for the catalogue search on _"ambos, Partidas o
+Subpartidas"_, and for a partida created on the fly to record _"relación con
+la Partida en caso de ser una Subpartida"_. Partidas have both. **Subpartidas
+have neither, because subpartidas have no editor at all** — `subLines` exists
+on the line model and is read in exactly one place, to aggregate the quantity
+when a line is measured in parts, and there is no screen anywhere that creates
+or edits one. Adding the search to a screen that does not exist is not
+possible; building the subline editor is its own unit of work that the rest of
+the deck does not describe. It needs a decision from the operator about what a
+subpartida is for in this product before it is worth building — measurement
+detail (which is what the data model currently implies) or a catalogue
+hierarchy (which is what the note implies).

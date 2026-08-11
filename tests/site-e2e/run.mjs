@@ -86,6 +86,7 @@ async function main() {
     await testControlTowerAndDay(browser, base);
     await testVisitCapture(browser, base);
     await testConfigurableLists(browser, base);
+    await testPresupuestadorRework(browser, base);
     await testJourneyRealMode(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
@@ -4151,6 +4152,173 @@ async function testControlTowerAndDay(browser, base) {
 //    #3). "Crear nuevo proyecto" stays the untouched default — testJourney
 //    already covers it end to end — this exercises the ADDITION: picking a
 //    real, already-existing project and seeing real data, not the sample.
+/* COM-03 after Package 1 slides 8 and 9 — the heart of the system, reworked:
+     · columns in the order the work is done, cost and margin before the price
+     · margin is an INPUT in %, and the sale price follows from cost + margin
+     · a 🔍 on every line searches the catalogue and fills the row from it
+     · chapters come from the catalogue instead of being typed fresh
+     · the bottom bar keeps two fields; finishing moved behind "Siguiente paso"
+     · Superficie is gone, input and figure both */
+async function testPresupuestadorRework(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  await autoAnswerModals(pg);
+  try {
+    await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+    await pg.evaluate(() => {
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      go("quotes", b.id);
+    });
+    await pg.waitForTimeout(800);
+
+    // ---- the column order the operator asked for --------------------------
+    const heads = await pg.evaluate(() =>
+      [...document.querySelectorAll(".bgrid thead th")]
+        .map((t) => t.textContent.trim())
+        .filter(Boolean),
+    );
+    const want = [
+      "Descripción",
+      "Unidad",
+      "Coste unitario",
+      "Margen unit. %",
+      "Cantidad",
+      "P. unitario venta",
+      "Precio total",
+    ];
+    const idx = want.map((w) => heads.indexOf(w));
+    if (idx.every((n, i) => n >= 0 && (i === 0 || n > idx[i - 1])))
+      ok(
+        "presupuestador: columns run descripción → unidad → coste → margen % → cantidad → venta → total",
+      );
+    else bad("presupuestador: column order", JSON.stringify(heads));
+
+    // "Ojo con las unidades": the unit is picked from DMC-03, not typed.
+    const unitTag = await pg.evaluate(() => document.querySelector('[data-f="unit"]')?.tagName);
+    if (unitTag === "SELECT")
+      ok("presupuestador: the unit is chosen from the units list, not typed");
+    else bad("presupuestador: unit is a select", unitTag);
+
+    // ---- margin drives the price, and the price back-solves the margin ----
+    const setField = async (f, value) =>
+      pg.evaluate(
+        ({ f, value }) => {
+          const el = document.querySelector(`tr.pbrow [data-f="${f}"]`);
+          el.value = value;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        },
+        { f, value },
+      );
+    const readRow = async () =>
+      pg.evaluate(() => {
+        const g = (f) => +document.querySelector(`tr.pbrow [data-f="${f}"]`).value;
+        return { cost: g("cost"), margin: g("marginPct"), price: g("price") };
+      });
+    await setField("cost", "50");
+    await setField("marginPct", "50");
+    await pg.waitForTimeout(300);
+    let r = await readRow();
+    // 50 % margin over the SALE price means the price is twice the cost.
+    if (Math.abs(r.price - 100) < 0.02)
+      ok("presupuestador: a 50% margin on a 50 € cost gives a 100 € price (margin over sale)");
+    else bad("presupuestador: margin drives price", JSON.stringify(r));
+
+    await setField("price", "80");
+    await pg.waitForTimeout(300);
+    r = await readRow();
+    if (Math.abs(r.margin - 37.5) < 0.11)
+      ok("presupuestador: typing a price back-solves the margin (80 € on 50 € = 37,5%)");
+    else bad("presupuestador: price back-solves margin", JSON.stringify(r));
+
+    const held = r.margin;
+    await setField("cost", "60");
+    await pg.waitForTimeout(300);
+    r = await readRow();
+    if (Math.abs(r.margin - held) < 0.11 && r.price > 80)
+      ok("presupuestador: changing the cost holds the margin and moves the price");
+    else bad("presupuestador: cost holds margin", JSON.stringify(r) + " held=" + held);
+
+    // ---- the catalogue picker fills the whole line -----------------------
+    await pg.click("[data-find]");
+    await pg.waitForTimeout(500);
+    const items = await pg.locator(".cpi").count();
+    if (items > 0) ok(`presupuestador: 🔍 opens the catalogue with its list (${items} partidas)`);
+    else bad("presupuestador: catalogue picker opens populated", `items=${items}`);
+    await pg.fill("#cp_q", "alicatado");
+    await pg.waitForTimeout(300);
+    await pg.evaluate(() => document.querySelector(".cpi")?.click());
+    await pg.waitForTimeout(600);
+    const picked = await pg.evaluate(() => {
+      const g = (f) => document.querySelector(`tr.pbrow [data-f="${f}"]`).value;
+      return { code: g("code"), desc: g("desc"), unit: g("unit"), cost: +g("cost") };
+    });
+    if (picked.code && picked.desc && picked.unit && picked.cost > 0)
+      ok(
+        `presupuestador: picking a partida fills código, descripción, unidad and coste (${picked.code})`,
+      );
+    else bad("presupuestador: catalogue pick fills the row", JSON.stringify(picked));
+
+    // ---- chapters come from the catalogue --------------------------------
+    await pg.click("#bAddChap");
+    await pg.waitForTimeout(500);
+    const chap = await pg.evaluate(() => ({
+      groups: [...document.querySelectorAll(".modal .mopts .og")].map((g) => g.textContent),
+      hasFree: [...document.querySelectorAll(".modal .mopts label")].some((l) =>
+        /Otro nombre/.test(l.textContent),
+      ),
+    }));
+    if (chap.groups.includes("Del catálogo") && chap.hasFree)
+      ok("presupuestador: chapters are offered from the catalogue, with a way out for a one-off");
+    else bad("presupuestador: chapter picker", JSON.stringify(chap));
+    await pg.keyboard.press("Escape");
+    await pg.waitForTimeout(300);
+
+    // ---- Superficie gone; finishing behind one button --------------------
+    const bar = await pg.evaluate(() => ({
+      m2: !!document.querySelector("#bcM2"),
+      porM2: (document.querySelector("#bSide")?.textContent || "").includes("Por m²"),
+      next: !!document.querySelector("#bcNext"),
+      validate: !!document.querySelector("#bValidate"),
+    }));
+    if (!bar.m2 && !bar.porM2) ok("presupuestador: Superficie is gone from the bar and the totals");
+    else bad("presupuestador: superficie removed", JSON.stringify(bar));
+    if (bar.next && !bar.validate)
+      ok("presupuestador: the bar ends in one «Siguiente paso» instead of three endings");
+    else bad("presupuestador: siguiente paso replaces the scattered buttons", JSON.stringify(bar));
+
+    await pg.click("#bcNext");
+    await pg.waitForTimeout(600);
+    const ns = await pg.evaluate(() => ({
+      title: document.querySelector("#dttl")?.textContent || "",
+      cards: [...document.querySelectorAll("#dbody .ch h3")].map((h) => h.textContent),
+      send: !!document.querySelector("#ns_send"),
+    }));
+    const wantCards = [
+      "Resumen",
+      "Condiciones de pago",
+      "Exclusiones",
+      "Supuestos",
+      "Comprobación",
+    ];
+    if (/Siguiente paso/.test(ns.title) && wantCards.every((c) => ns.cards.includes(c)) && ns.send)
+      ok("presupuestador: «Siguiente paso» carries terms, exclusions, the check and the send");
+    else bad("presupuestador: siguiente paso contents", JSON.stringify(ns));
+    await pg.evaluate(() => closeDrawer());
+
+    if (errs.length) bad("presupuestador: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("presupuestador: no console errors");
+  } catch (e) {
+    bad("presupuestador (rework): suite completed", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
 /* Package 1 (#2, #9): "Próxima acción" and "Condiciones de pago" were free
    text, so the same words got retyped slightly differently every time and
    never rolled into anything a person could act on or compare. Both are now

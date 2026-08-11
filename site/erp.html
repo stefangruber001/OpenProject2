@@ -2101,16 +2101,91 @@
       .bgrid th.int {
         background: var(--hair);
       }
+      /* The catalogue picker's result list. */
+      .cplist {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        max-height: 46vh;
+        overflow-y: auto;
+      }
+      .cpi {
+        display: grid;
+        grid-template-columns: 74px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        text-align: left;
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--paper);
+        cursor: pointer;
+        font: inherit;
+        color: var(--ink);
+        transition: 0.12s;
+      }
+      .cpi:hover {
+        border-color: var(--greenLt);
+        background: var(--greenSoft);
+      }
+      .cpi .cpc {
+        font: 600 11.5px var(--mono);
+        color: var(--muted);
+      }
+      .cpi .cpd b {
+        display: block;
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+      .cpi .cpd i {
+        display: block;
+        font-style: normal;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+      .cpi .cpm {
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      /* The 🔍 that opens it, tucked in beside the código cell. */
+      .pbfind {
+        white-space: nowrap;
+      }
+      .bfind {
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        padding: 0 3px 0 0;
+        font-size: 12px;
+        opacity: 0.55;
+        transition: 0.12s;
+      }
+      .bfind:hover {
+        opacity: 1;
+      }
+
       .pbcond {
         flex: 0 0 auto;
         border-top: 1px solid var(--line);
         background: var(--paper);
-        padding: 8px 14px;
+        /* The ES·CA·EN pill floats bottom-left over every page. This bar is the
+           only one that reaches the bottom of the viewport, so it is the only
+           one that has to leave room for it — the first control used to sit
+           underneath the pill. */
+        padding: 8px 14px 8px 152px;
         display: flex;
         gap: 14px;
         align-items: center;
         flex-wrap: wrap;
         font-size: 12px;
+      }
+      @media (max-width: 560px) {
+        .pbcond {
+          padding-left: 14px;
+          padding-bottom: 52px;
+        }
       }
       .pbcond label {
         display: inline-flex;
@@ -7306,6 +7381,96 @@
               closeDrawer();
             }, "Partida retirada del catálogo");
       }
+      /* ---------- Catalogue picker (Package 1, slide 9) ----------
+   "Debería en ambos, Partidas o Subpartidas, una opción de buscar que cuando
+   se apriete, se abra un pop up con la lista de partidas y una casilla de
+   búsqueda. En caso de no estar creada, dar la opción de crearla."
+
+   The search runs over código, descripción and the customer wording, because
+   people look a partida up by whichever of the three they remember. Picking
+   one fills the line's código, descripción, unidad AND both figures, which is
+   the point of a catalogue: the second time you quote alicatado it should
+   already know what alicatado costs.
+
+   Not finding one opens `catalogueItemDrawer` — the SAME "＋ Nueva partida"
+   form the Configuración screen uses (operator's own suggestion), rather than
+   a second form written for this popup that would drift out of step with it. */
+      function catalogueSearchModal(onPick, initialQuery) {
+        const rows = erp.state.catalogue.filter((i) => i.active !== false);
+        const chapLabel = (code) => (code ? erp.listLabel("itemChapters", code) : "sin capítulo");
+        const scrim = $("#mscrim") || document.getElementById("mscrim");
+        // Its own overlay rather than `ask()`: this is a searchable list that
+        // re-renders as you type, which the field-based modal does not model.
+        const node = el("div", "mscrim on");
+        node.id = "catpick";
+        const box = el("div", "modal wide");
+        box.innerHTML = `<div class="mh"><h3>Buscar en el catálogo</h3>
+    <p>Por código, descripción o cómo se le dice al cliente.</p></div>
+   <div class="mb">
+    <div class="mf"><input id="cp_q" placeholder="alicatado, ALB-010, tabique…" value="${esc(initialQuery || "")}"></div>
+    <div class="cplist" id="cp_list"></div>
+   </div>
+   <div class="ma"><span class="sp"></span>
+    <button class="btn sm" id="cp_cancel">Cancelar</button>
+    <button class="btn sm primary" id="cp_new">＋ Nueva partida</button></div>`;
+        node.appendChild(box);
+        document.body.appendChild(node);
+        box.onclick = (e) => e.stopPropagation();
+        const close = () => {
+          document.removeEventListener("keydown", onKey, true);
+          node.remove();
+        };
+        const onKey = (e) => {
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            close();
+          }
+        };
+        document.addEventListener("keydown", onKey, true);
+        node.onclick = close;
+        const paint = () => {
+          const q = $("#cp_q").value.trim().toLowerCase();
+          const hits = rows
+            .filter(
+              (i) =>
+                !q ||
+                (i.code || "").toLowerCase().includes(q) ||
+                (i.desc || "").toLowerCase().includes(q) ||
+                (i.customerWording || "").toLowerCase().includes(q),
+            )
+            .slice(0, 60);
+          $("#cp_list").innerHTML =
+            hits
+              .map(
+                (i) => `<button class="cpi" data-pick="${i.id}">
+      <span class="cpc">${esc(i.code)}</span>
+      <span class="cpd"><b>${esc(i.desc)}</b><i>${esc(chapLabel(i.chapter))} · ${esc(i.unit)}</i></span>
+      <span class="cpm">${i.defaultPriceCents ? eur(i.defaultPriceCents) : '<span class="pill y">sin precio</span>'}</span>
+     </button>`,
+              )
+              .join("") ||
+            `<div class="empty" style="padding:18px">Ninguna partida coincide con «${esc(q)}». Créala con el botón de abajo y queda en el catálogo para la próxima vez.</div>`;
+          $("#cp_list")
+            .querySelectorAll("[data-pick]")
+            .forEach(
+              (b) =>
+                (b.onclick = () => {
+                  const it = rows.find((x) => x.id === b.dataset.pick);
+                  close();
+                  onPick(it);
+                }),
+            );
+        };
+        $("#cp_q").oninput = paint;
+        $("#cp_cancel").onclick = close;
+        $("#cp_new").onclick = () => {
+          close();
+          catalogueItemDrawer(null);
+        };
+        paint();
+        setTimeout(() => $("#cp_q").focus(), 60);
+      }
+
       /** Unit picker over the owner-maintained list, keeping a retired unit visible. */
       function listOptionsUnits(selected) {
         const rows = erp.listActive("units").slice();
@@ -9248,6 +9413,37 @@
         return l.pending ? "pending" : l.optionalLine ? "optional" : "normal";
       }
 
+      /* ---------- margin on a line (Package 1, slide 9) ----------
+   The operator asked for margin as an INPUT expressed as a percentage, and
+   for the sale price to follow from cost + that margin — "margen efectivo, es
+   decir margen sobre el precio de venta". So:
+
+       margen % = (venta − coste) / venta          venta = coste / (1 − margen)
+
+   which is the same definition `budgetTotals.marginBasePct` and
+   `projectEconomics.marginForecastPct` already use, so a line, a presupuesto
+   and a job all say "40%" about the same thing.
+
+   NOTHING NEW IS STORED. The margin is derived from the two figures the line
+   already carries, so an old budget needs no migration and the number can
+   never drift out of step with the money beside it.
+
+   The sale price stays typeable even though it is "automatic": quoting a round
+   number is ordinary, and typing one back-solves the margin instead of
+   refusing. That keeps both directions available — which a purely derived
+   field would not. */
+      function bMarginPct(l) {
+        if (!l.priceCents) return 0;
+        return Math.round(((l.priceCents - l.costCents) / l.priceCents) * 1000) / 10;
+      }
+      /** Sale price implied by a cost and a margin-over-sale. Null when the margin
+    cannot produce a finite price (100% of a non-zero cost is not a price). */
+      function bPriceFromMargin(costCents, pct) {
+        const m = Number(pct) / 100;
+        if (!Number.isFinite(m) || m >= 0.9995) return null;
+        return Math.round(costCents / (1 - m));
+      }
+
       /* Blob-backed images are fetched once per session and the object URL kept.
    Revoking on every re-render would blank a thumbnail the user is still
    looking at, and the cache is bounded by the number of distinct pictures in
@@ -9634,10 +9830,16 @@
 
      <div class="pbpane mid bgrid">
       <div class="pbh">Partidas<span style="flex:1"></span><span class="tag" id="bGridTag"></span></div>
+      <!-- Column order and names come from Package 1 slide 9, and they are the
+           order the work is actually done in: say what it is, in what unit, what
+           it costs us, what we put on it, how much of it, and only then what the
+           customer pays. Cost and margin sit BEFORE the sale price because the
+           sale price is derived from them (see bPriceFromMargin), not typed
+           alongside them. -->
       <div class="scroll"><table><thead><tr>
-        <th style="width:16px"></th><th>Nº</th><th>Código</th><th>Descripción</th><th>Ud</th><th class="num">Cantidad</th>
-        <th class="num">P. venta</th><th class="num">Importe</th>
-        <th class="num int">P. coste</th><th class="num int">Margen</th>
+        <th style="width:16px"></th><th>Nº</th><th>Código</th><th>Descripción</th><th>Unidad</th>
+        <th class="num int">Coste unitario</th><th class="num int">Margen unit. %</th>
+        <th class="num">Cantidad</th><th class="num">P. unitario venta</th><th class="num">Precio total</th>
         <th>Estado</th><th>Imágenes</th>${locked ? "" : "<th></th>"}
       </tr></thead><tbody id="bRows"></tbody></table></div>
      </div>
@@ -9651,6 +9853,13 @@
      </div>
     </div>
 
+    <!-- Package 1, slide 9: "esta zona queda rara. Debería haber un botón de
+         «Siguiente paso» y de ahí que se abra un popup en que se puedan
+         agregar estas opciones finales, validar y emitir." So the bar keeps
+         only what a person glances at while writing lines — how long the
+         offer stands, what language it goes out in — and everything that
+         belongs to FINISHING moves behind one button. Superficie is gone
+         entirely, input and figure both, at the operator's request. -->
     <div class="pbcond">
      <label>Validez <input type="date" id="bcValid" value="${esc(b.validityDate || "")}"${dis}></label>
      <label>Idioma del documento
@@ -9658,25 +9867,54 @@
        <option value="es"${b.language === "es" ? " selected" : ""}>Español</option>
        <option value="ca"${b.language === "ca" ? " selected" : ""}>Català</option>
       </select></label>
-     <label class="grow" style="flex:1 1 220px">Condiciones de pago
-      <select class="grow" id="bcPay"${dis}>${listOptionsCreatable("paymentConditions", b.paymentConditions || "")}</select></label>
-     <label>Superficie <input type="number" id="bcM2" min="0" step="1" style="width:74px" value="${b.surfaceM2 || 0}"${dis}> m²</label>
-     <button class="btn sm" id="bcMore">Exclusiones y supuestos (${(b.exclusions || []).length + (b.assumptions || []).length})</button>
-     <button class="btn sm" id="bValidate">Validar</button>
+     <span style="flex:1"></span>
+     <button class="btn sm primary" id="bcNext">Siguiente paso →</button>
     </div>
    </div>`;
 
         $("#bBack").onclick = () => go("quotes");
         const addChap = $("#bAddChap");
         if (addChap)
+          /* Package 1, slide 8: "los Capítulos deberían ser un dropdown list de
+       las Partidas" — a chapter is not a free-text heading, it is one of the
+       catalogue's own chapters, and typing it fresh each time is how the same
+       chapter ends up spelled three ways across three presupuestos. The
+       already-used ones are hidden, since a second "Albañilería" in the same
+       budget is a mistake rather than a choice, and "Otro nombre…" keeps the
+       door open for a one-off that does not belong in the catalogue. */
           addChap.onclick = async () => {
-            const name = await askText("Nuevo capítulo", {
-              label: "Nombre",
-              value: "Nuevo capítulo",
-              required: true,
+            const used = new Set(erp.version(id, vsel).chapters.map((c) => c.name));
+            const options = erp
+              .listActive("itemChapters")
+              .filter((c) => !used.has(c.es))
+              .map((c) => {
+                const n = erp.state.catalogue.filter(
+                  (i) => i.chapter === c.code && i.active !== false,
+                ).length;
+                return {
+                  value: c.es,
+                  label: c.es,
+                  group: "Del catálogo",
+                  hint: n ? n + (n === 1 ? " partida" : " partidas") : "sin partidas todavía",
+                };
+              });
+            options.push({ value: "__free__", label: "Otro nombre…", group: "Fuera del catálogo" });
+            const pick = await askChoice("Nuevo capítulo", options, {
+              body: "Los capítulos salen del catálogo para que se llamen igual en todos los presupuestos.",
               okLabel: "Añadir",
+              wide: true,
             });
-            if (name === null) return;
+            if (pick === null) return;
+            let name = pick;
+            if (pick === "__free__") {
+              name = await askText("Nuevo capítulo", {
+                label: "Nombre del capítulo",
+                required: true,
+                okLabel: "Añadir",
+                hint: "Sólo para un capítulo que no se va a repetir. Si se va a usar más veces, añádelo al catálogo en Configuración → Partidas.",
+              });
+              if (name === null) return;
+            }
             mutate(() => {
               bChapter = erp.addChapter(id, { name }).id;
             }, "Capítulo añadido");
@@ -9713,16 +9951,8 @@
               "Nueva versión creada",
             );
           };
-        $("#bValidate").onclick = () => {
-          const issues = erp.validateBudget(id);
-          toast(
-            issues.length
-              ? `${issues.filter((i) => i.level === "block").length} bloqueos · ${issues.filter((i) => i.level === "warn").length} avisos`
-              : "Sin incidencias",
-          );
-          builderIssues(id, issues);
-        };
-        $("#bcMore").onclick = () => budgetConditionsDrawer(id);
+        const next = $("#bcNext");
+        if (next) next.onclick = () => budgetNextStepDrawer(id, vsel);
         v.querySelectorAll(".pbtabs button").forEach(
           (btn) =>
             (btn.onclick = () => {
@@ -9738,19 +9968,6 @@
           hdr($("#bcValid"), (el) => ({ validityDate: el.value }), "Validez actualizada");
           hdr($("#bcLang"), (el) => ({ language: el.value }), "Idioma del documento actualizado");
           // Not `hdr()`: picking "＋ Nueva…" has to be intercepted before it
-          // ever reaches updateBudget, or the sentinel value "__new__" would
-          // be saved as the condition itself.
-          wireCreatableSelect("#bcPay", "paymentConditions", "Condiciones de pago", (code) =>
-            mutate(
-              () => erp.updateBudget(id, { paymentConditions: code }, "backoffice"),
-              "Condiciones de pago actualizadas",
-            ),
-          );
-          hdr(
-            $("#bcM2"),
-            (el) => ({ surfaceM2: Math.max(0, Number(el.value) || 0) }),
-            "Superficie actualizada",
-          );
         }
 
         builderRows(id, vsel, locked, SECL);
@@ -9788,16 +10005,35 @@
               render();
               return;
             }
-            const patch =
-              f === "qty"
-                ? { qtyMilli: bQty(val) }
-                : f === "cost"
-                  ? { costCents: bMoney(val) }
-                  : f === "price"
-                    ? { priceCents: bMoney(val) }
-                    : f === "status"
-                      ? { pending: val === "pending", optionalLine: val === "optional" }
-                      : { [f]: val };
+            /* Cost and margin are the two things a person decides; the sale
+       price is what falls out of them. So editing either recomputes the
+       price, holding the OTHER one steady — change the cost and the
+       margin you set is preserved, change the margin and the cost you
+       looked up is preserved. Typing in the price itself is still
+       allowed and simply reverses the arithmetic (see bMarginPct).
+
+       The row is the source of the "other" figure rather than the stored
+       line, because on an `input` event the character just typed has not
+       been committed yet. */
+            const line = erp
+              .version(id, vsel)
+              .chapters.flatMap((c) => c.lines)
+              .find((x) => x.id === lid);
+            let patch;
+            if (f === "qty") patch = { qtyMilli: bQty(val) };
+            else if (f === "status")
+              patch = { pending: val === "pending", optionalLine: val === "optional" };
+            else if (f === "price") patch = { priceCents: bMoney(val) };
+            else if (f === "cost") {
+              const costCents = bMoney(val);
+              patch = { costCents };
+              const priceCents = bPriceFromMargin(costCents, bMarginPct(line));
+              if (priceCents !== null) patch.priceCents = priceCents;
+            } else if (f === "marginPct") {
+              const priceCents = bPriceFromMargin(line.costCents, val);
+              if (priceCents === null) return; // a half-typed "100" is not an error yet
+              patch = { priceCents };
+            } else patch = { [f]: val };
             try {
               erp.editLine(id, lid, patch, { audit, user: "backoffice" });
             } catch (err) {
@@ -9889,14 +10125,14 @@
       <td class="pbdrag" data-handle="${l.id}" title="Arrastrar para reordenar">${locked ? "" : "⠿"}</td>
       <td><input data-line="${l.id}" data-f="num" value="${esc(l.num)}" style="width:56px"
         title="${l.manualNum ? "Número escrito a mano — se mantiene al reordenar" : "Número automático — cambia con la posición"}"${locked ? " disabled" : ""}></td>
-      <td><input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="6"${locked ? " disabled" : ""}></td>
+      <td class="pbfind">${locked ? "" : `<button class="bfind" data-find="${l.id}" title="Buscar en el catálogo">🔍</button>`}<input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="5"${locked ? " disabled" : ""}></td>
       <td><input data-line="${l.id}" data-f="desc" value="${esc(l.desc)}"${locked ? " disabled" : ""}></td>
-      <td><input data-line="${l.id}" data-f="unit" value="${esc(l.unit)}" style="width:52px"${locked ? " disabled" : ""}></td>
+      <td><select data-line="${l.id}" data-f="unit" style="width:88px"${locked ? " disabled" : ""}>${listOptionsUnits(l.unit)}</select></td>
+      <td class="int"><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>
+      <td class="int"><input class="r" data-line="${l.id}" data-f="marginPct" type="number" step="0.1" max="99.9" value="${bMarginPct(l)}"${locked ? " disabled" : ""} title="Margen sobre el precio de venta. Al escribirlo, el precio unitario se recalcula."></td>
       <td><input class="r" data-line="${l.id}" data-f="qty" type="number" step="0.001" value="${l.qtyMilli / 1000}"${locked || l.subLines.length ? " disabled" : ""}></td>
       <td><input class="r" data-line="${l.id}" data-f="price" type="number" step="0.01" value="${(l.priceCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>
-      <td><span class="out" data-out="amt-${l.id}">${eur(a.saleCents)}</span></td>
-      <td class="int"><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>
-      <td class="int"><span class="out${m < 0 ? " neg" : ""}" data-out="mar-${l.id}">${eur(m)}</span></td>
+      <td><span class="out${m < 0 ? " neg" : ""}" data-out="amt-${l.id}">${eur(a.saleCents)}</span></td>
       <td><select data-line="${l.id}" data-f="status"${locked ? " disabled" : ""}>
         <option value="normal"${bStatus(l) === "normal" ? " selected" : ""}>Normal</option>
         <option value="pending"${bStatus(l) === "pending" ? " selected" : ""}>Pendiente</option>
@@ -9913,6 +10149,40 @@
         $("#bRows")
           .querySelectorAll("[data-gal]")
           .forEach((btn) => (btn.onclick = () => lineImagesDrawer(id, btn.dataset.gal)));
+        $("#bRows")
+          .querySelectorAll("[data-find]")
+          .forEach(
+            (btn) =>
+              (btn.onclick = () => {
+                const lid = btn.dataset.find;
+                // Opens on the WHOLE catalogue rather than pre-filtered by the
+                // line's current description: "Nueva partida" matches nothing,
+                // and a picker that opens empty reads as a broken picker. The
+                // search box is right there for anyone who knows what they want.
+                catalogueSearchModal((it) => {
+                  // Everything the catalogue knows, in one go — including the
+                  // cost, which is the whole reason to have looked it up.
+                  mutate(() => {
+                    erp.editLine(
+                      id,
+                      lid,
+                      {
+                        code: it.code,
+                        desc: it.customerWording || it.desc,
+                        unit: it.unit,
+                        costCents: it.defaultCostCents || 0,
+                        priceCents: it.defaultPriceCents || 0,
+                        // A partida with no reference price arrives marked
+                        // pending rather than priced at zero — the catalogue
+                        // screen says so and the line has to agree.
+                        pending: !it.defaultPriceCents,
+                      },
+                      { audit: true, user: "backoffice" },
+                    );
+                  }, "Partida tomada del catálogo");
+                });
+              }),
+          );
         $("#bRows")
           .querySelectorAll("[data-addline]")
           .forEach(
@@ -10039,12 +10309,22 @@
             const a = bLineAmt(found.line);
             const m = a.saleCents - a.costCents;
             const ae = document.querySelector(`[data-out="amt-${lineId}"]`);
-            if (ae) ae.textContent = eur(a.saleCents);
-            const me = document.querySelector(`[data-out="mar-${lineId}"]`);
-            if (me) {
-              me.textContent = eur(m);
-              me.classList.toggle("neg", m < 0);
+            if (ae) {
+              ae.textContent = eur(a.saleCents);
+              ae.classList.toggle("neg", m < 0);
             }
+            /* Cost, margin and price are three views of two numbers, so the two
+         the person is NOT typing in have to follow along — otherwise the
+         row shows a margin that contradicts the price beside it until the
+         next full render. The field being edited is left alone: rewriting
+         it under the caret would fight the typing. */
+            const sync = (f, value) => {
+              const el = document.querySelector(`[data-line="${lineId}"][data-f="${f}"]`);
+              if (el && el !== document.activeElement) el.value = value;
+            };
+            sync("price", (found.line.priceCents / 100).toFixed(2));
+            sync("marginPct", bMarginPct(found.line));
+            sync("cost", (found.line.costCents / 100).toFixed(2));
           }
         }
 
@@ -10093,7 +10373,6 @@
     <div class="row"><span>Coste</span><b>${eur(t.costBaseCents)}</b></div>
     <div class="row"><span>Margen</span><b class="${t.marginBaseCents < 0 ? "neg" : ""}">${eur(t.marginBaseCents)} · ${t.marginBasePct}%</b></div>
     <div class="row ${t.pendingCount ? "warn" : "mut"}"><span>Pendientes de precio</span><b>${t.pendingCount} · ${eur(t.pendingEstCents)}</b></div>
-    ${t.perM2Cents ? `<div class="row mut"><span>Por m²</span><b>${eur(t.perM2Cents)}</b></div>` : ""}
     <div class="row mut" style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px"><span>Coste y margen</span><b>no salen del documento</b></div>
    </div>
    <div style="margin-top:14px">
@@ -10929,8 +11208,126 @@
             }, "Presupuesto rechazado");
       }
 
+      /* ---------- "Siguiente paso" (Package 1, slide 9) ----------
+   Everything that belongs to FINISHING a presupuesto, in the order it is
+   actually done: the money terms, then what the price does not include, then
+   what the system objects to, then send. It replaced three buttons scattered
+   along the bottom bar — Exclusiones, Validar, and a separate Enviar in the
+   header — which is what made that zone "rara": three unrelated endings side
+   by side with the fields you use while writing lines.
+
+   The validation runs on OPEN rather than behind a button. A check somebody
+   has to remember to press is a check that gets skipped, and this drawer
+   exists precisely at the moment it matters. */
+      function budgetNextStepDrawer(id, vsel) {
+        const b = erp.budget(id);
+        const cur = erp.version(id, vsel);
+        const locked = cur.frozen || cur.issued || !!b.acceptedVersionId;
+        const issues = erp.validateBudget(id);
+        const blocks = issues.filter((i) => i.level === "block");
+        const warns = issues.filter((i) => i.level === "warn");
+        const t = erp.budgetTotals(id, vsel);
+        const db = openDrawer(`Siguiente paso · ${b.number}`);
+        const listCard = (key, title, help) => `
+   <div class="card"><div class="ch"><h3>${title}</h3><span class="tag">${(b[key] || []).length}</span></div>
+    <div class="daylist">
+     <div class="it" style="color:var(--muted)">${help}</div>
+     ${
+       (b[key] || [])
+         .map(
+           (x, i) => `<div class="it"><span>${esc(x)}</span><span style="flex:1"></span>
+       ${locked ? "" : `<button class="btn sm danger" data-del="${key}:${i}">✕</button>`}</div>`,
+         )
+         .join("") || '<div class="it" style="color:var(--muted)">Ninguna todavía.</div>'
+     }
+     ${locked ? "" : `<div class="it"><input id="bc_${key}" placeholder="Añadir y pulsar Enter" style="flex:1"></div>`}
+    </div></div>`;
+        db.innerHTML = `
+   <div class="card"><div class="ch"><h3>Resumen</h3><span class="tag">${cur.chapters.length} capítulos</span></div>
+    <div class="daylist">
+     <div class="it">Base <b>${eur(t.baseCents)}</b> · IVA ${t.vatBp / 100}% <b>${eur(t.vatCents)}</b></div>
+     <div class="it">Total <b>${eur(t.grandCents)}</b></div>
+     <div class="it" style="color:var(--muted)">Margen ${eur(t.marginBaseCents)} · ${t.marginBasePct}% — no sale del documento</div>
+    </div></div>
+   ${
+     locked
+       ? ""
+       : `<div class="card"><div class="ch"><h3>Condiciones de pago</h3></div>
+     <div class="fgrid" style="padding:12px 16px">
+      <div class="field full"><select id="ns_pay">${listOptionsCreatable("paymentConditions", b.paymentConditions || "")}</select></div>
+     </div></div>`
+   }
+   ${listCard("exclusions", "Exclusiones", "Lo que el precio NO incluye. Se imprime bajo los totales.")}
+   ${listCard("assumptions", "Supuestos", "Aquello que se ha dado por cierto al valorar; si cambia, cambia el precio.")}
+   <div class="card"><div class="ch"><h3>Comprobación</h3>
+     <span class="pill ${blocks.length ? "r" : warns.length ? "y" : "g"}">${
+       blocks.length
+         ? blocks.length + " " + (blocks.length === 1 ? "bloqueo" : "bloqueos")
+         : warns.length
+           ? warns.length + " " + (warns.length === 1 ? "aviso" : "avisos")
+           : "sin incidencias"
+     }</span></div>
+    <div class="daylist">
+     ${
+       issues
+         .map(
+           (i) =>
+             `<div class="it"><span class="pill ${i.level === "block" ? "r" : "y"}">${i.level === "block" ? "bloquea" : "aviso"}</span>
+        <span style="flex:1">Partida ${esc(i.line)} — ${esc(i.msg)}</span></div>`,
+         )
+         .join("") ||
+       '<div class="it">Nada que corregir: todas las partidas tienen cantidad, precio y coste coherentes.</div>'
+     }
+    </div></div>
+   ${
+     locked
+       ? '<div class="card"><div class="daylist"><div class="it">Esta versión ya está congelada: se conserva tal como se envió.</div></div></div>'
+       : `<div style="margin-top:10px">
+     <button class="btn primary" id="ns_send"${blocks.length ? ' disabled title="Hay partidas que bloquean el envío"' : ""}>Enviar al cliente →</button>
+     ${blocks.length ? '<div class="mhint" style="margin-top:6px">Corrige los bloqueos de arriba y vuelve a abrir este paso.</div>' : ""}
+    </div>`
+   }`;
+        if (locked) return;
+        wireCreatableSelect("#ns_pay", "paymentConditions", "Condiciones de pago", (code) =>
+          mutate(
+            () => erp.updateBudget(id, { paymentConditions: code }, "backoffice"),
+            "Condiciones de pago actualizadas",
+          ),
+        );
+        ["exclusions", "assumptions"].forEach((key) => {
+          const inp = $("#bc_" + key);
+          if (!inp) return;
+          inp.onkeydown = (e) => {
+            if (e.key !== "Enter") return;
+            const val = inp.value.trim();
+            if (!val) return;
+            mutate(() => {
+              erp.updateBudget(id, { [key]: [...(b[key] || []), val] }, "backoffice");
+              budgetNextStepDrawer(id, vsel);
+            }, "Añadido");
+          };
+        });
+        db.querySelectorAll("[data-del]").forEach(
+          (btn) =>
+            (btn.onclick = () => {
+              const [key, i] = btn.dataset.del.split(":");
+              mutate(() => {
+                erp.updateBudget(
+                  id,
+                  { [key]: (b[key] || []).filter((_, n) => n !== Number(i)) },
+                  "backoffice",
+                );
+                budgetNextStepDrawer(id, vsel);
+              }, "Eliminado");
+            }),
+        );
+        const send = $("#ns_send");
+        if (send) send.onclick = () => sendBudgetDrawer(id);
+      }
+
       /** Exclusions and assumptions: the two lists the conditions bar has no room
-    for, and the two a dispute is usually about. */
+    for, and the two a dispute is usually about. Still reachable from the
+    presupuestos register; the builder reaches them through "Siguiente paso". */
       function budgetConditionsDrawer(id) {
         const b = erp.budget(id);
         const cur = erp.currentVersion(id);
@@ -14823,7 +15220,6 @@
       ${doc.totals.optionsCents ? `<div class="chapline"><span>${L.options}</span><span>${eur(doc.totals.optionsCents)}</span></div>` : ""}
       <div class="chapline"><span>${L.vat} ${doc.totals.vatBp / 100}%</span><span>${eur(doc.totals.vatCents)}</span></div>
       <div class="chapline" style="font-size:14px"><b>${L.total}</b><b>${eur(doc.totals.grandCents)}</b></div>
-      ${doc.totals.perM2Cents ? `<div class="chapline"><span>${L.perM2}</span><span>${eur(doc.totals.perM2Cents)}/m²</span></div>` : ""}
       ${t.pendingCount ? `<div class="chapline"><span>${L.pending}</span><span>${t.pendingCount} · ~${eur(t.pendingEstCents)}</span></div>` : ""}
     </div>
     ${annex.pages
