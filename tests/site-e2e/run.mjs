@@ -188,8 +188,14 @@ async function autoAnswerModals(pg, answers = {}) {
         const wanted = [...radios].find((r) => r.value === answer) || radios[0];
         wanted.click();
       }
-      const ok = box.querySelector(".ma .btn.primary");
-      if (ok) ok.click();
+      // The accept button is the LAST one in the action row, not the one with
+      // `.primary`: a question about something irreversible styles it `.danger`
+      // instead, and a selector that only knew about `.primary` left every
+      // anular / rescindir / marcar-como-perdida box open — which then blocked
+      // every click after it behind its own scrim.
+      const buttons = box.querySelectorAll(".ma button");
+      const accept = buttons[buttons.length - 1];
+      if (accept) accept.click();
     }, 80);
   }, answers);
 }
