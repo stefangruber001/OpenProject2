@@ -323,6 +323,53 @@
       { code: "onAccount", es: "A cuenta", ca: "A compte" },
       { code: "oneOff", es: "Pago único", ca: "Pagament únic" },
     ],
+    /* Package 1, slide 9: the milestone split printed on a presupuesto — "40%
+       a la firma…" — was a free-text box, so the same split got retyped
+       slightly differently every time and never came back for a comparison.
+       Unlike the lists above, its code IS its Spanish wording rather than a
+       short identifier: nobody types a code for a payment split, they type
+       the split itself, and the picker that replaces the free-text box (see
+       erp.html) lets a new one be added inline without ever leaving the
+       presupuesto — `addListEntry` accepts that exactly as DMC-05 does. */
+    paymentConditions: [
+      {
+        code: "40% a la firma · 40% a mitad de obra · 20% a la finalización",
+        es: "40% a la firma · 40% a mitad de obra · 20% a la finalización",
+        ca: "40% a la signatura · 40% a mitja obra · 20% a la finalització",
+      },
+      {
+        code: "50% a la firma · 50% a la entrega",
+        es: "50% a la firma · 50% a la entrega",
+        ca: "50% a la signatura · 50% a l'entrega",
+      },
+      {
+        code: "30% a la firma · 70% a la entrega",
+        es: "30% a la firma · 70% a la entrega",
+        ca: "30% a la signatura · 70% a l'entrega",
+      },
+      {
+        code: "100% a la entrega",
+        es: "100% a la entrega",
+        ca: "100% a l'entrega",
+      },
+    ],
+    /* Package 1, slide 2: "Próxima acción" was a free-text box on the
+       oportunidad — same reasoning and the same code-is-the-wording shape as
+       paymentConditions above. `scheduleVisit`'s label matches the engine's
+       own default (addOpportunity, "Programar visita") so a lead created
+       before this list existed still resolves to a real entry rather than a
+       synthetic "(retirada)" one. */
+    nextActions: [
+      { code: "Programar visita", es: "Programar visita", ca: "Programar visita" },
+      { code: "Enviar presupuesto", es: "Enviar presupuesto", ca: "Enviar pressupost" },
+      { code: "Volver a llamar", es: "Volver a llamar", ca: "Tornar a trucar" },
+      {
+        code: "Esperar respuesta del cliente",
+        es: "Esperar respuesta del cliente",
+        ca: "Esperar resposta del client",
+      },
+      { code: "Hacer seguimiento", es: "Hacer seguimiento", ca: "Fer seguiment" },
+    ],
     /**
      * GAP 13 — the chart of accounts, and the reason it is a LIST.
      *
@@ -713,6 +760,10 @@
           S.contracts.filter((c) => c.paymentMethod === code).length +
           S.invoices.filter((i) => i.paymentMethod === code).length
         );
+      if (kind === "paymentConditions")
+        return S.budgets.filter((b) => b.paymentConditions === code).length;
+      if (kind === "nextActions")
+        return S.opportunities.filter((o) => o.nextAction === code).length;
       return 0;
     }
 

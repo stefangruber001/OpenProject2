@@ -3365,6 +3365,14 @@
       .cfgtables.two {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+      /* DMC-04 carries three lists since Package 1 #2 — a table on its own in
+         the last row would otherwise sit at half width with empty space
+         beside it. `:last-child:nth-child(odd)` only matches a trailing item
+         with nothing beside it (the 3rd of 3, the 5th of 5…), so a screen
+         with an even count of tables is untouched. */
+      .cfgtables.two > :last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+      }
       .cfghelp {
         background: var(--paper);
         border: 1px solid var(--line);
@@ -9651,7 +9659,7 @@
        <option value="ca"${b.language === "ca" ? " selected" : ""}>Català</option>
       </select></label>
      <label class="grow" style="flex:1 1 220px">Condiciones de pago
-      <input class="grow" id="bcPay" value="${esc(b.paymentConditions || "")}" placeholder="40% a la firma, 60% a la entrega"${dis}></label>
+      <select class="grow" id="bcPay"${dis}>${listOptionsCreatable("paymentConditions", b.paymentConditions || "")}</select></label>
      <label>Superficie <input type="number" id="bcM2" min="0" step="1" style="width:74px" value="${b.surfaceM2 || 0}"${dis}> m²</label>
      <button class="btn sm" id="bcMore">Exclusiones y supuestos (${(b.exclusions || []).length + (b.assumptions || []).length})</button>
      <button class="btn sm" id="bValidate">Validar</button>
@@ -9729,10 +9737,14 @@
           };
           hdr($("#bcValid"), (el) => ({ validityDate: el.value }), "Validez actualizada");
           hdr($("#bcLang"), (el) => ({ language: el.value }), "Idioma del documento actualizado");
-          hdr(
-            $("#bcPay"),
-            (el) => ({ paymentConditions: el.value }),
-            "Condiciones de pago actualizadas",
+          // Not `hdr()`: picking "＋ Nueva…" has to be intercepted before it
+          // ever reaches updateBudget, or the sentinel value "__new__" would
+          // be saved as the condition itself.
+          wireCreatableSelect("#bcPay", "paymentConditions", "Condiciones de pago", (code) =>
+            mutate(
+              () => erp.updateBudget(id, { paymentConditions: code }, "backoffice"),
+              "Condiciones de pago actualizadas",
+            ),
           );
           hdr(
             $("#bcM2"),
@@ -11233,6 +11245,27 @@
           esPlaceholder: "Transferencia 15 días",
           caPlaceholder: "Transferència 15 dies",
         },
+        // Package 1 (#4, #9): the code IS the wording here, not an
+        // abbreviation — a payment split or a next action is typed once, not
+        // coined as an identifier and then labelled. Editing "Nombre (ES)"
+        // still works exactly as it does for the other lists; it is just also
+        // what got stored the first time.
+        paymentConditions: {
+          title: "Condiciones de pago",
+          code: "DMC-05",
+          singular: "condición",
+          codeIsLabel: true,
+          esPlaceholder: "40% a la firma · 60% a la entrega",
+          caPlaceholder: "40% a la signatura · 60% a l'entrega",
+        },
+        nextActions: {
+          title: "Próximas acciones",
+          code: "DMC-04",
+          singular: "acción",
+          codeIsLabel: true,
+          esPlaceholder: "Llamar la semana que viene",
+          caPlaceholder: "Trucar la setmana que ve",
+        },
       };
       /** New-row drafts, keyed by list kind, so a half-typed entry survives re-render. */
       const listDraft = {};
@@ -11286,21 +11319,86 @@
           .join("");
       }
 
+      /**
+       * `listOptions` plus a trailing "＋ Nueva…" choice — for the two lists
+       * where the operator's own wording IS the value (a próxima acción, a
+       * condición de pago) rather than a short code picked from a fixed set.
+       * Package 1 asked for exactly this on both: choose from what exists, or
+       * type the one that doesn't and have it be there next time too.
+       */
+      function listOptionsCreatable(kind, selected) {
+        return listOptions(kind, selected) + `<option value="__new__">＋ Nueva…</option>`;
+      }
+      /**
+       * Wires a `<select>` built by `listOptionsCreatable`. Picking "＋
+       * Nueva…" asks for the wording, writes it into `state.lists[kind]`
+       * (so DMC-04/05 sees it and it survives past this one record), selects
+       * it, and calls `onSet(code)` — the same callback an ordinary choice
+       * gets. Cancelling restores whatever was selected before.
+       *
+       * `onSet` is optional: the leads screens only read `.value` when their
+       * own Guardar button is pressed, so they pass nothing and the select's
+       * value is enough; the presupuestador auto-saves on change and passes
+       * its `hdr()` handler.
+       */
+      function wireCreatableSelect(elId, kind, label, onSet) {
+        const el = $(elId);
+        if (!el) return;
+        let current = el.value;
+        el.onchange = async () => {
+          if (el.value !== "__new__") {
+            current = el.value;
+            if (onSet) onSet(el.value);
+            return;
+          }
+          const text = await askText("Nueva entrada", {
+            label,
+            required: true,
+            okLabel: "Añadir",
+          });
+          if (text === null) {
+            el.value = current;
+            return;
+          }
+          const code = text.trim();
+          try {
+            if (!erp.listAll(kind).some((r) => r.code === code))
+              erp.addListEntry(kind, { code, es: code }, "backoffice");
+          } catch (e) {
+            toast("⚠ " + e.message);
+            el.value = current;
+            return;
+          }
+          persist();
+          el.innerHTML = listOptionsCreatable(kind, code);
+          current = code;
+          if (onSet) onSet(code);
+          else toast("Añadida a la lista");
+        };
+      }
+
       function listConfigTable(kind) {
         const m = LIST_META[kind];
         const rows = erp.listAll(kind);
         const d = listDraft[kind] || { code: "", es: "", ca: "" };
+        // paymentConditions / nextActions: the wording IS the code, so a
+        // narrow "código" column would just repeat the ES column in miniature
+        // — worse, it would wrap a whole sentence into 110px. Their table
+        // skips it: one text is typed once and doubles as the identity, the
+        // same way the other lists treat their short codes.
+        const codeCol = m.codeIsLabel ? "" : `<th style="width:110px">${esc(m.codeLabel)}</th>`;
         return `<div class="card"><div class="ch"><h3>${esc(m.title)}</h3>
     <span class="tag">${rows.filter((r) => r.active !== false).length} activas de ${rows.length}</span></div>
    <div class="scroll"><table><thead><tr>
-     <th style="width:110px">${esc(m.codeLabel)}</th><th>Nombre (ES)</th><th>Nom (CA)</th>
+     ${codeCol}<th>Nombre (ES)</th><th>Nom (CA)</th>
      <th class="num" style="width:70px">En uso</th><th style="width:96px"></th></tr></thead><tbody>
    ${rows
      .map((r) => {
        const used = erp.listEntryUsage(kind, r.code);
        const off = r.active === false;
+       const codeCell = m.codeIsLabel ? "" : `<td class="k">${esc(r.code)}</td>`;
        return `<tr${off ? ' class="retired"' : ""}>
-      <td class="k">${esc(r.code)}</td>
+      ${codeCell}
       <td><input class="inline" data-lk="${kind}" data-lc="${esc(r.code)}" data-lf="es" value="${esc(r.es)}"></td>
       <td><input class="inline" data-lk="${kind}" data-lc="${esc(r.code)}" data-lf="ca" value="${esc(r.ca || "")}"></td>
       <td class="num">${used || "—"}</td>
@@ -11308,7 +11406,7 @@
      })
      .join("")}
    <tr>
-     <td><input class="inline" id="new_${kind}_code" placeholder="${esc(m.codePlaceholder)}" value="${esc(d.code)}"></td>
+     ${m.codeIsLabel ? "" : `<td><input class="inline" id="new_${kind}_code" placeholder="${esc(m.codePlaceholder)}" value="${esc(d.code)}"></td>`}
      <td><input class="inline" id="new_${kind}_es" placeholder="${esc(m.esPlaceholder)}" value="${esc(d.es)}"></td>
      <td><input class="inline" id="new_${kind}_ca" placeholder="${esc(m.caPlaceholder)}" value="${esc(d.ca)}"></td>
      <td></td>
@@ -11354,9 +11452,14 @@
           (b) =>
             (b.onclick = () => {
               const kind = b.dataset.ladd;
-              const code = $("#new_" + kind + "_code").value.trim();
+              const codeInput = $("#new_" + kind + "_code");
               const es = $("#new_" + kind + "_es").value.trim();
               const ca = $("#new_" + kind + "_ca").value.trim();
+              // codeIsLabel kinds have no code box: the Spanish wording being
+              // typed is what gets stored, exactly as it would be if this
+              // same entry were added inline from the presupuestador or the
+              // leads screen (see wireCreatableSelect).
+              const code = codeInput ? codeInput.value.trim() : es;
               // Kept before the mutate so a rejected entry (duplicate code, missing
               // name) is still in the boxes when the toast explains why.
               listDraft[kind] = { code, es, ca };
@@ -12804,18 +12907,25 @@
           );
         },
 
-        /* ---------- Fuentes de leads y motivos de pérdida (DMC-04) ----------
-    Two lists on one screen because they are two halves of one question:
-    where the work comes from, and why it does not close. */
+        /* ---------- Fuentes de leads, motivos de pérdida y próximas acciones (DMC-04) ----------
+    Three lists on one screen because they are three halves of the same
+    question — where the work comes from, what happens with it next, and why
+    it does not close. `nextActions` joined the other two after Package 1
+    (#2): "Próxima acción" was a free-text box on Leads, so the same action
+    got typed a dozen slightly different ways and never rolled up into
+    anything a person could act on. */
         "lead-sources"(v) {
           listConfigScreen(
             v,
-            ["leadSources", "lossReasons"],
-            "De dónde llegan los clientes y por qué se pierden las oportunidades. Las dos listas alimentan los informes de origen y de conversión.",
+            ["leadSources", "lossReasons", "nextActions"],
+            "De dónde llegan los clientes, qué toca hacer con cada oportunidad y por qué se pierden. Las tres listas alimentan los informes de origen y de conversión.",
             `<h4>Dónde se usa</h4>
     <p><b>Fuentes</b> — en la ficha de cada cliente («origen del contacto») y en cada oportunidad.
        Es lo que responde a «¿de dónde viene el trabajo?», así que añadir una fuente propia
        (una feria, un portal concreto) hace el informe más útil, no menos.</p>
+    <p><b>Próximas acciones</b> — al crear una oportunidad y en su ficha. Elegir de una lista en
+       vez de escribir cada vez hace que «llamar la semana que viene» sea la misma frase la
+       décima vez que la primera, y con eso se puede contar cuántas oportunidades esperan qué.</p>
     <p><b>Motivos de pérdida</b> — al marcar una oportunidad como perdida. Sin un motivo escrito
        en el momento, el porqué se pierde y sólo queda el número.</p>
     <h4>Antes existían, pero en el código</h4>
@@ -12824,21 +12934,31 @@
           );
         },
 
-        /* ---------- Formas de pago (DMC-05) ---------- */
+        /* ---------- Formas de pago y condiciones de pago (DMC-05) ----------
+    Two different questions that share a screen because both answer "how does
+    the money move": the METHOD (efectivo, transferencia…) used on contratos
+    y facturas, and the CONDITION — the milestone split printed on a
+    presupuesto — added after Package 1 (#9), which used to be a free-text box
+    where the same split got retyped slightly differently every time. */
         "payment-methods"(v) {
           listConfigScreen(
             v,
-            ["paymentMethods"],
-            "Las condiciones de pago que se ofrecen en contratos y facturas. El vencimiento real lo calcula cada documento; aquí se mantiene la lista.",
+            ["paymentMethods", "paymentConditions"],
+            "Cómo se cobra (formas de pago) y en qué reparto (condiciones de pago). El vencimiento real lo calcula cada documento; aquí se mantienen las listas.",
             `<h4>Dónde se usa</h4>
-    <p>En el contrato y en cada factura emitida, y es lo que se imprime como condición de pago.</p>
-    <p>El código es lo que queda guardado en los documentos ya emitidos, así que no se edita.
-       El nombre sí — <code>transfer30</code> puede pasar de «Transferencia 30 días» a
-       «Transferencia a 30 días fecha factura» sin tocar ninguna factura antigua.</p>
-    <h4>Retirar una forma de pago</h4>
-    <p>Deja de ofrecerse en documentos nuevos. Los contratos y facturas que ya la llevan no
-       cambian: siguen diciendo lo que decían el día que se emitieron, que es justamente lo
-       que un documento fiscal tiene que hacer.</p>`,
+    <p><b>Formas de pago</b> — en el contrato y en cada factura emitida, y es lo que se imprime
+       como condición de pago. El código es lo que queda guardado en los documentos ya
+       emitidos, así que no se edita. El nombre sí — <code>transfer30</code> puede pasar de
+       «Transferencia 30 días» a «Transferencia a 30 días fecha factura» sin tocar ninguna
+       factura antigua.</p>
+    <p><b>Condiciones de pago</b> — el reparto de hitos que se imprime en el presupuesto, por
+       ejemplo «40% a la firma · 60% a la entrega». Se elige de esta lista al escribir el
+       presupuesto, y si el reparto que hace falta no está, se puede crear ahí mismo sin venir
+       a esta pantalla — queda guardado aquí para la próxima vez.</p>
+    <h4>Retirar una entrada</h4>
+    <p>Deja de ofrecerse en documentos nuevos. Los contratos, facturas y presupuestos que ya la
+       llevan no cambian: siguen diciendo lo que decían el día que se emitieron, que es
+       justamente lo que un documento fiscal tiene que hacer.</p>`,
           );
         },
 
@@ -14150,7 +14270,7 @@
    <div class="field full"><label>Trabajo solicitado *</label><input id="o_work" placeholder="Reforma integral de baño"></div>
    <div class="field"><label>Origen *</label><select id="o_src">${listOptions("leadSources")}</select></div>
    <div class="field"><label>Valor estimado (€)</label><input id="o_val" type="number" min="0" step="100" value="0"></div>
-   <div class="field full"><label>Próxima acción</label><input id="o_next" value="Programar visita"></div>
+   <div class="field full"><label>Próxima acción</label><select id="o_next">${listOptionsCreatable("nextActions", "Programar visita")}</select></div>
    <div class="field full" style="margin-top:8px"><button class="btn primary" id="o_save">Crear oportunidad</button></div></div>`;
         // The property list depends on which client is selected, so it is rebuilt
         // on every change rather than loaded once for whichever client happened
@@ -14158,6 +14278,7 @@
         $("#o_party").onchange = (e) => {
           $("#o_prop").innerHTML = propertyOptions(e.target.value, null);
         };
+        wireCreatableSelect("#o_next", "nextActions", "Próxima acción");
         $("#o_save").onclick = () =>
           mutate(() => {
             const work = $("#o_work").value.trim();
@@ -14215,7 +14336,7 @@
    ${
      open
        ? `<div class="card"><div class="ch"><h3>Próxima acción</h3></div><div class="fgrid" style="padding:12px 16px">
-     <div class="field full"><input id="opp_next" value="${esc(o.nextAction || "")}"></div>
+     <div class="field full"><select id="opp_next">${listOptionsCreatable("nextActions", o.nextAction || "")}</select></div>
      <div class="field full"><button class="btn sm" id="opp_savenext">Guardar próxima acción</button></div></div></div>`
        : ""
    }
@@ -14252,6 +14373,7 @@
         );
         const sched = $("#opp_sched");
         if (sched) sched.onclick = () => scheduleVisitDrawer(id);
+        wireCreatableSelect("#opp_next", "nextActions", "Próxima acción");
         const savenext = $("#opp_savenext");
         if (savenext)
           savenext.onclick = () =>

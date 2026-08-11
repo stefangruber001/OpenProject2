@@ -2789,3 +2789,34 @@ different decisions, so these ten arrived colliding. They are renumbered from
   `editPartyDrawer` takes an `onSaved` callback so the visit can borrow it to
   complete a client and get control back, with its own draft intact — the
   alternative was sending someone mid-capture to another screen.
+
+- **#151 — two more free-text boxes become owner-maintained lists (Package 1
+  #2, #9, 2026-08-11).** «Próxima acción» on a lead and «Condiciones de pago»
+  on a presupuesto were typed fresh every time, so the same next step or the
+  same milestone split accumulated a dozen near-identical spellings and never
+  rolled up into anything countable. `lossReasons` already had this treatment
+  (S3); these two join `state.lists` the same way. **Decisions:** (a) unlike
+  the existing lists, **the code IS the Spanish wording**, not a short
+  identifier — nobody coins `earlySplit40` for a payment split, they type the
+  split, and `addListEntry` already accepts any unique string as a code.
+  `LIST_META[kind].codeIsLabel` drops the redundant código column these two
+  tables would otherwise show a full sentence in. (b) `nextActions` ships
+  seeded with `"Programar visita"`, matching the engine's own default
+  (`addOpportunity`), so every existing lead resolves to a real list entry on
+  first render rather than a synthetic "(retirada)" one — `listOptions`
+  already tolerates an unknown code, but tolerating it is not the same as it
+  being wrong to begin with. `paymentConditions` seeds the exact string the
+  demo data already carries for the same reason. (c) **Create-if-missing is a
+  new shared primitive**, `wireCreatableSelect`, not bespoke to either field —
+  a `<select>` built by `listOptionsCreatable` ends in "＋ Nueva…"; picking it
+  asks for the wording, writes it to `state.lists[kind]` so it is there for
+  every later record too, and hands the resolved code to an optional `onSet`.
+  The two leads fields (new-opportunity, the lead drawer) pass no `onSet` —
+  they only read `.value` when their own Guardar button fires — while the
+  presupuestador's condiciones select passes one that calls `updateBudget`
+  immediately, matching how every other field on that bar auto-saves. (d)
+  DMC-04 (Fuentes de leads) now carries three tables instead of two;
+  `.cfgtables.two > :last-child:nth-child(odd) { grid-column: 1 / -1 }` gives
+  a trailing lone table the full row rather than leaving it at half width
+  with empty space beside it — general for any odd count, so a screen with an
+  even number of lists is unaffected.

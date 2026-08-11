@@ -100,7 +100,7 @@ answers to the four questions the deck left open.
 | P1  | The browser's prompt/confirm/alert replaced across the whole site                        | **done** |
 | P2  | Visita: date/time defaults, real camera, the notes-wiped bug, photo viewer               | **done** |
 | P3  | Lead → visita flow: pick the lead, second visit, complete a client inline                | **done** |
-| P4  | Configurable lists: próximas acciones, condiciones de pago (lossReasons already existed) | next     |
+| P4  | Configurable lists: próximas acciones, condiciones de pago (lossReasons already existed) | **done** |
 | P5  | Presupuestador: catalogue picker, chapter dropdown, columns, Siguiente paso              | next     |
 
 **Answers carried forward** (operator, in the thread): the line grid reads

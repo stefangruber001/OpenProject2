@@ -85,6 +85,7 @@ async function main() {
     await testAdmin(browser, base);
     await testControlTowerAndDay(browser, base);
     await testVisitCapture(browser, base);
+    await testConfigurableLists(browser, base);
     await testJourneyRealMode(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
@@ -4150,6 +4151,99 @@ async function testControlTowerAndDay(browser, base) {
 //    #3). "Crear nuevo proyecto" stays the untouched default — testJourney
 //    already covers it end to end — this exercises the ADDITION: picking a
 //    real, already-existing project and seeing real data, not the sample.
+/* Package 1 (#2, #9): "Próxima acción" and "Condiciones de pago" were free
+   text, so the same words got retyped slightly differently every time and
+   never rolled into anything a person could act on or compare. Both are now
+   owner-maintained lists (DMC-04, DMC-05) with a "＋ Nueva…" entry that adds
+   to the list inline, without leaving the screen that needed it. */
+async function testConfigurableLists(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  await autoAnswerModals(pg, { "Nueva entrada": "E2E: valor de prueba" });
+  try {
+    // ---- DMC-04 now carries three lists, DMC-05 two ------------------------
+    await pg.goto(`${base}/erp.html#lead-sources`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+    const dmc04 = await pg.evaluate(() =>
+      [...document.querySelectorAll(".cfgtables h3")].map((h) => h.textContent),
+    );
+    if (dmc04.includes("Próximas acciones"))
+      ok("DMC-04: próximas acciones is a managed list alongside fuentes y motivos");
+    else bad("DMC-04: próximas acciones present", JSON.stringify(dmc04));
+
+    await pg.evaluate(() => (location.hash = "payment-methods"));
+    await pg.waitForTimeout(700);
+    const dmc05 = await pg.evaluate(() =>
+      [...document.querySelectorAll(".cfgtables h3")].map((h) => h.textContent),
+    );
+    if (dmc05.includes("Condiciones de pago"))
+      ok("DMC-05: condiciones de pago is a managed list alongside formas de pago");
+    else bad("DMC-05: condiciones de pago present", JSON.stringify(dmc05));
+
+    // ---- Leads: "Nueva oportunidad" offers a select, not a text box -------
+    await pg.evaluate(() => (location.hash = "leads"));
+    await pg.waitForTimeout(700);
+    await pg.click("text=＋ Nueva oportunidad");
+    await pg.waitForTimeout(500);
+    const nextTag = await pg.evaluate(() => document.querySelector("#o_next")?.tagName);
+    if (nextTag === "SELECT") ok("leads: «Próxima acción» is a select fed by the list");
+    else bad("leads: próxima acción is a select", nextTag);
+
+    // create one inline and confirm it landed in the list too
+    await pg.selectOption("#o_next", "__new__");
+    await pg.waitForTimeout(500);
+    const created = await pg.evaluate(() => document.querySelector("#o_next")?.value);
+    if (created === "E2E: valor de prueba")
+      ok("leads: a new próxima acción can be created without leaving the drawer");
+    else bad("leads: inline creation of a próxima acción", created);
+    const inEngineList = await pg.evaluate(() =>
+      erp.listAll("nextActions").some((r) => r.code === "E2E: valor de prueba"),
+    );
+    if (inEngineList) ok("leads: the new próxima acción is saved to the owner-maintained list");
+    else bad("leads: new próxima acción persisted to state.lists", "not found");
+    await pg.evaluate(() => closeDrawer());
+
+    // ---- Presupuestador: "Condiciones de pago" is a select, pre-selected --
+    const bid = await pg.evaluate(() => {
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      go("quotes", b.id);
+      return b.id;
+    });
+    await pg.waitForTimeout(800);
+    const bcpay = await pg.evaluate(() => ({
+      tag: document.querySelector("#bcPay")?.tagName,
+      value: document.querySelector("#bcPay")?.value,
+    }));
+    const expected = await pg.evaluate(
+      (id) => erp.state.budgets.find((b) => b.id === id).paymentConditions,
+      bid,
+    );
+    if (bcpay.tag === "SELECT" && bcpay.value === expected)
+      ok("presupuestador: «Condiciones de pago» is a select, pre-selected to the stored value");
+    else bad("presupuestador: bcPay select + preselection", JSON.stringify({ bcpay, expected }));
+
+    await pg.selectOption("#bcPay", "__new__");
+    await pg.waitForTimeout(600);
+    const savedCond = await pg.evaluate(
+      (id) => erp.state.budgets.find((b) => b.id === id).paymentConditions,
+      bid,
+    );
+    if (savedCond === "E2E: valor de prueba")
+      ok("presupuestador: a new condición de pago saves to the budget without leaving the screen");
+    else bad("presupuestador: inline condición de pago saved", savedCond);
+
+    if (errs.length) bad("listas configurables: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("listas configurables: no console errors");
+  } catch (e) {
+    bad("listas configurables: suite completed", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
 /* COM-02 after the operator's Package 1 review. Five separate complaints, all
    about the same screen, and each one is a check here:
      · "+ Programar visita" chose a customer for you — it must ask which lead
