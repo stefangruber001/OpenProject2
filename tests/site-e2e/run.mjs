@@ -4163,7 +4163,11 @@ async function testPresupuestadorRework(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
   const errs = [];
   attachConsole(pg, errs);
-  await autoAnswerModals(pg);
+  // Deliberately NO autoAnswerModals here: this suite inspects the chapter
+  // picker's own contents, and the auto-answerer would press its primary
+  // button within 80 ms and leave nothing to look at. Nothing else in this
+  // suite opens a question, and the one modal it does open is dismissed with
+  // Escape below.
   try {
     await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
     await bootedShell(pg);
@@ -4381,9 +4385,13 @@ async function testConfigurableLists(browser, base) {
       return b.id;
     });
     await pg.waitForTimeout(800);
+    // The select lives in the "Siguiente paso" drawer, not on the bar — P5
+    // moved everything about FINISHING behind that one button.
+    await pg.click("#bcNext");
+    await pg.waitForTimeout(600);
     const bcpay = await pg.evaluate(() => ({
-      tag: document.querySelector("#bcPay")?.tagName,
-      value: document.querySelector("#bcPay")?.value,
+      tag: document.querySelector("#ns_pay")?.tagName,
+      value: document.querySelector("#ns_pay")?.value,
     }));
     const expected = await pg.evaluate(
       (id) => erp.state.budgets.find((b) => b.id === id).paymentConditions,
@@ -4391,9 +4399,10 @@ async function testConfigurableLists(browser, base) {
     );
     if (bcpay.tag === "SELECT" && bcpay.value === expected)
       ok("presupuestador: «Condiciones de pago» is a select, pre-selected to the stored value");
-    else bad("presupuestador: bcPay select + preselection", JSON.stringify({ bcpay, expected }));
+    else
+      bad("presupuestador: condiciones select + preselection", JSON.stringify({ bcpay, expected }));
 
-    await pg.selectOption("#bcPay", "__new__");
+    await pg.selectOption("#ns_pay", "__new__");
     await pg.waitForTimeout(600);
     const savedCond = await pg.evaluate(
       (id) => erp.state.budgets.find((b) => b.id === id).paymentConditions,
