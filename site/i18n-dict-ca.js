@@ -1218,6 +1218,13 @@ window.CANEI_DICT.ca = {
   Justificante: "Justificant",
   Quitar: "Treu",
   Documento: "Document",
+  // PK2-B: version navigator + send drawer.
+  "Ir a otra versión": "Ves a una altra versió",
+  "Fecha de envío": "Data d'enviament",
+  "Envío de presupuesto": "Enviament del pressupost",
+  "Sin móvil registrado — añádalo en Datos maestros para poder abrir WhatsApp":
+    "Sense mòbil registrat — afegeix-lo a Dades mestres per poder obrir el WhatsApp",
+  viendo: "veient",
 };
 window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Programar visita — (.+)$"), "Programar visita — $1"],
@@ -1231,4 +1238,8 @@ window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Ya hay (\\d+) visita$"), "Ja hi ha $1 visita"],
   [new RegExp("^(\\d+) partidas$"), "$1 partides"],
   [new RegExp("^(\\d+) partida$"), "$1 partida"],
+  // PK2-B: the version-picker <option> text.
+  [new RegExp("^(v[\\d.]+) · aceptada$"), "$1 · acceptada"],
+  [new RegExp("^(v[\\d.]+) · emitida$"), "$1 · emesa"],
+  [new RegExp("^(v[\\d.]+) · borrador$"), "$1 · esborrany"],
 ];

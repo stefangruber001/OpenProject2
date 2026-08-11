@@ -88,6 +88,7 @@ async function main() {
     await testConfigurableLists(browser, base);
     await testPresupuestadorRework(browser, base);
     await testEvidence(browser, base);
+    await testSendAndVersions(browser, base);
     await testJourneyRealMode(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
@@ -4536,6 +4537,258 @@ async function testEvidence(browser, base) {
     bad("evidence: suite completed", String(e).slice(0, 200));
   } finally {
     await pg.close();
+  }
+}
+
+/* Package 2 slide 2 (PK2-B): "No hay forma de ir a cada una de las
+   versiones" — the builder header named the version it was showing but gave
+   no way to REACH any other one. Package 2 slide 1: the send drawer's
+   channels didn't do anything channel-specific — WhatsApp needed a real
+   deep-link, email needed to go through the operator's own template, "en
+   mano" needed a backdatable date/time, and there was no way to get a PDF
+   at all. */
+async function testSendAndVersions(browser, base) {
+  const errs = [];
+  let ctx, pg;
+  async function freshPage() {
+    ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+    pg = await ctx.newPage();
+    await pg.addInitScript(() => {
+      window.__opened = [];
+      const orig = window.open;
+      window.open = (url) => {
+        window.__opened.push(url);
+        return null;
+      };
+    });
+    attachConsole(pg, errs);
+    await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+  }
+  try {
+    // ---- version navigator: the header picker and the drawer's own list ---
+    await freshPage();
+    const target = await pg.evaluate(() => {
+      const b = erp.state.budgets.find((x) => x.versions.length > 1);
+      if (!b) return null;
+      go("quotes", b.id);
+      return { id: b.id, versions: b.versions.length };
+    });
+    if (!target) {
+      bad("versions: a multi-version budget exists to navigate", "none in the seed");
+    } else {
+      await pg.waitForTimeout(700);
+      const picker = await pg.evaluate(() => {
+        const s = document.querySelector("#bVerPick");
+        return s ? { count: s.options.length, val: s.value } : null;
+      });
+      if (picker && picker.count === target.versions)
+        ok("versions: the builder header offers every version, not only the current one");
+      else bad("versions: header picker options", JSON.stringify(picker));
+
+      await pg.evaluate(() => {
+        const s = document.querySelector("#bVerPick");
+        const other = [...s.options].find((o) => o.value !== s.value);
+        s.value = other.value;
+        s.dispatchEvent(new Event("change"));
+      });
+      await pg.waitForTimeout(600);
+      const opened = await pg.evaluate(() => ({
+        title: document.querySelector("#dttl")?.textContent || "",
+      }));
+      if (/PRE-/.test(opened.title))
+        ok("versions: picking another version opens its full document");
+      else bad("versions: picked version opens a document", JSON.stringify(opened));
+
+      // Jumping between versions from inside the drawer itself, via the
+      // clickable rows in its own "Versiones" list.
+      const rows = await pg.evaluate(() => document.querySelectorAll("[data-goverid]").length);
+      if (rows >= 1) {
+        await pg.click("[data-goverid]");
+        await pg.waitForTimeout(500);
+        const after = await pg.evaluate(() => ({
+          title: document.querySelector("#dttl")?.textContent || "",
+          activeMarked: !!document.querySelector(".daylist .it.active"),
+        }));
+        if (/PRE-/.test(after.title) && after.activeMarked)
+          ok("versions: the version list inside Vista previa is itself clickable");
+        else bad("versions: in-drawer version jump", JSON.stringify(after));
+      } else bad("versions: clickable rows in the Versiones card", rows);
+    }
+
+    // ---- send: WhatsApp deep-link ------------------------------------------
+    await ctx.close();
+    await freshPage();
+    const wa = await pg.evaluate(() => {
+      const b = erp.state.budgets.find(
+        (x) =>
+          erp.budgetStage(x) === "draft" &&
+          erp.party(x.partyId).mobile &&
+          !erp.validateBudget(x.id).some((i) => i.level === "block"),
+      );
+      if (!b) return null;
+      go("quotes", b.id);
+      return { id: b.id, mobile: erp.party(b.partyId).mobile };
+    });
+    if (!wa) {
+      bad("send: a clean draft with a mobile exists", "none in the seed");
+    } else {
+      await pg.waitForTimeout(700);
+      await pg.click("#bSend");
+      await pg.waitForTimeout(400);
+      await pg.selectOption("#sbChannel", "whatsapp");
+      await pg.waitForTimeout(200);
+      await pg.click("#sbGo");
+      await pg.waitForTimeout(700);
+      const result = await pg.evaluate((bid) => {
+        const b = erp.budget(bid);
+        const v = erp.version(bid, b.currentVersionId);
+        return { issued: v.issued, channel: v.sent && v.sent.channel, opened: window.__opened };
+      }, wa.id);
+      const link = (result.opened || [])[0] || "";
+      if (result.issued && result.channel === "whatsapp")
+        ok("send: WhatsApp channel issues and freezes the version");
+      else bad("send: whatsapp issues version", JSON.stringify(result));
+      if (link.startsWith("https://wa.me/34") && /text=/.test(link))
+        ok("send: WhatsApp opens a wa.me deep-link with the covering message pre-filled");
+      else bad("send: whatsapp deep-link", link);
+    }
+
+    // ---- send: email goes through the operator's own comms template -------
+    await ctx.close();
+    await freshPage();
+    const em = await pg.evaluate(() => {
+      const b = erp.state.budgets.find(
+        (x) =>
+          erp.budgetStage(x) === "draft" &&
+          erp.party(x.partyId).email &&
+          !erp.validateBudget(x.id).some((i) => i.level === "block"),
+      );
+      if (!b) return null;
+      go("quotes", b.id);
+      return { id: b.id, email: erp.party(b.partyId).email };
+    });
+    if (!em) {
+      bad("send: a clean draft with an email exists", "none in the seed");
+    } else {
+      await pg.waitForTimeout(700);
+      await pg.click("#bSend");
+      await pg.waitForTimeout(400);
+      await pg.click("#sbGo"); // default channel is email
+      await pg.waitForTimeout(700);
+      const result = await pg.evaluate((args) => {
+        const b = erp.budget(args.id);
+        const v = erp.version(args.id, b.currentVersionId);
+        const q = erp.state.commsQueue.find((x) => x.subjectRef === b.number);
+        return {
+          issued: v.issued,
+          channel: v.sent && v.sent.channel,
+          queued: q ? { status: q.status, to: q.to, template: q.templateKey } : null,
+        };
+      }, em);
+      if (result.issued && result.channel === "email")
+        ok("send: email channel issues and freezes the version");
+      else bad("send: email issues version", JSON.stringify(result));
+      if (
+        result.queued &&
+        result.queued.status === "sent" &&
+        result.queued.to === em.email &&
+        result.queued.template === "quote-send"
+      )
+        ok("send: the covering email is recorded through the same comms queue as everything else");
+      else bad("send: email recorded via comms queue", JSON.stringify(result));
+    }
+
+    // ---- send: "en mano", backdated -----------------------------------------
+    await ctx.close();
+    await freshPage();
+    const hand = await pg.evaluate(() => {
+      const b = erp.state.budgets.find(
+        (x) =>
+          erp.budgetStage(x) === "draft" &&
+          !erp.validateBudget(x.id).some((i) => i.level === "block"),
+      );
+      if (!b) return null;
+      go("quotes", b.id);
+      return { id: b.id };
+    });
+    if (!hand) {
+      bad("send: a clean draft exists for the manual channel", "none in the seed");
+    } else {
+      await pg.waitForTimeout(700);
+      await pg.click("#bSend");
+      await pg.waitForTimeout(400);
+      await pg.selectOption("#sbChannel", "hand");
+      await pg.waitForTimeout(200);
+      const dateFields = await pg.evaluate(() => ({
+        dateVisible: getComputedStyle(document.querySelector("#sbHandDateRow")).display !== "none",
+        timeVisible: getComputedStyle(document.querySelector("#sbHandTimeRow")).display !== "none",
+      }));
+      if (dateFields.dateVisible && dateFields.timeVisible)
+        ok("send: choosing «en mano» reveals a date and time to record, not a popup on a popup");
+      else bad("send: hand-channel date/time fields appear", JSON.stringify(dateFields));
+      const backdate = await pg.evaluate(() => {
+        const d = new Date(erp.today + "T00:00:00");
+        d.setDate(d.getDate() - 2);
+        const iso = d.toISOString().slice(0, 10);
+        document.querySelector("#sbHandDate").value = iso;
+        document.querySelector("#sbHandTime").value = "10:15";
+        return iso;
+      });
+      await pg.click("#sbGo");
+      await pg.waitForTimeout(700);
+      const result = await pg.evaluate((args) => {
+        const b = erp.budget(args.id);
+        const v = erp.version(args.id, b.currentVersionId);
+        return v.sent;
+      }, hand);
+      if (result && result.date === backdate && result.time === "10:15")
+        ok("send: «en mano» records the real send date and time, backdated");
+      else bad("send: hand-channel backdate persisted", JSON.stringify({ result, backdate }));
+    }
+
+    // ---- download: the PDF print sheet --------------------------------------
+    // Needs the send drawer open, which needs an UNLOCKED draft — a version
+    // already issued or accepted has no "Enviar" button at all.
+    await ctx.close();
+    await freshPage();
+    const dlOk = await pg.evaluate(() => {
+      const b = erp.state.budgets.find(
+        (x) =>
+          erp.budgetStage(x) === "draft" &&
+          !erp.validateBudget(x.id).some((i) => i.level === "block"),
+      );
+      if (!b) return false;
+      go("quotes", b.id);
+      return true;
+    });
+    if (!dlOk) throw new Error("no clean draft left for the download-PDF check");
+    await pg.waitForTimeout(700);
+    await pg.click("#bSend");
+    await pg.waitForTimeout(400);
+    const printResult = await pg.evaluate(async () => {
+      let existsDuring = null;
+      const origPrint = window.print;
+      window.print = () => {
+        existsDuring = !!document.querySelector(".printsheet .doc");
+      };
+      document.querySelector("#sbDownload").click();
+      await new Promise((r) => setTimeout(r, 900));
+      const existsAfter = !!document.querySelector(".printsheet");
+      window.print = origPrint;
+      return { existsDuring, existsAfter };
+    });
+    if (printResult.existsDuring && !printResult.existsAfter)
+      ok("send: «⤓ Descargar» prints exactly the customer document, then cleans up");
+    else bad("send: download PDF print sheet", JSON.stringify(printResult));
+
+    if (errs.length) bad("send/versions: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("send/versions: no console errors");
+  } catch (e) {
+    bad("send/versions: suite completed", String(e).slice(0, 200));
+  } finally {
+    if (ctx) await ctx.close();
   }
 }
 

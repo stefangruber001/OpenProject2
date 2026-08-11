@@ -187,3 +187,58 @@ dead "no se ha podido mostrar" — but **the two older panes do not**, and still
 show that dead end on such a browser. They should get the same escape hatch,
 or the vendored pdf.js should be pinned to a version that matches the browsers
 the operator actually runs.
+
+### PK2-B — **done**
+
+Slide 2: the builder header named the version it was showing but gave no way
+to reach any other one. Slide 1: the send drawer's three channels didn't do
+anything channel-specific, and there was no way to get a PDF at all.
+
+- **A version picker in the builder header** (`#bVerPick`), next to the
+  existing `v1.1` label — every version, not only the current one. Picking
+  one opens the read-only document Vista previa already knew how to render,
+  rather than making the edit grid itself try to show two versions' data:
+  only the current version is ever editable, so that stays exactly as it
+  was. The picker snaps back to the version actually being edited once the
+  document closes, so it never claims the builder is showing something it
+  is not.
+- **The "Versiones" list inside Vista previa is itself clickable now** —
+  every other version is one click away from there too, and the one being
+  viewed is marked (`viendo`) rather than left indistinguishable from the
+  rest.
+- **A real bug, only reachable once there was a way to view an older
+  version**: the drawer title appended "(aceptada)" whenever the BUDGET had
+  an accepted version anywhere, not only when the version on screen WAS that
+  one. Invisible before this session, because nothing could open a
+  non-accepted version's document; wrong on the very screen this session
+  built. Fixed to check the version being shown, not the budget overall.
+- **The send drawer's three channels now do three different things:**
+  WhatsApp opens a real `wa.me` deep-link with the covering message
+  pre-filled from the operator's own template, addressed to the party's
+  mobile in E.164 form; email is recorded through the exact same log-only
+  comms queue every other message in this system goes through — queued,
+  approved and marked sent in one motion, because a person pressing this
+  button IS the approval, not an automated rule bypassing one; "en mano"
+  reveals a date and time field instead of the browser's `confirm()`-era
+  approach of assuming "now", and the date may be backdated but never
+  postdated — the same rule PK2-A's acceptance date already established.
+- **A new comms template, `quote-send`**, seeded alongside the existing
+  `quote-followup` — "Envío de presupuesto" is what actually goes out when a
+  presupuesto is sent, and it belongs in Configuración → Comunicaciones like
+  every other wording in this system, not hardcoded in the send drawer.
+- **"⤓ Descargar" prints exactly the customer document.** No PDF library was
+  added: the browser's own print dialog is the established pattern here
+  (`#tPrint` already used it), and what was missing was isolating the
+  document on its own sheet rather than printing the drawer and the rail
+  around it. `budgetDrawer`'s `.doc` markup was pulled into
+  `renderBudgetDocHtml()` so the download prints the identical HTML Vista
+  previa shows on screen — never a second copy that could drift.
+
+**Consciously not attempted:** a literal one-tap "attach the PDF and send" on
+WhatsApp. A browser cannot push a file into WhatsApp on the user's behalf —
+`wa.me` accepts pre-filled TEXT only, and doing better needs the WhatsApp
+Business API, a real credential outside this session's scope (a candidate for
+`INTEGRATIONS_PENDING.md` if the operator wants it built). Likewise "real"
+email delivery: the mandate is explicit — no real emails, fakes behind ports
+only — so the email channel goes through the same log-only queue as every
+other communication in this system, honestly, rather than pretending to send.

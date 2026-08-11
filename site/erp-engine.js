@@ -1939,7 +1939,18 @@
           issues.push({ level: "block", line: c.num, msg: "Capítulo con margen negativo" });
       return issues;
     }
-    issueVersion(budgetId, { channel } = {}, user) {
+    /**
+     * @param sentDate  when the document actually left, for the "a mano"
+     *                  channel — a paper copy handed over yesterday is
+     *                  recorded on the day it happened, not on the day
+     *                  somebody got round to logging it. Defaults to today.
+     *                  A future date is refused, same reasoning as
+     *                  acceptVersion: nothing can be sent tomorrow.
+     * @param sentTime  the clock time alongside sentDate, free text (HH:MM),
+     *                  optional — a date is always known, a time is not
+     *                  always worth asking for.
+     */
+    issueVersion(budgetId, { channel, sentDate, sentTime } = {}, user) {
       // QUO-02/05/07: freeze + generate customer doc from data
       const b = this.budget(budgetId);
       const v = this.currentVersion(budgetId);
@@ -1958,6 +1969,8 @@
       const ch = channel || "email";
       if (ch === "email" && !validEmail(this.party(b.partyId).email))
         throw new Error("Email required to send electronically (MDM-04)");
+      const when = sentDate || this.state.today;
+      if (when > this.state.today) throw new Error("The send date cannot be in the future");
       v.issued = true;
       v.frozen = true;
       // PRE-10: freezing a version freezes its annex. The images are already
@@ -1966,7 +1979,7 @@
       // under an already-sent document. Snapshot them here so a reissued PDF is
       // laid out exactly as the one the customer received.
       v.annex = clone(b.annex || { enabled: true, imagesPerPage: 2 });
-      v.sent = { date: this.state.today, channel: ch }; // QUO-09 + MDM-04
+      v.sent = { date: when, time: sentTime || null, channel: ch }; // QUO-09 + MDM-04
       v.docRef = this._docName("presupuesto", b, v); // DOC-04
       b.status = "issued";
       const o = this.state.opportunities.find(

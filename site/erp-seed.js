@@ -1251,6 +1251,18 @@
        (nothing is ever sent from here). */
     [
       {
+        // Package 2 slide 1: sending a presupuesto by email or WhatsApp reads
+        // this template — it is the covering message, not the document
+        // itself — so the wording is owner-editable here rather than fixed
+        // in the send drawer's own code.
+        key: "quote-send",
+        label: "Envío de presupuesto",
+        family: "comercial",
+        subject: "Su presupuesto {{number}}",
+        body: "Hola {{cliente}},\n\nAdjuntamos el presupuesto {{number}}. Quedamos a su disposición para cualquier duda.\n\nUn saludo,\nCanei Subirats",
+        attach: "budget",
+      },
+      {
         key: "quote-followup",
         label: "Seguimiento de presupuesto",
         family: "comercial",

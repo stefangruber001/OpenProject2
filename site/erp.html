@@ -773,6 +773,18 @@
         color: var(--ink);
         font-variant-numeric: tabular-nums;
       }
+      .daylist .it.click {
+        cursor: pointer;
+      }
+      .daylist .it.click:hover {
+        color: var(--greenDeep);
+      }
+      /* The one row of a version list that IS what is on screen right now —
+         distinct from the others, which is the whole point of a navigator:
+         you can tell where you are, not only where you could go. */
+      .daylist .it.active {
+        font-weight: 600;
+      }
       .doc {
         background: #fbfdf9;
         border: 1px dashed var(--line);
@@ -3258,6 +3270,35 @@
         .camview {
           display: none;
         }
+        /* downloadBudgetPdf appends exactly one .printsheet as the last child
+           of body and calls window.print(). Hiding every OTHER direct child
+           of body is what keeps the rail, the drawer and its scrim out of the
+           printed page — the sheet does not need its own print stylesheet,
+           it only needs to be alone. */
+        body > *:not(.printsheet) {
+          display: none !important;
+        }
+      }
+      .printsheet {
+        display: none;
+      }
+      @media print {
+        .printsheet {
+          display: block;
+          padding: 20px;
+        }
+        /* On screen .doc reads as a PREVIEW of a document — dashed border,
+           tinted paper. On paper it IS the document, so it prints as one:
+           plain white, no border, no rounded corners pretending to be a card. */
+        .printsheet .doc {
+          background: #fff;
+          border: 0;
+          border-radius: 0;
+          padding: 0;
+        }
+        .printsheet .annexpg {
+          break-before: page;
+        }
       }
 
       .scrim {
@@ -4039,6 +4080,18 @@
         const p = String(iso).split("-");
         return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
       };
+      /* wa.me needs digits only, in international form with no leading "+".
+     Every mobile in this system is stored as a bare 9-digit Spanish number
+     (see the party record), so a 9-digit value gets the country code
+     prefixed; anything else is passed through digit-stripped, on the chance
+     it was already typed with one. Tenant-specific, and that is fine here —
+     `site/` is the host layer CLAUDE.md carves out for exactly this: the
+     kernel and capabilities never see a country code, this file already
+     hardcodes "España" as the default billing country. */
+      function waPhone(raw) {
+        const digits = String(raw || "").replace(/\D/g, "");
+        return digits.length === 9 ? "34" + digits : digits;
+      }
       function toast(m) {
         const t = $("#toast");
         t.textContent = m;
@@ -10179,6 +10232,26 @@
     <div class="pbbar">
      <button class="btn sm" id="bBack" title="Todos los presupuestos">←</button>
      <div class="who"><b>${b.number} · v${V.vNumber}</b><span>${esc(erp.party(b.partyId).name)}</span></div>
+     ${
+       b.versions.length > 1
+         ? // Package 2 slide 2: the header named the version being edited but
+           // offered no way to REACH any other one. Every version already
+           // renders in full through budgetDrawer — this just makes them
+           // reachable from the one screen the operator is actually looking
+           // at, instead of only from the "Versiones" list buried inside
+           // Vista previa.
+           `<select id="bVerPick" title="Ir a otra versión" style="max-width:130px">
+       ${b.versions
+         .slice()
+         .reverse()
+         .map(
+           (x) =>
+             `<option value="${esc(x.id)}"${x.id === vsel ? " selected" : ""}>v${x.vNumber}${x.id === b.acceptedVersionId ? " · aceptada" : x.issued ? " · emitida" : " · borrador"}</option>`,
+         )
+         .join("")}
+      </select>`
+         : ""
+     }
      <span class="pill ${meta[2]}">${meta[1]}</span>
      ${locked && stage !== "accepted" ? '<span class="pill b">Congelada</span>' : ""}
      <div class="tot"><span>Total</span><b id="pbTotal">${eur(t.grandCents)}</b></div>
@@ -10247,6 +10320,21 @@
    </div>`;
 
         $("#bBack").onclick = () => go("quotes");
+        const verPick = $("#bVerPick");
+        if (verPick)
+          // The builder only ever EDITS the current version — v1.0 cannot be
+          // reopened for changes once v1.1 exists, that is what a new version
+          // is for. Picking an older one here opens the full read-only
+          // document Vista previa already renders, rather than trying to make
+          // the edit grid itself show two different versions' data.
+          verPick.onchange = () => {
+            const picked = verPick.value;
+            if (picked === vsel) return;
+            budgetDrawer(id, picked);
+            // Leaving the dropdown on the just-viewed version would claim the
+            // builder is now showing it, which it is not.
+            verPick.value = vsel;
+          };
         const addChap = $("#bAddChap");
         if (addChap)
           /* Package 1, slide 8: "los Capítulos deberían ser un dropdown list de
@@ -11549,16 +11637,99 @@
        <option value="whatsapp">WhatsApp</option>
        <option value="hand">En mano</option>
       </select></label></div>
+    <div class="it" id="sbWaWarn" style="display:none"><span class="pill y">Sin móvil registrado — añádalo en Datos maestros para poder abrir WhatsApp</span></div>
+    <div class="it" id="sbHandDateRow" style="display:none"><label class="opt">Fecha de envío
+      <input id="sbHandDate" type="date" value="${esc(erp.today)}" max="${esc(erp.today)}" style="margin-left:auto"></label></div>
+    <div class="it" id="sbHandTimeRow" style="display:none"><label class="opt">Hora
+      <input id="sbHandTime" type="time" value="${nowHHMM()}" style="margin-left:auto"></label></div>
     <div class="it"><span>Al enviar, esta versión queda congelada: el documento del cliente se podrá reproducir siempre tal cual salió. Para cambiar algo después hay que crear una versión nueva.</span></div>
-    <div class="it"><button class="btn primary" id="sbGo"${blocks.length ? " disabled" : ""}>${blocks.length ? "Corrija los bloqueos primero" : "Enviar y congelar la versión"}</button></div>
+    <div class="it"><button class="btn sm" id="sbDownload">⤓ Descargar</button><span style="flex:1"></span>
+     <button class="btn primary" id="sbGo"${blocks.length ? " disabled" : ""}>${blocks.length ? "Corrija los bloqueos primero" : "Enviar y congelar la versión"}</button></div>
    </div></div>`;
+        $("#sbDownload").onclick = () => downloadBudgetPdf(id, vsel);
+        const chSel = $("#sbChannel");
         const go = $("#sbGo");
+        // Progressive disclosure, not a second popup: slide 1 asked for a
+        // pop-up to catch the date and time on "en mano", but this drawer IS
+        // already the one screen that question belongs to — a field that
+        // only appears once it is relevant reads the same to the operator
+        // and does not stack a modal on top of an open drawer.
+        const syncChannel = () => {
+          const ch = chSel.value;
+          const isHand = ch === "hand";
+          const isWa = ch === "whatsapp";
+          const waBlocked = isWa && !party.mobile;
+          $("#sbHandDateRow").style.display = isHand ? "" : "none";
+          $("#sbHandTimeRow").style.display = isHand ? "" : "none";
+          $("#sbWaWarn").style.display = waBlocked ? "" : "none";
+          if (!blocks.length) {
+            go.disabled = waBlocked;
+            go.textContent = waBlocked
+              ? "Añada un móvil para enviar por WhatsApp"
+              : "Enviar y congelar la versión";
+          }
+        };
+        chSel.onchange = syncChannel;
+        syncChannel();
         if (go && !blocks.length)
-          go.onclick = () =>
+          go.onclick = () => {
+            const ch = chSel.value;
+            let waLink = null;
             mutate(() => {
-              erp.issueVersion(id, { channel: $("#sbChannel").value }, "backoffice");
+              const opts = { channel: ch };
+              if (ch === "hand") {
+                opts.sentDate = $("#sbHandDate").value || erp.today;
+                opts.sentTime = $("#sbHandTime").value || null;
+              }
+              erp.issueVersion(id, opts, "backoffice");
+              // The covering message — not the document itself — comes from
+              // the operator's own "Envío de presupuesto" template in
+              // Configuración → Comunicaciones, exactly as slide 1 asked.
+              if (ch === "email" || ch === "whatsapp") {
+                const tpl = erp.commsTemplate("quote-send");
+                if (tpl) {
+                  const vars = { number: b.number, cliente: party.name };
+                  const C = commsApi();
+                  const body = C ? C.render(tpl.body, vars) : tpl.body;
+                  if (ch === "whatsapp" && party.mobile)
+                    waLink =
+                      "https://wa.me/" +
+                      waPhone(party.mobile) +
+                      "?text=" +
+                      encodeURIComponent(body);
+                  if (ch === "email") {
+                    // Recorded through the SAME log-only queue every other
+                    // communication in this system goes through (§5.7's own
+                    // note: "the mandate is explicit — no real emails"). This
+                    // is a person pressing send on ONE specific message, not
+                    // an automated rule, so it is queued and marked sent in
+                    // the same motion rather than left for a later approval
+                    // step nobody is waiting to give.
+                    const q = erp.queueCommunication(
+                      {
+                        ruleId: null,
+                        event: "quote-send",
+                        subjectRef: b.number,
+                        template: tpl.key,
+                        to: party.email,
+                        channel: "email",
+                        dueDate: erp.today,
+                        vars,
+                      },
+                      "backoffice",
+                    );
+                    erp.approveCommunication(q.id, "backoffice");
+                    erp.recordCommunicationSent(q.id, "backoffice");
+                  }
+                }
+              }
               closeDrawer();
             }, "Presupuesto enviado — versión congelada");
+            // A real send — even the WhatsApp text prefill — is a browser
+            // side effect, not a state mutation, so it happens once mutate()
+            // has actually committed rather than racing it.
+            if (waLink) window.open(waLink, "_blank", "noopener");
+          };
       }
 
       /* The customer's answer. One version, one answer — so this drawer closes the
@@ -15583,40 +15754,14 @@
             go("tower");
           }, "Tarea creada");
       }
-      function budgetDrawer(id, versionId) {
-        const b = erp.budget(id);
-        const vsel = versionId || b.acceptedVersionId || b.currentVersionId;
-        const V = erp.version(id, vsel);
-        const t = erp.budgetTotals(id, vsel);
-        const doc = erp.renderBudgetDoc(id, vsel);
-        /* The annex is laid out by @repo/capability-docs through the bridge: which
-     picture goes on which page, in what order, under what reference. This view
-     decides none of it — it only paints what came back, and asks the same
-     object which rows carry the discreet mark. */
-        const annex =
-          typeof ErpBridge !== "undefined" && ErpBridge.docs
-            ? ErpBridge.docs.annex(doc)
-            : { enabled: false, pages: [], plateCount: 0, markedItems: [] };
-        const marked = new Set(annex.markedItems);
-        const perPage = (doc.annex && doc.annex.imagesPerPage) || 2;
-        const db = openDrawer(
-          b.number + " · v" + V.vNumber + (b.acceptedVersionId ? " (aceptada)" : ""),
-        );
+      /* The customer document itself — chapters, totals, annex, conditions.
+   Pulled out of budgetDrawer so the download-PDF button (Package 2 slide 1)
+   can print EXACTLY this markup on its own sheet, rather than a second copy
+   that could drift from what Vista previa shows on screen. */
+      function renderBudgetDocHtml(doc, annex, marked, perPage, b, t) {
         const L = DOCL[doc.language] || DOCL.es;
         const SEC = L.sections;
-        db.innerHTML = `
-   <div class="card"><div class="ch"><h3>Versiones</h3><span class="tag">automáticas, emitidas = congeladas</span></div><div class="daylist">
-    ${b.versions.map((x) => `<div class="it"><b>v${x.vNumber}</b> ${fmtD(x.date)} · ${esc(x.reason || "—")} ${x.id === b.acceptedVersionId ? '<span class="pill g">Aceptada</span>' : x.issued ? '<span class="pill b">Emitida</span>' : '<span class="pill y">Borrador</span>'}${x.sent ? ` · enviada por ${x.sent.channel}` : ""}</div>`).join("")}
-    ${
-      b.versions.length > 1
-        ? (() => {
-            const d = erp.diffVersions(id, b.versions[0].id, b.versions[b.versions.length - 1].id);
-            return `<div class="it">Δ v${b.versions[0].vNumber}→v${b.versions[b.versions.length - 1].vNumber}: <b>${eur(d.deltaCents)}</b> (${d.deltaPct}%) · ${d.changed.length} líneas modificadas</div>`;
-          })()
-        : ""
-    }
-   </div></div>
-   <div class="doc" translate="no" lang="${esc(doc.language)}">
+        return `<div class="doc" translate="no" lang="${esc(doc.language)}">
     <div class="dh"><div><b>${L.doc} ${doc.number} · v${doc.version}</b><br>${esc(doc.issuer.legalName)} · ${esc(doc.issuer.taxId)}<br>${esc(doc.issuer.address)}</div>
     <div style="text-align:right">${esc(doc.customer.name)}<br>${esc(doc.customer.taxId)}<br>${esc(doc.customer.address)}</div></div>
     ${doc.chapters
@@ -15662,7 +15807,88 @@
         : ""
     }
     <div style="margin-top:8px;color:var(--muted)">${L.validity}: ${fmtD(b.validityDate)} · ${esc(b.paymentConditions)} · IBAN ${esc(doc.issuer.iban)}</div>
-   </div>
+   </div>`;
+      }
+      /**
+       * The document as a standalone printable sheet — Package 2 slide 1's
+       * "botón de descarga en PDF". No PDF library is bundled or needed: the
+       * browser's own print dialog ("Guardar como PDF") is the established
+       * pattern here, the same one #tPrint already uses elsewhere. What is new is
+       * isolating exactly this one document on the page, since printing the
+       * drawer as it sits would print the rail and the drawer chrome around it.
+       *
+       * Annex images are resolved to real URLs and awaited BEFORE print() is
+       * called: paintImages() fires them off without waiting, and a picture
+       * still loading when the print dialog opens prints as a blank frame.
+       */
+      async function downloadBudgetPdf(id, versionId) {
+        const doc = erp.renderBudgetDoc(id, versionId);
+        const annex =
+          typeof ErpBridge !== "undefined" && ErpBridge.docs
+            ? ErpBridge.docs.annex(doc)
+            : { enabled: false, pages: [], plateCount: 0, markedItems: [] };
+        const marked = new Set(annex.markedItems);
+        const perPage = (doc.annex && doc.annex.imagesPerPage) || 2;
+        const b = erp.budget(id);
+        const t = erp.budgetTotals(id, versionId);
+        const sheet = el("div", "printsheet");
+        sheet.innerHTML = renderBudgetDocHtml(doc, annex, marked, perPage, b, t);
+        document.body.appendChild(sheet);
+        const imgs = [...sheet.querySelectorAll("img[data-blob]")];
+        await Promise.all(
+          imgs.map(async (im) => {
+            const u = await imageUrl(im.dataset.blob);
+            if (u) im.src = u;
+            else im.alt = "(imagen no disponible)";
+          }),
+        );
+        window.print();
+        sheet.remove();
+      }
+      function budgetDrawer(id, versionId) {
+        const b = erp.budget(id);
+        const vsel = versionId || b.acceptedVersionId || b.currentVersionId;
+        const V = erp.version(id, vsel);
+        const t = erp.budgetTotals(id, vsel);
+        const doc = erp.renderBudgetDoc(id, vsel);
+        /* The annex is laid out by @repo/capability-docs through the bridge: which
+     picture goes on which page, in what order, under what reference. This view
+     decides none of it — it only paints what came back, and asks the same
+     object which rows carry the discreet mark. */
+        const annex =
+          typeof ErpBridge !== "undefined" && ErpBridge.docs
+            ? ErpBridge.docs.annex(doc)
+            : { enabled: false, pages: [], plateCount: 0, markedItems: [] };
+        const marked = new Set(annex.markedItems);
+        const perPage = (doc.annex && doc.annex.imagesPerPage) || 2;
+        // Pre-existing bug, newly reachable: this used to mark the drawer
+        // "(aceptada)" whenever the BUDGET had an accepted version, even
+        // while looking at a different, non-accepted one — invisible before
+        // there was any way to open an older version's document, which is
+        // exactly what this navigator now does.
+        const db = openDrawer(
+          b.number + " · v" + V.vNumber + (vsel === b.acceptedVersionId ? " (aceptada)" : ""),
+        );
+        const L = DOCL[doc.language] || DOCL.es;
+        const SEC = L.sections;
+        db.innerHTML = `
+   <div class="card"><div class="ch"><h3>Versiones</h3><span class="tag">automáticas, emitidas = congeladas</span></div><div class="daylist">
+    ${b.versions
+      .map(
+        (x) =>
+          `<div class="it${x.id === vsel ? " active" : " click"}" ${x.id === vsel ? "" : `data-goverid="${esc(x.id)}"`}><b>v${x.vNumber}</b> ${fmtD(x.date)} · ${esc(x.reason || "—")} ${x.id === b.acceptedVersionId ? '<span class="pill g">Aceptada</span>' : x.issued ? '<span class="pill b">Emitida</span>' : '<span class="pill y">Borrador</span>'}${x.sent ? ` · enviada por ${x.sent.channel}` : ""}${x.id === vsel ? ' <span class="pill">viendo</span>' : ""}</div>`,
+      )
+      .join("")}
+    ${
+      b.versions.length > 1
+        ? (() => {
+            const d = erp.diffVersions(id, b.versions[0].id, b.versions[b.versions.length - 1].id);
+            return `<div class="it">Δ v${b.versions[0].vNumber}→v${b.versions[b.versions.length - 1].vNumber}: <b>${eur(d.deltaCents)}</b> (${d.deltaPct}%) · ${d.changed.length} líneas modificadas</div>`;
+          })()
+        : ""
+    }
+   </div></div>
+   ${renderBudgetDocHtml(doc, annex, marked, perPage, b, t)}
    <div class="card" style="margin-top:12px"><div class="ch"><h3>Margen interno</h3><span class="tag">nunca aparece en el documento del cliente</span></div><div class="daylist">
     <div class="it">Coste interno base: <b>${eur(t.costBaseCents)}</b> · Margen: <b>${eur(t.marginBaseCents)} (${t.marginBasePct}%)</b></div>
     ${t.chapters
@@ -15682,6 +15908,12 @@
          : `<div class="card"><div class="daylist"><div class="it">El anexo gráfico está desactivado para este presupuesto.</div></div></div>`
    }`;
         paintImages(db);
+        // Every other version's full document is one click away — re-render
+        // this same drawer pinned to the version picked, rather than sending
+        // the operator back out to find it again.
+        db.querySelectorAll("[data-goverid]").forEach((n) => {
+          n.onclick = () => budgetDrawer(id, n.dataset.goverid);
+        });
       }
       /** Adjust one chapter's projection. The reason is required, by the engine. */
       function forecastDrawer(pid, chapterNum, name, row) {

@@ -3223,6 +3223,15 @@ window.CANEI_DICT = {
     ],
     ["⚠ Sólo se puede adjuntar un PDF o una imagen", "⚠ Only a PDF or an image can be attached"],
     ["⚠ No se ha podido guardar el archivo", "⚠ The file could not be saved"],
+    // PK2-B: version navigator + send drawer.
+    ["Ir a otra versión", "Go to another version"],
+    ["Fecha de envío", "Send date"],
+    ["Envío de presupuesto", "Sending the quote"],
+    [
+      "Sin móvil registrado — añádalo en Datos maestros para poder abrir WhatsApp",
+      "No mobile on file — add one in Master data to open WhatsApp",
+    ],
+    ["viendo", "viewing"],
   ],
   rxEs2En: [
     [new RegExp("^Programar visita — (.+)$"), "Schedule visit — $1"],
@@ -3619,6 +3628,12 @@ window.CANEI_DICT = {
     [new RegExp("^Ya hay (\\d+) visita$"), "There is already $1 visit"],
     [new RegExp("^(\\d+) partidas$"), "$1 items"],
     [new RegExp("^(\\d+) partida$"), "$1 item"],
+    // PK2-B: the version-picker <option> text — number and status combined
+    // into one text node, so the status word needs its own rule here rather
+    // than reusing the standalone "Aceptada"/"Emitida"/"Borrador" pills.
+    [new RegExp("^(v[\\d.]+) · aceptada$"), "$1 · accepted"],
+    [new RegExp("^(v[\\d.]+) · emitida$"), "$1 · issued"],
+    [new RegExp("^(v[\\d.]+) · borrador$"), "$1 · draft"],
   ],
   rxEn2Es: [
     [new RegExp("^(\\d+) opportunities$"), "$1 oportunidades"],

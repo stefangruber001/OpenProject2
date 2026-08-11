@@ -2930,3 +2930,51 @@ different decisions, so these ten arrived colliding. They are renumbered from
   one outcome this feature cannot have. The two older PDF panes (purchase
   comparison, captured document) still show that dead end and are recorded as
   owed in `docs/worklog/WORKLOG.md`.
+
+- **#155 — version navigator + send drawer rework (Package 2 slides 1–2,
+  PK2-B · 2026-08-11).** Decisions taken: (a) **only the current version is
+  ever editable.** Picking an older version from the new `#bVerPick` header
+  select or from the "Versiones" list opens the SAME read-only document Vista
+  previa already rendered, rather than teaching the edit grid to display two
+  different versions' data — a smaller, more reversible change, and it means
+  the one invariant that matters ("a frozen version cannot be changed") never
+  has to be re-checked in a second place. (b) **WhatsApp gets a real deep-link,
+  not a promise of one.** A browser genuinely cannot attach a file to WhatsApp
+  and press send on the user's behalf — `wa.me` accepts pre-filled text only —
+  so the honest scope is: open `wa.me` addressed to the party's mobile
+  (normalised to E.164 by prefixing "34" onto the bare 9-digit Spanish numbers
+  this system already stores) with the covering message pre-filled from the
+  operator's own template. True one-tap attach-and-send needs the WhatsApp
+  Business API, a real credential this session did not add — a candidate for
+  `INTEGRATIONS_PENDING.md` if the operator wants it built later, not a gap to
+  paper over with a fake success message. (c) **Email is recorded through the
+  existing `commsQueue`, queued and marked sent in the same click** — not
+  bypassed with a special "real send" path. The mandate is explicit (no real
+  emails; fakes behind ports only) and §5.7's own note says the same; the
+  difference from an automated comms rule is that a person pressing "Enviar"
+  on one specific presupuesto IS the approval, so queue → approve → record
+  happens in one motion instead of sitting in Cola waiting for someone to
+  approve a decision they already made. (d) **A new template, `quote-send`,**
+  was seeded rather than reusing `quote-followup` — the covering message for
+  the INITIAL send is a different piece of wording from the "have you looked
+  at this yet" follow-up, and slide 1 explicitly asked for it to be editable
+  in Configuración → Comunicaciones like everything else there. (e) **"en
+  mano" reveals its date/time fields inline in the same drawer** rather than
+  opening a second pop-up on top of it — slide 1 asked for a pop-up, but the
+  send drawer already IS the one screen that question belongs to, and
+  progressive disclosure reads the same to the operator without stacking
+  modal-on-drawer. The date follows PK2-A's rule: backdatable, never
+  postdated. (f) **The PDF download reuses the exact `.doc` markup Vista
+  previa already renders** (`renderBudgetDocHtml()`, extracted out of
+  `budgetDrawer`) and prints it via the browser's own print dialog — the
+  established pattern (`#tPrint` already does this elsewhere) — rather than
+  pulling in a PDF-writing library for one button. The print is isolated on
+  its own `.printsheet` appended to `<body>`, with `@media print` hiding every
+  other direct child of body, so the rail and the drawer chrome never appear
+  on the page. (g) **A real, newly-reachable bug was fixed in passing**: the
+  Vista previa title appended "(aceptada)" whenever the BUDGET had an
+  accepted version anywhere, not only when the version on screen actually was
+  that one — invisible before this session, because nothing could open a
+  non-accepted version's document before the navigator existed, and wrong on
+  exactly the screen this session built. Fixed to check the version being
+  shown.
