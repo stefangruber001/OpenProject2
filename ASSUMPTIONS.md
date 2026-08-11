@@ -2756,3 +2756,36 @@ different decisions, so these ten arrived colliding. They are renumbered from
   (f) Escape is handled in the module in the **capture phase** so it closes the
   question and not the drawer underneath it, which is where most of these are
   asked from.
+
+- **#150 — the visit screen, after Package 1 slides 1 and 4–7 (2026-08-11).**
+  Five complaints about one screen, and the fixes share a cause worth naming:
+  the drawer repaints itself wholesale, so anything living only in the DOM did
+  not survive. **Decisions:** (a) **the scheduling date floors at the later of
+  the wall-clock date and the dataset's `today`.** The demo lives in its own
+  exercise year, ahead of or behind real time depending on when it is opened;
+  taking the later of the two means the field opens on a day you could
+  actually go, in the demo and in production alike. The refusal is enforced in
+  the save handler, not only by the input's `min`, because `min` is advisory
+  and a typed date walks straight past it. The time defaults to the current
+  clock. (b) **The camera is `getUserMedia`, with the file input demoted to a
+  fallback.** `capture="environment"` opens the camera on a phone and a file
+  browser on a laptop, which is what the operator hit — asked to go and find a
+  photograph they had not taken yet. A denied permission, a machine without a
+  camera and an insecure origin now each produce their own message before the
+  file picker opens, rather than the picker appearing unexplained. (c) **Every
+  field the person has touched is read back into the draft before any
+  repaint** — notes, and the half-typed measurement too, which had the same
+  bug and nobody had hit yet. (d) **The photo viewer is delegated from the
+  document**, keyed on `data-blob`, so visits, adicionales, annexes and
+  captured documents all gained it at once instead of four screens gaining it
+  separately. Escape and the arrow keys are bound in the capture phase so
+  closing a photograph does not also close the drawer behind it. (e) **A
+  second visit is allowed and named** «de seguimiento», with the earlier
+  visits listed in the drawer. Blocking it would have been wrong — a revisit
+  before quoting is ordinary — and the complaint was that it looked like the
+  screen had lost track, not that it was permitted. (f) **«+ Programar visita»
+  asks which lead**, grouped so the never-visited come first and the longest
+  waiting lead each group. It used to schedule against `withOpp[0]`. (g)
+  `editPartyDrawer` takes an `onSaved` callback so the visit can borrow it to
+  complete a client and get control back, with its own draft intact — the
+  alternative was sending someone mid-capture to another screen.

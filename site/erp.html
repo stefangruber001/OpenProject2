@@ -3028,6 +3028,64 @@
       /* The question box lives in erp-modal.js — see that file for why it is
          not the browser's own prompt(). Its styles come with it. */
 
+      /* Full-size photograph and live camera. Both sit above the drawer and the
+         question box, because both are opened FROM one of those. */
+      .pview,
+      .camview {
+        position: fixed;
+        inset: 0;
+        z-index: 95;
+        background: rgba(12, 16, 9, 0.92);
+        display: flex;
+        flex-direction: column;
+      }
+      .pvbar,
+      .cvbar,
+      .cvfoot {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 10px 14px;
+        background: rgba(255, 255, 255, 0.96);
+        flex-wrap: wrap;
+      }
+      .cvfoot {
+        justify-content: center;
+      }
+      .pvn,
+      .cvn {
+        font: 600 12px var(--sans);
+        color: var(--body);
+        letter-spacing: 0.04em;
+      }
+      .pvimg,
+      .cvstage {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+      .pvimg img,
+      .cvstage video {
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 10px;
+        box-shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.8);
+        background: #000;
+      }
+      /* A picture is a button now — say so before it is clicked. */
+      img[data-blob] {
+        cursor: zoom-in;
+      }
+      @media print {
+        .pview,
+        .camview {
+          display: none;
+        }
+      }
+
       .scrim {
         position: fixed;
         inset: 0;
@@ -8544,7 +8602,16 @@
               const r = await ask(
                 "Posponer la alerta",
                 [
-                  { key: "d", label: "Hasta el", type: "date", value: erp.today, required: true },
+                  {
+                    key: "d",
+                    label: "Hasta el",
+                    // Tomorrow, not today: postponing something until today is
+                    // not postponing it, and the alert would come straight back.
+                    type: "date",
+                    value: isoAdd(erp.today, 1),
+                    min: isoAdd(erp.today, 1),
+                    required: true,
+                  },
                   {
                     key: "reason",
                     label: "Motivo",
@@ -9205,6 +9272,162 @@
           const u = await imageUrl(im.dataset.blob);
           if (u) im.src = u;
           else im.alt = "(imagen no disponible)";
+        });
+      }
+
+      /* ---------------------------- photo viewer ----------------------------
+   A thumbnail 90 px wide is proof that a photograph exists, not a look at
+   what it shows — and the whole point of photographing a damp patch is that
+   somebody looks at it later. Clicking any picture in the workspace opens it
+   full size, steps through the others in the same group with the arrow keys,
+   and offers the original file for download.
+
+   It is delegated from the document rather than wired per screen: every
+   picture the application renders already carries `data-blob`, so visits,
+   adicionales, presupuesto annexes and captured documents all inherit this
+   without another line each. */
+      let PV = null;
+      function closePhotoViewer() {
+        if (!PV) return;
+        document.removeEventListener("keydown", PV.onKey, true);
+        PV.node.remove();
+        PV = null;
+      }
+      async function openPhotoViewer(keys, index) {
+        closePhotoViewer();
+        const node = el("div", "pview");
+        node.innerHTML = `<div class="pvbar">
+   <span class="pvn"></span><span style="flex:1"></span>
+   <button class="btn sm" data-pv="prev">‹ Anterior</button>
+   <button class="btn sm" data-pv="next">Siguiente ›</button>
+   <a class="btn sm" data-pv="dl" download>⤓ Descargar</a>
+   <button class="btn sm" data-pv="close">Cerrar</button>
+  </div><div class="pvimg"><img alt=""></div>`;
+        document.body.appendChild(node);
+        let i = Math.max(0, Math.min(index || 0, keys.length - 1));
+        const show = async () => {
+          const key = keys[i];
+          const u = await imageUrl(key);
+          const img = node.querySelector("img");
+          if (u) img.src = u;
+          else img.alt = "(imagen no disponible)";
+          const dl = node.querySelector("[data-pv=dl]");
+          dl.href = u || "#";
+          // The stored key is not a filename anyone wants in their downloads
+          // folder, so the file arrives named after what it is.
+          dl.setAttribute("download", "foto-" + (i + 1) + ".jpg");
+          node.querySelector(".pvn").textContent =
+            keys.length > 1 ? i + 1 + " de " + keys.length : "";
+          node.querySelectorAll("[data-pv=prev],[data-pv=next]").forEach((b) => {
+            b.style.display = keys.length > 1 ? "" : "none";
+          });
+        };
+        const step = (d) => {
+          i = (i + d + keys.length) % keys.length;
+          show();
+        };
+        node.querySelector("[data-pv=prev]").onclick = () => step(-1);
+        node.querySelector("[data-pv=next]").onclick = () => step(1);
+        node.querySelector("[data-pv=close]").onclick = closePhotoViewer;
+        node.onclick = (e) => {
+          if (e.target === node || e.target.classList.contains("pvimg")) closePhotoViewer();
+        };
+        const onKey = (e) => {
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            closePhotoViewer();
+          } else if (e.key === "ArrowLeft") step(-1);
+          else if (e.key === "ArrowRight") step(1);
+        };
+        // Capture phase, ahead of the drawer's own Escape handler: closing the
+        // photograph must not also close the panel it was opened from.
+        document.addEventListener("keydown", onKey, true);
+        PV = { node, onKey };
+        await show();
+      }
+      document.addEventListener("click", (e) => {
+        const im = e.target.closest && e.target.closest("img[data-blob]");
+        if (!im) return;
+        // Every picture inside the same gallery is one group, so the arrows
+        // step through the visit rather than through one photograph.
+        const scope = im.closest(".gal") || im.closest(".card") || document;
+        const keys = [...scope.querySelectorAll("img[data-blob]")].map((x) => x.dataset.blob);
+        e.preventDefault();
+        e.stopPropagation();
+        openPhotoViewer(keys, keys.indexOf(im.dataset.blob));
+      });
+
+      /* ------------------------------ camera --------------------------------
+   `<input type="file" capture="environment">` opens the camera on a phone and
+   a FILE PICKER on a desktop, which is what the operator hit: pressing
+   "Cámara" on a laptop asked them to go and find a photograph they had not
+   taken yet. This asks the device for its camera and shows what it sees.
+
+   The file input is kept as the fallback, not as the implementation: a denied
+   permission, a machine with no camera, or an insecure origin all land there,
+   and the message says which of those happened rather than silently opening
+   a file browser. */
+      function cameraAvailable() {
+        return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      }
+      async function capturePhoto() {
+        if (!cameraAvailable()) throw new Error("Este dispositivo no ofrece cámara al navegador");
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 } },
+            audio: false,
+          });
+        } catch (e) {
+          throw new Error(
+            e && e.name === "NotAllowedError"
+              ? "No se ha dado permiso de cámara. Puedes autorizarlo en el candado de la barra de direcciones."
+              : "No se ha podido abrir la cámara: " + ((e && e.message) || e),
+          );
+        }
+        const node = el("div", "camview");
+        node.innerHTML = `<div class="cvbar"><span class="cvn">Encuadra y dispara</span><span style="flex:1"></span>
+   <button class="btn sm" data-cam="cancel">Cancelar</button></div>
+  <div class="cvstage"><video playsinline muted></video></div>
+  <div class="cvfoot"><button class="btn primary" data-cam="shoot">Hacer la foto</button></div>`;
+        document.body.appendChild(node);
+        const video = node.querySelector("video");
+        video.srcObject = stream;
+        await video.play().catch(() => {});
+        return new Promise((resolve) => {
+          const finish = (file) => {
+            stream.getTracks().forEach((t) => t.stop());
+            document.removeEventListener("keydown", onKey, true);
+            node.remove();
+            resolve(file);
+          };
+          const onKey = (e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              finish(null);
+            }
+          };
+          document.addEventListener("keydown", onKey, true);
+          node.querySelector("[data-cam=cancel]").onclick = () => finish(null);
+          node.querySelector("[data-cam=shoot]").onclick = () => {
+            const c = document.createElement("canvas");
+            c.width = video.videoWidth || 1280;
+            c.height = video.videoHeight || 720;
+            c.getContext("2d").drawImage(video, 0, 0, c.width, c.height);
+            c.toBlob(
+              (blob) => {
+                if (!blob) return finish(null);
+                finish(
+                  new File([blob], "camara-" + Date.now() + ".jpg", {
+                    type: "image/jpeg",
+                    lastModified: Date.now(),
+                  }),
+                );
+              },
+              "image/jpeg",
+              0.9,
+            );
+          };
         });
       }
 
@@ -11578,13 +11801,44 @@
             noExport: true,
             ids: { q: "vpQ", prev: "vpPrev", next: "vpNext", newBtn: "vpNew" },
             newLabel: "＋ Programar visita",
-            onNew: () => {
-              const withOpp = erp.opportunityAges();
-              if (!withOpp.length) {
+            // Opening this used to schedule against `withOpp[0]` — whichever
+            // opportunity happened to be first — so pressing "Programar visita"
+            // on the Visitas screen silently picked a customer for you. The
+            // question the button actually raises is "for whom", and it now
+            // asks it, with the leads that are waiting for a visit listed first.
+            onNew: async () => {
+              const open = erp.opportunityAges();
+              if (!open.length) {
                 toast("⚠ No hay oportunidades abiertas para programar una visita");
                 return;
               }
-              scheduleVisitDrawer(withOpp[0].id);
+              const visitCount = (id) =>
+                erp.state.visits.filter((x) => x.opportunityId === id).length;
+              const rank = (o) => (visitCount(o.id) === 0 ? 0 : 1);
+              const options = open
+                .slice()
+                .sort((a, b) => rank(a) - rank(b) || b.ageDays - a.ageDays)
+                .map((o) => {
+                  const n = visitCount(o.id);
+                  return {
+                    value: o.id,
+                    label: erp.party(o.partyId).name,
+                    group: n === 0 ? "Sin visita todavía" : "Ya visitados — sería un seguimiento",
+                    hint:
+                      esc(o.requestedWork) +
+                      " · " +
+                      o.ageDays +
+                      " d" +
+                      (n ? " · " + n + " visita" + (n === 1 ? "" : "s") : ""),
+                  };
+                });
+              const pick = await askChoice("¿Para qué lead?", options, {
+                body: "Los que aún no se han visitado van primero, y dentro de cada grupo los que llevan más tiempo esperando.",
+                okLabel: "Continuar",
+                wide: true,
+              });
+              if (pick === null) return;
+              scheduleVisitDrawer(pick);
             },
             searchPlaceholder: "Buscar por cliente",
             nounSingular: "visita programada",
@@ -13645,7 +13899,10 @@
             p.active ? "Tercero desactivado" : "Tercero reactivado",
           );
       }
-      function editPartyDrawer(id) {
+      /** `onSaved` lets a screen borrow this drawer and get control back — the
+    visit uses it to fill in a client that is missing data and then return to
+    the capture it was in the middle of, instead of sending the person away. */
+      function editPartyDrawer(id, onSaved) {
         const p = erp.party(id);
         const db = openDrawer("Editar — " + p.name);
         const ROLES = [
@@ -13779,6 +14036,7 @@
             }
             erp.updateParty(id, patch, "backoffice");
             closeDrawer();
+            if (onSaved) onSaved();
           }, "Datos actualizados");
       }
       /* Create a party.
@@ -13961,7 +14219,7 @@
      <div class="field full"><button class="btn sm" id="opp_savenext">Guardar próxima acción</button></div></div></div>`
        : ""
    }
-   <div class="card"><div class="ch"><h3>Visitas</h3>${open ? '<button class="btn sm" id="opp_sched">＋ Programar visita</button>' : ""}</div>
+   <div class="card"><div class="ch"><h3>Visitas</h3>${open ? `<button class="btn sm" id="opp_sched">＋ Programar visita${visits.length ? " de seguimiento" : ""}</button>` : ""}</div>
     <div class="daylist">
      ${
        visits
@@ -14026,20 +14284,58 @@
       }
 
       /* ---------- COM-02 · scheduling and capturing a visit (S4) ---------- */
+      /* A visit is scheduled in the real world, so its floor is the real date —
+   but never earlier than the dataset's own today, which is ahead of the wall
+   clock on the demo. Taking the later of the two means the field opens on a
+   day you could actually go, in both. */
+      function visitFloorDate() {
+        const wall = new Date().toISOString().slice(0, 10);
+        return wall > erp.today ? wall : erp.today;
+      }
+      function nowHHMM() {
+        const d = new Date();
+        return (
+          String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")
+        );
+      }
       function scheduleVisitDrawer(opportunityId) {
         const o = erp.state.opportunities.find((x) => x.id === opportunityId);
         if (!o) return;
-        const db = openDrawer("Programar visita — " + erp.party(o.partyId).name);
-        db.innerHTML = `<div class="fgrid">
-   <div class="field"><label>Fecha *</label><input id="sv_date" type="date" value="${erp.today}"></div>
-   <div class="field"><label>Hora</label><input id="sv_time" type="time" value="10:00"></div>
+        // A second visit is normal — a revisit before quoting, a measurement
+        // somebody forgot. What was wrong was calling it the same thing as the
+        // first, which read as the screen having lost track.
+        const prior = erp.state.visits.filter((x) => x.opportunityId === opportunityId);
+        const followUp = prior.length > 0;
+        const floor = visitFloorDate();
+        const db = openDrawer(
+          (followUp ? "Programar visita de seguimiento — " : "Programar visita — ") +
+            erp.party(o.partyId).name,
+        );
+        db.innerHTML = `${
+          followUp
+            ? `<div class="card"><div class="ch"><h3>Ya hay ${prior.length} visita${prior.length === 1 ? "" : "s"}</h3>
+      <span class="pill y">seguimiento</span></div>
+     <div class="daylist">${prior
+       .map(
+         (p) =>
+           `<div class="it">${p.status === "done" ? "✓ Realizada " + fmtD(p.completedAt) : "📅 Programada " + fmtD(p.scheduledAt)}</div>`,
+       )
+       .join("")}</div></div>`
+            : ""
+        }<div class="fgrid">
+   <div class="field"><label>Fecha *</label><input id="sv_date" type="date" value="${floor}" min="${floor}"></div>
+   <div class="field"><label>Hora</label><input id="sv_time" type="time" value="${nowHHMM()}"></div>
    <div class="field full"><label>Responsable</label><select id="sv_owner"><option value="operations">Obra</option><option value="backoffice">Oficina</option></select></div>
    <div class="field full"><label>Notas</label><input id="sv_notes" placeholder="Referencias, acceso, contacto en obra…"></div>
-   <div class="field full" style="margin-top:8px"><button class="btn primary" id="sv_save">Programar</button></div></div>`;
+   <div class="field full" style="margin-top:8px"><button class="btn primary" id="sv_save">${followUp ? "Programar seguimiento" : "Programar"}</button></div></div>`;
         $("#sv_save").onclick = () =>
           mutate(() => {
             const date = $("#sv_date").value;
             if (!date) throw new Error("Indica la fecha de la visita");
+            // `min` on the input is advisory — a typed date walks straight past
+            // it — so the refusal lives here, where it cannot be bypassed.
+            if (date < floor)
+              throw new Error("No se puede programar una visita en una fecha pasada");
             erp.scheduleVisit(
               {
                 opportunityId,
@@ -14082,7 +14378,13 @@
         }
         return keys;
       }
-      function completeVisitDrawer(visitId) {
+      /** Reopen a visit on the draft it was holding — used after a detour to fix
+    the client's missing data, so the notes and photographs already entered
+    survive the round trip. */
+      function completeVisitDrawerResume(visitId, draft) {
+        completeVisitDrawer(visitId, draft);
+      }
+      function completeVisitDrawer(visitId, seed) {
         const v = erp.state.visits.find((x) => x.id === visitId);
         if (!v) return;
         const o = erp.state.opportunities.find((x) => x.id === v.opportunityId);
@@ -14090,13 +14392,39 @@
         // Uploaded photos are the one exception: the file has to leave the <input>
         // and reach the blob store immediately or it cannot survive a re-render,
         // so those keys are held here and only LINKED to the visit on save.
-        const draft = {
+        // `notes` and the half-typed measurement live in the draft for one
+        // reason: adding a photograph repaints this drawer, and anything left
+        // only in the DOM is gone when it does. That is exactly what happened —
+        // type the notes, add a picture, lose the notes. Every field the person
+        // has touched is read back into the draft before any repaint.
+        const draft = seed || {
           measurements: (v.measurements || []).slice(),
           photos: (v.photos || []).slice(),
+          notes: v.notes || "",
+          what: "",
+          qty: "",
+          unit: "m2",
+        };
+        const readDraft = () => {
+          const g = (sel) => {
+            const n = db.querySelector(sel);
+            return n ? n.value : null;
+          };
+          const notes = g("#cv_notes");
+          if (notes !== null) draft.notes = notes;
+          const what = g("#cv_what");
+          if (what !== null) draft.what = what;
+          const qty = g("#cv_qty");
+          if (qty !== null) draft.qty = qty;
+          const unit = g("#cv_unit");
+          if (unit !== null) draft.unit = unit;
         };
         const overdue = v.scheduledAt && v.scheduledAt < erp.today;
         const db = openDrawer("Visita — " + erp.party(o.partyId).name);
         const paint = () => {
+          // Recomputed on every repaint: filling the client in from the button
+          // below has to make this card disappear without reopening the visit.
+          const comp = erp.partyCompleteness(o.partyId);
           db.innerHTML = `<div class="card"><div class="ch"><h3>Programada</h3>
        <span class="pill ${overdue ? "r" : "y"}">${fmtD(v.scheduledAt)}${v.scheduledTime ? " " + esc(v.scheduledTime) : ""}${overdue ? " · atrasada" : ""}</span></div>
       <div class="daylist"><div class="it">${esc(o.requestedWork)}</div>
@@ -14113,9 +14441,9 @@
       }
       </div>
       <div class="fgrid" style="padding:0 16px 14px">
-       <div class="field"><label>Qué</label><input id="cv_what" placeholder="baño"></div>
-       <div class="field"><label>Cantidad</label><input id="cv_qty" type="number" min="0" step="0.01"></div>
-       <div class="field"><label>Unidad</label><select id="cv_unit">${listOptionsUnits("m2")}</select></div>
+       <div class="field"><label>Qué</label><input id="cv_what" placeholder="baño" value="${esc(draft.what)}"></div>
+       <div class="field"><label>Cantidad</label><input id="cv_qty" type="number" min="0" step="0.01" value="${esc(draft.qty)}"></div>
+       <div class="field"><label>Unidad</label><select id="cv_unit">${listOptionsUnits(draft.unit)}</select></div>
        <div class="field full"><button class="btn sm" id="cv_addmeas">＋ Añadir medición</button></div></div></div>
      <div class="card"><div class="ch"><h3>Fotos</h3><span class="tag">${draft.photos.length}</span></div>
       <div class="gal" style="padding:12px 16px" id="cv_photos">
@@ -14123,59 +14451,102 @@
       </div>
       <div class="daylist"><div class="it">
        <label class="btn sm">Desde el ordenador<input type="file" id="cv_file" accept="image/*" multiple hidden></label>
-       <label class="btn sm">Cámara<input type="file" id="cv_cam" accept="image/*" capture="environment" hidden></label>
+       <button class="btn sm" id="cv_cam">Cámara</button>
+       <input type="file" id="cv_camfb" accept="image/*" capture="environment" hidden>
       </div></div></div>
+     ${
+       comp.ok
+         ? ""
+         : `<div class="card"><div class="ch"><h3>Faltan datos del cliente</h3><span class="pill y">${esc(comp.missing.join(", "))}</span></div>
+      <div class="daylist"><div class="it">La visita se captura igual — pero sin estos datos no se puede emitir ni contrato ni factura.</div></div>
+      <div style="padding:0 16px 14px"><button class="btn sm" id="cv_fixparty">Completar los datos ahora</button></div></div>`
+     }
      <div class="card"><div class="ch"><h3>Notas de la visita</h3></div><div style="padding:12px 16px">
-      <textarea id="cv_notes" rows="3" style="width:100%;font:inherit;font-size:13px;padding:8px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)" placeholder="Croquis a mano, estado del inmueble, supuestos…">${esc(v.notes || "")}</textarea>
+      <textarea id="cv_notes" rows="3" style="width:100%;font:inherit;font-size:13px;padding:8px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)" placeholder="Croquis a mano, estado del inmueble, supuestos…">${esc(draft.notes)}</textarea>
      </div></div>
      <div style="margin-top:10px"><button class="btn primary" id="cv_save">Completar visita</button></div>`;
           paintImages(db);
           db.querySelectorAll("[data-rm-meas]").forEach(
             (b) =>
               (b.onclick = () => {
+                readDraft();
                 draft.measurements.splice(+b.dataset.rmMeas, 1);
                 paint();
               }),
           );
           db.querySelectorAll("[data-rm-photo]").forEach(
             (b) =>
-              (b.onclick = () => {
+              (b.onclick = (ev) => {
+                // The picture above this button is a viewer trigger; deleting it
+                // must not also open it.
+                ev.stopPropagation();
+                readDraft();
                 draft.photos.splice(+b.dataset.rmPhoto, 1);
                 paint();
               }),
           );
           $("#cv_addmeas").onclick = () => {
-            const what = $("#cv_what").value.trim(),
-              qty = +$("#cv_qty").value || 0,
-              unit = $("#cv_unit").value;
+            readDraft();
+            const what = draft.what.trim(),
+              qty = +draft.qty || 0,
+              unit = draft.unit;
             if (!what || qty <= 0) {
               toast("⚠ Indica qué se mide y una cantidad");
               return;
             }
             draft.measurements.push({ what, qty, unit });
+            draft.what = "";
+            draft.qty = "";
             paint();
           };
-          const onFiles = async (input) => {
-            if (!input.files.length) return;
-            const keys = await captureVisitPhotos([...input.files]);
+          const addPhotos = async (files) => {
+            readDraft();
+            const keys = await captureVisitPhotos(files);
             draft.photos.push(...keys);
             paint();
           };
-          $("#cv_file").onchange = (e) => onFiles(e.target);
-          $("#cv_cam").onchange = (e) => onFiles(e.target);
-          $("#cv_save").onclick = () =>
+          $("#cv_file").onchange = (e) => {
+            if (e.target.files.length) addPhotos([...e.target.files]);
+          };
+          $("#cv_camfb").onchange = (e) => {
+            if (e.target.files.length) addPhotos([...e.target.files]);
+          };
+          $("#cv_cam").onclick = async () => {
+            readDraft();
+            try {
+              const file = await capturePhoto();
+              if (file) await addPhotos([file]);
+            } catch (e) {
+              // Say what went wrong, then offer the only thing left that works.
+              toast("⚠ " + e.message);
+              $("#cv_camfb").click();
+            }
+          };
+          const fix = $("#cv_fixparty");
+          if (fix)
+            fix.onclick = () => {
+              // The visit's own draft is not lost: it is held in `draft`, and the
+              // visit reopens on top of it once the client is saved.
+              readDraft();
+              editPartyDrawer(o.partyId, () => {
+                completeVisitDrawerResume(visitId, draft);
+              });
+            };
+          $("#cv_save").onclick = () => {
+            readDraft();
             mutate(() => {
               erp.completeVisit(
                 visitId,
                 {
                   measurements: draft.measurements,
                   photos: draft.photos,
-                  notes: $("#cv_notes").value.trim(),
+                  notes: draft.notes.trim(),
                 },
                 "operations",
               );
               closeDrawer();
             }, "Visita completada");
+          };
         };
         paint();
       }

@@ -98,8 +98,8 @@ answers to the four questions the deck left open.
 | #   | What                                                                                     | State    |
 | --- | ---------------------------------------------------------------------------------------- | -------- |
 | P1  | The browser's prompt/confirm/alert replaced across the whole site                        | **done** |
-| P2  | Visita: date/time defaults, real camera, the notes-wiped bug, photo viewer               | next     |
-| P3  | Lead → visita flow: pick the lead, second visit, complete a client inline                | next     |
+| P2  | Visita: date/time defaults, real camera, the notes-wiped bug, photo viewer               | **done** |
+| P3  | Lead → visita flow: pick the lead, second visit, complete a client inline                | **done** |
 | P4  | Configurable lists: próximas acciones, condiciones de pago (lossReasons already existed) | next     |
 | P5  | Presupuestador: catalogue picker, chapter dropdown, columns, Siguiente paso              | next     |
 
@@ -110,3 +110,10 @@ sale price, everywhere**, not only in the builder; a second visit is allowed
 and labelled _seguimiento_ rather than blocked; and creating a partida that the
 search cannot find **opens the existing «＋ Nueva partida» form** rather than a
 second one written for the popup.
+
+**Owed, and named so it is not forgotten:** the strings the new questions and
+the photo viewer introduce are Spanish only. `tests/i18n/coverage.mjs` checks
+that the dictionary is consistent across the three languages, not that every
+literal is in it — deliberately, see the note at the top of that file — so
+these pass the gate and still fall back to Spanish in CA and EN. They belong
+in `i18n-dict.js` and `i18n-dict-ca.js` before this package is called finished.

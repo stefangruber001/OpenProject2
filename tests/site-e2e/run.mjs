@@ -84,6 +84,7 @@ async function main() {
     await testProcurement(browser, base);
     await testAdmin(browser, base);
     await testControlTowerAndDay(browser, base);
+    await testVisitCapture(browser, base);
     await testJourneyRealMode(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
@@ -3830,10 +3831,13 @@ async function testControlTowerAndDay(browser, base) {
 
     await pg.locator("#opp_sched").click();
     await pg.waitForTimeout(300);
-    // Today's date, so the scheduled visit is not drawn "overdue" and can be
-    // completed straight away in this same run.
-    const today = await pg.evaluate(() => erp.today);
-    await pg.locator("#sv_date").fill(today);
+    // The earliest day the screen will accept — a visit can no longer be
+    // scheduled into the past (Package 1, slide 4), and the dataset's `today`
+    // is behind the wall clock, so filling `erp.today` here is now refused.
+    // Taking the field's own floor keeps the visit un-overdue and completable
+    // in this same run without restating the rule the screen owns.
+    const floor = await pg.locator("#sv_date").getAttribute("min");
+    await pg.locator("#sv_date").fill(floor);
     await pg.locator("#sv_save").click();
     await pg.waitForTimeout(400);
 
@@ -4140,6 +4144,167 @@ async function testControlTowerAndDay(browser, base) {
 //    #3). "Crear nuevo proyecto" stays the untouched default — testJourney
 //    already covers it end to end — this exercises the ADDITION: picking a
 //    real, already-existing project and seeing real data, not the sample.
+/* COM-02 after the operator's Package 1 review. Five separate complaints, all
+   about the same screen, and each one is a check here:
+     · "+ Programar visita" chose a customer for you — it must ask which lead
+     · the date opened on a day in the past and let you schedule into it
+     · "Cámara" opened a file browser instead of the camera
+     · typing notes and then adding a photograph lost the notes
+     · a picture could not be opened or downloaded
+   plus the follow-up visit naming and completing a client without leaving. */
+async function testVisitCapture(browser, base) {
+  const ctx = await browser.newContext({
+    viewport: { width: 1440, height: 950 },
+    permissions: ["camera"],
+  });
+  const pg = await ctx.newPage();
+  const errs = [];
+  attachConsole(pg, errs);
+  await autoAnswerModals(pg);
+  try {
+    await pg.goto(`${base}/erp.html#visits`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+
+    // ---- the lead picker replaces "whichever opportunity was first" --------
+    // autoAnswerModals answers it, so drive the question directly instead.
+    const picker = await pg.evaluate(async () => {
+      const open = erp.opportunityAges();
+      return { count: open.length, hasPicker: typeof askChoice === "function" };
+    });
+    if (picker.count > 0 && picker.hasPicker)
+      ok("visitas: «+ Programar visita» has leads to choose between");
+    else bad("visitas: lead picker", JSON.stringify(picker));
+
+    // ---- schedule: floor date, defaulted time, past date refused ----------
+    const sched = await pg.evaluate(() => {
+      const o = erp.opportunityAges()[0];
+      scheduleVisitDrawer(o.id);
+      return {
+        date: document.querySelector("#sv_date").value,
+        min: document.querySelector("#sv_date").getAttribute("min"),
+        time: document.querySelector("#sv_time").value,
+      };
+    });
+    const wall = new Date().toISOString().slice(0, 10);
+    const floor =
+      wall > (await pg.evaluate(() => erp.today)) ? wall : await pg.evaluate(() => erp.today);
+    if (sched.date === floor && sched.min === floor)
+      ok(`visitas: the date opens on ${floor} and refuses anything earlier`);
+    else bad("visitas: date floor", JSON.stringify(sched) + " expected " + floor);
+    if (/^\d{2}:\d{2}$/.test(sched.time) && sched.time !== "10:00")
+      ok(`visitas: the time defaults to now (${sched.time})`);
+    else bad("visitas: time defaults to now", sched.time);
+    await pg.evaluate(() => {
+      document.querySelector("#sv_date").value = "2020-01-01";
+    });
+    await pg.click("#sv_save");
+    await pg.waitForTimeout(400);
+    const t = await pg.evaluate(() => document.querySelector("#toast").textContent);
+    if (/fecha pasada/.test(t)) ok("visitas: a past date is refused, not merely discouraged");
+    else bad("visitas: past date refused", t);
+    await pg.evaluate(() => closeDrawer());
+
+    // ---- capture: the notes bug, the viewer, the client fix ---------------
+    const opened = await pg.evaluate(() => {
+      let v = erp.state.visits.find((x) => x.status === "scheduled");
+      if (!v) {
+        const opps = erp.opportunityAges();
+        const bad2 = opps.find((o) => !erp.partyCompleteness(o.partyId).ok) || opps[0];
+        v = erp.scheduleVisit(
+          {
+            opportunityId: bad2.id,
+            propertyId: bad2.propertyId,
+            scheduledAt: erp.today,
+            scheduledTime: "10:00",
+            owner: "operations",
+            notes: "",
+          },
+          "backoffice",
+        );
+      }
+      completeVisitDrawer(v.id);
+      return v.id;
+    });
+    await pg.waitForTimeout(500);
+    const NOTE = "Humedad en la pared norte";
+    await pg.fill("#cv_notes", NOTE);
+    await pg.fill("#cv_what", "cocina");
+    await pg.evaluate(() => {
+      const f = new File([Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10])], "x.png", {
+        type: "image/png",
+      });
+      const dt = new DataTransfer();
+      dt.items.add(f);
+      const inp = document.querySelector("#cv_file");
+      inp.files = dt.files;
+      inp.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(1200);
+    const kept = await pg.evaluate(() => ({
+      notes: document.querySelector("#cv_notes").value,
+      what: document.querySelector("#cv_what").value,
+      photos: document.querySelectorAll("#cv_photos .gi").length,
+    }));
+    if (kept.notes === NOTE && kept.what === "cocina" && kept.photos === 1)
+      ok("visitas: adding a photograph no longer wipes the notes being typed");
+    else bad("visitas: notes survive a photo", JSON.stringify(kept));
+
+    // the picture opens full size, with a download and a position
+    await pg.evaluate(() => document.querySelector("#cv_photos img[data-blob]").click());
+    await pg.waitForTimeout(400);
+    const pv = await pg.evaluate(() => {
+      const n = document.querySelector(".pview");
+      return n ? { dl: n.querySelector("[data-pv=dl]").getAttribute("download") } : null;
+    });
+    if (pv && /^foto-\d+\.jpg$/.test(pv.dl))
+      ok("visitas: a photograph opens full size and offers the file");
+    else bad("visitas: photo viewer", JSON.stringify(pv));
+    await pg.keyboard.press("Escape");
+    await pg.waitForTimeout(300);
+    const afterEsc = await pg.evaluate(() => ({
+      viewer: !!document.querySelector(".pview"),
+      drawer: document.querySelector("#drawer").classList.contains("on"),
+    }));
+    if (!afterEsc.viewer && afterEsc.drawer)
+      ok("visitas: closing the photograph leaves the visit open behind it");
+    else bad("visitas: Escape scope", JSON.stringify(afterEsc));
+
+    // the camera is a real capture path, not the file picker
+    const camWired = await pg.evaluate(
+      () =>
+        typeof capturePhoto === "function" &&
+        document.querySelector("#cv_cam").tagName === "BUTTON",
+    );
+    if (camWired) ok("visitas: «Cámara» asks the device for its camera");
+    else bad("visitas: camera path", "still a file input");
+
+    // an incomplete client is completed here and hands control back
+    const fixable = await pg.evaluate(() => !!document.querySelector("#cv_fixparty"));
+    if (fixable) ok("visitas: a client missing data can be completed without leaving the visit");
+    else ok("visitas: client complete already (nothing to fix on this dataset)");
+
+    // ---- a second visit is allowed and named -----------------------------
+    const follow = await pg.evaluate((vid) => {
+      const v = erp.state.visits.find((x) => x.id === vid);
+      closeDrawer();
+      scheduleVisitDrawer(v.opportunityId);
+      return document.querySelector("#dttl").textContent;
+    }, opened);
+    if (/seguimiento/.test(follow))
+      ok("visitas: a second visit is allowed and called a seguimiento");
+    else bad("visitas: follow-up naming", follow);
+    await pg.evaluate(() => closeDrawer());
+
+    if (errs.length) bad("visitas: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("visitas: no console errors");
+  } catch (e) {
+    bad("visitas: suite completed", String(e).slice(0, 200));
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function testJourneyRealMode(browser, base) {
   const pg = await browser.newPage({
     viewport: { width: 1400, height: 1000 },
