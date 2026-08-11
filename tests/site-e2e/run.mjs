@@ -81,6 +81,7 @@ async function main() {
     await testFinancials(browser, base);
     await testBankAndCash(browser, base);
     await testContract(browser, base);
+    await testChangeApprovalEvidence(browser, base);
     await testProcurement(browser, base);
     await testAdmin(browser, base);
     await testControlTowerAndDay(browser, base);
@@ -2941,22 +2942,34 @@ async function testContract(browser, base) {
 
     const viewer = await pg.evaluate(() => {
       const grid = document.querySelector(".con2");
+      const cols = grid
+        ? getComputedStyle(grid).gridTemplateColumns.split(" ").map(parseFloat)
+        : [];
       return {
         full: document.body.classList.contains("fs"),
         zones: grid ? grid.children.length : 0,
-        cols: grid ? getComputedStyle(grid).gridTemplateColumns : "",
+        docCol: cols[0] || 0,
+        panelCol: cols[1] || 0,
         docTranslateOff: document.querySelector(".cdoc")?.getAttribute("translate") === "no",
         tabs: [...document.querySelectorAll("[data-contab]")].map((b) => b.textContent),
       };
     });
+    // Package 2 slides 5 and 7: a panel pinned at exactly 392px left a wide
+    // strip of nothing on any real screen and starved Hitos de pago into a
+    // scrollbar it never needed. The document stays capped near 760 — it is
+    // a fixed-width piece of paper — and the panel now absorbs whatever is
+    // left, so it must end up wider than its old fixed value, not equal to it.
     if (
       viewer.full &&
       viewer.zones === 2 &&
-      /392px$/.test(viewer.cols) &&
+      viewer.docCol <= 760 &&
+      viewer.panelCol > 392 &&
       viewer.docTranslateOff &&
       viewer.tabs.length === 3
     )
-      ok(`COM-04: full screen, document 760 + panel 392, three tabs (${viewer.cols})`);
+      ok(
+        `COM-04: full screen, document ≤760 + panel fills the rest (${viewer.docCol}+${viewer.panelCol}), three tabs`,
+      );
     else bad("COM-04: full-screen viewer", JSON.stringify(viewer));
 
     // The document is built from data — it names the customer and totals its
@@ -2967,6 +2980,16 @@ async function testContract(browser, base) {
       ok("COM-04: the document is rendered from data, customer and all");
     else bad("COM-04: document from data", docText.replace(/\n/g, " ").slice(0, 120));
 
+    // Package 2 slide 6, a real bug: guaranteeCategories is engine vocabulary
+    // (executionAndFinishes/installations/structural) and was printed
+    // straight onto the customer's own contract.
+    if (/executionAndFinishes|installations|structural/.test(docText))
+      bad(
+        "COM-04: guarantee categories are translated, not raw engine keys",
+        docText.slice(0, 200),
+      );
+    else ok("COM-04: guarantee categories are translated, not raw engine keys");
+
     // Hitos de pago: the sum against the contracted amount, and S8's source.
     await pg.locator('[data-contab="hitos"]').click();
     await pg.waitForTimeout(400);
@@ -2974,6 +2997,16 @@ async function testContract(browser, base) {
     if (/Suma de hitos/i.test(hitos) && /(cuadra|sobre el contratado)/i.test(hitos))
       ok("COM-04: the milestones foot against the contracted amount");
     else bad("COM-04: milestones foot", hitos.replace(/\n/g, " ").slice(0, 140));
+
+    // Package 2 slide 7: the panel pinned at 392px starved this table into a
+    // horizontal scrollbar it never needed on any real screen.
+    const hitosWidth = await pg.evaluate(() => {
+      const d = document.querySelector("#conBody .scroll");
+      return d ? { scrollW: d.scrollWidth, clientW: d.clientWidth } : null;
+    });
+    if (hitosWidth && hitosWidth.scrollW <= hitosWidth.clientW + 1)
+      ok("COM-04: Hitos de pago fits without a horizontal scrollbar");
+    else bad("COM-04: hitos table width", JSON.stringify(hitosWidth));
 
     await pg.locator('[data-contab="anexos"]').click();
     await pg.waitForTimeout(400);
@@ -3001,6 +3034,113 @@ async function testContract(browser, base) {
     else bad("COM-04: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("contract viewer", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/* Package 2 slide 8 (PK2-C): the anexo tab named an amendment's number, date
+   and amount but had no way to see what it actually WAS or reopen its
+   backup — "Aprobar" wrote a hardcoded fake filename
+   ("aceptacion-cliente.png") the instant it was clicked, the same
+   "a filename proves nothing" bug PK2-A already fixed on the presupuesto's
+   own acceptance. This exercises the fix one step upstream: a real file
+   collected at approval time, reachable afterwards from the Anexos tab. */
+async function testChangeApprovalEvidence(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#contracts`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+
+    const target = await pg.evaluate(() => {
+      // No seeded change sits in identified/priced/sent, so raise a fresh one.
+      const p = erp.state.projects.find((x) => x.contractId);
+      if (!p) return null;
+      const c = erp.addChange(p.id, { desc: "E2E: extra de prueba", reason: "" }, "operations");
+      erp.priceChange(c.id, 20000, 12000, 0, "test");
+      erp.sendChange(c.id, "test");
+      return { changeId: c.id, contractId: p.contractId };
+    });
+    if (!target) {
+      bad(
+        "anexo evidence: a project with a contract exists to raise a change on",
+        "none in the seed",
+      );
+      return;
+    }
+
+    await pg.evaluate((id) => approveChangeDrawer(id), target.changeId);
+    await pg.waitForTimeout(500);
+    const field = await pg.evaluate(() => !!document.querySelector("#apEvid .evz"));
+    if (field) ok("anexo evidence: approving opens a drawer with a real upload field");
+    else bad("anexo evidence: approval drawer has an upload field", field);
+
+    await pg.setInputFiles("#apEvid input[type=file]", {
+      name: "whatsapp-aprobacion.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from(minimalPdf(), "latin1"),
+    });
+    await pg.waitForTimeout(700);
+    await pg.click("#apOk");
+    await pg.waitForTimeout(700);
+    const saved = await pg.evaluate((id) => {
+      const c = erp.state.changes.find((x) => x.id === id);
+      return {
+        status: c.status,
+        key: (c.evidence && c.evidence.storageKey) || "",
+        type: (c.evidence && c.evidence.type) || "",
+        name: (c.evidence && c.evidence.name) || "",
+      };
+    }, target.changeId);
+    if (
+      saved.status === "approved" &&
+      saved.key &&
+      saved.type === "application/pdf" &&
+      saved.name === "whatsapp-aprobacion.pdf"
+    )
+      ok("anexo evidence: the real file is stored on the change, not a hardcoded placeholder");
+    else bad("anexo evidence: persisted approval evidence", JSON.stringify(saved));
+
+    // ---- reachable from the Anexos tab afterwards --------------------------
+    await pg.evaluate(() => go("contracts"));
+    await pg.waitForTimeout(300);
+    await pg.evaluate((cid) => {
+      conWork = { id: cid, tab: "anexos" };
+      render();
+    }, target.contractId);
+    await pg.waitForTimeout(500);
+    const tabText = await pg.locator("#conBody").innerText();
+    const evLink = await pg.evaluate(() => !!document.querySelector("#conBody [data-evidence]"));
+    if (/E2E: extra de prueba/.test(tabText))
+      ok("anexo evidence: the Anexos tab shows what the amendment actually was");
+    else bad("anexo evidence: anexo detail in the tab", tabText.slice(0, 200));
+    if (evLink) ok("anexo evidence: the approval's backup document is reachable from the tab");
+    else bad("anexo evidence: evidence link in the anexos tab", tabText.slice(0, 200));
+
+    if (evLink) {
+      await pg.click("#conBody [data-evidence]");
+      await pg.waitForTimeout(2500);
+      const viewer = await pg.evaluate(() => {
+        const v = document.querySelector(".pview");
+        if (!v) return { open: false };
+        return {
+          open: true,
+          canvas: !!v.querySelector("canvas"),
+          ext: !!v.querySelector("[data-pv=ext]"),
+        };
+      });
+      if (viewer.open && (viewer.canvas || viewer.ext))
+        ok("anexo evidence: the backup document actually opens");
+      else bad("anexo evidence: viewer opens the backup", JSON.stringify(viewer));
+    }
+
+    if (errs.length) bad("anexo evidence: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("anexo evidence: no console errors");
+  } catch (e) {
+    bad("anexo evidence: suite completed", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }
@@ -3234,7 +3374,13 @@ async function testProcurement(browser, base) {
       bad("modificaciones: priced extra offers Enviar", "no [data-send]");
     await sendBtn.click();
     await pg.waitForTimeout(400);
+    // Package 2 slide 8 (PK2-C): "Aprobar" opens a drawer for the real backup
+    // document now, rather than firing the approval on the one click —
+    // evidence is optional here, so confirming without attaching anything
+    // still approves.
     await pg.locator("[data-approve]").first().click();
+    await pg.waitForTimeout(400);
+    await pg.click("#apOk");
     await pg.waitForTimeout(500);
     const kpisAfter = await pg.locator("#view .counter .val").allInnerTexts();
     if (JSON.stringify(kpisAfter) !== JSON.stringify(kpisBefore))

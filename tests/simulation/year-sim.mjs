@@ -556,7 +556,7 @@ function advanceProject(hnd) {
       photoRef: "extra-01.jpg",
     });
     erp.priceChange(chg.id, ri(1200, 3000) * 100, ri(700, 1800) * 100);
-    erp.approveChange(chg.id, "whatsapp-aprobacion.png");
+    erp.approveChange(chg.id, { evidenceRef: "whatsapp-aprobacion.png" });
     // subcontractor bill (autónomo fontanero — 0% IRPF) + technical adviser bill (15% IRPF)
     const b2 = erp.registerBill({
       supplierId: supFont.id,

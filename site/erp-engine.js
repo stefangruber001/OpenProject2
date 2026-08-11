@@ -2860,7 +2860,15 @@
       this._log(user, "sendChange", changeId);
       return c;
     }
-    approveChange(changeId, evidenceRef, user) {
+    /**
+     * @param evidenceRef  legacy free-text note. Kept for records written
+     *                     before a file could be attached.
+     * @param evidence     the real backing document —
+     *                     { storageKey, name, type, size, uploadedAt } —
+     *                     Package 2 slide 8's "respaldo" for the anexo this
+     *                     approval generates.
+     */
+    approveChange(changeId, { evidenceRef, evidence } = {}, user) {
       // CHG-03/04 + CON-12. Accepts "priced" too — sending to the client first
       // is a real step this spec adds, but skipping straight to acceptance
       // (a verbal yes, a signature on the spot) is common enough on site that
@@ -2871,6 +2879,7 @@
       c.status = "approved";
       c.approvedAt = this.state.today;
       c.evidenceRef = evidenceRef || null;
+      c.evidence = evidence || null;
       const p = this.project(c.projectId);
       const con = p.contractId ? this.state.contracts.find((x) => x.id === p.contractId) : null;
       if (con) {

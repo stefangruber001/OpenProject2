@@ -1225,6 +1225,15 @@ window.CANEI_DICT.ca = {
   "Sin móvil registrado — añádalo en Datos maestros para poder abrir WhatsApp":
     "Sense mòbil registrat — afegeix-lo a Dades mestres per poder obrir el WhatsApp",
   viendo: "veient",
+  // PK2-C: contract layout, garantías fix, anexo approval evidence.
+  "Efecto en venta": "Efecte en venda",
+  "Foto de origen": "Foto d'origen",
+  "Marcar como aprobada": "Marca com a aprovada",
+  "Aprobar genera la adenda del contrato y añade el importe al importe vigente.":
+    "Aprovar genera l'addenda del contracte i afegeix l'import a l'import vigent.",
+  "Arrastra aquí el respaldo de la aprobación (WhatsApp, correo, adenda firmada…), o búscalo en el dispositivo.":
+    "Arrossega aquí el respatller de l'aprovació (WhatsApp, correu, addenda signada…), o cerca'l al dispositiu.",
+  "Modificación aprobada — adenda generada": "Modificació aprovada — addenda generada",
 };
 window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Programar visita — (.+)$"), "Programar visita — $1"],

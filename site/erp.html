@@ -2365,11 +2365,17 @@
      bottom of is the difference between filing documents and having a pile. */
       /* ---------- COM-04: the contract, full screen (S9) ----------
      The fourth and last of §3.1's out-of-shell surfaces. Wider on the left
-     than ADM-02's 620 because a contract is read, not compared: 760 for the
-     document and a fixed 392 for the panel that indexes it. */
+     than ADM-02's 620 because a contract is read, not compared: up to 760
+     for the document, which is a fixed-width piece of paper and gains
+     nothing from stretching further, and the REST for the panel that
+     indexes it — a fixed 392 there (Package 2 slides 5 and 7) left a wide
+     strip of nothing on any screen over ~1150px wide, and starved the
+     Hitos de pago table into a horizontal scrollbar it never needed to
+     have. 392 stays as the FLOOR: the panel's own content (labels beside
+     figures) does not ask for less. */
       .con2 {
         display: grid;
-        grid-template-columns: minmax(0, 760px) 392px;
+        grid-template-columns: minmax(0, 760px) minmax(392px, 1fr);
         min-height: 0;
         flex: 1;
       }
@@ -6766,15 +6772,7 @@
           );
         document
           .querySelectorAll("[data-approve]")
-          .forEach(
-            (b) =>
-              (b.onclick = () =>
-                mutate(
-                  () =>
-                    erp.approveChange(b.dataset.approve, "aceptacion-cliente.png", "backoffice"),
-                  "Modificación aprobada — adenda generada",
-                )),
-          );
+          .forEach((b) => (b.onclick = () => approveChangeDrawer(b.dataset.approve)));
         document.querySelectorAll("[data-reject]").forEach(
           (b) =>
             (b.onclick = async () => {
@@ -6924,6 +6922,33 @@
             );
             closeDrawer();
           }, "Modificación valorada");
+      }
+      /* Package 2 slide 8: an anexo's backing document used to be a hardcoded
+   fake filename ("aceptacion-cliente.png") written the instant "Aprobar"
+   was clicked — the same "a filename proves nothing" problem PK2-A already
+   fixed on the presupuesto's own acceptance. This is that fix again, one
+   step upstream: the real backup — the client's WhatsApp confirmation, the
+   signed adenda, whatever it actually was — is what the Anexos tab shows
+   afterwards. */
+      function approveChangeDrawer(id) {
+        const c = erp.state.changes.find((x) => x.id === id);
+        const db = openDrawer("Aprobar · " + c.desc);
+        db.innerHTML = `<div class="card"><div class="daylist" style="gap:9px">
+    <div class="it">Aprobar genera la adenda del contrato y añade el importe al importe vigente.</div>
+    <div class="it"><span>Efecto en venta</span><span style="flex:1"></span><b>${eur(c.priceCents)}</b></div>
+    <div class="it" style="display:block"><label class="opt" style="margin-bottom:6px">Justificante</label>
+     <div id="apEvid"></div></div>
+    <div class="it"><button class="btn primary" id="apOk">Marcar como aprobada</button></div>
+   </div></div>`;
+        const evid = evidenceField($("#apEvid"), {
+          prefix: "chg",
+          hint: "Arrastra aquí el respaldo de la aprobación (WhatsApp, correo, adenda firmada…), o búscalo en el dispositivo.",
+        });
+        $("#apOk").onclick = () =>
+          mutate(() => {
+            erp.approveChange(id, { evidence: evid.value() }, "backoffice");
+            closeDrawer();
+          }, "Modificación aprobada — adenda generada");
       }
       function changeDocDrawer(id) {
         const doc = erp.renderChangeDoc(id);
@@ -16680,8 +16705,9 @@
       }
 
       /* ================= COM-04 · the contract, full screen (S9) ================
-   The last of §3.1's four out-of-shell surfaces. The document at 760 on the
-   left, a fixed 392 panel on the right with Datos · Hitos de pago · Anexos.
+   The last of §3.1's four out-of-shell surfaces. The document capped near
+   760 on the left, and the panel on the right — Datos · Hitos de pago ·
+   Anexos — taking whatever room is left (Package 2, PK2-C).
 
    The document is rendered FROM DATA, like the presupuesto in COM-03 and for
    the same reason: CON-03 made the terms structured on purpose, so requiring
@@ -16700,6 +16726,15 @@
         atStage: "Al llegar a una fase",
         onCompletion: "A la finalización",
         fixedDate: "Fecha fija",
+      };
+      /* Package 2 slide 6, a real bug: `guaranteeCategories` is engine
+     vocabulary (executionAndFinishes/installations/structural) and was being
+     printed straight onto the customer's contract — CON_TRIGGER got this
+     same lookup when the doc was built; guarantees never did. */
+      const CON_GUARANTEE = {
+        executionAndFinishes: "Ejecución y acabados",
+        installations: "Instalaciones",
+        structural: "Estructura",
       };
 
       function contractScreen(v) {
@@ -16826,6 +16861,14 @@
                 fixedDate: "Data fixa",
               }
             : CON_TRIGGER;
+        const GUA =
+          d.language === "ca"
+            ? {
+                executionAndFinishes: "Execució i acabats",
+                installations: "Instal·lacions",
+                structural: "Estructura",
+              }
+            : CON_GUARANTEE;
         host.innerHTML = `
    <h1>${esc(L.doc)}</h1>
    <div class="meta">${esc(L.no)} ${esc(d.number)} · ${esc(L.date)} ${fmtD(d.date)}</div>
@@ -16865,7 +16908,7 @@
    ${
      d.guarantees.length
        ? `<h2>${esc(L.gua)}</h2>
-    ${d.guarantees.map((g) => `<div class="pair"><span>${esc(g.category || "")}</span><span>${g.months || 0} ${esc(L.months)}</span></div>`).join("")}`
+    ${d.guarantees.map((g) => `<div class="pair"><span>${esc(GUA[g.category] || g.category || "")}</span><span>${g.months || 0} ${esc(L.months)}</span></div>`).join("")}`
        : ""
    }
 
@@ -16876,7 +16919,7 @@
    <div class="pair"><span>${d.signature.customerSignedAt ? esc(L.signed) + " " + fmtD(d.signature.customerSignedAt) : esc(L.unsigned)}</span><span>${esc(d.signature.method || "")}</span></div>`;
       }
 
-      /** Datos · Hitos de pago · Anexos — the 392 index beside the document. */
+      /** Datos · Hitos de pago · Anexos — the index beside the document. */
       function contractPanel(d, val) {
         const host = $("#conBody");
         if (!host) return;
@@ -16903,17 +16946,44 @@
           return;
         }
         if (conWork.tab === "anexos") {
-          host.innerHTML = `<div class="daylist">
+          // Package 2 slide 8: a number, a date and an amount proved an anexo
+          // EXISTS but said nothing about what it was or let anyone reopen
+          // its backup — the change record behind each one already carries
+          // both (desc/reason from when it was raised, evidence from when it
+          // was approved), so this reads them rather than adding a second
+          // place to store the same facts.
+          host.innerHTML = `<div class="daylist" style="gap:10px">
       ${
         d.annexes
-          .map(
-            (a) => `<div class="it"><b>${esc(a.number)}</b><span style="flex:1"></span>
-        <span>${fmtD(a.date)}</span><b>${eur(a.valueCents)}</b></div>`,
-          )
-          .join("") || '<div class="it">Sin anexos. El importe vigente es el original.</div>'
+          .map((a) => {
+            const chg = erp.state.changes.find((x) => x.id === a.changeId);
+            return `<div class="card" style="margin:0"><div class="ch"><h3>${esc(a.number)}</h3><b>${eur(a.valueCents)}</b></div>
+      <div class="daylist">
+       <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${fmtD(a.date)}</b></div>
+       ${chg ? `<div class="it"><span>Motivo</span><span style="flex:1"></span><b>${esc(chg.desc)}</b></div>` : ""}
+       ${chg && chg.reason ? `<div class="it" style="color:var(--muted)">${esc(chg.reason)}</div>` : ""}
+       ${
+         chg && chg.photoRef
+           ? `<div class="it"><span>Foto de origen</span><span style="flex:1"></span>
+        <img data-blob="${esc(chg.photoRef)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px"></div>`
+           : ""
+       }
+       ${
+         chg && chg.evidence && chg.evidence.storageKey
+           ? `<div class="it"><span>Justificante</span><span style="flex:1"></span>
+        <b data-evidence="${esc(JSON.stringify(chg.evidence))}">${esc(chg.evidence.name || "Ver el documento")}</b></div>`
+           : chg && chg.evidenceRef
+             ? `<div class="it" style="color:var(--muted)"><span>Justificante</span><span style="flex:1"></span><b>${esc(chg.evidenceRef)}</b></div>`
+             : `<div class="it" style="color:var(--muted)"><span>Justificante</span><span style="flex:1"></span><b>sin adjuntar</b></div>`
+       }
+      </div></div>`;
+          })
+          .join("") ||
+        '<div class="card" style="margin:0"><div class="daylist"><div class="it">Sin anexos. El importe vigente es el original.</div></div></div>'
       }
       ${d.annexes.length ? `<div class="it"><span>Total anexos</span><span style="flex:1"></span><b>${eur(val.annexCents)}</b></div>` : ""}
      </div>`;
+          paintImages(host);
           return;
         }
         // Hitos de pago. §3.2 asks for trigger, %/amount, expected date and the

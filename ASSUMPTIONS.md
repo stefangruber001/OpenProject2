@@ -2978,3 +2978,32 @@ different decisions, so these ten arrived colliding. They are renumbered from
   non-accepted version's document before the navigator existed, and wrong on
   exactly the screen this session built. Fixed to check the version being
   shown.
+
+- **#156 — contract detail layout + garantías + anexo evidence (Package 2
+  slides 5–8, PK2-C · 2026-08-11).** Decisions taken: (a) **the fix to the
+  392px panel is a grid change, not a redesign.** `minmax(392px, 1fr)`
+  replaces the fixed `392px` — the document column keeps its own cap near
+  760 (it renders a fixed-width piece of paper; more width there buys
+  nothing), and the panel takes whatever is left. This resolves both slide 5
+  (the empty strip) and slide 7 (Hitos de pago's forced horizontal scroll)
+  with one change, because they were the same bug seen from two tabs.
+  (b) **Garantías gets its own label map (`CON_GUARANTEE`)**, mirroring the
+  `CON_TRIGGER` map installment triggers already used — engine vocabulary
+  (`executionAndFinishes`/`installations`/`structural`) never belonged on a
+  customer-facing document, and the fix is scoped to `contractDocPane`
+  because that is the only place it was ever printed raw. (c) **The Anexos
+  tab reads the change record behind each entry** (`desc`, `reason`) rather
+  than adding new fields that would duplicate what the change already
+  states — an annex only exists because a change was approved, so the
+  detail already lives one lookup away. (d) **"Aprobar" became a drawer**
+  instead of a one-click button that fired `approveChange` immediately: the
+  hardcoded evidence string it wrote (`"aceptacion-cliente.png"`) was a real
+  bug of the exact same shape PK2-A fixed on the presupuesto's acceptance —
+  a fake filename with no file behind it, now a real `evidenceField()`
+  upload like every other evidence-collecting moment in this system.
+  (e) **`approveChange`'s signature changed to an options object**
+  (`{ evidenceRef, evidence }`) rather than a bare positional string, to
+  carry the new field the same way `acceptVersion` does — with no
+  backwards-compatibility shim, since every one of its six call sites (two
+  simulations, two seed builders, the history generator, the one real UI
+  site) is in this repository and was updated directly.

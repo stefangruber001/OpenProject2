@@ -3232,6 +3232,19 @@ window.CANEI_DICT = {
       "No mobile on file — add one in Master data to open WhatsApp",
     ],
     ["viendo", "viewing"],
+    // PK2-C: contract layout, garantías fix, anexo approval evidence.
+    ["Efecto en venta", "Effect on the sale price"],
+    ["Foto de origen", "Original photograph"],
+    ["Marcar como aprobada", "Mark as approved"],
+    [
+      "Aprobar genera la adenda del contrato y añade el importe al importe vigente.",
+      "Approving generates the contract amendment and adds the amount to the amount currently in force.",
+    ],
+    [
+      "Arrastra aquí el respaldo de la aprobación (WhatsApp, correo, adenda firmada…), o búscalo en el dispositivo.",
+      "Drag the approval's backup here (WhatsApp, email, signed amendment…), or find it on the device.",
+    ],
+    ["Modificación aprobada — adenda generada", "Change approved — amendment generated"],
   ],
   rxEs2En: [
     [new RegExp("^Programar visita — (.+)$"), "Schedule visit — $1"],

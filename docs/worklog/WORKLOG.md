@@ -242,3 +242,43 @@ Business API, a real credential outside this session's scope (a candidate for
 email delivery: the mandate is explicit — no real emails, fakes behind ports
 only — so the email channel goes through the same log-only queue as every
 other communication in this system, honestly, rather than pretending to send.
+
+### PK2-C — **done**
+
+Slides 5 and 7: the contract detail screen's right-hand panel was pinned at
+exactly 392px regardless of screen width, leaving a wide strip of nothing on
+any real monitor and starving the Hitos de pago table into a horizontal
+scrollbar it never needed. Slide 6: "Garantías" printed raw engine
+vocabulary (`executionAndFinishes`, `installations`, `structural`) straight
+onto the customer's own contract. Slide 8: the Anexos tab named an
+amendment's number, date and amount but gave no way to see what it actually
+was or reopen its backup.
+
+- **`.con2`'s grid now lets the panel absorb whatever the document doesn't
+  need**: `minmax(0, 760px) minmax(392px, 1fr)` in place of a fixed
+  `392px`. The document stays capped near 760 — it is a fixed-width piece of
+  paper and gains nothing from stretching further — and the panel takes the
+  rest, which is what turned Hitos de pago's forced scrollbar into a table
+  that simply fits. The existing E2E check that had `/392px$/` baked into it
+  was itself testing for the bug; it now asserts the panel ends up WIDER
+  than its old fixed value.
+- **A `CON_GUARANTEE` label map**, matching the `CON_TRIGGER` pattern
+  already used for installment triggers, wired into both the customer
+  document (`contractDocPane`) and nowhere else — guarantees are only ever
+  printed there today.
+- **Anexos now show what the amendment was and let its backup be reopened.**
+  Each row is looked up against the change record behind it (`desc`,
+  `reason`) rather than showing only the annex's own thin
+  `{number, date, valueCents}`. A real bug was fixed on the way to make the
+  "reopen the backup" half possible at all: **"Aprobar" used to write a
+  hardcoded fake filename** (`"aceptacion-cliente.png"`) the instant it was
+  clicked — the exact "a filename proves nothing" bug PK2-A already fixed on
+  the presupuesto's own acceptance, just one step upstream, at the
+  approval that PRODUCES an anexo. `approveChange` now takes PK2-A's
+  `evidence` shape, and a one-click button became a small drawer
+  (`approveChangeDrawer`) with `evidenceField()`, matching the shape
+  `budgetResponseDrawer` already established. Six pre-existing call sites
+  (two simulations, two seed files, the history generator, and the one real
+  UI call) were updated to the new `{ evidenceRef, evidence }` options
+  object — no back-compat shim, since every caller was in this repository
+  and could just be changed.

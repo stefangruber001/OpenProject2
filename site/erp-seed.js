@@ -710,7 +710,7 @@
       photoRef: "extra-suelo-radiante.jpg",
     });
     erp.priceChange(chgR.id, 186000, 112000);
-    erp.approveChange(chgR.id, "whatsapp-aprobacion.png");
+    erp.approveChange(chgR.id, { evidenceRef: "whatsapp-aprobacion.png" });
     // 50% installment invoiced, half collected (partial, AR-06)
     erp.setToday("2026-04-28");
     const invR2 = erp.issueInvoice({
@@ -1399,7 +1399,7 @@
     erp.priceChange(chB.id, 384000, 246000, 4, "backoffice");
     erp.sendChange(chB.id, "backoffice");
     erp.setToday("2026-04-24");
-    erp.approveChange(chB.id, "adenda-balmes-01.pdf", "backoffice");
+    erp.approveChange(chB.id, { evidenceRef: "adenda-balmes-01.pdf" }, "backoffice");
 
     [w1, w2].forEach((w) =>
       erp.assignResource(
