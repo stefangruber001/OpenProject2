@@ -7419,6 +7419,14 @@
         "assumptions",
       ];
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      // Package 3 slide 5: a validity date is how long the OFFER stands —
+      // one already in the past expired before anyone read it, which is not
+      // a state a presupuesto can be typed into. The `min` on the field
+      // stops the date picker offering an earlier day; this is the check
+      // that actually holds, since a picker's `min` does not stop a typed
+      // or programmatic value.
+      if (patch.validityDate && patch.validityDate < this.state.today)
+        throw new Error("Validity date cannot be in the past");
       Object.assign(b, patch);
       this._log(user, "updateBudget", b.number);
       return b;

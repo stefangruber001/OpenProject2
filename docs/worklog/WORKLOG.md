@@ -359,3 +359,55 @@ Fixed by not defaulting the parameter (`approveChange(changeId, opts, user)`,
 destructured inside), which keeps the arity the API advertises. The lesson is
 the checklist: **`pnpm test` belongs in every session's sweep**, alongside
 the gates already run. `CLAUDE.md` lists it; these sessions skipped it.
+
+## Package 3 — the operator's third pass (2026-08-12)
+
+Six slides. Slide 3's premise was checked against the running app before
+being accepted at face value: it names the Avance/Ficha tabs as the fix, but
+the Gantt screen already has its own working progress-entry grid
+(`progressTable`/`wireProgressTable`) that the tabs' own `panelAvance`
+control does not — it writes only through `markProgress`, never back to the
+Gantt's plan. The plan below reuses that grid as the single controller
+rather than porting `panelAvance`'s logic sideways, per the operator's
+explicit confirmation once the discrepancy was raised.
+
+| #     | Session                                                                   | Model    | Effort      | State       |
+| ----- | ------------------------------------------------------------------------- | -------- | ----------- | ----------- |
+| PK3-A | Presupuesto validity date · contract document sizing + scroll clearance   | Sonnet 5 | low         | **done**    |
+| PK3-B | Presupuestos toolbar + "＋ Presupuesto" creation from a visita or a lead  | Sonnet 5 | medium      | not started |
+| PK3-C | Merge Avance/Ficha into the Gantt's progress grid, %-only, desktop+mobile | Opus 5   | medium-high | not started |
+
+### PK3-A — **done**
+
+Slide 5: a presupuesto's Validez date could be typed into the past — an
+offer that has already expired before anyone reads it. Slide 6: the
+contract document card showed unexplained blank white space around short
+documents ("poco profesional"), and scrolling a long contract to its end
+left FIRMA hidden.
+
+- **`updateBudget` rejects a past `validityDate`.** This is the _inverse_ of
+  the backdatable-but-never-postdatable rule established for
+  `acceptVersion`/`issueVersion`/`signContract` — a validity date describes
+  how long an offer stands going forward, not a past event, so the past is
+  what has to be refused. The `min` attribute on `#bcValid` is the picker
+  affordance; the engine check is what actually holds, since a picker's
+  `min` never stops a typed or programmatic value. Confirmed the only
+  editable `validityDate` input in the file (three other occurrences are
+  read-only display spans).
+- **`.condoc` gained `align-items: flex-start`.** No explicit `align-items`
+  on a flex container defaults to `stretch`, which forced `.cdoc` to the
+  full column height even for a document with far less content than that —
+  the blank space the operator flagged. `flex-start` lets a short document
+  size to its own content without touching how a long one renders, since a
+  long document already grows past its container on flexbox's own
+  content-based minimum regardless of `align-items`. Verified by reverting
+  the fix (`git stash`) and re-measuring at an oversized viewport: without
+  the fix the card stretched to the full container; with it, to its own
+  content.
+- **`.condoc`'s bottom padding grew to clear the fixed language pill.** The
+  pill (`#canei-lang-pill`, `site/i18n.js`) sits fixed at the bottom-left of
+  every page; the document's own scroll container is the right place to
+  reserve room for it, since the pill is outside this screen's control.
+  Verified against the seed's longest contract: without the extra padding
+  the card's bottom edge (2984px) sat 27px below the pill's top (2957px) at
+  maximum scroll; with it, the card clears the pill.

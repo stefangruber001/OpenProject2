@@ -2385,13 +2385,22 @@
         min-height: 0;
         flex: 1;
       }
+      /* Package 3 slide 6: no explicit align-items defaults a flex container
+     to stretch, which forced .cdoc to the full column height even for a
+     short document (few chapters) with nothing to fill it — the blank
+     white card the operator flagged. flex-start lets .cdoc size to its own
+     content instead; a long document still grows past the viewport on its
+     own, unaffected. The extra bottom padding clears the fixed language
+     pill (site/i18n.js, ~44px tall incl. its own offset) so scrolling a
+     long contract to its true end does not leave FIRMA hidden behind it. */
       .condoc {
         min-height: 0;
         overflow: auto;
         background: var(--hair);
-        padding: 16px;
+        padding: 16px 16px 64px;
         display: flex;
         justify-content: center;
+        align-items: flex-start;
       }
       .conpanel {
         min-height: 0;
@@ -10339,7 +10348,7 @@
          belongs to FINISHING moves behind one button. Superficie is gone
          entirely, input and figure both, at the operator's request. -->
     <div class="pbcond">
-     <label>Validez <input type="date" id="bcValid" value="${esc(b.validityDate || "")}"${dis}></label>
+     <label>Validez <input type="date" id="bcValid" value="${esc(b.validityDate || "")}" min="${esc(erp.today)}"${dis}></label>
      <label>Idioma del documento
       <select id="bcLang"${dis}>
        <option value="es"${b.language === "es" ? " selected" : ""}>Español</option>

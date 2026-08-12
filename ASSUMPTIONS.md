@@ -3050,3 +3050,39 @@ different decisions, so these ten arrived colliding. They are renumbered from
   afterwards left a permanent hole whenever a contract was refused. It was
   unreachable before this session only because nothing could create a
   contract.
+
+- **#158 — presupuesto validity date + the contract document's sizing and
+  scroll clearance (Package 3 slides 5–6, PK3-A · 2026-08-12).** Slide 5
+  asked that a presupuesto's validity date never be typeable into the past —
+  a date already in the past has expired before anyone could read the offer,
+  which is not a state the field should accept. Slide 6 flagged the contract
+  document card as "poco profesional" (blank white space around a short
+  document) and separately, that scrolling to the end of a long contract
+  left the FIRMA section hidden. Decisions taken: (a) **the enforceable
+  check lives in `updateBudget` (erp-engine.js), the `min` attribute on
+  `#bcValid` is the UX affordance only** — a picker's `min` stops the
+  calendar offering an earlier day but does not stop a typed or
+  programmatic value, so the engine guard is what actually holds; confirmed
+  by grep that `#bcValid` is the only editable `validityDate` input
+  site-wide (three other occurrences are read-only display spans). (b) **the
+  guard rejects a past date, not a postdated one** — this is the _inverse_
+  of the backdatable-but-never-postdatable pattern used elsewhere
+  (`acceptVersion`/`issueVersion`/`signContract`), because a validity date
+  describes how long an offer stands going forward, not when a past event
+  happened. (c) **`.condoc`'s missing `align-items` was the root cause of
+  the sizing complaint**, not a `.cdoc` sizing rule — a flex container
+  defaults to `stretch`, so a short document's card was forced to the full
+  column height with nothing to fill it. `align-items: flex-start` was
+  chosen over constraining `.cdoc`'s own height because it only changes
+  behaviour for _short_ documents; a long one already grows past the
+  container on flexbox's own content-based minimum, `align-items` never
+  enters into it, verified empirically (with the fix reverted via `git
+stash`, a tall-viewport scratch check showed the short document's card
+  forced to the container's full height; with the fix, sized to its own
+  content). (d) **bottom clearance was added to `.condoc`'s padding, not to
+  `.cdoc` or to the language pill** — the pill (`#canei-lang-pill`,
+  site/i18n.js) is a fixed-position, cross-page element outside this
+  screen's control, so the document's own scroll container is the correct
+  place to reserve space for it. Verified against the seed's longest
+  contract: without the fix the card's bottom edge (2984px) sat below the
+  pill's top (2957px) at max scroll; with the fix it clears.
