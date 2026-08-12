@@ -83,6 +83,7 @@ async function main() {
     await testContract(browser, base);
     await testChangeApprovalEvidence(browser, base);
     await testContractCreation(browser, base);
+    await testBudgetCreation(browser, base);
     await testProcurement(browser, base);
     await testAdmin(browser, base);
     await testControlTowerAndDay(browser, base);
@@ -1248,21 +1249,19 @@ async function testBudgetBuilder(browser, base) {
 
     // Open the one budget that is still a draft — a frozen version is
     // deliberately read-only, so editing has to be tried on an editable one.
-    // The register groups by stage (COM-03), so the draft is the first row
-    // under the «Borradores» heading rather than a row carrying its own pill.
+    // The register's Estado column (COM-03) carries the stage pill per row.
     const opened = await pg.evaluate(() => {
-      const hd = [...document.querySelectorAll("#view tr.grouphd")].find((t) =>
-        /^Borradores/i.test(t.innerText.trim()),
+      const row = [...document.querySelectorAll("#view table.mlist tr.click")].find((tr) =>
+        /Borrador/i.test(tr.textContent),
       );
-      let row = hd && hd.nextElementSibling;
-      if (!row || !row.classList.contains("click")) return false;
+      if (!row) return false;
       row.click();
       return true;
     });
     if (!opened) {
       bad(
         "builder: a draft budget exists to edit",
-        `${await pg.locator("#view tr.click").count()} budgets, none under «Borradores»`,
+        `${await pg.locator("#view tr.click").count()} budgets, none in Borradores`,
       );
       return;
     }
@@ -1729,16 +1728,33 @@ async function testPresupuestador(browser, base) {
     await bootedShell(pg);
     await pg.waitForTimeout(900);
 
-    // ---- the register, grouped by the five stages -------------------------
-    const heads = await pg.evaluate(() =>
-      [...document.querySelectorAll("#view tr.grouphd")].map((t) => t.innerText.trim()),
-    );
-    // innerText is the RENDERED text and the headings are uppercased in CSS,
-    // so the comparison has to be case-insensitive or it tests the stylesheet.
+    // ---- the register: shared list toolbar (Package 3 slide 4) ------------
+    // budgetList used to be a raw <table> grouped into five stage sections
+    // with no search, export or pagination. It now runs on renderMasterList
+    // like every other register in the app, and the same five stages show as
+    // an Estado pill per row instead of a section heading.
+    const register = await pg.evaluate(() => ({
+      hasSearch: !!document.querySelector("#bqQ"),
+      hasExport: !!document.querySelector("#bqExp"),
+      hasNew: !!document.querySelector("#bqNew"),
+      hasPager: !!document.querySelector("#bqPrev") && !!document.querySelector("#bqNext"),
+      pills: [...document.querySelectorAll("#view table.mlist tr.click td:last-child .pill")].map(
+        (t) => t.textContent.trim(),
+      ),
+    }));
     const known = ["borradores", "enviados", "aceptados", "rechazados", "caducados"];
-    if (heads.length && heads.every((h) => known.some((k) => h.toLowerCase().startsWith(k))))
-      ok(`COM-03: the register is grouped by stage (${heads.length} groups)`);
-    else bad("COM-03: grouped register", JSON.stringify(heads));
+    if (
+      register.hasSearch &&
+      register.hasExport &&
+      register.hasNew &&
+      register.hasPager &&
+      register.pills.length &&
+      register.pills.every((p) => known.some((k) => p.toLowerCase().startsWith(k)))
+    )
+      ok(
+        `COM-03: the register has the shared list toolbar, Estado shows the five stages (${register.pills.length} rows)`,
+      );
+    else bad("COM-03: register toolbar + Estado column", JSON.stringify(register));
 
     // «Caducados» is the proof that the stage is derived rather than stored:
     // nothing was ever written to those records on the day they expired.
@@ -1995,12 +2011,13 @@ async function testPresupuestador(browser, base) {
 
     await pg.evaluate(() => go("quotes"));
     await pg.waitForTimeout(500);
-    const regrouped = await pg.evaluate(() =>
-      [...document.querySelectorAll("#view tr.grouphd")].map((t) => t.innerText.trim()),
-    );
-    if (regrouped.some((h) => /^rechazados/i.test(h)))
-      ok("COM-03: and the register regroups it under «Rechazados»");
-    else bad("COM-03: regrouped after refusal", JSON.stringify(regrouped));
+    const restage = await pg.evaluate((id) => {
+      const row = document.querySelector(`#view table.mlist tr.click[data-id="${id}"]`);
+      return row ? row.textContent : "";
+    }, draftId);
+    if (/rechazado/i.test(restage))
+      ok("COM-03: and the register's Estado column now shows «Rechazado»");
+    else bad("COM-03: re-staged after refusal", restage);
 
     // Leaving the builder must give the navigation back.
     const backOut = await pg.evaluate(() => ({
@@ -3391,6 +3408,113 @@ async function testContractCreation(browser, base) {
     else ok("COM-04 creation: no console errors");
   } catch (e) {
     bad("COM-04 creation: suite completed", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── Package 3 slide 4 (PK3-B): a presupuesto could only be created from a
+//    visit's own "＋ Crear presupuesto" — no entry point existed on the
+//    register itself, and none at all for a lead with no visit yet. This
+//    drives both new sources: an open lead (no visit required) and a
+//    completed visit (which must come back linked, exactly as the visit's
+//    own shortcut already links one).
+async function testBudgetCreation(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+
+    if (await pg.evaluate(() => !!document.querySelector("#bqNew")))
+      ok("COM-03: the register offers «＋ Presupuesto»");
+    else bad("COM-03: new-budget button exists", "no #bqNew");
+
+    // ---- from an open lead, no visit required ------------------------------
+    await pg.click("#bqNew");
+    await pg.waitForTimeout(500);
+    const sources = await pg.evaluate(() => ({
+      visit: !!document.querySelector('input[name="bnmode"][value="visit"]'),
+      lead: !!document.querySelector('input[name="bnmode"][value="lead"]'),
+    }));
+    if (sources.visit && sources.lead)
+      ok("COM-03: the drawer offers both a completed visit and an open lead as sources");
+    else bad("COM-03: new-budget sources", JSON.stringify(sources));
+
+    const leadPicked = await pg.evaluate(() => {
+      const r = [...document.querySelectorAll('input[name="bnmode"]')].find(
+        (x) => x.value === "lead",
+      );
+      if (!r || r.disabled) return null;
+      r.checked = true;
+      r.dispatchEvent(new Event("change"));
+      const sel = document.querySelector("#bn_lead");
+      return sel ? sel.value : null;
+    });
+    if (!leadPicked) {
+      bad("COM-03: an open lead exists to price from", "none in the seed");
+    } else {
+      const before = await pg.evaluate(() => erp.state.budgets.length);
+      await pg.click("#bn_save");
+      await pg.waitForTimeout(700);
+      const after = await pg.evaluate(
+        (leadId) => ({
+          count: erp.state.budgets.length,
+          onBuilder: !!document.querySelector("#bTree"),
+          leadStatus: erp.state.opportunities.find((o) => o.id === leadId)?.status,
+        }),
+        leadPicked,
+      );
+      if (after.count === before + 1 && after.onBuilder)
+        ok("COM-03: a presupuesto is created from an open lead with no visit in between");
+      else bad("COM-03: budget from lead", JSON.stringify({ before, after }));
+    }
+
+    // ---- from a completed visit, which must come back linked ---------------
+    await pg.evaluate(() => go("quotes"));
+    await pg.waitForTimeout(500);
+    if (await pg.locator("#bBack").count()) {
+      await pg.click("#bBack");
+      await pg.waitForTimeout(400);
+    }
+    await pg.click("#bqNew");
+    await pg.waitForTimeout(500);
+    const visitPicked = await pg.evaluate(() => {
+      const r = [...document.querySelectorAll('input[name="bnmode"]')].find(
+        (x) => x.value === "visit",
+      );
+      if (!r || r.disabled) return null;
+      r.checked = true;
+      r.dispatchEvent(new Event("change"));
+      const sel = document.querySelector("#bn_visit");
+      return sel ? sel.value : null;
+    });
+    if (!visitPicked) {
+      bad("COM-03: a completed visit without a presupuesto exists", "none in the seed");
+    } else {
+      const before = await pg.evaluate(() => erp.state.budgets.length);
+      await pg.click("#bn_save");
+      await pg.waitForTimeout(700);
+      const after = await pg.evaluate((visitId) => {
+        const v = erp.state.visits.find((x) => x.id === visitId);
+        return {
+          count: erp.state.budgets.length,
+          onBuilder: !!document.querySelector("#bTree"),
+          linkedBudgetId: v ? v.budgetId : null,
+          validated: !!(v && v.validated),
+        };
+      }, visitPicked);
+      if (after.count === before + 1 && after.onBuilder && after.linkedBudgetId)
+        ok("COM-03: a presupuesto is created from a completed visit, and the visit is linked back");
+      else bad("COM-03: budget from visit", JSON.stringify({ before, after }));
+    }
+
+    if (errs.length) bad("COM-03 creation: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("COM-03 creation: no console errors");
+  } catch (e) {
+    bad("COM-03 creation: suite completed", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }

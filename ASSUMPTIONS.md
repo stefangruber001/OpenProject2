@@ -3086,3 +3086,39 @@ stash`, a tall-viewport scratch check showed the short document's card
   place to reserve space for it. Verified against the seed's longest
   contract: without the fix the card's bottom edge (2984px) sat below the
   pill's top (2957px) at max scroll; with the fix it clears.
+
+- **#159 — Presupuestos register onto the shared list primitive, and a way
+  to start one that isn't buried in a visit (Package 3 slide 4, PK3-B ·
+  2026-08-12).** `budgetList` predated `renderMasterList` and was a raw
+  `<table>` grouped into five stage sections — no search, no export, no
+  pagination — and the only way to create a presupuesto was a "＋ Crear
+  presupuesto" button on an already-completed visit's own drawer
+  (`visitDetailDrawer`), so a lead nobody had visited yet had no path to a
+  presupuesto at all. Decisions taken: (a) **the stage grouping becomes an
+  Estado column, not a preserved table section** — `renderMasterList` is a
+  flat, searchable, paginated list by design, and every other register in
+  this app (Contratos, Facturas…) already shows its state as a pill per row
+  rather than a section heading, so this makes Presupuestos consistent with
+  the rest of the app instead of a one-off. The stage order is kept as the
+  sort key on `baseRows` (draft first, closed last), so the "what's
+  unwritten first" reading survives even though the visual grouping does
+  not. (b) **`newBudgetDrawer` offers two sources, not one** — a completed
+  visit (mirroring `visitDetailDrawer`'s existing shortcut exactly:
+  `createBudget` then `validateVisit(v.id, {budgetId}, user)` to link it
+  back) or an open lead, filtered to `opportunities` in `awaitingVisit` or
+  `awaitingBudget` status — both pre-`awaitingResponse`, i.e. no budget has
+  been issued for that party yet. A lead is offered deliberately without
+  requiring its visit to exist, per the explicit instruction that "a visit
+  should not be required" — pricing a job the operator already knows enough
+  about should not wait on a site visit being scheduled and completed
+  first. (c) **No completeness gate on this drawer** — decision 21's rule
+  (lead/visita/presupuesto proceed with whatever data exists; only
+  contrato/factura block) already covers a presupuesto, so unlike
+  `newContractDrawer` this flow needs no client-editor detour. (d) **Three
+  pre-existing site-e2e assertions that read `tr.grouphd` DOM structure had
+  to change, not just gain new checks** — they tested the group-header
+  markup the raw table produced, which no longer exists once the table is
+  `renderMasterList`'s. Updated to read the Estado pill on each row instead
+  (find the draft by pill text rather than by table position), following
+  the same precedent as PK2-C's `/392px$/` assertion: a check that tests
+  for the old shape is retargeted at the new one, not dropped.

@@ -10120,54 +10120,181 @@
         ["expired", "Caducados", "r"],
       ];
 
+      // Package 3 slide 4: this list was a raw <table>, built before
+      // renderMasterList existed — no search, no export, no pagination, on a
+      // register that only grows. The stage grouping it used to show is kept
+      // as an Estado column (matching how Contratos and other registers show
+      // status) rather than as separate table sections, since renderMasterList
+      // is a flat list; the stage order is still what the baseRows are sorted
+      // by, so the same "what's unwritten first, what's closed last" reading
+      // survives the search box and the pager.
       function budgetList(v) {
         $("#sub").textContent =
-          "El registro va agrupado por estado: primero lo que falta por escribir, después lo que espera al cliente, y al final lo cerrado.";
-        const groups = BUD_STAGES.map(([key, label, tone]) => ({
-          key,
-          label,
-          tone,
-          rows: erp.state.budgets.filter((b) => erp.budgetStage(b) === key),
-        }));
-        const total = erp.state.budgets.length;
-        v.innerHTML = `<div class="card"><div class="scroll"><table><thead><tr>
-     <th>Número</th><th>Cliente</th><th>Versión</th><th class="num">Base</th><th class="num">Total</th>
-     <th class="num">Margen</th><th>Pendientes</th><th>Anexo</th><th>Validez</th></tr></thead><tbody>
-   ${
-     groups
-       .filter((g) => g.rows.length)
-       .map(
-         (g) => `
-     <tr class="grouphd"><td colspan="9"><span>${g.label}</span> · <span>${g.rows.length}</span></td></tr>
-     ${g.rows
-       .map((b) => {
-         const vid = b.acceptedVersionId || b.currentVersionId;
-         const t = erp.budgetTotals(b.id, vid);
-         const cv = b.versions[b.versions.length - 1];
-         const imgs = erp.budgetImages(b.id, vid).length;
-         return `<tr class="click" data-id="${b.id}"><td class="k">${b.number}</td>
-        <td>${esc(erp.party(b.partyId).name)}</td>
-        <td>v${cv.vNumber} · ${b.versions.length} <span>versiones</span></td>
-        <td class="num">${eur0(t.baseCents)}</td><td class="num k">${eur0(t.grandCents)}</td>
-        <td class="num">${t.marginBasePct}%</td>
-        <td>${t.pendingCount ? `<span class="pill y">${t.pendingCount} (${eur0(t.pendingEstCents)})</span>` : "—"}</td>
-        <td>${b.annex && b.annex.enabled ? (imgs ? `<span class="pill g">${imgs} <span>imágenes</span></span>` : '<span class="pill">activo</span>') : '<span class="pill">desactivado</span>'}</td>
-        <td>${fmtD(b.validityDate)}</td></tr>`;
-       })
-       .join("")}`,
-       )
-       .join("") ||
-     `<tr><td colspan="9"><div class="empty">Todavía no hay presupuestos.</div></td></tr>`
-   }
-   </tbody></table></div></div>
-   <div class="periodnote"><span class="tag">${total} ${total === 1 ? "presupuesto" : "presupuestos"}</span>
-    ${groups
-      .filter((g) => g.rows.length)
-      .map((g) => `<span class="pill ${g.tone}"><span>${g.label}</span>: ${g.rows.length}</span>`)
-      .join(" ")}</div>`;
-        v.querySelectorAll("tr.click").forEach(
-          (tr) => (tr.onclick = () => openBuilder(tr.dataset.id)),
+          "Busca por número o cliente, o crea uno nuevo desde una visita realizada o un lead abierto.";
+        const stageIndex = Object.fromEntries(BUD_STAGES.map(([k], i) => [k, i]));
+        const stageMeta = Object.fromEntries(BUD_STAGES.map(([k, l, t]) => [k, [l, t]]));
+        const baseRows = erp.state.budgets.slice().sort((a, b) => {
+          const sa = stageIndex[erp.budgetStage(a)] ?? 99,
+            sb = stageIndex[erp.budgetStage(b)] ?? 99;
+          return sa !== sb ? sa - sb : b.number.localeCompare(a.number);
+        });
+        renderMasterList(v, {
+          id: "quotes",
+          ids: {
+            q: "bqQ",
+            size: "bqSize",
+            prev: "bqPrev",
+            next: "bqNext",
+            newBtn: "bqNew",
+            exp: "bqExp",
+            expMenu: "bqExpMenu",
+            expXlsx: "bqExpXlsx",
+            expCsv: "bqExpCsv",
+          },
+          newLabel: "＋ Presupuesto",
+          onNew: () => newBudgetDrawer(),
+          searchPlaceholder: "Buscar por número o cliente…",
+          nounSingular: "presupuesto",
+          nounPlural: "presupuestos",
+          defSize: 25,
+          baseRows,
+          matches: (b, q) => (b.number + " " + erp.party(b.partyId).name).toLowerCase().includes(q),
+          columns: [
+            { label: "Número", primary: true, get: (b) => b.number },
+            { label: "Cliente", get: (b) => erp.party(b.partyId).name },
+            {
+              label: "Versión",
+              html: (b) => {
+                const cv = b.versions[b.versions.length - 1];
+                return `v${cv.vNumber} <span>· ${b.versions.length} versiones</span>`;
+              },
+            },
+            {
+              label: "Base",
+              html: (b) =>
+                eur0(erp.budgetTotals(b.id, b.acceptedVersionId || b.currentVersionId).baseCents),
+            },
+            {
+              label: "Total",
+              html: (b) =>
+                `<b>${eur0(erp.budgetTotals(b.id, b.acceptedVersionId || b.currentVersionId).grandCents)}</b>`,
+            },
+            {
+              label: "Pendientes",
+              html: (b) => {
+                const t = erp.budgetTotals(b.id, b.acceptedVersionId || b.currentVersionId);
+                return t.pendingCount
+                  ? `<span class="pill y">${t.pendingCount} (${eur0(t.pendingEstCents)})</span>`
+                  : "—";
+              },
+            },
+            {
+              label: "Validez",
+              get: (b) => b.validityDate,
+              html: (b) => fmtD(b.validityDate),
+            },
+            {
+              label: "Estado",
+              get: (b) => stageMeta[erp.budgetStage(b)]?.[0] || b.status,
+              html: (b) => {
+                const [label, tone] = stageMeta[erp.budgetStage(b)] || [b.status, ""];
+                return `<span class="pill ${tone}">${esc(label)}</span>`;
+              },
+            },
+          ],
+          onRowClick: (id) => openBuilder(id),
+          emptyText: "Ningún presupuesto coincide con la búsqueda.",
+        });
+      }
+
+      /** Package 3 slide 4: there was no way to start a presupuesto from this
+    screen at all — every one arrived from a visit's own "＋ Crear
+    presupuesto" (visitDetailDrawer), which required a visit to already
+    exist and be completed. This is the same handoff generalised: pick a
+    completed visit (nothing is retyped, and the visit is linked exactly as
+    visitDetailDrawer already links one) OR an open lead that has not been
+    visited yet — a visit should not be a prerequisite for pricing a job
+    the operator already knows enough about. */
+      function newBudgetDrawer() {
+        const doneVisits = erp.state.visits.filter((x) => x.status === "done" && !x.budgetId);
+        const openLeads = erp.state.opportunities.filter((o) =>
+          ["awaitingVisit", "awaitingBudget"].includes(o.status),
         );
+        let mode = doneVisits.length ? "visit" : "lead";
+        const db = openDrawer("Nuevo presupuesto");
+        const paint = () => {
+          db.innerHTML = `
+   <div class="card"><div class="ch"><h3>¿De dónde sale este presupuesto?</h3></div><div class="daylist" style="gap:9px">
+    <div class="it"><label class="opt">
+      <input type="radio" name="bnmode" value="visit" ${mode === "visit" ? "checked" : ""}${doneVisits.length ? "" : " disabled"}>
+      <span>De una visita realizada</span></label></div>
+    <div class="it" style="color:var(--muted);margin-top:-4px">${
+      doneVisits.length
+        ? "Las mediciones y notas de la visita quedan enlazadas al presupuesto."
+        : "No hay ninguna visita realizada sin presupuesto todavía."
+    }</div>
+    <div class="it"><label class="opt">
+      <input type="radio" name="bnmode" value="lead" ${mode === "lead" ? "checked" : ""}${openLeads.length ? "" : " disabled"}>
+      <span>De un lead abierto</span></label></div>
+    <div class="it" style="color:var(--muted);margin-top:-4px">${
+      openLeads.length
+        ? "No hace falta esperar a la visita para preparar el presupuesto."
+        : "No hay ningún lead abierto todavía."
+    }</div>
+   </div></div>
+   ${
+     mode === "visit"
+       ? `<div class="card"><div class="ch"><h3>Visita</h3></div><div class="daylist" style="gap:9px">
+    <div class="it"><label class="opt">Visita realizada
+      <select id="bn_visit" style="margin-left:auto">${doneVisits
+        .map((x) => {
+          const o = erp.state.opportunities.find((y) => y.id === x.opportunityId);
+          return `<option value="${esc(x.id)}">${esc(fmtD(x.completedAt))} · ${esc(erp.party(o.partyId).name)} · ${esc(o.requestedWork)}</option>`;
+        })
+        .join("")}</select></label></div>
+   </div></div>`
+       : `<div class="card"><div class="ch"><h3>Lead</h3></div><div class="daylist" style="gap:9px">
+    <div class="it"><label class="opt">Lead abierto
+      <select id="bn_lead" style="margin-left:auto">${openLeads
+        .map(
+          (o) =>
+            `<option value="${esc(o.id)}">${esc(erp.party(o.partyId).name)} · ${esc(o.requestedWork)}</option>`,
+        )
+        .join("")}</select></label></div>
+   </div></div>`
+   }
+   <div style="margin-top:10px"><button class="btn primary" id="bn_save"${doneVisits.length || openLeads.length ? "" : " disabled"}>Crear presupuesto</button></div>`;
+          db.querySelectorAll('input[name="bnmode"]').forEach((r) => {
+            r.onchange = () => {
+              mode = r.value;
+              paint();
+            };
+          });
+          $("#bn_save").onclick = save;
+        };
+        const save = () =>
+          mutate(() => {
+            let partyId,
+              propertyId,
+              visit = null;
+            if (mode === "visit") {
+              if (!doneVisits.length) throw new Error("No hay ninguna visita disponible");
+              visit = doneVisits.find((x) => x.id === $("#bn_visit").value) || doneVisits[0];
+              const o = erp.state.opportunities.find((y) => y.id === visit.opportunityId);
+              partyId = o.partyId;
+              propertyId = o.propertyId || visit.propertyId;
+            } else {
+              if (!openLeads.length) throw new Error("No hay ningún lead disponible");
+              const o = openLeads.find((x) => x.id === $("#bn_lead").value) || openLeads[0];
+              partyId = o.partyId;
+              propertyId = o.propertyId;
+            }
+            const b = erp.createBudget({ partyId, propertyId }, "backoffice");
+            if (visit) erp.validateVisit(visit.id, { budgetId: b.id }, "backoffice");
+            closeDrawer();
+            go("quotes", b.id);
+          }, "Presupuesto creado");
+        paint();
       }
 
       /* ---------- The customer document's own vocabulary (COM-03, "ES/CA output")

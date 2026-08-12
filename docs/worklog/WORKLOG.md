@@ -374,7 +374,7 @@ explicit confirmation once the discrepancy was raised.
 | #     | Session                                                                   | Model    | Effort      | State       |
 | ----- | ------------------------------------------------------------------------- | -------- | ----------- | ----------- |
 | PK3-A | Presupuesto validity date · contract document sizing + scroll clearance   | Sonnet 5 | low         | **done**    |
-| PK3-B | Presupuestos toolbar + "＋ Presupuesto" creation from a visita or a lead  | Sonnet 5 | medium      | not started |
+| PK3-B | Presupuestos toolbar + "＋ Presupuesto" creation from a visita or a lead  | Sonnet 5 | medium      | **done**    |
 | PK3-C | Merge Avance/Ficha into the Gantt's progress grid, %-only, desktop+mobile | Opus 5   | medium-high | not started |
 
 ### PK3-A — **done**
@@ -411,3 +411,34 @@ left FIRMA hidden.
   Verified against the seed's longest contract: without the extra padding
   the card's bottom edge (2984px) sat 27px below the pill's top (2957px) at
   maximum scroll; with it, the card clears the pill.
+
+### PK3-B — **done**
+
+Slide 4: `budgetList` (COM-03 Presupuestos) predated `renderMasterList` and
+was a raw `<table>` with no search, no export, no pagination — grouped into
+five stage sections instead. The only way to start a presupuesto was
+"＋ Crear presupuesto" on an already-completed visit's own drawer, so a lead
+with no visit yet had no path to one at all.
+
+- **The register now runs on `renderMasterList`**, like every other list in
+  the app. The five-stage grouping becomes an Estado pill column instead of
+  a section heading — consistent with how Contratos and Facturas already
+  show status — with `baseRows` still sorted by stage so drafts sort first
+  and closed presupuestos last, the same reading the old grouping gave.
+- **"＋ Presupuesto" opens a two-source drawer**: a completed visit (which
+  links back exactly as the visit's own shortcut already does —
+  `createBudget` then `validateVisit(v.id, {budgetId}, user)`) or an open
+  lead — `opportunities` in `awaitingVisit` or `awaitingBudget` status, i.e.
+  no presupuesto issued for that party yet — with **no visit required**, so
+  a job the operator already knows enough about does not have to wait on a
+  site visit being scheduled first.
+- **No completeness gate here.** Decision 21 already covers a presupuesto —
+  lead, visita and presupuesto proceed with whatever data exists; only
+  contrato and factura block — so unlike `newContractDrawer` this drawer
+  needs no client-editor detour.
+- **Three pre-existing site-e2e checks read the old `tr.grouphd` markup**
+  and had to be retargeted at the Estado pill rather than just gaining
+  company — the same move PK2-C made on the `/392px$/` assertion that used
+  to test for the bug it fixed. A new `testBudgetCreation` covers both
+  creation paths, following `testContractCreation`'s shape. 416/416 site-e2e
+  checks pass (411 + 5 new).
