@@ -244,10 +244,9 @@ async function openJobWithChapters(pg, searchId) {
   return code;
 }
 
-/* PRY-01's Programación tab, then the chart itself. S8 moved the Gantt out of
-   a sibling route and behind the centre panel, where §3.1 says a full-screen
-   surface belongs; every check that used to call openTab(…, "_projectSchedule")
-   comes through here instead. */
+/* The chart itself. PK4-A made PRY-01 two screens — the list of jobs and one
+   job's chart — so opening a job IS opening the Gantt: no panel in between,
+   and nothing to click through once the row is clicked. */
 async function openGantt(pg, base) {
   // Leaving a full-screen surface is a JS state change, not a route change —
   // `goto` at the same hash is a no-op and would silently leave us on the
@@ -260,16 +259,8 @@ async function openGantt(pg, base) {
     await bootedShell(pg);
     await pg.waitForTimeout(700);
   }
-  if (await pg.locator("#view [data-ctrclose]").count()) {
-    await pg.locator("#view [data-ctrclose]").click();
-    await pg.waitForTimeout(300);
-  }
   await openJobWithChapters(pg, "prgQ");
-  // PK3-C: the panel no longer has a tab strip to click through — Avance and
-  // Ficha are gone, and Programación is all that is left, so it renders
-  // straight into the panel body.
-  await pg.locator("#pnlGantt").click();
-  await pg.waitForTimeout(700);
+  await pg.waitForTimeout(500);
 }
 
 async function openTab(pg, route, tab) {
@@ -2055,13 +2046,21 @@ async function testProjectTracking(browser, base) {
     await bootedShell(pg);
     await pg.waitForTimeout(900);
 
-    // ---- the persistent selector and its fixed header ----
-    // Package 3 slide 1: PRY-01 drops the summary strip, because its own panel
-    // header repeats every field on it. Every other project screen keeps it, so
-    // the check moves to one of those rather than disappearing.
-    if ((await pg.locator(".projbar .phead").count()) === 0)
-      ok("PRY-01: the project summary strip is not repeated above the panel that carries it");
-    else bad("PRY-01: summary strip dropped", "still rendered on #progress");
+    // ---- PK4-A: PRY-01 is two screens, and has no project bar ----
+    // The bar chose a job above a list that already offers the same choice, and
+    // the panel between the list and the chart existed to state three figures
+    // the chart's own toolbar already shows. Both are gone; the other four
+    // project screens keep the bar, because each is a single screen that has to
+    // be told which job it is about.
+    const listScreen = await pg.evaluate(() => ({
+      bar: document.querySelectorAll(".projbar").length,
+      centre: document.querySelectorAll("#view .ctr").length,
+      list: !!document.querySelector("#prgQ"),
+    }));
+    if (listScreen.bar === 0 && listScreen.centre === 0 && listScreen.list)
+      ok("PRY-01: the list stands alone — no PROYECTO bar, no centre panel");
+    else bad("PRY-01: list screen", JSON.stringify(listScreen));
+
     await pg.evaluate(() => (location.hash = "economics"));
     await pg.waitForTimeout(600);
     const fields = await pg.locator(".projbar .phead .f").count();
@@ -2078,29 +2077,36 @@ async function testProjectTracking(browser, base) {
       ok("PRY-01: the «Recientes» chips are gone from the shared project bar");
     else bad("PRY-01: Recientes dropped", "chips still rendered");
 
-    // ---- PRY-01 (S8 · PK3-C): the panel, and the list it now hides ----
+    // Opening a job IS opening its chart — the four things the operator asked
+    // to land on, in one screen, with a labelled way back.
     await pg.evaluate(() => (location.hash = "progress"));
     await pg.waitForTimeout(700);
     await openJobWithChapters(pg, "prgQ");
-    const panel = await pg.evaluate(() => ({
-      tabs: document.querySelectorAll("#view .ctrpanel [data-ptab]").length,
-      list: document.querySelectorAll("#view .ctrlist").length,
-      solo: !!document.querySelector("#view .ctr.solo"),
-      gantt: !!document.querySelector("#pnlGantt"),
+    await pg.waitForTimeout(600);
+    const landed = await pg.evaluate(() => ({
+      chart: !!document.querySelector("#gSvg"),
+      curve: document.querySelectorAll(".curve").length,
+      avance: !!document.querySelector("#progCtl"),
+      deviations: /Desviaciones/.test(document.querySelector(".bside")?.innerText || ""),
+      panel: document.querySelectorAll(".ctrpanel").length,
+      back: (document.querySelector("#gBack") || {}).textContent?.trim(),
     }));
-    // Package 3 slides 2 and 3: Avance and Ficha are gone, so the strip that
-    // chose between three tabs goes with them; and the open job gets the
-    // screen to itself, which is the one place §3.2's "the list never
-    // disappears" is deliberately overridden.
-    if (panel.tabs === 0 && panel.list === 0 && panel.solo && panel.gantt)
-      ok("PRY-01: one panel, no tab strip, and the list steps aside for the open job");
-    else bad("PRY-01: panel shape", JSON.stringify(panel));
+    if (
+      landed.chart &&
+      landed.curve === 1 &&
+      landed.avance &&
+      landed.deviations &&
+      landed.panel === 0 &&
+      /Obras/.test(landed.back || "")
+    )
+      ok("PRY-01: a row opens the chart itself — Gantt, Curva S, Avance, Desviaciones, «← Obras»");
+    else bad("PRY-01: job opens the chart", JSON.stringify(landed));
 
-    await pg.locator("#view [data-ctrclose]").click();
-    await pg.waitForTimeout(500);
-    if ((await pg.locator("#view .ctrlist").count()) === 1)
-      ok("PRY-01: closing the job brings the list straight back");
-    else bad("PRY-01: list returns on close", "no list after ✕");
+    await pg.locator("#gBack").click();
+    await pg.waitForTimeout(600);
+    if ((await pg.locator("#prgQ").count()) === 1 && (await pg.locator("#gSvg").count()) === 0)
+      ok("PRY-01: «← Obras» returns to the list of jobs");
+    else bad("PRY-01: back to the list", "still on the chart");
 
     // Money-chain item 14. The doc asks whether moving a milestone moves the
     // expected cash; before S8 nothing wrote installment.expectedDate after the
@@ -2108,7 +2114,6 @@ async function testProjectTracking(browser, base) {
     // previstos» moved onto the Gantt in PK3-C — moving a milestone is a thing
     // done TO the plan, and the plan is there.
     await openJobWithChapters(pg, "prgQ");
-    await pg.locator("#pnlGantt").click();
     await pg.waitForTimeout(800);
     if (await pg.locator("#gDerive").count()) {
       const had = await pg.evaluate(() => {
@@ -2168,20 +2173,21 @@ async function testProjectTracking(browser, base) {
     }
     await pg.waitForTimeout(300);
     if (await pg.locator("#drawer.on").count()) await pg.locator("#dClose").click();
-    // Back out of the full-screen chart before reading the shell's own bar.
-    await pg.waitForTimeout(300);
+
+    // The context must survive a change of subsection — that is what makes it
+    // a section context rather than one screen's dropdown. PK4-A: PRY-01 has no
+    // dropdown to read any more, so the job opened THERE is the reading, and
+    // the bar on the next screen is what has to agree with it.
+    const chosen = await pg.evaluate(() => gProject);
     if (await pg.locator("#gBack").count()) {
       await pg.locator("#gBack").click();
       await pg.waitForTimeout(500);
     }
-
-    // The context must survive a change of subsection — that is what makes it
-    // a section context rather than one screen's dropdown.
-    const chosen = await pg.locator("#psel").inputValue();
     await pg.evaluate(() => (location.hash = "economics"));
     await pg.waitForTimeout(600);
     const stillChosen = await pg.locator("#psel").inputValue();
-    if (stillChosen === chosen) ok("project context survives a subsection change");
+    if (stillChosen === chosen)
+      ok("project context survives a subsection change (opened on PRY-01, selected on PRY-02)");
     else bad("project context persists", `${chosen} → ${stillChosen}`);
 
     // ---- PRY-02 (S8): the centre panel, and the money that stopped here ----
@@ -2511,6 +2517,51 @@ async function testProjectTracking(browser, base) {
     if (/Desviaciones/.test(dev) && /Retraso sobre línea base/.test(dev))
       ok("tracking: deviations panel reports the slip against the baseline");
     else bad("tracking: deviations panel", dev.replace(/\n/g, " ").slice(0, 120));
+
+    // ---- PK4-A: the job that cannot be planned at all ----------------------
+    // Opening a job now lands here directly, so an UNPLANNED one lands here
+    // too — and a job with no accepted presupuesto has no chapters to derive
+    // from and no partidas to record against. Offering «Derivar del
+    // presupuesto» there is offering a button that can only fail, so it is
+    // disabled and the screen says what is actually missing.
+    const unplanned = await pg.evaluate(() => {
+      const B = ganttApi();
+      const p = erp.state.projects.find((x) => {
+        if (B.get(erp.state, x.id).tasks.length) return false;
+        try {
+          return !(
+            x.budgetId &&
+            erp
+              .version(x.budgetId, x.acceptedVersionId)
+              .chapters.some((c) => c.section === "base" && c.lines.length)
+          );
+        } catch (e) {
+          return true;
+        }
+      });
+      if (!p) return null;
+      ganttFull = true;
+      setProject(p.id);
+      return p.code;
+    });
+    if (!unplanned) {
+      ok("tracking: every job in the seed has something to plan — nothing to check here");
+    } else {
+      await pg.waitForTimeout(900);
+      const empty = await pg.evaluate(() => ({
+        derive: document.querySelector("#gDerive")?.disabled,
+        toBudget: !!document.querySelector("#gGoBudget"),
+        says: /presupuesto aceptado/.test(document.querySelector("#view")?.innerText || ""),
+        crashed: !document.querySelector("#gBack"),
+      }));
+      if (empty.derive === true && empty.toBudget && empty.says && !empty.crashed)
+        ok(
+          `tracking: a job with no accepted presupuesto (${unplanned}) says why and points at COM-03 instead of offering a button that fails`,
+        );
+      else bad("tracking: unplanned job empty state", JSON.stringify(empty));
+      await pg.locator("#gBack").click();
+      await pg.waitForTimeout(500);
+    }
 
     // The economics must move with the progress just recorded — the two screens
     // are two views of one set of figures, not two sets. Since S8 both run on
@@ -6134,9 +6185,8 @@ async function testI18n(browser, base) {
     await pg.evaluate(() => (location.hash = "progress"));
     await pg.waitForTimeout(700);
     await openJobWithChapters(pg, "prgQ");
-    // PK3-C: the panel is Programación alone, and the three-state control now
-    // lives on the Gantt, so the control is checked where it actually is.
-    await pg.locator("#pnlGantt").click();
+    // PK3-C put the three-state control on the Gantt; PK4-A made opening the
+    // job open the Gantt, so the row click above already landed on it.
     await pg.waitForTimeout(900);
     const pryCaText = await pg.locator("#view").innerText();
     if (
@@ -6317,8 +6367,7 @@ async function testI18n(browser, base) {
     await pg.evaluate(() => (location.hash = "progress"));
     await pg.waitForTimeout(700);
     await openJobWithChapters(pg, "prgQ");
-    // PK3-C: as in Catalan above, the control is on the Gantt now.
-    await pg.locator("#pnlGantt").click();
+    // As in Catalan above: the row click already landed on the chart.
     await pg.waitForTimeout(900);
     const pryEnText = await pg.locator("#view").innerText();
     if (

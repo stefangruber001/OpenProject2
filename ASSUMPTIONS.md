@@ -3170,3 +3170,49 @@ stash`, a tall-viewport scratch check showed the short document's card
   confirmation counts the former rather than warning generically, because a
   generic warning on an action that is usually safe is an action people learn
   to confirm without reading.
+
+- **#161 — PRY-01 collapses to two screens, and what that trades away
+  (Package 4 slide 1–3, PK4-A · 2026-08-12).** The operator's instruction was
+  explicit and radical: delete the project bar, replace the intermediate panel
+  with the Gantt screen itself, and add a way back to the list — "just two
+  screens", the list of jobs and one job's physical progress. Decisions taken:
+  (a) **the middle screen is deleted rather than slimmed**, because the three
+  figures it existed to state (tareas, fin de obra previsto, ruta crítica) are
+  all already on the chart — the first two as toolbar chips, the rest in the
+  Desviaciones panel — so it was a screen whose only unique content was a
+  button to the next screen. (b) **The project bar goes from PRY-01 only, not
+  globally.** The other four `PROJECT_SUBS` screens are each a single screen
+  that must be told which job it is about; PRY-01 is the only one where a list
+  of jobs is already on screen, which made the dropdown a second way to answer
+  a question the list was already asking. (c) **Switching job is now
+  back-then-click, not a dropdown** — one extra click, accepted deliberately
+  as the price of the operator's "exactly two screens", and cheap because the
+  back button lands on the list with its search still filled in.
+  (d) **`ganttFull` is set BEFORE `setProject` in the row handler**, since
+  `setProject` calls `render()` itself; the other order renders the list and
+  then the chart, which flickers. (e) **Deep links follow the screen.** All
+  five `go("progress", …)` callers — alerts, universal search, the change
+  register — now land on the chart, because that is where the job's work is;
+  the search path was still seeding a `centreState.progress` panel that no
+  longer exists. (f) **The unplanned job needed an honest empty state, and
+  this is the one thing the change actually broke.** Landing on the chart
+  directly means a job with no accepted presupuesto lands there too — and the
+  first row of the seeded list is exactly that — where the old empty state
+  offered «Derivar del presupuesto», which for such a job can only fail with
+  "no tiene presupuesto aceptado". The button is disabled there now and the
+  screen states what is missing, offering the presupuesto instead. This was
+  found by asking what the FIRST row of the list does, before writing the
+  change, rather than after. (g) **PK3-C's `hideListWhenOpen` is deleted, not
+  left dormant.** It was shipped an hour earlier to hide the list beside the
+  open panel; with the panel gone it is machinery with no purpose, and leaving
+  it would suggest a mode that no longer exists. `renderCentre` itself stays —
+  PRY-02 still wants a list beside a panel. (h) **A pre-existing bug in the
+  shared project bar, surfaced by writing the honest assertion.** With no
+  dropdown on PRY-01 the "context survives a subsection change" check had to
+  compare `gProject` to what the next screen's bar shows, instead of comparing
+  the bar to itself — and that exposed that `projectOptions()` is filtered, so
+  an active job outside the current filter left the `<select>` with no matching
+  `<option>`, which a browser renders as the FIRST option. The bar named one
+  job while the screen rendered another. The active job is now prepended to its
+  own option list rather than the filter being widened, so «Abiertos» keeps its
+  meaning and the selector cannot misname what is on screen.

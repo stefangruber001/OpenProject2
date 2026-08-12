@@ -2793,15 +2793,6 @@
       .ctr.on {
         grid-template-columns: 372px minmax(0, 780px);
       }
-      /* Package 3 slide 2: PRY-01 only. §3.2 says the list never disappears,
-     and everywhere else it does not — but the operator asked for the open
-     job to have the screen to itself here, and PRY-01 is the one screen
-     where the panel is a working surface rather than a record to read.
-     Switching job stays one click away in the project bar above, and ✕ on
-     the panel header brings the list straight back. */
-      .ctr.on.solo {
-        grid-template-columns: minmax(0, 1fr);
-      }
       .ctrlist {
         min-width: 0;
       }
@@ -4925,13 +4916,14 @@
               lab: `${p.code} — ${partyName(p.partyId)}`,
               sub: p.closed ? "cerrado" : "activo",
               k: "progress",
-              // Opens the job ON PRY-01, in the centre panel, rather than in a drawer
-              // over whatever screen the search was used from. A search result that
-              // lands you somewhere you can keep working is worth more than one that
-              // shows you a card you have to close.
+              // Opens the job ON PRY-01 rather than in a drawer over whatever
+              // screen the search was used from. A search result that lands you
+              // somewhere you can keep working is worth more than one that shows
+              // you a card you have to close — and since PK4-A the job's screen
+              // IS the chart, so that is where it lands.
               open: () => {
+                ganttFull = true;
                 setProject(p.id);
-                centreState.progress = { openId: p.id, scroll: 0 };
                 go("progress");
               },
             })),
@@ -9357,20 +9349,17 @@
         // list compressed against an empty panel.
         const open = st.openId && cfg.exists(st.openId) ? st.openId : null;
         if (st.openId && !open) st.openId = null;
-        // `hideListWhenOpen` is PRY-01's alone (Package 3 slide 2) — see the
-        // .ctr.on.solo note in the stylesheet for why one screen deviates.
-        const solo = !!(open && cfg.hideListWhenOpen);
-        const wrap = el("div", "ctr" + (open ? " on" : "") + (solo ? " solo" : ""));
+        const wrap = el("div", "ctr" + (open ? " on" : ""));
         const listHost = el("div", "ctrlist");
-        if (!solo) wrap.appendChild(listHost);
+        wrap.appendChild(listHost);
         v.innerHTML = "";
         v.appendChild(wrap);
-        if (!solo) cfg.renderList(listHost, open);
+        cfg.renderList(listHost, open);
         if (open) {
           const panel = el("div", "ctrpanel");
           wrap.appendChild(panel);
           cfg.renderPanel(panel, open);
-          if (!solo) listHost.scrollTop = st.scroll || 0;
+          listHost.scrollTop = st.scroll || 0;
         }
       }
 
@@ -9584,14 +9573,32 @@
       }
       function renderProjectBar() {
         const host = $("#projbar");
-        if (!PROJECT_SUBS.includes(cur) || !erp.state.projects.length) {
+        // PK4-A: PRY-01 has no bar at all. It is two screens — the list of
+        // jobs, and one job's chart — so the job is chosen by clicking a row,
+        // not by a dropdown above a list that already offers the same choice.
+        // The other four project screens keep the bar; each of them is a
+        // single screen that needs to be told which job it is about.
+        if (cur === "progress" || !PROJECT_SUBS.includes(cur) || !erp.state.projects.length) {
           host.innerHTML = "";
           return;
         }
-        const opts = projectOptions();
+        let opts = projectOptions();
         if (!gProject || !erp.state.projects.some((p) => p.id === gProject))
           gProject = (opts[0] || erp.state.projects.find((p) => !p.closed) || erp.state.projects[0])
             .id;
+        /* The selector must never name a different job from the one the screen
+       below is rendering. `projectOptions()` is FILTERED — Abiertos by
+       default — so whenever the active job falls outside that filter the
+       <select> had no matching <option>, and a <select> with no match
+       displays its first one: the bar said P-A while the screen showed P-B.
+       Pre-existing, and easy to reach now that PK4-A lets PRY-01 pick the job
+       from its own unfiltered list and then carries it to the next screen.
+       The active job is added to its own list rather than the filter being
+       widened, so «Abiertos» still means what it says. */
+        if (!opts.some((p) => p.id === gProject)) {
+          const active = erp.state.projects.find((p) => p.id === gProject);
+          if (active) opts = [active, ...opts];
+        }
         let h;
         try {
           h = erp.projectHeader(gProject);
@@ -9628,14 +9635,10 @@
         .join("")}</select>
     </div>
     ${
-      // Package 3 slide 1: PRY-01 opens the job into a panel whose own header
-      // already carries the code, the client, the address, the progress bar
-      // and the three dates — so on THIS screen the strip was the same facts a
-      // second time, pushing the work below the fold. Every other project
-      // screen keeps it, because none of them has that header.
-      cur === "progress"
-        ? ""
-        : `<div class="phead">
+      // PK3-C dropped this strip on PRY-01, where the panel header repeated
+      // it. PK4-A deleted that screen's bar outright, so the condition has
+      // nothing left to exclude — it is kept as an unconditional block again.
+      `<div class="phead">
       <div class="f"><span class="l">Obra</span><span class="v">${esc(h.code)}</span></div>
       <div class="f"><span class="l">Cliente</span><span class="v"><a href="#" data-party="${h.partyId}">${esc(h.partyName)}</a></span></div>
       ${h.address ? `<div class="f" style="max-width:230px"><span class="l">Dirección</span><span class="v" style="white-space:normal;font-weight:500">${esc(h.address)}</span></div>` : ""}
@@ -13522,100 +13525,99 @@
     in figures and opens the chart outside the shell — which is both what the
     document says and the version that does not spend a session shrinking a
     drag-and-drop timeline into half a panel. */
+        /* PK4-A: two screens, and nothing between them. This route used to be
+       list → centre panel → («Abrir la carta Gantt») → chart, and the middle
+       step existed to state three figures (tareas, fin de obra previsto, ruta
+       crítica) that the chart's own toolbar and its Desviaciones panel
+       already show. A screen whose whole job is a button to the next screen
+       is a screen to delete, so opening a job goes straight to the chart.
+
+       The project bar goes with it (see renderProjectBar): picking the job IS
+       the list, and coming back is ← Obras. Switching job is back-then-click
+       rather than a dropdown — one more click, and the operator asked for
+       exactly two screens. */
         progress(v) {
           $("#sub").textContent =
-            "Cada obra conserva su línea base aceptada. El avance se marca en la carta Gantt: estado y porcentaje, por capítulo y por partida.";
+            "Elige una obra para abrir su carta Gantt: ahí se marca el avance, se mueven las barras y se recalculan los cobros previstos.";
           const arg = window._arg;
           window._arg = null;
           if (!erp.state.projects.length) return noProjectsCard(v);
-          if (ganttFull) return ganttScreen(v);
           if (arg) {
             const p = erp.state.projects.find((x) => x.code === arg);
+            // A deep link names a job, and the job's screen is now the chart —
+            // so an alert or a search result lands where the work is. The
+            // recency list is updated by hand rather than through setProject,
+            // which renders: this runs DURING a render already.
             if (p) {
-              setProject(p.id);
-              centreState.progress = { openId: p.id, scroll: 0 };
+              ganttFull = true;
+              gProject = p.id;
+              projRecents = [p.id, ...projRecents.filter((x) => x !== p.id)].slice(0, 5);
+              saveProjPrefs();
             }
           }
-          renderCentre(v, {
-            id: "progress",
-            // Package 3 slide 2: the open job gets the screen to itself here.
-            hideListWhenOpen: true,
-            exists: (id) => erp.state.projects.some((p) => p.id === id),
-            renderList: (host, open) =>
-              renderMasterList(host, {
-                id: "projects-progress",
-                noNew: true,
-                ids: {
-                  q: "prgQ",
-                  size: "prgSize",
-                  prev: "prgPrev",
-                  next: "prgNext",
-                  exp: "prgExp",
-                  expMenu: "prgExpMenu",
-                  expXlsx: "prgExpXlsx",
-                  expCsv: "prgExpCsv",
+          if (ganttFull) return ganttScreen(v);
+          renderMasterList(v, {
+            id: "projects-progress",
+            noNew: true,
+            ids: {
+              q: "prgQ",
+              size: "prgSize",
+              prev: "prgPrev",
+              next: "prgNext",
+              exp: "prgExp",
+              expMenu: "prgExpMenu",
+              expXlsx: "prgExpXlsx",
+              expCsv: "prgExpCsv",
+            },
+            nounSingular: "obra",
+            nounPlural: "obras",
+            searchPlaceholder: "Buscar por código o cliente…",
+            emptyText: "Ninguna obra coincide con la búsqueda.",
+            baseRows: erp.state.projects.slice().reverse(),
+            matches: (p, q) => (p.code + " " + erp.party(p.partyId).name).toLowerCase().includes(q),
+            columns: [
+              { label: "Código", primary: true, get: (p) => p.code },
+              { label: "Cliente", get: (p) => erp.party(p.partyId).name },
+              {
+                label: "Línea",
+                get: (p) =>
+                  ({
+                    renovation: "Reforma",
+                    repairs: "Reparación",
+                    damp: "Humedades",
+                    commercial: "Comercial",
+                  })[p.activityLine] || p.activityLine,
+              },
+              {
+                label: "Avance",
+                html: (p) =>
+                  `<div class="bar"><i style="width:${erp.projectEconomics(p.id).progressPct}%"></i></div>`,
+              },
+              {
+                label: "Venta actual",
+                html: (p) => eur0(erp.projectEconomics(p.id).currentRevenueCents),
+              },
+              {
+                label: "Margen prev.",
+                html: (p) => {
+                  const e = erp.projectEconomics(p.id);
+                  return `<span style="color:${e.marginForecastCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(e.marginForecastCents)}</span>`;
                 },
-                nounSingular: "obra",
-                nounPlural: "obras",
-                searchPlaceholder: "Buscar por código o cliente…",
-                emptyText: "Ninguna obra coincide con la búsqueda.",
-                baseRows: erp.state.projects.slice().reverse(),
-                matches: (p, q) =>
-                  (p.code + " " + erp.party(p.partyId).name).toLowerCase().includes(q),
-                // Compressed: code and client only, exactly as §3.2 asks. The columns
-                // are not hidden with CSS — they are not built, so the 372 column has no
-                // horizontal scrollbar hiding six columns nobody can reach.
-                columns: open
-                  ? [
-                      { label: "Código", primary: true, get: (p) => p.code },
-                      { label: "Cliente", get: (p) => erp.party(p.partyId).name },
-                    ]
-                  : [
-                      { label: "Código", primary: true, get: (p) => p.code },
-                      { label: "Cliente", get: (p) => erp.party(p.partyId).name },
-                      {
-                        label: "Línea",
-                        get: (p) =>
-                          ({
-                            renovation: "Reforma",
-                            repairs: "Reparación",
-                            damp: "Humedades",
-                            commercial: "Comercial",
-                          })[p.activityLine] || p.activityLine,
-                      },
-                      {
-                        label: "Avance",
-                        html: (p) =>
-                          `<div class="bar"><i style="width:${erp.projectEconomics(p.id).progressPct}%"></i></div>`,
-                      },
-                      {
-                        label: "Venta actual",
-                        html: (p) => eur0(erp.projectEconomics(p.id).currentRevenueCents),
-                      },
-                      {
-                        label: "Margen prev.",
-                        html: (p) => {
-                          const e = erp.projectEconomics(p.id);
-                          return `<span style="color:${e.marginForecastCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(e.marginForecastCents)}</span>`;
-                        },
-                      },
-                      {
-                        label: "Estado",
-                        html: (p) =>
-                          p.closed
-                            ? '<span class="pill g">Cerrado</span>'
-                            : '<span class="pill b">Activo</span>',
-                      },
-                    ],
-                // Choosing a row also makes it the section's active project: picking a
-                // job from a list and then finding another one selected above is the
-                // surprise this avoids.
-                onRowClick: (id) => {
-                  setProject(id);
-                  centreOpen("progress", id);
-                },
-              }),
-            renderPanel: (panel, id) => projectPanel(panel, id, "progress"),
+              },
+              {
+                label: "Estado",
+                html: (p) =>
+                  p.closed
+                    ? '<span class="pill g">Cerrado</span>'
+                    : '<span class="pill b">Activo</span>',
+              },
+            ],
+            // `setProject` renders on its own, so the flag is set FIRST or the
+            // first render paints the list again and the second one the chart.
+            onRowClick: (id) => {
+              ganttFull = true;
+              setProject(id);
+            },
           });
         },
 
@@ -13643,6 +13645,25 @@
           const pid = gProject,
             plan = B.get(erp.state, pid),
             sch = B.schedule(plan);
+          /* PK4-A: opening a job now lands here directly, so an UNPLANNED job
+       lands here too — and the first row of the list is exactly that. The
+       empty state therefore has to distinguish "no plan yet" from "nothing
+       to plan from": a job with no accepted presupuesto has no chapters for
+       `fromBudget` to derive and no partidas to record progress against, so
+       offering «Derivar del presupuesto» there is offering a button that can
+       only fail. */
+          let derivable = false,
+            budgetId = null;
+          try {
+            const pr = erp.project(pid);
+            budgetId = pr.budgetId || null;
+            derivable = !!(
+              pr.budgetId &&
+              erp
+                .version(pr.budgetId, pr.acceptedVersionId)
+                .chapters.some((c) => c.section === "base" && c.lines.length)
+            );
+          } catch (e) {}
           const cmp = gBaseline ? B.compareToBaseline(plan) : null;
           const pays = ErpBridge.scheduling.paymentMilestones(erp, pid);
           const cal = plan.calendar || B.defaultCalendar();
@@ -13656,7 +13677,7 @@
    <div class="card"><div class="gtools">
      <button class="btn sm" id="gAdd">＋ Tarea</button>
      <button class="btn sm" id="gAddMs">◆ Hito</button>
-     <button class="btn sm${plan.tasks.length ? "" : " primary"}" id="gDerive" title="Vuelve a derivar la planificación de los capítulos y partidas del presupuesto aceptado, conservando el avance registrado">↻ Derivar del presupuesto</button>
+     <button class="btn sm${plan.tasks.length || !derivable ? "" : " primary"}" id="gDerive"${derivable ? "" : " disabled"} title="${derivable ? "Vuelve a derivar la planificación de los capítulos y partidas del presupuesto aceptado, conservando el avance registrado" : "Esta obra no tiene un presupuesto aceptado del que derivar la planificación"}">↻ Derivar del presupuesto</button>
      <!-- Package 3 slide 3: moved out of PRY-01's Programación tab. Moving a
           milestone is a thing done TO the plan, and the plan is here. -->
      <button class="btn sm" id="gResched" title="Recalcula las fechas previstas de los hitos de cobro del contrato a partir de la planificación actual">Recalcular los cobros previstos</button>
@@ -13678,7 +13699,14 @@
      ${plan.baselines && plan.baselines.length ? `<button class="btn sm${gBaseline ? " primary" : ""}" id="gBl">Línea base</button>` : ""}
      <button class="btn sm" id="gFreeze" title="Congelar la planificación actual como referencia">❄ Congelar</button>
    </div>
-   ${plan.tasks.length ? ganttChart(plan, sch, cmp, pays) : `<div class="empty">Sin planificación. «Derivar del presupuesto» la construye a partir de los capítulos y partidas aceptados: la duración de cada capítulo sale de sus cantidades y del rendimiento diario del oficio.</div>`}
+   ${
+     plan.tasks.length
+       ? ganttChart(plan, sch, cmp, pays)
+       : derivable
+         ? `<div class="empty">Sin planificación. «Derivar del presupuesto» la construye a partir de los capítulos y partidas aceptados: la duración de cada capítulo sale de sus cantidades y del rendimiento diario del oficio.</div>`
+         : `<div class="empty">Esta obra todavía no tiene un presupuesto aceptado, así que no hay capítulos ni partidas que planificar ni sobre los que registrar avance.
+       <div style="margin-top:10px"><button class="btn sm primary" id="gGoBudget">${budgetId ? "Abrir el presupuesto" : "Ir a Presupuestos"}</button></div></div>`
+   }
    <div class="glegend">
      <span><i style="background:var(--green)"></i>Tarea</span>
      <span><i style="background:var(--danger)"></i>Ruta crítica — un día perdido aquí es un día perdido en la obra</span>
@@ -13758,6 +13786,12 @@
           $("#gAddMs").onclick = () => ganttNewTask(pid, true);
           $("#gDerive").onclick = () => deriveFromBudget(pid, cal);
           $("#gResched").onclick = () => rescheduleCashDrawer(pid);
+          const goBudget = $("#gGoBudget");
+          if (goBudget)
+            goBudget.onclick = () => {
+              ganttFull = false;
+              go("quotes", budgetId || undefined);
+            };
           $("#gFreeze").onclick = () => ganttFreeze(pid, plan);
           $("#gNwAdd").onclick = () => {
             const d = $("#gNw").value;
@@ -16559,61 +16593,6 @@
    </div>`;
       }
 
-      /* PRY-01's panel (Package 3 slide 3). It carried three tabs; it now
-   carries one surface, so the strip that chose between them is gone too — a
-   tab bar with a single tab is a control that answers no question.
-
-   «Avance» went because it was the SECOND progress control, and the weaker
-   one: it wrote through `markProgress` alone, so a figure typed there never
-   reached the Gantt's bars or the S curve. Its three-state control and live
-   percentage box were not lost — they are what the Gantt's own grid is built
-   from now (see progressControl). «Ficha» went because every figure on it is
-   read from somewhere that owns it: venta, facturado, cobrado and por
-   facturar are ADM-01's, extras aprobados is PRY-03's, and estado, cliente
-   and the dates are in the panel header directly above. */
-      function projectPanel(panel, id, route) {
-        const p = erp.project(id);
-        panel.innerHTML = `${projectPanelHead(p)}
-   <div class="ctrbody" id="pnlBody"></div>`;
-        panel.querySelector("[data-ctrclose]").onclick = () => centreClose(route);
-        panelPlan(panel.querySelector("#pnlBody"), p);
-      }
-
-      /** Programación: the plan in figures, and the chart where §3.1 puts it. */
-      function panelPlan(body, p) {
-        const B = ganttApi();
-        if (!B) {
-          body.innerHTML =
-            '<div class="empty">La planificación necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div>';
-          return;
-        }
-        const plan = B.get(erp.state, p.id),
-          sch = plan.tasks.length ? B.schedule(plan) : null;
-        const cmp = plan.baselines && plan.baselines.length ? B.compareToBaseline(plan) : null;
-        const risk = plan.tasks.length ? B.risk(plan, { asOf: erp.today, thresholdDays: 5 }) : null;
-        body.innerHTML = `<div class="daylist">
-    <div class="it"><span>Tareas</span><span style="flex:1"></span><b>${plan.tasks.length}</b></div>
-    <div class="it"><span>Fin de obra previsto</span><span style="flex:1"></span><b>${sch ? fmtD(sch.finish) : "—"}</b></div>
-    <div class="it"><span>Ruta crítica</span><span style="flex:1"></span><b>${sch ? sch.criticalPath.length : 0}</b></div>
-    ${
-      cmp
-        ? `<div class="it"><span>Desvío sobre línea base</span><span style="flex:1"></span>
-      <b style="color:${cmp.finishDriftDays > 0 ? "var(--danger)" : "var(--greenDeep)"}">${cmp.finishDriftDays > 0 ? "+" : ""}${cmp.finishDriftDays} d</b></div>`
-        : ""
-    }
-    ${risk ? `<div class="it"><span>Tareas fuera de plazo</span><span style="flex:1"></span><b>${risk.items.length}</b></div>` : ""}
-   </div>
-   <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-     <button class="btn primary sm" id="pnlGantt">Abrir la carta Gantt</button>
-   </div>
-   <div class="daylist" style="margin-top:10px"><div class="it" style="color:var(--muted)">La carta Gantt se abre a pantalla completa: es donde se marca el avance, se mueven las barras y se recalculan los cobros previstos.</div></div>`;
-        $("#pnlGantt").onclick = () => {
-          setProject(p.id);
-          ganttFull = true;
-          render();
-        };
-      }
-
       /** PRY-02's panel: three cards, the per-capítulo table, what is unassigned. */
       function economicsPanel(panel, id) {
         const p = erp.project(id);
@@ -17518,10 +17497,12 @@
         const p = erp.project(gProject);
         v.innerHTML = `<div class="pb">
     <div class="pbbar">
-      <button class="btn sm" id="gBack" title="Volver a la obra">←</button>
+      <!-- PK4-A: the only way back, now that the panel between the list and
+           this screen is gone — so it is labelled rather than a bare arrow. -->
+      <button class="btn sm" id="gBack" title="Volver a la lista de obras">← Obras</button>
       <div class="who"><b>${esc(p.code)}</b><span>${esc(erp.party(p.partyId).name)}</span></div>
       <span style="flex:1"></span>
-      <div class="acts"><span class="tag">Programación</span></div>
+      <div class="acts"><span class="tag">Avance físico</span></div>
     </div>
     <div id="gBody" style="flex:1;min-height:0;overflow:auto;padding:12px 14px"></div>
    </div>`;

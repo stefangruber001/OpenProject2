@@ -518,3 +518,73 @@ following PK2-C's precedent, and the merged control gained its own checks for
 the two things a screenshot cannot show: that a state button moves the engine
 and the bar together, and that a partida percentage is stored with its state
 derived from it.
+
+## Package 4 — PRY-01 becomes two screens (2026-08-12)
+
+Same-day follow-on to Package 3, and the operator's own word for it was
+"radical": delete the project bar, delete the panel between the list and the
+chart, and let the chart itself be the job's screen. Two screens for physical
+progress — the list of jobs, and one job — and nothing in between.
+
+| #     | Session                                                      | Model    | Effort | State    |
+| ----- | ------------------------------------------------------------ | -------- | ------ | -------- |
+| PK4-A | Delete the PROYECTO bar and the panel; a row opens the chart | Sonnet 5 | medium | **done** |
+
+### PK4-A — **done**
+
+The middle screen existed to state three figures — tareas, fin de obra
+previsto, ruta crítica — and offer a button to the chart. All three are on the
+chart already: the first two as toolbar chips, the rest in Desviaciones. A
+screen whose whole job is a button to the next screen is a screen to delete.
+
+- **A row opens the chart.** `progress` is now two plain states: the list
+  (`renderMasterList` directly — no `renderCentre`, no panel) or `ganttScreen`.
+  The row handler sets `ganttFull` **before** `setProject`, because
+  `setProject` renders on its own and the other order paints the list first and
+  the chart second.
+- **The PROYECTO bar is gone from PRY-01 only.** Picking the job IS the list;
+  a dropdown above it offered the same choice twice. The other four project
+  screens keep the bar, because each is a single screen that has to be told
+  which job it is about. Switching job is now back-then-click rather than a
+  dropdown — one more click, which is what "exactly two screens" costs and
+  what the operator asked for.
+- **`← Obras`, labelled.** It is the only way back now, and its destination
+  changed, so the bare `←` arrow got a word.
+- **A real dead end fixed, found by asking what the first row of the list
+  does.** Landing on the chart directly means an _unplanned_ job lands there
+  too — and P-R014, the first row, has no accepted presupuesto at all. It
+  therefore has no chapters to derive a plan from and no partidas to record
+  progress against, so the old empty state's «Derivar del presupuesto» was a
+  button that could only fail with "no tiene presupuesto aceptado". It is now
+  disabled on such a job, and the screen says what is actually missing and
+  offers the presupuesto instead. Verified in a browser before the change was
+  written, and again after.
+- **Deep links follow the same rule.** The five `go("progress", …)` call sites
+  — alerts, universal search, the change register — now land on the chart,
+  which is where the work is. The search result path was still seeding
+  `centreState.progress`, a panel that no longer exists; it sets `ganttFull`
+  now.
+- **PK3-C's `hideListWhenOpen` is deleted, not left behind.** It was shipped
+  an hour earlier to hide the list beside the open panel; with the panel gone
+  it had nothing to do, and its `.ctr.on.solo` rule with it. `projectPanel`,
+  `panelPlan` and `#pnlGantt` went the same way. `renderCentre` survives with
+  one caller, PRY-02, which still wants a list beside a panel.
+
+**A real bug fell out of the test rewrite, and it was not this session's.**
+The check "project context survives a subsection change" used to read the bar's
+own dropdown on PRY-01 and compare it to the same dropdown on PRY-02 — the bar
+against itself. With no bar on PRY-01 the honest version compares `gProject`,
+the actual context, to what the next screen's bar displays, and that failed:
+`projectOptions()` is filtered (Abiertos by default), so whenever the active
+job fell outside the filter the `<select>` had no matching `<option>` — and a
+`<select>` with no match shows its FIRST one. The bar named one job while the
+screen below rendered another. Fixed by adding the active job to its own option
+list when the filter excludes it, so «Abiertos» still means what it says.
+Reachable before this session too; the old assertion could not see it because
+both halves of the comparison were the same lying control.
+
+Six site-e2e sites moved with the screen — the `openGantt` helper lost its
+click-through step, PK3-C's panel-shape checks became "a row lands on the
+chart", and two i18n suites stopped opening a button that no longer exists.
+Net: the screen lost a panel, a bar and ~90 lines, and gained an honest empty
+state.
