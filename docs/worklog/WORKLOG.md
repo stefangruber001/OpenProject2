@@ -645,3 +645,75 @@ absent rather than `.ctrpanel .kpi` present, `#ecoBody` in place of
 adjust-with-reason flows were left untouched, since their selectors
 (`#as_go`, `#fc_save`, `[data-adj]`) were never scoped to the panel that
 went. 422/422 passing.
+
+## Package 5 — two things the operator hit on a real phone (2026-08-12)
+
+Both raised from an iPhone against the live preview, and both global rather
+than per-screen.
+
+| #     | Session                                                           | Model  | Effort | State    |
+| ----- | ----------------------------------------------------------------- | ------ | ------ | -------- |
+| PK5-A | Cards that fit the phone · language switch moves to Configuración | Opus 5 | medium | **done** |
+
+### PK5-A — **done**
+
+**The cards were never readable on a phone, and the mobile sweep could not
+see it.** The screenshots showed a two-column card whose labels and values
+could not be on screen at the same time — scroll right for the values, left
+for the labels. The cause is one global rule: `table { min-width: 520px }`,
+there so a desktop table never collapses into unreadable columns. `width:100%`
+cannot beat a `min-width`, so every carded table was laid out at 520px inside
+a ~360px `.scroll` box and scrolled sideways under the thumb.
+
+The reason this survived S14's 390px sweep is worth naming: `.scroll` carries
+`overflow-x:auto`, so it absorbed the overflow internally and
+`document.documentElement.scrollWidth` stayed exactly 390. **The check watched
+the document, and the document was innocent.** The fix is
+`table.cards { min-width: 0 }` — a card has no columns to preserve, so it has
+no use for the floor — plus `flex-wrap` on the cell so a value too long to sit
+beside its label drops to its own line, which is the "two-line card" the
+specification asks for, arrived at only when the line actually needs two.
+
+Verified on **28 routes** at 390px: no carded table overflows its container.
+The new E2E guard was then confirmed to bite by re-breaking the rule on
+purpose — it flagged visits, items, price-list, units, lead-sources and
+payment-methods while `doc=390` stayed clean throughout, which is precisely
+the blind spot being closed.
+
+**The language pill moved into Configuración as DMC-09 «Idioma».** It was a
+fixed pill bottom-left of every page: always reachable, always in the way —
+to the point that PK3-A had to reserve blank space under the contract viewer
+purely to stop it covering the end of the document (that clearance is now a
+typographic choice rather than a workaround, and says so). A preference set
+once or twice a year does not earn permanent screen space on a phone.
+
+The screen is careful about a distinction the app already depends on: **this
+is the language of the interface, for whoever is at the screen** — stored in
+`localStorage`, so it follows the browser and not the account, and one
+colleague reading in Catalan changes nothing for anybody else. **A document's
+language is a field on that document**, chosen per customer, and nothing here
+touches it; the screen says so in its own second card. The satellite pages
+(journey, guides, master-data, financial-data) lost their switch and gained
+nothing else — they read the same stored key, so the ERP owns the setting and
+they honour it.
+
+`injectToggle()` is deleted; `window.CANEI_I18N` gains `langs` and `set()`.
+Two E2E checks that drove the pill now drive the real screen, and one asserts
+the pill is _absent_. The section menu is asserted to list it, because a
+screen only a URL can reach is not in Configuración in any useful sense.
+
+**Two things the failing tests were right about.** The screen first shipped
+with plain radios, and the E2E could not click them: `elementFromPoint` at the
+radio's centre returned a sibling `<span>`, because `.opt` is only styled
+inside `.bside` and had no layout here. A human would have got away with it —
+the label still toggles — but a 13px control that is not its own hit target is
+exactly the mobile problem this screen exists to answer, so the choices became
+full-height buttons and the check now pins a minimum 30px target. Separately,
+the test drove the flyout open with `toggleSection` and then navigated by URL,
+which left the rail's absolutely-positioned subsection panel covering the
+content; it now clicks the «Idioma» entry the way a person does, which is both
+a truer path and what proves the menu lists it. A third failure was the
+assertion doing its job on the product rather than on itself: the subsección
+count is pinned, so adding Idioma turned `6×29` red until it was re-pinned at
+30 — see ASSUMPTIONS #163(f), which records that this crosses a line S1B drew
+deliberately, and why.

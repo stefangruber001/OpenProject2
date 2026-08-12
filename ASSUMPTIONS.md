@@ -3255,3 +3255,61 @@ Coste / Margen`, the same three figures twice. (b) **The "no empty state
   were written; with the bar gone from both PRY screens, they retarget to
   PRY-03 (`variations`), which was never their real subject and is simply
   the nearest screen that still carries one.
+
+- **#163 — cards that fit the phone, and a language switch that stops getting
+  in the way (PK5-A · 2026-08-12).** Two operator reports from a real iPhone,
+  both global. Decisions taken: (a) **the card bug was diagnosed by measuring
+  rather than by reading the card CSS**, which is what found it: every `td`
+  reported an identical 496px regardless of content, and a uniform width means
+  a floor, not a layout. The floor was the global `table { min-width: 520px }`
+  — correct for desktop, never reset for cards, and unbeatable by `width:100%`.
+  (b) **The fix is scoped to `table.cards`, not to the global rule**, because
+  desktop tables genuinely do need the floor; a card has no columns to preserve
+  and so has no use for it. Tables that opt out of cards (`data-nocards` — the
+  forecast grid, the Gantt, the week calendar) keep the floor and keep
+  scrolling sideways on purpose. (c) **`flex-wrap` was chosen over truncating
+  or right-aligning the value.** A long value now drops to its own line, which
+  is the specification's own "two-line card" — reached only when the line
+  actually needs two, so short values still read as one tidy label/value pair.
+  (d) **The E2E guard was proven to bite before being trusted**: the rule was
+  re-broken on purpose and the new check flagged six routes while
+  `document.scrollWidth` stayed 390 on every one of them. That gap is the
+  finding worth keeping — S14's sweep watched the document, but `.scroll`
+  carries `overflow-x:auto` and absorbed the overflow internally, so the page
+  was innocent while every card was unusable. A container-level assertion is
+  now what guards it. (e) **The language pill is deleted rather than
+  repositioned.** Moving it (higher, smaller, auto-hiding) would have kept a
+  permanent overlay for a preference set once or twice a year — and the app
+  already carried evidence of the cost, since PK3-A reserved blank space under
+  the contract viewer purely to stop the pill covering the document's last
+  line. (f) **DMC-09 is a new subsection rather than a row bolted onto an
+  existing config screen** (29 → 30). None of DMC-01…08 is a preferences
+  screen — they are all data lists — so the alternative was hiding a personal
+  setting inside somebody else's data. **This crosses a line S1B drew on
+  purpose**: `SESSION-S1B.md` refused `journey.html` a subsección with the
+  words "inventing a thirtieth would be exactly the drift the 6×29 count
+  exists to prevent". The distinction is that journey.html already had a home
+  (the profile menu) and wanted a second one, whereas the language setting had
+  no home at all once the pill was removed — the operator asked for it to live
+  in Configuración, and there was nowhere in Configuración for it to live. The
+  count is re-pinned at 30 in site-e2e for the same reason it was pinned at
+  29: so a thirty-first has to be argued for rather than appear. Three earlier
+  extensions (decisions 18, 19, 22) were logged the same way; this is the
+  fourth. (g) **The satellite pages lost their switch
+  and gained no replacement.** They read the same `localStorage` key, so the
+  ERP owns the setting and the guides, the journey page and the two data pages
+  simply honour it — which is one place to change it instead of seven.
+  (h) **The screen states what it does NOT change**, in its own card: a
+  document's language is a field on that document, chosen per customer, and
+  the interface language never rewrites an emitted presupuesto or contrato.
+  That distinction already governs `translate="no"` on the document markup;
+  saying it out loud where somebody changes the setting is cheaper than
+  letting them discover it by sending a contract in the wrong language. (i) **The
+  choices are buttons, not radios, and the test pins the target size.** The
+  first cut used radios; `elementFromPoint` at the radio's centre returned a
+  sibling `<span>`, because `class="opt"` is only styled under `.bside` and had
+  no layout on this screen. A person would not have noticed — the label still
+  toggles the input — but a 13px control that is not even its own hit target is
+  precisely the mobile failure this screen was created to fix, so it would have
+  been the wrong thing to leave in place and teach the test to work around. The
+  E2E now asserts a minimum 30px target so it cannot quietly shrink back.

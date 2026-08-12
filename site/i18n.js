@@ -233,46 +233,27 @@
     if (mo) mo.disconnect();
   }
 
-  /* ---------- toggle pill ---------- */
-  function injectToggle() {
-    if (document.getElementById("canei-lang-pill")) return;
-    var css =
-      "#canei-lang-pill{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:14px;z-index:99999;display:flex;gap:0;" +
-      "background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border:1px solid #dde5d6;border-radius:999px;" +
-      "box-shadow:0 2px 4px rgba(24,32,16,.06),0 14px 30px -18px rgba(24,32,16,.3);overflow:hidden;" +
-      "font:600 11px Inter,system-ui,sans-serif;letter-spacing:.06em}" +
-      "#canei-lang-pill button{appearance:none;border:0;background:transparent;color:#8b8f80;padding:7px 12px;" +
-      "cursor:pointer;font:inherit;transition:.15s}" +
-      "#canei-lang-pill button.on{background:linear-gradient(120deg,#31532a,#48733c 70%);color:#fff}" +
-      "@media print{#canei-lang-pill{display:none}}" +
-      "@media(max-width:560px){#canei-lang-pill{bottom:calc(10px + env(safe-area-inset-bottom,0px));left:10px}#canei-lang-pill button{padding:6px 10px}}";
-    var st = document.createElement("style");
-    st.textContent = css;
-    document.head.appendChild(st);
-    var pill = document.createElement("div");
-    pill.id = "canei-lang-pill";
-    pill.setAttribute("role", "group");
-    pill.setAttribute("aria-label", "Idioma / Idioma / Language");
-    LANGS.forEach(function (lang) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.textContent = lang.toUpperCase();
-      if (lang === target) b.className = "on";
-      b.addEventListener("click", function () {
-        if (lang === target) return;
-        try {
-          localStorage.setItem(LS_KEY, lang);
-        } catch (e) {}
-        location.reload();
-      });
-      pill.appendChild(b);
-    });
-    document.body.appendChild(pill);
+  /* ---------- language, chosen in Configuración ----------
+     There used to be a fixed pill bottom-left of every page. It was always
+     reachable, and always in the way: it floated over content on every
+     screen, and one document viewer already had to reserve blank space
+     underneath itself purely to stop the pill covering the end of a contract.
+     A preference set once or twice a year does not earn permanent screen
+     space, so the choice moved into Configuración (DMC-09) and this module
+     just exposes the setter. The satellite pages carry no switch of their
+     own — they read the same `localStorage` key, so a choice made in the ERP
+     is the choice they honour. */
+  function setLang(lang) {
+    if (LANGS.indexOf(lang) < 0 || lang === target) return false;
+    try {
+      localStorage.setItem(LS_KEY, lang);
+    } catch (e) {}
+    location.reload();
+    return true;
   }
 
   /* ---------- boot ---------- */
   function boot() {
-    injectToggle();
     fullPass();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
@@ -282,6 +263,8 @@
     lang: function () {
       return target;
     },
+    langs: LANGS.slice(),
+    set: setLang,
     base: base,
     active: active,
     translateNode: translateNode,

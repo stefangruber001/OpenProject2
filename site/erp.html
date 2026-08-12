@@ -2390,14 +2390,16 @@
      short document (few chapters) with nothing to fill it — the blank
      white card the operator flagged. flex-start lets .cdoc size to its own
      content instead; a long document still grows past the viewport on its
-     own, unaffected. The extra bottom padding clears the fixed language
-     pill (site/i18n.js, ~44px tall incl. its own offset) so scrolling a
-     long contract to its true end does not leave FIRMA hidden behind it. */
+     own, unaffected. The generous bottom padding was originally clearance
+     for the fixed language pill, which has since moved into Configuración
+     (DMC-09); it stays because a document wants breathing room under its
+     last line either way, but it is now a typographic choice rather than a
+     workaround for something floating over it. */
       .condoc {
         min-height: 0;
         overflow: auto;
         background: var(--hair);
-        padding: 16px 16px 64px;
+        padding: 16px 16px 48px;
         display: flex;
         justify-content: center;
         align-items: flex-start;
@@ -3644,6 +3646,17 @@
           display: block;
           width: 100%;
         }
+        /* The one line that makes cards actually fit. `table` carries a global
+       `min-width:520px` so a desktop table never collapses into unreadable
+       columns — and `width:100%` cannot win against it, so every carded table
+       was laid out at 520px inside a ~360px `.scroll` box and scrolled
+       SIDEWAYS. The page itself never scrolled, because `.scroll` absorbed the
+       overflow internally, which is why this survived the 390px sweep: the
+       check watched the document, and the document was innocent. A card has
+       no columns to preserve, so it has no use for the floor. */
+        table.cards {
+          min-width: 0;
+        }
         table.cards tr {
           border: 1px solid var(--line);
           border-radius: 11px;
@@ -3659,11 +3672,18 @@
           padding: 2px 0;
           display: flex;
           justify-content: space-between;
-          gap: 10px;
+          align-items: baseline;
+          /* A value too long to sit beside its label drops to its own line
+         instead of forcing the row wider than the card — which is the
+         «two-line card» the specification asks for, arrived at only when the
+         line actually needs two. */
+          flex-wrap: wrap;
+          gap: 2px 10px;
           font-size: 13px;
           height: auto;
           text-align: left;
           white-space: normal;
+          overflow-wrap: anywhere;
         }
         table.cards td:before {
           content: attr(data-th);
@@ -4424,6 +4444,7 @@
             { k: "messaging", lab: "Comunicaciones", code: "DMC-06" },
             { k: "alerts", lab: "Alertas", code: "DMC-07" },
             { k: "users", lab: "Usuarios", code: "DMC-08" },
+            { k: "language", lab: "Idioma", code: "DMC-09" },
           ],
         },
       ];
@@ -14990,6 +15011,57 @@
           (b) => (b.onclick = () => inviteUser(b.dataset.invite)),
         );
         if (!uList.length && !uErr) loadUsers();
+      };
+
+      /* DMC-09 · Idioma — the interface language, chosen here instead of from a
+   pill floating over every screen.
+
+   Two things this screen is careful to keep apart, because they are two
+   different people's choices. THIS setting is the language of the interface,
+   for whoever is sitting at it: it lives in `localStorage`, so it follows the
+   browser and not the account, and one colleague reading the app in Catalan
+   does not change what anybody else sees. A DOCUMENT's language — the
+   presupuesto or the contrato the customer receives — is a field on that
+   document, set per customer where the document is written, and nothing here
+   touches it. Same reason `renderBudgetDocHtml` carries `translate="no"`. */
+      const UI_LANGS = [
+        ["es", "Castellano", "Español"],
+        ["ca", "Català", "Catalán"],
+        ["en", "English", "Inglés"],
+      ];
+      VIEWS.language = (v) => {
+        $("#sub").textContent =
+          "El idioma de la interfaz, para quien está usando el programa. No cambia el idioma de los presupuestos ni de los contratos: eso se elige por cliente, en cada documento.";
+        const cur_ = typeof CANEI_I18N !== "undefined" ? CANEI_I18N.lang() : "es";
+        /* Buttons rather than radios. A 13px radio is a poor target on a
+       phone — and this screen exists precisely because the old control was
+       unusable there — so each language is a full-height button that says
+       what it is. The current one is `primary`, which is how the rest of the
+       app shows a chosen state. */
+        v.innerHTML = `<div class="card"><div class="ch"><h3>Idioma de la interfaz</h3>
+     <span class="tag">${esc((UI_LANGS.find((l) => l[0] === cur_) || UI_LANGS[0])[1])}</span></div>
+    <div class="daylist">
+     ${UI_LANGS.map(
+       ([k, native, es]) => `<div class="it">
+       <button class="btn${k === cur_ ? " primary" : ""}" data-uilang="${k}" style="min-width:132px;justify-content:center"${k === cur_ ? ' aria-current="true"' : ""}>${esc(native)}</button>
+       <span style="flex:1"></span>
+       <span style="color:var(--muted);font-size:12.5px">${k === cur_ ? "en uso" : esc(es)}</span>
+      </div>`,
+     ).join("")}
+     <div class="it" style="color:var(--muted)">La elección se guarda en este navegador y se aplica al recargar. Es personal: un compañero puede tener el programa en otro idioma sin que cambie el suyo.</div>
+    </div></div>
+
+   <div class="card"><div class="ch"><h3>Qué NO cambia</h3></div><div class="daylist">
+    <div class="it">El <b>presupuesto</b> y el <b>contrato</b> se emiten en el idioma del cliente, que se elige en el propio documento. Cambiar el idioma de aquí no reescribe un documento ya emitido ni el que está por emitir.</div>
+    <div class="it">Los <b>datos</b> — nombres de partidas, descripciones, notas — se guardan tal y como se escribieron. Esto traduce la interfaz, no el contenido.</div>
+   </div></div>`;
+        v.querySelectorAll("[data-uilang]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              if (typeof CANEI_I18N !== "undefined" && CANEI_I18N.set)
+                CANEI_I18N.set(b.dataset.uilang);
+            }),
+        );
       };
 
       /* The invitation, shown rather than claimed. `delivered` is false whenever no

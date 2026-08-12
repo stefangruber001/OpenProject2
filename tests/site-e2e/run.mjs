@@ -579,7 +579,8 @@ async function testMobile(browser, base) {
     const offenders = [];
     let carded = 0,
       grids = 0,
-      overflow = [];
+      overflow = [],
+      sideways = [];
     for (const r of ROUTES) {
       await pg.evaluate((x) => (location.hash = x), r);
       await pg.waitForTimeout(400);
@@ -593,8 +594,23 @@ async function testMobile(browser, base) {
             ...[...t.querySelectorAll("tbody tr")].map((tr) => tr.children.length),
           ),
         })),
+        // A carded table whose own scroll box overflows is the failure the
+        // document-level check above CANNOT see: `.scroll` has overflow-x:auto,
+        // so it absorbs the overflow internally and the page stays 390 wide
+        // while every card scrolls sideways under the operator's thumb. That
+        // is exactly how a global `table{min-width:520px}` — which
+        // `width:100%` cannot override — shipped to a phone unnoticed.
+        clipped: [...document.querySelectorAll("#view table.cards")]
+          .map((t) => {
+            const box = t.closest(".scroll") || t.parentElement;
+            return box && box.scrollWidth > box.clientWidth + 1
+              ? `${box.clientWidth}<${box.scrollWidth}`
+              : null;
+          })
+          .filter(Boolean),
       }));
       if (info.sw > 391) overflow.push(`${r}:${info.sw}`);
+      if (info.clipped.length) sideways.push(`${r}:${info.clipped.join()}`);
       for (const t of info.tables) {
         if (t.cards) carded++;
         else if (t.nocards) grids++;
@@ -608,6 +624,9 @@ async function testMobile(browser, base) {
     else bad("mobile: tables become cards", `carded=${carded} offenders=${offenders.join()}`);
     if (!overflow.length) ok(`mobile: no screen scrolls sideways at 390 (${ROUTES.length} routes)`);
     else bad("mobile: no sideways scroll", overflow.join());
+    if (!sideways.length)
+      ok(`mobile: no carded table is cut off inside its own scroller (${carded} tables)`);
+    else bad("mobile: cards fit their container", sideways.join(" · "));
 
     // A card is only a card if the header labels moved onto the lines.
     await pg.evaluate(() => (location.hash = "customers"));
@@ -977,15 +996,18 @@ async function testShell(browser, base) {
     else bad("shell: sections + collapsed panel", `sections=${sections} open=${subsOpen}`);
 
     // The specification's own count, asserted rather than assumed: six
-    // secciones and twenty-nine subsecciones. It is twenty-nine and not the
-    // doc's twenty-six because Comunicaciones, Alertas and Usuarios were moved
-    // into Configuración instead of being deleted.
+    // secciones and thirty subsecciones. It is thirty and not the doc's
+    // twenty-six because Comunicaciones, Alertas and Usuarios were moved into
+    // Configuración instead of being deleted (decisions 18, 19, 22), and
+    // because PK5-A added Idioma there when the floating language pill was
+    // removed. Each deviation is recorded in ASSUMPTIONS.md; the number is
+    // pinned here so a thirty-first arrives deliberately rather than by drift.
     const shape = await pg.evaluate(() => ({
       sections: SECTIONS.length,
       subs: SECTIONS.reduce((n, s) => n + s.subs.length, 0),
     }));
-    if (shape.sections === 6 && shape.subs === 29) ok("shell: 6 secciones × 29 subsecciones");
-    else bad("shell: 6×29", JSON.stringify(shape));
+    if (shape.sections === 6 && shape.subs === 30) ok("shell: 6 secciones × 30 subsecciones");
+    else bad("shell: 6×30", JSON.stringify(shape));
 
     // Press a section → panel 2 opens with that section's subsections.
     await pg.locator('#p1 .secitem[data-sec="sales"]').click();
@@ -6083,19 +6105,61 @@ async function testI18n(browser, base) {
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(600);
-    const pill = await pg.locator("#canei-lang-pill button").count();
-    if (pill === 3) ok("i18n: the toggle offers all three languages (ES · CA · EN)");
-    else bad("i18n: toggle present", `buttons=${pill}, expected 3`);
+    // The switch lives in Configuración → Idioma (DMC-09) since the operator
+    // asked for it: the floating pill was reachable from everywhere and in the
+    // way everywhere, to the point that one document viewer reserved blank
+    // space purely to stop it covering the end of a contract.
+    if ((await pg.locator("#canei-lang-pill").count()) === 0)
+      ok("i18n: no floating language pill over the content");
+    else bad("i18n: pill removed", "#canei-lang-pill still injected");
     const esText = await pg.locator("body").innerText();
     if (esText.includes("Torre de control")) ok("i18n: workspace defaults to Spanish");
     else bad("i18n: workspace defaults to Spanish", esText.slice(0, 60));
 
-    // switch to EN via the pill (reloads the page)
-    await Promise.all([
-      pg.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
-      pg.locator("#canei-lang-pill button", { hasText: "EN" }).click(),
-    ]);
-    await pg.waitForTimeout(700);
+    // Reached the way a person reaches it: open Configuración and click the
+    // entry. That proves the menu lists it — a screen only a URL can open is
+    // not in Configuración in any useful sense — and it leaves the shell in
+    // the right state, because the rail's subsection panel is an absolutely
+    // positioned flyout that covers the content until a click closes it.
+    await pg.evaluate(() => toggleSection("settings"));
+    await pg.waitForTimeout(600);
+    const inMenu = await pg.evaluate(() =>
+      /Idioma/.test(document.querySelector("#p2list")?.innerText || ""),
+    );
+    await pg.locator("#p2list button", { hasText: "Idioma" }).click();
+    await pg.waitForTimeout(600);
+    const langScreen = await pg.evaluate(() => ({
+      options: [...document.querySelectorAll("[data-uilang]")].map((b) => b.dataset.uilang),
+      current: document.querySelector("[data-uilang][aria-current]")?.dataset.uilang,
+      // Each choice must be a real target, not a 13px radio behind a label:
+      // this screen exists because the old control was unusable on a phone.
+      minTarget: Math.min(
+        ...[...document.querySelectorAll("[data-uilang]")].map((b) =>
+          Math.round(b.getBoundingClientRect().height),
+        ),
+      ),
+    }));
+    if (
+      langScreen.options.join(",") === "es,ca,en" &&
+      langScreen.current === "es" &&
+      langScreen.minTarget >= 30 &&
+      inMenu
+    )
+      ok(
+        `i18n: Configuración → Idioma offers all three languages as ${langScreen.minTarget}px targets`,
+      );
+    else bad("i18n: language screen", JSON.stringify({ ...langScreen, inMenu }));
+
+    // Switching reloads the page, so the click is not awaited for a result —
+    // the assertion is what the reloaded document says. It reloads onto the
+    // language screen it was pressed from, so the workspace assertion below
+    // goes back to the Torre: what is being proven is that the CHOICE reaches
+    // the whole app, not that one screen happens to be translated.
+    await pg.locator('[data-uilang="en"]').click();
+    await pg.waitForLoadState("networkidle").catch(() => {});
+    await pg.waitForTimeout(900);
+    await pg.evaluate(() => (location.hash = "tower"));
+    await pg.waitForTimeout(800);
     // dynamic content gets translated too (MutationObserver path)
     const erpLang = await pg.evaluate(() => document.documentElement.lang);
     const erpText = await pg.locator("body").innerText();
