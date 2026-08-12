@@ -3216,3 +3216,42 @@ stash`, a tall-viewport scratch check showed the short document's card
   job while the screen rendered another. The active job is now prepended to its
   own option list rather than the filter being widened, so «Abiertos» keeps its
   meaning and the selector cannot misname what is on screen.
+
+- **#162 — Avance económico replicates PK4-A, but only where the analogy
+  actually holds (PK4-B · 2026-08-12).** The operator asked to replicate
+  "most of the changes" from Avance Físico onto Avance Económico. Rather than
+  copying the whole PK4-A change set, a contrast was run first — measuring
+  the running app, not guessing from the diff — and only three of PK4-A's
+  seven moves turned out to have a real PRY-02 counterpart: delete the
+  project bar, promote the panel to full screen, and (found on inspection,
+  not assumed) no empty state is needed. Decisions taken: (a) **the
+  duplication was measured before being called duplication** — with a job
+  open, the project bar read `VENTA CONTRATADA 2.566 € · COSTE REAL 2.518 €
+· MARGEN ACTUAL 48 €` while the KPI cards two lines below read `Venta /
+Coste / Margen`, the same three figures twice. (b) **The "no empty state
+  needed" finding came from reading the two project-creation paths, not from
+  assuming symmetry with Físico** — `createProjectFromAcceptance` and
+  `createQuickProject` both populate `baseline.chapters` unconditionally at
+  creation (the quick path always seeds one synthetic chapter), so unlike a
+  Gantt plan — which genuinely can be absent — a project's baseline can
+  never be empty by construction. Confirmed against the seed (14/14 projects
+  non-empty) rather than asserted from the model alone, and the panel's
+  existing defensive fallback already covers the type-theoretic case, so no
+  new empty-state code was written. (c) **The four remaining PK4-A/PK3-C
+  items were not force-fit** — no duplicate progress control exists on
+  economics to merge, nothing to move, nothing to guard against
+  overwriting, and no tabs to delete — because economics never had the
+  Físico-specific problems those changes solved. Replicating them anyway
+  would have been solving problems that do not exist here. (d) **The
+  "one progress figure drives both PRY screens" test assertion is retired,
+  not patched**, because its target — PRY-02's own progress-bar display —
+  was itself part of the duplication being deleted; there is nothing left in
+  PRY-02's UI to compare against PRY-01's recorded percentage, and inventing
+  a new display just to keep an old assertion alive would reintroduce the
+  duplication the session removes. (e) **Two other assertions were reading
+  `#economics`'s dropdown to check state that had nothing to do with
+  economics** — "context survives a subsection change" and the header/
+  Recientes check both used PRY-02 only because it still had a bar when they
+  were written; with the bar gone from both PRY screens, they retarget to
+  PRY-03 (`variations`), which was never their real subject and is simply
+  the nearest screen that still carries one.

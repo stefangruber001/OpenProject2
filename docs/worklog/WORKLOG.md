@@ -529,6 +529,7 @@ progress — the list of jobs, and one job — and nothing in between.
 | #     | Session                                                      | Model    | Effort | State    |
 | ----- | ------------------------------------------------------------ | -------- | ------ | -------- |
 | PK4-A | Delete the PROYECTO bar and the panel; a row opens the chart | Sonnet 5 | medium | **done** |
+| PK4-B | Replicate PK4-A onto PRY-02 Avance económico                 | Sonnet 5 | medium | **done** |
 
 ### PK4-A — **done**
 
@@ -588,3 +589,59 @@ click-through step, PK3-C's panel-shape checks became "a row lands on the
 chart", and two i18n suites stopped opening a button that no longer exists.
 Net: the screen lost a panel, a bar and ~90 lines, and gained an honest empty
 state.
+
+### PK4-B — **done**
+
+Contrast run against PK4-A before writing any code: of the seven Físico
+changes, only three had a real counterpart on Económico — deleting the
+project bar, promoting the panel to full screen, and (on inspection) _not_
+needing an empty state, because a project's `baseline.chapters` is populated
+at creation time for both project-creation paths (`createProjectFromAcceptance`
+and `createQuickProject`) and the seed confirms it: zero projects with an
+empty baseline, so the panel's existing defensive fallback was already
+sufficient. The remaining four PK3-C/PK4-A items (tabs, merged control,
+moved button, derive-guard) have no PRY-02 equivalent to replicate.
+
+- **The duplication was real and measured before touching code.** With a job
+  open, the old project bar read `VENTA CONTRATADA 2.566 € · COSTE REAL
+2.518 € · MARGEN ACTUAL 48 €` while the KPI cards two lines below read
+  `Venta / Coste / Margen` — the same three figures twice, plus an `AVANCE
+100%` the panel had no other use for. Deleting the bar on `#economics`
+  removes it (same guard as PK4-A: `renderProjectBar` now excludes both
+  `progress` and `economics`).
+- **The chapter table had zero slack, also measured first.** At the old
+  780px panel it fit 748px of content into 748px of space — the very next
+  column, or one longer chapter name, would have started scrolling. Full
+  screen measured 1410px, verified in a browser before committing to the
+  change.
+- **`renderCentre`/`centreState`/`centreOpen`/`centreClose`/`projectPanelHead`
+  are deleted, not deprecated** — economics was their last caller once PRY-01
+  retired them in PK4-A. `.ctr`/`.ctr.on`/`.ctrlist`/`.ctrpanel`/`.ctrhd` (and
+  the mobile media-query overrides) go with them; `.ctrbody` survives as the
+  padding rule on the new full-screen surface's scroll body, its one
+  remaining caller.
+- **`economicsScreen` mirrors `ganttScreen` exactly** — same `.pb`/`.pbbar`
+  wrapper, same `← Obras` label, same flag-before-`setProject` ordering PK4-A
+  established (`setProject` renders on its own, so setting `ecoFull` after it
+  would paint the list once and the panel a moment later).
+- **One test assertion lost its target entirely and was retired rather than
+  patched**: PRY-02's own progress-bar display (`.ctrhd .bar`) was the thing
+  the "one progress figure drives both PRY screens" check compared against —
+  and it was itself part of the duplication being removed. There is nothing
+  left in PRY-02's UI that shows physical progress; PRY-01 already owns that
+  display. The check now verifies the panel opens cleanly on the same job
+  after progress was recorded elsewhere, without asserting a number that no
+  longer has anywhere to render.
+- **Two more assertions had silently gone stale** while reading the _other_
+  side of a comparison that assumed a bar existed on both progress and
+  economics: "project context survives a subsection change" and the header
+  fields/Recientes check both used to land on `#economics` to read `#psel`.
+  With no bar on either PRY screen, both retarget to `#variations` (PRY-03),
+  which still carries the bar.
+
+Ten site-e2e checks were rewritten onto the full-screen shape (`.ctrpanel`
+absent rather than `.ctrpanel .kpi` present, `#ecoBody` in place of
+`.ctrpanel`, `#ecoBack` in place of `[data-ctrclose]`); the assign/split and
+adjust-with-reason flows were left untouched, since their selectors
+(`#as_go`, `#fc_save`, `[data-adj]`) were never scoped to the panel that
+went. 422/422 passing.

@@ -2779,68 +2779,12 @@
         letter-spacing: 0.02em;
       }
 
-      /* ---------- Centre panel (S8) ----------
-     §3.1's third surface, and the one both PRY screens are built on: opening
-     a record compresses the list to 372 and puts a 780 panel beside it. The
-     list NEVER disappears — that is the rule the whole layout exists for, and
-     it is why this is a grid change rather than a screen change. On close the
-     list returns to its width, its page and its scroll position. */
-      .ctr {
-        display: grid;
-        gap: 16px;
-        align-items: start;
-      }
-      .ctr.on {
-        grid-template-columns: 372px minmax(0, 780px);
-      }
-      .ctrlist {
-        min-width: 0;
-      }
-      .ctr.on .ctrlist {
-        max-height: calc(100vh - var(--top, 59px) - 120px);
-        overflow: auto;
-      }
-      .ctrpanel {
-        background: var(--paper);
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        box-shadow: var(--shadow);
-        min-width: 0;
-        overflow: hidden;
-      }
-      /* Fixed 88 header: code, client, address, total progress, the three dates. */
-      .ctrhd {
-        height: 88px;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 0 16px;
-        border-bottom: 1px solid var(--line);
-        background: var(--paper);
-      }
-      .ctrhd .who {
-        min-width: 0;
-        flex: 1;
-      }
-      .ctrhd .who b {
-        display: block;
-        font: 600 15px var(--sans);
-        color: var(--ink);
-      }
-      .ctrhd .who span {
-        display: block;
-        font-size: 12px;
-        color: var(--muted);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .ctrhd .dates {
-        font-size: 11.5px;
-        color: var(--muted);
-        text-align: right;
-        white-space: nowrap;
-      }
+      /* .ctrbody survives PK4-B as the padding on a full-screen job surface's
+     scrollable body (economicsScreen's #ecoBody) — the rest of the "centre
+     panel" rule set it used to live under (.ctr/.ctrlist/.ctrpanel/.ctrhd)
+     went with PK4-B: PRY-02 was its last caller once PRY-01 retired it in
+     PK4-A, so the 372/780 split, the fixed 88px header and its close button
+     have nowhere left to render. */
       .ctrbody {
         padding: 12px 14px 16px;
       }
@@ -2938,13 +2882,6 @@
         white-space: nowrap;
       }
       @media (max-width: 860px) {
-        .ctr.on {
-          grid-template-columns: minmax(0, 1fr);
-        }
-        .ctr.on .ctrlist {
-          max-height: none;
-          overflow: visible;
-        }
         /* Mobile: one tap cycles the three states, so the strip collapses to the
        single button that says where the row is now (§3.2). */
         .pstate button {
@@ -4648,6 +4585,7 @@
         if (k !== "purchasing") puWork = null;
         if (k !== "contracts") conWork = null;
         if (k !== "progress") ganttFull = false;
+        if (k !== "economics") ecoFull = false;
         cur = k;
         location.hash = k;
         window._arg = arg;
@@ -9309,60 +9247,6 @@
    into two-line-ish cards at the phone breakpoint (verified in full in S14) —
    the same table markup serves both, so there is exactly one row template to
    keep correct. */
-      /* ================= Centre panel (S8) ==================================
-   The specification's third shared surface, after the 480 side panel and the
-   full screen: opening a record compresses the list to 372 and puts a 780
-   panel beside it, and **the list never disappears**.
-
-   Two things it owns that a screen would otherwise get wrong:
-
-   · The list's PAGE survives, because the list keeps rendering through
-     `renderMasterList` and that primitive already holds page state per id.
-     Closing the panel is a grid change, not a navigation.
-   · The list's SCROLL survives, which page state does not cover. Opening a
-     record on row 40 and closing it back at row 1 is the small, constant
-     annoyance the doc's "the list returns to its width, page and scroll
-     position" sentence is about.
-
-   `openId` is deliberately NOT persisted: which record somebody last looked
-   at is not company data, the same call S1b made for the tab strips. */
-      const centreState = {};
-      function centreOpen(id, rowId) {
-        const st = centreState[id] || (centreState[id] = { openId: null, scroll: 0 });
-        const host = document.querySelector("#view .ctrlist");
-        st.scroll = host ? host.scrollTop : window.scrollY;
-        st.openId = rowId;
-        render();
-      }
-      function centreClose(id) {
-        const st = centreState[id];
-        if (!st) return;
-        st.openId = null;
-        render();
-        // After the panel goes, the list is wide again and its own scroller no
-        // longer exists — the position belongs to the window.
-        window.scrollTo(0, st.scroll || 0);
-      }
-      function renderCentre(v, cfg) {
-        const st = centreState[cfg.id] || (centreState[cfg.id] = { openId: null, scroll: 0 });
-        // A record that has gone (closed, deleted, filtered away) must not leave the
-        // list compressed against an empty panel.
-        const open = st.openId && cfg.exists(st.openId) ? st.openId : null;
-        if (st.openId && !open) st.openId = null;
-        const wrap = el("div", "ctr" + (open ? " on" : ""));
-        const listHost = el("div", "ctrlist");
-        wrap.appendChild(listHost);
-        v.innerHTML = "";
-        v.appendChild(wrap);
-        cfg.renderList(listHost, open);
-        if (open) {
-          const panel = el("div", "ctrpanel");
-          wrap.appendChild(panel);
-          cfg.renderPanel(panel, open);
-          listHost.scrollTop = st.scroll || 0;
-        }
-      }
-
       const LIST_PAGE_SIZES = [10, 25, 50];
       const listState = {};
       function getListState(id, defSize) {
@@ -9573,12 +9457,19 @@
       }
       function renderProjectBar() {
         const host = $("#projbar");
-        // PK4-A: PRY-01 has no bar at all. It is two screens — the list of
-        // jobs, and one job's chart — so the job is chosen by clicking a row,
-        // not by a dropdown above a list that already offers the same choice.
-        // The other four project screens keep the bar; each of them is a
-        // single screen that needs to be told which job it is about.
-        if (cur === "progress" || !PROJECT_SUBS.includes(cur) || !erp.state.projects.length) {
+        // PK4-A/PK4-B: PRY-01 and PRY-02 have no bar at all. Each is two
+        // screens — the list of jobs, and one job's full-screen surface — so
+        // the job is chosen by clicking a row, not by a dropdown above a list
+        // that already offers the same choice, and the panel's own KPI cards
+        // already carry the figures the bar would repeat. The other three
+        // project screens keep the bar; each of them is a single screen that
+        // needs to be told which job it is about.
+        if (
+          cur === "progress" ||
+          cur === "economics" ||
+          !PROJECT_SUBS.includes(cur) ||
+          !erp.state.projects.length
+        ) {
           host.innerHTML = "";
           return;
         }
@@ -13336,10 +13227,12 @@
     as comfortable and says nothing, while "spent 40 to get a quarter of the way,
     so heading for 160" is the sentence somebody can act on. It is computed by
     @repo/capability-projects, never here. */
-        /* ---------- PRY-02 Avance económico (S8) ----------
-    Same list and centre mechanics as PRY-01, because the doc gives them the
-    same ones and because two adjacent screens that behave differently is a
-    tax the operator pays every day.
+        /* ---------- PRY-02 Avance económico (S8 · PK4-B) ----------
+    Same shape as PRY-01 now (PK4-A), for the identical reason the doc gave
+    them the same shape in the first place: two adjacent screens that behave
+    differently is a tax the operator pays every day. A row opens the job's
+    own full-screen surface directly — no panel in between, no project bar
+    repeating the KPI cards the panel already carries.
 
     Three things the panel says that no screen said before: the margin as its
     own card rather than a column somebody has to find; the per-capítulo table
@@ -13348,71 +13241,60 @@
     job and stopped, because nobody said which capítulo pays for it. */
         economics(v) {
           $("#sub").textContent =
-            "Venta, coste y margen de la obra, capítulo a capítulo, y el coste que ha llegado a la obra sin capítulo asignado. Repartirlo aquí es lo que hace que la tabla cuadre con el proyecto.";
+            "Elige una obra: venta, coste y margen capítulo a capítulo, y el coste que ha llegado sin capítulo asignado.";
           if (!erp.state.projects.length) return noProjectsCard(v);
-          renderCentre(v, {
-            id: "economics",
-            exists: (id) => erp.state.projects.some((p) => p.id === id),
-            renderList: (host, open) =>
-              renderMasterList(host, {
-                id: "projects-economics",
-                noNew: true,
-                ids: {
-                  q: "ecoQ",
-                  size: "ecoSize",
-                  prev: "ecoPrev",
-                  next: "ecoNext",
-                  exp: "ecoExp",
-                  expMenu: "ecoExpMenu",
-                  expXlsx: "ecoExpXlsx",
-                  expCsv: "ecoExpCsv",
+          if (ecoFull) return economicsScreen(v);
+          renderMasterList(v, {
+            id: "projects-economics",
+            noNew: true,
+            ids: {
+              q: "ecoQ",
+              size: "ecoSize",
+              prev: "ecoPrev",
+              next: "ecoNext",
+              exp: "ecoExp",
+              expMenu: "ecoExpMenu",
+              expXlsx: "ecoExpXlsx",
+              expCsv: "ecoExpCsv",
+            },
+            nounSingular: "obra",
+            nounPlural: "obras",
+            searchPlaceholder: "Buscar por código o cliente…",
+            emptyText: "Ninguna obra coincide con la búsqueda.",
+            baseRows: erp.state.projects.slice().reverse(),
+            matches: (p, q) => (p.code + " " + erp.party(p.partyId).name).toLowerCase().includes(q),
+            columns: [
+              { label: "Código", primary: true, get: (p) => p.code },
+              { label: "Cliente", get: (p) => erp.party(p.partyId).name },
+              {
+                label: "Venta actual",
+                html: (p) => eur0(erp.projectEconomics(p.id).currentRevenueCents),
+              },
+              {
+                label: "Coste real",
+                html: (p) => eur0(erp.projectEconomics(p.id).actualCents),
+              },
+              {
+                label: "Margen prev.",
+                html: (p) => {
+                  const e = erp.projectEconomics(p.id);
+                  return `<span style="color:${e.marginForecastCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(e.marginForecastCents)}</span>`;
                 },
-                nounSingular: "obra",
-                nounPlural: "obras",
-                searchPlaceholder: "Buscar por código o cliente…",
-                emptyText: "Ninguna obra coincide con la búsqueda.",
-                baseRows: erp.state.projects.slice().reverse(),
-                matches: (p, q) =>
-                  (p.code + " " + erp.party(p.partyId).name).toLowerCase().includes(q),
-                columns: open
-                  ? [
-                      { label: "Código", primary: true, get: (p) => p.code },
-                      { label: "Cliente", get: (p) => erp.party(p.partyId).name },
-                    ]
-                  : [
-                      { label: "Código", primary: true, get: (p) => p.code },
-                      { label: "Cliente", get: (p) => erp.party(p.partyId).name },
-                      {
-                        label: "Venta actual",
-                        html: (p) => eur0(erp.projectEconomics(p.id).currentRevenueCents),
-                      },
-                      {
-                        label: "Coste real",
-                        html: (p) => eur0(erp.projectEconomics(p.id).actualCents),
-                      },
-                      {
-                        label: "Margen prev.",
-                        html: (p) => {
-                          const e = erp.projectEconomics(p.id);
-                          return `<span style="color:${e.marginForecastCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(e.marginForecastCents)}</span>`;
-                        },
-                      },
-                      {
-                        label: "Sin repartir",
-                        html: (p) => {
-                          const n = erp.unassignedChapterCosts(p.id).length;
-                          return n
-                            ? `<span class="pill y">${n}</span>`
-                            : '<span class="pill g">0</span>';
-                        },
-                      },
-                    ],
-                onRowClick: (id) => {
-                  setProject(id);
-                  centreOpen("economics", id);
+              },
+              {
+                label: "Sin repartir",
+                html: (p) => {
+                  const n = erp.unassignedChapterCosts(p.id).length;
+                  return n ? `<span class="pill y">${n}</span>` : '<span class="pill g">0</span>';
                 },
-              }),
-            renderPanel: (panel, id) => economicsPanel(panel, id),
+              },
+            ],
+            // `setProject` renders on its own, so the flag is set FIRST — same
+            // order PK4-A established, for the same reason.
+            onRowClick: (id) => {
+              ecoFull = true;
+              setProject(id);
+            },
           });
         },
 
@@ -16567,34 +16449,20 @@
             }, "Ajuste retirado");
       }
 
-      /* ================= PRY-01/PRY-02 · the centre panel's contents (S8) =======
-   One header for both screens, because the doc gives them the same one and
-   because a job that reads differently depending on which of two adjacent
-   screens you opened it from is a job somebody will mis-read once. */
-      let ganttFull = false;
-
-      /** The fixed 88 header: code, client, address, total progress, three dates. */
-      function projectPanelHead(p) {
-        const e = erp.projectEconomics(p.id);
-        const addr = (erp.state.properties.find((x) => x.id === p.propertyId) || {}).street || "";
-        const d = p.dates || {};
-        return `<div class="ctrhd">
-    <div class="who">
-      <b>${esc(p.code)}</b>
-      <span>${esc(erp.party(p.partyId).name)}${addr ? " · " + esc(addr) : ""}</span>
-      <div class="bar" style="margin-top:6px"><i style="width:${e.progressPct}%"></i></div>
-    </div>
-    <div class="dates">
-      <div><span>Inicio</span> <b>${d.start ? fmtD(d.start) : "—"}</b></div>
-      <div><span>Fin comprometido</span> <b>${d.targetEnd ? fmtD(d.targetEnd) : "—"}</b></div>
-      <div><span>Fin real</span> <b>${d.actualEnd ? fmtD(d.actualEnd) : "—"}</b></div>
-    </div>
-    <button class="btn sm" data-ctrclose="1" title="Cerrar">✕</button>
-   </div>`;
-      }
+      /* ================= PRY-01/PRY-02 · the two jobs' full-screen surfaces =====
+   Both used to share `projectPanelHead` — one header, because a job that
+   read differently depending on which of two adjacent screens you opened it
+   from was a job somebody would mis-read once. PK4-A retired that header for
+   PRY-01 when its screen stopped being a 780px panel; PK4-B does the same for
+   PRY-02, for the identical reason: the project bar (`renderProjectBar`) or
+   the panel's own KPI cards already carry every figure the shared header
+   repeated (venta, coste, margen), so full screen removed the duplication a
+   fixed 88px header existed to state. */
+      let ganttFull = false,
+        ecoFull = false;
 
       /** PRY-02's panel: three cards, the per-capítulo table, what is unassigned. */
-      function economicsPanel(panel, id) {
+      function economicsPanel(body, id) {
         const p = erp.project(id);
         const e = erp.projectEconomics(id);
         const f =
@@ -16614,8 +16482,7 @@
           : 0;
         const SRC = { bill: "Factura", labour: "Horas", capture: "Documento" };
 
-        panel.innerHTML = `${projectPanelHead(p)}
-   <div class="ctrbody">
+        body.innerHTML = `
     <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
       <div class="kpi"><div class="lab">Venta</div><div class="val">${eur0(e.currentRevenueCents)}</div>
         <div class="sub"><span>contratada más extras aprobados</span></div></div>
@@ -16677,11 +16544,9 @@
      </tbody></table></div>`
          : '<div class="daylist"><div class="it">Todo el coste de esta obra tiene capítulo. La tabla de arriba cuadra con el proyecto.</div></div>'
      }
-    </div>
-   </div>`;
+    </div>`;
 
-        panel.querySelector("[data-ctrclose]").onclick = () => centreClose("economics");
-        panel.querySelectorAll("[data-assign]").forEach(
+        body.querySelectorAll("[data-assign]").forEach(
           (b) =>
             (b.onclick = () =>
               assignChapterDrawer(
@@ -16694,7 +16559,7 @@
         // reason ("the tiler quoted a fixed price, stop extrapolating") and this is
         // its only interface — dropping it would un-cover it, which is the mistake
         // S1b named when the subcontract screens went.
-        panel
+        body
           .querySelectorAll("[data-adj]")
           .forEach(
             (b) =>
@@ -16706,6 +16571,27 @@
                   f && f.byChapter.find((c) => String(c.chapter) === String(b.dataset.adj)),
                 )),
           );
+      }
+
+      /** The full-screen shell for a job's Avance económico — PK4-B's mirror of
+    `ganttScreen`. Same wrapper (`.pb`/`.pbbar`), same labelled way back. */
+      function economicsScreen(v) {
+        document.body.classList.add("fs");
+        const p = erp.project(gProject);
+        v.innerHTML = `<div class="pb">
+    <div class="pbbar">
+      <button class="btn sm" id="ecoBack" title="Volver a la lista de obras">← Obras</button>
+      <div class="who"><b>${esc(p.code)}</b><span>${esc(erp.party(p.partyId).name)}</span></div>
+      <span style="flex:1"></span>
+      <div class="acts"><span class="tag">Avance económico</span></div>
+    </div>
+    <div id="ecoBody" class="ctrbody" style="flex:1;min-height:0;overflow:auto"></div>
+   </div>`;
+        $("#ecoBack").onclick = () => {
+          ecoFull = false;
+          render();
+        };
+        economicsPanel($("#ecoBody"), gProject);
       }
 
       /* The 480 panel §3.2 calls "the only place cost is split by capítulo", and it

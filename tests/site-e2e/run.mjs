@@ -2046,12 +2046,12 @@ async function testProjectTracking(browser, base) {
     await bootedShell(pg);
     await pg.waitForTimeout(900);
 
-    // ---- PK4-A: PRY-01 is two screens, and has no project bar ----
-    // The bar chose a job above a list that already offers the same choice, and
-    // the panel between the list and the chart existed to state three figures
-    // the chart's own toolbar already shows. Both are gone; the other four
-    // project screens keep the bar, because each is a single screen that has to
-    // be told which job it is about.
+    // ---- PK4-A/PK4-B: PRY-01 and PRY-02 are two screens each, no bar ----
+    // The bar chose a job above a list that already offers the same choice,
+    // and the panel/full-screen surface behind it already carries the figures
+    // the bar would repeat. Both project screens lost their bar for that
+    // reason; the other three keep it, because each is a single screen that
+    // has to be told which job it is about.
     const listScreen = await pg.evaluate(() => ({
       bar: document.querySelectorAll(".projbar").length,
       centre: document.querySelectorAll("#view .ctr").length,
@@ -2063,6 +2063,20 @@ async function testProjectTracking(browser, base) {
 
     await pg.evaluate(() => (location.hash = "economics"));
     await pg.waitForTimeout(600);
+    const ecoListScreen = await pg.evaluate(() => ({
+      bar: document.querySelectorAll(".projbar").length,
+      ctrpanel: document.querySelectorAll(".ctrpanel").length,
+      list: !!document.querySelector("#ecoQ"),
+    }));
+    if (ecoListScreen.bar === 0 && ecoListScreen.ctrpanel === 0 && ecoListScreen.list)
+      ok("PRY-02: the list stands alone too — no PROYECTO bar, no centre panel");
+    else bad("PRY-02: list screen", JSON.stringify(ecoListScreen));
+
+    // The bar itself is checked on a screen that still has one — variations,
+    // purchasing and labour keep it, each being a single screen that needs to
+    // be told which job it is about.
+    await pg.evaluate(() => (location.hash = "variations"));
+    await pg.waitForTimeout(600);
     const fields = await pg.locator(".projbar .phead .f").count();
     const headText = await pg.locator(".projbar .phead").innerText();
     if (
@@ -2071,11 +2085,11 @@ async function testProjectTracking(browser, base) {
       /Avance/i.test(headText) &&
       /Margen actual/i.test(headText)
     )
-      ok(`project header: ${fields} fields incl. customer, progress and margin (PRY-02)`);
+      ok(`project header: ${fields} fields incl. customer, progress and margin (PRY-03)`);
     else bad("project header", headText.replace(/\n/g, " ").slice(0, 100));
     if ((await pg.locator("[data-recent]").count()) === 0)
-      ok("PRY-01: the «Recientes» chips are gone from the shared project bar");
-    else bad("PRY-01: Recientes dropped", "chips still rendered");
+      ok("PRY-01/02: the «Recientes» chips are gone from the shared project bar");
+    else bad("Recientes dropped", "chips still rendered");
 
     // Opening a job IS opening its chart — the four things the operator asked
     // to land on, in one screen, with a labelled way back.
@@ -2175,56 +2189,54 @@ async function testProjectTracking(browser, base) {
     if (await pg.locator("#drawer.on").count()) await pg.locator("#dClose").click();
 
     // The context must survive a change of subsection — that is what makes it
-    // a section context rather than one screen's dropdown. PK4-A: PRY-01 has no
-    // dropdown to read any more, so the job opened THERE is the reading, and
-    // the bar on the next screen is what has to agree with it.
+    // a section context rather than one screen's dropdown. PK4-A/PK4-B:
+    // neither PRY-01 nor PRY-02 has a dropdown to read any more, so the job
+    // opened on PRY-01 is the reading, and PRY-03 — which still has a bar —
+    // is what has to agree with it.
     const chosen = await pg.evaluate(() => gProject);
     if (await pg.locator("#gBack").count()) {
       await pg.locator("#gBack").click();
       await pg.waitForTimeout(500);
     }
-    await pg.evaluate(() => (location.hash = "economics"));
+    await pg.evaluate(() => (location.hash = "variations"));
     await pg.waitForTimeout(600);
     const stillChosen = await pg.locator("#psel").inputValue();
     if (stillChosen === chosen)
-      ok("project context survives a subsection change (opened on PRY-01, selected on PRY-02)");
+      ok("project context survives a subsection change (opened on PRY-01, selected on PRY-03)");
     else bad("project context persists", `${chosen} → ${stillChosen}`);
 
-    // ---- PRY-02 (S8): the centre panel, and the money that stopped here ----
-    const compressed = await pg.evaluate(() => {
-      const el = document.querySelector("#view .ctr");
-      return { present: !!el, open: el ? el.classList.contains("on") : false };
-    });
-    if (compressed.present && !compressed.open)
-      ok("PRY-02: the list opens wide, with no panel beside it");
-    else bad("PRY-02: list before opening", JSON.stringify(compressed));
+    // ---- PRY-02 (S8 · PK4-B): the job's own full-screen surface ----
+    await pg.evaluate(() => (location.hash = "economics"));
+    await pg.waitForTimeout(600);
+    const beforeOpen = await pg.evaluate(() => ({
+      fs: document.body.classList.contains("fs"),
+      list: !!document.querySelector("#ecoQ"),
+    }));
+    if (!beforeOpen.fs && beforeOpen.list) ok("PRY-02: the register shows first, not the panel");
+    else bad("PRY-02: list before opening", JSON.stringify(beforeOpen));
 
-    const listColsWide = await pg.locator("#view table.mlist thead th").count();
     await openJobWithChapters(pg, "ecoQ");
-    const opened = await pg.evaluate(() => {
-      const el = document.querySelector("#view .ctr");
-      return {
-        open: el ? el.classList.contains("on") : false,
-        cols: getComputedStyle(el).gridTemplateColumns,
-        listStillThere: !!document.querySelector("#view .ctrlist table.mlist"),
-        headerHeight: Math.round(
-          document.querySelector("#view .ctrhd").getBoundingClientRect().height,
-        ),
-        cards: document.querySelectorAll("#view .ctrpanel .kpi").length,
-      };
-    });
-    const listColsNarrow = await pg.locator("#view table.mlist thead th").count();
+    const opened = await pg.evaluate(() => ({
+      fs: document.body.classList.contains("fs"),
+      back: (document.querySelector("#ecoBack") || {}).textContent?.trim(),
+      list: !!document.querySelector("#ecoQ"),
+      panel: document.querySelectorAll(".ctrpanel").length,
+      cards: document.querySelectorAll("#view .kpi").length,
+    }));
+    // PK4-B mirrors PK4-A: a row opens the job's own full screen directly —
+    // no 372/780 split, no panel, no list left compressed beside it — and a
+    // labelled button is the way back.
     if (
-      opened.open &&
-      opened.listStillThere &&
-      opened.headerHeight === 88 &&
-      opened.cards === 3 &&
-      listColsNarrow < listColsWide
+      opened.fs &&
+      /Obras/.test(opened.back || "") &&
+      !opened.list &&
+      !opened.panel &&
+      opened.cards === 3
     )
-      ok(`PRY-02: 372 list + 780 panel, list never disappears (${opened.cols})`);
-    else bad("PRY-02: centre panel", JSON.stringify({ ...opened, listColsWide, listColsNarrow }));
+      ok("PRY-02: a row opens the job's own full screen — KPI cards, no panel, no list beside it");
+    else bad("PRY-02: full-screen surface", JSON.stringify(opened));
 
-    const panelText = await pg.locator("#view .ctrpanel").innerText();
+    const panelText = await pg.locator("#ecoBody").innerText();
     const hasCols = ["Presupuestado", "Acumulado", "Desviación", "Margen"].every((c) =>
       new RegExp(c, "i").test(panelText),
     );
@@ -2252,7 +2264,7 @@ async function testProjectTracking(browser, base) {
     });
     await pg.evaluate(() => render());
     await pg.waitForTimeout(500);
-    const pendingText = await pg.locator("#view .ctrpanel").innerText();
+    const pendingText = await pg.locator("#ecoBody").innerText();
     if (seeded.chapters < seeded.project && /sin repartir/i.test(pendingText))
       ok("PRY-02: a cost with no chapter is in the project and in no chapter, and says so");
     else
@@ -2342,15 +2354,14 @@ async function testProjectTracking(browser, base) {
       ok("economics: an adjustment is recorded against the chapter");
     else bad("economics: adjustment recorded", adjusted.replace(/\n/g, " ").slice(0, 160));
 
-    // Closing the panel gives the list its width back — the doc's own rule.
-    await pg.locator("#view [data-ctrclose]").click();
-    await pg.waitForTimeout(400);
+    // ← Obras returns to the register, same as PRY-01's own back button.
+    await pg.locator("#ecoBack").click();
+    await pg.waitForTimeout(500);
     const closed = await pg.evaluate(() => ({
-      open: document.querySelector("#view .ctr").classList.contains("on"),
-      cols: document.querySelectorAll("#view table.mlist thead th").length,
+      fs: document.body.classList.contains("fs"),
+      list: !!document.querySelector("#ecoQ"),
     }));
-    if (!closed.open && closed.cols === listColsWide)
-      ok("PRY-02: closing the panel restores the list to its full width");
+    if (!closed.fs && closed.list) ok("PRY-02: «← Obras» returns to the register");
     else bad("PRY-02: list restored", JSON.stringify(closed));
 
     // ---- derive the plan from the budget ----
@@ -2563,26 +2574,22 @@ async function testProjectTracking(browser, base) {
       await pg.waitForTimeout(500);
     }
 
-    // The economics must move with the progress just recorded — the two screens
-    // are two views of one set of figures, not two sets. Since S8 both run on
-    // the centre panel, so the check opens the job rather than reading a flat
-    // table: the figure it compares is the progress bar in PRY-02's header
-    // against the number PRY-01 wrote.
+    // PK4-B: economics' own shared header — the one that used to repeat
+    // PRY-01's progress bar inside PRY-02's panel — is gone, along with the
+    // duplication it existed to name. What survives to check is that the
+    // panel still opens cleanly on the SAME job right after progress was
+    // recorded elsewhere, with its chapter rows intact.
     await pg.evaluate(() => (location.hash = "economics"));
     await pg.waitForTimeout(600);
     await openJobWithChapters(pg, "ecoQ");
-    const after = await pg.evaluate(() => {
-      const bar = document.querySelector("#view .ctrhd .bar i");
-      const panel = document.querySelector("#view .ctrpanel");
-      return {
-        pct: erp.projectEconomics(gProject).progressPct,
-        barWidth: bar ? bar.style.width : null,
-        chapterRows: document.querySelectorAll("#view .ctrpanel tbody tr").length,
-        hasPct: panel ? /%/.test(panel.innerText) : false,
-      };
-    });
-    if (after.chapterRows > 0 && after.hasPct && after.barWidth === `${after.pct}%`)
-      ok(`economics: one progress figure drives both PRY screens (${after.barWidth})`);
+    const after = await pg.evaluate(() => ({
+      pct: erp.projectEconomics(gProject).progressPct,
+      chapterRows: document.querySelectorAll("#ecoBody tbody tr").length,
+    }));
+    if (after.chapterRows > 0)
+      ok(
+        `economics: the panel opens on the same job after progress was recorded (${after.pct}% avance)`,
+      );
     else bad("economics after progress", JSON.stringify(after));
 
     if (errs.length === 0) ok("tracking: no console errors");
