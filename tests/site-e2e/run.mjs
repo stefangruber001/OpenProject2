@@ -265,8 +265,9 @@ async function openGantt(pg, base) {
     await pg.waitForTimeout(300);
   }
   await openJobWithChapters(pg, "prgQ");
-  await pg.locator('[data-ptab="plan"]').click();
-  await pg.waitForTimeout(400);
+  // PK3-C: the panel no longer has a tab strip to click through — Avance and
+  // Ficha are gone, and Programación is all that is left, so it renders
+  // straight into the panel body.
   await pg.locator("#pnlGantt").click();
   await pg.waitForTimeout(700);
 }
@@ -1122,9 +1123,13 @@ async function testGantt(browser, base) {
   try {
     await openGantt(pg, base);
 
-    // Empty plan → derive it from the project's accepted budget.
+    // Empty plan → derive it from the project's accepted budget. Over a plan
+    // that already exists the derivation asks first (PK3-C); say yes.
     if (await pg.locator("#gDerive").count()) {
       await pg.locator("#gDerive").click();
+      await pg.waitForTimeout(500);
+      const confirm = pg.getByRole("button", { name: /Volver a derivar/ });
+      if (await confirm.count()) await confirm.click();
       await pg.waitForTimeout(700);
     }
     const bars = await pg.locator("#gSvg .gbar").count();
@@ -2051,6 +2056,14 @@ async function testProjectTracking(browser, base) {
     await pg.waitForTimeout(900);
 
     // ---- the persistent selector and its fixed header ----
+    // Package 3 slide 1: PRY-01 drops the summary strip, because its own panel
+    // header repeats every field on it. Every other project screen keeps it, so
+    // the check moves to one of those rather than disappearing.
+    if ((await pg.locator(".projbar .phead").count()) === 0)
+      ok("PRY-01: the project summary strip is not repeated above the panel that carries it");
+    else bad("PRY-01: summary strip dropped", "still rendered on #progress");
+    await pg.evaluate(() => (location.hash = "economics"));
+    await pg.waitForTimeout(600);
     const fields = await pg.locator(".projbar .phead .f").count();
     const headText = await pg.locator(".projbar .phead").innerText();
     if (
@@ -2059,87 +2072,56 @@ async function testProjectTracking(browser, base) {
       /Avance/i.test(headText) &&
       /Margen actual/i.test(headText)
     )
-      ok(`project header: ${fields} fields incl. customer, progress and margin`);
+      ok(`project header: ${fields} fields incl. customer, progress and margin (PRY-02)`);
     else bad("project header", headText.replace(/\n/g, " ").slice(0, 100));
+    if ((await pg.locator("[data-recent]").count()) === 0)
+      ok("PRY-01: the «Recientes» chips are gone from the shared project bar");
+    else bad("PRY-01: Recientes dropped", "chips still rendered");
 
-    // ---- PRY-01 (S8): the panel, the three-state control, item 14 ----
+    // ---- PRY-01 (S8 · PK3-C): the panel, and the list it now hides ----
+    await pg.evaluate(() => (location.hash = "progress"));
+    await pg.waitForTimeout(700);
     await openJobWithChapters(pg, "prgQ");
-    const tabs = await pg.locator("#view .ctrpanel [data-ptab]").allInnerTexts();
-    if (
-      tabs.length === 3 &&
-      /Avance/i.test(tabs[0]) &&
-      /Programaci/i.test(tabs[1]) &&
-      /Ficha/i.test(tabs[2])
-    )
-      ok("PRY-01: the panel carries Avance · Programación · Ficha");
-    else bad("PRY-01: panel tabs", tabs.join("/"));
+    const panel = await pg.evaluate(() => ({
+      tabs: document.querySelectorAll("#view .ctrpanel [data-ptab]").length,
+      list: document.querySelectorAll("#view .ctrlist").length,
+      solo: !!document.querySelector("#view .ctr.solo"),
+      gantt: !!document.querySelector("#pnlGantt"),
+    }));
+    // Package 3 slides 2 and 3: Avance and Ficha are gone, so the strip that
+    // chose between three tabs goes with them; and the open job gets the
+    // screen to itself, which is the one place §3.2's "the list never
+    // disappears" is deliberately overridden.
+    if (panel.tabs === 0 && panel.list === 0 && panel.solo && panel.gantt)
+      ok("PRY-01: one panel, no tab strip, and the list steps aside for the open job");
+    else bad("PRY-01: panel shape", JSON.stringify(panel));
 
-    const control = await pg.evaluate(() => {
-      const strip = document.querySelector("#view .pstate");
-      if (!strip) return null;
-      const box = document.querySelector("#view .pctbox");
-      return {
-        buttons: strip.querySelectorAll("button").length,
-        buttonWidth: Math.round(strip.querySelector("button").getBoundingClientRect().width),
-        boxWidth: box ? Math.round(box.getBoundingClientRect().width) : 0,
-        boxDisabled: box ? box.disabled : null,
-        state: (strip.querySelector("button.on") || {}).dataset?.st,
-      };
-    });
-    if (
-      control &&
-      control.buttons === 3 &&
-      control.buttonWidth === 90 &&
-      control.boxWidth === 60 &&
-      control.boxDisabled === (control.state !== "inProgress")
-    )
-      ok(
-        `PRY-01: three 90 px states and a 60 px box, live only on «en ejecución» (${control.state})`,
-      );
-    else bad("PRY-01: three-state control", JSON.stringify(control));
-
-    // Press «En ejecución»: the state moves AND the box comes alive, which is
-    // the half of §3.2 that a screenshot cannot show.
-    await pg.locator('#view .pstate button[data-st="inProgress"]').first().click();
+    await pg.locator("#view [data-ctrclose]").click();
     await pg.waitForTimeout(500);
-    const live = await pg.evaluate(() => {
-      const strip = document.querySelector("#view .pstate");
-      const box = document.querySelector("#view .pctbox");
-      return { on: (strip.querySelector("button.on") || {}).dataset?.st, disabled: box.disabled };
-    });
-    if (live.on === "inProgress" && live.disabled === false)
-      ok("PRY-01: choosing «en ejecución» is what makes the percentage editable");
-    else bad("PRY-01: percentage becomes live", JSON.stringify(live));
-
-    await pg.locator('#view .pstate button[data-st="done"]').first().click();
-    await pg.waitForTimeout(500);
-    const finished = await pg.evaluate(() => {
-      const box = document.querySelector("#view .pctbox");
-      return { value: box.value, disabled: box.disabled };
-    });
-    if (finished.value === "100" && finished.disabled === true)
-      ok("PRY-01: a finished chapter reads 100 and stops accepting a percentage");
-    else bad("PRY-01: finished chapter", JSON.stringify(finished));
+    if ((await pg.locator("#view .ctrlist").count()) === 1)
+      ok("PRY-01: closing the job brings the list straight back");
+    else bad("PRY-01: list returns on close", "no list after ✕");
 
     // Money-chain item 14. The doc asks whether moving a milestone moves the
-    // expected cash; before this session nothing wrote installment.expectedDate
-    // after the contract was drawn up, so the answer was no.
-    await pg.locator('#view [data-ptab="plan"]').click();
-    await pg.waitForTimeout(400);
-    if ((await pg.locator("#gDerive").count()) === 0) {
-      // The plan has to exist before it can move anything.
-      await pg.locator("#pnlGantt").click();
-      await pg.waitForTimeout(700);
-      if (await pg.locator("#gDerive").count()) {
-        await pg.locator("#gDerive").click();
-        await pg.waitForTimeout(900);
-      }
-      await pg.locator("#gBack").click();
+    // expected cash; before S8 nothing wrote installment.expectedDate after the
+    // contract was drawn up, so the answer was no. «Recalcular los cobros
+    // previstos» moved onto the Gantt in PK3-C — moving a milestone is a thing
+    // done TO the plan, and the plan is there.
+    await openJobWithChapters(pg, "prgQ");
+    await pg.locator("#pnlGantt").click();
+    await pg.waitForTimeout(800);
+    if (await pg.locator("#gDerive").count()) {
+      const had = await pg.evaluate(() => {
+        const B = ganttApi();
+        return B ? B.get(erp.state, gProject).tasks.length : 0;
+      });
+      await pg.locator("#gDerive").click();
       await pg.waitForTimeout(500);
-      await pg.locator('#view [data-ptab="plan"]').click();
-      await pg.waitForTimeout(400);
+      // With a plan already in place the re-derivation asks first (PK3-C).
+      if (had) await pg.getByRole("button", { name: /Volver a derivar/ }).click();
+      await pg.waitForTimeout(1000);
     }
-    await pg.locator("#pnlResched").click();
+    await pg.locator("#gResched").click();
     await pg.waitForTimeout(500);
     const reschedule = await pg.evaluate(() => {
       const rows = [...document.querySelectorAll("#drawer tbody tr")].map((r) => r.innerText);
@@ -2186,6 +2168,12 @@ async function testProjectTracking(browser, base) {
     }
     await pg.waitForTimeout(300);
     if (await pg.locator("#drawer.on").count()) await pg.locator("#dClose").click();
+    // Back out of the full-screen chart before reading the shell's own bar.
+    await pg.waitForTimeout(300);
+    if (await pg.locator("#gBack").count()) {
+      await pg.locator("#gBack").click();
+      await pg.waitForTimeout(500);
+    }
 
     // The context must survive a change of subsection — that is what makes it
     // a section context rather than one screen's dropdown.
@@ -2361,7 +2349,26 @@ async function testProjectTracking(browser, base) {
 
     // ---- derive the plan from the budget ----
     await openGantt(pg, base);
+    // Package 3 slide 3: re-deriving is not additive — tasks and milestones
+    // added by hand, and dependencies drawn on the chart, do not survive it —
+    // so over an existing plan it asks first. Into an empty one it just runs.
+    const planBefore = await pg.evaluate(() => {
+      const B = ganttApi();
+      return B ? B.get(erp.state, gProject).tasks.length : 0;
+    });
     await pg.locator("#gDerive").click();
+    await pg.waitForTimeout(500);
+    const guardAsked = await pg.evaluate(() =>
+      /Volver a derivar la planificaci/i.test(document.body.innerText),
+    );
+    if (guardAsked === planBefore > 0)
+      ok(
+        planBefore
+          ? "tracking: re-deriving over an existing plan asks before discarding hand-made work"
+          : "tracking: deriving into an empty plan runs without a question nobody needs",
+      );
+    else bad("tracking: derive guard", `tasksBefore=${planBefore} asked=${guardAsked}`);
+    if (guardAsked) await pg.getByRole("button", { name: /Volver a derivar/ }).click();
     await pg.waitForTimeout(900);
     const bars = await pg.locator("#gSvg .gbar").count();
     const deriveToast = await pg.locator("#toast").innerText();
@@ -2380,8 +2387,10 @@ async function testProjectTracking(browser, base) {
     else bad("tracking: derived durations", `all bars ${widths[0]}px wide`);
 
     // Progress already recorded against the budget shows on the fresh bars.
+    // PK3-C: the chapter figure is now the box beside the three-state control
+    // (`data-pct`), not a bare numeric cell in a table.
     const chapterPcts = await pg
-      .locator("[data-chap]")
+      .locator("#progCtl [data-pct]")
       .evaluateAll((els) => els.map((e) => Number(e.value)));
     if (chapterPcts.some((p) => p > 0))
       ok(`tracking: recorded progress carried onto the derived bars (${chapterPcts.join("/")})`);
@@ -2394,18 +2403,108 @@ async function testProjectTracking(browser, base) {
       ok("tracking: S curve draws planned, actual and projected");
     else bad("tracking: S curve", `paths=${paths} tags=${curveTag.join(" | ").slice(0, 80)}`);
 
-    // ---- progress by executed quantity ----
-    const qty = pg.locator("[data-lineqty]").first();
-    const total = Number(await qty.getAttribute("data-total"));
-    const pctInput = pg.locator("[data-line]").first();
-    await qty.fill(String(total / 2));
-    await qty.press("Enter");
-    await pg.waitForTimeout(600);
-    const readBack = Number(await pctInput.inputValue());
-    // Half the quantity is half the line; the engine converts, not the view.
-    if (Math.abs(readBack - 50) <= 1)
-      ok(`tracking: progress entered as a quantity becomes ${readBack}%`);
-    else bad("tracking: quantity → percentage", `${total}/2 read back as ${readBack}%`);
+    // ---- the one progress control (Package 3 slide 3) ----------------------
+    // Two controls used to record the same fact: this grid, and PRY-01's
+    // «Avance» tab, which wrote only through markProgress and so never reached
+    // the chart. They are one control now — the structure from here, the
+    // three-state buttons and live-only-in-the-middle box from there, and no
+    // quantity column at all, which the operator asked for and which costs the
+    // record nothing since the engine never stored a quantity anyway.
+    const shape = await pg.evaluate(() => {
+      const host = document.querySelector("#progCtl");
+      if (!host) return null;
+      const strip = host.querySelector(".provrow.chap .pstate");
+      const box = host.querySelector(".provrow.chap .pctbox");
+      return {
+        chapters: host.querySelectorAll(".provrow.chap").length,
+        lines: host.querySelectorAll(".provrow.sub").length,
+        tables: host.querySelectorAll("table").length,
+        quantityInputs: document.querySelectorAll("[data-lineqty]").length,
+        buttons: strip ? strip.querySelectorAll("button").length : 0,
+        buttonWidth: strip
+          ? Math.round(strip.querySelector("button").getBoundingClientRect().width)
+          : 0,
+        boxWidth: box ? Math.round(box.getBoundingClientRect().width) : 0,
+        boxDisabled: box ? box.disabled : null,
+        state: strip ? (strip.querySelector("button.on") || {}).dataset?.st : null,
+        lineControls: host.querySelectorAll(".provrow.sub .pstate").length,
+      };
+    });
+    if (
+      shape &&
+      shape.chapters > 0 &&
+      shape.lines > 0 &&
+      shape.lineControls === shape.lines &&
+      shape.tables === 0 &&
+      shape.quantityInputs === 0 &&
+      shape.buttons === 3 &&
+      shape.buttonWidth === 90 &&
+      shape.boxWidth === 60 &&
+      shape.boxDisabled === (shape.state !== "inProgress")
+    )
+      ok(
+        `PRY-01: one control — ${shape.chapters} chapters and ${shape.lines} partidas as flex rows, three 90 px states and a 60 px box, no quantity column`,
+      );
+    else bad("PRY-01: merged progress control", JSON.stringify(shape));
+
+    // The half a screenshot cannot show: a state button writes the ENGINE and
+    // the PLAN's own bar in one action. That is the whole reason this is the
+    // control that survived — the tab it replaced moved one and not the other.
+    const chapNum = await pg.evaluate(
+      () => document.querySelector("#progCtl .provrow.chap .pstate").dataset.chap,
+    );
+    await pg
+      .locator(`#progCtl .pstate[data-chap="${chapNum}"] button[data-st="inProgress"]`)
+      .click();
+    await pg.waitForTimeout(700);
+    const synced = await pg.evaluate((num) => {
+      const B = ganttApi();
+      const task = B.get(erp.state, gProject).tasks.find((t) => t.sourceRef === "group:" + num);
+      const eng = erp.chapterProgress(gProject).find((c) => c.num === num);
+      const box = document.querySelector(`#progCtl [data-pct="${num}"]`);
+      return {
+        taskPct: task ? task.progressPct : null,
+        enginePct: eng ? eng.progressPct : null,
+        boxLive: box ? !box.disabled : null,
+      };
+    }, chapNum);
+    if (synced.taskPct != null && synced.taskPct === synced.enginePct && synced.boxLive)
+      ok(
+        `PRY-01: «en ejecución» moves the chapter and its bar together (${synced.enginePct}%) and makes the box live`,
+      );
+    else bad("PRY-01: chapter write reaches both records", JSON.stringify(synced));
+
+    // A partida takes a percentage — the only input it takes now — and the
+    // engine derives its state from that figure rather than being told one.
+    const lineId = await pg.evaluate(
+      () => document.querySelector("#progCtl .provrow.sub .pstate").dataset.line,
+    );
+    await pg.fill(`#progCtl [data-lpct="${lineId}"]`, "40");
+    await pg.locator(`#progCtl [data-lpct="${lineId}"]`).press("Enter");
+    await pg.waitForTimeout(700);
+    const lineWrote = await pg.evaluate((id) => {
+      let found = null;
+      erp.state.budgets.forEach((b) =>
+        b.versions.forEach((v) =>
+          v.chapters.forEach((c) => c.lines.forEach((l) => (l.id === id ? (found = l) : 0))),
+        ),
+      );
+      return found ? { pct: found.progressPct, state: found.progress } : null;
+    }, lineId);
+    if (lineWrote && lineWrote.pct === 40 && lineWrote.state === "inProgress")
+      ok("PRY-01: a partida percentage is stored and its state derived from it");
+    else bad("PRY-01: partida percentage", JSON.stringify(lineWrote));
+
+    // «Terminado» is 100 by definition, and the box stops taking a figure.
+    await pg.locator(`#progCtl .pstate[data-chap="${chapNum}"] button[data-st="done"]`).click();
+    await pg.waitForTimeout(700);
+    const finished = await pg.evaluate((num) => {
+      const box = document.querySelector(`#progCtl [data-pct="${num}"]`);
+      return box ? { value: box.value, disabled: box.disabled } : null;
+    }, chapNum);
+    if (finished && finished.value === "100" && finished.disabled === true)
+      ok("PRY-01: a finished chapter reads 100 and stops accepting a percentage");
+    else bad("PRY-01: finished chapter", JSON.stringify(finished));
 
     // ---- the deviations panel ----
     const dev = await pg.locator(".bside").innerText();
@@ -6035,15 +6134,23 @@ async function testI18n(browser, base) {
     await pg.evaluate(() => (location.hash = "progress"));
     await pg.waitForTimeout(700);
     await openJobWithChapters(pg, "prgQ");
+    // PK3-C: the panel is Programación alone, and the three-state control now
+    // lives on the Gantt, so the control is checked where it actually is.
+    await pg.locator("#pnlGantt").click();
+    await pg.waitForTimeout(900);
     const pryCaText = await pg.locator("#view").innerText();
     if (
-      /Fitxa/i.test(pryCaText) &&
       /execuci/i.test(pryCaText) &&
+      /Sense començar/i.test(pryCaText) &&
       !/En ejecución/.test(pryCaText) &&
-      !/Fin comprometido/.test(pryCaText)
+      !/Sin empezar/.test(pryCaText)
     )
       ok("i18n: CA translates the PRY-01 panel and its three-state control");
     else bad("i18n: CA PRY-01", pryCaText.replace(/\n/g, " ").slice(0, 160));
+    if (await pg.locator("#gBack").count()) {
+      await pg.locator("#gBack").click();
+      await pg.waitForTimeout(500);
+    }
 
     await pg.evaluate(() => (location.hash = "economics"));
     await pg.waitForTimeout(700);
@@ -6210,14 +6317,22 @@ async function testI18n(browser, base) {
     await pg.evaluate(() => (location.hash = "progress"));
     await pg.waitForTimeout(700);
     await openJobWithChapters(pg, "prgQ");
+    // PK3-C: as in Catalan above, the control is on the Gantt now.
+    await pg.locator("#pnlGantt").click();
+    await pg.waitForTimeout(900);
     const pryEnText = await pg.locator("#view").innerText();
     if (
-      /Details/i.test(pryEnText) &&
       /In progress/i.test(pryEnText) &&
-      !/Fin comprometido/.test(pryEnText)
+      /Not started/i.test(pryEnText) &&
+      !/En ejecución/.test(pryEnText) &&
+      !/Sin empezar/.test(pryEnText)
     )
       ok("i18n: EN translates the PRY-01 panel and its three-state control");
     else bad("i18n: EN PRY-01", pryEnText.replace(/\n/g, " ").slice(0, 160));
+    if (await pg.locator("#gBack").count()) {
+      await pg.locator("#gBack").click();
+      await pg.waitForTimeout(500);
+    }
 
     await pg.evaluate(() => (location.hash = "economics"));
     await pg.waitForTimeout(700);

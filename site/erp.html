@@ -2793,6 +2793,15 @@
       .ctr.on {
         grid-template-columns: 372px minmax(0, 780px);
       }
+      /* Package 3 slide 2: PRY-01 only. §3.2 says the list never disappears,
+     and everywhere else it does not — but the operator asked for the open
+     job to have the screen to itself here, and PRY-01 is the one screen
+     where the panel is a working surface rather than a record to read.
+     Switching job stays one click away in the project bar above, and ✕ on
+     the panel header brings the list straight back. */
+      .ctr.on.solo {
+        grid-template-columns: minmax(0, 1fr);
+      }
       .ctrlist {
         min-width: 0;
       }
@@ -2912,6 +2921,31 @@
         white-space: nowrap;
         font-size: 13px;
       }
+      /* Package 3 slide 3: the same row, one level down. A partida is indented
+     under the chapter it belongs to and set slightly quieter, so the two read
+     as a tree without needing a <table> to draw one — which is the whole
+     point, since a table forces a phone into horizontal scrolling and a flex
+     row does not. */
+      .provrow.chap .nm {
+        font-weight: 600;
+      }
+      .provrow.sub {
+        height: 40px;
+        padding-left: 22px;
+      }
+      .provrow.sub .nm {
+        font-size: 12.5px;
+        color: var(--body);
+      }
+      .provrow .ud,
+      .provrow .gdates {
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 11.5px;
+      }
+      .provrow .gdates {
+        white-space: nowrap;
+      }
       @media (max-width: 860px) {
         .ctr.on {
           grid-template-columns: minmax(0, 1fr);
@@ -2929,6 +2963,11 @@
         }
         .pstate button.on {
           display: block;
+        }
+        /* The planned dates are the first thing to go when the row is tight:
+       they are readable off the bar directly above. */
+        .provrow .gdates {
+          display: none;
         }
       }
 
@@ -5255,12 +5294,6 @@
           )
           .join("");
       }
-      const pillProg = (s) =>
-        s === "done"
-          ? '<span class="pill g">Hecho</span>'
-          : s === "inProgress"
-            ? '<span class="pill y">En curso</span>'
-            : '<span class="pill">Sin empezar</span>';
 
       /* =============================== Gantt (spec §3.3 · §4.3) ==========================
    THE CHART IS A VIEW AND NOTHING MORE. Every date, duration, float,
@@ -5759,8 +5792,31 @@
    durations were arrived at, because "5 tasks, 2 with no known daily output"
    is the difference between a plan and a guess, and the planner should be told
    which one they just got rather than having to infer it from bar widths. */
-      function deriveFromBudget(pid, cal) {
+      async function deriveFromBudget(pid, cal) {
         const B = ganttApi();
+        /* Package 3 slide 3: re-deriving is not additive, and the button read
+       as though it were. `mergeDerivedPlan` maps over the DERIVED tasks and
+       carries progress, status, pinned dates, baselines and the progress log
+       across for the ones that survive — but a task that the budget's work
+       breakdown does not regenerate is not in that list. That is every task
+       and milestone added by hand with ＋ Tarea or ◆ Hito, and every
+       dependency drawn on the chart, since the derived plan brings its own
+       links. The tooltip's "conservando el avance registrado" was true and
+       was being read as "conserving everything". */
+        const before = B ? B.get(erp.state, pid) : null;
+        if (before && before.tasks.length) {
+          const byHand = before.tasks.filter((t) => !/^group:/.test(t.sourceRef || "")).length;
+          const go = await askConfirm("¿Volver a derivar la planificación?", {
+            body:
+              "Se conservan el avance registrado, las líneas base congeladas y las fechas fijadas a mano." +
+              (byHand
+                ? ` Se pierden ${byHand === 1 ? "la tarea o hito añadido" : `las ${byHand} tareas o hitos añadidos`} a mano y las dependencias dibujadas sobre el gráfico.`
+                : " Se pierden las dependencias dibujadas a mano sobre el gráfico."),
+            okLabel: "Volver a derivar",
+            danger: true,
+          });
+          if (!go) return;
+        }
         let msg = "Planificación derivada del presupuesto";
         try {
           const derived = B.fromBudget(erp, pid, { calendar: cal });
@@ -5824,8 +5880,41 @@
   </svg>`;
       }
 
-      /** Chapters (the bars) and, under each, the budget lines they are made of. */
-      function progressTable(pid, plan) {
+      /* ================= The one progress control (Package 3 slide 3) =============
+   Two controls used to record the same fact. This screen had a grid of
+   chapters and their partidas that wrote through to the plan's own bars;
+   PRY-01's «Avance» tab had a three-state control that wrote only through
+   `markProgress`, so a percentage typed there never reached the chart, and a
+   job could read 40 % on one screen and 0 % on the other. The operator asked
+   for one control, usable on a desk and on a phone.
+
+   What each side contributed. From the grid: the chapter+partida structure
+   and — the part that matters — the write path, `recordProgress` for a
+   chapter with a bar and `syncProgress` after a partida, so the engine and
+   the plan always move together. From the tab: the three contiguous state
+   buttons and the percentage box that is live only in the middle state
+   (§3.2), including the mobile rule that collapses the strip to the single
+   button saying where the row is now, so one tap cycles.
+
+   What went. The quantity column — the operator asked for percentage only,
+   and it costs the record nothing: `markLineProgress` already converted a
+   quantity to a percentage and never stored the quantity, so there was never
+   a second figure to lose. And the <table>, which forced a phone into
+   sideways scrolling; `.provrow` is a flex row and does not. */
+      const PROG_STATES = [
+        ["notStarted", "Sin empezar"],
+        ["inProgress", "En ejecución"],
+        ["done", "Terminado"],
+      ];
+      const progStrip = (attr, id, state) =>
+        `<span class="pstate" data-${attr}="${esc(id)}">${PROG_STATES.map(
+          ([k, l]) => `<button data-st="${k}"${k === state ? ' class="on"' : ""}>${l}</button>`,
+        ).join("")}</span>`;
+      const progBox = (attr, id, state, pct) =>
+        `<input class="pctbox" type="number" min="0" max="100" step="1" data-${attr}="${esc(id)}"
+     value="${state === "done" ? 100 : Math.round(pct || 0)}"${state === "inProgress" ? "" : " disabled"}>`;
+
+      function progressControl(pid, plan) {
         let chapters = [];
         try {
           const p = erp.project(pid);
@@ -5840,97 +5929,129 @@
           const m = /^group:(.+)$/.exec(t.sourceRef || "");
           if (m) taskFor[m[1]] = t;
         });
+        // The chapter figure is asked of the engine rather than averaged here:
+        // `chapterProgress` weights each line by its value, and it is the same
+        // function `syncProgress` carries onto the bars and the S curve reads.
+        // Computing a second, simpler average in the view is how the box and
+        // the bar directly above it come to disagree.
+        const chapPct = {};
+        try {
+          erp.chapterProgress(pid).forEach((c) => (chapPct[c.num] = c.progressPct));
+        } catch (e) {}
         if (!chapters.length && !plan.tasks.length) return "";
-        return `<div class="card"><div class="ch"><h3>Avance</h3>
-    <span class="tag">por porcentaje o por cantidad ejecutada — lo que sepa la obra</span></div>
-   <div class="scroll"><table><thead><tr>
-     <th>Partida</th><th>Ud</th><th class="num">Cantidad</th><th class="num">Ejecutado</th>
-     <th class="num">Avance</th><th>Fechas previstas</th><th>Estado</th></tr></thead><tbody>
+        return `<div class="card" id="progCtl"><div class="ch"><h3>Avance</h3>
+    <span class="tag">estado y porcentaje, por capítulo y por partida</span></div>
+   <div style="padding:4px 14px 12px">
    ${
      chapters
        .map((c) => {
+         const st = c.progress || "notStarted";
          const t = taskFor[c.num];
-         return `<tr class="chaprow"><td>${c.num}. ${esc(c.name)}</td><td></td><td></td><td></td>
-       <td class="num"><input class="inline pctin" type="number" min="0" max="100" step="1" data-chap="${c.num}" value="${t ? t.progressPct : 0}"></td>
-       <td>${t ? `${fmtD(t.plannedStart)} → ${fmtD(t.plannedEnd)}` : "—"}</td>
-       <td>${pillProg(c.progress)}</td></tr>
+         return `<div class="provrow chap">
+       <span class="nm">${c.num}. ${esc(c.name)}</span>
+       ${t ? `<span class="gdates">${fmtD(t.plannedStart)} → ${fmtD(t.plannedEnd)}</span>` : ""}
+       ${progStrip("chap", c.num, st)}
+       ${progBox("pct", c.num, st, chapPct[c.num] || 0)}
+      </div>
       ${c.lines
         .filter((l) => !l.pending)
         .map((l) => {
-          const qty =
-            (l.subLines.length
-              ? l.subLines.reduce(
-                  (a, s) => a + Math.round(s.qtyMilli * (1 + (s.wastePct || 0) / 100)),
-                  0,
-                )
-              : l.qtyMilli) / 1000;
-          return `<tr><td style="padding-left:26px">${l.num} ${esc(l.desc)}</td><td>${esc(l.unit)}</td>
-         <td class="num">${qty}</td>
-         <td class="num"><input class="inline pctin" type="number" min="0" step="0.001" data-lineqty="${l.id}" data-total="${qty}" value="${Math.round(qty * (l.progressPct || 0)) / 100}"></td>
-         <td class="num"><input class="inline pctin" type="number" min="0" max="100" step="1" data-line="${l.id}" value="${l.progressPct || 0}"></td>
-         <td></td><td>${pillProg(l.progress)}</td></tr>`;
+          const lst = l.progress || "notStarted";
+          return `<div class="provrow sub">
+         <span class="nm">${l.num} ${esc(l.desc)}${l.unit ? ` <span class="ud">· ${esc(l.unit)}</span>` : ""}</span>
+         ${progStrip("line", l.id, lst)}
+         ${progBox("lpct", l.id, lst, l.progressPct || 0)}
+        </div>`;
         })
         .join("")}`;
        })
        .join("") ||
-     '<tr><td colspan="7"><div class="empty">Sin capítulos aceptados: el avance se registra sobre las tareas del gráfico.</div></td></tr>'
+     '<div class="empty">Sin capítulos aceptados: el avance se registra sobre las tareas del gráfico.</div>'
    }
-   </tbody></table></div></div>`;
+   </div></div>`;
       }
 
-      function wireProgressTable(pid, plan) {
+      function wireProgressControl(pid, plan) {
         const B = ganttApi();
-        if (!B) return;
+        const host = $("#progCtl");
+        if (!B || !host) return;
         const taskFor = {};
         plan.tasks.forEach((t) => {
           const m = /^group:(.+)$/.exec(t.sourceRef || "");
           if (m) taskFor[m[1]] = t;
         });
-        document.querySelectorAll("[data-chap]").forEach(
-          (inp) =>
-            (inp.onchange = () => {
-              const t = taskFor[inp.dataset.chap];
-              mutate(() => {
-                if (t)
-                  B.save(
-                    erp.state,
-                    pid,
-                    B.recalculate(B.recordProgress(erp, pid, plan, t.id, +inp.value)),
-                  );
-                else
-                  erp.markProgress(
-                    pid,
-                    inp.dataset.chap,
-                    +inp.value >= 100 ? "done" : +inp.value > 0 ? "inProgress" : "notStarted",
-                    +inp.value,
-                    "operations",
-                  );
-              }, "Avance registrado");
-            }),
-        );
-        document.querySelectorAll("[data-line]").forEach(
-          (inp) =>
-            (inp.onchange = () =>
-              mutate(() => {
-                erp.markLineProgress(pid, inp.dataset.line, { pct: +inp.value }, "operations");
-                B.save(erp.state, pid, B.syncProgress(erp, pid, plan));
-              }, "Avance de la partida registrado")),
-        );
-        /* Quantity, not percentage: the number the site actually knows. The engine
-     converts it against the line's own quantity — the view does not divide. */
-        document.querySelectorAll("[data-lineqty]").forEach(
-          (inp) =>
-            (inp.onchange = () =>
-              mutate(() => {
-                erp.markLineProgress(
-                  pid,
-                  inp.dataset.lineqty,
-                  { qtyMilliDone: Math.round(+inp.value * 1000) },
-                  "operations",
-                );
-                B.save(erp.state, pid, B.syncProgress(erp, pid, plan));
-              }, "Cantidad ejecutada registrada")),
-        );
+        const clamp = (n) => Math.max(0, Math.min(100, Math.round(+n || 0)));
+        /* A state button says which STATE, not which percentage. «Terminado» is
+       100 and «Sin empezar» is 0 by definition; «En ejecución» keeps the
+       figure the row already carries and only falls back to the engine's own
+       50 when there is nothing to keep. The tab this replaces passed null
+       there, which made `markProgress` write 50 over every line — so tapping
+       «En ejecución» on a chapter already at 40 % reset it to 50. That number
+       came from somebody on site; it is not the view's to round off. */
+        const pctForState = (state, current) =>
+          state === "done"
+            ? 100
+            : state === "notStarted"
+              ? 0
+              : current > 0 && current < 100
+                ? current
+                : 50;
+        const writeChapter = (num, pct) => {
+          const t = taskFor[num];
+          mutate(() => {
+            // `recordProgress` writes BOTH — the bar through the capability and
+            // the chapter through `markProgress` — which is the whole reason
+            // this is the surviving path. Without a bar there is nothing to
+            // move, so the engine is written directly.
+            if (t)
+              B.save(erp.state, pid, B.recalculate(B.recordProgress(erp, pid, plan, t.id, pct)));
+            else
+              erp.markProgress(
+                pid,
+                num,
+                pct >= 100 ? "done" : pct > 0 ? "inProgress" : "notStarted",
+                pct,
+                "operations",
+              );
+          }, "Avance registrado");
+        };
+        const writeLine = (lineId, pct) =>
+          mutate(() => {
+            erp.markLineProgress(pid, lineId, { pct }, "operations");
+            B.save(erp.state, pid, B.syncProgress(erp, pid, plan));
+          }, "Avance de la partida registrado");
+
+        host.querySelectorAll(".pstate").forEach((strip) => {
+          const isLine = "line" in strip.dataset;
+          const key = isLine ? strip.dataset.line : strip.dataset.chap;
+          const box = host.querySelector(`[data-${isLine ? "lpct" : "pct"}="${CSS.escape(key)}"]`);
+          strip.querySelectorAll("button").forEach(
+            (b) =>
+              (b.onclick = () => {
+                // Mobile shows only the button for the state the row is IN, so a
+                // tap on it means "next state", not "this state" — §3.2's
+                // one-tap cycle. One handler serves both, because the question
+                // is only ever which button was pressed and whether the others
+                // are on screen at all.
+                const off = strip.querySelector("button:not(.on)");
+                const cycling = !off || getComputedStyle(off).display === "none";
+                let next = b.dataset.st;
+                if (cycling && b.classList.contains("on")) {
+                  const order = PROG_STATES.map((x) => x[0]);
+                  next = order[(order.indexOf(b.dataset.st) + 1) % order.length];
+                }
+                const pct = pctForState(next, clamp(box && box.value));
+                if (isLine) writeLine(key, pct);
+                else writeChapter(key, pct);
+              }),
+          );
+        });
+        host
+          .querySelectorAll("[data-pct]")
+          .forEach((inp) => (inp.onchange = () => writeChapter(inp.dataset.pct, clamp(inp.value))));
+        host
+          .querySelectorAll("[data-lpct]")
+          .forEach((inp) => (inp.onchange = () => writeLine(inp.dataset.lpct, clamp(inp.value))));
       }
 
       /* ===================== Compras · Subcontratos · Modificaciones · Horas ==============
@@ -9236,17 +9357,20 @@
         // list compressed against an empty panel.
         const open = st.openId && cfg.exists(st.openId) ? st.openId : null;
         if (st.openId && !open) st.openId = null;
-        const wrap = el("div", "ctr" + (open ? " on" : ""));
+        // `hideListWhenOpen` is PRY-01's alone (Package 3 slide 2) — see the
+        // .ctr.on.solo note in the stylesheet for why one screen deviates.
+        const solo = !!(open && cfg.hideListWhenOpen);
+        const wrap = el("div", "ctr" + (open ? " on" : "") + (solo ? " solo" : ""));
         const listHost = el("div", "ctrlist");
-        wrap.appendChild(listHost);
+        if (!solo) wrap.appendChild(listHost);
         v.innerHTML = "";
         v.appendChild(wrap);
-        cfg.renderList(listHost, open);
+        if (!solo) cfg.renderList(listHost, open);
         if (open) {
           const panel = el("div", "ctrpanel");
           wrap.appendChild(panel);
           cfg.renderPanel(panel, open);
-          listHost.scrollTop = st.scroll || 0;
+          if (!solo) listHost.scrollTop = st.scroll || 0;
         }
       }
 
@@ -9502,20 +9626,16 @@
       ]
         .map(([v, l]) => `<option value="${v}"${projStatus === v ? " selected" : ""}>${l}</option>`)
         .join("")}</select>
-      ${
-        projRecents.length > 1
-          ? `<span style="font-size:11.5px;color:var(--muted)">Recientes: ${projRecents
-              .slice(1, 4)
-              .map((id) => {
-                const p = erp.state.projects.find((x) => x.id === id);
-                return p ? `<a href="#" data-recent="${id}">${p.code}</a>` : "";
-              })
-              .filter(Boolean)
-              .join(" · ")}</span>`
-          : ""
-      }
     </div>
-    <div class="phead">
+    ${
+      // Package 3 slide 1: PRY-01 opens the job into a panel whose own header
+      // already carries the code, the client, the address, the progress bar
+      // and the three dates — so on THIS screen the strip was the same facts a
+      // second time, pushing the work below the fold. Every other project
+      // screen keeps it, because none of them has that header.
+      cur === "progress"
+        ? ""
+        : `<div class="phead">
       <div class="f"><span class="l">Obra</span><span class="v">${esc(h.code)}</span></div>
       <div class="f"><span class="l">Cliente</span><span class="v"><a href="#" data-party="${h.partyId}">${esc(h.partyName)}</a></span></div>
       ${h.address ? `<div class="f" style="max-width:230px"><span class="l">Dirección</span><span class="v" style="white-space:normal;font-weight:500">${esc(h.address)}</span></div>` : ""}
@@ -9526,7 +9646,8 @@
       <div class="f"><span class="l">Coste real</span><span class="v">${eur0(h.actualCents)}</span></div>
       <div class="f"><span class="l">Margen actual</span><span class="v${h.marginCents < 0 ? " neg" : ""}">${eur0(h.marginCents)} · ${h.marginPct}%</span></div>
       ${h.nextDates.length ? `<div class="sep"></div><div class="f"><span class="l">Próximas fechas</span><span class="v" style="font-weight:500">${h.nextDates.map((d) => `${esc(d.what)} ${fmtD(d.date)}`).join(" · ")}</span></div>` : ""}
-    </div></div>`;
+    </div>`
+    }</div>`;
         $("#psel").onchange = (e) => setProject(e.target.value);
         $("#pst").onchange = (e) => {
           projStatus = e.target.value;
@@ -9545,13 +9666,10 @@
           saveProjPrefs();
           renderProjectBar();
         };
-        host.querySelectorAll("[data-recent]").forEach(
-          (a) =>
-            (a.onclick = (e) => {
-              e.preventDefault();
-              setProject(a.dataset.recent);
-            }),
-        );
+        // Package 3 slide 1: the «Recientes» chips are gone from the bar. The
+        // recency they were built on is not — `projectOptions()` still sorts
+        // the selector by it, so the last few jobs are still the first few in
+        // the dropdown, which is where somebody looking for them already goes.
         const pl = host.querySelector("[data-party]");
         if (pl)
           pl.onclick = (e) => {
@@ -13406,7 +13524,7 @@
     drag-and-drop timeline into half a panel. */
         progress(v) {
           $("#sub").textContent =
-            "Cada obra conserva su línea base aceptada. Marca el estado de cada capítulo — sin empezar, en ejecución o terminado — y el porcentaje sólo cuando esté en ejecución.";
+            "Cada obra conserva su línea base aceptada. El avance se marca en la carta Gantt: estado y porcentaje, por capítulo y por partida.";
           const arg = window._arg;
           window._arg = null;
           if (!erp.state.projects.length) return noProjectsCard(v);
@@ -13420,6 +13538,8 @@
           }
           renderCentre(v, {
             id: "progress",
+            // Package 3 slide 2: the open job gets the screen to itself here.
+            hideListWhenOpen: true,
             exists: (id) => erp.state.projects.some((p) => p.id === id),
             renderList: (host, open) =>
               renderMasterList(host, {
@@ -13537,6 +13657,9 @@
      <button class="btn sm" id="gAdd">＋ Tarea</button>
      <button class="btn sm" id="gAddMs">◆ Hito</button>
      <button class="btn sm${plan.tasks.length ? "" : " primary"}" id="gDerive" title="Vuelve a derivar la planificación de los capítulos y partidas del presupuesto aceptado, conservando el avance registrado">↻ Derivar del presupuesto</button>
+     <!-- Package 3 slide 3: moved out of PRY-01's Programación tab. Moving a
+          milestone is a thing done TO the plan, and the plan is here. -->
+     <button class="btn sm" id="gResched" title="Recalcula las fechas previstas de los hitos de cobro del contrato a partir de la planificación actual">Recalcular los cobros previstos</button>
      <span style="flex:1"></span>
      ${
        sch && plan.tasks.length
@@ -13585,7 +13708,7 @@
        : ""
    }
 
-   ${progressTable(pid, plan)}
+   ${progressControl(pid, plan)}
   </div>
 
   <div class="bside">
@@ -13634,6 +13757,7 @@
           $("#gAdd").onclick = () => ganttNewTask(pid, false);
           $("#gAddMs").onclick = () => ganttNewTask(pid, true);
           $("#gDerive").onclick = () => deriveFromBudget(pid, cal);
+          $("#gResched").onclick = () => rescheduleCashDrawer(pid);
           $("#gFreeze").onclick = () => ganttFreeze(pid, plan);
           $("#gNwAdd").onclick = () => {
             const d = $("#gNw").value;
@@ -13660,7 +13784,7 @@
                 );
               }),
           );
-          wireProgressTable(pid, plan);
+          wireProgressControl(pid, plan);
           ganttWire(v, pid, plan, sch);
         },
 
@@ -16414,7 +16538,6 @@
    because a job that reads differently depending on which of two adjacent
    screens you opened it from is a job somebody will mis-read once. */
       let ganttFull = false;
-      const projTab = {};
 
       /** The fixed 88 header: code, client, address, total progress, three dates. */
       function projectPanelHead(p) {
@@ -16436,126 +16559,24 @@
    </div>`;
       }
 
-      /** PRY-01's panel: Avance · Programación · Ficha. */
+      /* PRY-01's panel (Package 3 slide 3). It carried three tabs; it now
+   carries one surface, so the strip that chose between them is gone too — a
+   tab bar with a single tab is a control that answers no question.
+
+   «Avance» went because it was the SECOND progress control, and the weaker
+   one: it wrote through `markProgress` alone, so a figure typed there never
+   reached the Gantt's bars or the S curve. Its three-state control and live
+   percentage box were not lost — they are what the Gantt's own grid is built
+   from now (see progressControl). «Ficha» went because every figure on it is
+   read from somewhere that owns it: venta, facturado, cobrado and por
+   facturar are ADM-01's, extras aprobados is PRY-03's, and estado, cliente
+   and the dates are in the panel header directly above. */
       function projectPanel(panel, id, route) {
         const p = erp.project(id);
-        const tab = projTab[route] || "avance";
-        const TABS = [
-          ["avance", "Avance"],
-          ["plan", "Programación"],
-          ["ficha", "Ficha"],
-        ];
         panel.innerHTML = `${projectPanelHead(p)}
-   <div class="tabstrip" style="margin:0;padding:0 12px">
-     ${TABS.map(([k, l]) => `<button class="tab${k === tab ? " on" : ""}" data-ptab="${k}">${l}</button>`).join("")}
-   </div>
    <div class="ctrbody" id="pnlBody"></div>`;
         panel.querySelector("[data-ctrclose]").onclick = () => centreClose(route);
-        panel.querySelectorAll("[data-ptab]").forEach(
-          (b) =>
-            (b.onclick = () => {
-              projTab[route] = b.dataset.ptab;
-              render();
-            }),
-        );
-        const body = panel.querySelector("#pnlBody");
-        if (tab === "avance") panelAvance(body, p);
-        else if (tab === "plan") panelPlan(body, p);
-        else panelFicha(body, p);
-      }
-
-      /* The three-state control. §3.2 is precise about it and the precision earns
-   its keep: three contiguous buttons say the whole vocabulary at a glance,
-   and the percentage box is live ONLY in the middle state — a percentage on a
-   chapter nobody has started is a number with nothing behind it, and one on a
-   finished chapter is always 100 and always ignored. */
-      function panelAvance(body, p) {
-        let chapters = [];
-        try {
-          chapters = p.budgetId
-            ? erp
-                .version(p.budgetId, p.acceptedVersionId)
-                .chapters.filter((c) => c.section === "base")
-            : [];
-        } catch (e) {}
-        if (!chapters.length) {
-          body.innerHTML =
-            '<div class="empty">Esta obra no tiene capítulos aceptados: el avance se registra sobre las tareas del gráfico.</div>';
-          return;
-        }
-        const ST = [
-          ["notStarted", "Sin empezar"],
-          ["inProgress", "En ejecución"],
-          ["done", "Terminado"],
-        ];
-        // A chapter stores no percentage of its own — `markProgress` writes the
-        // figure onto its lines — so the number in the box is read back from them
-        // rather than from a field that does not exist. Rounding once, here, keeps
-        // the box and the progress bar in the header telling the same story.
-        const chapPct = (c) => {
-          const ls = c.lines || [];
-          if (!ls.length) return c.progress === "done" ? 100 : 0;
-          return Math.round(ls.reduce((s, l) => s + (l.progressPct || 0), 0) / ls.length);
-        };
-        body.innerHTML = chapters
-          .map((c) => {
-            const st = c.progress || "notStarted";
-            return `<div class="provrow">
-      <span class="nm">${c.num}. ${esc(c.name)}</span>
-      <span class="pstate" data-chap="${c.num}">
-        ${ST.map(([k, l]) => `<button data-st="${k}"${k === st ? ' class="on"' : ""}>${l}</button>`).join("")}
-      </span>
-      <input class="pctbox" type="number" min="0" max="100" step="1" data-pct="${c.num}"
-        value="${st === "done" ? 100 : chapPct(c)}"${st === "inProgress" ? "" : " disabled"}>
-     </div>`;
-          })
-          .join("");
-
-        body.querySelectorAll(".pstate").forEach((strip) => {
-          strip.querySelectorAll("button").forEach(
-            (b) =>
-              (b.onclick = () => {
-                const num = strip.dataset.chap;
-                // Mobile shows only the button for the state the row is IN, so a tap on
-                // it means "next state", not "this state" — §3.2's one-tap cycle. The
-                // same handler serves both because the question is only ever which
-                // button was pressed and whether the others are on screen.
-                const cycling =
-                  !strip.querySelector("button:not(.on)") ||
-                  getComputedStyle(strip.querySelector("button:not(.on)")).display === "none";
-                let next = b.dataset.st;
-                if (cycling && b.classList.contains("on")) {
-                  const order = ST.map((x) => x[0]);
-                  next = order[(order.indexOf(b.dataset.st) + 1) % order.length];
-                }
-                mutate(
-                  () =>
-                    erp.markProgress(
-                      p.id,
-                      num,
-                      next,
-                      next === "done" ? 100 : next === "notStarted" ? 0 : null,
-                      "operations",
-                    ),
-                  "Avance actualizado",
-                );
-              }),
-          );
-        });
-        body.querySelectorAll("[data-pct]").forEach(
-          (inp) =>
-            (inp.onchange = () =>
-              mutate(() => {
-                const pct = Math.max(0, Math.min(100, +inp.value || 0));
-                erp.markProgress(
-                  p.id,
-                  inp.dataset.pct,
-                  pct >= 100 ? "done" : pct > 0 ? "inProgress" : "notStarted",
-                  pct,
-                  "operations",
-                );
-              }, "Avance registrado")),
-        );
+        panelPlan(panel.querySelector("#pnlBody"), p);
       }
 
       /** Programación: the plan in figures, and the chart where §3.1 puts it. */
@@ -16584,32 +16605,13 @@
    </div>
    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
      <button class="btn primary sm" id="pnlGantt">Abrir la carta Gantt</button>
-     <button class="btn sm" id="pnlResched">Recalcular los cobros previstos</button>
    </div>
-   <div class="daylist" style="margin-top:10px"><div class="it" style="color:var(--muted)">La carta Gantt se abre a pantalla completa: arrastrar una barra, alargarla o unir dos tareas necesita la anchura entera.</div></div>`;
+   <div class="daylist" style="margin-top:10px"><div class="it" style="color:var(--muted)">La carta Gantt se abre a pantalla completa: es donde se marca el avance, se mueven las barras y se recalculan los cobros previstos.</div></div>`;
         $("#pnlGantt").onclick = () => {
           setProject(p.id);
           ganttFull = true;
           render();
         };
-        $("#pnlResched").onclick = () => rescheduleCashDrawer(p.id);
-      }
-
-      /** Ficha: what the old project drawer said, in the panel that replaced it. */
-      function panelFicha(body, p) {
-        const e = erp.projectEconomics(p.id),
-          bill = erp.projectBilling(p.id),
-          ex = erp.extrasRegister(p.id);
-        body.innerHTML = `<div class="daylist">
-    <div class="it"><span>Presupuesto</span><span style="flex:1"></span><b>${esc(p.budgetNumber || "—")}</b></div>
-    <div class="it"><span>Línea de negocio</span><span style="flex:1"></span><b>${esc({ renovation: "Reforma", repairs: "Reparación", damp: "Humedades", commercial: "Comercial" }[p.activityLine] || p.activityLine || "—")}</b></div>
-    <div class="it"><span>Venta actual</span><span style="flex:1"></span><b>${eur0(e.currentRevenueCents)}</b></div>
-    <div class="it"><span>Facturado</span><span style="flex:1"></span><b>${eur0(bill.invoicedCents)}</b></div>
-    <div class="it"><span>Cobrado</span><span style="flex:1"></span><b>${eur0(bill.collectedCents)}</b></div>
-    <div class="it"><span>Por facturar</span><span style="flex:1"></span><b>${eur0(bill.remainingToInvoiceCents)}</b></div>
-    <div class="it"><span>Extras aprobados</span><span style="flex:1"></span><b>${ex.approved}</b></div>
-    <div class="it"><span>Estado</span><span style="flex:1"></span>${p.closed ? '<span class="pill g">Cerrado</span>' : '<span class="pill b">Activo</span>'}</div>
-   </div>`;
       }
 
       /** PRY-02's panel: three cards, the per-capítulo table, what is unassigned. */

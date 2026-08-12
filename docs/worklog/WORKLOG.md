@@ -371,11 +371,11 @@ Gantt's plan. The plan below reuses that grid as the single controller
 rather than porting `panelAvance`'s logic sideways, per the operator's
 explicit confirmation once the discrepancy was raised.
 
-| #     | Session                                                                   | Model    | Effort      | State       |
-| ----- | ------------------------------------------------------------------------- | -------- | ----------- | ----------- |
-| PK3-A | Presupuesto validity date · contract document sizing + scroll clearance   | Sonnet 5 | low         | **done**    |
-| PK3-B | Presupuestos toolbar + "＋ Presupuesto" creation from a visita or a lead  | Sonnet 5 | medium      | **done**    |
-| PK3-C | Merge Avance/Ficha into the Gantt's progress grid, %-only, desktop+mobile | Opus 5   | medium-high | not started |
+| #     | Session                                                                   | Model    | Effort      | State    |
+| ----- | ------------------------------------------------------------------------- | -------- | ----------- | -------- |
+| PK3-A | Presupuesto validity date · contract document sizing + scroll clearance   | Sonnet 5 | low         | **done** |
+| PK3-B | Presupuestos toolbar + "＋ Presupuesto" creation from a visita or a lead  | Sonnet 5 | medium      | **done** |
+| PK3-C | Merge Avance/Ficha into the Gantt's progress grid, %-only, desktop+mobile | Opus 5   | medium-high | **done** |
 
 ### PK3-A — **done**
 
@@ -442,3 +442,79 @@ with no visit yet had no path to one at all.
   to test for the bug it fixed. A new `testBudgetCreation` covers both
   creation paths, following `testContractCreation`'s shape. 416/416 site-e2e
   checks pass (411 + 5 new).
+
+### PK3-C — **done**
+
+Slides 1–3, and the largest of the three: PRY-01 had **two controls recording
+the same fact**. The Gantt screen carried a grid of chapters and their
+partidas that wrote through to the plan's own bars; PRY-01's «Avance» tab
+carried a three-state control that wrote through `markProgress` alone. A
+percentage typed in the tab never reached the chart or the S curve, so one
+job could read 40 % on one screen and 0 % on the other. The slide asks for
+one control, on the Gantt, and the operator added two constraints: it has to
+work on a desk **and** on a phone, and it takes **percentages, not
+quantities**.
+
+- **One control, built from both.** From the grid: the chapter+partida
+  structure and — the part that decides which one survives — the write path.
+  A chapter with a bar goes through `recordProgress`, which writes the
+  capability's task **and** calls `markProgress`; a partida goes through
+  `markLineProgress` and then `syncProgress`, which carries the engine's
+  rolled-up chapter figure back onto the bar. Either way both records move in
+  one action. From the tab: the three contiguous state buttons and the
+  percentage box that is live only in the middle state, including the mobile
+  rule that collapses the strip to the single button saying where the row is
+  now — so one tap cycles on a phone and three are visible on a desk. The
+  same markup serves both; there is no second mobile control to keep correct.
+- **The `<table>` became `.provrow` flex rows**, which is what makes the
+  phone half work at all: a seven-column table forces sideways scrolling at
+  390 px and a flex row does not. Verified at 390 px — no horizontal scroll,
+  one visible state button.
+- **The quantity column is gone.** It cost the record nothing:
+  `markLineProgress` already converted a quantity into a percentage and
+  stored only the percentage, so there was never a second figure to lose. The
+  engine still accepts `qtyMilliDone`; nothing in the UI sends it.
+- **A real if small bug fixed on the way.** The tab passed `null` as the
+  percentage when «En ejecución» was pressed, and `markProgress` reads that
+  as "write 50 over every line" — so tapping «En ejecución» on a chapter
+  already at 40 % reset it to 50. The merged control keeps the figure the row
+  already carries and falls back to 50 only when there is nothing to keep.
+  That number came from somebody on site; it is not the view's to round off.
+- **The chapter figure is asked of `chapterProgress`**, the engine's own
+  value-weighted number, rather than averaged in the view. It is the same
+  function `syncProgress` puts on the bars and the S curve reads, so the box,
+  the bar above it and the curve cannot drift apart.
+- **«Recalcular los cobros previstos» moved onto the Gantt** — moving a
+  milestone is a thing done _to_ the plan, and the plan is there. The panel
+  keeps one button, the door to the chart.
+- **«Derivar del presupuesto» now asks before overwriting.** It is not
+  additive: `mergeDerivedPlan` maps over the _derived_ tasks, so progress,
+  baselines, status and pinned dates survive for the tasks that survive — but
+  anything added by hand with ＋ Tarea or ◆ Hito is not regenerated from the
+  budget and goes, along with dependencies drawn on the chart. The tooltip's
+  "conservando el avance registrado" was true and was being read as
+  "conserving everything". The confirmation counts the hand-made tasks it is
+  about to discard.
+- **The Avance and Ficha tabs are gone, and the tab strip with them** — a tab
+  bar with one tab is a control that answers no question. Ficha's figures all
+  had an owner elsewhere: venta/facturado/cobrado/por facturar are ADM-01's,
+  extras aprobados is PRY-03's, and estado, cliente and the three dates are
+  in the panel header directly above where the tab used to be.
+- **The summary strip goes on `#progress` only** (slide 1), because the
+  panel header repeats every field on it; the other four project screens keep
+  it, since none of them has that header. **«Recientes» goes everywhere**
+  (slide 1) — the recency it was built on stays, sorting the project
+  selector, which is where somebody looking for a recent job already goes.
+- **The list steps aside when a job is open** (slide 2). §3.2 says the list
+  never disappears and everywhere else it does not; PRY-01 is the one screen
+  where the panel is a working surface rather than a record to read, so it
+  gets the width. Switching job is still one click in the bar above, and ✕
+  brings the list straight back — verified.
+
+Five site-e2e checks that read the old shapes (`[data-ptab]`, the `.phead` on
+`#progress`, `[data-chap]` as an input, `#pnlResched`, and the
+quantity→percentage conversion) were **retargeted rather than deleted**,
+following PK2-C's precedent, and the merged control gained its own checks for
+the two things a screenshot cannot show: that a state button moves the engine
+and the bar together, and that a partida percentage is stored with its state
+derived from it.

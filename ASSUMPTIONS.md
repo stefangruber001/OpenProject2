@@ -3122,3 +3122,51 @@ stash`, a tall-viewport scratch check showed the short document's card
   (find the draft by pill text rather than by table position), following
   the same precedent as PK2-C's `/392px$/` assertion: a check that tests
   for the old shape is retargeted at the new one, not dropped.
+
+- **#160 — one progress control instead of two, and what that costs
+  (Package 3 slides 1–3, PK3-C · 2026-08-12).** PRY-01 had two controls
+  writing the same fact by different routes: the Gantt's grid, which wrote
+  the plan's bars _and_ the engine, and the «Avance» tab's three-state
+  control, which wrote only `markProgress` — so a figure typed in the tab
+  never reached the chart or the S curve. Decisions taken: (a) **the Gantt's
+  grid is the one that survives, and the tab's control is what it is now
+  built from** — the write path is the property that cannot be added later,
+  and the three-state buttons are presentation that ports in an afternoon;
+  doing it the other way round would have meant re-deriving the
+  `recordProgress`/`syncProgress` wiring on a screen that had never had it.
+  This reverses my own earlier claim, made before the grid was tested, that
+  the tab was "the only place chapter progress is recorded". (b) **The
+  quantity input is dropped with no migration and no engine change**:
+  `markLineProgress` converts `qtyMilliDone` to a percentage and persists
+  only `l.progressPct`, so there is no stored quantity to orphan. The engine
+  keeps accepting the parameter — removing a working input from the domain
+  layer to reflect a UI decision would be the wrong direction — it simply
+  has no caller in the UI. (c) **`<table>` → `.provrow` flex rows is a
+  mobile fix, not a cosmetic one.** The seven-column table forced sideways
+  scrolling at 390 px, which is exactly what the operator's
+  "desktop-and-mobile" constraint rules out; the flex row plus the existing
+  `@media (max-width:860px)` collapse of `.pstate` gives one control that is
+  three buttons on a desk and a one-tap cycle on a phone, with no second
+  markup path. (d) **The chapter percentage is read from
+  `erp.chapterProgress`, not averaged in the view** — it is value-weighted,
+  and it is the same function `syncProgress` carries onto the bars, so the
+  box and the bar directly above it cannot tell different stories. The tab
+  averaged line percentages unweighted, which was a third figure for the
+  same quantity. (e) **`markProgress`'s `null` percentage is no longer sent
+  for «En ejecución».** The tab relied on the engine's `?? 50` default, which
+  overwrote a chapter already at 40 %; the merged control passes the current
+  figure when there is one. This changes behaviour deliberately and in the
+  operator's favour. (f) **PRY-01 alone hides its list when a job is open**,
+  overriding §3.2's "the list never disappears" — it is the one screen whose
+  panel is a working surface rather than a record to read. Recovery is two
+  ways (the project selector above, the ✕ on the panel), so the override
+  costs no navigation. (g) **«Ficha» is deleted rather than moved**: every
+  figure on it is read from a screen that owns it (ADM-01, PRY-03, or the
+  panel header two lines above), so re-homing it would have re-created the
+  duplication this session exists to remove. (h) **The derive guard names
+  what it will destroy.** `mergeDerivedPlan` iterates the derived tasks, so
+  hand-added tasks/milestones and hand-drawn dependencies do not survive a
+  re-derivation while progress, baselines and pinned dates do; the
+  confirmation counts the former rather than warning generically, because a
+  generic warning on an action that is usually safe is an action people learn
+  to confirm without reading.
