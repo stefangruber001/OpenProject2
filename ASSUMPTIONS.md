@@ -3342,3 +3342,80 @@ dropdown would then be as invisible as the strip's return. The replacement
 pins the four controls, the single row, and the absence of `€` in the bar's
 text — that last clause is the one that will fail if somebody adds "just the
 margin" back in six months.
+
+### 165 · What the invoice generator assumes, where the operator did not say (PK6-A)
+
+The instruction was four words long — _"Where is the invoice generator?"_ — and
+the answer was that it did not exist. Building one meant deciding several
+things the question did not cover. Each was taken the reversible way.
+
+(a) **Four origins, not one.** The generator could have been a free-text form,
+which is the smallest thing that satisfies "there is a way to bill". It offers
+the contract's pending milestones, a certification against physical progress,
+approved adicionales and free lines instead, because those four are what
+`issueInvoice` already models — `installmentIdx`, `changeId` and the chapter
+progress feed exist and were unused. A form that ignored them would have made
+the operator retype amounts the system already knows, and would have left the
+contract's payment plan permanently showing "planned" against milestones that
+had in fact been billed.
+
+(b) **A certification deducts on a visible line.** Certifiable = executed to
+date − already billed. That aggregate could have been shown as one net figure.
+It is instead chapter lines plus an explicit _"Menos certificado en facturas
+anteriores"_, which is how a certificación reads on paper, and which means a
+customer holding two invoices can see where the difference went. The
+alternative — splitting the deduction back across chapters — would require a
+per-chapter history of what was billed, which the system does not have; any
+split would have been invented.
+
+(c) **The proposal is floored at zero.** A job can legitimately be billed ahead
+of its progress (a deposit precedes the work it pays for), so executed − billed
+goes negative. It reads as "nothing to certify yet" rather than proposing a
+negative certification, which would be a nonsense document rather than an
+honest one.
+
+(d) **The number is minted at issue, never at draft.** Fixing this exposed that
+two existing checks ran _after_ `nextNumber` had already consumed one. See
+entry (e).
+
+(e) **Two engine bugs were fixed rather than worked around.** Both were found
+by building on top of the code rather than by looking for them, and both are
+in scope for a session about invoicing:
+
+- `nextNumber` mutates the series. The AR-10 (abono with no original) and
+  CHG-04 (unapproved adicional) checks sat below the record literal, so a
+  refused invoice still burned a number — leaving it in a series required to
+  have no gaps and on no document. All refusals now precede minting.
+- The milestone→invoice link was written as `installment.invoiceId` and read as
+  `invoicedInvoiceId`. Rather than migrate, the writer now uses the declared
+  name and the reader accepts both, so records written before this fix resolve.
+
+(f) **The `.cdoc table` floor was removed globally, not just for the factura.**
+The global `table { min-width: 520px }` was making the invoice sheet 520 wide
+inside a 356 wide document on a phone. The fix is on `.cdoc table`, which the
+**contract** document also uses. Touching a screen this session did not ask
+about is normally drift; here the alternative was a rule that says "documents
+may not exceed the page, except the contract", which is not a rule anybody
+would write on purpose. The contract's document simply gets the same fix.
+
+### 166 · `issueInvoice` is NOT added to the server command whitelist (PK6-A)
+
+Decision 16 of the v4 plan says every session ships the server half of its own
+screens, and `apps/web/lib/erp-commands.ts` is where a command becomes callable
+from a request body. This session does not add one, and that is deliberate.
+
+`site/erp.html` **dispatches no named commands at all.** It mutates the engine
+in the page and persists the whole document through `ErpStore.saveState`, which
+in remote mode is a `PUT /api/~/erp/state`. There is not one reference to a
+command anywhere under `site/`. So the generator already persists in remote
+mode by exactly the route every other screen in the app uses, and it needs
+nothing from the whitelist to work.
+
+Against that, `apps/web/lib/erp-commands.test.ts` opens by calling the
+whitelist "a security boundary, not a convenience", pins the accepted set
+exactly so that widening it "should be a visible line in a diff", and names
+`issueInvoice` in its list of things that must be **rejected**. Adding it would
+have meant editing that rejection list to make room for the very method it
+cites as an example — to enable no caller. Reserved for whenever `apps/web`
+grows a screen that issues invoices, where it will be a change made for a
+reason rather than out of a checklist.

@@ -2405,6 +2405,12 @@
         width: 100%;
         border-collapse: collapse;
         font-size: 12.5px;
+        /* The global `table { min-width: 520px }` again — the same floor PK5-A
+           found behind the unreadable cards, still in place here because a
+           document's tables are not cards (autoCards skips a headerless
+           two-column table, correctly) and so never picked up that fix. A
+           sheet 356 wide was holding a table 520 wide. */
+        min-width: 0;
       }
       .cdoc th {
         text-align: left;
@@ -2439,6 +2445,30 @@
       @media (max-width: 1180px) {
         .con2 {
           grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      /* A document sheet on a phone (PK6-A). `.condoc` is a flex container, so
+         its child floors at min-content unless told otherwise — and inside the
+         sheet a 180px label beside an unbreakable IBAN is exactly the kind of
+         floor that pushes a 390 wide screen out to 560. The label loses its
+         minimum and the pair is allowed to wrap, so the sheet fits the phone
+         instead of scrolling sideways inside its own box. */
+      @media (max-width: 700px) {
+        .cdoc {
+          min-width: 0;
+          padding: 22px 18px;
+        }
+        .cdoc .pair {
+          flex-wrap: wrap;
+          gap: 0 10px;
+        }
+        .cdoc .pair span:first-child {
+          min-width: 0;
+          flex: 1 1 100%;
+        }
+        .cdoc td,
+        .cdoc th {
+          overflow-wrap: anywhere;
         }
       }
 
@@ -3236,12 +3266,18 @@
         }
         /* On screen .doc reads as a PREVIEW of a document — dashed border,
            tinted paper. On paper it IS the document, so it prints as one:
-           plain white, no border, no rounded corners pretending to be a card. */
-        .printsheet .doc {
+           plain white, no border, no rounded corners pretending to be a card.
+           `.cdoc` is the same idea for the contract and the factura, which are
+           set as sheets rather than as cards; it needs the same treatment or
+           it prints its own shadow. */
+        .printsheet .doc,
+        .printsheet .cdoc {
           background: #fff;
           border: 0;
           border-radius: 0;
           padding: 0;
+          box-shadow: none;
+          max-width: none;
         }
         .printsheet .annexpg {
           break-before: page;
@@ -4562,6 +4598,7 @@
         // asked for the list and got a document.
         if (k !== "purchasing") puWork = null;
         if (k !== "contracts") conWork = null;
+        if (k !== "invoicing") invWork = null;
         if (k !== "progress") ganttFull = false;
         if (k !== "economics") ecoFull = false;
         cur = k;
@@ -8694,7 +8731,10 @@
         $("#tNewOpp").onclick = () => newOpportunityDrawer();
         $("#tNewTask").onclick = () => newTaskDrawer();
         $("#tNewBudget").onclick = () => go("quotes");
-        $("#tNewInvoice").onclick = () => go("invoicing");
+        // PK6-A: this used to be pure navigation — a button labelled «＋ Factura»
+        // that took you to a register with no create button on it. It now opens
+        // the generator, which is what it always looked like it did.
+        $("#tNewInvoice").onclick = () => newInvoiceDrawer();
         $("#tPrint").onclick = () => window.print();
         v.querySelectorAll("[data-goref]").forEach(
           (n) => (n.onclick = () => gotoAlert(JSON.parse(n.dataset.goref))),
@@ -14128,6 +14168,7 @@
     disagree with the table. «Vencido» is a subset of «pendiente», not a fifth
     bucket beside it: money that is late is still money that is owed. */
         invoicing(v) {
+          if (invWork) return invoiceScreen(v);
           $("#sub").textContent =
             "Facturas emitidas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos, las emitidas son inmutables, y un día de retraso ya se ve en rojo.";
           const issued = {};
@@ -14174,8 +14215,11 @@
    </tbody></table></div></div>`;
 
           renderMasterList($("#invList"), {
+            // PK6-A: this list was `noNew: true` — a register of invoices with
+            // no way to write one. The engine could all along.
+            newLabel: "＋ Nueva factura",
+            onNew: () => newInvoiceDrawer(),
             id: "invoices",
-            noNew: true,
             ids: {
               q: "invQ",
               size: "invSize",
@@ -16951,6 +16995,501 @@
    register — it IS the register — so pressing it clears the filter like
    pressing an active one, rather than pretending to narrow anything. */
       let invFilter = "";
+
+      /* ==================== ADM-01 · the invoice generator (PK6-A) ================
+   Until now this section was a REGISTER and nothing else: it listed invoices,
+   filtered them and recorded collections, and had no way to create one. The
+   engine could — `issueInvoice` has been complete since S10, with numbering,
+   IVA, IRPF, the completeness gate, the unsigned-contract gate, the
+   unapproved-extra gate and the hash chain — it simply had no caller. You
+   could win a job, quote it, sign it, build it, and then not bill it.
+
+   FOUR ORIGINS, BECAUSE THE BUSINESS HAS FOUR. A milestone from the contract,
+   a certification against physical progress, an approved adicional, or free
+   lines. Each is already a record elsewhere, so the generator offers them
+   rather than asking anybody to add them up again — the amounts, the wording
+   and the links back to the milestone or the extra all come from the engine's
+   `invoiceBases`.
+
+   THIS BLOCK COMPUTES NO MONEY. Base, IVA, retención and total come from
+   `previewInvoice`, which is the same arithmetic `issueInvoice` runs. The
+   preview on the left is therefore the document that will be emitted, not an
+   optimistic copy of it that drifts by a cent and is discovered by a customer.
+
+   NO NUMBER UNTIL ISSUE. `nextNumber` mutates the series, so a draft that
+   reserved one and was then abandoned would leave a number in a series
+   required by law to have none spare. The draft is unnumbered until the
+   moment somebody commits, and the screen says so where the number goes. */
+      let invWork = null;
+
+      const INV_KINDS = [
+        ["deposit", "Anticipo"],
+        ["progress", "Certificación"],
+        ["final", "Factura final"],
+        ["extra", "Adicional"],
+      ];
+      const INV_BASES = [
+        ["milestone", "Hito"],
+        ["certification", "Certificación"],
+        ["change", "Adicional"],
+        ["manual", "Manual"],
+      ];
+
+      /** Which origin to land on: the first one that actually has something in it. */
+      function invDefaultBasis(bases) {
+        if (bases.milestones.length) return "milestone";
+        if (bases.changes.length) return "change";
+        if (bases.certification.proposedCents > 0) return "certification";
+        return "manual";
+      }
+
+      /**
+       * The one thing the generator cannot infer: which job is being billed.
+       *
+       * Closed jobs are offered too — a final invoice, and more often an
+       * abono, are both things that happen after a job closes, and a register
+       * that refuses to bill a closed job just sends somebody to reopen it.
+       */
+      function newInvoiceDrawer(preselect) {
+        const projects = erp.state.projects
+          .slice()
+          .sort((a, b) => (a.closed === b.closed ? 0 : a.closed ? 1 : -1));
+        if (!projects.length) {
+          toast("⚠ No hay obras que facturar");
+          return;
+        }
+        const db = openDrawer("Nueva factura");
+        db.innerHTML = `<div class="fgrid">
+   <div class="field full"><label>Obra *</label><select id="nf_p">
+    ${projects.map((p) => `<option value="${p.id}"${p.id === preselect ? " selected" : ""}>${esc(p.code)} — ${esc(erp.party(p.partyId).name)}${p.closed ? " (cerrada)" : ""}</option>`).join("")}
+   </select></div>
+   <div class="field full"><p style="font-size:12.5px;color:var(--body);margin:0">Se abre el generador con lo que ya se puede facturar de esa obra: los hitos del contrato pendientes, el avance certificable y los adicionales aprobados.</p></div>
+   <div class="field full" style="margin-top:6px"><button class="btn primary" id="nf_go">Continuar</button></div>
+  </div>`;
+        $("#nf_go").onclick = () => {
+          const id = $("#nf_p").value;
+          closeDrawer();
+          invOpen(id);
+        };
+      }
+
+      function invOpen(projectId, opts) {
+        const bases = erp.invoiceBases(projectId);
+        invWork = {
+          projectId,
+          basis: (opts && opts.basis) || invDefaultBasis(bases),
+          kind: "progress",
+          lines: [],
+          vatBp: null,
+          irpfBp: 0,
+          installmentIdx: null,
+          changeId: null,
+          rectifies: (opts && opts.rectifies) || null,
+          rectifyReason: "",
+        };
+        if (opts && opts.rectifies) invWork.basis = "credit";
+        invApplyBasis(bases);
+        go("invoicing");
+      }
+
+      /**
+       * Fill the draft's lines from whatever origin is selected.
+       *
+       * The certification case is the one worth reading: it emits the
+       * standard shape a certificación has on paper — what has been executed,
+       * by chapter, LESS what was already certified, equals this one. The
+       * subtraction is a line rather than a silently reduced total because a
+       * customer comparing two invoices needs to see where the difference
+       * went, and because the alternative (splitting an aggregate deduction
+       * back across chapters) would be inventing a distribution the system
+       * does not know.
+       */
+      function invApplyBasis(bases) {
+        const w = invWork;
+        if (!w) return;
+        if (w.basis === "milestone") {
+          w.kind = "progress";
+          w.changeId = null;
+          const m = bases.milestones.find((x) => x.idx === w.installmentIdx);
+          /* CON_TRIGGER, not the raw trigger. `onSignature` is engine
+             vocabulary, and this line is printed on the customer's factura —
+             exactly the bug Package 2 slide 6 found on the contract, where
+             the same enum was reaching the same customer. */
+          w.lines = m
+            ? [
+                {
+                  desc: `Hito de contrato · ${CON_TRIGGER[m.trigger] || m.trigger || "sin motivo"}`,
+                  amountCents: m.amountCents,
+                },
+              ]
+            : [];
+        } else if (w.basis === "certification") {
+          w.kind = "progress";
+          w.installmentIdx = null;
+          w.changeId = null;
+          const c = bases.certification;
+          if (c.proposedCents <= 0) w.lines = [];
+          else {
+            w.lines = c.chapters
+              .filter((ch) => ch.doneCents > 0)
+              .map((ch) => ({
+                desc: `${ch.num}. ${ch.name} — ejecutado ${ch.progressPct}%`,
+                amountCents: ch.doneCents,
+              }));
+            if (bases.billedBaseCents > 0)
+              w.lines.push({
+                desc: "Menos certificado en facturas anteriores",
+                amountCents: -bases.billedBaseCents,
+              });
+          }
+        } else if (w.basis === "change") {
+          w.kind = "extra";
+          w.installmentIdx = null;
+          const ch = bases.changes.find((x) => x.id === w.changeId);
+          w.lines = ch ? [{ desc: ch.desc || "Adicional", amountCents: ch.priceCents }] : [];
+        } else if (w.basis === "credit") {
+          w.kind = "creditNote";
+          w.installmentIdx = null;
+          w.changeId = null;
+          const orig = bases.issued.find((i) => i.id === w.rectifies);
+          if (!w.lines.length)
+            w.lines = [
+              { desc: orig ? `Rectificación de ${orig.number}` : "Rectificación", amountCents: 0 },
+            ];
+        } else {
+          w.kind = w.kind === "creditNote" ? "progress" : w.kind;
+          w.installmentIdx = null;
+          w.changeId = null;
+          if (!w.lines.length) w.lines = [{ desc: "", amountCents: 0 }];
+        }
+      }
+
+      /** The draft as the engine wants it. Nothing here is a figure — only choices. */
+      function invDraft() {
+        const w = invWork;
+        return {
+          projectId: w.projectId,
+          kind: w.kind,
+          lines: w.lines.map((l) => ({ desc: l.desc, amountCents: l.amountCents })),
+          vatBp: w.vatBp,
+          irpfBp: w.irpfBp,
+          installmentIdx: w.installmentIdx,
+          changeId: w.changeId,
+          rectifies: w.rectifies,
+          rectifyReason: w.rectifyReason,
+        };
+      }
+
+      function invoiceScreen(v) {
+        const p = (() => {
+          try {
+            return erp.project(invWork.projectId);
+          } catch (e) {
+            return null;
+          }
+        })();
+        if (!p) {
+          invWork = null;
+          return render();
+        }
+        document.body.classList.add("fs");
+        v.innerHTML = `<div class="pb">
+   <div class="pbbar">
+    <button class="btn sm" id="invBack" title="Volver al registro de facturas">← Facturas</button>
+    <div class="who"><b>Nueva factura</b><span>${esc(p.code)} · ${esc(erp.party(p.partyId).name)}</span></div>
+    <span style="flex:1"></span>
+    <div class="tot"><span>Total</span><b id="invTotal">—</b></div>
+   </div>
+   <div class="con2">
+    <!-- The sheet IS the flex child, exactly as #conDoc is on the contract.
+         Wrapping it in a plain div instead made that div the flex item, and a
+         flex item with width:auto sizes to MAX-content: the sheet came out 602
+         wide inside a 390 phone while the contract's, sized by .cdoc's own
+         width:100%, measured 388 in the same place. -->
+    <div class="condoc"><div class="cdoc" translate="no" id="invDoc"></div></div>
+    <div class="conpanel"><div id="invBody" style="padding:12px 14px 18px"></div></div>
+   </div>
+  </div>`;
+        $("#invBack").onclick = () => {
+          invWork = null;
+          render();
+        };
+        invPaint();
+      }
+
+      /** Full repaint — after anything structural (origin, a line added or removed). */
+      function invPaint() {
+        const host = $("#invBody");
+        if (!host || !invWork) return;
+        const w = invWork;
+        const bases = erp.invoiceBases(w.projectId);
+        const p = erp.project(w.projectId);
+        const comp = erp.partyCompleteness(p.partyId);
+        host.innerHTML = `
+   <div class="card"><div class="ch"><h3>Origen</h3></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px">
+     ${INV_BASES.map(([k, l]) => `<button class="btn sm${w.basis === k ? " primary" : ""}" data-invbasis="${k}">${l}</button>`).join("")}
+     ${bases.issued.length ? `<button class="btn sm${w.basis === "credit" ? " primary" : ""}" data-invbasis="credit">Abono</button>` : ""}
+    </div>
+    <div style="padding:0 12px 12px">${invBasisBody(bases)}</div>
+   </div>
+
+   <div class="card"><div class="ch"><h3>Líneas</h3><span class="tag">${w.lines.length}</span></div>
+    <div class="scroll"><table><thead><tr><th>Concepto</th><th class="num">Importe (€)</th><th></th></tr></thead><tbody>
+    ${
+      w.lines
+        .map(
+          (l, i) => `<tr>
+      <td><input data-invld="${i}" value="${esc(l.desc)}" placeholder="Concepto"
+        style="width:100%;font:inherit;font-size:12.5px;padding:5px 7px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink)"></td>
+      <td class="num"><input data-invla="${i}" type="number" step="0.01" value="${(l.amountCents / 100).toFixed(2)}"
+        style="width:110px;font:inherit;font-size:12.5px;padding:5px 7px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink);text-align:right"></td>
+      <td><button class="btn sm" data-invlr="${i}" title="Quitar la línea">✕</button></td></tr>`,
+        )
+        .join("") ||
+      '<tr><td colspan="3"><div class="empty">Elige un origen arriba, o añade una línea.</div></td></tr>'
+    }
+    </tbody></table></div>
+    <div style="padding:8px 12px"><button class="btn sm" id="invAddLine">＋ Línea</button></div>
+   </div>
+
+   <div class="card"><div class="ch"><h3>Impuestos</h3></div>
+    <div class="fgrid" style="padding:10px 12px 12px">
+     <div class="field"><label>Tipo</label><select id="inv_kind"${w.basis === "credit" ? " disabled" : ""}>
+      ${INV_KINDS.map(([k, l]) => `<option value="${k}"${w.kind === k ? " selected" : ""}>${l}</option>`).join("")}
+     </select></div>
+     <div class="field"><label>IVA (%)</label><input id="inv_vat" type="number" step="0.1" value="${((w.vatBp != null ? w.vatBp : p.vatBp) / 100).toFixed(1)}"></div>
+     <div class="field"><label>Retención IRPF (%)</label><input id="inv_irpf" type="number" step="0.1" value="${(w.irpfBp / 100).toFixed(1)}"></div>
+    </div>
+   </div>
+
+   <div class="card" id="invGates"><div class="ch"><h3>Antes de emitir</h3></div><div class="daylist"></div></div>
+
+   <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn primary" id="invIssue">Emitir factura</button>
+   </div>`;
+
+        host.querySelectorAll("[data-invbasis]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              w.basis = b.dataset.invbasis;
+              if (w.basis !== "manual") w.lines = [];
+              invApplyBasis(erp.invoiceBases(w.projectId));
+              invPaint();
+            }),
+        );
+        const pick = $("#inv_pick");
+        if (pick)
+          pick.onchange = () => {
+            const val = pick.value;
+            if (w.basis === "milestone") w.installmentIdx = val === "" ? null : +val;
+            else if (w.basis === "change") w.changeId = val || null;
+            else if (w.basis === "credit") w.rectifies = val || null;
+            if (w.basis === "credit") w.lines = [];
+            invApplyBasis(erp.invoiceBases(w.projectId));
+            invPaint();
+          };
+        const reason = $("#inv_reason");
+        if (reason)
+          reason.oninput = () => {
+            w.rectifyReason = reason.value;
+            invSync();
+          };
+        host.querySelectorAll("[data-invld]").forEach(
+          (inp) =>
+            (inp.oninput = () => {
+              w.lines[+inp.dataset.invld].desc = inp.value;
+              invSync();
+            }),
+        );
+        host.querySelectorAll("[data-invla]").forEach(
+          (inp) =>
+            (inp.oninput = () => {
+              w.lines[+inp.dataset.invla].amountCents = Math.round(+inp.value * 100) || 0;
+              invSync();
+            }),
+        );
+        host.querySelectorAll("[data-invlr]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              w.lines.splice(+b.dataset.invlr, 1);
+              invPaint();
+            }),
+        );
+        $("#invAddLine").onclick = () => {
+          w.lines.push({ desc: "", amountCents: 0 });
+          invPaint();
+        };
+        $("#inv_kind").onchange = (e) => {
+          w.kind = e.target.value;
+          invSync();
+        };
+        $("#inv_vat").oninput = (e) => {
+          w.vatBp = Math.round(+e.target.value * 100) || 0;
+          invSync();
+        };
+        $("#inv_irpf").oninput = (e) => {
+          w.irpfBp = Math.round(+e.target.value * 100) || 0;
+          invSync();
+        };
+        $("#invIssue").onclick = invIssue;
+        invSync(comp);
+      }
+
+      /** The origin's own picker — a milestone, a chapter table, an extra, an invoice. */
+      function invBasisBody(bases) {
+        const w = invWork;
+        if (w.basis === "milestone")
+          return bases.milestones.length
+            ? `<select id="inv_pick"><option value="">— elige el hito —</option>
+       ${bases.milestones.map((m) => `<option value="${m.idx}"${w.installmentIdx === m.idx ? " selected" : ""}>${esc(CON_TRIGGER[m.trigger] || m.trigger || "hito")} · ${eur(m.amountCents)}${m.expectedDate ? " · " + fmtD(m.expectedDate) : ""}</option>`).join("")}
+      </select>`
+            : '<div class="empty">Esta obra no tiene hitos de contrato pendientes.</div>';
+        if (w.basis === "certification") {
+          const c = bases.certification;
+          if (!c.chapters.length)
+            return '<div class="empty">Esta obra no tiene capítulos sobre los que certificar.</div>';
+          return `<div class="scroll"><table><thead><tr><th>Capítulo</th><th class="num">Avance</th><th class="num">Ejecutado</th></tr></thead><tbody>
+      ${c.chapters.map((ch) => `<tr><td>${esc(ch.num)}. ${esc(ch.name)}</td><td class="num">${ch.progressPct}%</td><td class="num">${eur0(ch.doneCents)}</td></tr>`).join("")}
+      <tr class="tot"><td>Ejecutado a origen</td><td></td><td class="num">${eur0(c.executedCents)}</td></tr>
+      <tr><td>Ya facturado</td><td></td><td class="num">${eur0(bases.billedBaseCents)}</td></tr>
+      <tr class="tot"><td>Certificable ahora</td><td></td><td class="num">${eur0(c.proposedCents)}</td></tr>
+      </tbody></table></div>
+      ${c.proposedCents <= 0 ? '<div class="empty">Nada que certificar todavía: lo facturado ya cubre el avance registrado.</div>' : ""}`;
+        }
+        if (w.basis === "change")
+          return bases.changes.length
+            ? `<select id="inv_pick"><option value="">— elige el adicional —</option>
+       ${bases.changes.map((c) => `<option value="${c.id}"${w.changeId === c.id ? " selected" : ""}>${esc(c.desc || "adicional")} · ${eur(c.priceCents)}</option>`).join("")}
+      </select>`
+            : '<div class="empty">No hay adicionales aprobados pendientes de facturar.</div>';
+        if (w.basis === "credit")
+          return `<select id="inv_pick"><option value="">— elige la factura a rectificar —</option>
+      ${bases.issued.map((i) => `<option value="${i.id}"${w.rectifies === i.id ? " selected" : ""}>${esc(i.number)} · ${eur(i.totalCents)} · ${fmtD(i.date)}</option>`).join("")}
+     </select>
+     <div class="field full" style="margin-top:8px"><label>Motivo de la rectificación *</label>
+      <input id="inv_reason" value="${esc(w.rectifyReason || "")}" placeholder="Por qué se rectifica"></div>`;
+        return '<div class="empty">Líneas libres: escribe abajo lo que se factura.</div>';
+      }
+
+      /**
+       * Repaint everything DERIVED — the document, the total, the gates — while
+       * leaving the inputs alone. Rewriting them on every keystroke is what
+       * takes the cursor away mid-word.
+       */
+      function invSync(comp) {
+        if (!invWork) return;
+        let pv;
+        try {
+          pv = erp.previewInvoice(invDraft());
+        } catch (e) {
+          return;
+        }
+        const doc = $("#invDoc");
+        if (doc) doc.innerHTML = invoiceDocHtml(pv.doc);
+        const tot = $("#invTotal");
+        if (tot) tot.textContent = eur(pv.totalCents);
+        const gates = $("#invGates");
+        if (gates) {
+          const p = erp.project(invWork.projectId);
+          const c = comp || erp.partyCompleteness(p.partyId);
+          const rows = pv.blocks
+            .map(
+              (b) => `<div class="it"><span class="pill r">${esc(b.code)}</span>
+       <span style="flex:1;margin-left:8px">${esc(b.label)}${b.detail ? ` — ${esc(b.detail)}` : ""}</span></div>`,
+            )
+            .join("");
+          const empty = pv.empty
+            ? '<div class="it"><span class="pill y">—</span><span style="flex:1;margin-left:8px">La factura no tiene importe.</span></div>'
+            : "";
+          gates.querySelector(".daylist").innerHTML =
+            rows + empty ||
+            `<div class="it"><span class="pill g">✓</span><span style="flex:1;margin-left:8px">Todo en regla. Al emitir se asigna el número y la factura queda inmutable.</span></div>`;
+          const fix = gates.querySelector("#invFixParty");
+          if (fix) fix.remove();
+          if (!c.ok) {
+            const b = el("button", "btn sm");
+            b.id = "invFixParty";
+            b.textContent = "Completar los datos del cliente";
+            b.style.margin = "0 16px 12px";
+            b.onclick = () => editPartyDrawer(p.partyId, () => invPaint());
+            gates.appendChild(b);
+          }
+        }
+        const issue = $("#invIssue");
+        if (issue) issue.disabled = !pv.ok;
+      }
+
+      async function invIssue() {
+        const w = invWork;
+        if (!w) return;
+        const pv = erp.previewInvoice(invDraft());
+        if (!pv.ok) return;
+        const p = erp.project(w.projectId);
+        const okGo = await askConfirm("Emitir la factura", {
+          body: `${eur(pv.totalCents)} a ${erp.party(p.partyId).name}, obra ${p.code}.\n\nAl emitirla se le asigna el número definitivo y ya no se puede modificar: una factura emitida sólo se corrige con un abono.`,
+          okLabel: "Emitir",
+        });
+        if (!okGo) return;
+        let issued = null;
+        mutate(() => {
+          issued = erp.issueInvoice(invDraft(), "backoffice");
+          invWork = null;
+        }, "Factura emitida");
+        if (issued) invoiceDrawer(issued.number);
+      }
+
+      /**
+       * The document's INSIDE, for the preview pane and the printed sheet
+       * alike — one function, so what somebody approves on screen is what
+       * prints. It returns no wrapper: the pane's own `#invDoc` is the sheet,
+       * and `downloadInvoicePdf` supplies an identical one.
+       */
+      function invoiceDocHtml(doc) {
+        return `
+   <h1>${esc(doc.docType)}</h1>
+   <div class="meta">${doc.number ? esc(doc.number) : "Sin numerar — el número se asigna al emitir"} · ${fmtD(doc.date)}</div>
+   <!-- Both halves must be allowed to SHRINK, not just to wrap: a flex item's
+        default min-width is its content, and a min-width floor here made the
+        whole sheet 600 wide inside a 390 phone — the contract's own document,
+        which has no such floor, measures 388 in the same place. -->
+   <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px">
+    <div style="flex:1 1 170px;min-width:0;overflow-wrap:anywhere"><b>${esc(doc.issuer.legalName)}</b><br>${esc(doc.issuer.taxId)}<br>${esc(doc.issuer.address)}${doc.issuer.phone ? `<br>${esc(doc.issuer.phone)}` : ""}</div>
+    <div style="flex:1 1 170px;min-width:0;overflow-wrap:anywhere;text-align:right"><b>${esc(doc.customer.name)}</b><br>${esc(doc.customer.taxId)}<br>${esc(doc.customer.address)}</div>
+   </div>
+   <h2>Obra</h2>
+   <div class="pair"><span>Obra</span><span>${esc(doc.projectCode || "—")}</span></div>
+   ${doc.budgetNumber ? `<div class="pair"><span>Presupuesto</span><span>${esc(doc.budgetNumber)}</span></div>` : ""}
+   ${doc.worksAddress ? `<div class="pair"><span>Dirección</span><span>${esc(doc.worksAddress)}</span></div>` : ""}
+   ${doc.rectifies ? `<div class="pair"><span>Rectifica</span><span>${esc(doc.rectifies)}${doc.rectifyReason ? " · " + esc(doc.rectifyReason) : ""}</span></div>` : ""}
+   <h2>Detalle</h2>
+   <table><tbody>
+   ${doc.lines.map((l) => `<tr><td>${esc(l.desc || "—")}</td><td class="n">${eur(l.amountCents)}</td></tr>`).join("")}
+   </tbody></table>
+   <table style="margin-top:10px"><tbody>
+   <tr><td>Base imponible</td><td class="n">${eur(doc.baseCents)}</td></tr>
+   <tr><td>IVA ${doc.vatBp / 100}%</td><td class="n">${eur(doc.vatCents)}</td></tr>
+   ${doc.irpfCents ? `<tr><td>Retención IRPF ${doc.irpfBp / 100}%</td><td class="n">−${eur(doc.irpfCents)}</td></tr>` : ""}
+   <tr class="tot"><td>Total</td><td class="n">${eur(doc.totalCents)}</td></tr>
+   </tbody></table>
+   <h2>Pago</h2>
+   <div class="pair"><span>Vencimiento</span><span>${fmtD(doc.dueDate)}</span></div>
+   <div class="pair"><span>IBAN</span><span>${esc(doc.issuer.iban || "—")}</span></div>`;
+      }
+
+      /**
+       * The issued invoice as a sheet the browser can save as PDF — the same
+       * `.printsheet` route the presupuesto uses. No PDF library: the print
+       * dialog's "Guardar como PDF" is the established pattern here.
+       */
+      function downloadInvoicePdf(number) {
+        const sheet = el("div", "printsheet");
+        sheet.innerHTML = `<div class="cdoc" translate="no">${invoiceDocHtml(erp.renderInvoiceDoc(number))}</div>`;
+        document.body.appendChild(sheet);
+        window.print();
+        sheet.remove();
+      }
+
       function invoiceDrawer(number) {
         const inv = erp.state.invoices.find((i) => i.number === number);
         if (!inv) return;
@@ -16995,7 +17534,11 @@
     <div class="daylist"><div class="it" style="color:var(--muted)">Un cobro parcial deja el resto pendiente y el contador de vencido lo sigue contando.</div></div>
    </div>`
        : ""
-   }`;
+   }
+   <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn sm" id="iv_pdf">⤓ Descargar PDF</button>
+   </div>`;
+        $("#iv_pdf").onclick = () => downloadInvoicePdf(inv.number);
         const go = $("#iv_go");
         if (go)
           go.onclick = () =>

@@ -77,6 +77,7 @@ async function main() {
     await testCapture(browser, base);
     await testProjectTracking(browser, base);
     await testInvoicing(browser, base);
+    await testInvoiceGenerator(browser, base);
     await testCashFlow(browser, base);
     await testFinancials(browser, base);
     await testBankAndCash(browser, base);
@@ -3098,6 +3099,259 @@ async function testInvoicing(browser, base) {
     else bad("ADM-01: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("invoicing", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── ADM-01 · the invoice generator (PK6-A) ────────────────────────────────
+//    The engine could issue a legally-shaped factura since S10 and nothing
+//    called it: the register was `noNew`, and the Torre's «＋ Factura» merely
+//    navigated to it. These checks cover the four origins, the rules that
+//    refuse, and the property that makes those rules worth having — a refusal
+//    must not consume a number from a series required to have no gaps.
+async function testInvoiceGenerator(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#invoicing`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(800);
+
+    // The affordance itself. Its absence WAS the defect, so it is checked as
+    // a thing on screen rather than as a function that exists.
+    const entry = await pg.evaluate(() => ({
+      create: !!document.querySelector("#view #mlNew"),
+      label: (document.querySelector("#view #mlNew") || {}).textContent || "",
+    }));
+    if (entry.create && /Factura/i.test(entry.label))
+      ok(`ADM-01: the register can create — «${entry.label.trim()}»`);
+    else bad("ADM-01: create affordance", JSON.stringify(entry));
+
+    // ---- the rules, and the series they protect ----
+    const rules = await pg.evaluate(() => {
+      const out = {};
+      const p = erp.state.projects.find((x) => x.contractId) || erp.state.projects[0];
+      const series = () => JSON.stringify(erp.state.series.invoice.byYear);
+
+      // An unapproved adicional (CHG-04) and an abono naming no original
+      // (AR-10) both used to be checked AFTER the record literal had already
+      // called nextNumber — which increments the counter and pushes onto
+      // `issued`. The refusal is worth nothing if it costs a number.
+      const ch = erp.addChange(p.id, { desc: "e2e sin aprobar", priceCents: 50000 });
+      const s0 = series();
+      let chgThrew = false;
+      try {
+        erp.issueInvoice({ projectId: p.id, kind: "extra", baseCents: 50000, changeId: ch.id });
+      } catch (e) {
+        chgThrew = true;
+      }
+      out.chg04 = { threw: chgThrew, seriesUntouched: s0 === series() };
+
+      const s1 = series();
+      let creditThrew = false;
+      try {
+        erp.issueInvoice({ projectId: p.id, kind: "creditNote", baseCents: 1000 });
+      } catch (e) {
+        creditThrew = true;
+      }
+      out.ar10 = { threw: creditThrew, seriesUntouched: s1 === series() };
+
+      // The same two, as the SCREEN sees them: reported, not thrown, and from
+      // the one implementation the engine refuses with.
+      out.previewCredit = erp
+        .previewInvoice({
+          projectId: p.id,
+          kind: "creditNote",
+          lines: [{ desc: "x", amountCents: 1000 }],
+        })
+        .blocks.map((b) => b.code);
+      out.previewChange = erp
+        .previewInvoice({
+          projectId: p.id,
+          kind: "extra",
+          changeId: ch.id,
+          lines: [{ desc: "x", amountCents: 1000 }],
+        })
+        .blocks.map((b) => b.code);
+      out.gaps = erp.seriesGaps("invoice").length;
+      return out;
+    });
+    if (rules.chg04.threw && rules.chg04.seriesUntouched)
+      ok("AR: an unapproved adicional is refused, and the refusal costs no number (CHG-04)");
+    else bad("CHG-04 + numbering", JSON.stringify(rules.chg04));
+    if (rules.ar10.threw && rules.ar10.seriesUntouched)
+      ok("AR: an abono naming no original is refused, and costs no number (AR-10)");
+    else bad("AR-10 + numbering", JSON.stringify(rules.ar10));
+    if (
+      rules.previewCredit.join() === "AR-10" &&
+      rules.previewChange.join() === "CHG-04" &&
+      rules.gaps === 0
+    )
+      ok("AR: previewInvoice reports the same refusals the engine throws, series gapless");
+    else bad("preview vs engine", JSON.stringify(rules));
+
+    // ---- the screen: open it on a job and walk the origins ----
+    const pid = await pg.evaluate(
+      () => (erp.state.projects.find((x) => x.contractId) || erp.state.projects[0]).id,
+    );
+    await pg.evaluate((p) => invOpen(p), pid);
+    await pg.waitForTimeout(700);
+    const screen = await pg.evaluate(() => ({
+      fs: document.body.classList.contains("fs"),
+      sheet: !!document.querySelector("#invDoc.cdoc"),
+      // The number is minted at issue, never at draft — the sheet has to say
+      // so where the number goes, or a draft reads like an issued invoice.
+      unnumbered: /Sin numerar/i.test(document.querySelector("#invDoc").innerText),
+      origins: [...document.querySelectorAll("[data-invbasis]")].map((b) => b.dataset.invbasis),
+      back: !!document.querySelector("#invBack"),
+    }));
+    if (
+      screen.fs &&
+      screen.sheet &&
+      screen.unnumbered &&
+      screen.back &&
+      ["milestone", "certification", "change", "manual"].every((k) => screen.origins.includes(k))
+    )
+      ok(
+        `ADM-01: the generator is a full screen with ${screen.origins.length} origins, unnumbered`,
+      );
+    else bad("ADM-01: generator screen", JSON.stringify(screen));
+
+    /* Certification: the shape a certificación has on paper — executed by
+       chapter, LESS what was already certified. The subtraction is a visible
+       line, not a quietly reduced total.
+
+       Deliberately run on a job that HAS something to certify, found by asking
+       the engine rather than by hoping the first project qualifies. A job with
+       nothing outstanding satisfies every assertion about its lines by having
+       none — which is a check that cannot fail. */
+    const certPid = await pg.evaluate(() => {
+      const hit = erp.state.projects
+        .filter((p) => p.budgetId)
+        .find((p) => erp.invoiceBases(p.id).certification.proposedCents > 0);
+      return hit ? hit.id : null;
+    });
+    if (certPid) {
+      await pg.evaluate((p) => invOpen(p, { basis: "certification" }), certPid);
+      await pg.waitForTimeout(600);
+      const cert = await pg.evaluate(() => {
+        const descs = [...document.querySelectorAll("[data-invld]")].map((i) => i.value);
+        const amts = [...document.querySelectorAll("[data-invla]")].map((i) => +i.value);
+        const b = erp.invoiceBases(invWork.projectId);
+        return {
+          sum: Math.round(amts.reduce((a, x) => a + x, 0) * 100),
+          proposed: b.certification.proposedCents,
+          billed: b.billedBaseCents,
+          executed: b.certification.executedCents,
+          chapterLines: descs.filter((d) => /ejecutado \d+%/.test(d)).length,
+          deductions: amts.filter((a) => a < 0).length,
+          previewBase: erp.previewInvoice({
+            projectId: invWork.projectId,
+            kind: "progress",
+            lines: invWork.lines,
+          }).baseCents,
+        };
+      });
+      if (
+        cert.proposed > 0 &&
+        cert.sum === cert.proposed &&
+        cert.previewBase === cert.proposed &&
+        cert.chapterLines > 0 &&
+        cert.deductions === (cert.billed > 0 ? 1 : 0)
+      )
+        ok(
+          `ADM-01: certification = executed ${cert.executed}c less certified ${cert.billed}c = ${cert.proposed}c`,
+        );
+      else bad("ADM-01: certification", JSON.stringify(cert));
+    } else bad("ADM-01: certification", "no seeded job has anything left to certify");
+
+    // Milestone → issue. The whole point: a number is minted, the contract's
+    // payment plan learns which invoice covered the milestone, and the series
+    // stays gapless.
+    await pg.evaluate((p) => invOpen(p), pid);
+    await pg.waitForTimeout(600);
+    await pg.click('[data-invbasis="milestone"]');
+    await pg.waitForTimeout(400);
+    const hasMilestone = (await pg.locator("#inv_pick option").count()) > 1;
+    if (hasMilestone) {
+      await pg.selectOption("#inv_pick", { index: 1 });
+      await pg.waitForTimeout(400);
+      const armed = await pg.evaluate(() => ({
+        lines: document.querySelectorAll("[data-invld]").length,
+        // Engine vocabulary must never reach a customer's document: the
+        // trigger prints as «A la firma», not as `onSignature`.
+        raw: /onSignature|atStage|onCompletion|atWorksStart|fixedDate/.test(
+          document.querySelector("#invDoc").innerText,
+        ),
+        disabled: document.querySelector("#invIssue").disabled,
+      }));
+      if (armed.lines === 1 && !armed.raw && !armed.disabled)
+        ok("ADM-01: a contract milestone arms the draft, in words a customer can read");
+      else bad("ADM-01: milestone draft", JSON.stringify(armed));
+
+      const before = await pg.evaluate(() => erp.state.invoices.length);
+      await pg.click("#invIssue");
+      await pg.waitForTimeout(400);
+      await pg.getByRole("button", { name: "Emitir", exact: true }).click();
+      await pg.waitForTimeout(800);
+      const after = await pg.evaluate(() => {
+        const inv = erp.state.invoices[erp.state.invoices.length - 1];
+        const p = erp.project(inv.projectId);
+        const c = p.contractId && erp.state.contracts.find((x) => x.id === p.contractId);
+        const doc = c ? erp.renderContractDoc(c.id) : null;
+        return {
+          count: erp.state.invoices.length,
+          number: inv.number,
+          immutable: inv.immutable === true,
+          gaps: erp.seriesGaps("invoice").length,
+          linked:
+            inv.installmentIdx != null && doc
+              ? doc.installments[inv.installmentIdx].invoiceId === inv.id
+              : null,
+          closed: !document.body.classList.contains("fs"),
+        };
+      });
+      if (
+        after.count === before + 1 &&
+        /^FAC-\d{4}-\d{4}$/.test(after.number) &&
+        after.immutable &&
+        after.gaps === 0 &&
+        after.linked === true &&
+        after.closed
+      )
+        ok(`ADM-01: issued ${after.number} — numbered, immutable, milestone linked, no gaps`);
+      else bad("ADM-01: issue", JSON.stringify(after));
+
+      // The document exists as a document, and can be printed.
+      const doc = await pg.evaluate((n) => {
+        const d = erp.renderInvoiceDoc(n);
+        const sheet = document.createElement("div");
+        sheet.className = "printsheet";
+        sheet.innerHTML = `<div class="cdoc">${invoiceDocHtml(d)}</div>`;
+        document.body.appendChild(sheet);
+        const text = sheet.innerText;
+        sheet.remove();
+        return {
+          type: d.docType,
+          number: d.number,
+          lines: d.lines.length,
+          total: d.totalCents,
+          printable: /FACTURA/i.test(text) && text.includes(d.number),
+        };
+      }, after.number);
+      if (doc.type === "FACTURA" && doc.lines > 0 && doc.total > 0 && doc.printable)
+        ok(`ADM-01: renderInvoiceDoc prints ${doc.number} as a document`);
+      else bad("ADM-01: invoice document", JSON.stringify(doc));
+    } else {
+      bad("ADM-01: milestone origin", "the seed offers no pending contract milestone");
+    }
+
+    if (!errs.length) ok("ADM-01: the generator raises no console error");
+    else bad("ADM-01: console", errs.slice(0, 2).join(" | ").slice(0, 160));
+  } catch (e) {
+    bad("invoice generator", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }

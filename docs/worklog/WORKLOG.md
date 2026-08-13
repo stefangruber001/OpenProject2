@@ -760,3 +760,97 @@ bar that had lost its dropdown. The new one asserts the bar exists, has
 exactly **one** child row, carries all four controls, has no `.phead`, and
 contains **no `€` anywhere** — the last being the part that keeps a figure
 from creeping back later. 424/424 passing.
+
+## Package 6 — the two things that were never built (2026-08-13)
+
+Raised together with the project-bar rule. Both are _absences_ rather than
+defects: a screen the operator went looking for and could not find, and a tool
+that turned out to be far thinner than the job needs.
+
+| #     | Session                                                     | Model  | Effort | State       |
+| ----- | ----------------------------------------------------------- | ------ | ------ | ----------- |
+| PK6-A | The invoice generator                                       | Opus 5 | high   | **done**    |
+| PK6-B | Orden de compra as a multi-line builder, with annexes + OCR | Opus 5 | max    | not started |
+
+PK6-B is explicitly **deferred by the operator** («For the moment, we will not
+develope the purchase order generator»), not dropped. Its findings stand: the
+engine's `addPurchase` is single-line by design with no `lines[]`, so it needs
+a record change plus a v16 migration, and `committedByChapter` reads
+`pu.chapterNum` — one chapter per order — so a multi-chapter order would make
+chapter-level committed cost wrong unless it is computed from the lines.
+
+### PK6-A — **done**
+
+**«Other thing that I don't see is the invoice generator. Where is it?»** It
+was nowhere. `issueInvoice` has been complete in the engine since S10 —
+numbering, IVA, IRPF, MDM-10 completeness, CON-11's unsigned contract, CHG-04's
+unapproved extra, AR-10's abono reference, the VFU-01 hash chain — and had
+**zero callers**. The register was built `noNew: true`, and the Torre's
+«＋ Factura» ran `go("invoicing")`: a button that looked like it created an
+invoice and only navigated to a list that could not. You could win a job, quote
+it, sign it, build it, and then not bill it.
+
+**Four origins, because the business has four.** A milestone from the contract,
+a certification against physical progress, an approved adicional, or free
+lines — plus an abono against any issued invoice. Each is already a record
+elsewhere, so `invoiceBases(projectId)` offers them with their own amounts and
+wording rather than asking anybody to add them up again. The screen opens on
+whichever origin actually has something in it.
+
+The certification is the one worth reading. It emits the shape a certificación
+has on paper: what has been executed, by chapter, **less what was already
+certified**, equals this one. The deduction is a visible line rather than a
+quietly reduced total, because a customer comparing two invoices needs to see
+where the difference went — and because the alternative, splitting an aggregate
+deduction back across chapters, would be inventing a distribution the system
+does not know. On the seeded job the E2E now asserts the actual arithmetic:
+executed 20.995 € less certified 14.313 € = 6.682 €.
+
+**Three engine additions, and one deletion of duplication.** `invoiceBases` (the
+four origins), `previewInvoice` (totals + document + refusals, persisting
+nothing) and `renderInvoiceDoc` (the document projection the presupuesto and
+the contrato already had and the factura did not). The rules live in exactly
+one place, `_invoiceBlocks`: `issueInvoice` throws on its first entry and the
+screen lists all of them. A second implementation for the screen would have
+been a second implementation of the law — agreeing on the day it was written
+and drifting silently from then on.
+
+**A real numbering bug, found by moving the checks.** `nextNumber` mutates the
+series: it increments the counter and pushes onto `issued`. The AR-10 and
+CHG-04 checks sat **below the record literal**, so a refused credit note or an
+unapproved extra had already consumed a number — one that then existed in a
+series required by law to have no spare numbers, and on no document. Every
+refusal now happens before minting, and the E2E asserts the series is byte-for-
+byte unchanged across both refusals.
+
+**A second, smaller one on the way past.** `issueInvoice` wrote the milestone's
+invoice link as `installment.invoiceId`; the shape declares — and
+`renderContractDoc` reads — `invoicedInvoiceId`. A billed milestone therefore
+showed as invoiced with no invoice behind it. Now written under the declared
+name, and the reader accepts the old spelling too, so milestones billed before
+this fix resolve without a migration.
+
+**And a third, in the CSS, which is PK5-A's bug in a place PK5-A could not
+see.** The document sheet came out 560 px wide inside a 390 px phone. Two
+causes, both instructive: `#invDoc` was a plain wrapper _around_ the sheet, and
+a flex item with `width:auto` sizes to max-content — the contract's own
+document, where `.cdoc` **is** the flex child and carries `width:100%`,
+measures 388 in the same place. Underneath that sat the global
+`table { min-width: 520px }`, the same floor PK5-A found behind the unreadable
+cards: `table.cards { min-width: 0 }` fixed the lists, but a document's tables
+are not cards — `autoCards` correctly skips a headerless two-column table — so
+they kept the floor. A 356 px sheet was holding a 520 px table. Both fixed;
+the sheet now measures 356 inside 390 with nothing scrolling sideways, and the
+contract's document gets the same improvement for free.
+
+The Torre's «＋ Factura» opens the generator. The register has «＋ Nueva
+factura». An issued invoice offers «⤓ Descargar PDF» through the same
+`.printsheet` + `window.print()` route the presupuesto uses.
+
+**Not done, deliberately: `issueInvoice` is not added to the server command
+whitelist.** See ASSUMPTIONS #166 — `site/erp.html` dispatches no named
+commands at all, so the generator already persists in remote mode.
+
+Ten new site-e2e checks; 434/434 passing, 118/118 vitest, 149/149 year sim,
+226/226 manageability sim, boundaries · lint · check-types · i18n coverage all
+green.

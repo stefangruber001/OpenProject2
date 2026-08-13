@@ -2632,7 +2632,10 @@
           // or the honesty that session bought is lost one screen along.
           expectedDateSource: i.expectedDateSource || null,
           status: i.status,
-          invoiceId: i.invoicedInvoiceId || null,
+          // `invoiceId` is the pre-PK6-A spelling: milestones invoiced before
+          // that fix stored the link under it, and they still resolve here
+          // rather than needing a migration to say what they already knew.
+          invoiceId: i.invoicedInvoiceId || i.invoiceId || null,
         })),
         initiation: clone(c.initiation),
         duration: clone(c.duration),
@@ -3724,10 +3727,32 @@
     }
 
     /* =========================== AR — invoices, receipts, collections =========================== */
-    issueInvoice(inv, user) {
-      // AR-01..04 / VFU-01/02
-      const p = this.project(inv.projectId);
-      this._requireComplete(p.partyId, "invoice"); // MDM-10
+
+    /**
+     * Everything standing between a draft and an issued invoice, as a LIST
+     * rather than as the first exception thrown.
+     *
+     * The rules themselves are old — completeness, an unsigned contract, an
+     * unapproved extra, an abono that names no original. What is new is that
+     * a screen can now ask for them BEFORE trying, which is the whole
+     * difference between "the invoice you were about to write is blocked, and
+     * here is what to fix" and an error toast after the fact.
+     *
+     * There is exactly one copy of them, and `issueInvoice` throws on the
+     * first entry of this same list. A second implementation for the screen
+     * would be a second implementation of the law: it would agree on the day
+     * it was written and drift silently from then on.
+     */
+    _invoiceBlocks(draft) {
+      const out = [];
+      const p = this.project(draft.projectId);
+      const comp = this.partyCompleteness(p.partyId);
+      if (!comp.ok)
+        out.push({
+          code: "MDM-10",
+          label: "Datos fiscales del cliente incompletos",
+          detail: comp.missing.join(", "),
+        });
       const contract = p.contractId
         ? this.state.contracts.find((c) => c.id === p.contractId)
         : null;
@@ -3735,9 +3760,253 @@
         (i) => i.projectId === p.id && i.kind !== "creditNote",
       );
       if (contract && firstForProject && !contract.signature.customerSignedAt)
-        throw new Error("First invoice blocked: contract not signed (CON-11)");
+        out.push({
+          code: "CON-11",
+          label: "Contrato sin firmar",
+          detail: "La primera factura de la obra necesita el contrato firmado.",
+        });
+      if (draft.kind === "creditNote" && !draft.rectifies)
+        out.push({
+          code: "AR-10",
+          label: "El abono no dice qué factura rectifica",
+          detail: "Un abono siempre nombra la factura que corrige.",
+        });
+      if (draft.changeId) {
+        const ch = this.state.changes.find((x) => x.id === draft.changeId);
+        if (!ch)
+          out.push({ code: "CHG-04", label: "El adicional no existe", detail: draft.changeId });
+        else if (!["approved", "executed"].includes(ch.status))
+          out.push({
+            code: "CHG-04",
+            label: "Adicional sin aprobar",
+            detail: "Sólo se factura un adicional que el cliente ya ha aprobado.",
+          });
+      }
+      return out;
+    }
+
+    /** The base of a draft: its own lines when it has them, `baseCents` otherwise. */
+    _invoiceBase(draft) {
+      if (draft.baseCents != null) return cents(draft.baseCents);
+      return sum(draft.lines || [], (l) => cents(l.amountCents));
+    }
+
+    /**
+     * The four places an invoice legitimately comes from on one project, each
+     * already a record somewhere else in the system.
+     *
+     * Nothing here is a suggestion the operator has to retype: a milestone
+     * carries its own amount, a certification is the value-weighted progress
+     * the S curve already draws, and an adicional is priced and approved
+     * before it ever reaches this screen. The generator's job is to let
+     * somebody pick one, not to make them add it up again.
+     */
+    invoiceBases(projectId) {
+      const p = this.project(projectId);
+      const contract = p.contractId
+        ? this.state.contracts.find((c) => c.id === p.contractId)
+        : null;
+      const invs = this.state.invoices.filter((i) => i.projectId === p.id);
+      // Already billed, as BASE and net of abonos — the figure a certification
+      // has to subtract. Totals would be the wrong number: VAT is not revenue.
+      const billedBase =
+        sum(
+          invs.filter((i) => i.kind !== "creditNote"),
+          (i) => i.baseCents,
+        ) -
+        sum(
+          invs.filter((i) => i.kind === "creditNote"),
+          (i) => i.baseCents,
+        );
+      const prog = this.chapterProgress(p.id);
+      const chapters = (p.baseline.chapters || []).map((c) => {
+        const hit = prog.find((x) => x.num === c.num);
+        const progressPct = hit ? hit.progressPct : 0;
+        return {
+          num: c.num,
+          name: c.name,
+          valueCents: c.saleCents,
+          progressPct,
+          doneCents: Math.round((c.saleCents * progressPct) / 100),
+        };
+      });
+      const executedCents = sum(chapters, (c) => c.doneCents);
+      return {
+        billedBaseCents: billedBase,
+        milestones: contract
+          ? contract.installments
+              .map((i, idx) => ({
+                idx,
+                trigger: i.trigger,
+                pct: i.pct != null ? i.pct : null,
+                amountCents: i.amountCents,
+                expectedDate: i.expectedDate || null,
+                status: i.status,
+              }))
+              .filter((i) => i.status === "planned")
+          : [],
+        certification: {
+          chapters,
+          executedCents,
+          // Never negative: over-billing against progress is a real situation
+          // (a deposit invoice precedes the work it pays for), and proposing a
+          // negative certification would turn that into a nonsense line rather
+          // than into "nothing to certify yet".
+          proposedCents: Math.max(0, executedCents - billedBase),
+        },
+        changes: this.state.changes
+          .filter(
+            (c) =>
+              c.projectId === p.id && ["approved", "executed"].includes(c.status) && !c.invoiceId,
+          )
+          .map((c) => ({ id: c.id, desc: c.desc, priceCents: c.priceCents, status: c.status })),
+        issued: invs
+          .filter((i) => i.kind !== "creditNote")
+          .map((i) => ({ id: i.id, number: i.number, date: i.date, totalCents: i.totalCents })),
+      };
+    }
+
+    /**
+     * What this draft would become if it were issued now — and what stops it.
+     *
+     * The screen computes no money. Base, VAT, withholding and total come from
+     * here, which is the same arithmetic `issueInvoice` performs, so a preview
+     * cannot show one figure and the emitted document another. Nothing is
+     * persisted and no number is minted: a draft that is abandoned must leave
+     * no trace in a series that is required to have no gaps.
+     */
+    previewInvoice(draft) {
+      const p = this.project(draft.projectId);
       const party = this.party(p.partyId);
-      const baseCents = cents(inv.baseCents);
+      const baseCents = this._invoiceBase(draft);
+      const vatBp = draft.vatBp != null ? draft.vatBp : p.vatBp;
+      const vatCents = pctOf(baseCents, vatBp);
+      const irpfBp = draft.irpfBp || 0;
+      const irpfCents = pctOf(baseCents, irpfBp);
+      const blocks = this._invoiceBlocks(draft);
+      const rec = {
+        number: null, // minted at issue, never before — see nextNumber
+        kind: draft.kind || "progress",
+        date: this.state.today,
+        partyId: p.partyId,
+        projectId: p.id,
+        budgetNumber: p.budgetNumber,
+        worksAddress: draft.worksAddress || "",
+        lines: this._invoiceLines(draft, baseCents),
+        baseCents,
+        vatBp,
+        vatCents,
+        irpfBp,
+        irpfCents,
+        totalCents: baseCents + vatCents - irpfCents,
+        dueDate: addDays(this.state.today, party.paymentTermsDays || 30),
+        paymentMethod: party.paymentMethod,
+        iban: this.state.config.iban,
+        rectifies: draft.rectifies || null,
+        rectifyReason: draft.rectifyReason || null,
+      };
+      return {
+        doc: this._invoiceDoc(rec),
+        baseCents,
+        vatBp,
+        vatCents,
+        irpfBp,
+        irpfCents,
+        totalCents: rec.totalCents,
+        dueDate: rec.dueDate,
+        blocks,
+        // An invoice for nothing is not a blocked invoice, it is an empty one —
+        // it gets its own flag rather than a rule number it does not have.
+        empty: baseCents === 0,
+        ok: blocks.length === 0 && baseCents !== 0,
+      };
+    }
+
+    /**
+     * A caller that supplies `baseCents` and no lines gets the one-line form
+     * this has always produced. A draft with neither — the state the generator
+     * is in before anybody has chosen an origin — previews as genuinely empty
+     * rather than as a placeholder line for nothing, which reads like a real
+     * concept somebody has already agreed to bill.
+     */
+    _invoiceLines(inv, baseCents) {
+      if (inv.lines && inv.lines.length) return clone(inv.lines);
+      if (!baseCents) return [];
+      return [{ desc: inv.desc || "Certificación de obra", amountCents: baseCents }];
+    }
+
+    /**
+     * The invoice as a document — the same projection shape a presupuesto and
+     * a contrato already have, and for the same reason: the sheet that gets
+     * printed reads one object rather than reaching into engine state.
+     */
+    _invoiceDoc(rec) {
+      const cfg = this.state.config;
+      const project = this.state.projects.find((x) => x.id === rec.projectId) || null;
+      const rectified = rec.rectifies
+        ? this.state.invoices.find((i) => i.id === rec.rectifies || i.number === rec.rectifies)
+        : null;
+      return {
+        docType: rec.kind === "creditNote" ? "FACTURA RECTIFICATIVA" : "FACTURA",
+        number: rec.number,
+        date: rec.date,
+        dueDate: rec.dueDate,
+        issuer: {
+          legalName: cfg.legalName,
+          taxId: cfg.taxId,
+          address: `${cfg.street}, ${cfg.postalCode} ${cfg.city}`,
+          phone: cfg.phone,
+          email: cfg.email,
+          iban: rec.iban || cfg.iban,
+        },
+        customer: (({ name, taxId, billStreet, billPostalCode, billCity }) => ({
+          name,
+          taxId,
+          address: `${billStreet}, ${billPostalCode} ${billCity}`,
+        }))(this.party(rec.partyId)),
+        projectCode: project ? project.code : null,
+        budgetNumber: rec.budgetNumber || null,
+        worksAddress: rec.worksAddress || "",
+        lines: clone(rec.lines || []),
+        baseCents: rec.baseCents,
+        vatBp: rec.vatBp,
+        vatCents: rec.vatCents,
+        irpfBp: rec.irpfBp,
+        irpfCents: rec.irpfCents,
+        totalCents: rec.totalCents,
+        paymentMethod: rec.paymentMethod,
+        rectifies: rectified ? rectified.number : null,
+        rectifyReason: rec.rectifyReason || null,
+      };
+    }
+
+    /** The issued invoice as a document (AR-02/03, DOC-01). */
+    renderInvoiceDoc(invoiceId) {
+      const inv = this.state.invoices.find((i) => i.id === invoiceId || i.number === invoiceId);
+      if (!inv) throw new Error("Invoice not found");
+      return this._invoiceDoc(inv);
+    }
+
+    issueInvoice(inv, user) {
+      // AR-01..04 / VFU-01/02
+      const p = this.project(inv.projectId);
+      /* EVERY refusal happens before a number is minted.
+         `nextNumber` mutates the series — it increments the counter and pushes
+         the number onto `issued` — so a check that fires after it has run
+         leaves a number that exists in a gapless series and on no document.
+         The credit-note and unapproved-extra checks used to sit below the
+         record literal and did exactly that. */
+      const blocked = this._invoiceBlocks(inv);
+      if (blocked.length)
+        throw new Error(
+          `${blocked[0].code}: ${blocked[0].label}` +
+            (blocked[0].detail ? ` (${blocked[0].detail})` : ""),
+        );
+      const contract = p.contractId
+        ? this.state.contracts.find((c) => c.id === p.contractId)
+        : null;
+      const party = this.party(p.partyId);
+      const baseCents = this._invoiceBase(inv);
       const vatBp = inv.vatBp != null ? inv.vatBp : p.vatBp;
       const vatCents = pctOf(baseCents, vatBp);
       const irpfBp = inv.irpfBp || 0; // AR-07 customer withholds
@@ -3752,7 +4021,7 @@
         projectId: p.id,
         budgetNumber: p.budgetNumber, // AR-03
         worksAddress: inv.worksAddress || "",
-        lines: inv.lines || [{ desc: inv.desc || "Certificación de obra", amountCents: baseCents }],
+        lines: this._invoiceLines(inv, baseCents),
         baseCents,
         vatBp,
         vatCents,
@@ -3769,13 +4038,10 @@
         immutable: true,
         docRef: null,
       };
-      if (isCredit && !rec.rectifies)
-        throw new Error("Credit note must reference the original invoice (AR-10/VFU-02)");
       if (rec.changeId) {
-        // extras: only approved are billable (CHG-04)
+        // Billable by now — _invoiceBlocks refused an unapproved one above,
+        // before the number was minted (CHG-04).
         const ch = this.state.changes.find((x) => x.id === rec.changeId);
-        if (!["approved", "executed"].includes(ch.status))
-          throw new Error("Unapproved extra is not billable (CHG-04)");
         ch.status = "invoiced";
         ch.invoiceId = rec.id;
       }
@@ -3796,7 +4062,11 @@
       if (contract && rec.installmentIdx != null) {
         const i = contract.installments[rec.installmentIdx];
         i.status = "invoiced";
-        i.invoiceId = rec.id;
+        /* `invoicedInvoiceId` is the name the installment shape declares and
+           the name renderContractDoc reads. This wrote `invoiceId`, so a
+           billed milestone showed as invoiced with no invoice behind it — the
+           link was stored under a name nothing looked for. */
+        i.invoicedInvoiceId = rec.id;
       }
       this._log(user, "issueInvoice", rec.number + " " + rec.totalCents);
       return rec;
