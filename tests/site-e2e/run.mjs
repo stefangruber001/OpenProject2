@@ -2099,16 +2099,37 @@ async function testProjectTracking(browser, base) {
     // be told which job it is about.
     await pg.evaluate(() => (location.hash = "variations"));
     await pg.waitForTimeout(600);
-    const fields = await pg.locator(".projbar .phead .f").count();
-    const headText = await pg.locator(".projbar .phead").innerText();
+    // PK5-B: the bar is a CHOOSER and nothing else. It used to carry a second
+    // row of twelve summary figures — client, address, status, progress,
+    // contracted revenue, actual cost, current margin, next dates — above
+    // every screen that then shows its own. The economic ones belong to
+    // Avance económico. What must survive is the four controls that answer
+    // "which job", and what must not come back is money in the bar.
+    const chooser = await pg.evaluate(() => {
+      const bar = document.querySelector(".projbar");
+      return {
+        bar: !!bar,
+        strip: document.querySelectorAll(".projbar .phead").length,
+        search: !!document.querySelector(".projbar #pqf"),
+        picker: !!document.querySelector(".projbar #psel"),
+        fav: !!document.querySelector(".projbar #pfav"),
+        status: !!document.querySelector(".projbar #pst"),
+        money: bar ? /€/.test(bar.innerText) : false,
+        rows: bar ? bar.children.length : 0,
+      };
+    });
     if (
-      fields >= 8 &&
-      /Cliente/i.test(headText) &&
-      /Avance/i.test(headText) &&
-      /Margen actual/i.test(headText)
+      chooser.bar &&
+      chooser.strip === 0 &&
+      chooser.search &&
+      chooser.picker &&
+      chooser.fav &&
+      chooser.status &&
+      !chooser.money &&
+      chooser.rows === 1
     )
-      ok(`project header: ${fields} fields incl. customer, progress and margin (PRY-03)`);
-    else bad("project header", headText.replace(/\n/g, " ").slice(0, 100));
+      ok("project bar: chooser only — search, job, favourite, status; no summary strip (PK5-B)");
+    else bad("project bar chooser", JSON.stringify(chooser));
     if ((await pg.locator("[data-recent]").count()) === 0)
       ok("PRY-01/02: the «Recientes» chips are gone from the shared project bar");
     else bad("Recientes dropped", "chips still rendered");

@@ -3313,3 +3313,32 @@ Coste / Margen`, the same three figures twice. (b) **The "no empty state
   precisely the mobile failure this screen was created to fix, so it would have
   been the wrong thing to leave in place and teach the test to work around. The
   E2E now asserts a minimum 30px target so it cannot quietly shrink back.
+
+### 164 · The project bar's summary strip is deleted, not moved (PK5-B)
+
+The operator's instruction was to keep only "proyecto buscar, project dropdown
+list, favorit and status dropdownlist" wherever the project selector appears at
+the top of a section. That is unambiguous about what stays; it is silent about
+whether the twelve deleted figures should reappear somewhere. **Assumed: no.**
+They are not orphaned by the deletion — avance, venta contratada, coste real
+and margen actual are PRY-02's subject and are on that screen already in larger
+type; obra, cliente and estado are named by each screen's own header; próximas
+fechas is PRY-01's Gantt. The strip was a duplicate view of data that has an
+owner, and the operator's stated reason ("si requerimos ver el progreso
+económico, vamos a avance económico") is that the owner is where it belongs.
+
+Two smaller calls inside that, both taken the reversible way:
+
+(a) **The client link is dropped, not re-homed.** It was a real affordance —
+the only clickable thing in the strip — and re-siting it as a lone icon in the
+chooser row would have been defensible. But it would also be the first figure
+back in a bar the operator has just asked to empty, and DMT-01 is two clicks
+away. If it turns out to be missed, adding one button is a smaller change than
+removing one would have been.
+
+(b) **The E2E check is rewritten, not removed.** Deleting the assertion would
+have left the bar unpinned in both directions: a regression that dropped the
+dropdown would then be as invisible as the strip's return. The replacement
+pins the four controls, the single row, and the absence of `€` in the bar's
+text — that last clause is the one that will fail if somebody adds "just the
+margin" back in six months.

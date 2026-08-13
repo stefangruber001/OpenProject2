@@ -1033,7 +1033,9 @@
         align-items: center;
         flex-wrap: wrap;
         padding: 9px 13px;
-        border-bottom: 1px solid var(--hair);
+        /* No border-bottom any more: with the summary strip gone (PK5-B) this
+           row is the whole bar, and the hairline sat a pixel above the bar's
+           own border. */
         background: linear-gradient(120deg, var(--greenSoft), transparent 70%);
       }
       .projbar .psel select {
@@ -1073,54 +1075,9 @@
       .projbar .fav.on {
         color: var(--spark);
       }
-      .projbar .phead {
-        display: flex;
-        gap: 14px;
-        align-items: center;
-        flex-wrap: wrap;
-        padding: 10px 13px;
-      }
-      .projbar .f {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        min-width: 0;
-      }
-      .projbar .f .l {
-        font: 600 9.5px var(--sans);
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--muted);
-      }
-      .projbar .f .v {
-        font: 600 13px var(--sans);
-        color: var(--ink);
-        font-variant-numeric: tabular-nums;
-        white-space: nowrap;
-      }
-      .projbar .f .v.neg {
-        color: var(--danger);
-      }
-      .projbar .f a {
-        color: var(--green);
-      }
-      .projbar .sep {
-        width: 1px;
-        align-self: stretch;
-        background: var(--hair);
-      }
-      .projbar .pbar {
-        min-width: 90px;
-      }
       @media (max-width: 860px) {
         .projbar {
           position: static;
-        }
-        .projbar .phead {
-          gap: 10px;
-        }
-        .projbar .sep {
-          display: none;
         }
       }
 
@@ -9476,6 +9433,17 @@
         saveProjPrefs();
         render();
       }
+      /* The project bar is a CHOOSER, and nothing else (PK5-B).
+   It used to carry a second row summarising the chosen job: client, address,
+   status, progress, contracted revenue, actual cost, current margin, next
+   dates. Twelve figures above every screen that then shows its own — and the
+   economic ones belong to Avance económico, which is the screen built to
+   explain them. A number repeated out of context is not a shortcut to it: it
+   is one more thing to read before reaching the work. So the bar is now the
+   four controls that answer "which job": the search box, the dropdown, the
+   favourite star and the status filter. The client link went with the strip;
+   the customer record is one click away in DMT-01, and every project screen
+   below names its client already. */
       function renderProjectBar() {
         const host = $("#projbar");
         // PK4-A/PK4-B: PRY-01 and PRY-02 have no bar at all. Each is two
@@ -9519,11 +9487,6 @@
           return;
         }
         const fav = projFavs.includes(gProject);
-        const ST = {
-          active: ["b", "Activo"],
-          suspended: ["y", "Suspendido"],
-          closed: ["g", "Cerrado"],
-        };
         host.innerHTML = `<div class="projbar">
     <div class="psel">
       <span style="font:700 9.5px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--faint)">Proyecto</span>
@@ -9546,23 +9509,7 @@
         .map(([v, l]) => `<option value="${v}"${projStatus === v ? " selected" : ""}>${l}</option>`)
         .join("")}</select>
     </div>
-    ${
-      // PK3-C dropped this strip on PRY-01, where the panel header repeated
-      // it. PK4-A deleted that screen's bar outright, so the condition has
-      // nothing left to exclude — it is kept as an unconditional block again.
-      `<div class="phead">
-      <div class="f"><span class="l">Obra</span><span class="v">${esc(h.code)}</span></div>
-      <div class="f"><span class="l">Cliente</span><span class="v"><a href="#" data-party="${h.partyId}">${esc(h.partyName)}</a></span></div>
-      ${h.address ? `<div class="f" style="max-width:230px"><span class="l">Dirección</span><span class="v" style="white-space:normal;font-weight:500">${esc(h.address)}</span></div>` : ""}
-      <div class="f"><span class="l">Estado</span><span class="v"><span class="pill ${(ST[h.status] || ["b"])[0]}">${(ST[h.status] || ["", "—"])[1]}</span></span></div>
-      <div class="sep"></div>
-      <div class="f pbar"><span class="l">Avance</span><span class="v">${h.progressPct}% <span class="bar" style="display:inline-block;width:60px;vertical-align:middle"><i style="width:${h.progressPct}%"></i></span></span></div>
-      <div class="f"><span class="l">Venta contratada</span><span class="v">${eur0(h.revenueCents)}</span></div>
-      <div class="f"><span class="l">Coste real</span><span class="v">${eur0(h.actualCents)}</span></div>
-      <div class="f"><span class="l">Margen actual</span><span class="v${h.marginCents < 0 ? " neg" : ""}">${eur0(h.marginCents)} · ${h.marginPct}%</span></div>
-      ${h.nextDates.length ? `<div class="sep"></div><div class="f"><span class="l">Próximas fechas</span><span class="v" style="font-weight:500">${h.nextDates.map((d) => `${esc(d.what)} ${fmtD(d.date)}`).join(" · ")}</span></div>` : ""}
-    </div>`
-    }</div>`;
+  </div>`;
         $("#psel").onchange = (e) => setProject(e.target.value);
         $("#pst").onchange = (e) => {
           projStatus = e.target.value;
@@ -9585,13 +9532,6 @@
         // recency they were built on is not — `projectOptions()` still sorts
         // the selector by it, so the last few jobs are still the first few in
         // the dropdown, which is where somebody looking for them already goes.
-        const pl = host.querySelector("[data-party]");
-        if (pl)
-          pl.onclick = (e) => {
-            e.preventDefault();
-            go("customers");
-            partyDrawer(pl.dataset.party);
-          };
       }
 
       /* =============================== Budget builder (spec §3.3) =========================

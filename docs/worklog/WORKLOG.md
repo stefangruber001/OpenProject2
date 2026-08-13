@@ -654,6 +654,7 @@ than per-screen.
 | #     | Session                                                           | Model  | Effort | State    |
 | ----- | ----------------------------------------------------------------- | ------ | ------ | -------- |
 | PK5-A | Cards that fit the phone · language switch moves to Configuración | Opus 5 | medium | **done** |
+| PK5-B | The project bar becomes a chooser and nothing else                | Opus 5 | low    | **done** |
 
 ### PK5-A — **done**
 
@@ -717,3 +718,45 @@ assertion doing its job on the product rather than on itself: the subsección
 count is pinned, so adding Idioma turned `6×29` red until it was re-pinned at
 30 — see ASSUMPTIONS #163(f), which records that this crosses a line S1B drew
 deliberately, and why.
+
+### PK5-B — **done**
+
+**The project bar goes back to being a chooser.** Above Adicionales, Compras
+and Horas sat a bar in two rows: the four controls that answer _which job_,
+and under them a strip of summary figures — obra, cliente, dirección, estado,
+avance with a progress bar, venta contratada, coste real, margen actual,
+próximas fechas. Twelve figures above a screen that then shows its own. The
+operator's verdict was that this is simply too much to read before reaching
+the work, and that the economic ones have a home already: _"si requerimos ver
+el progreso económico, vamos a avance económico"_ — which since PK4-B is a
+screen built to explain exactly those numbers rather than to flash them.
+
+So the strip is deleted. What remains is `.psel`: the search box, the job
+dropdown, the favourite star and the status filter. The bar is one row on
+desktop (51px) and wraps to three on a 390px phone, where it previously cost
+most of the first screenful before any content appeared.
+
+Two things went with the strip and are worth naming, because neither is a
+loss the operator asked for and both had to be checked rather than assumed:
+
+- the **client link** (`[data-party]` → DMT-01 drawer) was the strip's only
+  interactive element. It is not re-homed. Every screen under the bar names
+  its client already, and the customer record is one click from Maestros;
+  a shortcut is not worth eleven figures of chrome.
+- `erp.projectHeader(gProject)` is still called. Not for the strip — for the
+  `<option>` fallback when `projectOptions()` returns nothing, and because
+  its throw is how the bar detects a project id that no longer resolves.
+
+The CSS for `.phead`, `.f`, `.sep` and `.pbar` under `.projbar` is deleted
+rather than left orphaned, along with the 860px media query that only tuned
+their spacing. `.psel` also loses its `border-bottom`, which was the divider
+between the two rows and would otherwise have drawn a hairline one pixel
+above the bar's own border.
+
+The site-e2e check that pinned the strip (`.projbar .phead .f` ≥ 8, with
+Cliente, Avance and Margen actual present) is replaced rather than deleted —
+a check that only asserted the strip's absence would pass just as well on a
+bar that had lost its dropdown. The new one asserts the bar exists, has
+exactly **one** child row, carries all four controls, has no `.phead`, and
+contains **no `€` anywhere** — the last being the part that keeps a figure
+from creeping back later. 424/424 passing.
