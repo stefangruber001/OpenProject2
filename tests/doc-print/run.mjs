@@ -39,5 +39,8 @@ fs.rmSync(OUT, { recursive: true, force: true });
 const rendered = node([resolve(__dirname, "render.mjs"), DOCS, OUT]);
 if (rendered.status !== 0) process.exit(rendered.status ?? 1);
 
-const checked = node([resolve(__dirname, "margins.mjs"), OUT, "9.5"]);
-process.exit(checked.status ?? 1);
+const margins = node([resolve(__dirname, "margins.mjs"), OUT, "9.5"]);
+if (margins.status !== 0) process.exit(margins.status ?? 1);
+
+const searchable = node([resolve(__dirname, "searchable.mjs"), OUT]);
+process.exit(searchable.status ?? 1);

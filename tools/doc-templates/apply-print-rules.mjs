@@ -48,6 +48,15 @@ const PRINT_CSS = `
 }
 `;
 
+/**
+ * Tracking above this makes a PDF text extractor insert spaces between the
+ * glyphs, so "FACTURA" is stored as "FAC T U R A" and Ctrl+F finds nothing.
+ * Measured on the real templates: .1em breaks, .08em and below is clean, and
+ * .04em leaves no stray split anywhere in the set. Still visibly tracked.
+ */
+const MAX_TRACKING = ".04em";
+const WIDE = [".1em", ".11em", ".12em", ".14em", ".07em", ".08em"];
+
 let n = 0;
 const walk = (d) => {
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {
@@ -58,6 +67,8 @@ const walk = (d) => {
       if (s.includes("CANEI-PRINT-FIX")) continue;
       // Appended last so it wins on specificity ties without editing the
       // designer's stylesheet — their file stays readable and diffable.
+      for (const w of WIDE)
+        s = s.split(`letter-spacing:${w}`).join(`letter-spacing:${MAX_TRACKING}`);
       s = s.replace("</head>", `<style>/* CANEI-PRINT-FIX */${PRINT_CSS}</style>\n</head>`);
       fs.writeFileSync(p, s);
       n++;

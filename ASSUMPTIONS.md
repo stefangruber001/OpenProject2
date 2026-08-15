@@ -1552,3 +1552,28 @@ SERVER_SSH_KEY`. The browser-ops path has never had its credentials, so it has n
   every page and broke five "no console errors" assertions; and the switcher's
   own labels being counted by the audit as untranslated — measuring the ruler as
   part of what it measures.
+
+- **#95 — The two review points, both fixed, and one of them was not what I said
+  it was.** (1) Fonts are self-hosted: 386KB of woff2 under `site/assets/`, zero
+  external requests from any template. A company's invoice must look the same
+  offline, and no customer's browser should tell Google which invoice they just
+  opened. (2) Letter-spacing: the headings were unsearchable in the PDF —
+  "FACTURA" stored as "FAC T U R A", so Ctrl+F found nothing and a screen reader
+  working from the extracted text read it letter by letter.
+  **I overstated the screen-reader half when I first reported it.** In the HTML,
+  screen readers read the DOM text, which is clean regardless of CSS tracking.
+  It is only broken in the PDF — which is the artifact customers receive, so the
+  fix still mattered, but the claim as written was wrong.
+  **The threshold was measured, not guessed**, and the first measurement was
+  wrong in the useful direction: an isolated probe of the same declaration
+  (Roboto Serif, 12px, .1em, uppercase) extracted perfectly, which would have
+  had me "fix" something that was not the cause. Testing the REAL document
+  showed .1em breaks and everything to .08em is clean; capped at **.04em**,
+  where no stray split survives anywhere in the set, and the tracking is still
+  visible.
+  **A single split is as bad as full shattering** and much easier to miss:
+  ".07em" left "FAC TURA" and "TRABA JO", which passed a gate that only looked
+  for four-or-more single letters. `tests/doc-print/searchable.mjs` now also
+  squeezes the spaces out of each line and fails when a document-type word
+  appears only after squeezing — and the gate was verified by reverting one file
+  to .1em and confirming it exits 1.
