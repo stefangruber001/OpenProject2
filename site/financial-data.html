@@ -5,7 +5,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="robots" content="noindex" />
-<title>Canei Subirats — Financial Data</title>
+<title>Canei Subirats — Datos financieros</title>
 <style>
   :root{
     --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a; --greenSoft:#e7f0e1; --greenPale:#dce8d4; --spark:#f2c230;
@@ -147,6 +147,7 @@
   @media(max-width:560px){.topbar{padding:12px 14px}.tb-actions .lbl{display:none}}
 </style>
 <script src="i18n-dict.js"></script>
+<script src="i18n-dict-ca.js"></script>
 <script src="i18n.js"></script>
 <!-- erp-sync.js must load BEFORE the stores: they register their
      documents with it as soon as the first read comes back. Without it
@@ -163,7 +164,7 @@
         <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
         <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230"/>
       </svg>
-      <span class="nm">Canei Subirats<small>Financial Data</small></span>
+      <span class="nm">Canei Subirats<small>Datos financieros</small></span>
     </div>
     <span class="tb-spacer"></span>
     <div class="tb-actions">
@@ -178,7 +179,7 @@
   <div class="shell">
     <aside id="nav"></aside>
     <main>
-      <div class="crumbs">Financial Data ›&nbsp;<span id="crumb">—</span></div>
+      <div class="crumbs">Datos financieros ›&nbsp;<span id="crumb">—</span></div>
       <div class="head"><div><h1 id="ttl">—</h1><div class="sub" id="sub"></div></div></div>
       <div class="mobsel"><select id="mnav"></select></div>
       <div id="view"></div>
@@ -486,7 +487,7 @@ const VIEWS={
     ${tile('Net profit',euro(k.net),`${pctf(k.nm)} net margin`)}
     ${tile('Cash position',euro(k.cash),`Net ${k.netDebt<0?'cash':'debt'} ${euro(Math.abs(k.netDebt))}`,1)}
     ${tile('Current ratio',k.currentRatio.toFixed(2),`Quick ${k.quick.toFixed(2)} · WC ${euro(k.workingCap)}`)}
-    ${tile('DSO / DPO',`${Math.round(k.dso)} / ${Math.round(k.dpo)}d`,'Collection vs payment days')}
+    ${tile('Cobros / Pagos (DSO / DPO)',`${Math.round(k.dso)} / ${Math.round(k.dpo)}d`,'Días de cobro frente a días de pago')}
     ${tile('Backlog',euro(k.backlog),`${euro(k.pipeline)} open pipeline`)}
    </div>
    <div class="grid2">

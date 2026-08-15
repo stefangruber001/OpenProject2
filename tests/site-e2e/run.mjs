@@ -603,48 +603,83 @@ async function testErp(browser, base) {
   }
 }
 
-// ── Language toggle: ES default, EN translates Spanish-base pages, and the
-//    choice carries to English-base pages (html lang flips to the target).
+// ── Language: three of them, the choice remembered, and English-base pages
+//    adopting it too.
+//
+//    index.html is a redirect stub to erp.html — asserting on "the home page"
+//    means asserting on the workspace, which is why the strings checked here
+//    are the workspace's.
 async function testI18n(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+  // The choice now lives in a cookie so the server-rendered sign-in page can
+  // see it too. Cleared first: a cookie set by an earlier test in this context
+  // would otherwise decide the language before this one gets a say.
+  const clear = () =>
+    pg.evaluate(() => {
+      document.cookie = "canei_lang=;path=/;max-age=0";
+      try {
+        localStorage.removeItem("caneiLang");
+        localStorage.removeItem("caneiLangCompany");
+      } catch (e) {}
+    });
   try {
-    await pg.goto(`${base}/index.html`, { waitUntil: "networkidle" });
-    await pg.waitForTimeout(300);
-    const pill = await pg.locator("#canei-lang-pill button").count();
-    if (pill === 2) ok("i18n: language toggle present on home");
-    else bad("i18n: toggle present", `buttons=${pill}`);
-    const esText = await pg.locator("body").innerText();
-    if (esText.includes("Áreas de gestión")) ok("i18n: home defaults to Spanish");
-    else bad("i18n: home defaults to Spanish", esText.slice(0, 60));
-
-    // switch to EN via the pill (reloads the page)
-    await Promise.all([
-      pg.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
-      pg.locator("#canei-lang-pill button", { hasText: "EN" }).click(),
-    ]);
-    await pg.waitForTimeout(400);
-    const enText = await pg.locator("body").innerText();
-    if (enText.includes("Management areas") && !enText.includes("Áreas de gestión"))
-      ok("i18n: EN toggle translates the home page");
-    else bad("i18n: EN toggle translates home", enText.slice(0, 100));
-
-    // dynamic content on erp.html gets translated too (MutationObserver path)
     await pg.goto(`${base}/erp.html#torre`, { waitUntil: "networkidle" });
-    await pg.waitForTimeout(700);
-    const erpLang = await pg.evaluate(() => document.documentElement.lang);
-    const erpText = await pg.locator("body").innerText();
-    if (erpLang === "en" && /Control tower/i.test(erpText))
-      ok("i18n: choice persists and translates the ERP workspace");
-    else bad("i18n: erp translated", `lang=${erpLang} ${erpText.slice(0, 80)}`);
+    await clear();
+    await pg.reload({ waitUntil: "networkidle" });
+    await pg.waitForTimeout(400);
 
-    // English-base page flips to Spanish when ES is chosen
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "es"));
+    const pill = await pg.locator("#canei-lang-pill button").count();
+    if (pill === 3) ok("i18n: three languages offered");
+    else bad("i18n: toggle present", `buttons=${pill}`);
+
+    // Waited for, not slept for. The control tower builds its tiles from data
+    // after first paint, so a fixed delay tests how fast this machine is.
+    // Case-insensitive, and against the page CHROME rather than the control
+    // tower's tiles: the tiles do not render at all in this static harness
+    // (the same pre-existing failure as "home launchpad"), so asserting on them
+    // would test that unrelated breakage instead of the translation.
+    const settled = (needle) =>
+      pg
+        .waitForFunction(
+          (s) => document.body.innerText.toLowerCase().includes(s.toLowerCase()),
+          needle,
+          { timeout: 10000 },
+        )
+        .then(() => true)
+        .catch(() => false);
+
+    if ((await settled("un único entorno")) && (await settled("＋ Crear")))
+      ok("i18n: defaults to Spanish");
+    else bad("i18n: defaults to Spanish", (await pg.locator("body").innerText()).slice(0, 80));
+
+    for (const [code, expect, forbid] of [
+      ["EN", "a single environment", "único entorno"],
+      ["CA", "un únic entorn", "único entorno"],
+    ]) {
+      await Promise.all([
+        pg.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
+        pg.locator("#canei-lang-pill button", { hasText: code }).click(),
+      ]);
+      const arrived = await settled(expect);
+      const text = await pg.locator("body").innerText();
+      const lang = await pg.evaluate(() => document.documentElement.lang);
+      if (
+        arrived &&
+        lang === code.toLowerCase() &&
+        !text.toLowerCase().includes(forbid.toLowerCase())
+      )
+        ok(`i18n: ${code} translates the workspace`);
+      else bad(`i18n: ${code} translates`, `lang=${lang} ${text.slice(0, 90)}`);
+    }
+
+    // An English-base page adopts the chosen language too.
+    await pg.evaluate(() => (document.cookie = "canei_lang=es;path=/;max-age=31536000"));
     await pg.goto(`${base}/journey.html`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(500);
     const jLang = await pg.evaluate(() => document.documentElement.lang);
     if (jLang === "es") ok("i18n: English-base page adopts Spanish choice");
     else bad("i18n: journey adopts ES", `lang=${jLang}`);
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "es"));
+    await clear();
   } catch (e) {
     bad("i18n toggle", String(e).slice(0, 160));
   } finally {

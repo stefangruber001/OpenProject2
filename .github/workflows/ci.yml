@@ -42,6 +42,16 @@ jobs:
       - name: Draft mailbox adapter
         run: pnpm test:mailbox
 
+      # Renders every page in every language and counts the strings that came
+      # out identical in two of them. Budgeted rather than zero: the
+      # documentation pages (setup-guide, backend) are still Spanish-only, and a
+      # gate nobody can pass is a gate that gets deleted. The number only ever
+      # moves down.
+      - name: Translation coverage
+        run: |
+          node tests/i18n/audit.mjs --lang en --max 620
+          node tests/i18n/audit.mjs --lang ca --max 610
+
       - name: Unit tests
         run: pnpm test
 

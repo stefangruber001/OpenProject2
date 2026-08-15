@@ -25,8 +25,18 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { loginConfigured } from "@/lib/auth";
-import { sharedAccessEnabled } from "@/lib/access";
+import { defaultTenant, sharedAccessEnabled } from "@/lib/access";
+import { loadUiSettings } from "@/lib/erp-runtime";
 import { SESSION_COOKIE, readSession } from "@/lib/session-token";
+import {
+  LANGUAGES,
+  LANGUAGE_NAMES,
+  LANGUAGE_SHORT,
+  LANG_COOKIE,
+  asLanguage,
+  t,
+  type Language,
+} from "@/lib/ui-language";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +89,19 @@ export default async function LoginPage({
   const next = nextPath.startsWith("/login") ? "/" : nextPath;
   const shared = sharedAccessEnabled();
 
+  // WHICH LANGUAGE THIS PAGE IS IN, in order: what this visitor just clicked,
+  // what this device chose before, what the company works in. Resolved on the
+  // server so the page arrives correct rather than arriving wrong and being
+  // corrected — the second is what makes a multilingual site feel broken.
+  const jar = await cookies();
+  const companyLang =
+    asLanguage(
+      ((await loadUiSettings(defaultTenant()).catch(() => null)) as { language?: unknown } | null)
+        ?.language,
+    ) || "es";
+  const lang: Language =
+    asLanguage(params.lang) || asLanguage(jar.get(LANG_COOKIE)?.value) || companyLang;
+
   // ALREADY SIGNED IN? Then this page is not a login, it is a door standing
   // open, and the right thing is to walk through it.
   //
@@ -106,12 +129,10 @@ export default async function LoginPage({
     return (
       <main style={{ fontFamily: SANS, maxWidth: 560, margin: "12vh auto", padding: 24 }}>
         <h1 style={{ fontSize: 20, marginBottom: 12, fontFamily: SERIF }}>
-          Sign-in is not configured
+          {t("notConfiguredTitle", lang)}
         </h1>
         <p style={{ color: BODY, lineHeight: 1.6 }}>
-          This server has no accounts set up, so there is nothing to sign in to. Either it is a
-          single-operator deployment reachable only over a tunnel, or <code>ERP_USERS</code> and{" "}
-          <code>SESSION_SECRET</code> are missing from its configuration.
+          {t("notConfiguredBody", lang)} <code>ERP_USERS</code> / <code>SESSION_SECRET</code>.
         </p>
       </main>
     );
@@ -179,10 +200,60 @@ export default async function LoginPage({
                 marginTop: 4,
               }}
             >
-              Management system
+              {t("tagline", lang)}
             </div>
           </div>
         </div>
+
+        {/* THE LANGUAGE CHOICE, ABOVE THE FORM AND BEFORE ANYTHING IS TYPED.
+            Three plain links, because this page has no JavaScript: each one
+            hands the choice to /api/lang, which records it and sends the
+            visitor straight back here. The names are written in their own
+            language — nobody looking for Català is helped by the word
+            "Catalan". */}
+        <nav
+          aria-label={t("languageGroup", lang)}
+          translate="no"
+          style={{
+            display: "flex",
+            gap: 3,
+            padding: 3,
+            marginBottom: 14,
+            background: "rgba(255,255,255,.72)",
+            border: `1px solid ${LINE}`,
+            borderRadius: 999,
+            width: "fit-content",
+          }}
+        >
+          {LANGUAGES.map((code) => {
+            const on = code === lang;
+            const back = `/login?next=${encodeURIComponent(next)}`;
+            return (
+              <a
+                key={code}
+                href={`/api/lang?to=${code}&next=${encodeURIComponent(back)}`}
+                hrefLang={code}
+                aria-current={on ? "true" : undefined}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "baseline",
+                  gap: 6,
+                  padding: "7px 13px",
+                  borderRadius: 999,
+                  textDecoration: "none",
+                  font: `600 12px ${SANS}`,
+                  color: on ? "#fff" : MUTED,
+                  background: on ? `linear-gradient(120deg, ${GREEN_DEEP}, ${GREEN} 72%)` : "none",
+                }}
+              >
+                <span style={{ font: `700 11px ${SANS}`, letterSpacing: ".06em" }}>
+                  {LANGUAGE_SHORT[code]}
+                </span>
+                <span style={{ font: `500 12px ${SANS}` }}>{LANGUAGE_NAMES[code]}</span>
+              </a>
+            );
+          })}
+        </nav>
 
         <form
           method="post"
@@ -225,14 +296,14 @@ export default async function LoginPage({
                 marginBottom: 18,
               }}
             >
-              Incorrect email or password.
+              {t("failed", lang)}
             </div>
           )}
 
           <input type="hidden" name="next" value={next} />
 
           <label htmlFor="canei-email" style={LABEL}>
-            Email
+            {t("email", lang)}
           </label>
           {shared && (
             // The shared password needs no address. Saying so is what makes a
@@ -240,7 +311,7 @@ export default async function LoginPage({
             // evaluating the system does is invent an email address, and the
             // sign-in fails for a reason the screen never explains.
             <div style={{ font: `400 12.5px/1.4 ${SANS}`, color: MUTED, margin: "-3px 0 7px" }}>
-              Leave blank if you only have the password.
+              {t("blankIfShared", lang)}
             </div>
           )}
           <input
@@ -260,7 +331,7 @@ export default async function LoginPage({
           />
 
           <label htmlFor="canei-password" style={LABEL}>
-            Password
+            {t("password", lang)}
           </label>
           <input
             id="canei-password"
@@ -285,7 +356,7 @@ export default async function LoginPage({
               boxShadow: "0 10px 22px -12px rgba(49,83,42,.9)",
             }}
           >
-            Sign in
+            {t("submit", lang)}
           </button>
 
           {/* The closing line says something different in the phone app, because
@@ -302,8 +373,8 @@ export default async function LoginPage({
           `}</style>
           {(
             [
-              ["canei-hint-web", "Save the password to sign in with Face ID."],
-              ["canei-hint-app", "Next time you will sign in with Face ID."],
+              ["canei-hint-web", t("hintWeb", lang)],
+              ["canei-hint-app", t("hintApp", lang)],
             ] as const
           ).map(([cls, line]) => (
             <p
@@ -316,7 +387,7 @@ export default async function LoginPage({
                 margin: "16px 0 0",
               }}
             >
-              You stay signed in on this device.
+              {t("staySignedIn", lang)}
               <br />
               {line}
             </p>

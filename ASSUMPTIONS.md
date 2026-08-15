@@ -1505,3 +1505,50 @@ SERVER_SSH_KEY`. The browser-ops path has never had its credentials, so it has n
      accident and against loops, not against a person with credentials deciding to
      email someone. Ranking that risk against the customer's own inbox is the
      owner's call, and they made it.
+
+- **#94 — Three languages, and a ruler that cannot flatter us.**
+  Asked to check that every text translates on ES / CA / EN, with a switcher on
+  the sign-in screen and a company-wide switch inside the ERP. Catalan did not
+  exist at all, and the honest answer to "is everything translated" was **no**:
+  rendering all ten pages in both existing languages and diffing the visible
+  text found **833 untranslated strings**. Every previous coverage claim in this
+  project came from counting dictionary entries; the dictionary is what we
+  wrote, the rendered page is what the operator reads, and the gap between them
+  was the whole problem. `tests/i18n/audit.mjs` now measures the page.
+  **Two switches, deliberately different.** The sign-in selector sets a cookie —
+  this device, this person, immediately, and readable by the server so the page
+  is _rendered_ in that language rather than arriving wrong and flipping. The
+  ERP's switch writes `ui-settings.language` through
+  `PUT /api/~/erp/language` — the whole company, every device. Resolution is
+  device override → company language → the page's own language. A company change
+  clears the local override, or the person who made the change would be the one
+  person who never saw it.
+  **The sign-in page is translated on the SERVER, from a table** (`lib/ui-language.ts`),
+  not by the runtime layer. It carries no client JavaScript by design, so there
+  is nothing there to rewrite text — and a first screen that flips language a
+  moment after it appears reads as broken.
+  **Catalan is Central Catalan and uses the trade's own words** — _amidament_
+  not "medició", _lampisteria_ not "fontaneria", _enderroc_, _desar_, _cercar_,
+  _ajornar_, _fita_, _comanda_. A word-for-word Catalan of Spanish construction
+  vocabulary is exactly what reads as machine output to a builder in Sant Just.
+  **A translation that is identical is a decision, not a gap.** "Principal",
+  "Subtotal", "Comercial", "Documental" and "Variables" are spelled the same in
+  Spanish and Catalan. The audit therefore treats an explicit dictionary entry
+  mapping a string to itself as answered, and only counts strings with no entry
+  at all. Without that the gate could never reach zero however much work was
+  done, which is the fastest way to make a gate get ignored.
+  **Where it stands, measured, not claimed:** the workspace (`erp.html`) went
+  from 77 untranslated to **11 in Catalan and 14 in English**; journey 12 → 9;
+  master data 7 → 8 (it gained strings when hardcoded English headings were
+  moved into Spanish so they could be translated at all); financial data 5 → 6.
+  What remains is dominated by `setup-guide.html` (≈443) and `backend.html`
+  (≈38) — long-form documentation pages, not the ERP — plus seed data that
+  should never be translated (customer names, streets, Catalan town names).
+  CI gates on a budget that only moves down.
+  **Three real bugs found on the way:** English headings hardcoded on Spanish
+  pages ("Master Data", "Financial Data", "Tax", and a whole sentence in
+  journey.html) which no language setting could ever have fixed; the language
+  fetch 404ing on the published static copy, which logged a console error on
+  every page and broke five "no console errors" assertions; and the switcher's
+  own labels being counted by the audit as untranslated — measuring the ruler as
+  part of what it measures.
