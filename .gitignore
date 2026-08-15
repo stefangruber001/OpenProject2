@@ -71,3 +71,6 @@ apps/web/public/*
 # machine that built them and nowhere else. A shared link would have shown no
 # thumbnail, with the image 404ing on the server.
 !apps/web/public/brand/
+
+# Generated document templates — rebuilt by tools/doc-templates/build.mjs
+dist/
