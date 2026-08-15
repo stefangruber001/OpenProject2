@@ -11,9 +11,12 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import fs from "node:fs";
+import { requirePoppler } from "../doc-print/poppler.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..", "..");
+requirePoppler();
+
 const OUT = resolve(ROOT, "dist/doc-pdf-check");
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -178,7 +181,8 @@ check("the legal footer is on the page", txt.includes("Canei Subirats, S.L."));
 
 // The margin rule the HTML templates are held to, applied to the writer too.
 const bbox = spawnSync("pdftotext", ["-bbox", file, "-"], { encoding: "utf8" }).stdout || "";
-let closest = 999;
+let closest = Infinity;
+let wordsSeen = 0;
 for (const page of bbox.split(/<page\b/).slice(1)) {
   const m = /width="([\d.]+)"\s+height="([\d.]+)"/.exec(page);
   const W = m ? +m[1] : 595.28,
@@ -186,14 +190,19 @@ for (const page of bbox.split(/<page\b/).slice(1)) {
   for (const w of page.matchAll(
     /xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)"/g,
   )) {
+    wordsSeen++;
     const e = Math.min(+w[1], +w[2], W - +w[3], H - +w[4]);
     closest = Math.min(closest, (e / 72) * 25.4);
   }
 }
+// Measured, or failed — never "999mm and therefore fine". In CI this exact
+// assertion passed on a PDF that nothing had read, because the sentinel stood in
+// for a measurement that never happened.
+check("the document could be read back at all", wordsSeen > 50, `${wordsSeen} words extracted`);
 check(
   "no ink inside the printable border",
-  closest >= 9.5,
-  `${closest.toFixed(1)}mm from the edge`,
+  wordsSeen > 0 && closest >= 9.5,
+  wordsSeen ? `${closest.toFixed(1)}mm from the edge` : "nothing measured",
 );
 
 const failed = results.filter((r) => !r.ok);

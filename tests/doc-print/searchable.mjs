@@ -20,6 +20,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { requirePoppler } from "./poppler.mjs";
 
 const dir = process.argv[2];
 // Two ways a heading can come out wrong, and the second is easy to miss.
@@ -54,14 +55,18 @@ const TITLE_WORDS = [
   "CAMBIO",
 ];
 
+requirePoppler();
+
 let bad = 0,
-  checked = 0;
+  checked = 0,
+  wordsSeen = 0;
 for (const f of fs
   .readdirSync(dir)
   .filter((x) => x.endsWith(".pdf"))
   .sort()) {
   const txt = spawnSync("pdftotext", [path.join(dir, f), "-"], { encoding: "utf8" }).stdout || "";
   checked++;
+  wordsSeen += (txt.match(/\S+/g) || []).length;
   const lines = txt.split("\n").map((l) => l.trim());
   const hits = lines.filter((l) => l.length > 6 && SHATTERED.test(l));
 
@@ -80,6 +85,14 @@ for (const f of fs
     for (const h of hits.slice(0, 3)) console.log(`      "${h.slice(0, 60)}"`);
   }
 }
+if (!wordsSeen) {
+  console.error(
+    `FAIL: zero words extracted from ${checked} PDF(s) — nothing was checked for ` +
+      "searchability, so this gate cannot report success.",
+  );
+  process.exit(1);
+}
+
 console.log(
   bad
     ? `\n${bad} of ${checked} documents contain unsearchable headings`
