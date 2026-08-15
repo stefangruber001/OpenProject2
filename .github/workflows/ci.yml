@@ -50,6 +50,11 @@ jobs:
       # Every document template rendered to PDF and measured: no ink within
       # 9.5mm of the paper edge, on any page. The redesign shipped with 0.8mm
       # on continuation pages, which no printer can reproduce.
+      # The writer that produces every quote and invoice: paginates, keeps
+      # Spanish accents, and stays clear of the printable border.
+      - name: PDF writer
+        run: pnpm test:pdf
+
       - name: Documents are printable
         run: pnpm test:docs
 

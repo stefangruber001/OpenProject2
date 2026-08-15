@@ -235,6 +235,7 @@
   .realgrid .it{background:var(--panel);border-radius:11px;padding:10px 12px;font-size:12.5px}
   .realgrid .it b{display:block;font-family:var(--serif);font-size:17px;color:var(--ink);margin-top:2px}
 </style>
+<script src="erp-pdf.js"></script>
 <script src="i18n-dict.js"></script>
 <script src="i18n-dict-ca.js"></script>
 <script src="i18n.js"></script>
@@ -716,85 +717,24 @@ const tr = s => String(s)
 function wrapTxt(s,maxCh){ const words=String(s).split(/\s+/); const out=[]; let cur="";
   for(const w of words){ if((cur+" "+w).trim().length>maxCh){ if(cur)out.push(cur); cur=w; } else cur=(cur?cur+" ":"")+w; }
   if(cur)out.push(cur); return out.length?out:[""]; }
+/**
+ * The document PDF.
+ *
+ * The layout lives in erp-pdf.js — a paginating writer with real font metrics,
+ * built to the approved design. This is the seam that feeds it, kept under the
+ * old name and returning base64 exactly as before so that every caller, the
+ * .eml attachments included, needed no change.
+ *
+ * What the previous writer here did wrong is worth remembering: its page tree
+ * said `Count 1`, so any document longer than one page lost the remainder in
+ * silence. The sample data fitted, so nothing ever complained.
+ */
 function buildDocPdf(d){
-  const G="0.282 0.451 0.235", INK="0.078 0.086 0.059", GREY="0.5 0.52 0.46", BODY="0.29 0.31 0.26", LN="0.85 0.88 0.82";
-  let c="";
-  const escp=s=>tr(s).replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)");
-  const T=(x,y,sz,f,col,s)=>{ c+=`${col} rg BT /${f} ${sz} Tf ${x} ${y} Td (${escp(s)}) Tj ET\n`; };
-  const TR=(rx,y,sz,f,col,s)=>{ const w=tr(s).length*sz*0.5; T(rx-w,y,sz,f,col,s); };
-  const rect=(x,y,w,h,col)=>{ c+=`${col} rg ${x} ${y} ${w} ${h} re f\n`; };
-  const hr=(x,y,w,col)=>{ c+=`${col} rg ${x} ${y} ${w} 0.8 re f\n`; };
-  // header band
-  rect(0,792,595,50,G);
-  T(42,812,19,"F2","1 1 1",BRAND.name);
-  T(42,799,9.5,"F1","0.93 0.86 0.62",BRAND.slogan);
-  TR(553,812,20,"F2","1 1 1",d.docType);
-  // seller (left) + meta (right)
-  let y=764;
-  T(42,y,9.5,"F2",INK,BRAND.legal); y-=13;
-  [BRAND.cif, BRAND.address, BRAND.from+"   "+BRAND.phone].forEach(l=>{ T(42,y,8.5,"F1",GREY,l); y-=12; });
-  let my=764;
-  [["No.",d.number],[d.dateLabel+":",d.dateIssued],[d.dueLabel+":",d.dueOrValid]].forEach(([k,v])=>{
-    TR(468,my,9,"F1",GREY,k); TR(553,my,9,"F2",INK,v); my-=15; });
-  // bill-to
-  y-=10;
-  T(42,y,8.5,"F2",G,"BILL TO / FACTURAR A"); y-=15;
-  T(42,y,11,"F2",INK,d.buyer.name); y-=14;
-  [d.buyer.nif, d.buyer.address].filter(Boolean).forEach(l=>{ T(42,y,9,"F1",BODY,l); y-=12; });
-  // lines table
-  y-=16;
-  if(d.groups){
-    T(42,y,8,"F2",GREY,"CONCEPTO / DESCRIPTION");
-    TR(432,y,8,"F2",GREY,"CANT."); TR(492,y,8,"F2",GREY,"PRECIO"); TR(553,y,8,"F2",GREY,"IMPORTE");
-    y-=7; hr(42,y,511,G); y-=15;
-    d.groups.forEach(g=>{
-      T(42,y,9.5,"F2",G,g.chapter); y-=14;
-      g.rows.forEach(r=>{
-        const wr=wrapTxt(r.item,50);
-        wr.forEach((w,i)=>T(54,y-i*11,9.5,"F1",BODY,w));
-        TR(432,y,9.5,"F1",BODY,r.qtyLabel); TR(492,y,9.5,"F1",BODY,r.priceLabel); TR(553,y,9.5,"F1",INK,r.amount);
-        y -= Math.max(1,wr.length)*11 + 5;
-      });
-      hr(300,y+5,253,LN); TR(432,y-3,8.5,"F1",GREY,"Subtotal"); TR(553,y-3,9.5,"F2",INK,g.subtotal); y-=18;
-    });
-  } else {
-    T(42,y,8.5,"F2",GREY,"CONCEPTO / DESCRIPTION"); TR(553,y,8.5,"F2",GREY,"IMPORTE / AMOUNT");
-    y-=7; hr(42,y,511,G); y-=17;
-    d.lines.forEach(li=>{
-      const wr=wrapTxt(li.desc,64);
-      wr.forEach((w,i)=>T(42,y-i*12,10,"F1",BODY,w));
-      TR(553,y,10,"F1",INK,li.amount);
-      y -= Math.max(1,wr.length)*12 + 7; hr(42,y+5,511,LN);
-    });
-  }
-  // totals
-  y-=10;
-  d.totals.forEach((t,i)=>{ const bold=i===d.totals.length-1;
-    if(bold){ hr(330,y+14,223,G); }
-    TR(468,y,bold?11:9.5,bold?"F2":"F1",bold?INK:BODY,t[0]);
-    TR(553,y,bold?11:9.5,bold?"F2":"F1",bold?INK:BODY,t[1]); y-=17; });
-  // payment
-  if(d.payment&&d.payment.length){ y-=8; T(42,y,8.5,"F2",G,"PAGO / PAYMENT"); y-=14;
-    d.payment.forEach(l=>{ wrapTxt(l,92).forEach(w=>{ T(42,y,9,"F1",BODY,w); y-=12; }); }); }
-  // legal notes
-  if(d.notes&&d.notes.length){ y-=6; T(42,y,8.5,"F2",GREY,"NOTAS / NOTES"); y-=13;
-    d.notes.forEach(l=>{ wrapTxt("- "+l,104).forEach(w=>{ T(42,y,8,"F1",GREY,w); y-=10.5; }); }); }
-  // footer
-  hr(42,52,511,G);
-  T(42,40,8.5,"F1",GREY,BRAND.legal+"   -   "+BRAND.address);
-  T(42,29,8.5,"F1",GREY,BRAND.from+"   -   "+BRAND.phone+"   -   "+BRAND.cif);
-  // assemble
-  const objs=[
-    "<</Type/Catalog/Pages 2 0 R>>","<</Type/Pages/Kids[3 0 R]/Count 1>>",
-    "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R/F2 5 0 R>>>>/Contents 6 0 R>>",
-    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>","<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/WinAnsiEncoding>>",
-    "<</Length "+c.length+">>\nstream\n"+c+"\nendstream" ];
-  let pdf="%PDF-1.4\n"; const off=[];
-  objs.forEach((o2,i)=>{ off.push(pdf.length); pdf+=(i+1)+" 0 obj\n"+o2+"\nendobj\n"; });
-  const xref=pdf.length; pdf+="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n";
-  off.forEach(o2=>{ pdf+=String(o2).padStart(10,"0")+" 00000 n \n"; });
-  pdf+="trailer\n<</Size "+(objs.length+1)+"/Root 1 0 R>>\nstartxref\n"+xref+"\n%%EOF";
-  return btoa(pdf);
+  const brand = {
+    wordmark: "CaneiSubirats", legal: BRAND.legal, slogan: BRAND.slogan,
+    cif: BRAND.cif, address: BRAND.address, phone: BRAND.phone,
+    from: BRAND.from, iban: BRAND.iban };
+  return btoa(CaneiPdf.build(d, brand, tr));
 }
 function docGroups(includeOptional){
   const by={}; const order=[];
@@ -819,8 +759,17 @@ function invoiceDoc(){
   const totals=[["Base imponible",eurTxt(S.revenue)],["IVA "+vp+"%",eurTxt(vat)]];
   if(irpf>0) totals.push(["Retencion IRPF -"+irpf+"%","-"+eurTxt(irpfAmt)]);
   totals.push(["Total a pagar",eurTxt(S.revenue+vat-irpfAmt)]);
+  const dueTxt=fmtDate(addDaysISO(issueISO,S.termsDays));
   return { docType, number:S.invoiceNo, dateLabel:"Fecha", dateIssued:fmtDate(issueISO),
-    dueLabel:"Vencimiento", dueOrValid:fmtDate(addDaysISO(issueISO,S.termsDays)),
+    dueLabel:"Vencimiento", dueOrValid:dueTxt,
+    audience:"cobro",
+    title:"Factura de obra", subtitle:S.address||"",
+    meta:[["Fecha",fmtDate(issueISO)],["Vencimiento",dueTxt],["Forma de pago","Transferencia"],["Plazo",S.termsDays+" dias"]],
+    facts:[["Total a pagar",eurTxt(S.revenue+vat-irpfAmt)],["Base imponible",eurTxt(S.revenue)],["IVA",vp+" %"],["Vencimiento",dueTxt]],
+    parties:[
+      {label:"Expedidor",name:BRAND.legal,lines:[BRAND.cif,BRAND.address,BRAND.from]},
+      {label:"Destinatario",name:S.customer,lines:[S.buyerNif?("NIF/CIF: "+S.buyerNif):"",S.address]}],
+    tableLabel:"Detalle de la obra",
     buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
     lines, groups: itemized?docGroups(true):undefined, totals,
     payment:["Forma de pago: transferencia · "+S.termsDays+" días.","IBAN: "+BRAND.iban+"   ·   Referencia: "+S.invoiceNo],
@@ -837,8 +786,20 @@ function quoteDoc(accepted){
   const totals=[["Base (IVA no incl.)",eurTxt(base)]];
   if(accepted&&S.optional.included) totals.push(["Aceptado (con opcional)",eurTxt(base+S.optional.amount)]);
   const sd3=sdOf(3); const validity=num(sd3.validityDays)||30;
-  return { docType:"PRESUPUESTO · QUOTE", number:S.quoteNo, dateLabel:"Fecha", dateIssued:today(),
-    dueLabel:"Valido hasta", dueOrValid:addDays(validity),
+  const validTxt=addDays(validity);
+  return { docType:accepted?"PRESUPUESTO ACEPTADO":"PRESUPUESTO", number:S.quoteNo,
+    dateLabel:"Fecha", dateIssued:today(), dueLabel:"Valido hasta", dueOrValid:validTxt,
+    audience:"cliente",
+    title:accepted?"Presupuesto aceptado — version congelada":"Presupuesto de obra",
+    subtitle:S.address||"",
+    meta:[["Fecha",today()],["Valido hasta",validTxt],["Version","1.0"],["Contacto",BRAND.phone]],
+    facts:[["Base (IVA no incl.)",eurTxt(base)],["Capitulos",String(S.chapters.length)],
+           ["Opcional",hasOpt?eurTxt(S.optional.amount):"-"],["Validez",validity+" dias"]],
+    parties:[
+      {label:"Emisor",name:BRAND.legal,lines:[BRAND.cif,BRAND.address,BRAND.from]},
+      {label:"Cliente",name:S.customer,lines:[S.buyerNif?("NIF/CIF: "+S.buyerNif):"",S.address]}],
+    tableLabel:"Detalle por capitulos", tableNote:"precios unitarios sin IVA",
+    signatures:["Por "+BRAND.legal,"Conforme — el cliente (firma y fecha)"],
     buyer:{name:S.customer, nif:S.buyerNif?("NIF/CIF: "+S.buyerNif):"", address:S.address},
     lines, groups: itemized?docGroups(hasOpt):undefined, totals,
     payment:["Los trabajos opcionales solo se incluyen si los acepta.","El IVA se aplica en la factura final segun la regla legal aplicable."],
