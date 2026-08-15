@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CaneiSubirats — documentos del ERP</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font:400 9.3pt/1.45 Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:#3D3D3D;background:#EDEDEB;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sheet{width:210mm;min-height:297mm;margin:10mm auto;padding:15mm 16mm 12mm;background:#fff;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.05),0 30px 60px -30px rgba(0,0,0,.22);overflow:hidden}
+.inner{position:relative;z-index:1;display:flex;flex-direction:column;min-height:267mm}
+@media print{body{background:#fff}.sheet{margin:0;box-shadow:none;width:auto;min-height:auto;padding:11mm 13mm 8mm;overflow:visible}@page{size:A4;margin:0}
+tr,.box,.note,.sig,.facts,.meta,.docfoot{break-inside:avoid}.band,h2,tr.chapter{break-after:avoid}thead{display:table-header-group}
+h1{margin-top:4.5mm;font-size:16.5pt}
+.facts{margin-top:4mm}.fig{font-size:12.5pt}.fig.hero{font-size:16pt}
+.meta>div{padding:5px 10px 6px}
+.parties{margin-top:3.5mm}.pdet{font-size:8pt}
+.band{margin:4mm 0 2.5mm}
+tbody td{padding:4px 8px}
+.note{margin:3mm 0;padding:7px 10px}
+.sig .line{margin-top:9mm}
+.docfoot{padding-top:3mm}}
+.serif{font-family:"Roboto Serif",Georgia,serif}
+.wm{position:absolute;top:0;right:0;width:96mm;height:64mm;overflow:hidden;z-index:0;pointer-events:none}
+.wm svg{position:absolute;top:-36mm;right:-32mm;width:128mm;height:auto;display:block}
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:12mm}
+.lockup{display:flex;align-items:center;gap:11px}
+.sym{width:33px;height:auto;flex:none}
+.wordmark{font:400 16pt/1 "Roboto Serif",Georgia,serif;color:#000;letter-spacing:.005em}
+.tagline{font-family:"Roboto Serif",Georgia,serif;font-weight:200;font-variation-settings:'wght' 200;font-size:7.4pt;color:#48733C;margin-top:3px;letter-spacing:.015em}
+.docref{text-align:right;flex:none}
+.doctype{font-family:"Roboto Serif",Georgia,serif;font-weight:500;font-size:9pt;letter-spacing:.1em;text-transform:uppercase;color:#48733C}
+.docnum{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:18pt;color:#000;font-variant-numeric:tabular-nums;margin-top:2px;letter-spacing:.01em}
+.meta{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border-top:1px solid #E0E0E0;border-bottom:1px solid #E0E0E0;margin-top:5mm}
+.meta>div{padding:6px 11px 7px;border-left:1px solid #E0E0E0}
+.meta>div:first-child{border-left:0;padding-left:0}
+.lbl{font:600 6.6pt Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#767676;margin-bottom:3px}
+.val{font:600 9.2pt Inter,sans-serif;color:#000;font-variant-numeric:tabular-nums}
+.val .badge{margin-top:-2px}
+h1{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:17.5pt;letter-spacing:-.01em;color:#000;margin:5.5mm 0 0;text-wrap:pretty}
+.subject{font-size:9.4pt;color:#3D3D3D;margin-top:1.5mm;max-width:155mm;text-wrap:pretty}
+.facts{display:flex;flex-wrap:wrap;row-gap:3mm;margin-top:5mm}
+.facts>div{padding:0 12mm 0 0;margin-right:12mm;border-right:1px solid #E0E0E0}
+.facts>div:last-child{border-right:0;margin-right:0;padding-right:0}
+.fig{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:13.5pt;color:#000;font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap}
+.fig.hero{font-size:17pt}
+.fig .unit{font-size:9pt;font-weight:500;color:#3D3D3D}
+.punct{display:inline-block;width:11px;height:auto;margin-right:7px;vertical-align:baseline}
+.band{font-family:"Roboto Serif",Georgia,serif;font-weight:500;font-size:8.4pt;letter-spacing:.035em;text-transform:uppercase;color:#000;padding:4px 10px;margin:4.5mm 0 3mm;display:flex;justify-content:space-between;align-items:baseline;gap:8mm}
+.band .bandnote{font:400 7.4pt Inter,sans-serif;letter-spacing:0;text-transform:none;color:#3D3D3D}
+.band.blue{background:#C2D2F2}.band.yellow{background:#F2D64B}.band.grey{background:#F2F2F2}
+.parties{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin-top:4.5mm}
+.plabel{font:600 6.6pt Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#48733C;margin-bottom:4px}
+.pname{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:10.5pt;color:#000;margin-bottom:2px}
+.pdet{font-size:8.3pt;line-height:1.5;color:#3D3D3D}
+table{width:100%;border-collapse:collapse;font-size:8.6pt}
+thead th{background:#F2F2F2;font:600 6.7pt Inter,sans-serif;letter-spacing:.11em;text-transform:uppercase;color:#3D3D3D;text-align:left;padding:5px 8px;border-bottom:1px solid #E0E0E0}
+thead th.num{text-align:right}
+tbody td{padding:5px 8px;border-bottom:1px solid #ECECEA;vertical-align:top;color:#3D3D3D}
+tbody td b,tbody td strong{color:#000}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.chapter td{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:9.2pt;color:#375A2E;padding:10px 8px 4px;border-bottom:1.5px solid #48733C;background:#fff}
+tr.first td{padding-top:4px}
+tr.sub td{font-weight:600;color:#000;background:#FAFAF8;border-bottom:1px solid #E0E0E0}
+tr.sub td.cap{font-weight:400;color:#767676;text-align:right}
+tfoot td{padding:7px 9px;font-weight:600;color:#000;border-top:1.5px solid #48733C;font-variant-numeric:tabular-nums}
+.small{font-size:8pt;line-height:1.5}
+.muted{color:#767676}
+.notecell{color:#767676;font-size:7.8pt}
+.totals{margin-left:auto;min-width:76mm;width:auto;margin-top:4mm}
+.totals td{padding:3px 10px;border:0;font-size:9pt;color:#000}
+.totals td:first-child{color:#767676}
+.totals tr.grand td{border-top:2px solid #48733C;background:#F2F2F2;padding-top:8px;padding-bottom:7px;font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:12.5pt;color:#000;letter-spacing:-.01em}
+.note{border-left:3px solid #48733C;background:#F4F7F1;padding:8px 11px;font-size:8.6pt;margin:3.5mm 0}
+.note.warn{border-left-color:#F2D64B;background:#FBF5DA}
+.note.plain{border-left-color:#767676;background:#F7F7F6}
+.badge{display:inline-block;padding:3px 9px;font:600 6.8pt Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase}
+.badge.ok{background:#E4EBE1;color:#375A2E}
+.badge.warn{background:#F2D64B;color:#000}
+.badge.info{background:#F2F2F2;color:#3D3D3D}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 16px;font-size:8.9pt;margin:0}
+.kv dt{color:#767676}
+.kv dd{margin:0;color:#000}
+.box{border:1px solid #E0E0E0;padding:10px 13px;background:#fff}
+h2{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:10.5pt;color:#000;margin:4.5mm 0 2mm;letter-spacing:-.005em}
+ul.clean{margin:2mm 0 0;padding-left:14px}
+ul.clean li{margin-bottom:1.2mm}
+.bar{display:flex;height:15px;margin:3mm 0 2.5mm}
+.bar span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:3px 12px;font-size:7.3pt;color:#3D3D3D}
+.legend i{display:inline-block;width:8px;height:8px;margin-right:5px;vertical-align:baseline}
+.prog{height:6px;background:#F2F2F2;position:relative}
+.prog i{position:absolute;top:0;left:0;height:100%;display:block}
+.flow{display:flex;align-items:center;flex-wrap:wrap;gap:4px 7px;margin-top:3mm;font:500 6.8pt Inter,sans-serif;letter-spacing:.07em;text-transform:uppercase;color:#B0B0AC}
+.flow i{font-style:normal;color:#C9C9C5}
+.flow b{color:#375A2E;font-weight:700;padding:2.5px 8px;background:#E4EBE1;white-space:nowrap}
+.flow .done{color:#48733C;white-space:nowrap}
+.flow .next{white-space:nowrap}
+.sig{display:grid;grid-template-columns:1fr 1fr;gap:14mm}
+.sig .line{border-top:1px solid #000;margin-top:11mm;padding-top:5px;font-size:7.8pt;color:#767676}
+.terms{margin-top:auto;padding-top:4.5mm}
+.docfoot{margin-top:auto;padding-top:4mm}
+footer.brand{border-top:2px solid #48733C;padding-top:4mm;display:flex;justify-content:space-between;gap:12mm;align-items:flex-start}
+.legal{font-family:"Roboto Serif",Georgia,serif;font-size:6.8pt;line-height:1.6;color:#48733C;max-width:132mm}
+.site{text-align:right;font-family:"Roboto Serif",Georgia,serif;color:#48733C;flex:none}
+.site .url{font-weight:700;font-size:8.6pt}
+.site .loc{font-weight:200;font-variation-settings:'wght' 200;font-size:6.8pt;margin-top:2px}
+a{color:#48733C;text-decoration:none}
+a:hover{color:#375A2E;text-decoration:underline;text-underline-offset:2px}
+</style>
+<style>/* CANEI-PRINT-FIX */
+/* ---- print: margins on @page so EVERY page gets them ---- */
+@page{size:A4;margin:11mm 13mm 10mm}
+@media print{
+  html,body{background:#fff!important}
+  .sheet{margin:0!important;padding:0!important;width:auto!important;min-height:0!important;
+    box-shadow:none!important;border:0!important;overflow:visible!important}
+  /* The watermark is decorative and bleeds off the corner. Inside a margin box
+     it would sit in the middle of nowhere, so it is dropped when printing. */
+  .wm{display:none!important}
+  /* Never strand a heading at the foot of a page, never split a row, a box or
+     a signature line across two. */
+  thead{display:table-header-group}
+  tfoot{display:table-footer-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .box,.note,.sig,.facts,.meta,.docfoot,.totals,.parties,.party,.bandnote,.kv{
+    break-inside:avoid;page-break-inside:avoid}
+  h1,h2,h3,.band,tr.chapter,.doctype{break-after:avoid;page-break-after:avoid}
+  tr.chapter+tr{break-before:avoid;page-break-before:avoid}
+  p,li,td{orphans:3;widows:3}
+  table{break-inside:auto}
+  /* A hair of print scale. The documents sit at 82-89%% of the page height and
+     their legal footer needs another 8-10%% — just over, so eleven of the
+     twenty sent nothing but a company-registry line to a sheet of its own.
+     Five percent recovers it: 10.5pt body becomes 10pt, which nobody notices,
+     while a page carrying one line is visible to everybody. Also saves five
+     sheets across the set. */
+  .sheet{zoom:0.95}
+
+}
+</style>
+<link rel="stylesheet" href="../assets/canei-fonts.css">
+</head>
+<body>
+<div class="sheet">
+<div class="wm"><svg class="" viewBox="0 0 118.391 137.002" xmlns="http://www.w3.org/2000/svg"><path fill="#F2F2F2" fill-rule="nonzero" d="M60.449 0 0 38.374V137.002H118.391V38.445ZM107.462 126.073H71.480L56.137 122.671V71.986L82.416 65.524H45.953V126.073H10.929V44.382L60.318 13.028L107.462 44.311Z"/></svg></div>
+<div class="inner">
+<header class="hdr">
+  <div class="lockup"><svg class="sym" viewBox="0 0 118.391 137.002" xmlns="http://www.w3.org/2000/svg"><path fill="#48733C" fill-rule="nonzero" d="M60.449 0 0 38.374V137.002H118.391V38.445ZM107.462 126.073H71.480L56.137 122.671V71.986L82.416 65.524H45.953V126.073H10.929V44.382L60.318 13.028L107.462 44.311Z"/></svg>
+    <div><div class="wordmark">CaneiSubirats</div><div class="tagline">Reformes senzillament complexes</div></div>
+  </div>
+  <div class="docref"><div class="doctype">Índice</div><div class="docnum">20 documentos</div></div>
+</header>
+<div class="meta">
+  <div><div class="lbl">Conjunto</div><div class="val">Documentos del ERP · v2</div></div>
+  <div><div class="lbl">Empresa</div><div class="val">Canei Subirats, S.L.</div></div>
+  <div><div class="lbl">Identidad</div><div class="val">Identitat Visual · Maig 2026</div></div>
+  <div><div class="lbl">Formato</div><div class="val">A4 · HTML autónomo</div></div>
+</div>
+<h1>Documentos que genera el ERP en operación</h1>
+<div class="subject">Cada archivo es una página A4 autónoma con datos de ejemplo realistas. Ábralo en el navegador y se ve tal y como se imprime.</div>
+<div class="facts">
+  <div><div class="lbl">Documentos</div><div class="fig hero"><svg class="punct" viewBox="0 0 118.391 137.002" xmlns="http://www.w3.org/2000/svg"><path fill="#F2D64B" fill-rule="nonzero" d="M60.449 0 0 38.374V137.002H118.391V38.445ZM107.462 126.073H71.480L56.137 122.671V71.986L82.416 65.524H45.953V126.073H10.929V44.382L60.318 13.028L107.462 44.311Z"/></svg>20</div></div>
+  <div><div class="lbl">Cliente</div><div class="fig">13</div></div>
+  <div><div class="lbl">Proveedor</div><div class="fig">3</div></div>
+  <div><div class="lbl">Gestoría</div><div class="fig">1</div></div>
+  <div><div class="lbl">Interno</div><div class="fig">3</div></div>
+</div>
+<div style="display:grid;grid-template-columns:1.15fr 1fr;gap:0 10mm;margin-top:6mm;align-items:start">
+  <div><div class="band blue" style="margin-top:0"><span>01 · Cliente</span><span class="bandnote">del presupuesto a la reseña</span></div>
+<table style="margin-bottom:5mm"><tbody><tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/01-presupuesto.html" style="font-weight:600">Presupuesto</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">PRE-2026-0014</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/02-presupuesto-aceptado.html" style="font-weight:600">Presupuesto aceptado (congelado)</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">PRE-2026-0014</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/03-contrato-obra.html" style="font-weight:600">Contrato de obra</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">CTR-2026-0009</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/04-orden-de-cambio.html" style="font-weight:600">Orden de cambio</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">OC-C-2026-003</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/05-certificacion-obra.html" style="font-weight:600">Certificación de obra</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">CERT-2026-0002-02</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/06-factura.html" style="font-weight:600">Factura</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">FAC-2026-0021</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/07-factura-rectificativa.html" style="font-weight:600">Factura rectificativa (abono)</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">ABO-2026-0003</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/08-recibo.html" style="font-weight:600">Recibo de cobro</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">REC-2026-0044</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/13-acta-entrega.html" style="font-weight:600">Acta de entrega + punch list</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">ACT-2026-0009</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/17-email-aceptacion.html" style="font-weight:600">Email — presupuesto aceptado</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">—</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/18-email-factura.html" style="font-weight:600">Email — envío de factura</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">—</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/19-email-recordatorio-pago.html" style="font-weight:600">Email — recordatorio de pago</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">—</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="01-cliente/20-email-solicitud-resena.html" style="font-weight:600">Email — solicitud de reseña</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">—</td></tr></tbody></table></div>
+  <div>
+    <div class="band grey" style="margin-top:0"><span>02 · Proveedor</span><span class="bandnote">proveedores y subcontratistas</span></div>
+<table style="margin-bottom:5mm"><tbody><tr><td style="width:56%;padding:4px 6px 4px 0"><a href="02-proveedor/10-orden-compra.html" style="font-weight:600">Orden de compra</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">OC-2026-0087</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="02-proveedor/11-contrato-subcontratacion.html" style="font-weight:600">Contrato de subcontratación</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">SUB-2026-0012</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="02-proveedor/12-albaran-entrega.html" style="font-weight:600">Albarán de entrega</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">ALB-2026-0155</td></tr></tbody></table>
+    <div class="band grey" style="margin-top:0"><span>03 · Gestoría</span><span class="bandnote">la asesoría contable y fiscal</span></div>
+<table style="margin-bottom:5mm"><tbody><tr><td style="width:56%;padding:4px 6px 4px 0"><a href="03-gestoria/16-paquete-trimestral-gestoria.html" style="font-weight:600">Paquete trimestral</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">GES-2026-T2</td></tr></tbody></table>
+    <div class="band yellow" style="margin-top:0"><span>04 · Interno</span><span class="bandnote">solo personal de CaneiSubirats</span></div>
+<table style="margin-bottom:5mm"><tbody><tr><td style="width:56%;padding:4px 6px 4px 0"><a href="04-interno/09-informe-visita.html" style="font-weight:600">Informe de visita de obra</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">V-2026-0031</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="04-interno/14-parte-de-trabajo.html" style="font-weight:600">Parte de trabajo semanal</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">PT-2026-W24</td></tr>
+<tr><td style="width:56%;padding:4px 6px 4px 0"><a href="04-interno/15-ficha-proyecto.html" style="font-weight:600">Ficha de proyecto (margen)</a></td><td style="padding:4px 0;color:#767676;font-variant-numeric:tabular-nums">P-2026-0002</td></tr></tbody></table>
+    <div class="note plain" style="margin-top:2mm"><b>Proceso:</b> presupuesto → aceptación → contrato → obra → certificación → factura → cobro → entrega. Cada documento muestra su posición en esta cadena.</div>
+  </div>
+</div>
+<div class="docfoot">
+<footer class="brand">
+  <div class="legal">Canei Subirats, S.L. · NIF B-6712 3456 · Carrer de la Creu 18, baixos, 08960 Sant Just Desvern (Barcelona)<br>+34 934 77 12 08 · if@2iberia.com · Inscrita en el Registro Mercantil de Barcelona, Tomo 46.812, Folio 118, Hoja B-529.441</div>
+  <div class="site"><div class="url">www.caneisubirats.com</div><div class="loc">Sant Just Desvern · Barcelona</div></div>
+</footer>
+</div>
+</div>
+</div>
+</body>
+</html>

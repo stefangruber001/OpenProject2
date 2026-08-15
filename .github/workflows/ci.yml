@@ -47,6 +47,12 @@ jobs:
       # documentation pages (setup-guide, backend) are still Spanish-only, and a
       # gate nobody can pass is a gate that gets deleted. The number only ever
       # moves down.
+      # Every document template rendered to PDF and measured: no ink within
+      # 9.5mm of the paper edge, on any page. The redesign shipped with 0.8mm
+      # on continuation pages, which no printer can reproduce.
+      - name: Documents are printable
+        run: pnpm test:docs
+
       - name: Translation coverage
         run: |
           node tests/i18n/audit.mjs --lang en --max 620
