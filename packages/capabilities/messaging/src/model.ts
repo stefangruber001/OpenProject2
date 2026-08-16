@@ -34,3 +34,22 @@ export interface EmailDraft {
   body: string;
   status: "draft" | "sent";
 }
+
+/**
+ * Tenant-file schema for a communications rule, kept here beside the other
+ * config schemas rather than in rules.ts. The plain type and its defaults live
+ * in rules.ts, which the browser bundle imports; keeping zod out of that module
+ * is what stops a validation library travelling into a phone to plan a queue.
+ */
+export const commsRuleSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().optional(),
+  event: z.string().min(1),
+  template: z.string().min(1),
+  recipient: z.string().default("customer"),
+  afterDays: z.number().int().min(0).max(365).default(0),
+  channel: z.enum(["email", "whatsapp", "sms"]).default("email"),
+  mode: z.enum(["draft", "auto"]).default("draft"),
+  requiresFlag: z.string().optional(),
+  active: z.boolean().default(true),
+});

@@ -398,3 +398,139 @@ export class PrismaErpStateStore {
     );
   }
 }
+
+/**
+ * The people who may sign in.
+ *
+ * Same tenant isolation as everything else: every query runs inside a
+ * transaction with the RLS GUC set, so one company's account list cannot be
+ * read from another's connection whatever the query says.
+ *
+ * The hash is stored and never returned by `list` — a screen has no use for it,
+ * and a field that is never sent cannot be logged, cached or leaked by a
+ * careless `JSON.stringify` somewhere upstream.
+ */
+export class PrismaUserStore {
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly tenantId: string,
+  ) {}
+
+  /** Everyone, disabled included — the screen shows them and says so. */
+  async list() {
+    return withTenant(this.prisma, this.tenantId, (tx) =>
+      tx.erpUser.findMany({ where: { tenantId: this.tenantId }, orderBy: { email: "asc" } }),
+    );
+  }
+
+  async find(email: string) {
+    return withTenant(this.prisma, this.tenantId, (tx) =>
+      tx.erpUser.findUnique({
+        where: { tenantId_email: { tenantId: this.tenantId, email: email.toLowerCase() } },
+      }),
+    );
+  }
+
+  async create(data: { email: string; name: string; role: string; createdBy: string }) {
+    return withTenant(this.prisma, this.tenantId, (tx) =>
+      tx.erpUser.create({
+        data: {
+          tenantId: this.tenantId,
+          email: data.email.toLowerCase(),
+          name: data.name,
+          role: data.role,
+          state: "invited",
+          hash: "",
+          createdBy: data.createdBy,
+        },
+      }),
+    );
+  }
+
+  async update(
+    email: string,
+    patch: Partial<{
+      name: string;
+      role: string;
+      state: string;
+      hash: string;
+      /** Set when the change must end that person's existing sessions. */
+      sessionsValidFrom: Date;
+      disabledAt: Date | null;
+    }>,
+  ) {
+    return withTenant(this.prisma, this.tenantId, (tx) =>
+      tx.erpUser.update({
+        where: { tenantId_email: { tenantId: this.tenantId, email: email.toLowerCase() } },
+        data: patch,
+      }),
+    );
+  }
+
+  /** Store an invitation or reset. Only the digest — never the link. */
+  async putToken(data: {
+    tokenHash: string;
+    email: string;
+    purpose: string;
+    expiresAt: Date;
+    createdBy: string;
+  }) {
+    return withTenant(this.prisma, this.tenantId, (tx) =>
+      tx.erpUserToken.create({
+        data: {
+          tenantId: this.tenantId,
+          tokenHash: data.tokenHash,
+          email: data.email.toLowerCase(),
+          purpose: data.purpose,
+          expiresAt: data.expiresAt,
+          createdBy: data.createdBy,
+        },
+      }),
+    );
+  }
+
+  async findToken(tokenHash: string) {
+    return withTenant(this.prisma, this.tenantId, (tx) =>
+      tx.erpUserToken.findUnique({
+        where: { tenantId_tokenHash: { tenantId: this.tenantId, tokenHash } },
+      }),
+    );
+  }
+
+  /** Single use: stamped the moment it is accepted, and never accepted twice. */
+  async useToken(tokenHash: string) {
+    return withTenant(this.prisma, this.tenantId, (tx) =>
+      tx.erpUserToken.update({
+        where: { tenantId_tokenHash: { tenantId: this.tenantId, tokenHash } },
+        data: { usedAt: new Date() },
+      }),
+    );
+  }
+
+  /**
+   * Retire every outstanding invitation for somebody.
+   *
+   * Issuing a new one has to invalidate the old, or a link mailed a month ago
+   * still sets the password on an account whose invitation was reissued because
+   * the first one went astray.
+   */
+  async revokeTokens(email: string) {
+    return withTenant(this.prisma, this.tenantId, (tx) =>
+      tx.erpUserToken.updateMany({
+        where: { tenantId: this.tenantId, email: email.toLowerCase(), usedAt: null },
+        data: { usedAt: new Date() },
+      }),
+    );
+  }
+
+  /** Outstanding, unexpired invitations, by email. */
+  async pendingInvites(now = new Date()) {
+    const rows = await withTenant(this.prisma, this.tenantId, (tx) =>
+      tx.erpUserToken.findMany({
+        where: { tenantId: this.tenantId, usedAt: null, expiresAt: { gt: now } },
+        select: { email: true },
+      }),
+    );
+    return new Set(rows.map((r) => r.email));
+  }
+}

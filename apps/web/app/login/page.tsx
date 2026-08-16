@@ -34,6 +34,7 @@ import {
   LANGUAGE_SHORT,
   LANG_COOKIE,
   asLanguage,
+  rateLimitMessage,
   t,
   type Language,
 } from "@/lib/ui-language";
@@ -82,6 +83,13 @@ export default async function LoginPage({
 }) {
   const params = await searchParams;
   const failed = params.error !== undefined;
+  // Being told to wait is a different situation from getting the password
+  // wrong, and saying so is not a leak: whoever is locked out already knows
+  // they have been trying. Telling them "incorrect password" while silently
+  // refusing to check it is the version that wastes an honest person's evening.
+  const rateLimited = params.error === "rate";
+  const retryAfter = Number(typeof params.retry === "string" ? params.retry : 0) || 0;
+  const retryMinutes = Math.max(1, Math.ceil(retryAfter / 60));
   const nextRaw = typeof params.next === "string" ? params.next : "/";
   // Same rule as the route handler: only ever a path on this site.
   const nextPath = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/";
@@ -296,7 +304,11 @@ export default async function LoginPage({
                 marginBottom: 18,
               }}
             >
-              {t("failed", lang)}
+              {/* Rate limiting came from one branch, the language switcher from
+                  the other. Neither is dropped: the wait message now goes
+                  through the same table as every other string on this screen,
+                  so being locked out reads in the language you chose. */}
+              {rateLimited ? rateLimitMessage(retryMinutes, lang) : t("failed", lang)}
             </div>
           )}
 

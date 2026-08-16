@@ -87,7 +87,7 @@
     [
       "company",
       "Bar El Racó S.L.",
-      "B67219049",
+      "B67219048",
       "C/ Girona 45",
       "08009",
       "Barcelona",
@@ -97,7 +97,7 @@
     [
       "community",
       "Comunidad Prop. Aragó 331",
-      "H08944721",
+      "H08944720",
       "C/ Aragó 331",
       "08009",
       "Barcelona",
@@ -147,7 +147,7 @@
     [
       "community",
       "Comunidad Prop. Nàpols 55",
-      "H08551204",
+      "H08551202",
       "C/ Nàpols 55",
       "08013",
       "Barcelona",

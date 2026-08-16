@@ -156,6 +156,7 @@ describe("session tokens", () => {
       sub: "invitado-4f2a",
       role: "shared",
       exp: NOW + SHARED_TTL_SECONDS,
+      iat: NOW,
     });
   });
 
@@ -165,7 +166,40 @@ describe("session tokens", () => {
       sub: "ana@example.com",
       role: "staff",
       exp: NOW + SESSION_TTL_SECONDS,
+      iat: NOW,
     });
+  });
+
+  // The issue time is what lets a single person be signed out everywhere.
+  // Without it the only lever was rotating SESSION_SECRET, which signs out the
+  // whole company to disable one account.
+  it("stamps a token with when it was issued", async () => {
+    const t = await signSession("ana@example.com", SECRET, NOW);
+    const claims = await readSession(t, SECRET, NOW + 60);
+    expect(claims?.iat).toBe(NOW);
+  });
+
+  it("reads a token minted before issue times existed as issued at 0", async () => {
+    // Hand-built in the old shape. Reading it as 0 means the first time that
+    // person is disabled or resets a password, their pre-existing tokens stop
+    // working — the safe direction to be wrong in.
+    const body = Buffer.from(
+      JSON.stringify({ sub: "ana@example.com", exp: NOW + 3600, role: "staff" }),
+    )
+      .toString("base64url")
+      .replace(/=+$/, "");
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
+    const b64 = Buffer.from(new Uint8Array(sig)).toString("base64url").replace(/=+$/, "");
+    const claims = await readSession(`${body}.${b64}`, SECRET, NOW + 60);
+    expect(claims?.sub).toBe("ana@example.com");
+    expect(claims?.iat).toBe(0);
   });
 
   it("rejects a token signed with a different secret", async () => {

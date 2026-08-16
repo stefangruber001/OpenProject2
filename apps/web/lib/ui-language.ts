@@ -73,6 +73,21 @@ export const SIGN_IN: Record<string, Copy> = {
     en: "Next time you will sign in with Face ID.",
   },
   languageGroup: { es: "Idioma", ca: "Llengua", en: "Language" },
+  // Being told to wait is a different situation from getting the password
+  // wrong, and saying so is not a leak: whoever is locked out already knows
+  // they have been trying. Rendered through `rateLimitMessage` because the
+  // number and its unit have to agree, and the three languages do not
+  // pluralise the same way.
+  rateLimitedOne: {
+    es: "Demasiados intentos. Vuelva a intentarlo en 1 minuto.",
+    ca: "Massa intents. Torneu-ho a provar d'aquí a 1 minut.",
+    en: "Too many attempts. Try again in 1 minute.",
+  },
+  rateLimitedMany: {
+    es: "Demasiados intentos. Vuelva a intentarlo en {n} minutos.",
+    ca: "Massa intents. Torneu-ho a provar d'aquí a {n} minuts.",
+    en: "Too many attempts. Try again in {n} minutes.",
+  },
   notConfiguredTitle: {
     es: "El acceso no está configurado",
     ca: "L'accés no està configurat",
@@ -87,4 +102,10 @@ export const SIGN_IN: Record<string, Copy> = {
 
 export function t(key: keyof typeof SIGN_IN, lang: Language): string {
   return SIGN_IN[key]![lang];
+}
+
+/** "Try again in N minutes", with the singular that N === 1 needs. */
+export function rateLimitMessage(minutes: number, lang: Language): string {
+  const n = Math.max(1, Math.ceil(minutes));
+  return n === 1 ? t("rateLimitedOne", lang) : t("rateLimitedMany", lang).replace("{n}", String(n));
 }

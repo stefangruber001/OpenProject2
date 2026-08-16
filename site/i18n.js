@@ -1,36 +1,34 @@
-/* Canei Subirats — the language layer (Español · Català · English).
+/* Canei Subirats — trilingual layer (ES · CA · EN).
  *
- * HOW A PAGE GETS TRANSLATED. Every page declares the language it was authored
- * in via <html lang="…">. If the chosen language differs, the whole document is
- * rewritten in place from the dictionary in i18n-dict.js: text nodes first, then
- * the attributes a person can read (placeholder / title / aria-label / alt) and
- * button values, then a MutationObserver keeps anything rendered later in the
- * same language. Generated documents (print windows, previews) opt in with one
- * call to CANEI_I18N.translateNode(root).
+ * Every page declares its base language in <html lang="…">. The visitor's
+ * choice is stored in localStorage ("caneiLang", default "es").
  *
- * WHICH LANGUAGE, AND WHO DECIDES. There are two answers and they are different
- * on purpose:
+ * The default is Spanish and stays Spanish until the dictionary can carry the
+ * workspace. erp.html is authored in Spanish and builds most of its content in
+ * JavaScript; those generated sentences have no entries, so defaulting to
+ * English produces English chrome around Spanish content — worse than either
+ * language on its own. See task #72. When the
+ * chosen language differs from the page's base language, the whole document
+ * is translated in place using the dictionary in i18n-dict.js:
+ *   - text nodes and key attributes (placeholder / title / aria-label / value / alt)
+ *   - exact-match phrases first, then regex rules for interpolated strings
+ *   - a MutationObserver keeps dynamically rendered content translated
+ *   - window.CANEI_I18N.translateNode(root) lets generated documents
+ *     (print windows, previews) opt in with one call
+ * A floating ES | CA | EN toggle is injected on every page.
  *
- *   the company language — one setting for the whole company, kept on the
- *     server next to everything else the company owns. Changing it in the ERP
- *     changes it for everyone, on every device, which is what "global" has to
- *     mean or it is not global.
- *   this device — an override, kept locally, for the person who wants English
- *     on their own phone without imposing it. Set from the sign-in screen or
- *     from the switcher. Choosing "Company" gives the device back.
+ * WHY SPANISH IS THE HUB (S3, decision 20). The dictionary is a set of
+ * TRIPLES keyed on the Spanish string: `pairs` carries [es, en] and `ca`
+ * carries es → ca. Any direction is then one lookup — including EN → CA,
+ * which is the pairing that has no dictionary of its own and would otherwise
+ * have to translate twice, through Spanish, and lose everything the first
+ * hop failed to match. Spanish is the language the application is written
+ * in, so it is the only key every string is guaranteed to have.
  *
- * Resolution is therefore: device override, else company language, else the
- * page's own language. The company value arrives asynchronously (it is a
- * fetch), so the FIRST paint uses a cached copy — otherwise every load would
- * flash the wrong language while the network went and asked.
- *
- * WHY A DICTIONARY AND NOT KEYS. The pages are authored in Spanish prose, in
- * HTML and in JavaScript that builds sentences at runtime. Retrofitting message
- * keys would mean rewriting every page; translating the rendered text means the
- * translation layer can be complete without the pages knowing it exists. The
- * cost is that a new sentence needs a new entry — which is why
- * tests/i18n/audit.mjs renders every page in every language and fails CI on
- * anything that comes out identical in two of them.
+ * A missing Catalan entry falls back to Spanish rather than to the raw key.
+ * That is a deliberate degradation and not a licence: `tests/i18n/coverage.mjs`
+ * fails the build on a string that has no Catalan, precisely because a silent
+ * fallback is invisible to the person who introduced it.
  */
 (function () {
   "use strict";
@@ -39,11 +37,14 @@
   var NAMES = { es: "Español", ca: "Català", en: "English" };
   var SHORT = { es: "ES", ca: "CA", en: "EN" };
 
-  var DEVICE_KEY = "caneiLang"; // "" | "es" | "ca" | "en"  ("" = follow company)
+  var LS_KEY = "caneiLang"; // this device's choice ("" = follow the company)
   var CACHE_KEY = "caneiLangCompany"; // last company value seen, for first paint
   var COOKIE = "canei_lang";
   var API = "/api/~/erp/language";
 
+  function valid(lang) {
+    return LANGS.indexOf(lang) >= 0 ? lang : "";
+  }
   function readLocal(key) {
     try {
       return localStorage.getItem(key) || "";
@@ -59,12 +60,9 @@
       /* private mode — the choice lasts for this page only */
     }
   }
-  function valid(lang) {
-    return LANGS.indexOf(lang) >= 0 ? lang : "";
-  }
 
   /**
-   * The device's choice lives in a COOKIE, not in localStorage.
+   * The device's choice lives in a COOKIE as well as in localStorage.
    *
    * The sign-in page is rendered on the server and carries no JavaScript, so it
    * can only know a preference the server can see. Keeping the choice in a
@@ -72,7 +70,7 @@
    * workspace are the same act, recorded in the same place — rather than two
    * settings that drift apart and make the app look like it forgot.
    *
-   * localStorage is still read once, so anybody carrying a choice made by the
+   * localStorage is still read, so anybody carrying a choice made by the
    * previous version does not silently lose it.
    */
   function readCookie(name) {
@@ -86,72 +84,48 @@
       : name + "=;path=/;max-age=0;samesite=lax";
   }
 
-  var device = readCookie(COOKIE) || valid(readLocal(DEVICE_KEY));
+  var device = readCookie(COOKIE) || valid(readLocal(LS_KEY));
   var company = valid(readLocal(CACHE_KEY));
-  var base = (document.documentElement.getAttribute("lang") || "es").slice(0, 2);
-  if (!valid(base)) base = "es";
+  var target = device || company || "es";
 
-  var target = device || company || base;
-  var active = target !== base;
+  var base = (document.documentElement.getAttribute("lang") || "en").slice(0, 2);
+  if (LANGS.indexOf(base) < 0) base = "en";
+  var active = target !== base; // do we need to translate this page?
 
   /* ---------- dictionary ---------- */
-  var D = (typeof window !== "undefined" && window.CANEI_DICT) || {};
+  var D = (typeof window !== "undefined" && window.CANEI_DICT) || {
+    pairs: [],
+    ca: {},
+    rxEs2En: [],
+    rxEn2Es: [],
+    rxEs2Ca: [],
+  };
+  var CA = D.ca || {};
   var map = new Map();
   var rx = [];
-
-  /**
-   * Build the lookup for base → target.
-   *
-   * Spanish is the pivot. `pairs` is ES↔EN and `ca` is ES↔CA, so an English
-   * page asked for Catalan is translated EN→ES→CA by composition rather than by
-   * a third list nobody would keep in step with the other two.
-   */
-  function buildMap() {
-    map = new Map();
-    rx = [];
-    if (!active) return;
-
-    var pairs = D.pairs || [];
-    var cat = D.ca || [];
-    var es2en = new Map(),
-      en2es = new Map(),
-      es2ca = new Map(),
-      ca2es = new Map();
-    var i;
-    for (i = 0; i < pairs.length; i++) {
-      if (!es2en.has(pairs[i][0])) es2en.set(pairs[i][0], pairs[i][1]);
-      if (!en2es.has(pairs[i][1])) en2es.set(pairs[i][1], pairs[i][0]);
+  if (active) {
+    // One pass over the triples, building a direct base → target map. The
+    // Spanish form of each entry is the join key; `pairs` supplies English
+    // and `ca` supplies Catalan, each falling back to Spanish when absent so
+    // a partial entry degrades to a readable interface rather than a blank.
+    for (var i = 0; i < D.pairs.length; i++) {
+      var es = D.pairs[i][0];
+      var forms = { es: es, en: D.pairs[i][1] || es, ca: CA[es] || es };
+      var from = forms[base];
+      var to = forms[target];
+      // Never map a string onto itself, and never let a language that has no
+      // entry of its own overwrite a real one already in the map.
+      if (from && to && from !== to && !map.has(from)) map.set(from, to);
     }
-    for (i = 0; i < cat.length; i++) {
-      if (!es2ca.has(cat[i][0])) es2ca.set(cat[i][0], cat[i][1]);
-      if (!ca2es.has(cat[i][1])) ca2es.set(cat[i][1], cat[i][0]);
-    }
-
-    var toEs = base === "es" ? null : base === "en" ? en2es : ca2es; /* first hop, into Spanish */
-    var fromEs = target === "es" ? null : target === "en" ? es2en : es2ca;
-
-    if (!toEs && fromEs) {
-      map = fromEs;
-    } else if (toEs && !fromEs) {
-      map = toEs;
-    } else if (toEs && fromEs) {
-      // Compose through Spanish. Only entries that survive both hops are
-      // usable; a half-translated phrase would be worse than the original.
-      toEs.forEach(function (spanish, source) {
-        var out = fromEs.get(spanish);
-        if (out !== undefined) map.set(source, out);
-      });
-    }
-
-    // Regex rules for sentences with numbers or names in them. Same pivot rule,
-    // except composition is not attempted: chaining two patterns produces
-    // nonsense far more often than it produces a sentence.
-    if (base === "es" && target === "en") rx = D.rxEs2En || [];
-    else if (base === "es" && target === "ca") rx = D.rxEs2Ca || [];
-    else if (base === "en" && target === "es") rx = D.rxEn2Es || [];
-    else if (base === "en" && target === "ca") rx = D.rxEn2Ca || [];
+    rx =
+      base === "es"
+        ? target === "en"
+          ? D.rxEs2En || []
+          : D.rxEs2Ca || []
+        : target === "es"
+          ? D.rxEn2Es || []
+          : []; // EN → CA has no interpolation rules of its own; exact matches only
   }
-  buildMap();
 
   function tr(text) {
     if (!text) return null;
@@ -159,41 +133,57 @@
     if (!trimmed) return null;
     var hit = map.get(trimmed);
     if (hit === undefined) {
+      // collapse internal runs of whitespace (multi-line HTML text nodes)
       var collapsed = trimmed.replace(/\s+/g, " ");
       hit = map.get(collapsed);
     }
     if (hit === undefined) {
       for (var i = 0; i < rx.length; i++) {
-        var re = rx[i][0];
+        var m = rx[i];
+        var re = m[0];
         re.lastIndex = 0;
         if (re.test(trimmed)) {
           re.lastIndex = 0;
-          hit = trimmed.replace(re, rx[i][1]);
+          hit = trimmed.replace(re, m[1]);
           break;
         }
       }
     }
     if (hit === undefined || hit === trimmed) return null;
+    // keep original leading / trailing whitespace
     var lead = text.match(/^\s*/)[0];
     var tail = text.match(/\s*$/)[0];
     return lead + hit + tail;
   }
 
   var ATTRS = ["placeholder", "title", "aria-label", "alt"];
-  var SKIP = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, CODE: 1 };
+  var SKIP = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, CODE: 1, PRE: 0 };
+
+  /**
+   * `translate="no"` — the standard HTML opt-out, honoured for the subtree.
+   *
+   * It exists here for one specific and important case: a document addressed
+   * to somebody else. A presupuesto is written in the CUSTOMER's language,
+   * which is a field on the record; the toggle is the OPERATOR's language,
+   * which is a preference of whoever happens to be at the screen. Without
+   * this, a Spanish back-office user reading their interface in English would
+   * see — and print — an English presupuesto for a Catalan customer. Marking
+   * the document keeps the two ideas apart.
+   */
+  function noTranslate(node) {
+    var el = node.nodeType === 1 ? node : node.parentNode;
+    return !!(el && el.closest && el.closest('[translate="no"]'));
+  }
 
   function translateNode(root) {
     if (!active || !root) return;
     var doc = root.ownerDocument || root;
-    var walker = doc.createTreeWalker(root, 4 /* SHOW_TEXT */, null);
+    var walker = doc.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */, null);
     var n;
     while ((n = walker.nextNode())) {
       var pn = n.parentNode && n.parentNode.nodeName;
       if (pn && SKIP[pn]) continue;
-      // The switcher names languages in their own tongue and must never be
-      // translated — "Català" is Català in every language.
-      if (n.parentElement && n.parentElement.closest && n.parentElement.closest("#canei-lang-pill"))
-        continue;
+      if (noTranslate(n)) continue;
       var out = tr(n.nodeValue);
       if (out !== null) n.nodeValue = out;
     }
@@ -206,7 +196,7 @@
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
       if (SKIP[el.nodeName]) continue;
-      if (el.closest && el.closest("#canei-lang-pill")) continue;
+      if (noTranslate(el)) continue;
       for (var a = 0; a < ATTRS.length; a++) {
         var v = el.getAttribute && el.getAttribute(ATTRS[a]);
         if (v) {
@@ -223,7 +213,6 @@
 
   function translateAttr(el, name) {
     if (!active || !el.getAttribute) return;
-    if (el.closest && el.closest("#canei-lang-pill")) return;
     var v = el.getAttribute(name);
     if (v) {
       var o = tr(v);
@@ -250,19 +239,23 @@
       mo = new MutationObserver(function (muts) {
         if (pending) return;
         pending = true;
+        // batch: one microtask handles all mutations of this frame
         Promise.resolve().then(function () {
           pending = false;
           observerOff();
           for (var i = 0; i < muts.length; i++) {
             var m = muts[i];
             if (m.type === "characterData") {
+              if (noTranslate(m.target)) continue;
               var out = tr(m.target.nodeValue);
               if (out !== null) m.target.nodeValue = out;
             } else if (m.type === "attributes") {
+              if (noTranslate(m.target)) continue;
               translateAttr(m.target, m.attributeName);
             } else {
               for (var j = 0; j < m.addedNodes.length; j++) {
                 var node = m.addedNodes[j];
+                if (noTranslate(node)) continue;
                 if (node.nodeType === 3) {
                   var o = tr(node.nodeValue);
                   if (o !== null) node.nodeValue = o;
@@ -304,22 +297,18 @@
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ language: lang || "es" }),
-      })
-        .then(function (r) {
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          writeLocal(CACHE_KEY, lang || "es");
-          // A company change also clears this device's override, or the person
-          // who just set the company language would be the one person who does
-          // not see it.
-          writeLocal(DEVICE_KEY, "");
-          writeCookie(COOKIE, "");
-          location.reload();
-        })
-        .catch(function (e) {
-          return Promise.reject(e);
-        });
+      }).then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        writeLocal(CACHE_KEY, lang || "es");
+        // A company change also clears this device's override, or the person
+        // who just set the company language would be the one person who does
+        // not see it.
+        writeLocal(LS_KEY, "");
+        writeCookie(COOKIE, "");
+        location.reload();
+      });
     }
-    writeLocal(DEVICE_KEY, lang);
+    writeLocal(LS_KEY, lang);
     writeCookie(COOKIE, lang);
     location.reload();
     return Promise.resolve();
@@ -354,34 +343,29 @@
       });
   }
 
-  /* ---------- the switcher ---------- */
-  function injectSwitcher() {
+  /* ---------- toggle pill ---------- */
+  function injectToggle() {
     if (document.getElementById("canei-lang-pill")) return;
     var css =
-      "#canei-lang-pill{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:14px;z-index:99999;" +
-      "display:flex;gap:2px;padding:3px;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);" +
-      "border:1px solid #dde5d6;border-radius:999px;box-shadow:0 2px 4px rgba(24,32,16,.06),0 14px 30px -18px rgba(24,32,16,.34);" +
-      "font:600 11px Inter,system-ui,-apple-system,sans-serif;letter-spacing:.06em}" +
-      "#canei-lang-pill button{appearance:none;border:0;background:transparent;color:#8b8f80;padding:6px 11px;" +
-      "cursor:pointer;font:inherit;border-radius:999px;transition:background .16s,color .16s}" +
-      "#canei-lang-pill button:hover{color:#31532a}" +
+      "#canei-lang-pill{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:14px;z-index:99999;display:flex;gap:0;" +
+      "background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border:1px solid #dde5d6;border-radius:999px;" +
+      "box-shadow:0 2px 4px rgba(24,32,16,.06),0 14px 30px -18px rgba(24,32,16,.3);overflow:hidden;" +
+      "font:600 11px Inter,system-ui,sans-serif;letter-spacing:.06em}" +
+      "#canei-lang-pill button{appearance:none;border:0;background:transparent;color:#8b8f80;padding:7px 12px;" +
+      "cursor:pointer;font:inherit;transition:.15s}" +
       "#canei-lang-pill button.on{background:linear-gradient(120deg,#31532a,#48733c 70%);color:#fff}" +
       "@media print{#canei-lang-pill{display:none}}" +
-      "@media(max-width:560px){#canei-lang-pill{bottom:calc(10px + env(safe-area-inset-bottom,0px));left:10px}" +
-      "#canei-lang-pill button{padding:6px 9px}}";
+      "@media(max-width:560px){#canei-lang-pill{bottom:calc(10px + env(safe-area-inset-bottom,0px));left:10px}#canei-lang-pill button{padding:6px 10px}}";
     var st = document.createElement("style");
     st.textContent = css;
     document.head.appendChild(st);
-
     var pill = document.createElement("div");
     pill.id = "canei-lang-pill";
     pill.setAttribute("role", "group");
     pill.setAttribute("aria-label", "Idioma · Llengua · Language");
-    // `translate="no"` and the skip rule above are belt and braces: a language
-    // switcher that translates its own labels tells you what you already chose
-    // instead of what you can choose.
+    // A language switcher that translates its own labels tells you what you
+    // already chose instead of what you can choose.
     pill.setAttribute("translate", "no");
-
     LANGS.forEach(function (lang) {
       var b = document.createElement("button");
       b.type = "button";
@@ -403,7 +387,7 @@
 
   /* ---------- boot ---------- */
   function boot() {
-    injectSwitcher();
+    injectToggle();
     fullPass();
     syncCompany();
   }

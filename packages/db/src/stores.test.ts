@@ -21,6 +21,7 @@ import {
   PrismaEventLog,
   PrismaKeyValueStore,
   PrismaRepository,
+  PrismaUserStore,
   erpStateVersions,
 } from "./stores";
 
@@ -157,6 +158,135 @@ if (!DB) {
     });
   });
 
+  describe("PrismaUserStore (who may sign in)", () => {
+    it("creates somebody invited, with no password of their own yet", async () => {
+      const t = await freshTenant();
+      const store = new PrismaUserStore(prisma, t);
+      const u = await store.create({
+        email: "Ana@Example.com",
+        name: "Ana",
+        role: "backoffice",
+        createdBy: "owner@example.com",
+      });
+      // Lower-cased on the way in, because somebody's phone will capitalise it.
+      expect(u.email).toBe("ana@example.com");
+      expect(u.state).toBe("invited");
+      expect(u.hash).toBe("");
+    });
+
+    it("activating sets the password the invited person chose", async () => {
+      const t = await freshTenant();
+      const store = new PrismaUserStore(prisma, t);
+      await store.create({ email: "b@x.es", name: "B", role: "site", createdBy: "o" });
+      await store.update("b@x.es", { state: "active", hash: "scrypt$fake" });
+      const u = await store.find("b@x.es");
+      expect(u?.state).toBe("active");
+      expect(u?.hash).toBe("scrypt$fake");
+    });
+
+    it("disabling moves sessionsValidFrom forward, which is what ends their sessions", async () => {
+      const t = await freshTenant();
+      const store = new PrismaUserStore(prisma, t);
+      const created = await store.create({
+        email: "c@x.es",
+        name: "C",
+        role: "site",
+        createdBy: "o",
+      });
+      const cutoff = new Date(Date.now() + 1000);
+      await store.update("c@x.es", {
+        state: "disabled",
+        disabledAt: new Date(),
+        sessionsValidFrom: cutoff,
+      });
+      const u = await store.find("c@x.es");
+      expect(u?.state).toBe("disabled");
+      expect(u!.sessionsValidFrom.getTime()).toBeGreaterThan(created.sessionsValidFrom.getTime());
+      // The row is still there: the audit trail has to keep resolving who did what.
+      expect(u).not.toBeNull();
+    });
+
+    it("stores only the digest of an invitation, and spends it once", async () => {
+      const t = await freshTenant();
+      const store = new PrismaUserStore(prisma, t);
+      await store.create({ email: "d@x.es", name: "D", role: "site", createdBy: "o" });
+      await store.putToken({
+        tokenHash: "deadbeef",
+        email: "d@x.es",
+        purpose: "activation",
+        expiresAt: new Date(Date.now() + 60_000),
+        createdBy: "o",
+      });
+      expect((await store.pendingInvites()).has("d@x.es")).toBe(true);
+      const tok = await store.findToken("deadbeef");
+      expect(tok?.usedAt).toBeNull();
+      await store.useToken("deadbeef");
+      expect((await store.findToken("deadbeef"))?.usedAt).not.toBeNull();
+      expect((await store.pendingInvites()).has("d@x.es")).toBe(false);
+    });
+
+    it("an expired invitation is not pending", async () => {
+      const t = await freshTenant();
+      const store = new PrismaUserStore(prisma, t);
+      await store.create({ email: "e@x.es", name: "E", role: "site", createdBy: "o" });
+      await store.putToken({
+        tokenHash: "expired1",
+        email: "e@x.es",
+        purpose: "activation",
+        expiresAt: new Date(Date.now() - 1000),
+        createdBy: "o",
+      });
+      expect((await store.pendingInvites()).has("e@x.es")).toBe(false);
+    });
+
+    it("reissuing an invitation retires the one sent before it", async () => {
+      // Otherwise a link mailed a month ago still sets the password on an
+      // account whose invitation was reissued because the first went astray.
+      const t = await freshTenant();
+      const store = new PrismaUserStore(prisma, t);
+      await store.create({ email: "f@x.es", name: "F", role: "site", createdBy: "o" });
+      const soon = new Date(Date.now() + 60_000);
+      await store.putToken({
+        tokenHash: "first",
+        email: "f@x.es",
+        purpose: "activation",
+        expiresAt: soon,
+        createdBy: "o",
+      });
+      await store.revokeTokens("f@x.es");
+      await store.putToken({
+        tokenHash: "second",
+        email: "f@x.es",
+        purpose: "activation",
+        expiresAt: soon,
+        createdBy: "o",
+      });
+      expect((await store.findToken("first"))?.usedAt).not.toBeNull();
+      expect((await store.findToken("second"))?.usedAt).toBeNull();
+    });
+
+    it("one company's account list is invisible to another", async () => {
+      const t1 = await freshTenant();
+      const t2 = await freshTenant();
+      await new PrismaUserStore(prisma, t1).create({
+        email: "a@one.es",
+        name: "",
+        role: "admin",
+        createdBy: "o",
+      });
+      await new PrismaUserStore(prisma, t2).create({
+        email: "b@two.es",
+        name: "",
+        role: "admin",
+        createdBy: "o",
+      });
+      expect((await new PrismaUserStore(prisma, t1).list()).map((u) => u.email)).toEqual([
+        "a@one.es",
+      ]);
+      expect(await new PrismaUserStore(prisma, t2).find("a@one.es")).toBeNull();
+    });
+  });
+
   describe("PrismaErpStateStore (optimistic concurrency)", () => {
     it("an absent document loads as version 0 and first save takes version 1", async () => {
       const s = new PrismaErpStateStore(prisma, await freshTenant());
@@ -277,6 +407,45 @@ if (!RLS_DB || !DB) {
         return tx.$queryRaw<{ id: string }[]>`SELECT id FROM aggregates`;
       });
       expect(seen).toEqual([{ id: "x" }]);
+    });
+
+    it("one company's ACCOUNT LIST cannot be read from another's connection", async () => {
+      // The table this guards matters more than most: it is who may sign in.
+      // Raw SQL with no WHERE clause, so only the policy can be filtering.
+      const t1 = `rls-users-${Date.now()}-a`;
+      const t2 = `rls-users-${Date.now()}-b`;
+      await owner.tenant.create({ data: { id: t1, name: t1 } });
+      await owner.tenant.create({ data: { id: t2, name: t2 } });
+      await new PrismaUserStore(owner, t1).create({
+        email: "one@a.es",
+        name: "",
+        role: "admin",
+        createdBy: "o",
+      });
+      await new PrismaUserStore(owner, t2).create({
+        email: "two@b.es",
+        name: "",
+        role: "admin",
+        createdBy: "o",
+      });
+
+      const seen = await restricted.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT set_config('app.tenant_id', ${t1}, true)`;
+        return tx.$queryRaw<{ email: string }[]>`SELECT email FROM erp_users`;
+      });
+      expect(seen).toEqual([{ email: "one@a.es" }]);
+    });
+
+    it("cannot create an account for another company", async () => {
+      const t = `rls-users-${Date.now()}-c`;
+      await owner.tenant.create({ data: { id: t, name: t } });
+      await expect(
+        restricted.$transaction(async (tx) => {
+          await tx.$executeRaw`SELECT set_config('app.tenant_id', ${t}, true)`;
+          await tx.$executeRaw`INSERT INTO erp_users (tenant_id, email, updated_at)
+                               VALUES ('someone-else', 'intruder@x.es', now())`;
+        }),
+      ).rejects.toThrow();
     });
 
     it("cannot write rows belonging to another tenant", async () => {

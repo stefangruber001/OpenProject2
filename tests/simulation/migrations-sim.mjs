@@ -62,22 +62,210 @@ const retyped = Object.keys(v1).filter(
 );
 assert(retyped.length === 0, "no pre-existing top-level key changed type", retyped.join(","));
 
-const changed = Object.keys(v1).filter(
-  (k) => JSON.stringify(v1[k]) !== JSON.stringify(r1.state[k]),
+/**
+ * Additive at EVERY depth, not just the top level.
+ *
+ * The first version of this check compared each top-level value as a JSON
+ * string, which was right while every migration only added top-level
+ * collections. v4 adds a key inside each budget, and that check calls it a
+ * violation — wrongly: nothing was renamed, retyped or dropped. So the property
+ * is now stated the way it was always meant: the old blob must still be a
+ * SUBSET of the new one. Added keys are fine anywhere; a changed or vanished
+ * value is not, however deep it sits.
+ *
+ * Returns the paths that broke the rule, so a failure names the field.
+ */
+/*
+ * Keys the product removed ON PURPOSE, written as the path with array indices
+ * collapsed to "[]". The guard below still fails on every other dropped key —
+ * this list is the change record, not an escape hatch. Adding to it should
+ * take an argument; the one entry here has one:
+ *
+ *   parties[].activityLine — v9. A línea de actividad describes the work, not
+ *   the person paying for it, so it lives on budgets and projects (where
+ *   profitability("activityLine") still reads it) and was a weaker duplicate
+ *   on the customer that could disagree with the job's own line.
+ */
+const INTENTIONAL_REMOVALS = new Set(["parties[].activityLine"]);
+const generalise = (p) => p.replace(/\[\d+\]/g, "[]");
+
+function additiveViolations(before, after, path = "") {
+  const at = path || "(root)";
+  if (Array.isArray(before)) {
+    if (!Array.isArray(after)) return [`${at}: array -> ${typeof after}`];
+    if (before.length !== after.length)
+      return [`${at}: length ${before.length} -> ${after.length}`];
+    return before.flatMap((x, i) => additiveViolations(x, after[i], `${path}[${i}]`));
+  }
+  if (before && typeof before === "object") {
+    if (!after || typeof after !== "object" || Array.isArray(after))
+      return [`${at}: object -> ${Array.isArray(after) ? "array" : typeof after}`];
+    return Object.keys(before).flatMap((k) => {
+      const here = path ? `${path}.${k}` : k;
+      if (k in after) return additiveViolations(before[k], after[k], here);
+      return INTENTIONAL_REMOVALS.has(generalise(here)) ? [] : [`${at}.${k}: dropped`];
+    });
+  }
+  return before === after ? [] : [`${at}: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`];
+}
+
+const violations = additiveViolations(v1, r1.state);
+assert(
+  violations.length === 0,
+  "the whole ladder is additive at every depth (nothing renamed, retyped or dropped)",
+  violations.slice(0, 5).join(" · "),
 );
-assert(changed.length === 0, "v1->v2 is purely additive (no existing value altered)", changed.join(","));
 
 // ---- the keys v2 promises to declare ---------------------------------------
-for (const k of [
-  "feedback",
-  "supplierPerf",
-  "assignments",
-  "recurring",
-  "importConflicts",
-]) {
+for (const k of ["feedback", "supplierPerf", "assignments", "recurring", "importConflicts"]) {
   assert(Array.isArray(r1.state[k]), `v2 declares ${k} as an array`);
 }
-assert(r1.state.imports && typeof r1.state.imports === "object", "v2 declares imports as an object");
+assert(
+  r1.state.imports && typeof r1.state.imports === "object",
+  "v2 declares imports as an object",
+);
+
+// ---- what v3 and v4 promise -------------------------------------------------
+assert(
+  r1.state.plans && typeof r1.state.plans === "object" && !Array.isArray(r1.state.plans),
+  "v3 declares plans as an object",
+);
+{
+  const budgets = r1.state.budgets || [];
+  assert(budgets.length > 0, "the fixture actually carries budgets to migrate");
+  assert(
+    budgets.every(
+      (b) => b.annex && typeof b.annex.enabled === "boolean" && b.annex.imagesPerPage >= 1,
+    ),
+    "v4 gives every budget its annex settings",
+  );
+  const lines = budgets.flatMap((b) =>
+    (b.versions || []).flatMap((v) => (v.chapters || []).flatMap((c) => c.lines || [])),
+  );
+  assert(lines.length > 0, "the fixture actually carries budget lines to migrate");
+  assert(
+    lines.every(
+      (l) => Array.isArray(l.imageRefs) && l.imageRefs.every((i) => typeof i === "object"),
+    ),
+    "v4 leaves every image reference as a record, never a bare string",
+  );
+}
+{
+  const projects = r1.state.projects || [];
+  assert(projects.length > 0, "the fixture actually carries projects to migrate");
+  assert(
+    projects.every(
+      (p) =>
+        p.forecastOverrides &&
+        typeof p.forecastOverrides === "object" &&
+        !Array.isArray(p.forecastOverrides),
+    ),
+    "v5 declares forecastOverrides on every project",
+  );
+  // A plan that predates the progress log must come back with an empty one,
+  // so a reader can tell "nothing recorded" from "key never existed".
+  const withPlans = M.migrate({ ...v1, plans: { prj_1: { tasks: [] } } });
+  assert(
+    Array.isArray(withPlans.state.plans.prj_1.progressLog),
+    "v5 declares progressLog on an existing plan",
+  );
+}
+{
+  // A blob that DID write bare strings: the widening must keep the reference
+  // and survive a second pass unchanged.
+  const legacy = JSON.parse(JSON.stringify(v1));
+  const line = legacy.budgets[0].versions[0].chapters[0].lines[0];
+  line.imageRefs = ["blob_abc"];
+  const w = M.migrate(legacy);
+  const got = w.state.budgets[0].versions[0].chapters[0].lines[0].imageRefs;
+  assert(
+    got.length === 1 && got[0].storageKey === "blob_abc" && got[0].internal === false,
+    "v4 widens a bare image reference into a record without losing it",
+    JSON.stringify(got),
+  );
+  assert(
+    JSON.stringify(M.migrate(w.state).state) === JSON.stringify(w.state),
+    "widening an image reference is idempotent",
+  );
+}
+{
+  // v6 (session 10b): subcontracts collection, purchase lifecycle fields,
+  // change chapterNum/sentAt, locked labour weeks, worker docs.
+  assert(Array.isArray(r1.state.subcontracts), "v6 declares subcontracts as an array");
+  assert(
+    r1.state.series && r1.state.series.subcontract && r1.state.series.subcontract.prefix === "SUB-",
+    "v6 registers the subcontract numbering series",
+  );
+  const purchases = r1.state.purchases || [];
+  assert(purchases.length > 0, "the fixture actually carries purchases to migrate");
+  assert(
+    purchases.every(
+      (p) =>
+        Array.isArray(p.receipts) &&
+        "sentAt" in p &&
+        "acceptedAt" in p &&
+        "expectedArrival" in p &&
+        "cancelledAt" in p,
+    ),
+    "v6 gives every purchase its lifecycle fields",
+  );
+  const changes = r1.state.changes || [];
+  assert(
+    changes.every((c) => "chapterNum" in c && "sentAt" in c),
+    "v6 gives every change order a chapterNum and a sentAt",
+  );
+  const labour = r1.state.labour || [];
+  assert(labour.length > 0, "the fixture actually carries labour entries to migrate");
+  assert(
+    labour.every((l) => l.locked === false && l.approvedAt === null && l.approvedBy === null),
+    "v6 leaves every existing hours entry unlocked",
+  );
+  const workers = r1.state.workers || [];
+  assert(workers.length > 0, "the fixture actually carries workers to migrate");
+  assert(
+    workers.every((w) => Array.isArray(w.docs)),
+    "v6 gives every worker a docs array",
+  );
+  // The un-migrated v1 blob has none of this — alerts()/controlTower() must
+  // still run on it directly, which is exactly what the "behaviour is
+  // preserved" block below does. This is the regression that block exists to
+  // catch: a bare `this.state.subcontracts.filter(...)` crashed on it the
+  // first time this migration was written.
+  assert(
+    v1.subcontracts === undefined,
+    "sanity: the raw v1 fixture really has no subcontracts key",
+  );
+}
+
+// ---- v14: the archive fields, and the array ADM-02 reads every render ------
+{
+  const captured = r1.state.captured || [];
+  assert(captured.length > 0, "the fixture actually carries captured documents to migrate");
+  assert(
+    captured.every(
+      (c) =>
+        typeof c.sourcePath === "string" &&
+        typeof c.reference === "string" &&
+        typeof c.notes === "string",
+    ),
+    "v14 gives every captured document sourcePath, reference and notes",
+  );
+  // The distinction v13's note argued for, asserted rather than assumed: the
+  // backfill is an empty string somebody can read, not an absent key that
+  // reads as "which build wrote this?".
+  assert(
+    captured.every((c) => "sourcePath" in c && "reference" in c && "notes" in c),
+    "v14 backfills the keys rather than leaving them absent",
+  );
+  assert(
+    (r1.state.purchases || []).every((p) => Array.isArray(p.docRefs)),
+    "v14 normalises docRefs to an array on every purchase order",
+  );
+  assert(
+    (v1.captured || []).every((c) => c.reference === undefined),
+    "sanity: the raw v1 fixture really has no reference on its captures",
+  );
+}
 
 // ---- idempotency -----------------------------------------------------------
 const r2 = M.migrate(r1.state);

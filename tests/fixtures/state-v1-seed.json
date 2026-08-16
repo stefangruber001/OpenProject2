@@ -20,12 +20,7 @@
     "budget": {
       "prefix": "PRE-",
       "next": 5,
-      "issued": [
-        "PRE-2026-0001",
-        "PRE-2026-0002",
-        "PRE-2026-0003",
-        "PRE-2026-0004"
-      ],
+      "issued": ["PRE-2026-0001", "PRE-2026-0002", "PRE-2026-0003", "PRE-2026-0004"],
       "byYear": {
         "2026": 5
       }
@@ -33,11 +28,7 @@
     "contract": {
       "prefix": "CTR-",
       "next": 4,
-      "issued": [
-        "CTR-2026-0001",
-        "CTR-2026-0002",
-        "CTR-2026-0003"
-      ],
+      "issued": ["CTR-2026-0001", "CTR-2026-0002", "CTR-2026-0003"],
       "byYear": {
         "2026": 4
       }
@@ -70,9 +61,7 @@
     "purchaseOrder": {
       "prefix": "OC-",
       "next": 2,
-      "issued": [
-        "OC-2026-0001"
-      ],
+      "issued": ["OC-2026-0001"],
       "byYear": {
         "2026": 2
       }
@@ -83,9 +72,7 @@
       "id": "pty_3",
       "code": "T-0001",
       "accountingCode": "430001",
-      "roles": [
-        "supplier"
-      ],
+      "roles": ["supplier"],
       "partyType": "company",
       "name": "Materiales Vallès S.A.",
       "taxId": "A58818501",
@@ -117,9 +104,7 @@
       "id": "pty_4",
       "code": "T-0002",
       "accountingCode": "430002",
-      "roles": [
-        "subcontractor"
-      ],
+      "roles": ["subcontractor"],
       "partyType": "company",
       "name": "ElectroBaix S.L.",
       "taxId": "B65739207",
@@ -151,10 +136,7 @@
       "id": "pty_5",
       "code": "T-0003",
       "accountingCode": "430003",
-      "roles": [
-        "subcontractor",
-        "selfEmployed"
-      ],
+      "roles": ["subcontractor", "selfEmployed"],
       "partyType": "individual",
       "name": "Josep Maria Solé (fontanería)",
       "taxId": "46543299Q",
@@ -186,10 +168,7 @@
       "id": "pty_6",
       "code": "T-0004",
       "accountingCode": "430004",
-      "roles": [
-        "adviser",
-        "selfEmployed"
-      ],
+      "roles": ["adviser", "selfEmployed"],
       "partyType": "individual",
       "name": "N. Camps, arquitecta técnica",
       "taxId": "47732924N",
@@ -221,9 +200,7 @@
       "id": "pty_7",
       "code": "T-0005",
       "accountingCode": "430005",
-      "roles": [
-        "customer"
-      ],
+      "roles": ["customer"],
       "partyType": "individual",
       "name": "Marta Roca Puig",
       "taxId": "12345678Z",
@@ -255,9 +232,7 @@
       "id": "pty_8",
       "code": "T-0006",
       "accountingCode": "430006",
-      "roles": [
-        "customer"
-      ],
+      "roles": ["customer"],
       "partyType": "community",
       "name": "Comunidad Prop. Balmes 120",
       "taxId": "H08571730",
@@ -289,9 +264,7 @@
       "id": "pty_9",
       "code": "T-0007",
       "accountingCode": "430007",
-      "roles": [
-        "customer"
-      ],
+      "roles": ["customer"],
       "partyType": "company",
       "name": "Nou Local Gràcia S.L.",
       "taxId": "B66957286",
@@ -323,9 +296,7 @@
       "id": "pty_10",
       "code": "T-0008",
       "accountingCode": "430008",
-      "roles": [
-        "customer"
-      ],
+      "roles": ["customer"],
       "partyType": "individual",
       "name": "Pau Ferrer Vila",
       "taxId": "46027840X",
@@ -357,9 +328,7 @@
       "id": "pty_11",
       "code": "T-0009",
       "accountingCode": "430009",
-      "roles": [
-        "customer"
-      ],
+      "roles": ["customer"],
       "partyType": "individual",
       "name": "Sra. García (pendiente de datos)",
       "taxId": "",
@@ -523,9 +492,7 @@
           "unit": "m2"
         }
       ],
-      "photos": [
-        "visita-roca-01.jpg"
-      ],
+      "photos": ["visita-roca-01.jpg"],
       "notes": "Croquis a mano; bajante en buen estado",
       "assumptions": [],
       "exclusions": [],
@@ -543,9 +510,7 @@
           "unit": "m2"
         }
       ],
-      "photos": [
-        "balmes-fachada.jpg"
-      ],
+      "photos": ["balmes-fachada.jpg"],
       "notes": "Andamio necesario",
       "assumptions": [],
       "exclusions": [],
@@ -563,9 +528,7 @@
           "unit": "m2"
         }
       ],
-      "photos": [
-        "verdi-local.jpg"
-      ],
+      "photos": ["verdi-local.jpg"],
       "notes": "Licencia de actividad en trámite",
       "assumptions": [],
       "exclusions": [],
@@ -583,9 +546,7 @@
           "unit": "ml"
         }
       ],
-      "photos": [
-        "humedad-01.jpg"
-      ],
+      "photos": ["humedad-01.jpg"],
       "notes": "Humedad de capilaridad en PB",
       "assumptions": [],
       "exclusions": [],
@@ -1723,11 +1684,7 @@
         "delayPenaltyCentsPerWeek": 15000,
         "capCents": 49444,
         "graceDays": 7,
-        "suspendingEvents": [
-          "retraso del cliente",
-          "fuerza mayor",
-          "cambio aprobado"
-        ]
+        "suspendingEvents": ["retraso del cliente", "fuerza mayor", "cambio aprobado"]
       },
       "guarantees": [
         {
@@ -1746,9 +1703,7 @@
           "startDate": null
         }
       ],
-      "clauseBlockVersions": [
-        "cb1"
-      ],
+      "clauseBlockVersions": ["cb1"],
       "language": "es",
       "signature": {
         "customerSignedAt": "2026-03-16",
@@ -1826,11 +1781,7 @@
         "delayPenaltyCentsPerWeek": 0,
         "capCents": 0,
         "graceDays": 7,
-        "suspendingEvents": [
-          "customer delay",
-          "force majeure",
-          "approved change"
-        ]
+        "suspendingEvents": ["customer delay", "force majeure", "approved change"]
       },
       "guarantees": [
         {
@@ -1849,9 +1800,7 @@
           "startDate": null
         }
       ],
-      "clauseBlockVersions": [
-        "cb1"
-      ],
+      "clauseBlockVersions": ["cb1"],
       "language": "es",
       "signature": {
         "customerSignedAt": "2026-04-25",
@@ -1914,11 +1863,7 @@
         "delayPenaltyCentsPerWeek": 0,
         "capCents": 0,
         "graceDays": 7,
-        "suspendingEvents": [
-          "customer delay",
-          "force majeure",
-          "approved change"
-        ]
+        "suspendingEvents": ["customer delay", "force majeure", "approved change"]
       },
       "guarantees": [
         {
@@ -1928,9 +1873,7 @@
           "expiryDate": "2028-03-27"
         }
       ],
-      "clauseBlockVersions": [
-        "cb1"
-      ],
+      "clauseBlockVersions": ["cb1"],
       "language": "es",
       "signature": {
         "customerSignedAt": "2026-03-12",

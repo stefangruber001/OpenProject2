@@ -119,8 +119,24 @@ function loadDeliberate(target) {
   }
   const D = sandbox.window.CANEI_DICT || {};
   const exact = new Set();
-  const list = target === "ca" ? D.ca || [] : D.pairs || [];
-  for (const [from, to] of list) if (from === to) exact.add(from);
+  // The two columns are shaped differently and always have been: `pairs` is a
+  // list of [es, en] and `ca` is an OBJECT keyed on the Spanish string. Reading
+  // the object as a list yields nothing, which would empty this set silently —
+  // and an empty set does not make the audit fail, it makes it over-report,
+  // demanding "fixes" for strings somebody already decided stay as they are.
+  // So the shape is asserted rather than assumed.
+  const entries =
+    target === "ca"
+      ? Object.entries(D.ca || {})
+      : Object.entries(Object.fromEntries(D.pairs || []));
+  if (!entries.length) {
+    console.error(
+      `FAIL: the ${target} column of the dictionary read as empty. ` +
+        `Expected ${target === "ca" ? "an object keyed on Spanish (window.CANEI_DICT.ca)" : "a list of [es, en] pairs (window.CANEI_DICT.pairs)"}.`,
+    );
+    process.exit(1);
+  }
+  for (const [from, to] of entries) if (from === to) exact.add(from);
   return exact;
 }
 

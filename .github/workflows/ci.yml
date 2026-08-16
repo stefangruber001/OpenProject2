@@ -105,18 +105,12 @@ jobs:
       - name: Build capability bundle
         run: pnpm --filter @repo/erp-browser build
 
+      # One copy of this rule, in a script `make gates` runs too. It lived
+      # here as inline bash and that is precisely how it failed to help: a
+      # local gate run cannot execute a workflow step, so the regression was
+      # found after the push instead of before it.
       - name: Assert the bundle is browser-safe
-        run: |
-          test -s site/erp-factory.js  || { echo "erp-factory.js missing/empty";  exit 1; }
-          test -s site/erp-factory.cjs || { echo "erp-factory.cjs missing/empty"; exit 1; }
-          # The IIFE must expose the global site/erp-bridge.js reaches for.
-          grep -q "ErpFactory" site/erp-factory.js || { echo "global ErpFactory not found"; exit 1; }
-          # zod is a resolve-time concern and must tree-shake out of the browser
-          # bundle ("sideEffects": false on every capability enables that).
-          if grep -q "ZodError" site/erp-factory.js; then
-            echo "zod leaked into the browser bundle — check tree-shaking"; exit 1
-          fi
-          ls -l site/erp-factory.js site/erp-factory.cjs
+        run: node tests/parity/bundle-safety.mjs
 
       # The artifacts are committed (pages.yml publishes site/** from a bare
       # checkout with no Node). This proves the committed copies still match
@@ -175,8 +169,39 @@ jobs:
           node tests/simulation/migrations-sim.mjs
           node tests/simulation/import-sim.mjs
 
+      # Drives the COMMITTED site/erp-factory bundle, not the TypeScript source:
+      # the scheduling capability reaches the browser only through that artifact,
+      # so a bundle that was not rebuilt after a source change fails here rather
+      # than in front of an operator looking at a Gantt chart.
+      - name: Scheduling capability simulation (committed bundle)
+        run: node tests/simulation/scheduling-sim.mjs
+
       - name: Ownership file guard (strangler-fig migration state)
         run: node tests/parity/ownership-guard.mjs
+
+      # The interface is trilingual (ES · CA · EN) and the dictionary is
+      # hand-maintained, so nothing but a check stops a new Spanish string
+      # shipping with no translation — it renders correctly for whoever wrote
+      # it and silently falls back for everybody else. Fails on a missing
+      # English form, and on any growth in the Catalan backlog.
+      - name: i18n coverage (no untranslated user-visible string)
+        run: node tests/i18n/coverage.mjs
+
+      # The mapping's field dictionary is the strongest claim in the governance
+      # set — "the data you have today fits the system you are buying" — and it
+      # is a markdown table, so nothing but this stops it drifting away from the
+      # engine. Resolves every field the table claims against the real seeded
+      # dataset, not against the source text.
+      - name: Workbook coverage (the field dictionary is still true)
+        run: node tests/workbook/coverage.mjs
+
+      # The phone app is six URLs pointed at this site, and it is built on a
+      # macOS runner — so nothing here would notice a tab addressing a page
+      # that no longer exists, a section that was renamed, or the URL being
+      # assembled in the one way that percent-encodes a fragment. All three are
+      # readable as text, so they are checked next to the site they point at.
+      - name: iOS tab routes (every tab addresses a real screen)
+        run: node tests/ios-routes/coverage.mjs
 
   persistence:
     name: Durable adapters (Postgres + RLS contract tests)
