@@ -408,32 +408,24 @@
     return !!(el && el.closest && el.closest('[translate="no"]'));
   }
 
-  /* ---------- audit mode ----------------------------------------------------
+  /**
+   * A diagnostic flag, with NO visible effect.
    *
-   * `?i18n=audit`, or localStorage `caneiI18nAudit=1` to keep it on across the
-   * whole session. Every element holding an untranslated string is outlined,
-   * and a counter in the corner lists them and copies the list to the
-   * clipboard.
+   * There used to be an on-screen audit here: `?i18n=audit` outlined every
+   * untranslated element in red and floated a counter over the workspace. It
+   * was removed on the operator's instruction — the ERP is a tool for running
+   * a building company, not a surface for its own defect list, and a person
+   * using it should never be asked to do the finding.
    *
-   * This is the half of the tool that does not need a developer. Walking the
-   * ERP with it on shows the gaps AS YOU MEET THEM, on the real screens, in
-   * the real language, including the ones behind a button — which is the
-   * failure mode every previous scanner had. It is off by default and leaves
-   * no trace when off.
+   * What is left is invisible and exists only so `tests/i18n/miss-crawl.mjs`
+   * can record WHERE a string was seen. It draws nothing, injects nothing and
+   * changes no markup; with the flag off it does not even compute the path.
    */
-  var AUDIT = false;
+  var TRACE = false;
   try {
-    AUDIT =
-      active && (/[?&]i18n=audit\b/.test(location.search) || readLocal("caneiI18nAudit") === "1");
-    if (/[?&]i18n=audit\b/.test(location.search)) writeLocal("caneiI18nAudit", "1");
-    if (/[?&]i18n=off\b/.test(location.search)) writeLocal("caneiI18nAudit", "");
+    TRACE = active && readLocal("caneiI18nTrace") === "1";
   } catch (e) {
-    /* no location, no localStorage — audit stays off */
-  }
-
-  function mark(el) {
-    if (el && el.setAttribute && !el.closest("#canei-i18n-hud"))
-      el.setAttribute("data-i18n-miss", "");
+    /* no localStorage — tracing stays off */
   }
 
   function translateNode(root) {
@@ -445,9 +437,8 @@
       var pn = n.parentNode && n.parentNode.nodeName;
       if (pn && SKIP[pn]) continue;
       if (noTranslate(n)) continue;
-      var out = tr(n.nodeValue, AUDIT ? locate(n) : "");
+      var out = tr(n.nodeValue, TRACE ? locate(n) : "");
       if (out !== null) n.nodeValue = out;
-      else if (AUDIT && lastMiss) mark(n.parentElement);
     }
     // THE ROOT ITSELF, not only its descendants.
     //
@@ -472,15 +463,13 @@
       for (var a = 0; a < ATTRS.length; a++) {
         var v = el.getAttribute && el.getAttribute(ATTRS[a]);
         if (v) {
-          var o = tr(v, AUDIT ? locate(el) + "[" + ATTRS[a] + "]" : "");
+          var o = tr(v, TRACE ? locate(el) + "[" + ATTRS[a] + "]" : "");
           if (o !== null) el.setAttribute(ATTRS[a], o);
-          else if (AUDIT && lastMiss) mark(el);
         }
       }
       if (el.nodeName === "INPUT" && (el.type === "button" || el.type === "submit") && el.value) {
-        var ov = tr(el.value, AUDIT ? locate(el) + "[value]" : "");
+        var ov = tr(el.value, TRACE ? locate(el) + "[value]" : "");
         if (ov !== null) el.value = ov;
-        else if (AUDIT && lastMiss) mark(el);
       }
     }
   }
@@ -681,76 +670,9 @@
     return out;
   }
 
-  function injectHud() {
-    if (!AUDIT || document.getElementById("canei-i18n-hud")) return;
-    var st = document.createElement("style");
-    st.textContent =
-      "[data-i18n-miss]{outline:2px dashed #e5484d!important;outline-offset:1px;background:rgba(229,72,77,.08)!important}" +
-      "#canei-i18n-hud{position:fixed;bottom:14px;right:14px;z-index:99999;max-width:min(420px,92vw);" +
-      "background:#1d1f1a;color:#fff;border-radius:12px;box-shadow:0 18px 40px -14px rgba(0,0,0,.6);" +
-      "font:12px/1.45 Inter,system-ui,sans-serif;overflow:hidden}" +
-      "#canei-i18n-hud header{display:flex;gap:8px;align-items:center;padding:9px 12px;background:#e5484d;font-weight:700}" +
-      "#canei-i18n-hud header span{flex:1}" +
-      "#canei-i18n-hud button{appearance:none;border:0;border-radius:6px;background:rgba(255,255,255,.18);" +
-      "color:#fff;font:inherit;font-weight:600;padding:3px 8px;cursor:pointer}" +
-      "#canei-i18n-hud ol{margin:0;padding:8px 12px 10px 28px;max-height:38vh;overflow:auto}" +
-      "#canei-i18n-hud li{margin:0 0 3px;word-break:break-word}" +
-      "#canei-i18n-hud li i{color:#a9b0a0;font-style:normal}" +
-      "@media print{#canei-i18n-hud,[data-i18n-miss]{outline:0!important;display:none}}";
-    document.head.appendChild(st);
-
-    var hud = document.createElement("div");
-    hud.id = "canei-i18n-hud";
-    hud.setAttribute("translate", "no");
-    hud.innerHTML =
-      '<header><span></span><button data-a="copy">Copiar</button>' +
-      '<button data-a="off">✕</button></header><ol></ol>';
-    document.body.appendChild(hud);
-
-    var head = hud.querySelector("span");
-    var list = hud.querySelector("ol");
-    var render = function () {
-      var all = missList();
-      // `target.toUpperCase()`, not a lookup table: the `SHORT` map went with
-      // the floating pill it existed to label (PK5-A), and the merge that
-      // removed it left this line referring to a name that no longer exists.
-      // Text merged clean; the code did not.
-      head.textContent = all.length + " sin traducir · " + target.toUpperCase();
-      list.innerHTML = "";
-      all.slice(0, 60).forEach(function (e) {
-        var li = document.createElement("li");
-        li.textContent = e.text.slice(0, 110);
-        if (e.n > 1) {
-          var i = document.createElement("i");
-          i.textContent = " ×" + e.n;
-          li.appendChild(i);
-        }
-        list.appendChild(li);
-      });
-    };
-    hud.addEventListener("click", function (ev) {
-      var a = ev.target.getAttribute && ev.target.getAttribute("data-a");
-      if (a === "off") {
-        writeLocal("caneiI18nAudit", "");
-        location.href = location.pathname + "?i18n=off" + location.hash;
-      } else if (a === "copy") {
-        var text = missList()
-          .map(function (e) {
-            return e.text;
-          })
-          .join("\n");
-        if (navigator.clipboard) navigator.clipboard.writeText(text);
-        ev.target.textContent = "✓";
-      }
-    });
-    render();
-    setInterval(render, 1200);
-  }
-
   /* ---------- boot ---------- */
   function boot() {
     fullPass();
-    injectHud();
     syncCompany();
     // Registered even when this page needs no translating: a Spanish page has
     // to notice a switch to Catalan just as much as the other way round, and
@@ -785,9 +707,6 @@
     misses: missList,
     resetMisses: function () {
       misses.clear();
-    },
-    auditing: function () {
-      return AUDIT;
     },
   };
 })();

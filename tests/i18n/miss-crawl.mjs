@@ -365,7 +365,7 @@ async function crawl(browser, base, lang) {
   // outlines it also draws are invisible in a headless run and harmless.
   await ctx.addInitScript(`try {
     localStorage.setItem("caneiLang", ${JSON.stringify(lang)});
-    localStorage.setItem("caneiI18nAudit", "1");
+    localStorage.setItem("caneiI18nTrace", "1");
     document.cookie = "canei_lang=${lang};path=/;max-age=31536000";
   } catch (e) {}`);
   const page = await ctx.newPage();

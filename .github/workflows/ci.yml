@@ -192,8 +192,8 @@ jobs:
       # #168, and the same argument for the source-literal ceilings in #167.
       #
       # From here it only goes down. Every string behind these numbers is one an
-      # operator can see in the wrong language; `?i18n=audit` on the live site
-      # lists them per screen.
+      # operator can see in the wrong language. Run this locally with --json to get
+      # the full list grouped by screen.
       - name: Translation coverage (translator miss ledger)
         if: always()
         run: |
