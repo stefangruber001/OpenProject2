@@ -205,6 +205,184 @@ check(
   wordsSeen ? `${closest.toFixed(1)}mm from the edge` : "nothing measured",
 );
 
+/* ==========================================================================
+   Every document type, not just the quote.
+
+   The writer used to be exercised by one document, which is how `Count 1`
+   survived: the sample fitted on a page, so nothing complained. Each of the
+   sixteen PDF documents is built TWICE — once with ordinary data and once with
+   every list inflated until it cannot fit — and the inflated build has to still
+   contain the LAST item of every list it was given. That is the assertion that
+   catches truncation; page count alone does not, because a writer that drops
+   the overflow silently still reports the pages it did emit.
+   ========================================================================== */
+
+const docSandbox = { globalThis: null, module: undefined, console };
+docSandbox.globalThis = docSandbox;
+createContext(docSandbox);
+runInContext(fs.readFileSync(resolve(ROOT, "site/erp-doctypes.js"), "utf8"), docSandbox);
+const DT = docSandbox.CaneiDocTypes;
+
+/** Repeat every row array so the document cannot fit on one page. */
+function inflate(value, n, depth = 0) {
+  if (Array.isArray(value)) {
+    const grown = [];
+    for (let i = 0; i < n; i++) for (const v of value) grown.push(inflate(v, 1, depth + 1));
+    return grown;
+  }
+  if (value && typeof value === "object" && depth < 3) {
+    const out = {};
+    for (const k of Object.keys(value)) out[k] = inflate(value[k], n, depth + 1);
+    return out;
+  }
+  return value;
+}
+
+/** Every string the descriptor asked to be printed, as a flat list. */
+function printedStrings(node, out = [], depth = 0) {
+  if (depth > 6) return out;
+  if (typeof node === "string") {
+    if (node.trim().length > 12) out.push(node.trim());
+    return out;
+  }
+  if (Array.isArray(node)) {
+    for (const v of node) printedStrings(v, out, depth + 1);
+    return out;
+  }
+  if (node && typeof node === "object") {
+    for (const k of Object.keys(node)) printedStrings(node[k], out, depth + 1);
+  }
+  return out;
+}
+
+const BASE14 = new Set([
+  "Helvetica",
+  "Helvetica-Bold",
+  "Helvetica-Oblique",
+  "Helvetica-BoldOblique",
+  "Times-Roman",
+  "Times-Bold",
+  "Times-Italic",
+  "Times-BoldItalic",
+  "Courier",
+  "Courier-Bold",
+  "Courier-Oblique",
+  "Courier-BoldOblique",
+  "Symbol",
+  "ZapfDingbats",
+]);
+
+/**
+ * The font decision, made a rule.
+ *
+ * Helvetica and Times were chosen over the design's own faces because every
+ * reader ever written already has them. The risk that creates is not those two
+ * faces — it is somebody later adding a custom one and NOT embedding it, which
+ * is exactly the "opens wrong on the customer's machine" failure the operator
+ * asked to avoid, and which would look perfect on the machine that added it.
+ */
+function fontProblems(raw) {
+  const bad = [];
+  const embedded = /\/FontFile[23]?\b/.test(raw);
+  for (const m of raw.matchAll(/\/BaseFont\s*\/([A-Za-z0-9+\-,.]+)/g)) {
+    const name = m[1].replace(/^[A-Z]{6}\+/, "");
+    if (!BASE14.has(name) && !embedded) bad.push(name);
+  }
+  return [...new Set(bad)];
+}
+
+const bulkOut = resolve(OUT, "all");
+fs.mkdirSync(bulkOut, { recursive: true });
+const facts = DT.sampleFacts();
+const big = inflate(facts, 3);
+// The chapter list drives the tables and is the one array whose growth changes
+// page count for most documents; inflate() already multiplied it, but the codes
+// have to stay distinct or "the last chapter is present" would pass on a copy
+// of the first.
+big.chapters = big.chapters.map((c, i) => ({
+  ...c,
+  code: String(i + 1).padStart(2, "0"),
+  name: c.name + " (bloque " + (i + 1) + ")",
+}));
+
+console.log("\n──── every document type, inflated until it overflows ────");
+let manyPage = 0;
+for (const kind of DT.KINDS) {
+  let descriptor, raw;
+  try {
+    descriptor = DT.build(kind, big);
+    raw = build(descriptor, BRAND, tr);
+  } catch (e) {
+    check(`${kind}: builds`, false, String(e.message).slice(0, 90));
+    continue;
+  }
+  const f = resolve(bulkOut, kind + ".pdf");
+  fs.writeFileSync(f, Buffer.from(raw, "latin1"));
+  const pages = (raw.match(/\/Type\s*\/Page[^s]/g) || []).length;
+  if (pages > 1) manyPage++;
+
+  const out = spawnSync("pdftotext", ["-layout", f, "-"], { encoding: "utf8" }).stdout || "";
+  // Case-folded and whitespace-free, for two reasons that are properties of the
+  // DESIGN and not of the check: several blocks print their labels in capitals
+  // (kvGrid, the band, the table head), and any string long enough to be worth
+  // asserting on is wrapped across lines by the writer. Comparing raw text
+  // would fail on documents that are perfectly correct — and a gate that cries
+  // wolf is one somebody switches off.
+  const squeezed = out.replace(/\s+/g, "").toLowerCase();
+
+  // Truncation guard. Each descriptor is asked what it wanted printed, and the
+  // LAST of those strings — the one a one-page writer loses — must be there.
+  const wanted = printedStrings(descriptor);
+  const tail = wanted.slice(-6);
+  const missing = tail.filter((s) => {
+    const t = tr(s).replace(/\s+/g, "").toLowerCase();
+    return !squeezed.includes(t.slice(0, Math.min(24, t.length)));
+  });
+
+  const numbered = Array.from({ length: pages }, (_, i) =>
+    new RegExp(`\\b${i + 1}\\s*/\\s*${pages}\\b`).test(out),
+  ).every(Boolean);
+
+  const bbox = spawnSync("pdftotext", ["-bbox", f, "-"], { encoding: "utf8" }).stdout || "";
+  let near = Infinity,
+    words = 0;
+  for (const page of bbox.split(/<page\b/).slice(1)) {
+    const m = /width="([\d.]+)"\s+height="([\d.]+)"/.exec(page);
+    const W = m ? +m[1] : 595.28,
+      H = m ? +m[2] : 841.89;
+    for (const w of page.matchAll(
+      /xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)"/g,
+    )) {
+      words++;
+      near = Math.min(near, (Math.min(+w[1], +w[2], W - +w[3], H - +w[4]) / 72) * 25.4);
+    }
+  }
+
+  const badFonts = fontProblems(raw);
+  const shattered = /\b(?:[A-Za-zÁÉÍÓÚÑ]\s){3,}[A-Za-zÁÉÍÓÚÑ]\b/.test(out);
+
+  const problems = [];
+  if (words < 40) problems.push(`only ${words} words extracted`);
+  if (missing.length) problems.push(`missing tail: ${missing[0].slice(0, 44)}`);
+  if (!numbered) problems.push("page numbering incomplete");
+  if (!(near >= 9.5)) problems.push(`ink ${near.toFixed(1)}mm from the edge`);
+  if (badFonts.length) problems.push(`non-base-14, not embedded: ${badFonts.join(", ")}`);
+  if (shattered) problems.push("shattered heading");
+  if (!/€|\x80/.test(out) && /€/.test(JSON.stringify(descriptor))) problems.push("euro sign lost");
+
+  check(
+    `${kind.padEnd(20)} ${String(pages).padStart(2)}p`,
+    problems.length === 0,
+    problems.join(" · ") || `${words} words, ${near.toFixed(1)}mm clear`,
+  );
+}
+
+check(
+  "the block primitives paginate",
+  manyPage >= 12,
+  `${manyPage} of ${DT.KINDS.length} documents ran past one page`,
+);
+
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed → ${file}`);
 process.exit(failed.length ? 1 : 0);

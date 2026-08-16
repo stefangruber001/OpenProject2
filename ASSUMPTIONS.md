@@ -2895,3 +2895,55 @@ different decisions, so these ten arrived colliding. They are renumbered from
   check scoped small enough to pass.
   **Reversible: yes** — every decision is a dictionary entry, a test helper or a
   ceiling, and the merge is an ordinary merge commit with no history rewritten.
+
+- **#96 — the other seventeen documents, and the tracking that only shattered
+  on somebody else's browser (2026-08-16).**
+  The approved redesign covers twenty documents; the ERP could generate three.
+  **Sixteen PDF descriptors now live in `site/erp-doctypes.js`** — data, not
+  drawing — plus five new block primitives in the writer (`progressBars`,
+  `milestones`, `checklist`, `kvGrid`, `marginTable`) and a `sections` list so a
+  new document is a descriptor and not an edit to the writer. An unknown section
+  type THROWS rather than being skipped: a silently ignored section is a page
+  that goes missing without saying so.
+  **Named `erp-doctypes`, not `erp-documents`,** because `site/erp-docs.js`
+  already exists and is the storage layer. Two modules a letter apart, one about
+  storing records and one about printing paper, would be confused permanently.
+  **Four of the seventeen are placeholder-fed** (change order, delivery note,
+  timesheet, handover) and say so in the descriptor rather than in a comment: an
+  invented number that looks measured is worse than a blank.
+  **The emails are tables, not the template's own CSS.** The approved files use
+  grid and flexbox, which Outlook on Windows ignores — it renders through Word —
+  so shipping the design verbatim would arrive as one unstyled column at exactly
+  the moment it matters. The design is reproduced; the mechanism is tables and
+  inline styles. Every fact (amounts, IBAN, reference, due date) is real text in
+  a cell, so the message still reads correctly with styling stripped entirely.
+  **The De/Para/Asunto strip is preview-only.** In an inbox the client draws
+  those headers from the envelope, so shipping them in the body prints them
+  twice.
+  **THE ONE THAT MATTERED: `.04em` letter-spacing was tuned to one Chromium.**
+  The local gate passed; CI reported 16 of 21 documents with shattered headings
+  ("CO N T RAT O D E O B RA"), and CI extracted 7584 words where this machine
+  extracted 6785 — the PDFs themselves differ, because each machine renders them
+  with its own browser build. Positive CSS tracking is baked into glyph
+  positions and is therefore at the mercy of the renderer's rounding; it is now
+  **zero** in all 21 templates. Negative tracking stays: pulling glyphs together
+  never makes an extractor insert a space.
+  **The writer's own tracking is NOT the same mechanism and stays.** It uses the
+  PDF character-spacing operator (`Tc`), which poppler accounts for — the PDF
+  writer gate passed on CI with tracking on the same run the templates failed.
+  **This machine cannot download CI's browser** (the proxy refuses), so the fix
+  is reasoned from the CI evidence and falsifiable there: if the explanation is
+  right, CI's extracted word count drops to about this machine's 6785. If it
+  does not, the explanation is wrong.
+  **The gate now builds all sixteen documents twice** — ordinary data and every
+  list inflated ×3 — and asserts the LAST string of each list survives. Page
+  count alone does not catch truncation: a writer that drops the overflow still
+  reports the pages it did emit. Negative-controlled by reintroducing the
+  original `Count 1` bug (18 assertions fail, exit 1) and by naming a custom
+  font without embedding it (exit 1, the font named).
+  **The truncation check first failed on four correct documents** because
+  `kvGrid` prints its labels in capitals and long strings wrap. A gate that
+  cries wolf is one somebody switches off, so it case-folds and squeezes
+  whitespace — still a real check, since a truncated document lacks the string
+  entirely.
+  **Reversible: yes.**

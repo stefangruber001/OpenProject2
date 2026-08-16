@@ -449,6 +449,194 @@
     }
   };
 
+  /* ------------------------------------------------------ block primitives
+   *
+   * The thirteen documents the quote and the invoice do not cover need shapes
+   * the table cannot express: a percentage per chapter, a payment schedule, a
+   * punch list, a field/value sheet, a budget-versus-actual comparison.
+   *
+   * Every one of them calls `need()` before drawing a row and redraws its own
+   * heading after a break. That is not decoration. The writer this replaced
+   * emitted `Count 1` and discarded everything past the first page in silence,
+   * and a block that measures its height once and then draws N rows reproduces
+   * exactly that failure one document at a time. */
+
+  /** Percentage per line — progress valuation, physical completion. */
+  Doc.prototype.progressBars = function (rows, opts) {
+    if (!rows || !rows.length) return;
+    const labelW = 190;
+    const barX = X0 + labelW + 8;
+    const barW = X1 - barX - 62;
+    const head = () => {
+      this.text(X0, this.y - 8, 6.5, FONT.sansB, C.muted, (opts && opts.label) || "CONCEPTO", {
+        tracking: 0.04,
+      });
+      this.textRight(X1, this.y - 8, 6.5, FONT.sansB, C.muted, "AVANCE", { tracking: 0.04 });
+      this.y -= 13;
+      this.rule(X0, this.y, CONTENT_W, C.line, 1.2);
+      this.y -= 6;
+    };
+    head();
+    for (const r of rows) {
+      const lines = this.wrap(r.label, FONT.sans, 9, labelW);
+      const h = Math.max(lines.length * 11, 11) + 10;
+      if (this.need(h)) head();
+      lines.forEach((l, i) => this.text(X0, this.y - 9 - i * 11, 9, FONT.sans, C.body, l));
+      const pct = Math.max(0, Math.min(100, Number(r.pct) || 0));
+      this.rect(barX, this.y - 11, barW, 7, C.wash);
+      if (pct > 0) this.rect(barX, this.y - 11, (barW * pct) / 100, 7, C.green);
+      this.textRight(X1, this.y - 9, 9, FONT.sansB, C.ink, r.amount || pct.toFixed(0) + " %");
+      if (r.note) {
+        this.text(barX, this.y - 11 - lines.length * 11 + 2, 7.5, FONT.sans, C.muted, r.note);
+      }
+      this.y -= h;
+      this.rule(X0, this.y + 3, CONTENT_W, rgb("#f0f4ec"));
+    }
+    this.y -= 8;
+  };
+
+  /** A dated schedule — contract payment milestones, planned visits. */
+  Doc.prototype.milestones = function (rows) {
+    if (!rows || !rows.length) return;
+    const whenX = X0,
+      labelX = X0 + 86,
+      stateX = X1 - 190;
+    const head = () => {
+      this.text(whenX, this.y - 8, 6.5, FONT.sansB, C.muted, "FECHA", { tracking: 0.04 });
+      this.text(labelX, this.y - 8, 6.5, FONT.sansB, C.muted, "HITO", { tracking: 0.04 });
+      this.text(stateX, this.y - 8, 6.5, FONT.sansB, C.muted, "ESTADO", { tracking: 0.04 });
+      this.textRight(X1, this.y - 8, 6.5, FONT.sansB, C.muted, "IMPORTE", { tracking: 0.04 });
+      this.y -= 13;
+      this.rule(X0, this.y, CONTENT_W, C.line, 1.2);
+      this.y -= 6;
+    };
+    head();
+    for (const r of rows) {
+      const lines = this.wrap(r.label, FONT.sans, 9, stateX - labelX - 12);
+      const h = lines.length * 11 + 8;
+      if (this.need(h)) head();
+      this.text(whenX, this.y - 9, 9, FONT.sans, C.body, r.when || "-");
+      lines.forEach((l, i) => this.text(labelX, this.y - 9 - i * 11, 9, FONT.sans, C.body, l));
+      this.text(stateX, this.y - 9, 8, FONT.sans, C.muted, r.state || "");
+      this.textRight(X1, this.y - 9, 9, FONT.sansB, C.ink, r.amount || "");
+      this.y -= h;
+      this.rule(X0, this.y + 3, CONTENT_W, rgb("#f0f4ec"));
+    }
+    this.y -= 8;
+  };
+
+  /**
+   * A punch list. The mark is drawn, not typed: a tick and a cross as glyphs
+   * are outside WinAnsi, so they would arrive as a substituted character or as
+   * nothing at all on the customer's reader.
+   */
+  Doc.prototype.checklist = function (rows) {
+    if (!rows || !rows.length) return;
+    const boxX = X0 + 2,
+      textX = X0 + 18;
+    for (const r of rows) {
+      const lines = this.wrap(r.label, FONT.sans, 9, X1 - textX - 120);
+      const note = r.note ? this.wrap(r.note, FONT.sans, 7.5, X1 - textX - 120) : [];
+      const h = lines.length * 11 + note.length * 9 + 8;
+      this.need(h);
+      const top = this.y - 11;
+      this.rect(boxX, top, 9, 9, r.state === "ok" ? C.green : C.wash);
+      if (r.state !== "ok") {
+        this.c += `${C.line} RG 0.6 w ${boxX.toFixed(2)} ${top.toFixed(2)} 9 9 re S\n`;
+      }
+      if (r.state === "fail") this.rect(boxX + 2.5, top + 3.5, 4, 2, rgb("#8f2d1b"));
+      lines.forEach((l, i) => this.text(textX, this.y - 9 - i * 11, 9, FONT.sans, C.body, l));
+      note.forEach((l, i) =>
+        this.text(textX, this.y - 9 - lines.length * 11 - i * 9, 7.5, FONT.sans, C.muted, l),
+      );
+      if (r.by) this.textRight(X1, this.y - 9, 8, FONT.sans, C.muted, r.by);
+      this.y -= h;
+    }
+    this.y -= 6;
+  };
+
+  /** Field/value pairs in columns — receipts, project sheets, summaries. */
+  Doc.prototype.kvGrid = function (rows, cols) {
+    if (!rows || !rows.length) return;
+    const n = cols || 3;
+    const cw = CONTENT_W / n;
+    for (let i = 0; i < rows.length; i += n) {
+      const slice = rows.slice(i, i + n);
+      const wrapped = slice.map((r) => this.wrap(String(r[1]), FONT.serifB, 9.5, cw - 12));
+      const h = 14 + Math.max(...wrapped.map((w) => w.length)) * 12;
+      // Measured per ROW OF CELLS, not once for the whole grid: a value that
+      // wraps to three lines makes its row taller than the rest, and a single
+      // height for all of them is how a long address ends up drawn over the
+      // block underneath.
+      this.need(h + 4);
+      slice.forEach((r, j) => {
+        const x = X0 + j * cw;
+        this.text(x, this.y - 8, 6.5, FONT.sansB, C.muted, String(r[0]).toUpperCase(), {
+          tracking: 0.04,
+        });
+        wrapped[j].forEach((l, k) =>
+          this.text(x, this.y - 21 - k * 12, 9.5, FONT.serifB, C.ink, l),
+        );
+      });
+      this.y -= h;
+      this.rule(X0, this.y + 4, CONTENT_W, rgb("#f0f4ec"));
+      this.y -= 4;
+    }
+    this.y -= 6;
+  };
+
+  /** Budget against actual, with the variance called out. */
+  Doc.prototype.marginTable = function (rows) {
+    if (!rows || !rows.length) return;
+    const budgetX = X1 - 300,
+      actualX = X1 - 190,
+      varX = X1 - 80,
+      pctX = X1;
+    const head = () => {
+      this.text(X0, this.y - 8, 6.5, FONT.sansB, C.muted, "CAPITULO", { tracking: 0.04 });
+      this.textRight(budgetX, this.y - 8, 6.5, FONT.sansB, C.muted, "PREVISTO", { tracking: 0.04 });
+      this.textRight(actualX, this.y - 8, 6.5, FONT.sansB, C.muted, "REAL", { tracking: 0.04 });
+      this.textRight(varX, this.y - 8, 6.5, FONT.sansB, C.muted, "DESVIACION", { tracking: 0.04 });
+      this.textRight(pctX, this.y - 8, 6.5, FONT.sansB, C.muted, "MARGEN", { tracking: 0.04 });
+      this.y -= 13;
+      this.rule(X0, this.y, CONTENT_W, C.line, 1.2);
+      this.y -= 6;
+    };
+    head();
+    for (const r of rows) {
+      const lines = this.wrap(r.label, FONT.sans, 9, budgetX - X0 - 60);
+      const h = lines.length * 11 + 8;
+      if (this.need(h)) head();
+      const over = r.over === true;
+      lines.forEach((l, i) =>
+        this.text(X0, this.y - 9 - i * 11, 9, FONT[r.total ? "sansB" : "sans"], C.body, l),
+      );
+      this.textRight(budgetX, this.y - 9, 9, FONT.sans, C.body, r.budget || "");
+      this.textRight(actualX, this.y - 9, 9, FONT.sans, C.body, r.actual || "");
+      // Over budget is stated in words as well as colour. A reader who prints
+      // in greyscale, or cannot distinguish the two, still gets the fact.
+      this.textRight(
+        varX,
+        this.y - 9,
+        9,
+        FONT.sansB,
+        over ? rgb("#8f2d1b") : C.ink,
+        (over ? "+" : "") + (r.variance || ""),
+      );
+      this.textRight(
+        pctX,
+        this.y - 9,
+        9,
+        FONT.sansB,
+        over ? rgb("#8f2d1b") : C.green,
+        r.margin || "",
+      );
+      this.y -= h;
+      this.rule(X0, this.y + 3, CONTENT_W, over ? rgb("#f2dcd6") : rgb("#f0f4ec"));
+    }
+    this.y -= 8;
+  };
+
   Doc.prototype.signatures = function () {
     const d = this.o.doc;
     if (!d.signatures || !d.signatures.length) return;
@@ -540,23 +728,62 @@
    * that pass only the old fields still get a valid document — the new blocks
    * are skipped when absent, so nothing breaks while callers are updated.
    */
+  /**
+   * The body, when a document declares one.
+   *
+   * `doc.sections` is an ordered list of `{ type, … }`. It exists because the
+   * twenty documents do not share one body: a delivery note has a conformity
+   * list where an invoice has a totals block, and a project sheet has both a
+   * field sheet and a variance table. Encoding that as a fixed sequence with
+   * flags produced a build() nobody could read; encoding it as data means a new
+   * document type is a descriptor and not an edit here.
+   *
+   * An unknown type is a hard error rather than a skip. A silently ignored
+   * section is a page of the document that goes missing without saying so,
+   * which is the exact failure this writer was rewritten to end.
+   */
+  const SECTION = {
+    band: (d, s) => d.band(s.label, s.note, s.tone),
+    note: (d, s) => d.note(s.text),
+    table: (d, s) => {
+      if (s.label) d.band(s.label, s.note);
+      d.groups();
+    },
+    lines: (d) => d.plainLines(),
+    totals: (d) => d.totals(),
+    progressBars: (d, s) => d.progressBars(s.rows, s),
+    milestones: (d, s) => d.milestones(s.rows),
+    checklist: (d, s) => d.checklist(s.rows),
+    kvGrid: (d, s) => d.kvGrid(s.rows, s.cols),
+    marginTable: (d, s) => d.marginTable(s.rows),
+  };
+
   function build(doc, brand, tr) {
     const d = new Doc({ doc, brand, tr: tr || String });
     d.header();
     d.title();
     d.parties();
     if (doc.intro) d.note(doc.intro);
-    if (doc.groups && doc.groups.length) {
+
+    if (doc.sections && doc.sections.length) {
+      for (const s of doc.sections) {
+        const fn = SECTION[s.type];
+        if (!fn) throw new Error("erp-pdf: unknown section type " + JSON.stringify(s.type));
+        fn(d, s);
+      }
+    } else if (doc.groups && doc.groups.length) {
       d.band(doc.tableLabel || "Detalle por capitulos", doc.tableNote || "");
       d.groups();
+      d.totals();
     } else {
       d.plainLines();
+      d.totals();
     }
-    d.totals();
+
     d.blocks();
     d.signatures();
     return d.finish();
   }
 
-  return { build, widthOf, PAGE, MM };
+  return { build, widthOf, PAGE, MM, SECTION_TYPES: Object.keys(SECTION) };
 });
