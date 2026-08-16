@@ -102,6 +102,9 @@
   };
   var CA = D.ca || {};
   var map = new Map();
+  var known = new Set(); // every key the dictionary HAS an opinion about
+  var produced = new Set(); // every string translation can PRODUCE
+  var alt = new Map(); // Spanish → target, for pages that are not Spanish but contain it
   var rx = [];
   if (active) {
     // One pass over the triples, building a direct base → target map. The
@@ -116,6 +119,51 @@
       // Never map a string onto itself, and never let a language that has no
       // entry of its own overwrite a real one already in the map.
       if (from && to && from !== to && !map.has(from)) map.set(from, to);
+      // `known` records the key REGARDLESS of whether the two forms differ,
+      // which `map` cannot: an entry whose Catalan is identical to its Spanish
+      // is a decision somebody took, and the miss ledger below must not report
+      // it as a gap. Without this the two cases — "nobody has translated this"
+      // and "this word is the same in both languages" — are indistinguishable
+      // from inside `tr()`, and the ledger would be mostly noise.
+      if (from) known.add(from);
+      // And the OUTPUT side, which the ledger needs for a different reason.
+      //
+      // A translated node is offered back to `tr()` — by the MutationObserver
+      // watching the change this file just made, and by any re-render that
+      // copies text already on screen. The second pass necessarily misses:
+      // "Transactions" is not a key, it is an ANSWER. Recording it would fill
+      // the report with strings that are already correct, in the target
+      // language, which is precisely the noise that makes a report get
+      // ignored — and the first crawl produced fourteen of them.
+      if (to) produced.add(to);
+
+      /**
+       * THE MIXED-PAGE FALLBACK.
+       *
+       * `journey.html`, `master-data.html` and `financial-data.html` declare
+       * `lang="en"` and are full of Spanish: "Cliente", "Estado", "Avance",
+       * "Buscar por código o cliente", "Conectado al ERP.". With the base read
+       * as English the only keys in the map are English ones, so those strings
+       * are UNREACHABLE — not missing from the dictionary, unreachable through
+       * it, and no number of new entries would ever have fixed them. Thirty-odd
+       * of them sat on the financial screens looking exactly like a translation
+       * gap.
+       *
+       * So a page whose base is not Spanish keeps a second map, keyed on the
+       * Spanish form, consulted only after the declared base has missed. A
+       * genuinely English string is not a Spanish key, so it cannot be caught
+       * by this; and the primary map always wins, so nothing already working
+       * changes. Fixing the three files' declared language instead would be the
+       * tidier answer and a much larger change — this makes the interface
+       * correct today and leaves that as cleanup, not as a prerequisite.
+       */
+      if (base !== "es" && es && to && es !== to && !alt.has(es)) alt.set(es, to);
+      // And when the TARGET is Spanish, a Spanish string on such a page is
+      // already in the right language. Say so, or the ledger reports every
+      // Spanish label on those pages as untranslated for a Spanish reader.
+      if (base !== "es" && target === "es" && es) produced.add(es);
+      // A Spanish label whose target form is identical is a decision, here too.
+      if (base !== "es" && es) known.add(es);
     }
     rx =
       base === "es"
@@ -124,18 +172,119 @@
           : D.rxEs2Ca || []
         : target === "es"
           ? D.rxEn2Es || []
-          : []; // EN → CA has no interpolation rules of its own; exact matches only
+          : // EN → CA. This used to be an empty list, on the reasoning that
+            // Spanish is the hub so every pairing is one lookup away. That
+            // holds for EXACT matches and is false for interpolated ones: a
+            // page authored in English ("16 rows", "3 records", "Net debt
+            // 80.000 €") has no Spanish form to hub through, so a Catalan
+            // reader saw English counts on every financial screen. The ledger
+            // found forty of them in one crawl. The rules live beside the
+            // Catalan column they belong to.
+            D.rxEn2Ca || [];
+    // Interpolated Spanish on a page declared English — same reason as `alt`,
+    // same ordering: the declared base's rules are tried first and win.
+    if (base !== "es" && target !== "es")
+      rx = rx.concat((target === "ca" ? D.rxEs2Ca : D.rxEs2En) || []);
   }
 
-  function tr(text) {
+  /* ---------- the miss ledger ----------------------------------------------
+   *
+   * WHY THIS EXISTS, and why it replaces four scanners.
+   *
+   * Until now, finding untranslated text meant guessing from outside: scan the
+   * source for literals, or render two languages and diff them. Both are
+   * reconstructions of something this file already knows for certain. `tr()`
+   * is called with every user-visible string the moment before it is painted,
+   * and when it returns null it has just decided, with complete information,
+   * that it cannot translate that string. That verdict was thrown away.
+   *
+   * The scanners each missed real gaps because they enumerate PLACES a string
+   * might live — a route, a `<label>`, a quoted literal — and a screen reached
+   * by pressing a button inside a modal is in none of those lists. The photo
+   * that prompted this was exactly that: an invoice-issuing form no route
+   * walker opens. A ledger kept by the translator has no such blind spot,
+   * because it does not look for strings at all; it records the ones that
+   * arrive. Whatever the operator can see, `tr()` has already been asked about.
+   *
+   * Cost is one Map lookup on a path that already did several, and the ledger
+   * is capped so a runaway render cannot grow it without bound.
+   */
+  var MISS_CAP = 4000;
+  var misses = new Map(); // text → { text, n, where }
+  var lastMiss = false; // did the most recent tr() call record a gap?
+
+  /**
+   * Is this string something a person would expect to be translated?
+   *
+   * Every rule here is a place the ledger stops looking, so each one is a
+   * SHAPE — a date, a code, a number with a unit — never a word. Excusing a
+   * word would hide the one string somebody needs to see.
+   */
+  var NOT_PROSE = [
+    /^[\s\p{P}\p{S}\d]*$/u, // punctuation, symbols and digits only
+    /^[\d.,\s]+(€|%|h|kg|m²|m³|m|ud|u)?$/iu, // a quantity, with or without a unit
+    /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/, // a date
+    /^\d{1,2}:\d{2}$/, // a time
+    /^[A-Z]{1,5}-?\d{2,}[-/]?[\d-]*$/, // a document reference
+    /^[\w.+-]+@[\w.-]+$/, // an address
+    /^https?:\/\//, // a link
+    /^[A-Z0-9]{6,}$/, // an identifier
+  ];
+  function translatable(s) {
+    if (s.length < 2 || s.length > 200) return false;
+    if (!/\p{L}{2}/u.test(s)) return false; // no word in it at all
+    for (var i = 0; i < NOT_PROSE.length; i++) if (NOT_PROSE[i].test(s)) return false;
+    return true;
+  }
+
+  function record(text, where) {
+    lastMiss = false;
+    if (known.has(text)) return; // translated to itself on purpose
+    if (produced.has(text)) return; // already the answer, not a question
+    if (!translatable(text)) return;
+    lastMiss = true;
+    var e = misses.get(text);
+    if (e) {
+      e.n++;
+      return;
+    }
+    if (misses.size >= MISS_CAP) return;
+    misses.set(text, { text: text, n: 1, where: where || "" });
+  }
+
+  /** Where on the page a string was found, in a form a person can act on. */
+  function locate(node) {
+    var el = node && (node.nodeType === 1 ? node : node.parentElement);
+    var path = [];
+    for (var i = 0; el && i < 4; i++) {
+      var bit = el.nodeName.toLowerCase();
+      if (el.id) {
+        path.unshift(bit + "#" + el.id);
+        break;
+      }
+      var cls = (el.getAttribute && el.getAttribute("class")) || "";
+      if (cls) bit += "." + cls.trim().split(/\s+/)[0];
+      path.unshift(bit);
+      el = el.parentElement;
+    }
+    return (location.hash || "") + " " + path.join(">");
+  }
+
+  function tr(text, where) {
     if (!text) return null;
     var trimmed = text.trim();
     if (!trimmed) return null;
+    lastMiss = false;
     var hit = map.get(trimmed);
     if (hit === undefined) {
       // collapse internal runs of whitespace (multi-line HTML text nodes)
       var collapsed = trimmed.replace(/\s+/g, " ");
       hit = map.get(collapsed);
+    }
+    // The Spanish-on-a-non-Spanish-page fallback. See where `alt` is built.
+    if (hit === undefined && alt.size) {
+      hit = alt.get(trimmed);
+      if (hit === undefined) hit = alt.get(collapsed);
     }
     if (hit === undefined) {
       for (var i = 0; i < rx.length; i++) {
@@ -221,7 +370,19 @@
       if (touched) hit = rebuilt.join("·");
     }
 
-    if (hit === undefined || hit === trimmed) return null;
+    if (hit === undefined || hit === trimmed) {
+      // The one place in the application that knows, for certain and at the
+      // moment it matters, that a visible string has no translation.
+      record(collapsed || trimmed, where);
+      return null;
+    }
+    // Whatever this call produced is now an ANSWER, and answers come back:
+    // the observer sees the change, and a re-render copies text already on
+    // screen. The pairs above cover the exact matches, but a string built by a
+    // regex rule ("1–14 of 14 · page 1 of 1") or by the decoration pass exists
+    // nowhere in the dictionary and would be reported as a gap in the language
+    // it is already correct in.
+    produced.add(hit);
     // keep original leading / trailing whitespace
     var lead = text.match(/^\s*/)[0];
     var tail = text.match(/\s*$/)[0];
@@ -247,6 +408,34 @@
     return !!(el && el.closest && el.closest('[translate="no"]'));
   }
 
+  /* ---------- audit mode ----------------------------------------------------
+   *
+   * `?i18n=audit`, or localStorage `caneiI18nAudit=1` to keep it on across the
+   * whole session. Every element holding an untranslated string is outlined,
+   * and a counter in the corner lists them and copies the list to the
+   * clipboard.
+   *
+   * This is the half of the tool that does not need a developer. Walking the
+   * ERP with it on shows the gaps AS YOU MEET THEM, on the real screens, in
+   * the real language, including the ones behind a button — which is the
+   * failure mode every previous scanner had. It is off by default and leaves
+   * no trace when off.
+   */
+  var AUDIT = false;
+  try {
+    AUDIT =
+      active && (/[?&]i18n=audit\b/.test(location.search) || readLocal("caneiI18nAudit") === "1");
+    if (/[?&]i18n=audit\b/.test(location.search)) writeLocal("caneiI18nAudit", "1");
+    if (/[?&]i18n=off\b/.test(location.search)) writeLocal("caneiI18nAudit", "");
+  } catch (e) {
+    /* no location, no localStorage — audit stays off */
+  }
+
+  function mark(el) {
+    if (el && el.setAttribute && !el.closest("#canei-lang-pill,#canei-i18n-hud"))
+      el.setAttribute("data-i18n-miss", "");
+  }
+
   function translateNode(root) {
     if (!active || !root) return;
     var doc = root.ownerDocument || root;
@@ -256,8 +445,9 @@
       var pn = n.parentNode && n.parentNode.nodeName;
       if (pn && SKIP[pn]) continue;
       if (noTranslate(n)) continue;
-      var out = tr(n.nodeValue);
+      var out = tr(n.nodeValue, AUDIT ? locate(n) : "");
       if (out !== null) n.nodeValue = out;
+      else if (AUDIT && lastMiss) mark(n.parentElement);
     }
     // THE ROOT ITSELF, not only its descendants.
     //
@@ -282,13 +472,15 @@
       for (var a = 0; a < ATTRS.length; a++) {
         var v = el.getAttribute && el.getAttribute(ATTRS[a]);
         if (v) {
-          var o = tr(v);
+          var o = tr(v, AUDIT ? locate(el) + "[" + ATTRS[a] + "]" : "");
           if (o !== null) el.setAttribute(ATTRS[a], o);
+          else if (AUDIT && lastMiss) mark(el);
         }
       }
       if (el.nodeName === "INPUT" && (el.type === "button" || el.type === "submit") && el.value) {
-        var ov = tr(el.value);
+        var ov = tr(el.value, AUDIT ? locate(el) + "[value]" : "");
         if (ov !== null) el.value = ov;
+        else if (AUDIT && lastMiss) mark(el);
       }
     }
   }
@@ -502,10 +694,85 @@
     document.body.appendChild(pill);
   }
 
+  /* ---------- the audit heads-up display ---------- */
+  function missList() {
+    var out = [];
+    misses.forEach(function (e) {
+      out.push(e);
+    });
+    out.sort(function (a, b) {
+      return b.n - a.n || (a.text < b.text ? -1 : 1);
+    });
+    return out;
+  }
+
+  function injectHud() {
+    if (!AUDIT || document.getElementById("canei-i18n-hud")) return;
+    var st = document.createElement("style");
+    st.textContent =
+      "[data-i18n-miss]{outline:2px dashed #e5484d!important;outline-offset:1px;background:rgba(229,72,77,.08)!important}" +
+      "#canei-i18n-hud{position:fixed;bottom:14px;right:14px;z-index:99999;max-width:min(420px,92vw);" +
+      "background:#1d1f1a;color:#fff;border-radius:12px;box-shadow:0 18px 40px -14px rgba(0,0,0,.6);" +
+      "font:12px/1.45 Inter,system-ui,sans-serif;overflow:hidden}" +
+      "#canei-i18n-hud header{display:flex;gap:8px;align-items:center;padding:9px 12px;background:#e5484d;font-weight:700}" +
+      "#canei-i18n-hud header span{flex:1}" +
+      "#canei-i18n-hud button{appearance:none;border:0;border-radius:6px;background:rgba(255,255,255,.18);" +
+      "color:#fff;font:inherit;font-weight:600;padding:3px 8px;cursor:pointer}" +
+      "#canei-i18n-hud ol{margin:0;padding:8px 12px 10px 28px;max-height:38vh;overflow:auto}" +
+      "#canei-i18n-hud li{margin:0 0 3px;word-break:break-word}" +
+      "#canei-i18n-hud li i{color:#a9b0a0;font-style:normal}" +
+      "@media print{#canei-i18n-hud,[data-i18n-miss]{outline:0!important;display:none}}";
+    document.head.appendChild(st);
+
+    var hud = document.createElement("div");
+    hud.id = "canei-i18n-hud";
+    hud.setAttribute("translate", "no");
+    hud.innerHTML =
+      '<header><span></span><button data-a="copy">Copiar</button>' +
+      '<button data-a="off">✕</button></header><ol></ol>';
+    document.body.appendChild(hud);
+
+    var head = hud.querySelector("span");
+    var list = hud.querySelector("ol");
+    var render = function () {
+      var all = missList();
+      head.textContent = all.length + " sin traducir · " + SHORT[target];
+      list.innerHTML = "";
+      all.slice(0, 60).forEach(function (e) {
+        var li = document.createElement("li");
+        li.textContent = e.text.slice(0, 110);
+        if (e.n > 1) {
+          var i = document.createElement("i");
+          i.textContent = " ×" + e.n;
+          li.appendChild(i);
+        }
+        list.appendChild(li);
+      });
+    };
+    hud.addEventListener("click", function (ev) {
+      var a = ev.target.getAttribute && ev.target.getAttribute("data-a");
+      if (a === "off") {
+        writeLocal("caneiI18nAudit", "");
+        location.href = location.pathname + "?i18n=off" + location.hash;
+      } else if (a === "copy") {
+        var text = missList()
+          .map(function (e) {
+            return e.text;
+          })
+          .join("\n");
+        if (navigator.clipboard) navigator.clipboard.writeText(text);
+        ev.target.textContent = "✓";
+      }
+    });
+    render();
+    setInterval(render, 1200);
+  }
+
   /* ---------- boot ---------- */
   function boot() {
     injectToggle();
     fullPass();
+    injectHud();
     syncCompany();
     // Registered even when this page needs no translating: a Spanish page has
     // to notice a switch to Catalan just as much as the other way round, and
@@ -532,5 +799,17 @@
     set: set,
     translateNode: translateNode,
     tr: tr,
+    /**
+     * Every user-visible string this page could not translate, most frequent
+     * first. The crawler in tests/i18n/miss-crawl.mjs reads exactly this, and
+     * so can anybody with a console open on the live site.
+     */
+    misses: missList,
+    resetMisses: function () {
+      misses.clear();
+    },
+    auditing: function () {
+      return AUDIT;
+    },
   };
 })();

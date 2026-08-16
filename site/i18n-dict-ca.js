@@ -2053,8 +2053,161 @@ window.CANEI_DICT.ca = {
   "IRPF % (si aplica)": "IRPF % (si s'aplica)",
   "Para una obra con presupuesto formal, créala desde el presupuesto aceptado: así conserva su línea base.":
     "Per a una obra amb pressupost formal, crea-la des del pressupost acceptat: així conserva la seva línia base.",
+  App: "App",
+  "Caja no cubre los pagos previstos": "La caixa no cobreix els pagaments previstos",
+  "Capítulo por encima de coste previsto": "Capítol per sobre del cost previst",
+  "Certificado por encima de lo adjudicado": "Certificat per sobre de l'adjudicat",
+  "Diferencias en la conciliación de una orden": "Diferències en la conciliació d'una comanda",
+  "Documentación caducada": "Documentació caducada",
+  "Documentación caducada de un trabajador": "Documentació caducada d'un treballador",
+  "Documentación caducada de una subcontrata": "Documentació caducada d'una subcontracta",
+  "Duración contractual excedida": "Durada contractual excedida",
+  "Extra sin aprobar con coste incurrido": "Extra sense aprovar amb cost incorregut",
+  "Facturas de proveedor sin asignar": "Factures de proveïdor sense assignar",
+  "Fecha de inicio comprometida en riesgo": "Data d'inici compromesa en risc",
+  "Garantía próxima a vencer": "Garantia a punt de vèncer",
+  "Hito de cobro vencido": "Fita de cobrament vençuda",
+  "Jornadas sin registrar": "Jornades sense registrar",
+  "Llegada de material retrasada": "Arribada de material endarrerida",
+  "Margen bajo el umbral configurado": "Marge per sota del llindar configurat",
+  "Margen negativo": "Marge negatiu",
+  "Movimientos bancarios sin asignar": "Moviments bancaris sense assignar",
+  "Obra iniciada sin contrato firmado": "Obra iniciada sense contracte signat",
+  "Oportunidad sin avance": "Oportunitat sense avanç",
+  "Paquete trimestral sin enviar a gestoría": "Paquet trimestral sense enviar a la gestoria",
+  "Posible factura duplicada": "Possible factura duplicada",
+  "Presupuesto con líneas pendientes": "Pressupost amb línies pendents",
+  "Presupuesto por caducar": "Pressupost a punt de caducar",
+  "Retención no liberada tras su plazo": "Retenció no alliberada després del seu termini",
+  "Subcontrata sin factura": "Subcontracta sense factura",
+  Ninguno: "Cap",
+  Nº: "Núm.",
+  Plantillas: "Plantilles",
+  Posventa: "Postvenda",
+  "Recientes:": "Recents:",
+  Retirar: "Retirar",
+  Ud: "Un",
+  activa: "activa",
+  Fiscal: "Fiscal",
+  ERP: "ERP",
+  "Canei Subirats": "Canei Subirats",
+  "Canei Subirats — ERP": "Canei Subirats — ERP",
+  "Fira local": "Fira local",
+  Termini: "Termini",
+  "Transferència 15 dies": "Transferència 15 dies",
+  feriaLocal: "feriaLocal",
+  plazo: "plazo",
+  "{{cliente}}": "{{cliente}}",
+  "{{fecha}}": "{{fecha}}",
+  "{{importe}}": "{{importe}}",
+  "{{number}}": "{{number}}",
+  "Asignar, poner fecha, posponer con motivo, resolver con nota y evidencia, o convertir en tarea. Las reglas viven detrás de ⚙ Reglas.":
+    "Assignar, posar data, ajornar amb motiu, resoldre amb nota i evidència, o convertir en tasca. Les regles viuen darrere de ⚙ Regles.",
+  "Cada partida del catálogo y cada línea de presupuesto llevan una unidad. Es lo que se imprime junto a la cantidad en el presupuesto y en la factura.":
+    "Cada partida del catàleg i cada línia de pressupost porten una unitat. És el que s'imprimeix al costat de la quantitat al pressupost i a la factura.",
+  "De dónde llegan los clientes y por qué se pierden las oportunidades. Las dos listas alimentan los informes de origen y de conversión.":
+    "D'on arriben els clients i per què es perden les oportunitats. Les dues llistes alimenten els informes d'origen i de conversió.",
+  "El catálogo de partidas: capítulo, unidad, marca, modelo y calidad, con su coste y su precio de referencia. Arrastra un capítulo para cambiar el orden en que sale en los presupuestos.":
+    "El catàleg de partides: capítol, unitat, marca, model i qualitat, amb el seu cost i el seu preu de referència. Arrossega un capítol per canviar l'ordre en què surt als pressupostos.",
+  "Es lo que queda guardado en cada línea ya escrita: renombrarlo rompería documentos ya emitidos. Lo que sí se edita es el nombre, y por eso hay dos —":
+    "És el que queda desat a cada línia ja escrita: reanomenar-lo trencaria documents ja emesos. El que sí que s'edita és el nom, i per això n'hi ha dos —",
+  ". El documento sale en el idioma del cliente, así que una unidad sin nombre en catalán saldría en castellano dentro de un presupuesto en catalán.":
+    ". El document surt en l'idioma del client, així que una unitat sense nom en català sortiria en castellà dins d'un pressupost en català.",
+  "Esta copia funciona en modo local, sin servidor, así que no hay cuentas que gestionar. Las cuentas viven donde viven los datos.":
+    "Aquesta còpia funciona en mode local, sense servidor, així que no hi ha comptes per gestionar. Els comptes viuen on viuen les dades.",
+  "Estas listas estaban escritas dentro del programa: añadir una fuente era una entrega nueva. Ahora son datos de la empresa y se mantienen desde aquí.":
+    "Aquestes llistes estaven escrites dins del programa: afegir una font era un lliurament nou. Ara són dades de l'empresa i es mantenen des d'aquí.",
+  "Las condiciones de pago que se ofrecen en contratos y facturas. El vencimiento real lo calcula cada documento; aquí se mantiene la lista.":
+    "Les condicions de pagament que s'ofereixen en contractes i factures. El venciment real el calcula cada document; aquí es manté la llista.",
+  "Las unidades que usan las partidas, los presupuestos y los documentos impresos. El símbolo es lo que aparece en la tabla; el nombre, en el desplegable y en el documento.":
+    "Les unitats que fan servir les partides, els pressupostos i els documents impresos. El símbol és el que apareix a la taula; el nom, al desplegable i al document.",
+  "Plantillas por familia, reglas evento → plantilla → destinatario → momento, y la cola resultante. Por defecto nada sale sin que una persona lo apruebe.":
+    "Plantilles per família, regles esdeveniment → plantilla → destinatari → moment, i la cua resultant. Per defecte res no surt sense que una persona ho aprovi.",
+  "Precios por proveedor con su fecha, su documento de origen y su vigencia. Filtra por partida para comparar proveedores; un precio ausente se ve ausente y nunca cuenta como cero.":
+    "Preus per proveïdor amb la seva data, el seu document d'origen i la seva vigència. Filtra per partida per comparar proveïdors; un preu absent es veu absent i mai no compta com a zero.",
+  "Retirar una unidad la quita de los desplegables. Las líneas que ya la llevan la conservan y se siguen viendo con su nombre — por eso la columna «en uso» informa, pero no bloquea.":
+    "Retirar una unitat la treu dels desplegables. Les línies que ja la porten la conserven i se segueixen veient amb el seu nom — per això la columna «en ús» informa, però no bloqueja.",
+  "Una cuenta se desactiva, nunca se borra: el registro de actividad tiene que seguir diciendo quién hizo qué. Al desactivar, sus sesiones abiertas terminan de inmediato.":
+    "Un compte es desactiva, mai no s'esborra: el registre d'activitat ha de continuar dient qui va fer què. En desactivar, les seves sessions obertes acaben immediatament.",
+  "puede pasar de «Transferencia 30 días» a «Transferencia a 30 días fecha factura» sin tocar ninguna factura antigua.":
+    "pot passar de «Transferència 30 dies» a «Transferència a 30 dies data factura» sense tocar cap factura antiga.",
+  "— al marcar una oportunidad como perdida. Sin un motivo escrito en el momento, el porqué se pierde y sólo queda el número.":
+    "— en marcar una oportunitat com a perduda. Sense un motiu escrit en el moment, el perquè es perd i només queda el número.",
+  "— Presupuestos, facturas, cobros y pagos. No gestiona usuarios.":
+    "— Pressupostos, factures, cobraments i pagaments. No gestiona usuaris.",
+  "— Registrar avance, partes y fotos. Sin importes ni márgenes.":
+    "— Registrar avanç, parts i fotos. Sense imports ni marges.",
+  "— Sólo lectura y exportación. Nunca ve márgenes ni precios de venta.":
+    "— Només lectura i exportació. Mai no veu marges ni preus de venda.",
+  "— Todo, incluida esta pantalla.": "— Tot, inclosa aquesta pantalla.",
+  Avance: "Avanç",
+  "Buscar por código o cliente": "Cercar per codi o client",
+  Cerrado: "Tancat",
+  Cerrados: "Tancats",
+  "Conectado al ERP.": "Connectat a l'ERP.",
+  Libros: "Llibres",
+  "Todos los estados": "Tots els estats",
+  "Estas filas se leen de": "Aquestes files es llegeixen de",
+  "el ERP entero": "l'ERP sencer",
+  ": se corrigen en": ": es corregeixen a",
+  ", no aquí. Un dato que el ERP ya conoce no se teclea dos veces.":
+    ", no aquí. Una dada que l'ERP ja coneix no es teclegen dues vegades.",
+  "Las fotos, los documentos, los PDF de presupuesto y factura y cada correo se archivan por paso — guardados en el servidor de la empresa.":
+    "Les fotos, els documents, els PDF de pressupost i factura i cada correu s'arxiven per pas — desats al servidor de l'empresa.",
+  "Oficial 1ª — Albañilería": "Oficial 1a — Paleteria",
+  "PRL Oficial 1ª": "PRL Oficial 1a",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  [new RegExp("^(\\d+) documentos$"), "$1 documents"],
+  [new RegExp("^(\\d+) documento$"), "$1 document"],
+  [new RegExp("^Caducado (\\S+)$"), "Caducat $1"],
+  [new RegExp("^Albarán valorado · Albarán (\\S+)$"), "Albarà valorat · Albarà $1"],
+  [new RegExp("^(\\d+) capítulos$"), "$1 capítols"],
+  [new RegExp("^(\\d+) capítulo$"), "$1 capítol"],
+  [new RegExp("^(\\d+) partidas$"), "$1 partides"],
+  [new RegExp("^(\\d+) precios$"), "$1 preus"],
+  [new RegExp("^(\\d+) activas de (\\d+)$"), "$1 actives de $2"],
+  [new RegExp("^(\\d+) por encolar$"), "$1 per encuar"],
+  [new RegExp("^(\\d+) de (\\d+) registros$"), "$1 de $2 registres"],
+  [
+    new RegExp("^(\\d+) de (\\d+) registros · (\\d+) fuera del periodo$"),
+    "$1 de $2 registres · $3 fora del període",
+  ],
+  [new RegExp("^(\\d+) imágenes en (\\d+) página\\(s\\)$"), "$1 imatges en $2 pàgina(es)"],
+  [
+    new RegExp("^(\\d+) facturas? de proveedor sin asignar$"),
+    "$1 factures de proveïdor sense assignar",
+  ],
+  [
+    new RegExp("^(\\d+) movimientos bancarios sin asignar$"),
+    "$1 moviments bancaris sense assignar",
+  ],
+  [
+    new RegExp("^(\\d+) jornada\\(s\\) sin registrar — (.+)$"),
+    "$1 jornada(es) sense registrar — $2",
+  ],
+  [
+    new RegExp("^Capítulo (\\d+) por encima de coste previsto — (.+)$"),
+    "Capítol $1 per sobre del cost previst — $2",
+  ],
+  [new RegExp("^Documentación caducada — (.+)$"), "Documentació caducada — $1"],
+  [new RegExp("^Exclusiones y supuestos \\((\\d+)\\)$"), "Exclusions i supòsits ($1)"],
+  [
+    new RegExp("^Hito de cobro (.+) · Hito de cobro (.+)$"),
+    "Fita de cobrament $1 · Fita de cobrament $2",
+  ],
+  [new RegExp("^Hito de cobro (.+) · Fin previsto (.+)$"), "Fita de cobrament $1 · Fi previst $2"],
+  [new RegExp("^Oportunidad sin avance (\\d+) días$"), "Oportunitat sense avanç $1 dies"],
+  [new RegExp("^Periodo · (\\d+)$"), "Període · $1"],
+  [new RegExp("^Presupuesto (\\S+) caduca el (\\S+)$"), "Pressupost $1 caduca el $2"],
+  [
+    new RegExp("^✓ Realizada (\\S+) · (\\d+) mediciónes · (\\d+) 📷$"),
+    "✓ Realitzada $1 · $2 mesuraments · $3 📷",
+  ],
+  [
+    new RegExp("^✓ Realizada (\\S+) · (\\d+) medición · (\\d+) 📷$"),
+    "✓ Realitzada $1 · $2 mesurament · $3 📷",
+  ],
   [new RegExp("^(\\d+) críticas · (\\d+) altas$"), "$1 crítiques · $2 altes"],
   [new RegExp("^(\\d+) crítica · (\\d+) altas$"), "$1 crítica · $2 altes"],
   [new RegExp("^(\\d+) visitas programadas$"), "$1 visites programades"],
@@ -2093,4 +2246,46 @@ window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Fin previsto (.+) · Hito de cobro (.+)$"), "Fi previst $1 · Fita de cobrament $2"],
   [new RegExp("^Programar visita — (.+)$"), "Programar visita — $1"],
   [new RegExp("^Visita — (.+)$"), "Visita — $1"],
+];
+
+/**
+ * EN → CA interpolation rules.
+ *
+ * Spanish is the hub for EXACT matches, and that is enough for them. It is
+ * not enough for interpolated lines on a page authored in English: there is
+ * no Spanish form to hub through, so `16 rows` and `Net debt 80.000 €` had
+ * no route to Catalan at all and rendered in English on every financial
+ * screen. Written against the English string, applied straight to Catalan.
+ */
+window.CANEI_DICT.rxEn2Ca = [
+  [new RegExp("^(\\d+) rows$"), "$1 files"],
+  [new RegExp("^(\\d+) row$"), "$1 fila"],
+  [new RegExp("^(\\d+) records$"), "$1 registres"],
+  [new RegExp("^(\\d+) record$"), "$1 registre"],
+  [new RegExp("^([\\d.,]+ €) open$"), "$1 obert"],
+  [new RegExp("^([\\d.,]+ €) open pipeline$"), "$1 de cartera oberta"],
+  [new RegExp("^(-?[\\d.,]+ €) gross profit$"), "$1 de benefici brut"],
+  [new RegExp("^([\\d.,]+)% net margin$"), "$1% de marge net"],
+  [new RegExp("^([\\d.,]+)% of revenue$"), "$1% dels ingressos"],
+  [new RegExp("^Net debt ([\\d.,]+ €)$"), "Deute net $1"],
+  [new RegExp("^≈ ([\\d.,]+ €) annualised$"), "≈ $1 anualitzat"],
+  [new RegExp("^⚠ Reconciliation gap ([\\d.,]+ €)\\.$"), "⚠ Diferència de conciliació $1."],
+  [new RegExp("^Quick ([\\d.,]+) · WC ([\\d.,]+ €)$"), "Quick $1 · CC $2"],
+  [new RegExp("^Quote — (\\d+) itemised lines$"), "Pressupost — $1 línies detallades"],
+  [new RegExp("^Capital circulante — (.+)$"), "Capital circulant — $1"],
+  [new RegExp("^Estados financieros — (.+)$"), "Estats financers — $1"],
+  [new RegExp("^Libros — (.+)$"), "Llibres — $1"],
+  [new RegExp("^Resumen — (.+)$"), "Resum — $1"],
+  [
+    new RegExp(
+      "^Aging is computed live from open items as of (\\S+) — the >60-day buckets are what the collections and supplier-payment automation acts on\\.$",
+    ),
+    "L'antiguitat es calcula en directe a partir de les partides obertes a $1 — els trams de més de 60 dies són els que fan actuar l'automatisme de cobraments i de pagaments a proveïdors.",
+  ],
+  [
+    new RegExp(
+      "^Gross margin ([\\d.,]+)% · EBITDA margin ([\\d.,]+)% · Net margin ([\\d.,]+)%\\. Budget is the annual plan phased evenly across (\\d+) months\\.$",
+    ),
+    "Marge brut $1% · Marge EBITDA $2% · Marge net $3%. El pressupost és el pla anual repartit uniformement al llarg de $4 mesos.",
+  ],
 ];

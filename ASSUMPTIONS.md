@@ -3166,3 +3166,58 @@ different decisions, so these ten arrived colliding. They are renumbered from
   30/30 scheduling · 28/28 PDF · 21 documents printable · 17/17 sync · 55/55
   mailbox · ownership, bundle-safety, workbook, iOS routes.
   **Reversible: yes** — additive dictionary entries and one lookup fallback.
+
+## 2026-08-16 — translation: instrument the translator instead of scanning for it
+
+**Context.** A photograph of the invoice-issuing screen showed English chrome
+around Spanish labels while all four translation gates were green. The mandate
+was explicit that the answer must not be another round of dictionary patching.
+
+**Decisions taken, most reversible first.**
+
+1. **`site/i18n.js` keeps a ledger of its own misses.** `tr()` already decides,
+   with complete information, that a string has no translation; that verdict was
+   discarded. It is now recorded, exposed as `CANEI_I18N.misses()`, and shown to
+   the operator behind `?i18n=audit`. Reversible: delete the ledger and the
+   translator behaves exactly as before. Cost is one Map lookup on a path that
+   already did several, and the ledger is capped at 4 000 entries.
+
+2. **`tests/i18n/miss-crawl.mjs` drives the app and reads the ledger.** It walks
+   17 pages and then presses every visible control on each, so panels a click
+   away are painted and therefore measured. Added as a fifth CI gate rather than
+   replacing the other four: they answer different questions and the cost of
+   keeping them is a minute of CI.
+
+3. **The data exclusion splits by ORIGIN, not by storage.** `RECORDS` in
+   miss-crawl.mjs lists the collections the company authors. `alertRules`,
+   `commsRules` and `clauseBlocks` are deliberately absent: they ship with the
+   product and are the vendor's to translate. An earlier version excused
+   everything in `erp.state` and hid 25 real alert-rule labels — the count went
+   DOWN, which is the most dangerous direction for a measurement to move.
+   `--show-excused` prints what the rules swallowed, so the decision is readable.
+
+4. **`lists` and `commsTemplates` ARE excused.** They carry their own `es`/`ca`
+   columns and are edited from the workspace, so translating them is the
+   product's job through those columns and a dictionary entry would fight the
+   editor. Their config screens legitimately show both language columns at once.
+
+5. **The mixed-page fallback.** `journey.html`, `master-data.html` and
+   `financial-data.html` declare `lang="en"` and contain Spanish. With the base
+   read as English those strings were UNREACHABLE through the dictionary — a
+   different defect from being absent from it, and one no number of entries
+   would have fixed. A page whose base is not Spanish now keeps a second map
+   keyed on Spanish, consulted only after the declared base misses. Correcting
+   the three files' declared language is the tidier answer and a much larger
+   change; it is left as cleanup, not made a prerequisite.
+
+6. **`rxEn2Ca` now exists.** Spanish being the hub is sufficient for exact
+   matches and insufficient for interpolated ones: an English-authored line like
+   "16 rows" has no Spanish form to hub through, so Catalan readers saw English
+   counts on every financial screen.
+
+**Not done, and why.** Moving the workspace to message keys (`t("invoice.issue")`)
+with build-time extraction is the textbook answer and remains the right long-term
+shape. It is a rewrite of a 15 000-line file that is live in front of a customer,
+and it would have to land in one commit to avoid a half-migrated screen. The
+ledger makes the current architecture self-reporting, which removes the reason
+the rewrite felt urgent; it can now be done incrementally, or not at all.

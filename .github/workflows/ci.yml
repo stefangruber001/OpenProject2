@@ -144,6 +144,28 @@ jobs:
           node tests/i18n/source-audit.mjs --lang en --max 147
           node tests/i18n/source-audit.mjs --lang ca --max 219
 
+      # THE ONE THAT DOES NOT GUESS. The four gates above each answer "what is
+      # untranslated" by enumerating places a string might live — an entry, a
+      # page, a route, a quoted literal — and each has reported clean while an
+      # operator was looking at Spanish. The photograph that prompted this was
+      # an invoice-issuing form no route walker opens.
+      #
+      # This one asks the translator. `tr()` is called with every visible string
+      # before it is painted and knows, at the moment it fails, that the string
+      # has no translation; site/i18n.js now keeps those verdicts and this drives
+      # the app — every route, then every control on it — and reads them off. It
+      # cannot miss a screen it has opened, and it opens the ones a click away.
+      #
+      # Ceilings are the measurement of 2026-08-16 and only move down. What is
+      # left in EN is message-template content and budget chapter names, which
+      # are the company's records; the Catalan figure is the visible part of the
+      # historical backlog counted in tests/i18n/coverage.mjs.
+      - name: Translation coverage (translator miss ledger)
+        if: always()
+        run: |
+          node tests/i18n/miss-crawl.mjs --lang en --max 6
+          node tests/i18n/miss-crawl.mjs --lang ca --max 79
+
   bundle:
     name: Capability bundle (build, browser-safety, drift)
     runs-on: ubuntu-latest
