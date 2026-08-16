@@ -83,6 +83,19 @@ jobs:
         if: always()
         run: pnpm test:docs
 
+      # The runner's Chromium places glyphs differently from any machine this is
+      # developed on, and its build cannot be downloaded here — so its PDFs are
+      # the only evidence that exists for the heading-splitting question. Kept
+      # so the next person diagnoses it from the artifact instead of guessing.
+      - name: Keep the runner's rendered PDFs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-documents
+          path: dist/doc-print-check/*.pdf
+          retention-days: 14
+          if-no-files-found: warn
+
       # Two questions, two checks, and they are not the same question.
       #
       # coverage.mjs asks whether every entry exists in all three languages —

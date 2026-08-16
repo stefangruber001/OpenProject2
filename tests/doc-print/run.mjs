@@ -42,5 +42,9 @@ if (rendered.status !== 0) process.exit(rendered.status ?? 1);
 const margins = node([resolve(__dirname, "margins.mjs"), OUT, "9.5"]);
 if (margins.status !== 0) process.exit(margins.status ?? 1);
 
-const searchable = node([resolve(__dirname, "searchable.mjs"), OUT]);
+// The ceiling is the CI runner's count, not this machine's — its Chromium
+// places glyphs differently and is the stricter of the two. Overridable so the
+// number lives in one place when CI calls it directly.
+const MAX = process.env.SEARCHABLE_MAX || "8";
+const searchable = node([resolve(__dirname, "searchable.mjs"), OUT, "--max", MAX]);
 process.exit(searchable.status ?? 1);

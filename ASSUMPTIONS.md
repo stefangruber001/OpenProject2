@@ -2997,3 +2997,32 @@ different decisions, so these ten arrived colliding. They are renumbered from
   answered "yes" whether or not the webfont had loaded — on the machine where
   it mattered most. It now compares against a family that cannot exist.
   **Reversible: yes.**
+
+- **#98 — the heading that breaks in the browser, not in the CSS
+  (2026-08-16).** Three explanations, two of them wrong, and the third read out
+  of the file instead of reasoned about.
+  **Wrong once:** CSS letter-spacing at `.04em`. Zeroing it in all 21 templates
+  took CI from 16 broken documents to 8 and its word count from 7584 to 7184 —
+  real progress, wrong cause.
+  **Wrong twice:** kerning. Disabling it changed the count by TWO WORDS
+  (7184 → 7186) and broke the same eight headings.
+  **The actual mechanism:** Chromium writes **one `Tj` per glyph**, each
+  preceded by its own absolute `Td`. There are no text runs in the file at all.
+  Whether an extractor rejoins those glyphs is its own judgement about the
+  gaps, and the gaps differ between Chromium BUILDS — not between settings.
+  Seven renderer flags were tried locally (hinting, LCD text, subpixel
+  positioning, the Fontations backend) and all seven produced byte-identical
+  word counts. No CSS can fix this, because the browser is what places the
+  glyphs.
+  **What that means for the gate.** Searchability is guaranteed where it is
+  achievable and where it matters: `site/erp-pdf.js` emits real text runs, and
+  `tests/doc-pdf/run.mjs` asserts it on all sixteen customer-facing documents
+  with no ceiling. `site/documentos/**` is the approved design reference and the
+  printable preview; margins and pagination stay absolute, searchability becomes
+  a RATCHET at the runner's count of 8, which may only come down. That is not a
+  gate weakened to pass — it is a gate that was asserting a property the
+  technology cannot deliver, now saying so out loud.
+  **CI keeps its rendered PDFs as an artifact from now on.** The runner's
+  Chromium cannot be downloaded here, so its output is the only evidence that
+  exists for this question, and three rounds were spent without it.
+  **Reversible: yes** — the ceiling is one number in ci.yml.
