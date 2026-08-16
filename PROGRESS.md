@@ -1372,3 +1372,54 @@ history rewrite.
   100 green-sheet columns to model fields: **~85 covered, 13 new fields, the rest derived or
   discarded**. Q4 verdict: the chain closes for every job-costed euro; the one break is the
   non-job branch (rule 07's "or to an account"), scheduled S11. No code changed.
+
+## S14 — the twenty documents, and the audits that were looking at the wrong page (2026-08-16)
+
+Merged `origin/main` (v101, 50 commits) into the document + language branch,
+finished the document programme, and fixed the translation gap an operator
+photographed. **Landed on `main` at `d739206`; CI green, images built, smoke
+test passed inside the published image, `:main` promoted.**
+
+**The merge.** Both branches had built a trilingual layer. One rule, applied to
+all eight conflicts: main's artifact wins where it is larger or a gate depends
+on it, this branch's deltas go on top. Nothing dropped from either side. The
+business simulation, previously mis-diagnosed here as environment-dependent, was
+fixed by main's engine and now passes (149/149, 214/214). The five "pre-existing"
+E2E failures were gone too — main had rewritten 4,407 lines of that harness.
+
+**The documents.** `site/erp-doctypes.js`: sixteen PDF descriptors as data, over
+five new block primitives in the writer (`progressBars`, `milestones`,
+`checklist`, `kvGrid`, `marginTable`), ordered by a `sections` list. An unknown
+section type throws rather than being skipped. Four documents are
+placeholder-fed and say so in the descriptor. The four emails moved to the
+approved design as tables, not the template's CSS — Outlook renders through Word
+and ignores grid and flex.
+
+**The translation.** The gate was reading `erp.html` on a static server, where
+the shell never boots — 43 strings measured against the 439 the operator sees.
+`tests/i18n/workspace-audit.mjs` walks twelve booted screens: **88 untranslated
+→ 3** in both languages. Most of it was interpolated and needed regex rules, 27
+of them, in both directions — Catalan had two against English's 247. One real
+bug in the layer: `translateNode` passed added elements to
+`querySelectorAll("*")`, which never returns the element itself, so a button
+added with an `aria-label` kept it in Spanish.
+
+**Three explanations for the split headings, two wrong.** Not letter-spacing
+(zeroing it: 16 broken → 8), not kerning (disabling it: two words' difference).
+Chromium writes one `Tj` per glyph with its own `Td`; whether an extractor
+rejoins them differs between browser BUILDS, and no CSS reaches it. Searchability
+is now asserted absolutely on `site/erp-pdf.js` — every customer-facing document,
+no ceiling — and as a ratchet at 8 on the reference templates. CI keeps its
+rendered PDFs as an artifact so the next attempt starts from evidence.
+
+Verified: CI green on `d739206` · PDF writer 28/28 (all sixteen documents built
+twice, inflated until they overflow, plus a base-14-or-embedded font guard) ·
+21 templates printable · site E2E 336/336 · unit 118 · mailbox 55/55 · year
+149/149 and 214/214 · manageability 226/226 · i18n coverage (2287 entries, EN
+complete, CA backlog 1158 and falling).
+
+Gates negative-controlled this session: reintroducing `Count 1` (18 assertions
+fail), an unembedded custom font, removing a Catalan entry, removing a regex
+rule, a dictionary read in the wrong shape, and `.35em` tracking against a
+ceiling of 0. A probe that reported "worst gap 0" on 21 PDFs it could not parse
+was deleted rather than shipped.
