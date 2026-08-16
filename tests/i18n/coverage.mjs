@@ -47,6 +47,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { createRequire } from "node:module";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SITE = resolve(ROOT, "site");
@@ -86,7 +87,7 @@ const ca = D.ca || {};
    main), because each branch had translated strings the other had not and the
    union keeps both. Recomputed rather than chosen: taking either side's number
    would have been wrong in one direction or the other. */
-const CA_BACKLOG = 1046;
+const CA_BACKLOG = 1036;
 
 const problems = [];
 const note = (kind, detail) => problems.push({ kind, detail });
@@ -126,6 +127,44 @@ const rxEn = new Set((D.rxEs2En || []).map((r) => r[0].source));
 const rxCa = new Set((D.rxEs2Ca || []).map((r) => r[0].source));
 for (const src of rxEn) {
   if (!rxCa.has(src)) note("interpolation rule with no Catalan form", src);
+}
+
+/* ---- 1c. every SHIPPED LIST VALUE must translate --------------------------
+ *
+ * The configurable lists — units, chapter tree, lead sources, loss reasons,
+ * payment methods and terms, next actions, expense accounts — are seeded with
+ * the product and read on screen like any other label. They carry `es` and `ca`
+ * columns of their own but NO `en`, so English comes from this dictionary or
+ * not at all.
+ *
+ * Nothing could see the gap. The runtime audits excuse anything stored in
+ * `erp.state.lists` as company data, on the reasoning that a company may rename
+ * these — which is true, and which also hid the fifty-one SHIPPED values that
+ * had never been translated. The operator found it by opening the chapter list
+ * on an English phone and reading "Climatización", "Sanitarios y grifería" and
+ * "Varios" among nine English names.
+ *
+ * A value the product ships is the vendor's to translate, whether or not the
+ * company may later edit it. This checks exactly those.
+ */
+{
+  const req = createRequire(import.meta.url);
+  const { ERP } = req(resolve(SITE, "erp-engine.js"));
+  const pack = req(resolve(SITE, "erp-catalogue-pack.js"));
+  const shipped = new Map();
+  for (const list of Object.values(new ERP("2026-01-01").state.lists || {})) {
+    if (Array.isArray(list)) for (const row of list) if (row && row.es) shipped.set(row.es, row.ca);
+  }
+  for (const c of pack.CHAPTERS) shipped.set(c.es, c.ca);
+
+  const enOf = new Map(pairs);
+  if (shipped.size < 40) {
+    note("shipped-list check read too few values", `${shipped.size} — the lists moved`);
+  }
+  for (const [es] of shipped) {
+    if (!enOf.get(es)) note("shipped list value with no English", es);
+    if (ca[es] === undefined) note("shipped list value with no Catalan", es);
+  }
 }
 
 /* ---- 2. duplicate Spanish keys would make one of them unreachable -------- */
