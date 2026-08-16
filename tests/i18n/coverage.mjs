@@ -111,6 +111,23 @@ for (const [es, en] of pairs) {
   else if (c === es) identicalCa++;
 }
 
+/* ---- 1b. the two RULE lists must cover the same patterns ------------------
+ *
+ * An interpolated line — "16 rows", "Nueva factura", "Deuda neta 80.000 €" —
+ * is matched by a regex, not by an entry, so the completeness check above is
+ * blind to it. The two lists drifted to 351 rules for English and 120 for
+ * Catalan, which meant every counted, dated or priced line that English
+ * rendered correctly, Catalan rendered in Spanish. Nothing ever failed.
+ *
+ * A pattern with no Catalan form is the same defect as an entry with no
+ * Catalan form, and it fails the build for the same reason.
+ */
+const rxEn = new Set((D.rxEs2En || []).map((r) => r[0].source));
+const rxCa = new Set((D.rxEs2Ca || []).map((r) => r[0].source));
+for (const src of rxEn) {
+  if (!rxCa.has(src)) note("interpolation rule with no Catalan form", src);
+}
+
 /* ---- 2. duplicate Spanish keys would make one of them unreachable -------- */
 const seen = new Map();
 for (const [es] of pairs) {
