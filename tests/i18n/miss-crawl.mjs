@@ -359,8 +359,19 @@ async function freePort() {
   });
 }
 
-async function crawl(browser, base, lang) {
-  const ctx = await browser.newContext({ viewport: { width: 1400, height: 1100 } });
+async function crawl(browser, base, lang, viewport) {
+  // THE VIEWPORT IS PART OF THE MEASUREMENT.
+  //
+  // Every earlier run was 1400px wide, and reported the master-data screens
+  // clean while the operator was reading Spanish on an English phone. The
+  // reason is CSS: erp.html turns wide tables into cards below a breakpoint and
+  // paints each field label with `content: attr(data-th)`. At 1400px that
+  // layout never activates, so the labels are never displayed, never offered to
+  // tr(), and never counted. The desktop <th> translated fine — a clean report
+  // about a screen nobody looks at that way.
+  //
+  // So both widths, and the phone first: it is the one the operator uses.
+  const ctx = await browser.newContext({ viewport: viewport.size, isMobile: viewport.mobile });
   // Audit mode is what makes the ledger record WHERE each miss was seen; the
   // outlines it also draws are invisible in a headless run and harmless.
   await ctx.addInitScript(`try {
@@ -501,9 +512,38 @@ for (let i = 0; i < 80; i++) {
 }
 
 const browser = await chromium.launch({ executablePath: CHROME });
+/** Phone first — it is the width the operator actually uses. */
+const VIEWPORTS = [
+  { name: "phone", size: { width: 390, height: 844 }, mobile: true },
+  { name: "desktop", size: { width: 1400, height: 1100 }, mobile: false },
+];
+
 let result;
 try {
-  result = await crawl(browser, base, TARGET);
+  result = {
+    found: new Map(),
+    booted: 0,
+    data: new Set(),
+    vocabulary: new Set(),
+    failed: [],
+    pages: [],
+  };
+  for (const vp of VIEWPORTS) {
+    const r = await crawl(browser, base, TARGET, vp);
+    for (const [k, v] of r.found) {
+      const e = result.found.get(k);
+      if (e) e.n += v.n;
+      else result.found.set(k, { ...v, where: `${vp.name} ${v.where}` });
+    }
+    for (const d of r.data) result.data.add(d);
+    for (const d of r.vocabulary) result.vocabulary.add(d);
+    for (const f of r.failed) result.failed.push(`[${vp.name}] ${f}`);
+    result.booted += r.booted;
+    result.pages = result.pages.concat(r.pages.map((p) => [vp.name, ...p]));
+    console.log(
+      `  ${vp.name} (${vp.size.width}px): ${r.booted}/${r.pages.length} pages, ${r.found.size} misses`,
+    );
+  }
 } finally {
   await browser.close();
   server.kill("SIGKILL");

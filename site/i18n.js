@@ -271,6 +271,42 @@
     return (location.hash || "") + " " + path.join(">");
   }
 
+  /**
+   * Apply an interpolation rule, TRANSLATING WHAT IT CAPTURES.
+   *
+   * A rule is `^Nueva (.+)$ → "New $1"`, and the naive substitution puts the
+   * captured text back untouched. For a customer name or a street that is
+   * exactly right. For a noun it is a disaster in two ways at once:
+   *
+   *   "Nueva factura"  →  "New factura"
+   *
+   * mixed language on screen, AND — worse — `tr()` reports success, so the
+   * miss ledger never records it and no audit can find it. A half-translating
+   * rule hides its own gap. This one shipped: the operator photographed "New
+   * factura" on a screen every check called clean.
+   *
+   * So each captured group is looked up on the way back in. `map` already
+   * knows the difference between a word it can translate and data it cannot —
+   * a name, an address, an amount return nothing and pass through untouched,
+   * which is the behaviour the 131 rules that capture data depend on.
+   *
+   * Exact lookups only, never the rule list again: a rule whose output can
+   * re-enter the rule list is a loop waiting for the right input.
+   */
+  function applyRule(text, re, template) {
+    return text.replace(re, function () {
+      var groups = Array.prototype.slice.call(arguments, 1, arguments.length - 2);
+      return template.replace(/\$(\d+)/g, function (whole, n) {
+        var g = groups[Number(n) - 1];
+        if (g === undefined || g === null) return whole;
+        var bare = String(g).trim();
+        var t = map.get(bare);
+        if (t === undefined) t = alt.get(bare);
+        return t !== undefined && t !== bare ? String(g).replace(bare, t) : g;
+      });
+    });
+  }
+
   function tr(text, where) {
     if (!text) return null;
     var trimmed = text.trim();
@@ -294,7 +330,7 @@
         re.lastIndex = 0;
         if (re.test(trimmed)) {
           re.lastIndex = 0;
-          hit = trimmed.replace(re, m[1]);
+          hit = applyRule(trimmed, re, m[1]);
           break;
         }
       }
@@ -390,7 +426,27 @@
     return lead + hit + tail;
   }
 
-  var ATTRS = ["placeholder", "title", "aria-label", "alt"];
+  /**
+   * `data-th` IS A VISIBLE LABEL, and this is why the phone stayed Spanish.
+   *
+   * erp.html turns every wide table into cards on a narrow screen with
+   *
+   *     table.cards td:before { content: attr(data-th) }
+   *
+   * and `autoCards()` fills `data-th` from the column header. So on a phone the
+   * field labels — Tipo, NIF, Teléfono, Tarifa, Documentos, Categoría, Ciudad,
+   * Alta, Datos — are painted BY CSS, out of an attribute. A tree walker over
+   * text nodes cannot see generated content, and this attribute was not in the
+   * list, so `tr()` was never even asked. The desktop <th> translated fine,
+   * which is exactly why every check run at 1400px reported those screens
+   * clean while the operator was reading Spanish on an English phone.
+   *
+   * Adding it here fixes both orderings: if autoCards() has already copied a
+   * translated header, the value is a no-op; if it copied a Spanish one, the
+   * MutationObserver's attributeFilter (built from this list) catches the
+   * write and translates it.
+   */
+  var ATTRS = ["placeholder", "title", "aria-label", "alt", "data-th"];
   var SKIP = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, CODE: 1, PRE: 0 };
 
   /**

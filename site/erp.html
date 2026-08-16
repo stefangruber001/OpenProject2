@@ -12909,7 +12909,13 @@
               { label: "Teléfono", get: (w) => w.phone || "", html: (w) => esc(w.phone || "—") },
               { label: "Email", get: (w) => w.email || "", html: (w) => esc(w.email || "—") },
               {
-                label: "Tarifa",
+                // "Tarifa horaria", not "Tarifa". The bare word is ALSO the
+                // name of the supplier price-list screen, and a dictionary
+                // keyed on the source string cannot serve both meanings from
+                // one key — it translated this field as "Price list" on an
+                // English phone. Disambiguating at the source is the fix; it
+                // reads better in Spanish too.
+                label: "Tarifa horaria",
                 get: (w) => {
                   try {
                     return String(erp.workerRateCents(w.id, erp.today) / 100);

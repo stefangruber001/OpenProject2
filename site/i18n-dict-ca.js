@@ -2386,8 +2386,43 @@ window.CANEI_DICT.ca = {
   "Reclamar factura vencida a los 3 días": "Reclamar factura vençuda als 3 dies",
   "Seguir presupuesto a los 5 días": "Seguir pressupost als 5 dies",
   "40% a la firma · 60% a la entrega": "40% a la signatura · 60% a l'entrega",
+  "Tarifa horaria": "Tarifa horària",
+  "orden de compra": "ordre de compra",
+  "órdenes de compra": "ordres de compra",
+  factura: "factura",
+  facturas: "factures",
+  presupuesto: "pressupost",
+  contrato: "contracte",
+  tarea: "tasca",
+  visita: "visita",
+  oportunidad: "oportunitat",
+  cliente: "client",
+  proveedor: "proveïdor",
+  trabajador: "treballador",
+  subcontrata: "subcontracta",
+  hito: "fita",
+  adicional: "addicional",
+  parte: "part",
+  recibo: "rebut",
+  albarán: "albarà",
+  "Fichero de personal interno. La tarifa vigente y la documentación (PRL, alta S.S.) se gestionan desde la ficha de cada persona.":
+    "Fitxer de personal intern. La tarifa vigent i la documentació (PRL, alta S.S.) es gestionen des de la fitxa de cada persona.",
+  "Fichero de subcontratas (industriales). El ciclo de documentos y certificaciones sigue en el motor; esta pantalla es su ficha.":
+    "Fitxer de subcontractes (industrials). El cicle de documents i certificacions continua al motor; aquesta pantalla és la seva fitxa.",
+  "Fichero de proveedores. La categoría clasifica el proveedor; los precios y compras se gestionan en sus propias pantallas.":
+    "Fitxer de proveïdors. La categoria classifica el proveïdor; els preus i les compres es gestionen a les seves pròpies pantalles.",
+  "Elige una obra para abrir su carta Gantt: ahí se marca el avance, se mueven las barras y se recalculan los cobros previstos.":
+    "Tria una obra per obrir la seva carta Gantt: allà es marca l'avanç, es mouen les barres i es recalculen els cobraments previstos.",
+  "Se abre el generador con lo que ya se puede facturar de esa obra: los hitos del contrato pendientes, el avance certificable y los adicionales aprobados.":
+    "Obre el generador amb el que ja es pot facturar d'aquella obra: les fites del contracte pendents, l'avanç certificable i els addicionals aprovats.",
+  Alta: "Alta",
+  Datos: "Dades",
+  Ciudad: "Ciutat",
+  Contacto: "Contacte",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  [new RegExp("^(\\d+) industriales$"), "$1 industrials"],
+  [new RegExp("^(\\d+) industrial$"), "$1 industrial"],
   [new RegExp("^Fecha (\\S+) · vigencia (.+)$"), "Data $1 · vigència $2"],
   [new RegExp("^vigencia sin límite$"), "sense límit"],
   [new RegExp("^Lista ([\\d.,]+ €) · descuento ([\\d.,]+)% →$"), "Llista $1 · descompte $2% →"],

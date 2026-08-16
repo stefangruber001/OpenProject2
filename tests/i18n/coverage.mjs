@@ -86,7 +86,7 @@ const ca = D.ca || {};
    main), because each branch had translated strings the other had not and the
    union keeps both. Recomputed rather than chosen: taking either side's number
    would have been wrong in one direction or the other. */
-const CA_BACKLOG = 1048;
+const CA_BACKLOG = 1046;
 
 const problems = [];
 const note = (kind, detail) => problems.push({ kind, detail });
