@@ -336,7 +336,7 @@ assert(
 // "executed" status in LISTS.changeStatuses was unreachable.
 const chg = erp.addChange(prj.id, { desc: "Extra tomas", priceCents: 20000 }, "bo");
 erp.priceChange(chg.id, 20000, 12000, "bo");
-erp.approveChange(chg.id, "firma.png", "bo");
+erp.approveChange(chg.id, { evidenceRef: "firma.png" }, "bo");
 erp.markChangeExecuted(chg.id, "bo");
 assert(
   erp.state.changes.find((c) => c.id === chg.id).status === "executed",
@@ -1330,7 +1330,7 @@ assert(
     erp.changeStage(erp.state.changes.find((c) => c.id === extra.id)) === "priced",
     "changeStage: one already with the customer is still valorado — the pill says the rest",
   );
-  erp.approveChange(extra.id, "firma.png", "bo");
+  erp.approveChange(extra.id, { evidenceRef: "firma.png" }, "bo");
 
   const v1 = erp.contractValue(con.id);
   assert(

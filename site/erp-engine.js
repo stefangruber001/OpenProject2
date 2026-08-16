@@ -323,6 +323,53 @@
       { code: "onAccount", es: "A cuenta", ca: "A compte" },
       { code: "oneOff", es: "Pago único", ca: "Pagament únic" },
     ],
+    /* Package 1, slide 9: the milestone split printed on a presupuesto — "40%
+       a la firma…" — was a free-text box, so the same split got retyped
+       slightly differently every time and never came back for a comparison.
+       Unlike the lists above, its code IS its Spanish wording rather than a
+       short identifier: nobody types a code for a payment split, they type
+       the split itself, and the picker that replaces the free-text box (see
+       erp.html) lets a new one be added inline without ever leaving the
+       presupuesto — `addListEntry` accepts that exactly as DMC-05 does. */
+    paymentConditions: [
+      {
+        code: "40% a la firma · 40% a mitad de obra · 20% a la finalización",
+        es: "40% a la firma · 40% a mitad de obra · 20% a la finalización",
+        ca: "40% a la signatura · 40% a mitja obra · 20% a la finalització",
+      },
+      {
+        code: "50% a la firma · 50% a la entrega",
+        es: "50% a la firma · 50% a la entrega",
+        ca: "50% a la signatura · 50% a l'entrega",
+      },
+      {
+        code: "30% a la firma · 70% a la entrega",
+        es: "30% a la firma · 70% a la entrega",
+        ca: "30% a la signatura · 70% a l'entrega",
+      },
+      {
+        code: "100% a la entrega",
+        es: "100% a la entrega",
+        ca: "100% a l'entrega",
+      },
+    ],
+    /* Package 1, slide 2: "Próxima acción" was a free-text box on the
+       oportunidad — same reasoning and the same code-is-the-wording shape as
+       paymentConditions above. `scheduleVisit`'s label matches the engine's
+       own default (addOpportunity, "Programar visita") so a lead created
+       before this list existed still resolves to a real entry rather than a
+       synthetic "(retirada)" one. */
+    nextActions: [
+      { code: "Programar visita", es: "Programar visita", ca: "Programar visita" },
+      { code: "Enviar presupuesto", es: "Enviar presupuesto", ca: "Enviar pressupost" },
+      { code: "Volver a llamar", es: "Volver a llamar", ca: "Tornar a trucar" },
+      {
+        code: "Esperar respuesta del cliente",
+        es: "Esperar respuesta del cliente",
+        ca: "Esperar resposta del client",
+      },
+      { code: "Hacer seguimiento", es: "Hacer seguimiento", ca: "Fer seguiment" },
+    ],
     /**
      * GAP 13 — the chart of accounts, and the reason it is a LIST.
      *
@@ -713,6 +760,10 @@
           S.contracts.filter((c) => c.paymentMethod === code).length +
           S.invoices.filter((i) => i.paymentMethod === code).length
         );
+      if (kind === "paymentConditions")
+        return S.budgets.filter((b) => b.paymentConditions === code).length;
+      if (kind === "nextActions")
+        return S.opportunities.filter((o) => o.nextAction === code).length;
       return 0;
     }
 
@@ -1888,7 +1939,18 @@
           issues.push({ level: "block", line: c.num, msg: "Capítulo con margen negativo" });
       return issues;
     }
-    issueVersion(budgetId, { channel } = {}, user) {
+    /**
+     * @param sentDate  when the document actually left, for the "a mano"
+     *                  channel — a paper copy handed over yesterday is
+     *                  recorded on the day it happened, not on the day
+     *                  somebody got round to logging it. Defaults to today.
+     *                  A future date is refused, same reasoning as
+     *                  acceptVersion: nothing can be sent tomorrow.
+     * @param sentTime  the clock time alongside sentDate, free text (HH:MM),
+     *                  optional — a date is always known, a time is not
+     *                  always worth asking for.
+     */
+    issueVersion(budgetId, { channel, sentDate, sentTime } = {}, user) {
       // QUO-02/05/07: freeze + generate customer doc from data
       const b = this.budget(budgetId);
       const v = this.currentVersion(budgetId);
@@ -1907,6 +1969,8 @@
       const ch = channel || "email";
       if (ch === "email" && !validEmail(this.party(b.partyId).email))
         throw new Error("Email required to send electronically (MDM-04)");
+      const when = sentDate || this.state.today;
+      if (when > this.state.today) throw new Error("The send date cannot be in the future");
       v.issued = true;
       v.frozen = true;
       // PRE-10: freezing a version freezes its annex. The images are already
@@ -1915,7 +1979,7 @@
       // under an already-sent document. Snapshot them here so a reissued PDF is
       // laid out exactly as the one the customer received.
       v.annex = clone(b.annex || { enabled: true, imagesPerPage: 2 });
-      v.sent = { date: this.state.today, channel: ch }; // QUO-09 + MDM-04
+      v.sent = { date: when, time: sentTime || null, channel: ch }; // QUO-09 + MDM-04
       v.docRef = this._docName("presupuesto", b, v); // DOC-04
       b.status = "issued";
       const o = this.state.opportunities.find(
@@ -2037,7 +2101,28 @@
           : 0,
       };
     }
-    acceptVersion(budgetId, versionId, { evidenceRef, acceptedOptions } = {}, user) {
+    /**
+     * @param evidenceRef  legacy free-text note naming the backing document.
+     *                     Kept because records written before a file could be
+     *                     attached carry one, and a typed filename is still
+     *                     better than nothing when that is all there is.
+     * @param evidence     the backing document itself —
+     *                     { storageKey, name, type, size, uploadedAt }.
+     * @param date         when the customer actually answered. Defaults to
+     *                     today, and may be EARLIER: the answer usually
+     *                     arrives before anyone sits down to record it. A
+     *                     future date is refused — nothing can be accepted
+     *                     tomorrow.
+     * @param acceptedBy   who on the customer's side gave the answer, by name
+     *                     or by role. Free text, because the customer's staff
+     *                     are not users of this system.
+     */
+    acceptVersion(
+      budgetId,
+      versionId,
+      { evidenceRef, evidence, date, acceptedBy, acceptedOptions } = {},
+      user,
+    ) {
       // QUO-04/09 + PRJ-01
       const b = this.budget(budgetId);
       const v = this.version(budgetId, versionId);
@@ -2049,10 +2134,14 @@
       // which answer the customer actually gave. A customer who changes their
       // mind gets a NEW version, which is what newVersion is for.
       if (v.customerResponse) throw new Error("This version already has the customer's answer");
+      const when = date || this.state.today;
+      if (when > this.state.today) throw new Error("The answer cannot be dated in the future");
       v.customerResponse = {
         accepted: true,
-        date: this.state.today,
+        date: when,
         evidenceRef: evidenceRef || null,
+        evidence: evidence || null,
+        acceptedBy: acceptedBy || null,
         acceptedOptions: acceptedOptions || [],
       };
       v.frozen = true;
@@ -2063,7 +2152,11 @@
       );
       if (o) {
         o.status = "won";
-        o.decidedAt = this.state.today; // DAS-01: "contratadas/perdidas últimos 12 meses"
+        // The day the customer answered, not the day somebody typed it in:
+        // a backdated acceptance must land in the quarter it happened, or
+        // DAS-01's "contratadas/perdidas últimos 12 meses" counts it twice
+        // over — once where it belongs and never where it is.
+        o.decidedAt = when; // DAS-01: "contratadas/perdidas últimos 12 meses"
       }
       this._log(user, "acceptVersion", b.number + " v" + v.vNumber);
       return v;
@@ -2130,17 +2223,171 @@
     }
 
     /* =========================== CON — contracts =========================== */
+    /**
+     * The parts of a contract record that do not depend on WHERE it came
+     * from, so the budget-derived path and the externally-signed one cannot
+     * drift apart in what a contract is.
+     *
+     * @param origin  "generated" — this system drew it up from an accepted
+     *                budget, and `renderContractDoc` IS the contract.
+     *                "external" — it was signed elsewhere and is being
+     *                recorded; the uploaded file is the contract and the
+     *                structured data is our index of it.
+     */
+    _contractRecord({ origin, partyId, propertyId, valueCents, vatBp, language, date }) {
+      const vatCents = pctOf(valueCents, vatBp);
+      return {
+        id: this._id("con"),
+        number: this.nextNumber("contract"),
+        date: date || this.state.today,
+        origin,
+        partyId,
+        propertyId: propertyId || null,
+        budgetId: null,
+        budgetNumber: null,
+        acceptedVersionId: null,
+        // The signed file itself, for an external contract. PK2-A's evidence
+        // shape: { storageKey, name, type, size, uploadedAt }.
+        document: null,
+        valueCents,
+        vatBp,
+        vatCents,
+        totalCents: valueCents + vatCents, // CON-03 structured
+        installments: [], // CON-04 {pct|amountCents, trigger, stageRef, expectedDate, invoicedInvoiceId, status}
+        initiation: {
+          scheduleWithinDays: 7,
+          startWithinDays: 15,
+          firstPaymentDate: null,
+          committedStartDate: null,
+        }, // CON-05
+        duration: {
+          estimatedDays: null,
+          plannedStart: null,
+          plannedFinish: null,
+          actualStart: null,
+          actualFinish: null,
+          deviationReason: null,
+        }, // CON-06
+        penalties: {
+          latePaymentInterestPctYear: 8,
+          delayPenaltyCentsPerWeek: 0,
+          capCents: 0,
+          graceDays: 7,
+          suspendingEvents: ["customer delay", "force majeure", "approved change"],
+        }, // CON-07
+        guarantees: [], // CON-08 {category, months, startDate, expiryDate}
+        clauseBlockVersions: this.state.clauseBlocks
+          .filter((cb) => cb.effectiveFrom <= this.state.today)
+          .map((cb) => cb.id), // CON-09
+        language: language || "es", // CON-10
+        signature: { customerSignedAt: null, companySignedAt: null, method: null }, // CON-11
+        status: "draft",
+        annexes: [],
+        scopeAnnexRef: null,
+      };
+    }
+    /**
+     * Normalise and validate the terms both contract paths accept, then file
+     * the record. Shared so a milestone entered by hand and one written by
+     * the seed are checked identically.
+     */
+    /**
+     * Everything that can refuse a contract, checked BEFORE a number is
+     * minted.
+     *
+     * `nextNumber` is a side effect: it appends to `series.contract.issued`
+     * and advances the counter whether or not the record it was minted for
+     * survives. Validating afterwards therefore left a permanent hole in a
+     * series ORG-04 requires to be gap-free — type a contract, forget the
+     * duration, and CTR-YYYY-nnnn was gone for good. Both paths call this
+     * first, and `_finishContract` keeps the same assertion as a backstop.
+     */
+    _validateContractTerms(terms) {
+      const d = (terms || {}).duration || {};
+      if (!d.estimatedDays) throw new Error("Execution duration is mandatory (CON-06)");
+    }
+    _finishContract(rec, user, logAs) {
+      if (!rec.duration.estimatedDays) throw new Error("Execution duration is mandatory (CON-06)");
+      const instSum = sum(rec.installments, (i) =>
+        i.pct != null ? pctOf(rec.totalCents, i.pct * 100) : i.amountCents,
+      );
+      if (rec.installments.length && Math.abs(instSum - rec.totalCents) > rec.installments.length)
+        // cent-rounding tolerance
+        rec.installments[rec.installments.length - 1].adjustCents = rec.totalCents - instSum;
+      rec.installments.forEach((i, idx) => {
+        i.idx = idx;
+        i.status = "planned";
+        i.amountCents =
+          (i.pct != null ? pctOf(rec.totalCents, i.pct * 100) : i.amountCents) +
+          (i.adjustCents || 0);
+      });
+      this.state.contracts.push(rec);
+      this._log(user, logAs, rec.number);
+      return rec;
+    }
+    /**
+     * Record a contract that was signed OUTSIDE this system — on paper, by a
+     * lawyer, or before this ERP existed (Package 2 slide 4).
+     *
+     * Deliberately not `createContract` with a null budget. CON-02's rule
+     * ("a contract requires an accepted budget version") is real and stays
+     * enforced for contracts this system DRAWS UP; what this method records
+     * is a different kind of fact — one that already happened elsewhere —
+     * and marking it `origin:"external"` is what lets the screen show the
+     * signed file as the contract instead of printing a generated document
+     * that nobody ever signed.
+     *
+     * Completeness is still required (decision 21 / RD 1619/2012): a contract
+     * is one of the two documents that block on an incomplete tercero, and
+     * recording one from paper does not change what the law needs before it
+     * can be invoiced. The screen offers the missing fields inline rather
+     * than sending the operator away.
+     */
+    registerExternalContract(data, user) {
+      const d = data || {};
+      if (!d.partyId) throw new Error("A contract needs a customer");
+      if (!(d.valueCents > 0)) throw new Error("A contract needs an amount");
+      if (d.date && d.date > this.state.today)
+        throw new Error("A contract cannot be dated in the future");
+      this._requireComplete(d.partyId, "contract"); // 7.5 parties control
+      this._validateContractTerms(d); // before nextNumber — see the note there
+      const rec = Object.assign(
+        this._contractRecord({
+          origin: "external",
+          partyId: d.partyId,
+          propertyId: d.propertyId,
+          valueCents: d.valueCents,
+          // Same default a new budget takes, so a hand-entered contract and a
+          // quoted one start from the same rate rather than two different ones.
+          vatBp: d.vatBp != null ? d.vatBp : 1000,
+          language: d.language,
+          date: d.date,
+        }),
+        // Only the parts a person types; id/number/origin/totals stay ours.
+        {
+          installments: d.installments || [],
+          duration: Object.assign({ estimatedDays: null }, d.duration || {}),
+          guarantees: d.guarantees || [],
+          document: d.document || null,
+          externalRef: d.externalRef || null,
+        },
+      );
+      return this._finishContract(rec, user, "registerExternalContract");
+    }
     createContract(budgetId, terms, user) {
       // CON-01..14
       const b = this.budget(budgetId);
       if (!b.acceptedVersionId) throw new Error("Contract requires an accepted budget version"); // CON-02
       this._requireComplete(b.partyId, "contract"); // 7.5 parties control
+      this._validateContractTerms(terms); // before nextNumber — see the note there
       const t = this.budgetTotals(budgetId, b.acceptedVersionId);
       const rec = Object.assign(
         {
           id: this._id("con"),
           number: this.nextNumber("contract"),
           date: this.state.today,
+          origin: "generated",
+          document: null,
           partyId: b.partyId,
           propertyId: b.propertyId,
           budgetId,
@@ -2188,30 +2435,22 @@
         },
         terms || {},
       );
-      if (!rec.duration.estimatedDays) throw new Error("Execution duration is mandatory (CON-06)");
-      const instSum = sum(rec.installments, (i) =>
-        i.pct != null ? pctOf(rec.totalCents, i.pct * 100) : i.amountCents,
-      );
-      if (rec.installments.length && Math.abs(instSum - rec.totalCents) > rec.installments.length)
-        // cent-rounding tolerance
-        rec.installments[rec.installments.length - 1].adjustCents = rec.totalCents - instSum;
-      rec.installments.forEach((i, idx) => {
-        i.idx = idx;
-        i.status = "planned";
-        i.amountCents =
-          (i.pct != null ? pctOf(rec.totalCents, i.pct * 100) : i.amountCents) +
-          (i.adjustCents || 0);
-      });
-      this.state.contracts.push(rec);
-      this._log(user, "createContract", rec.number);
-      return rec;
+      return this._finishContract(rec, user, "createContract");
     }
-    signContract(id, { method } = {}, user) {
+    /**
+     * @param date  when it was actually signed. Defaults to today and may be
+     *              EARLIER — a contract registered from paper was signed
+     *              before anybody typed it in. A future date is refused, the
+     *              same rule acceptVersion and issueVersion already apply.
+     */
+    signContract(id, { method, date } = {}, user) {
       // CON-11
       const c = this.state.contracts.find((x) => x.id === id);
+      const when = date || this.state.today;
+      if (when > this.state.today) throw new Error("A signature cannot be dated in the future");
       c.signature = {
-        customerSignedAt: this.state.today,
-        companySignedAt: this.state.today,
+        customerSignedAt: when,
+        companySignedAt: when,
         method: method || "physical",
       };
       c.status = "signed";
@@ -2340,6 +2579,7 @@
           signed: !!c.signature.customerSignedAt,
           status: c.status,
           active: !["completed", "cancelled"].includes(c.status),
+          origin: c.origin || "generated",
         };
       });
     }
@@ -2392,7 +2632,10 @@
           // or the honesty that session bought is lost one screen along.
           expectedDateSource: i.expectedDateSource || null,
           status: i.status,
-          invoiceId: i.invoicedInvoiceId || null,
+          // `invoiceId` is the pre-PK6-A spelling: milestones invoiced before
+          // that fix stored the link under it, and they still resolve here
+          // rather than needing a migration to say what they already knew.
+          invoiceId: i.invoicedInvoiceId || i.invoiceId || null,
         })),
         initiation: clone(c.initiation),
         duration: clone(c.duration),
@@ -2401,6 +2644,13 @@
         annexes: clone(c.annexes || []),
         signature: clone(c.signature),
         status: c.status,
+        // Where this contract came from, and the signed file when it came
+        // from outside. A screen showing an externally-signed contract must
+        // show THAT file rather than the document rendered below it, which
+        // nobody ever signed — see registerExternalContract.
+        origin: c.origin || "generated",
+        document: c.document ? clone(c.document) : null,
+        externalRef: c.externalRef || null,
       };
     }
 
@@ -2767,7 +3017,23 @@
       this._log(user, "sendChange", changeId);
       return c;
     }
-    approveChange(changeId, evidenceRef, user) {
+    /**
+     * @param evidenceRef  legacy free-text note. Kept for records written
+     *                     before a file could be attached.
+     * @param evidence     the real backing document —
+     *                     { storageKey, name, type, size, uploadedAt } —
+     *                     Package 2 slide 8's "respaldo" for the anexo this
+     *                     approval generates.
+     */
+    approveChange(changeId, opts, user) {
+      // The options object is NOT defaulted in the signature, deliberately: a
+      // parameter with a default stops counting towards `Function.length`,
+      // and `apps/web/lib/erp-commands.ts` pins each whitelisted method's
+      // arity against exactly that — the server reads positional arguments
+      // off a request body, so the count is part of the wire contract, not a
+      // style choice. Defaulting it here silently changed approveChange's
+      // declared arity from 3 to 1.
+      const { evidenceRef, evidence } = opts || {};
       // CHG-03/04 + CON-12. Accepts "priced" too — sending to the client first
       // is a real step this spec adds, but skipping straight to acceptance
       // (a verbal yes, a signature on the spot) is common enough on site that
@@ -2778,6 +3044,7 @@
       c.status = "approved";
       c.approvedAt = this.state.today;
       c.evidenceRef = evidenceRef || null;
+      c.evidence = evidence || null;
       const p = this.project(c.projectId);
       const con = p.contractId ? this.state.contracts.find((x) => x.id === p.contractId) : null;
       if (con) {
@@ -3460,10 +3727,32 @@
     }
 
     /* =========================== AR — invoices, receipts, collections =========================== */
-    issueInvoice(inv, user) {
-      // AR-01..04 / VFU-01/02
-      const p = this.project(inv.projectId);
-      this._requireComplete(p.partyId, "invoice"); // MDM-10
+
+    /**
+     * Everything standing between a draft and an issued invoice, as a LIST
+     * rather than as the first exception thrown.
+     *
+     * The rules themselves are old — completeness, an unsigned contract, an
+     * unapproved extra, an abono that names no original. What is new is that
+     * a screen can now ask for them BEFORE trying, which is the whole
+     * difference between "the invoice you were about to write is blocked, and
+     * here is what to fix" and an error toast after the fact.
+     *
+     * There is exactly one copy of them, and `issueInvoice` throws on the
+     * first entry of this same list. A second implementation for the screen
+     * would be a second implementation of the law: it would agree on the day
+     * it was written and drift silently from then on.
+     */
+    _invoiceBlocks(draft) {
+      const out = [];
+      const p = this.project(draft.projectId);
+      const comp = this.partyCompleteness(p.partyId);
+      if (!comp.ok)
+        out.push({
+          code: "MDM-10",
+          label: "Datos fiscales del cliente incompletos",
+          detail: comp.missing.join(", "),
+        });
       const contract = p.contractId
         ? this.state.contracts.find((c) => c.id === p.contractId)
         : null;
@@ -3471,9 +3760,253 @@
         (i) => i.projectId === p.id && i.kind !== "creditNote",
       );
       if (contract && firstForProject && !contract.signature.customerSignedAt)
-        throw new Error("First invoice blocked: contract not signed (CON-11)");
+        out.push({
+          code: "CON-11",
+          label: "Contrato sin firmar",
+          detail: "La primera factura de la obra necesita el contrato firmado.",
+        });
+      if (draft.kind === "creditNote" && !draft.rectifies)
+        out.push({
+          code: "AR-10",
+          label: "El abono no dice qué factura rectifica",
+          detail: "Un abono siempre nombra la factura que corrige.",
+        });
+      if (draft.changeId) {
+        const ch = this.state.changes.find((x) => x.id === draft.changeId);
+        if (!ch)
+          out.push({ code: "CHG-04", label: "El adicional no existe", detail: draft.changeId });
+        else if (!["approved", "executed"].includes(ch.status))
+          out.push({
+            code: "CHG-04",
+            label: "Adicional sin aprobar",
+            detail: "Sólo se factura un adicional que el cliente ya ha aprobado.",
+          });
+      }
+      return out;
+    }
+
+    /** The base of a draft: its own lines when it has them, `baseCents` otherwise. */
+    _invoiceBase(draft) {
+      if (draft.baseCents != null) return cents(draft.baseCents);
+      return sum(draft.lines || [], (l) => cents(l.amountCents));
+    }
+
+    /**
+     * The four places an invoice legitimately comes from on one project, each
+     * already a record somewhere else in the system.
+     *
+     * Nothing here is a suggestion the operator has to retype: a milestone
+     * carries its own amount, a certification is the value-weighted progress
+     * the S curve already draws, and an adicional is priced and approved
+     * before it ever reaches this screen. The generator's job is to let
+     * somebody pick one, not to make them add it up again.
+     */
+    invoiceBases(projectId) {
+      const p = this.project(projectId);
+      const contract = p.contractId
+        ? this.state.contracts.find((c) => c.id === p.contractId)
+        : null;
+      const invs = this.state.invoices.filter((i) => i.projectId === p.id);
+      // Already billed, as BASE and net of abonos — the figure a certification
+      // has to subtract. Totals would be the wrong number: VAT is not revenue.
+      const billedBase =
+        sum(
+          invs.filter((i) => i.kind !== "creditNote"),
+          (i) => i.baseCents,
+        ) -
+        sum(
+          invs.filter((i) => i.kind === "creditNote"),
+          (i) => i.baseCents,
+        );
+      const prog = this.chapterProgress(p.id);
+      const chapters = (p.baseline.chapters || []).map((c) => {
+        const hit = prog.find((x) => x.num === c.num);
+        const progressPct = hit ? hit.progressPct : 0;
+        return {
+          num: c.num,
+          name: c.name,
+          valueCents: c.saleCents,
+          progressPct,
+          doneCents: Math.round((c.saleCents * progressPct) / 100),
+        };
+      });
+      const executedCents = sum(chapters, (c) => c.doneCents);
+      return {
+        billedBaseCents: billedBase,
+        milestones: contract
+          ? contract.installments
+              .map((i, idx) => ({
+                idx,
+                trigger: i.trigger,
+                pct: i.pct != null ? i.pct : null,
+                amountCents: i.amountCents,
+                expectedDate: i.expectedDate || null,
+                status: i.status,
+              }))
+              .filter((i) => i.status === "planned")
+          : [],
+        certification: {
+          chapters,
+          executedCents,
+          // Never negative: over-billing against progress is a real situation
+          // (a deposit invoice precedes the work it pays for), and proposing a
+          // negative certification would turn that into a nonsense line rather
+          // than into "nothing to certify yet".
+          proposedCents: Math.max(0, executedCents - billedBase),
+        },
+        changes: this.state.changes
+          .filter(
+            (c) =>
+              c.projectId === p.id && ["approved", "executed"].includes(c.status) && !c.invoiceId,
+          )
+          .map((c) => ({ id: c.id, desc: c.desc, priceCents: c.priceCents, status: c.status })),
+        issued: invs
+          .filter((i) => i.kind !== "creditNote")
+          .map((i) => ({ id: i.id, number: i.number, date: i.date, totalCents: i.totalCents })),
+      };
+    }
+
+    /**
+     * What this draft would become if it were issued now — and what stops it.
+     *
+     * The screen computes no money. Base, VAT, withholding and total come from
+     * here, which is the same arithmetic `issueInvoice` performs, so a preview
+     * cannot show one figure and the emitted document another. Nothing is
+     * persisted and no number is minted: a draft that is abandoned must leave
+     * no trace in a series that is required to have no gaps.
+     */
+    previewInvoice(draft) {
+      const p = this.project(draft.projectId);
       const party = this.party(p.partyId);
-      const baseCents = cents(inv.baseCents);
+      const baseCents = this._invoiceBase(draft);
+      const vatBp = draft.vatBp != null ? draft.vatBp : p.vatBp;
+      const vatCents = pctOf(baseCents, vatBp);
+      const irpfBp = draft.irpfBp || 0;
+      const irpfCents = pctOf(baseCents, irpfBp);
+      const blocks = this._invoiceBlocks(draft);
+      const rec = {
+        number: null, // minted at issue, never before — see nextNumber
+        kind: draft.kind || "progress",
+        date: this.state.today,
+        partyId: p.partyId,
+        projectId: p.id,
+        budgetNumber: p.budgetNumber,
+        worksAddress: draft.worksAddress || "",
+        lines: this._invoiceLines(draft, baseCents),
+        baseCents,
+        vatBp,
+        vatCents,
+        irpfBp,
+        irpfCents,
+        totalCents: baseCents + vatCents - irpfCents,
+        dueDate: addDays(this.state.today, party.paymentTermsDays || 30),
+        paymentMethod: party.paymentMethod,
+        iban: this.state.config.iban,
+        rectifies: draft.rectifies || null,
+        rectifyReason: draft.rectifyReason || null,
+      };
+      return {
+        doc: this._invoiceDoc(rec),
+        baseCents,
+        vatBp,
+        vatCents,
+        irpfBp,
+        irpfCents,
+        totalCents: rec.totalCents,
+        dueDate: rec.dueDate,
+        blocks,
+        // An invoice for nothing is not a blocked invoice, it is an empty one —
+        // it gets its own flag rather than a rule number it does not have.
+        empty: baseCents === 0,
+        ok: blocks.length === 0 && baseCents !== 0,
+      };
+    }
+
+    /**
+     * A caller that supplies `baseCents` and no lines gets the one-line form
+     * this has always produced. A draft with neither — the state the generator
+     * is in before anybody has chosen an origin — previews as genuinely empty
+     * rather than as a placeholder line for nothing, which reads like a real
+     * concept somebody has already agreed to bill.
+     */
+    _invoiceLines(inv, baseCents) {
+      if (inv.lines && inv.lines.length) return clone(inv.lines);
+      if (!baseCents) return [];
+      return [{ desc: inv.desc || "Certificación de obra", amountCents: baseCents }];
+    }
+
+    /**
+     * The invoice as a document — the same projection shape a presupuesto and
+     * a contrato already have, and for the same reason: the sheet that gets
+     * printed reads one object rather than reaching into engine state.
+     */
+    _invoiceDoc(rec) {
+      const cfg = this.state.config;
+      const project = this.state.projects.find((x) => x.id === rec.projectId) || null;
+      const rectified = rec.rectifies
+        ? this.state.invoices.find((i) => i.id === rec.rectifies || i.number === rec.rectifies)
+        : null;
+      return {
+        docType: rec.kind === "creditNote" ? "FACTURA RECTIFICATIVA" : "FACTURA",
+        number: rec.number,
+        date: rec.date,
+        dueDate: rec.dueDate,
+        issuer: {
+          legalName: cfg.legalName,
+          taxId: cfg.taxId,
+          address: `${cfg.street}, ${cfg.postalCode} ${cfg.city}`,
+          phone: cfg.phone,
+          email: cfg.email,
+          iban: rec.iban || cfg.iban,
+        },
+        customer: (({ name, taxId, billStreet, billPostalCode, billCity }) => ({
+          name,
+          taxId,
+          address: `${billStreet}, ${billPostalCode} ${billCity}`,
+        }))(this.party(rec.partyId)),
+        projectCode: project ? project.code : null,
+        budgetNumber: rec.budgetNumber || null,
+        worksAddress: rec.worksAddress || "",
+        lines: clone(rec.lines || []),
+        baseCents: rec.baseCents,
+        vatBp: rec.vatBp,
+        vatCents: rec.vatCents,
+        irpfBp: rec.irpfBp,
+        irpfCents: rec.irpfCents,
+        totalCents: rec.totalCents,
+        paymentMethod: rec.paymentMethod,
+        rectifies: rectified ? rectified.number : null,
+        rectifyReason: rec.rectifyReason || null,
+      };
+    }
+
+    /** The issued invoice as a document (AR-02/03, DOC-01). */
+    renderInvoiceDoc(invoiceId) {
+      const inv = this.state.invoices.find((i) => i.id === invoiceId || i.number === invoiceId);
+      if (!inv) throw new Error("Invoice not found");
+      return this._invoiceDoc(inv);
+    }
+
+    issueInvoice(inv, user) {
+      // AR-01..04 / VFU-01/02
+      const p = this.project(inv.projectId);
+      /* EVERY refusal happens before a number is minted.
+         `nextNumber` mutates the series — it increments the counter and pushes
+         the number onto `issued` — so a check that fires after it has run
+         leaves a number that exists in a gapless series and on no document.
+         The credit-note and unapproved-extra checks used to sit below the
+         record literal and did exactly that. */
+      const blocked = this._invoiceBlocks(inv);
+      if (blocked.length)
+        throw new Error(
+          `${blocked[0].code}: ${blocked[0].label}` +
+            (blocked[0].detail ? ` (${blocked[0].detail})` : ""),
+        );
+      const contract = p.contractId
+        ? this.state.contracts.find((c) => c.id === p.contractId)
+        : null;
+      const party = this.party(p.partyId);
+      const baseCents = this._invoiceBase(inv);
       const vatBp = inv.vatBp != null ? inv.vatBp : p.vatBp;
       const vatCents = pctOf(baseCents, vatBp);
       const irpfBp = inv.irpfBp || 0; // AR-07 customer withholds
@@ -3488,7 +4021,7 @@
         projectId: p.id,
         budgetNumber: p.budgetNumber, // AR-03
         worksAddress: inv.worksAddress || "",
-        lines: inv.lines || [{ desc: inv.desc || "Certificación de obra", amountCents: baseCents }],
+        lines: this._invoiceLines(inv, baseCents),
         baseCents,
         vatBp,
         vatCents,
@@ -3505,13 +4038,10 @@
         immutable: true,
         docRef: null,
       };
-      if (isCredit && !rec.rectifies)
-        throw new Error("Credit note must reference the original invoice (AR-10/VFU-02)");
       if (rec.changeId) {
-        // extras: only approved are billable (CHG-04)
+        // Billable by now — _invoiceBlocks refused an unapproved one above,
+        // before the number was minted (CHG-04).
         const ch = this.state.changes.find((x) => x.id === rec.changeId);
-        if (!["approved", "executed"].includes(ch.status))
-          throw new Error("Unapproved extra is not billable (CHG-04)");
         ch.status = "invoiced";
         ch.invoiceId = rec.id;
       }
@@ -3532,7 +4062,11 @@
       if (contract && rec.installmentIdx != null) {
         const i = contract.installments[rec.installmentIdx];
         i.status = "invoiced";
-        i.invoiceId = rec.id;
+        /* `invoicedInvoiceId` is the name the installment shape declares and
+           the name renderContractDoc reads. This wrote `invoiceId`, so a
+           billed milestone showed as invoiced with no invoice behind it — the
+           link was stored under a name nothing looked for. */
+        i.invoicedInvoiceId = rec.id;
       }
       this._log(user, "issueInvoice", rec.number + " " + rec.totalCents);
       return rec;
@@ -7155,6 +7689,14 @@
         "assumptions",
       ];
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      // Package 3 slide 5: a validity date is how long the OFFER stands —
+      // one already in the past expired before anyone read it, which is not
+      // a state a presupuesto can be typed into. The `min` on the field
+      // stops the date picker offering an earlier day; this is the check
+      // that actually holds, since a picker's `min` does not stop a typed
+      // or programmatic value.
+      if (patch.validityDate && patch.validityDate < this.state.today)
+        throw new Error("Validity date cannot be in the past");
       Object.assign(b, patch);
       this._log(user, "updateBudget", b.number);
       return b;

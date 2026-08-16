@@ -81,7 +81,12 @@ const ca = D.ca || {};
  *
  * Lower it whenever you translate a batch; the check tells you the new value.
  */
-const CA_BACKLOG = 1052;
+/* 1048 after the merge of the v4 programme branch into main — LOWER than
+   either side's ceiling on its own (1294 on the programme branch, 1052 on
+   main), because each branch had translated strings the other had not and the
+   union keeps both. Recomputed rather than chosen: taking either side's number
+   would have been wrong in one direction or the other. */
+const CA_BACKLOG = 1048;
 
 const problems = [];
 const note = (kind, detail) => problems.push({ kind, detail });

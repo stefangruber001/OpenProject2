@@ -600,7 +600,7 @@
           "backoffice",
         );
         erp.sendChange(ch.id, "backoffice");
-        erp.approveChange(ch.id, "adenda-" + ch.id + ".pdf", "backoffice");
+        erp.approveChange(ch.id, { evidenceRef: "adenda-" + ch.id + ".pdf" }, "backoffice");
       }
 
       // ── billing and cash ───────────────────────────────────────────────

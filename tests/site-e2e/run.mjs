@@ -77,13 +77,22 @@ async function main() {
     await testCapture(browser, base);
     await testProjectTracking(browser, base);
     await testInvoicing(browser, base);
+    await testInvoiceGenerator(browser, base);
     await testCashFlow(browser, base);
     await testFinancials(browser, base);
     await testBankAndCash(browser, base);
     await testContract(browser, base);
+    await testChangeApprovalEvidence(browser, base);
+    await testContractCreation(browser, base);
+    await testBudgetCreation(browser, base);
     await testProcurement(browser, base);
     await testAdmin(browser, base);
     await testControlTowerAndDay(browser, base);
+    await testVisitCapture(browser, base);
+    await testConfigurableLists(browser, base);
+    await testPresupuestadorRework(browser, base);
+    await testEvidence(browser, base);
+    await testSendAndVersions(browser, base);
     await testJourneyRealMode(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
@@ -140,6 +149,64 @@ function attachConsole(page, errors) {
     if (m.type() === "error") errors.push(m.text());
   });
   page.on("pageerror", (e) => errors.push(String(e)));
+}
+
+/** Answer the application's own question box, in the background.
+ *
+ *  The screens used to ask with prompt() and confirm(), which Playwright
+ *  intercepts as `dialog` events — four suites carried a `pg.on("dialog")`
+ *  handler with a chain of regexes over the question text. Those questions are
+ *  now real DOM (see site/erp-modal.js), so nothing intercepts them and a run
+ *  that clicks "Anular" simply waits forever for a person.
+ *
+ *  This replaces all four handlers with one poller that behaves like a
+ *  cooperative user: fill anything empty, choose the first option when a list
+ *  demands a choice, then press the primary button. `answers` overrides the
+ *  text for a given question, keyed by a substring of its title — used only
+ *  where the VALUE matters to a later assertion, not to get past the box.
+ *
+ *  It is deliberately generic. The old regex chains had to be edited every
+ *  time a question was reworded, and a missed rewording showed up as a
+ *  mystery timeout rather than as a failed assertion.
+ */
+async function autoAnswerModals(pg, answers = {}) {
+  await pg.addInitScript((rules) => {
+    const fire = (el2, type) => el2.dispatchEvent(new Event(type, { bubbles: true }));
+    setInterval(() => {
+      const scrim = document.getElementById("mscrim");
+      if (!scrim || !scrim.classList.contains("on")) return;
+      const box = scrim.querySelector(".modal");
+      if (!box) return;
+      const title = (box.querySelector("#mttl") || {}).textContent || "";
+      let answer = "Respuesta E2E";
+      for (const key in rules)
+        if (title.includes(key)) {
+          answer = rules[key];
+          break;
+        }
+      box.querySelectorAll("input, textarea, select").forEach((f) => {
+        if (f.type === "radio") return;
+        if (f.tagName === "SELECT") return; // a select always has a valid value
+        if (f.value) return; // a prefilled date or default text is the answer
+        f.value = f.type === "date" ? "2026-05-20" : answer;
+        fire(f, "input");
+        fire(f, "change");
+      });
+      const radios = box.querySelectorAll('.mopts input[type="radio"]');
+      if (radios.length && !box.querySelector('.mopts input[type="radio"]:checked')) {
+        const wanted = [...radios].find((r) => r.value === answer) || radios[0];
+        wanted.click();
+      }
+      // The accept button is the LAST one in the action row, not the one with
+      // `.primary`: a question about something irreversible styles it `.danger`
+      // instead, and a selector that only knew about `.primary` left every
+      // anular / rescindir / marcar-como-perdida box open — which then blocked
+      // every click after it behind its own scrim.
+      const buttons = box.querySelectorAll(".ma button");
+      const accept = buttons[buttons.length - 1];
+      if (accept) accept.click();
+    }, 80);
+  }, answers);
 }
 
 /** Three v4 screens are merges of two built ones and carry a tab strip
@@ -205,10 +272,9 @@ async function openJobWithChapters(pg, searchId) {
   return code;
 }
 
-/* PRY-01's Programación tab, then the chart itself. S8 moved the Gantt out of
-   a sibling route and behind the centre panel, where §3.1 says a full-screen
-   surface belongs; every check that used to call openTab(…, "_projectSchedule")
-   comes through here instead. */
+/* The chart itself. PK4-A made PRY-01 two screens — the list of jobs and one
+   job's chart — so opening a job IS opening the Gantt: no panel in between,
+   and nothing to click through once the row is clicked. */
 async function openGantt(pg, base) {
   // Leaving a full-screen surface is a JS state change, not a route change —
   // `goto` at the same hash is a no-op and would silently leave us on the
@@ -221,15 +287,8 @@ async function openGantt(pg, base) {
     await bootedShell(pg);
     await pg.waitForTimeout(700);
   }
-  if (await pg.locator("#view [data-ctrclose]").count()) {
-    await pg.locator("#view [data-ctrclose]").click();
-    await pg.waitForTimeout(300);
-  }
   await openJobWithChapters(pg, "prgQ");
-  await pg.locator('[data-ptab="plan"]').click();
-  await pg.waitForTimeout(400);
-  await pg.locator("#pnlGantt").click();
-  await pg.waitForTimeout(700);
+  await pg.waitForTimeout(500);
 }
 
 async function openTab(pg, route, tab) {
@@ -548,7 +607,8 @@ async function testMobile(browser, base) {
     const offenders = [];
     let carded = 0,
       grids = 0,
-      overflow = [];
+      overflow = [],
+      sideways = [];
     for (const r of ROUTES) {
       await pg.evaluate((x) => (location.hash = x), r);
       await pg.waitForTimeout(400);
@@ -562,8 +622,23 @@ async function testMobile(browser, base) {
             ...[...t.querySelectorAll("tbody tr")].map((tr) => tr.children.length),
           ),
         })),
+        // A carded table whose own scroll box overflows is the failure the
+        // document-level check above CANNOT see: `.scroll` has overflow-x:auto,
+        // so it absorbs the overflow internally and the page stays 390 wide
+        // while every card scrolls sideways under the operator's thumb. That
+        // is exactly how a global `table{min-width:520px}` — which
+        // `width:100%` cannot override — shipped to a phone unnoticed.
+        clipped: [...document.querySelectorAll("#view table.cards")]
+          .map((t) => {
+            const box = t.closest(".scroll") || t.parentElement;
+            return box && box.scrollWidth > box.clientWidth + 1
+              ? `${box.clientWidth}<${box.scrollWidth}`
+              : null;
+          })
+          .filter(Boolean),
       }));
       if (info.sw > 391) overflow.push(`${r}:${info.sw}`);
+      if (info.clipped.length) sideways.push(`${r}:${info.clipped.join()}`);
       for (const t of info.tables) {
         if (t.cards) carded++;
         else if (t.nocards) grids++;
@@ -577,6 +652,9 @@ async function testMobile(browser, base) {
     else bad("mobile: tables become cards", `carded=${carded} offenders=${offenders.join()}`);
     if (!overflow.length) ok(`mobile: no screen scrolls sideways at 390 (${ROUTES.length} routes)`);
     else bad("mobile: no sideways scroll", overflow.join());
+    if (!sideways.length)
+      ok(`mobile: no carded table is cut off inside its own scroller (${carded} tables)`);
+    else bad("mobile: cards fit their container", sideways.join(" · "));
 
     // A card is only a card if the header labels moved onto the lines.
     await pg.evaluate(() => (location.hash = "customers"));
@@ -956,15 +1034,18 @@ async function testShell(browser, base) {
     else bad("shell: sections + collapsed panel", `sections=${sections} open=${subsOpen}`);
 
     // The specification's own count, asserted rather than assumed: six
-    // secciones and twenty-nine subsecciones. It is twenty-nine and not the
-    // doc's twenty-six because Comunicaciones, Alertas and Usuarios were moved
-    // into Configuración instead of being deleted.
+    // secciones and thirty subsecciones. It is thirty and not the doc's
+    // twenty-six because Comunicaciones, Alertas and Usuarios were moved into
+    // Configuración instead of being deleted (decisions 18, 19, 22), and
+    // because PK5-A added Idioma there when the floating language pill was
+    // removed. Each deviation is recorded in ASSUMPTIONS.md; the number is
+    // pinned here so a thirty-first arrives deliberately rather than by drift.
     const shape = await pg.evaluate(() => ({
       sections: SECTIONS.length,
       subs: SECTIONS.reduce((n, s) => n + s.subs.length, 0),
     }));
-    if (shape.sections === 6 && shape.subs === 29) ok("shell: 6 secciones × 29 subsecciones");
-    else bad("shell: 6×29", JSON.stringify(shape));
+    if (shape.sections === 6 && shape.subs === 30) ok("shell: 6 secciones × 30 subsecciones");
+    else bad("shell: 6×30", JSON.stringify(shape));
 
     // Press a section → panel 2 opens with that section's subsections.
     await pg.locator('#p1 .secitem[data-sec="sales"]').click();
@@ -1093,9 +1174,13 @@ async function testGantt(browser, base) {
   try {
     await openGantt(pg, base);
 
-    // Empty plan → derive it from the project's accepted budget.
+    // Empty plan → derive it from the project's accepted budget. Over a plan
+    // that already exists the derivation asks first (PK3-C); say yes.
     if (await pg.locator("#gDerive").count()) {
       await pg.locator("#gDerive").click();
+      await pg.waitForTimeout(500);
+      const confirm = pg.getByRole("button", { name: /Volver a derivar/ });
+      if (await confirm.count()) await confirm.click();
       await pg.waitForTimeout(700);
     }
     const bars = await pg.locator("#gSvg .gbar").count();
@@ -1220,21 +1305,19 @@ async function testBudgetBuilder(browser, base) {
 
     // Open the one budget that is still a draft — a frozen version is
     // deliberately read-only, so editing has to be tried on an editable one.
-    // The register groups by stage (COM-03), so the draft is the first row
-    // under the «Borradores» heading rather than a row carrying its own pill.
+    // The register's Estado column (COM-03) carries the stage pill per row.
     const opened = await pg.evaluate(() => {
-      const hd = [...document.querySelectorAll("#view tr.grouphd")].find((t) =>
-        /^Borradores/i.test(t.innerText.trim()),
+      const row = [...document.querySelectorAll("#view table.mlist tr.click")].find((tr) =>
+        /Borrador/i.test(tr.textContent),
       );
-      let row = hd && hd.nextElementSibling;
-      if (!row || !row.classList.contains("click")) return false;
+      if (!row) return false;
       row.click();
       return true;
     });
     if (!opened) {
       bad(
         "builder: a draft budget exists to edit",
-        `${await pg.locator("#view tr.click").count()} budgets, none under «Borradores»`,
+        `${await pg.locator("#view tr.click").count()} budgets, none in Borradores`,
       );
       return;
     }
@@ -1692,27 +1775,42 @@ async function testPresupuestador(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
   const errs = [];
   attachConsole(pg, errs);
-  pg.on("dialog", async (d) => {
-    const m = d.message() || "";
-    if (/^Nombre del capítulo/.test(m)) await d.accept("Capítulo E2E");
-    else if (/^Motivo de la nueva versión/.test(m)) await d.accept("Revisión E2E");
-    else await d.accept("");
+  await autoAnswerModals(pg, {
+    "Nuevo capítulo": "Capítulo E2E",
+    "Nueva versión": "Revisión E2E",
   });
   try {
     await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(900);
 
-    // ---- the register, grouped by the five stages -------------------------
-    const heads = await pg.evaluate(() =>
-      [...document.querySelectorAll("#view tr.grouphd")].map((t) => t.innerText.trim()),
-    );
-    // innerText is the RENDERED text and the headings are uppercased in CSS,
-    // so the comparison has to be case-insensitive or it tests the stylesheet.
+    // ---- the register: shared list toolbar (Package 3 slide 4) ------------
+    // budgetList used to be a raw <table> grouped into five stage sections
+    // with no search, export or pagination. It now runs on renderMasterList
+    // like every other register in the app, and the same five stages show as
+    // an Estado pill per row instead of a section heading.
+    const register = await pg.evaluate(() => ({
+      hasSearch: !!document.querySelector("#bqQ"),
+      hasExport: !!document.querySelector("#bqExp"),
+      hasNew: !!document.querySelector("#bqNew"),
+      hasPager: !!document.querySelector("#bqPrev") && !!document.querySelector("#bqNext"),
+      pills: [...document.querySelectorAll("#view table.mlist tr.click td:last-child .pill")].map(
+        (t) => t.textContent.trim(),
+      ),
+    }));
     const known = ["borradores", "enviados", "aceptados", "rechazados", "caducados"];
-    if (heads.length && heads.every((h) => known.some((k) => h.toLowerCase().startsWith(k))))
-      ok(`COM-03: the register is grouped by stage (${heads.length} groups)`);
-    else bad("COM-03: grouped register", JSON.stringify(heads));
+    if (
+      register.hasSearch &&
+      register.hasExport &&
+      register.hasNew &&
+      register.hasPager &&
+      register.pills.length &&
+      register.pills.every((p) => known.some((k) => p.toLowerCase().startsWith(k)))
+    )
+      ok(
+        `COM-03: the register has the shared list toolbar, Estado shows the five stages (${register.pills.length} rows)`,
+      );
+    else bad("COM-03: register toolbar + Estado column", JSON.stringify(register));
 
     // «Caducados» is the proof that the stage is derived rather than stored:
     // nothing was ever written to those records on the day they expired.
@@ -1969,12 +2067,13 @@ async function testPresupuestador(browser, base) {
 
     await pg.evaluate(() => go("quotes"));
     await pg.waitForTimeout(500);
-    const regrouped = await pg.evaluate(() =>
-      [...document.querySelectorAll("#view tr.grouphd")].map((t) => t.innerText.trim()),
-    );
-    if (regrouped.some((h) => /^rechazados/i.test(h)))
-      ok("COM-03: and the register regroups it under «Rechazados»");
-    else bad("COM-03: regrouped after refusal", JSON.stringify(regrouped));
+    const restage = await pg.evaluate((id) => {
+      const row = document.querySelector(`#view table.mlist tr.click[data-id="${id}"]`);
+      return row ? row.textContent : "";
+    }, draftId);
+    if (/rechazado/i.test(restage))
+      ok("COM-03: and the register's Estado column now shows «Rechazado»");
+    else bad("COM-03: re-staged after refusal", restage);
 
     // Leaving the builder must give the navigation back.
     const backOut = await pg.evaluate(() => ({
@@ -2007,96 +2106,122 @@ async function testProjectTracking(browser, base) {
     await bootedShell(pg);
     await pg.waitForTimeout(900);
 
-    // ---- the persistent selector and its fixed header ----
-    const fields = await pg.locator(".projbar .phead .f").count();
-    const headText = await pg.locator(".projbar .phead").innerText();
-    if (
-      fields >= 8 &&
-      /Cliente/i.test(headText) &&
-      /Avance/i.test(headText) &&
-      /Margen actual/i.test(headText)
-    )
-      ok(`project header: ${fields} fields incl. customer, progress and margin`);
-    else bad("project header", headText.replace(/\n/g, " ").slice(0, 100));
+    // ---- PK4-A/PK4-B: PRY-01 and PRY-02 are two screens each, no bar ----
+    // The bar chose a job above a list that already offers the same choice,
+    // and the panel/full-screen surface behind it already carries the figures
+    // the bar would repeat. Both project screens lost their bar for that
+    // reason; the other three keep it, because each is a single screen that
+    // has to be told which job it is about.
+    const listScreen = await pg.evaluate(() => ({
+      bar: document.querySelectorAll(".projbar").length,
+      centre: document.querySelectorAll("#view .ctr").length,
+      list: !!document.querySelector("#prgQ"),
+    }));
+    if (listScreen.bar === 0 && listScreen.centre === 0 && listScreen.list)
+      ok("PRY-01: the list stands alone — no PROYECTO bar, no centre panel");
+    else bad("PRY-01: list screen", JSON.stringify(listScreen));
 
-    // ---- PRY-01 (S8): the panel, the three-state control, item 14 ----
-    await openJobWithChapters(pg, "prgQ");
-    const tabs = await pg.locator("#view .ctrpanel [data-ptab]").allInnerTexts();
-    if (
-      tabs.length === 3 &&
-      /Avance/i.test(tabs[0]) &&
-      /Programaci/i.test(tabs[1]) &&
-      /Ficha/i.test(tabs[2])
-    )
-      ok("PRY-01: the panel carries Avance · Programación · Ficha");
-    else bad("PRY-01: panel tabs", tabs.join("/"));
+    await pg.evaluate(() => (location.hash = "economics"));
+    await pg.waitForTimeout(600);
+    const ecoListScreen = await pg.evaluate(() => ({
+      bar: document.querySelectorAll(".projbar").length,
+      ctrpanel: document.querySelectorAll(".ctrpanel").length,
+      list: !!document.querySelector("#ecoQ"),
+    }));
+    if (ecoListScreen.bar === 0 && ecoListScreen.ctrpanel === 0 && ecoListScreen.list)
+      ok("PRY-02: the list stands alone too — no PROYECTO bar, no centre panel");
+    else bad("PRY-02: list screen", JSON.stringify(ecoListScreen));
 
-    const control = await pg.evaluate(() => {
-      const strip = document.querySelector("#view .pstate");
-      if (!strip) return null;
-      const box = document.querySelector("#view .pctbox");
+    // The bar itself is checked on a screen that still has one — variations,
+    // purchasing and labour keep it, each being a single screen that needs to
+    // be told which job it is about.
+    await pg.evaluate(() => (location.hash = "variations"));
+    await pg.waitForTimeout(600);
+    // PK5-B: the bar is a CHOOSER and nothing else. It used to carry a second
+    // row of twelve summary figures — client, address, status, progress,
+    // contracted revenue, actual cost, current margin, next dates — above
+    // every screen that then shows its own. The economic ones belong to
+    // Avance económico. What must survive is the four controls that answer
+    // "which job", and what must not come back is money in the bar.
+    const chooser = await pg.evaluate(() => {
+      const bar = document.querySelector(".projbar");
       return {
-        buttons: strip.querySelectorAll("button").length,
-        buttonWidth: Math.round(strip.querySelector("button").getBoundingClientRect().width),
-        boxWidth: box ? Math.round(box.getBoundingClientRect().width) : 0,
-        boxDisabled: box ? box.disabled : null,
-        state: (strip.querySelector("button.on") || {}).dataset?.st,
+        bar: !!bar,
+        strip: document.querySelectorAll(".projbar .phead").length,
+        search: !!document.querySelector(".projbar #pqf"),
+        picker: !!document.querySelector(".projbar #psel"),
+        fav: !!document.querySelector(".projbar #pfav"),
+        status: !!document.querySelector(".projbar #pst"),
+        money: bar ? /€/.test(bar.innerText) : false,
+        rows: bar ? bar.children.length : 0,
       };
     });
     if (
-      control &&
-      control.buttons === 3 &&
-      control.buttonWidth === 90 &&
-      control.boxWidth === 60 &&
-      control.boxDisabled === (control.state !== "inProgress")
+      chooser.bar &&
+      chooser.strip === 0 &&
+      chooser.search &&
+      chooser.picker &&
+      chooser.fav &&
+      chooser.status &&
+      !chooser.money &&
+      chooser.rows === 1
     )
-      ok(
-        `PRY-01: three 90 px states and a 60 px box, live only on «en ejecución» (${control.state})`,
-      );
-    else bad("PRY-01: three-state control", JSON.stringify(control));
+      ok("project bar: chooser only — search, job, favourite, status; no summary strip (PK5-B)");
+    else bad("project bar chooser", JSON.stringify(chooser));
+    if ((await pg.locator("[data-recent]").count()) === 0)
+      ok("PRY-01/02: the «Recientes» chips are gone from the shared project bar");
+    else bad("Recientes dropped", "chips still rendered");
 
-    // Press «En ejecución»: the state moves AND the box comes alive, which is
-    // the half of §3.2 that a screenshot cannot show.
-    await pg.locator('#view .pstate button[data-st="inProgress"]').first().click();
-    await pg.waitForTimeout(500);
-    const live = await pg.evaluate(() => {
-      const strip = document.querySelector("#view .pstate");
-      const box = document.querySelector("#view .pctbox");
-      return { on: (strip.querySelector("button.on") || {}).dataset?.st, disabled: box.disabled };
-    });
-    if (live.on === "inProgress" && live.disabled === false)
-      ok("PRY-01: choosing «en ejecución» is what makes the percentage editable");
-    else bad("PRY-01: percentage becomes live", JSON.stringify(live));
+    // Opening a job IS opening its chart — the four things the operator asked
+    // to land on, in one screen, with a labelled way back.
+    await pg.evaluate(() => (location.hash = "progress"));
+    await pg.waitForTimeout(700);
+    await openJobWithChapters(pg, "prgQ");
+    await pg.waitForTimeout(600);
+    const landed = await pg.evaluate(() => ({
+      chart: !!document.querySelector("#gSvg"),
+      curve: document.querySelectorAll(".curve").length,
+      avance: !!document.querySelector("#progCtl"),
+      deviations: /Desviaciones/.test(document.querySelector(".bside")?.innerText || ""),
+      panel: document.querySelectorAll(".ctrpanel").length,
+      back: (document.querySelector("#gBack") || {}).textContent?.trim(),
+    }));
+    if (
+      landed.chart &&
+      landed.curve === 1 &&
+      landed.avance &&
+      landed.deviations &&
+      landed.panel === 0 &&
+      /Obras/.test(landed.back || "")
+    )
+      ok("PRY-01: a row opens the chart itself — Gantt, Curva S, Avance, Desviaciones, «← Obras»");
+    else bad("PRY-01: job opens the chart", JSON.stringify(landed));
 
-    await pg.locator('#view .pstate button[data-st="done"]').first().click();
-    await pg.waitForTimeout(500);
-    const finished = await pg.evaluate(() => {
-      const box = document.querySelector("#view .pctbox");
-      return { value: box.value, disabled: box.disabled };
-    });
-    if (finished.value === "100" && finished.disabled === true)
-      ok("PRY-01: a finished chapter reads 100 and stops accepting a percentage");
-    else bad("PRY-01: finished chapter", JSON.stringify(finished));
+    await pg.locator("#gBack").click();
+    await pg.waitForTimeout(600);
+    if ((await pg.locator("#prgQ").count()) === 1 && (await pg.locator("#gSvg").count()) === 0)
+      ok("PRY-01: «← Obras» returns to the list of jobs");
+    else bad("PRY-01: back to the list", "still on the chart");
 
     // Money-chain item 14. The doc asks whether moving a milestone moves the
-    // expected cash; before this session nothing wrote installment.expectedDate
-    // after the contract was drawn up, so the answer was no.
-    await pg.locator('#view [data-ptab="plan"]').click();
-    await pg.waitForTimeout(400);
-    if ((await pg.locator("#gDerive").count()) === 0) {
-      // The plan has to exist before it can move anything.
-      await pg.locator("#pnlGantt").click();
-      await pg.waitForTimeout(700);
-      if (await pg.locator("#gDerive").count()) {
-        await pg.locator("#gDerive").click();
-        await pg.waitForTimeout(900);
-      }
-      await pg.locator("#gBack").click();
+    // expected cash; before S8 nothing wrote installment.expectedDate after the
+    // contract was drawn up, so the answer was no. «Recalcular los cobros
+    // previstos» moved onto the Gantt in PK3-C — moving a milestone is a thing
+    // done TO the plan, and the plan is there.
+    await openJobWithChapters(pg, "prgQ");
+    await pg.waitForTimeout(800);
+    if (await pg.locator("#gDerive").count()) {
+      const had = await pg.evaluate(() => {
+        const B = ganttApi();
+        return B ? B.get(erp.state, gProject).tasks.length : 0;
+      });
+      await pg.locator("#gDerive").click();
       await pg.waitForTimeout(500);
-      await pg.locator('#view [data-ptab="plan"]').click();
-      await pg.waitForTimeout(400);
+      // With a plan already in place the re-derivation asks first (PK3-C).
+      if (had) await pg.getByRole("button", { name: /Volver a derivar/ }).click();
+      await pg.waitForTimeout(1000);
     }
-    await pg.locator("#pnlResched").click();
+    await pg.locator("#gResched").click();
     await pg.waitForTimeout(500);
     const reschedule = await pg.evaluate(() => {
       const rows = [...document.querySelectorAll("#drawer tbody tr")].map((r) => r.innerText);
@@ -2145,49 +2270,54 @@ async function testProjectTracking(browser, base) {
     if (await pg.locator("#drawer.on").count()) await pg.locator("#dClose").click();
 
     // The context must survive a change of subsection — that is what makes it
-    // a section context rather than one screen's dropdown.
-    const chosen = await pg.locator("#psel").inputValue();
-    await pg.evaluate(() => (location.hash = "economics"));
+    // a section context rather than one screen's dropdown. PK4-A/PK4-B:
+    // neither PRY-01 nor PRY-02 has a dropdown to read any more, so the job
+    // opened on PRY-01 is the reading, and PRY-03 — which still has a bar —
+    // is what has to agree with it.
+    const chosen = await pg.evaluate(() => gProject);
+    if (await pg.locator("#gBack").count()) {
+      await pg.locator("#gBack").click();
+      await pg.waitForTimeout(500);
+    }
+    await pg.evaluate(() => (location.hash = "variations"));
     await pg.waitForTimeout(600);
     const stillChosen = await pg.locator("#psel").inputValue();
-    if (stillChosen === chosen) ok("project context survives a subsection change");
+    if (stillChosen === chosen)
+      ok("project context survives a subsection change (opened on PRY-01, selected on PRY-03)");
     else bad("project context persists", `${chosen} → ${stillChosen}`);
 
-    // ---- PRY-02 (S8): the centre panel, and the money that stopped here ----
-    const compressed = await pg.evaluate(() => {
-      const el = document.querySelector("#view .ctr");
-      return { present: !!el, open: el ? el.classList.contains("on") : false };
-    });
-    if (compressed.present && !compressed.open)
-      ok("PRY-02: the list opens wide, with no panel beside it");
-    else bad("PRY-02: list before opening", JSON.stringify(compressed));
+    // ---- PRY-02 (S8 · PK4-B): the job's own full-screen surface ----
+    await pg.evaluate(() => (location.hash = "economics"));
+    await pg.waitForTimeout(600);
+    const beforeOpen = await pg.evaluate(() => ({
+      fs: document.body.classList.contains("fs"),
+      list: !!document.querySelector("#ecoQ"),
+    }));
+    if (!beforeOpen.fs && beforeOpen.list) ok("PRY-02: the register shows first, not the panel");
+    else bad("PRY-02: list before opening", JSON.stringify(beforeOpen));
 
-    const listColsWide = await pg.locator("#view table.mlist thead th").count();
     await openJobWithChapters(pg, "ecoQ");
-    const opened = await pg.evaluate(() => {
-      const el = document.querySelector("#view .ctr");
-      return {
-        open: el ? el.classList.contains("on") : false,
-        cols: getComputedStyle(el).gridTemplateColumns,
-        listStillThere: !!document.querySelector("#view .ctrlist table.mlist"),
-        headerHeight: Math.round(
-          document.querySelector("#view .ctrhd").getBoundingClientRect().height,
-        ),
-        cards: document.querySelectorAll("#view .ctrpanel .kpi").length,
-      };
-    });
-    const listColsNarrow = await pg.locator("#view table.mlist thead th").count();
+    const opened = await pg.evaluate(() => ({
+      fs: document.body.classList.contains("fs"),
+      back: (document.querySelector("#ecoBack") || {}).textContent?.trim(),
+      list: !!document.querySelector("#ecoQ"),
+      panel: document.querySelectorAll(".ctrpanel").length,
+      cards: document.querySelectorAll("#view .kpi").length,
+    }));
+    // PK4-B mirrors PK4-A: a row opens the job's own full screen directly —
+    // no 372/780 split, no panel, no list left compressed beside it — and a
+    // labelled button is the way back.
     if (
-      opened.open &&
-      opened.listStillThere &&
-      opened.headerHeight === 88 &&
-      opened.cards === 3 &&
-      listColsNarrow < listColsWide
+      opened.fs &&
+      /Obras/.test(opened.back || "") &&
+      !opened.list &&
+      !opened.panel &&
+      opened.cards === 3
     )
-      ok(`PRY-02: 372 list + 780 panel, list never disappears (${opened.cols})`);
-    else bad("PRY-02: centre panel", JSON.stringify({ ...opened, listColsWide, listColsNarrow }));
+      ok("PRY-02: a row opens the job's own full screen — KPI cards, no panel, no list beside it");
+    else bad("PRY-02: full-screen surface", JSON.stringify(opened));
 
-    const panelText = await pg.locator("#view .ctrpanel").innerText();
+    const panelText = await pg.locator("#ecoBody").innerText();
     const hasCols = ["Presupuestado", "Acumulado", "Desviación", "Margen"].every((c) =>
       new RegExp(c, "i").test(panelText),
     );
@@ -2215,7 +2345,7 @@ async function testProjectTracking(browser, base) {
     });
     await pg.evaluate(() => render());
     await pg.waitForTimeout(500);
-    const pendingText = await pg.locator("#view .ctrpanel").innerText();
+    const pendingText = await pg.locator("#ecoBody").innerText();
     if (seeded.chapters < seeded.project && /sin repartir/i.test(pendingText))
       ok("PRY-02: a cost with no chapter is in the project and in no chapter, and says so");
     else
@@ -2305,20 +2435,38 @@ async function testProjectTracking(browser, base) {
       ok("economics: an adjustment is recorded against the chapter");
     else bad("economics: adjustment recorded", adjusted.replace(/\n/g, " ").slice(0, 160));
 
-    // Closing the panel gives the list its width back — the doc's own rule.
-    await pg.locator("#view [data-ctrclose]").click();
-    await pg.waitForTimeout(400);
+    // ← Obras returns to the register, same as PRY-01's own back button.
+    await pg.locator("#ecoBack").click();
+    await pg.waitForTimeout(500);
     const closed = await pg.evaluate(() => ({
-      open: document.querySelector("#view .ctr").classList.contains("on"),
-      cols: document.querySelectorAll("#view table.mlist thead th").length,
+      fs: document.body.classList.contains("fs"),
+      list: !!document.querySelector("#ecoQ"),
     }));
-    if (!closed.open && closed.cols === listColsWide)
-      ok("PRY-02: closing the panel restores the list to its full width");
+    if (!closed.fs && closed.list) ok("PRY-02: «← Obras» returns to the register");
     else bad("PRY-02: list restored", JSON.stringify(closed));
 
     // ---- derive the plan from the budget ----
     await openGantt(pg, base);
+    // Package 3 slide 3: re-deriving is not additive — tasks and milestones
+    // added by hand, and dependencies drawn on the chart, do not survive it —
+    // so over an existing plan it asks first. Into an empty one it just runs.
+    const planBefore = await pg.evaluate(() => {
+      const B = ganttApi();
+      return B ? B.get(erp.state, gProject).tasks.length : 0;
+    });
     await pg.locator("#gDerive").click();
+    await pg.waitForTimeout(500);
+    const guardAsked = await pg.evaluate(() =>
+      /Volver a derivar la planificaci/i.test(document.body.innerText),
+    );
+    if (guardAsked === planBefore > 0)
+      ok(
+        planBefore
+          ? "tracking: re-deriving over an existing plan asks before discarding hand-made work"
+          : "tracking: deriving into an empty plan runs without a question nobody needs",
+      );
+    else bad("tracking: derive guard", `tasksBefore=${planBefore} asked=${guardAsked}`);
+    if (guardAsked) await pg.getByRole("button", { name: /Volver a derivar/ }).click();
     await pg.waitForTimeout(900);
     const bars = await pg.locator("#gSvg .gbar").count();
     const deriveToast = await pg.locator("#toast").innerText();
@@ -2337,8 +2485,10 @@ async function testProjectTracking(browser, base) {
     else bad("tracking: derived durations", `all bars ${widths[0]}px wide`);
 
     // Progress already recorded against the budget shows on the fresh bars.
+    // PK3-C: the chapter figure is now the box beside the three-state control
+    // (`data-pct`), not a bare numeric cell in a table.
     const chapterPcts = await pg
-      .locator("[data-chap]")
+      .locator("#progCtl [data-pct]")
       .evaluateAll((els) => els.map((e) => Number(e.value)));
     if (chapterPcts.some((p) => p > 0))
       ok(`tracking: recorded progress carried onto the derived bars (${chapterPcts.join("/")})`);
@@ -2351,18 +2501,108 @@ async function testProjectTracking(browser, base) {
       ok("tracking: S curve draws planned, actual and projected");
     else bad("tracking: S curve", `paths=${paths} tags=${curveTag.join(" | ").slice(0, 80)}`);
 
-    // ---- progress by executed quantity ----
-    const qty = pg.locator("[data-lineqty]").first();
-    const total = Number(await qty.getAttribute("data-total"));
-    const pctInput = pg.locator("[data-line]").first();
-    await qty.fill(String(total / 2));
-    await qty.press("Enter");
-    await pg.waitForTimeout(600);
-    const readBack = Number(await pctInput.inputValue());
-    // Half the quantity is half the line; the engine converts, not the view.
-    if (Math.abs(readBack - 50) <= 1)
-      ok(`tracking: progress entered as a quantity becomes ${readBack}%`);
-    else bad("tracking: quantity → percentage", `${total}/2 read back as ${readBack}%`);
+    // ---- the one progress control (Package 3 slide 3) ----------------------
+    // Two controls used to record the same fact: this grid, and PRY-01's
+    // «Avance» tab, which wrote only through markProgress and so never reached
+    // the chart. They are one control now — the structure from here, the
+    // three-state buttons and live-only-in-the-middle box from there, and no
+    // quantity column at all, which the operator asked for and which costs the
+    // record nothing since the engine never stored a quantity anyway.
+    const shape = await pg.evaluate(() => {
+      const host = document.querySelector("#progCtl");
+      if (!host) return null;
+      const strip = host.querySelector(".provrow.chap .pstate");
+      const box = host.querySelector(".provrow.chap .pctbox");
+      return {
+        chapters: host.querySelectorAll(".provrow.chap").length,
+        lines: host.querySelectorAll(".provrow.sub").length,
+        tables: host.querySelectorAll("table").length,
+        quantityInputs: document.querySelectorAll("[data-lineqty]").length,
+        buttons: strip ? strip.querySelectorAll("button").length : 0,
+        buttonWidth: strip
+          ? Math.round(strip.querySelector("button").getBoundingClientRect().width)
+          : 0,
+        boxWidth: box ? Math.round(box.getBoundingClientRect().width) : 0,
+        boxDisabled: box ? box.disabled : null,
+        state: strip ? (strip.querySelector("button.on") || {}).dataset?.st : null,
+        lineControls: host.querySelectorAll(".provrow.sub .pstate").length,
+      };
+    });
+    if (
+      shape &&
+      shape.chapters > 0 &&
+      shape.lines > 0 &&
+      shape.lineControls === shape.lines &&
+      shape.tables === 0 &&
+      shape.quantityInputs === 0 &&
+      shape.buttons === 3 &&
+      shape.buttonWidth === 90 &&
+      shape.boxWidth === 60 &&
+      shape.boxDisabled === (shape.state !== "inProgress")
+    )
+      ok(
+        `PRY-01: one control — ${shape.chapters} chapters and ${shape.lines} partidas as flex rows, three 90 px states and a 60 px box, no quantity column`,
+      );
+    else bad("PRY-01: merged progress control", JSON.stringify(shape));
+
+    // The half a screenshot cannot show: a state button writes the ENGINE and
+    // the PLAN's own bar in one action. That is the whole reason this is the
+    // control that survived — the tab it replaced moved one and not the other.
+    const chapNum = await pg.evaluate(
+      () => document.querySelector("#progCtl .provrow.chap .pstate").dataset.chap,
+    );
+    await pg
+      .locator(`#progCtl .pstate[data-chap="${chapNum}"] button[data-st="inProgress"]`)
+      .click();
+    await pg.waitForTimeout(700);
+    const synced = await pg.evaluate((num) => {
+      const B = ganttApi();
+      const task = B.get(erp.state, gProject).tasks.find((t) => t.sourceRef === "group:" + num);
+      const eng = erp.chapterProgress(gProject).find((c) => c.num === num);
+      const box = document.querySelector(`#progCtl [data-pct="${num}"]`);
+      return {
+        taskPct: task ? task.progressPct : null,
+        enginePct: eng ? eng.progressPct : null,
+        boxLive: box ? !box.disabled : null,
+      };
+    }, chapNum);
+    if (synced.taskPct != null && synced.taskPct === synced.enginePct && synced.boxLive)
+      ok(
+        `PRY-01: «en ejecución» moves the chapter and its bar together (${synced.enginePct}%) and makes the box live`,
+      );
+    else bad("PRY-01: chapter write reaches both records", JSON.stringify(synced));
+
+    // A partida takes a percentage — the only input it takes now — and the
+    // engine derives its state from that figure rather than being told one.
+    const lineId = await pg.evaluate(
+      () => document.querySelector("#progCtl .provrow.sub .pstate").dataset.line,
+    );
+    await pg.fill(`#progCtl [data-lpct="${lineId}"]`, "40");
+    await pg.locator(`#progCtl [data-lpct="${lineId}"]`).press("Enter");
+    await pg.waitForTimeout(700);
+    const lineWrote = await pg.evaluate((id) => {
+      let found = null;
+      erp.state.budgets.forEach((b) =>
+        b.versions.forEach((v) =>
+          v.chapters.forEach((c) => c.lines.forEach((l) => (l.id === id ? (found = l) : 0))),
+        ),
+      );
+      return found ? { pct: found.progressPct, state: found.progress } : null;
+    }, lineId);
+    if (lineWrote && lineWrote.pct === 40 && lineWrote.state === "inProgress")
+      ok("PRY-01: a partida percentage is stored and its state derived from it");
+    else bad("PRY-01: partida percentage", JSON.stringify(lineWrote));
+
+    // «Terminado» is 100 by definition, and the box stops taking a figure.
+    await pg.locator(`#progCtl .pstate[data-chap="${chapNum}"] button[data-st="done"]`).click();
+    await pg.waitForTimeout(700);
+    const finished = await pg.evaluate((num) => {
+      const box = document.querySelector(`#progCtl [data-pct="${num}"]`);
+      return box ? { value: box.value, disabled: box.disabled } : null;
+    }, chapNum);
+    if (finished && finished.value === "100" && finished.disabled === true)
+      ok("PRY-01: a finished chapter reads 100 and stops accepting a percentage");
+    else bad("PRY-01: finished chapter", JSON.stringify(finished));
 
     // ---- the deviations panel ----
     const dev = await pg.locator(".bside").innerText();
@@ -2370,26 +2610,67 @@ async function testProjectTracking(browser, base) {
       ok("tracking: deviations panel reports the slip against the baseline");
     else bad("tracking: deviations panel", dev.replace(/\n/g, " ").slice(0, 120));
 
-    // The economics must move with the progress just recorded — the two screens
-    // are two views of one set of figures, not two sets. Since S8 both run on
-    // the centre panel, so the check opens the job rather than reading a flat
-    // table: the figure it compares is the progress bar in PRY-02's header
-    // against the number PRY-01 wrote.
+    // ---- PK4-A: the job that cannot be planned at all ----------------------
+    // Opening a job now lands here directly, so an UNPLANNED one lands here
+    // too — and a job with no accepted presupuesto has no chapters to derive
+    // from and no partidas to record against. Offering «Derivar del
+    // presupuesto» there is offering a button that can only fail, so it is
+    // disabled and the screen says what is actually missing.
+    const unplanned = await pg.evaluate(() => {
+      const B = ganttApi();
+      const p = erp.state.projects.find((x) => {
+        if (B.get(erp.state, x.id).tasks.length) return false;
+        try {
+          return !(
+            x.budgetId &&
+            erp
+              .version(x.budgetId, x.acceptedVersionId)
+              .chapters.some((c) => c.section === "base" && c.lines.length)
+          );
+        } catch (e) {
+          return true;
+        }
+      });
+      if (!p) return null;
+      ganttFull = true;
+      setProject(p.id);
+      return p.code;
+    });
+    if (!unplanned) {
+      ok("tracking: every job in the seed has something to plan — nothing to check here");
+    } else {
+      await pg.waitForTimeout(900);
+      const empty = await pg.evaluate(() => ({
+        derive: document.querySelector("#gDerive")?.disabled,
+        toBudget: !!document.querySelector("#gGoBudget"),
+        says: /presupuesto aceptado/.test(document.querySelector("#view")?.innerText || ""),
+        crashed: !document.querySelector("#gBack"),
+      }));
+      if (empty.derive === true && empty.toBudget && empty.says && !empty.crashed)
+        ok(
+          `tracking: a job with no accepted presupuesto (${unplanned}) says why and points at COM-03 instead of offering a button that fails`,
+        );
+      else bad("tracking: unplanned job empty state", JSON.stringify(empty));
+      await pg.locator("#gBack").click();
+      await pg.waitForTimeout(500);
+    }
+
+    // PK4-B: economics' own shared header — the one that used to repeat
+    // PRY-01's progress bar inside PRY-02's panel — is gone, along with the
+    // duplication it existed to name. What survives to check is that the
+    // panel still opens cleanly on the SAME job right after progress was
+    // recorded elsewhere, with its chapter rows intact.
     await pg.evaluate(() => (location.hash = "economics"));
     await pg.waitForTimeout(600);
     await openJobWithChapters(pg, "ecoQ");
-    const after = await pg.evaluate(() => {
-      const bar = document.querySelector("#view .ctrhd .bar i");
-      const panel = document.querySelector("#view .ctrpanel");
-      return {
-        pct: erp.projectEconomics(gProject).progressPct,
-        barWidth: bar ? bar.style.width : null,
-        chapterRows: document.querySelectorAll("#view .ctrpanel tbody tr").length,
-        hasPct: panel ? /%/.test(panel.innerText) : false,
-      };
-    });
-    if (after.chapterRows > 0 && after.hasPct && after.barWidth === `${after.pct}%`)
-      ok(`economics: one progress figure drives both PRY screens (${after.barWidth})`);
+    const after = await pg.evaluate(() => ({
+      pct: erp.projectEconomics(gProject).progressPct,
+      chapterRows: document.querySelectorAll("#ecoBody tbody tr").length,
+    }));
+    if (after.chapterRows > 0)
+      ok(
+        `economics: the panel opens on the same job after progress was recorded (${after.pct}% avance)`,
+      );
     else bad("economics after progress", JSON.stringify(after));
 
     if (errs.length === 0) ok("tracking: no console errors");
@@ -2860,6 +3141,259 @@ async function testInvoicing(browser, base) {
   }
 }
 
+// ── ADM-01 · the invoice generator (PK6-A) ────────────────────────────────
+//    The engine could issue a legally-shaped factura since S10 and nothing
+//    called it: the register was `noNew`, and the Torre's «＋ Factura» merely
+//    navigated to it. These checks cover the four origins, the rules that
+//    refuse, and the property that makes those rules worth having — a refusal
+//    must not consume a number from a series required to have no gaps.
+async function testInvoiceGenerator(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#invoicing`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(800);
+
+    // The affordance itself. Its absence WAS the defect, so it is checked as
+    // a thing on screen rather than as a function that exists.
+    const entry = await pg.evaluate(() => ({
+      create: !!document.querySelector("#view #mlNew"),
+      label: (document.querySelector("#view #mlNew") || {}).textContent || "",
+    }));
+    if (entry.create && /Factura/i.test(entry.label))
+      ok(`ADM-01: the register can create — «${entry.label.trim()}»`);
+    else bad("ADM-01: create affordance", JSON.stringify(entry));
+
+    // ---- the rules, and the series they protect ----
+    const rules = await pg.evaluate(() => {
+      const out = {};
+      const p = erp.state.projects.find((x) => x.contractId) || erp.state.projects[0];
+      const series = () => JSON.stringify(erp.state.series.invoice.byYear);
+
+      // An unapproved adicional (CHG-04) and an abono naming no original
+      // (AR-10) both used to be checked AFTER the record literal had already
+      // called nextNumber — which increments the counter and pushes onto
+      // `issued`. The refusal is worth nothing if it costs a number.
+      const ch = erp.addChange(p.id, { desc: "e2e sin aprobar", priceCents: 50000 });
+      const s0 = series();
+      let chgThrew = false;
+      try {
+        erp.issueInvoice({ projectId: p.id, kind: "extra", baseCents: 50000, changeId: ch.id });
+      } catch (e) {
+        chgThrew = true;
+      }
+      out.chg04 = { threw: chgThrew, seriesUntouched: s0 === series() };
+
+      const s1 = series();
+      let creditThrew = false;
+      try {
+        erp.issueInvoice({ projectId: p.id, kind: "creditNote", baseCents: 1000 });
+      } catch (e) {
+        creditThrew = true;
+      }
+      out.ar10 = { threw: creditThrew, seriesUntouched: s1 === series() };
+
+      // The same two, as the SCREEN sees them: reported, not thrown, and from
+      // the one implementation the engine refuses with.
+      out.previewCredit = erp
+        .previewInvoice({
+          projectId: p.id,
+          kind: "creditNote",
+          lines: [{ desc: "x", amountCents: 1000 }],
+        })
+        .blocks.map((b) => b.code);
+      out.previewChange = erp
+        .previewInvoice({
+          projectId: p.id,
+          kind: "extra",
+          changeId: ch.id,
+          lines: [{ desc: "x", amountCents: 1000 }],
+        })
+        .blocks.map((b) => b.code);
+      out.gaps = erp.seriesGaps("invoice").length;
+      return out;
+    });
+    if (rules.chg04.threw && rules.chg04.seriesUntouched)
+      ok("AR: an unapproved adicional is refused, and the refusal costs no number (CHG-04)");
+    else bad("CHG-04 + numbering", JSON.stringify(rules.chg04));
+    if (rules.ar10.threw && rules.ar10.seriesUntouched)
+      ok("AR: an abono naming no original is refused, and costs no number (AR-10)");
+    else bad("AR-10 + numbering", JSON.stringify(rules.ar10));
+    if (
+      rules.previewCredit.join() === "AR-10" &&
+      rules.previewChange.join() === "CHG-04" &&
+      rules.gaps === 0
+    )
+      ok("AR: previewInvoice reports the same refusals the engine throws, series gapless");
+    else bad("preview vs engine", JSON.stringify(rules));
+
+    // ---- the screen: open it on a job and walk the origins ----
+    const pid = await pg.evaluate(
+      () => (erp.state.projects.find((x) => x.contractId) || erp.state.projects[0]).id,
+    );
+    await pg.evaluate((p) => invOpen(p), pid);
+    await pg.waitForTimeout(700);
+    const screen = await pg.evaluate(() => ({
+      fs: document.body.classList.contains("fs"),
+      sheet: !!document.querySelector("#invDoc.cdoc"),
+      // The number is minted at issue, never at draft — the sheet has to say
+      // so where the number goes, or a draft reads like an issued invoice.
+      unnumbered: /Sin numerar/i.test(document.querySelector("#invDoc").innerText),
+      origins: [...document.querySelectorAll("[data-invbasis]")].map((b) => b.dataset.invbasis),
+      back: !!document.querySelector("#invBack"),
+    }));
+    if (
+      screen.fs &&
+      screen.sheet &&
+      screen.unnumbered &&
+      screen.back &&
+      ["milestone", "certification", "change", "manual"].every((k) => screen.origins.includes(k))
+    )
+      ok(
+        `ADM-01: the generator is a full screen with ${screen.origins.length} origins, unnumbered`,
+      );
+    else bad("ADM-01: generator screen", JSON.stringify(screen));
+
+    /* Certification: the shape a certificación has on paper — executed by
+       chapter, LESS what was already certified. The subtraction is a visible
+       line, not a quietly reduced total.
+
+       Deliberately run on a job that HAS something to certify, found by asking
+       the engine rather than by hoping the first project qualifies. A job with
+       nothing outstanding satisfies every assertion about its lines by having
+       none — which is a check that cannot fail. */
+    const certPid = await pg.evaluate(() => {
+      const hit = erp.state.projects
+        .filter((p) => p.budgetId)
+        .find((p) => erp.invoiceBases(p.id).certification.proposedCents > 0);
+      return hit ? hit.id : null;
+    });
+    if (certPid) {
+      await pg.evaluate((p) => invOpen(p, { basis: "certification" }), certPid);
+      await pg.waitForTimeout(600);
+      const cert = await pg.evaluate(() => {
+        const descs = [...document.querySelectorAll("[data-invld]")].map((i) => i.value);
+        const amts = [...document.querySelectorAll("[data-invla]")].map((i) => +i.value);
+        const b = erp.invoiceBases(invWork.projectId);
+        return {
+          sum: Math.round(amts.reduce((a, x) => a + x, 0) * 100),
+          proposed: b.certification.proposedCents,
+          billed: b.billedBaseCents,
+          executed: b.certification.executedCents,
+          chapterLines: descs.filter((d) => /ejecutado \d+%/.test(d)).length,
+          deductions: amts.filter((a) => a < 0).length,
+          previewBase: erp.previewInvoice({
+            projectId: invWork.projectId,
+            kind: "progress",
+            lines: invWork.lines,
+          }).baseCents,
+        };
+      });
+      if (
+        cert.proposed > 0 &&
+        cert.sum === cert.proposed &&
+        cert.previewBase === cert.proposed &&
+        cert.chapterLines > 0 &&
+        cert.deductions === (cert.billed > 0 ? 1 : 0)
+      )
+        ok(
+          `ADM-01: certification = executed ${cert.executed}c less certified ${cert.billed}c = ${cert.proposed}c`,
+        );
+      else bad("ADM-01: certification", JSON.stringify(cert));
+    } else bad("ADM-01: certification", "no seeded job has anything left to certify");
+
+    // Milestone → issue. The whole point: a number is minted, the contract's
+    // payment plan learns which invoice covered the milestone, and the series
+    // stays gapless.
+    await pg.evaluate((p) => invOpen(p), pid);
+    await pg.waitForTimeout(600);
+    await pg.click('[data-invbasis="milestone"]');
+    await pg.waitForTimeout(400);
+    const hasMilestone = (await pg.locator("#inv_pick option").count()) > 1;
+    if (hasMilestone) {
+      await pg.selectOption("#inv_pick", { index: 1 });
+      await pg.waitForTimeout(400);
+      const armed = await pg.evaluate(() => ({
+        lines: document.querySelectorAll("[data-invld]").length,
+        // Engine vocabulary must never reach a customer's document: the
+        // trigger prints as «A la firma», not as `onSignature`.
+        raw: /onSignature|atStage|onCompletion|atWorksStart|fixedDate/.test(
+          document.querySelector("#invDoc").innerText,
+        ),
+        disabled: document.querySelector("#invIssue").disabled,
+      }));
+      if (armed.lines === 1 && !armed.raw && !armed.disabled)
+        ok("ADM-01: a contract milestone arms the draft, in words a customer can read");
+      else bad("ADM-01: milestone draft", JSON.stringify(armed));
+
+      const before = await pg.evaluate(() => erp.state.invoices.length);
+      await pg.click("#invIssue");
+      await pg.waitForTimeout(400);
+      await pg.getByRole("button", { name: "Emitir", exact: true }).click();
+      await pg.waitForTimeout(800);
+      const after = await pg.evaluate(() => {
+        const inv = erp.state.invoices[erp.state.invoices.length - 1];
+        const p = erp.project(inv.projectId);
+        const c = p.contractId && erp.state.contracts.find((x) => x.id === p.contractId);
+        const doc = c ? erp.renderContractDoc(c.id) : null;
+        return {
+          count: erp.state.invoices.length,
+          number: inv.number,
+          immutable: inv.immutable === true,
+          gaps: erp.seriesGaps("invoice").length,
+          linked:
+            inv.installmentIdx != null && doc
+              ? doc.installments[inv.installmentIdx].invoiceId === inv.id
+              : null,
+          closed: !document.body.classList.contains("fs"),
+        };
+      });
+      if (
+        after.count === before + 1 &&
+        /^FAC-\d{4}-\d{4}$/.test(after.number) &&
+        after.immutable &&
+        after.gaps === 0 &&
+        after.linked === true &&
+        after.closed
+      )
+        ok(`ADM-01: issued ${after.number} — numbered, immutable, milestone linked, no gaps`);
+      else bad("ADM-01: issue", JSON.stringify(after));
+
+      // The document exists as a document, and can be printed.
+      const doc = await pg.evaluate((n) => {
+        const d = erp.renderInvoiceDoc(n);
+        const sheet = document.createElement("div");
+        sheet.className = "printsheet";
+        sheet.innerHTML = `<div class="cdoc">${invoiceDocHtml(d)}</div>`;
+        document.body.appendChild(sheet);
+        const text = sheet.innerText;
+        sheet.remove();
+        return {
+          type: d.docType,
+          number: d.number,
+          lines: d.lines.length,
+          total: d.totalCents,
+          printable: /FACTURA/i.test(text) && text.includes(d.number),
+        };
+      }, after.number);
+      if (doc.type === "FACTURA" && doc.lines > 0 && doc.total > 0 && doc.printable)
+        ok(`ADM-01: renderInvoiceDoc prints ${doc.number} as a document`);
+      else bad("ADM-01: invoice document", JSON.stringify(doc));
+    } else {
+      bad("ADM-01: milestone origin", "the seed offers no pending contract milestone");
+    }
+
+    if (!errs.length) ok("ADM-01: the generator raises no console error");
+    else bad("ADM-01: console", errs.slice(0, 2).join(" | ").slice(0, 160));
+  } catch (e) {
+    bad("invoice generator", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
 // ── COM-04 Contrato (§3.2) — the last of the four full-screen surfaces, and
 //    the one column that earns the screen: «Importe vigente» goes amber the
 //    moment annexes exist, so nobody has to open a contract to find out.
@@ -2917,22 +3451,34 @@ async function testContract(browser, base) {
 
     const viewer = await pg.evaluate(() => {
       const grid = document.querySelector(".con2");
+      const cols = grid
+        ? getComputedStyle(grid).gridTemplateColumns.split(" ").map(parseFloat)
+        : [];
       return {
         full: document.body.classList.contains("fs"),
         zones: grid ? grid.children.length : 0,
-        cols: grid ? getComputedStyle(grid).gridTemplateColumns : "",
+        docCol: cols[0] || 0,
+        panelCol: cols[1] || 0,
         docTranslateOff: document.querySelector(".cdoc")?.getAttribute("translate") === "no",
         tabs: [...document.querySelectorAll("[data-contab]")].map((b) => b.textContent),
       };
     });
+    // Package 2 slides 5 and 7: a panel pinned at exactly 392px left a wide
+    // strip of nothing on any real screen and starved Hitos de pago into a
+    // scrollbar it never needed. The document stays capped near 760 — it is
+    // a fixed-width piece of paper — and the panel now absorbs whatever is
+    // left, so it must end up wider than its old fixed value, not equal to it.
     if (
       viewer.full &&
       viewer.zones === 2 &&
-      /392px$/.test(viewer.cols) &&
+      viewer.docCol <= 760 &&
+      viewer.panelCol > 392 &&
       viewer.docTranslateOff &&
       viewer.tabs.length === 3
     )
-      ok(`COM-04: full screen, document 760 + panel 392, three tabs (${viewer.cols})`);
+      ok(
+        `COM-04: full screen, document ≤760 + panel fills the rest (${viewer.docCol}+${viewer.panelCol}), three tabs`,
+      );
     else bad("COM-04: full-screen viewer", JSON.stringify(viewer));
 
     // The document is built from data — it names the customer and totals its
@@ -2943,6 +3489,16 @@ async function testContract(browser, base) {
       ok("COM-04: the document is rendered from data, customer and all");
     else bad("COM-04: document from data", docText.replace(/\n/g, " ").slice(0, 120));
 
+    // Package 2 slide 6, a real bug: guaranteeCategories is engine vocabulary
+    // (executionAndFinishes/installations/structural) and was printed
+    // straight onto the customer's own contract.
+    if (/executionAndFinishes|installations|structural/.test(docText))
+      bad(
+        "COM-04: guarantee categories are translated, not raw engine keys",
+        docText.slice(0, 200),
+      );
+    else ok("COM-04: guarantee categories are translated, not raw engine keys");
+
     // Hitos de pago: the sum against the contracted amount, and S8's source.
     await pg.locator('[data-contab="hitos"]').click();
     await pg.waitForTimeout(400);
@@ -2950,6 +3506,16 @@ async function testContract(browser, base) {
     if (/Suma de hitos/i.test(hitos) && /(cuadra|sobre el contratado)/i.test(hitos))
       ok("COM-04: the milestones foot against the contracted amount");
     else bad("COM-04: milestones foot", hitos.replace(/\n/g, " ").slice(0, 140));
+
+    // Package 2 slide 7: the panel pinned at 392px starved this table into a
+    // horizontal scrollbar it never needed on any real screen.
+    const hitosWidth = await pg.evaluate(() => {
+      const d = document.querySelector("#conBody .scroll");
+      return d ? { scrollW: d.scrollWidth, clientW: d.clientWidth } : null;
+    });
+    if (hitosWidth && hitosWidth.scrollW <= hitosWidth.clientW + 1)
+      ok("COM-04: Hitos de pago fits without a horizontal scrollbar");
+    else bad("COM-04: hitos table width", JSON.stringify(hitosWidth));
 
     await pg.locator('[data-contab="anexos"]').click();
     await pg.waitForTimeout(400);
@@ -2977,6 +3543,469 @@ async function testContract(browser, base) {
     else bad("COM-04: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("contract viewer", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/* Package 2 slide 8 (PK2-C): the anexo tab named an amendment's number, date
+   and amount but had no way to see what it actually WAS or reopen its
+   backup — "Aprobar" wrote a hardcoded fake filename
+   ("aceptacion-cliente.png") the instant it was clicked, the same
+   "a filename proves nothing" bug PK2-A already fixed on the presupuesto's
+   own acceptance. This exercises the fix one step upstream: a real file
+   collected at approval time, reachable afterwards from the Anexos tab. */
+async function testChangeApprovalEvidence(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#contracts`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+
+    const target = await pg.evaluate(() => {
+      // No seeded change sits in identified/priced/sent, so raise a fresh one.
+      const p = erp.state.projects.find((x) => x.contractId);
+      if (!p) return null;
+      const c = erp.addChange(p.id, { desc: "E2E: extra de prueba", reason: "" }, "operations");
+      erp.priceChange(c.id, 20000, 12000, 0, "test");
+      erp.sendChange(c.id, "test");
+      return { changeId: c.id, contractId: p.contractId };
+    });
+    if (!target) {
+      bad(
+        "anexo evidence: a project with a contract exists to raise a change on",
+        "none in the seed",
+      );
+      return;
+    }
+
+    await pg.evaluate((id) => approveChangeDrawer(id), target.changeId);
+    await pg.waitForTimeout(500);
+    const field = await pg.evaluate(() => !!document.querySelector("#apEvid .evz"));
+    if (field) ok("anexo evidence: approving opens a drawer with a real upload field");
+    else bad("anexo evidence: approval drawer has an upload field", field);
+
+    await pg.setInputFiles("#apEvid input[type=file]", {
+      name: "whatsapp-aprobacion.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from(minimalPdf(), "latin1"),
+    });
+    await pg.waitForTimeout(700);
+    await pg.click("#apOk");
+    await pg.waitForTimeout(700);
+    const saved = await pg.evaluate((id) => {
+      const c = erp.state.changes.find((x) => x.id === id);
+      return {
+        status: c.status,
+        key: (c.evidence && c.evidence.storageKey) || "",
+        type: (c.evidence && c.evidence.type) || "",
+        name: (c.evidence && c.evidence.name) || "",
+      };
+    }, target.changeId);
+    if (
+      saved.status === "approved" &&
+      saved.key &&
+      saved.type === "application/pdf" &&
+      saved.name === "whatsapp-aprobacion.pdf"
+    )
+      ok("anexo evidence: the real file is stored on the change, not a hardcoded placeholder");
+    else bad("anexo evidence: persisted approval evidence", JSON.stringify(saved));
+
+    // ---- reachable from the Anexos tab afterwards --------------------------
+    await pg.evaluate(() => go("contracts"));
+    await pg.waitForTimeout(300);
+    await pg.evaluate((cid) => {
+      conWork = { id: cid, tab: "anexos" };
+      render();
+    }, target.contractId);
+    await pg.waitForTimeout(500);
+    const tabText = await pg.locator("#conBody").innerText();
+    const evLink = await pg.evaluate(() => !!document.querySelector("#conBody [data-evidence]"));
+    if (/E2E: extra de prueba/.test(tabText))
+      ok("anexo evidence: the Anexos tab shows what the amendment actually was");
+    else bad("anexo evidence: anexo detail in the tab", tabText.slice(0, 200));
+    if (evLink) ok("anexo evidence: the approval's backup document is reachable from the tab");
+    else bad("anexo evidence: evidence link in the anexos tab", tabText.slice(0, 200));
+
+    if (evLink) {
+      await pg.click("#conBody [data-evidence]");
+      await pg.waitForTimeout(2500);
+      const viewer = await pg.evaluate(() => {
+        const v = document.querySelector(".pview");
+        if (!v) return { open: false };
+        return {
+          open: true,
+          canvas: !!v.querySelector("canvas"),
+          ext: !!v.querySelector("[data-pv=ext]"),
+        };
+      });
+      if (viewer.open && (viewer.canvas || viewer.ext))
+        ok("anexo evidence: the backup document actually opens");
+      else bad("anexo evidence: viewer opens the backup", JSON.stringify(viewer));
+    }
+
+    if (errs.length) bad("anexo evidence: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("anexo evidence: no console errors");
+  } catch (e) {
+    bad("anexo evidence: suite completed", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/* Package 2 slide 4 (PK2-D): "No hay opción de crear/subir nuevo contrato" —
+   and it was literal. NO contract could be created from this application at
+   all; every one in the system came from the seed, so both halves of CON-01
+   were missing: drawing one up from an accepted presupuesto, and recording
+   one that was signed on paper.
+
+   The load-bearing assertion here is the last one. A contract signed
+   elsewhere must show the FILE the customer signed, never this system's own
+   generated «CONTRATO DE OBRA» — printing that over the top of somebody
+   else's contract invents a document nobody agreed to. */
+async function testContractCreation(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#contracts`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+
+    if (await pg.evaluate(() => !!document.querySelector("#conNew")))
+      ok("COM-04: the contract list offers «＋ Nuevo contrato»");
+    else bad("COM-04: new-contract button exists", "no #conNew");
+
+    // ---- a contract signed outside this system ----------------------------
+    await pg.click("#conNew");
+    await pg.waitForTimeout(500);
+    await pg.evaluate(() => {
+      const r = [...document.querySelectorAll('input[name="cnmode"]')].find(
+        (x) => x.value === "external",
+      );
+      r.checked = true;
+      r.dispatchEvent(new Event("change"));
+    });
+    await pg.waitForTimeout(400);
+    const form = await pg.evaluate(() => ({
+      party: !!document.querySelector("#cn_party"),
+      base: !!document.querySelector("#cn_base"),
+      dropzone: !!document.querySelector("#cn_doc .evz"),
+      dateMax: document.querySelector("#cn_date")?.max || "",
+      today: erp.today,
+    }));
+    if (form.party && form.base && form.dropzone && form.dateMax === form.today)
+      ok("COM-04: the manual path asks for the data and the signed file, and cannot be postdated");
+    else bad("COM-04: manual contract form", JSON.stringify(form));
+
+    const picked = await pg.evaluate(() => {
+      const p = erp.state.parties.find(
+        (x) => x.active && x.roles.includes("customer") && erp.partyCompleteness(x.id).ok,
+      );
+      if (!p) return null;
+      const sel = document.querySelector("#cn_party");
+      sel.value = p.id;
+      sel.dispatchEvent(new Event("change"));
+      return p.id;
+    });
+    if (!picked) {
+      bad("COM-04: a complete customer exists to contract with", "none in the seed");
+      return;
+    }
+    await pg.fill("#cn_base", "12500");
+    await pg.fill("#cn_ref", "EXT-2026-77");
+    await pg.fill("#cn_days", "45");
+    const backdate = await pg.evaluate(() => {
+      const d = new Date(erp.today + "T00:00:00");
+      d.setDate(d.getDate() - 10);
+      const iso = d.toISOString().slice(0, 10);
+      document.querySelector("#cn_date").value = iso;
+      document.querySelector("#cn_signed").value = iso;
+      return iso;
+    });
+    await pg.setInputFiles("#cn_doc input[type=file]", {
+      name: "contrato-firmado.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from(minimalPdf(), "latin1"),
+    });
+    await pg.waitForTimeout(700);
+    // Two milestones, entered as rows — they feed ADM-08's cash forecast.
+    await pg.click("#cn_addh");
+    await pg.waitForTimeout(300);
+    await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("[data-hrow]")];
+      rows[0].querySelector("[data-hpct]").value = "40";
+      rows[0].querySelector("[data-hpct]").dispatchEvent(new Event("input"));
+      rows[1].querySelector("[data-htrig]").value = "onCompletion";
+      rows[1].querySelector("[data-hpct]").value = "60";
+      rows[1].querySelector("[data-hpct]").dispatchEvent(new Event("input"));
+    });
+    await pg.waitForTimeout(200);
+    await pg.click("#cn_save");
+    await pg.waitForTimeout(900);
+
+    const saved = await pg.evaluate(() => {
+      const c = erp.state.contracts[erp.state.contracts.length - 1];
+      return {
+        origin: c.origin,
+        value: c.valueCents,
+        total: c.totalCents,
+        date: c.date,
+        ref: c.externalRef,
+        docType: (c.document || {}).type || "",
+        signed: c.signature.customerSignedAt,
+        inst: c.installments.map((i) => i.amountCents),
+        days: c.duration.estimatedDays,
+      };
+    });
+    if (saved.origin === "external" && saved.value === 1250000 && saved.days === 45)
+      ok("COM-04: a contract signed elsewhere can be recorded with its own amount and term");
+    else bad("COM-04: external contract saved", JSON.stringify(saved));
+    if (saved.date === backdate && saved.signed === backdate && saved.ref === "EXT-2026-77")
+      ok(
+        "COM-04: it keeps the real contract date, signature date and the customer's own reference",
+      );
+    else bad("COM-04: external contract dates/ref", JSON.stringify({ saved, backdate }));
+    if (saved.docType === "application/pdf")
+      ok("COM-04: the signed file itself is stored on the contract");
+    else bad("COM-04: signed file stored", JSON.stringify(saved));
+    // 40/60 of 13.750 (12.500 + 10% IVA) — the milestones foot to the total.
+    if (saved.inst.length === 2 && saved.inst[0] + saved.inst[1] === saved.total)
+      ok("COM-04: the payment milestones foot to the contracted total");
+    else bad("COM-04: milestones foot", JSON.stringify(saved));
+
+    // THE point of `origin`: show what was signed, not what we would print.
+    await pg.waitForTimeout(500);
+    const pane = await pg.evaluate(() => {
+      const t = document.querySelector("#conDoc")?.innerText || "";
+      return {
+        generated: /CONTRATO DE OBRA/.test(t),
+        saysExternal: /firmado fuera de este sistema/i.test(t),
+        reachable:
+          !!document.querySelector("#conDoc canvas") ||
+          !!document.querySelector("#conDoc a[download]"),
+      };
+    });
+    if (!pane.generated && pane.saysExternal && pane.reachable)
+      ok("COM-04: an externally-signed contract shows the signed file, not a generated document");
+    else bad("COM-04: external contract document pane", JSON.stringify(pane));
+
+    // ---- the normal path: from an accepted presupuesto ---------------------
+    await pg.evaluate(() => {
+      conWork = null;
+      go("contracts");
+    });
+    await pg.waitForTimeout(600);
+    // Free one accepted budget from its seeded contract so the path is live.
+    const freed = await pg.evaluate(() => {
+      const c = erp.state.contracts.find((x) => x.budgetId);
+      if (!c) return null;
+      const bid = c.budgetId;
+      c.budgetId = null;
+      return bid;
+    });
+    if (!freed) {
+      bad("COM-04: an accepted budget exists to contract from", "none in the seed");
+      return;
+    }
+    await pg.click("#conNew");
+    await pg.waitForTimeout(500);
+    const budgetMode = await pg.evaluate(() => {
+      const r = [...document.querySelectorAll('input[name="cnmode"]')].find(
+        (x) => x.value === "budget",
+      );
+      return {
+        enabled: !r.disabled,
+        checked: r.checked,
+        sel: !!document.querySelector("#cn_budget"),
+      };
+    });
+    if (budgetMode.enabled && budgetMode.checked && budgetMode.sel)
+      ok("COM-04: an accepted presupuesto is offered as the default source");
+    else bad("COM-04: budget mode default", JSON.stringify(budgetMode));
+
+    await pg.fill("#cn_days", "60");
+    await pg.click("#cn_save");
+    await pg.waitForTimeout(900);
+    const fromBudget = await pg.evaluate(() => {
+      const c = erp.state.contracts[erp.state.contracts.length - 1];
+      return {
+        origin: c.origin,
+        budgetNumber: c.budgetNumber,
+        value: c.valueCents,
+        generated: /CONTRATO DE OBRA/.test(document.querySelector("#conDoc")?.innerText || ""),
+      };
+    });
+    if (fromBudget.origin === "generated" && fromBudget.budgetNumber && fromBudget.value > 0)
+      ok("COM-04: a contract can be drawn up from an accepted presupuesto, amounts and all");
+    else bad("COM-04: budget-derived contract", JSON.stringify(fromBudget));
+    if (fromBudget.generated)
+      ok("COM-04: a contract this system drew up still renders as its own document");
+    else bad("COM-04: generated contract renders its document", JSON.stringify(fromBudget));
+
+    // ---- an incomplete customer blocks, without burning a number ----------
+    await pg.evaluate(() => {
+      conWork = null;
+      go("contracts");
+    });
+    await pg.waitForTimeout(600);
+    await pg.click("#conNew");
+    await pg.waitForTimeout(500);
+    await pg.evaluate(() => {
+      const r = [...document.querySelectorAll('input[name="cnmode"]')].find(
+        (x) => x.value === "external",
+      );
+      r.checked = true;
+      r.dispatchEvent(new Event("change"));
+    });
+    await pg.waitForTimeout(400);
+    const incomplete = await pg.evaluate(() => {
+      const p = erp.state.parties.find(
+        (x) => x.active && x.roles.includes("customer") && !erp.partyCompleteness(x.id).ok,
+      );
+      if (!p) return null;
+      const sel = document.querySelector("#cn_party");
+      sel.value = p.id;
+      sel.dispatchEvent(new Event("change"));
+      return p.id;
+    });
+    if (incomplete) {
+      await pg.fill("#cn_base", "3300");
+      await pg.fill("#cn_days", "20");
+      const before = await pg.evaluate(() => ({
+        contracts: erp.state.contracts.length,
+        issued: erp.state.series.contract.issued.length,
+      }));
+      await pg.click("#cn_save");
+      await pg.waitForTimeout(700);
+      const after = await pg.evaluate(() => ({
+        contracts: erp.state.contracts.length,
+        issued: erp.state.series.contract.issued.length,
+        drawer: document.querySelector("#dttl")?.textContent || "",
+      }));
+      if (after.contracts === before.contracts && /Editar/i.test(after.drawer))
+        ok("COM-04: an incomplete customer blocks the contract and offers the missing fields");
+      else bad("COM-04: incomplete-party block", JSON.stringify({ before, after }));
+      // ORG-04: the series is gap-free, so a refused contract must not have
+      // consumed a number on its way to being refused.
+      if (after.issued === before.issued && after.issued === after.contracts)
+        ok("COM-04: a refused contract burns no number — the series stays gap-free");
+      else bad("COM-04: series gapless after refusal", JSON.stringify({ before, after }));
+    }
+
+    if (errs.length) bad("COM-04 creation: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("COM-04 creation: no console errors");
+  } catch (e) {
+    bad("COM-04 creation: suite completed", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── Package 3 slide 4 (PK3-B): a presupuesto could only be created from a
+//    visit's own "＋ Crear presupuesto" — no entry point existed on the
+//    register itself, and none at all for a lead with no visit yet. This
+//    drives both new sources: an open lead (no visit required) and a
+//    completed visit (which must come back linked, exactly as the visit's
+//    own shortcut already links one).
+async function testBudgetCreation(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+
+    if (await pg.evaluate(() => !!document.querySelector("#bqNew")))
+      ok("COM-03: the register offers «＋ Presupuesto»");
+    else bad("COM-03: new-budget button exists", "no #bqNew");
+
+    // ---- from an open lead, no visit required ------------------------------
+    await pg.click("#bqNew");
+    await pg.waitForTimeout(500);
+    const sources = await pg.evaluate(() => ({
+      visit: !!document.querySelector('input[name="bnmode"][value="visit"]'),
+      lead: !!document.querySelector('input[name="bnmode"][value="lead"]'),
+    }));
+    if (sources.visit && sources.lead)
+      ok("COM-03: the drawer offers both a completed visit and an open lead as sources");
+    else bad("COM-03: new-budget sources", JSON.stringify(sources));
+
+    const leadPicked = await pg.evaluate(() => {
+      const r = [...document.querySelectorAll('input[name="bnmode"]')].find(
+        (x) => x.value === "lead",
+      );
+      if (!r || r.disabled) return null;
+      r.checked = true;
+      r.dispatchEvent(new Event("change"));
+      const sel = document.querySelector("#bn_lead");
+      return sel ? sel.value : null;
+    });
+    if (!leadPicked) {
+      bad("COM-03: an open lead exists to price from", "none in the seed");
+    } else {
+      const before = await pg.evaluate(() => erp.state.budgets.length);
+      await pg.click("#bn_save");
+      await pg.waitForTimeout(700);
+      const after = await pg.evaluate(
+        (leadId) => ({
+          count: erp.state.budgets.length,
+          onBuilder: !!document.querySelector("#bTree"),
+          leadStatus: erp.state.opportunities.find((o) => o.id === leadId)?.status,
+        }),
+        leadPicked,
+      );
+      if (after.count === before + 1 && after.onBuilder)
+        ok("COM-03: a presupuesto is created from an open lead with no visit in between");
+      else bad("COM-03: budget from lead", JSON.stringify({ before, after }));
+    }
+
+    // ---- from a completed visit, which must come back linked ---------------
+    await pg.evaluate(() => go("quotes"));
+    await pg.waitForTimeout(500);
+    if (await pg.locator("#bBack").count()) {
+      await pg.click("#bBack");
+      await pg.waitForTimeout(400);
+    }
+    await pg.click("#bqNew");
+    await pg.waitForTimeout(500);
+    const visitPicked = await pg.evaluate(() => {
+      const r = [...document.querySelectorAll('input[name="bnmode"]')].find(
+        (x) => x.value === "visit",
+      );
+      if (!r || r.disabled) return null;
+      r.checked = true;
+      r.dispatchEvent(new Event("change"));
+      const sel = document.querySelector("#bn_visit");
+      return sel ? sel.value : null;
+    });
+    if (!visitPicked) {
+      bad("COM-03: a completed visit without a presupuesto exists", "none in the seed");
+    } else {
+      const before = await pg.evaluate(() => erp.state.budgets.length);
+      await pg.click("#bn_save");
+      await pg.waitForTimeout(700);
+      const after = await pg.evaluate((visitId) => {
+        const v = erp.state.visits.find((x) => x.id === visitId);
+        return {
+          count: erp.state.budgets.length,
+          onBuilder: !!document.querySelector("#bTree"),
+          linkedBudgetId: v ? v.budgetId : null,
+          validated: !!(v && v.validated),
+        };
+      }, visitPicked);
+      if (after.count === before + 1 && after.onBuilder && after.linkedBudgetId)
+        ok("COM-03: a presupuesto is created from a completed visit, and the visit is linked back");
+      else bad("COM-03: budget from visit", JSON.stringify({ before, after }));
+    }
+
+    if (errs.length) bad("COM-03 creation: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("COM-03 creation: no console errors");
+  } catch (e) {
+    bad("COM-03 creation: suite completed", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }
@@ -3210,7 +4239,13 @@ async function testProcurement(browser, base) {
       bad("modificaciones: priced extra offers Enviar", "no [data-send]");
     await sendBtn.click();
     await pg.waitForTimeout(400);
+    // Package 2 slide 8 (PK2-C): "Aprobar" opens a drawer for the real backup
+    // document now, rather than firing the approval on the one click —
+    // evidence is optional here, so confirming without attaching anything
+    // still approves.
     await pg.locator("[data-approve]").first().click();
+    await pg.waitForTimeout(400);
+    await pg.click("#apOk");
     await pg.waitForTimeout(500);
     const kpisAfter = await pg.locator("#view .counter .val").allInnerTexts();
     if (JSON.stringify(kpisAfter) !== JSON.stringify(kpisBefore))
@@ -3343,10 +4378,9 @@ async function testAdmin(browser, base) {
   const errs = [];
   attachConsole(pg, errs);
   // Both screens ask for free text before doing anything irreversible; answer
-  // whatever they ask so the run never blocks on a modal.
-  pg.on("dialog", async (d) => {
-    const m = d.message();
-    await d.accept(/envía/.test(m) ? "Gestoría Subirats" : "Justificado por el E2E");
+  // whatever they ask so the run never blocks on a question.
+  await autoAnswerModals(pg, {
+    "Enviar el paquete": "Gestoría Subirats",
   });
   try {
     // ---- §5.3 Conciliación: suggestion + reasons → accept → transfers → close refuses
@@ -3549,17 +4583,10 @@ async function testControlTowerAndDay(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
   const errs = [];
   attachConsole(pg, errs);
-  pg.on("dialog", async (d) => {
-    const m = d.message();
-    if (/A quién/.test(m)) await d.accept("backoffice");
-    else if (/Fecha límite/.test(m)) await d.accept("2026-05-20");
-    else if (/Posponer hasta/.test(m)) await d.accept("2026-05-15");
-    else if (/^Motivo de la pérdida/.test(m)) await d.accept("price");
-    else if (/^Motivo/.test(m)) await d.accept("");
-    else if (/Nota de resoluci/.test(m)) await d.accept("Resuelto en el E2E");
-    else if (/^Evidencia/.test(m)) await d.accept("");
-    else if (/^Vence/.test(m)) await d.accept("2026-05-10");
-    else await d.accept("");
+  await autoAnswerModals(pg, {
+    "Asignar la alerta": "backoffice",
+    "Resolver la alerta": "Resuelto en el E2E",
+    perdido: "price", // the loss reason is a list now; pick that code
   });
   try {
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
@@ -3825,10 +4852,13 @@ async function testControlTowerAndDay(browser, base) {
 
     await pg.locator("#opp_sched").click();
     await pg.waitForTimeout(300);
-    // Today's date, so the scheduled visit is not drawn "overdue" and can be
-    // completed straight away in this same run.
-    const today = await pg.evaluate(() => erp.today);
-    await pg.locator("#sv_date").fill(today);
+    // The earliest day the screen will accept — a visit can no longer be
+    // scheduled into the past (Package 1, slide 4), and the dataset's `today`
+    // is behind the wall clock, so filling `erp.today` here is now refused.
+    // Taking the field's own floor keeps the visit un-overdue and completable
+    // in this same run without restating the rule the screen owns.
+    const floor = await pg.locator("#sv_date").getAttribute("min");
+    await pg.locator("#sv_date").fill(floor);
     await pg.locator("#sv_save").click();
     await pg.waitForTimeout(400);
 
@@ -4135,6 +5165,903 @@ async function testControlTowerAndDay(browser, base) {
 //    #3). "Crear nuevo proyecto" stays the untouched default — testJourney
 //    already covers it end to end — this exercises the ADDITION: picking a
 //    real, already-existing project and seeing real data, not the sample.
+/* COM-03 after Package 1 slides 8 and 9 — the heart of the system, reworked:
+     · columns in the order the work is done, cost and margin before the price
+     · margin is an INPUT in %, and the sale price follows from cost + margin
+     · a 🔍 on every line searches the catalogue and fills the row from it
+     · chapters come from the catalogue instead of being typed fresh
+     · the bottom bar keeps two fields; finishing moved behind "Siguiente paso"
+     · Superficie is gone, input and figure both */
+async function testPresupuestadorRework(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  // Deliberately NO autoAnswerModals here: this suite inspects the chapter
+  // picker's own contents, and the auto-answerer would press its primary
+  // button within 80 ms and leave nothing to look at. Nothing else in this
+  // suite opens a question, and the one modal it does open is dismissed with
+  // Escape below.
+  try {
+    await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+    await pg.evaluate(() => {
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      go("quotes", b.id);
+    });
+    await pg.waitForTimeout(800);
+
+    // ---- the column order the operator asked for --------------------------
+    const heads = await pg.evaluate(() =>
+      [...document.querySelectorAll(".bgrid thead th")]
+        .map((t) => t.textContent.trim())
+        .filter(Boolean),
+    );
+    const want = [
+      "Descripción",
+      "Unidad",
+      "Coste unitario",
+      "Margen unit. %",
+      "Cantidad",
+      "P. unitario venta",
+      "Precio total",
+    ];
+    const idx = want.map((w) => heads.indexOf(w));
+    if (idx.every((n, i) => n >= 0 && (i === 0 || n > idx[i - 1])))
+      ok(
+        "presupuestador: columns run descripción → unidad → coste → margen % → cantidad → venta → total",
+      );
+    else bad("presupuestador: column order", JSON.stringify(heads));
+
+    // "Ojo con las unidades": the unit is picked from DMC-03, not typed.
+    const unitTag = await pg.evaluate(() => document.querySelector('[data-f="unit"]')?.tagName);
+    if (unitTag === "SELECT")
+      ok("presupuestador: the unit is chosen from the units list, not typed");
+    else bad("presupuestador: unit is a select", unitTag);
+
+    // ---- margin drives the price, and the price back-solves the margin ----
+    const setField = async (f, value) =>
+      pg.evaluate(
+        ({ f, value }) => {
+          const el = document.querySelector(`tr.pbrow [data-f="${f}"]`);
+          el.value = value;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        },
+        { f, value },
+      );
+    const readRow = async () =>
+      pg.evaluate(() => {
+        const g = (f) => +document.querySelector(`tr.pbrow [data-f="${f}"]`).value;
+        return { cost: g("cost"), margin: g("marginPct"), price: g("price") };
+      });
+    await setField("cost", "50");
+    await setField("marginPct", "50");
+    await pg.waitForTimeout(300);
+    let r = await readRow();
+    // 50 % margin over the SALE price means the price is twice the cost.
+    if (Math.abs(r.price - 100) < 0.02)
+      ok("presupuestador: a 50% margin on a 50 € cost gives a 100 € price (margin over sale)");
+    else bad("presupuestador: margin drives price", JSON.stringify(r));
+
+    await setField("price", "80");
+    await pg.waitForTimeout(300);
+    r = await readRow();
+    if (Math.abs(r.margin - 37.5) < 0.11)
+      ok("presupuestador: typing a price back-solves the margin (80 € on 50 € = 37,5%)");
+    else bad("presupuestador: price back-solves margin", JSON.stringify(r));
+
+    const held = r.margin;
+    await setField("cost", "60");
+    await pg.waitForTimeout(300);
+    r = await readRow();
+    if (Math.abs(r.margin - held) < 0.11 && r.price > 80)
+      ok("presupuestador: changing the cost holds the margin and moves the price");
+    else bad("presupuestador: cost holds margin", JSON.stringify(r) + " held=" + held);
+
+    // ---- the catalogue picker fills the whole line -----------------------
+    await pg.click("[data-find]");
+    await pg.waitForTimeout(500);
+    const items = await pg.locator(".cpi").count();
+    if (items > 0) ok(`presupuestador: 🔍 opens the catalogue with its list (${items} partidas)`);
+    else bad("presupuestador: catalogue picker opens populated", `items=${items}`);
+    await pg.fill("#cp_q", "alicatado");
+    await pg.waitForTimeout(300);
+    await pg.evaluate(() => document.querySelector(".cpi")?.click());
+    await pg.waitForTimeout(600);
+    const picked = await pg.evaluate(() => {
+      const g = (f) => document.querySelector(`tr.pbrow [data-f="${f}"]`).value;
+      return { code: g("code"), desc: g("desc"), unit: g("unit"), cost: +g("cost") };
+    });
+    if (picked.code && picked.desc && picked.unit && picked.cost > 0)
+      ok(
+        `presupuestador: picking a partida fills código, descripción, unidad and coste (${picked.code})`,
+      );
+    else bad("presupuestador: catalogue pick fills the row", JSON.stringify(picked));
+
+    // ---- chapters come from the catalogue --------------------------------
+    await pg.click("#bAddChap");
+    await pg.waitForTimeout(500);
+    const chap = await pg.evaluate(() => ({
+      groups: [...document.querySelectorAll(".modal .mopts .og")].map((g) => g.textContent),
+      hasFree: [...document.querySelectorAll(".modal .mopts label")].some((l) =>
+        /Otro nombre/.test(l.textContent),
+      ),
+    }));
+    if (chap.groups.includes("Del catálogo") && chap.hasFree)
+      ok("presupuestador: chapters are offered from the catalogue, with a way out for a one-off");
+    else bad("presupuestador: chapter picker", JSON.stringify(chap));
+    await pg.keyboard.press("Escape");
+    await pg.waitForTimeout(300);
+
+    // ---- Superficie gone; finishing behind one button --------------------
+    const bar = await pg.evaluate(() => ({
+      m2: !!document.querySelector("#bcM2"),
+      porM2: (document.querySelector("#bSide")?.textContent || "").includes("Por m²"),
+      next: !!document.querySelector("#bcNext"),
+      validate: !!document.querySelector("#bValidate"),
+    }));
+    if (!bar.m2 && !bar.porM2) ok("presupuestador: Superficie is gone from the bar and the totals");
+    else bad("presupuestador: superficie removed", JSON.stringify(bar));
+    if (bar.next && !bar.validate)
+      ok("presupuestador: the bar ends in one «Siguiente paso» instead of three endings");
+    else bad("presupuestador: siguiente paso replaces the scattered buttons", JSON.stringify(bar));
+
+    await pg.click("#bcNext");
+    await pg.waitForTimeout(600);
+    const ns = await pg.evaluate(() => ({
+      title: document.querySelector("#dttl")?.textContent || "",
+      cards: [...document.querySelectorAll("#dbody .ch h3")].map((h) => h.textContent),
+      send: !!document.querySelector("#ns_send"),
+    }));
+    const wantCards = [
+      "Resumen",
+      "Condiciones de pago",
+      "Exclusiones",
+      "Supuestos",
+      "Comprobación",
+    ];
+    if (/Siguiente paso/.test(ns.title) && wantCards.every((c) => ns.cards.includes(c)) && ns.send)
+      ok("presupuestador: «Siguiente paso» carries terms, exclusions, the check and the send");
+    else bad("presupuestador: siguiente paso contents", JSON.stringify(ns));
+    await pg.evaluate(() => closeDrawer());
+
+    if (errs.length) bad("presupuestador: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("presupuestador: no console errors");
+  } catch (e) {
+    bad("presupuestador (rework): suite completed", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/* Package 2 slide 3 (PK2-A): the backing document behind a decision is a FILE
+   now, not a typed filename. "correo-aceptacion.pdf" in a text box proved
+   nothing and could not be reopened.
+
+   This exercises the shared primitive three later screens depend on: the
+   drop-or-browse field, the record it produces, the acceptance date and
+   person that travel with it, and the viewer that reads a PDF as well as a
+   photograph. */
+/** A structurally valid one-page PDF, xref table included, built here rather
+    than committed as a fixture so the bytes are readable next to the test. */
+function minimalPdf() {
+  const objs = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+    null,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  const stream = "BT /F1 18 Tf 20 100 Td (Aceptado) Tj ET";
+  objs[3] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+  let out = "%PDF-1.4\n";
+  const off = [];
+  objs.forEach((body, i) => {
+    off.push(out.length);
+    out += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+  off.forEach((o) => (out += String(o).padStart(10, "0") + " 00000 n \n"));
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return out;
+}
+
+async function testEvidence(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+
+    // An issued version nobody has answered yet is the one state in which the
+    // customer's answer can still be recorded.
+    const opened = await pg.evaluate(() => {
+      const b = erp.state.budgets.find(
+        (x) =>
+          !x.acceptedVersionId && (x.versions || []).some((v) => v.issued && !v.customerResponse),
+      );
+      if (!b) return null;
+      go("quotes", b.id);
+      // Whether this customer had an open opportunity decides what the
+      // acceptance is allowed to move; without one there is nothing to date.
+      return {
+        id: b.id,
+        hadOpp: !!erp.state.opportunities.find(
+          (x) => x.partyId === b.partyId && !["won", "lost"].includes(x.status),
+        ),
+      };
+    });
+    if (!opened) {
+      bad("evidence: an issued unanswered version exists to answer", "none in the seed");
+      return;
+    }
+    await pg.waitForTimeout(800);
+    await pg.click("#bAnswer");
+    await pg.waitForTimeout(500);
+
+    // ---- the justificante is a dropzone, not a text box --------------------
+    const field = await pg.evaluate(() => ({
+      zone: !!document.querySelector("#brEvid .evz"),
+      file: !!document.querySelector("#brEvid input[type=file]"),
+      accept: document.querySelector("#brEvid input[type=file]")?.accept || "",
+      oldTextBox: document.querySelector("#brEvid")?.tagName === "INPUT",
+      date: document.querySelector("#brDate")?.value || "",
+      maxDate: document.querySelector("#brDate")?.max || "",
+      who: !!document.querySelector("#brWho"),
+    }));
+    if (field.zone && field.file && !field.oldTextBox)
+      ok("evidence: the justificante is a drop-or-browse field, not a text box");
+    else bad("evidence: justificante is a real upload", JSON.stringify(field));
+    if (/pdf/.test(field.accept) && /image/.test(field.accept))
+      ok("evidence: it accepts a PDF as well as an image");
+    else bad("evidence: accepts pdf and image", field.accept);
+    // Slide 3 asks for the acceptance date and the person, and the date has to
+    // allow a past day — the answer arrives before anyone records it.
+    if (field.date && field.maxDate === field.date && field.who)
+      ok("evidence: acceptance carries a date (today, backdatable) and who accepted it");
+    else bad("evidence: date + person fields", JSON.stringify(field));
+
+    // ---- attaching a real PDF ---------------------------------------------
+    // A genuine, structurally valid PDF — xref table and all. A fake byte
+    // string would prove the upload and hide a broken viewer behind it.
+    await pg.setInputFiles("#brEvid input[type=file]", {
+      name: "correo-aceptacion.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from(minimalPdf(), "latin1"),
+    });
+    await pg.waitForTimeout(700);
+    const attached = await pg.evaluate(() => ({
+      chip: !!document.querySelector("#brEvid .evfile"),
+      name: document.querySelector("#brEvid .evnm")?.textContent || "",
+      see: !!document.querySelector("#brEvid [data-ev=see]"),
+      drop: !!document.querySelector("#brEvid [data-ev=drop]"),
+    }));
+    if (attached.chip && attached.name === "correo-aceptacion.pdf" && attached.see && attached.drop)
+      ok("evidence: the attached file shows as a named chip with «Ver» and «Quitar»");
+    else bad("evidence: attached chip", JSON.stringify(attached));
+
+    // ---- what is actually persisted ---------------------------------------
+    await pg.fill("#brWho", "Marta Roca · propietaria");
+    const backdate = await pg.evaluate(() => {
+      const d = new Date(erp.today + "T00:00:00");
+      d.setDate(d.getDate() - 3);
+      const iso = d.toISOString().slice(0, 10);
+      document.querySelector("#brDate").value = iso;
+      return iso;
+    });
+    await pg.click("#brOk");
+    await pg.waitForTimeout(800);
+    const saved = await pg.evaluate((bid) => {
+      const b = erp.budget(bid);
+      const v = erp.version(bid, b.acceptedVersionId);
+      const r = (v && v.customerResponse) || {};
+      const o = erp.state.opportunities.find((x) => x.partyId === b.partyId && x.status === "won");
+      return {
+        accepted: !!r.accepted,
+        date: r.date || "",
+        by: r.acceptedBy || "",
+        key: (r.evidence && r.evidence.storageKey) || "",
+        type: (r.evidence && r.evidence.type) || "",
+        fname: (r.evidence && r.evidence.name) || "",
+        size: (r.evidence && r.evidence.size) || 0,
+        decidedAt: (o && o.decidedAt) || "",
+      };
+    }, opened.id);
+    if (saved.accepted && saved.key && saved.type === "application/pdf" && saved.size > 0)
+      ok("evidence: the record stores the file itself — key, type and size");
+    else bad("evidence: persisted evidence record", JSON.stringify(saved));
+    if (saved.date === backdate && saved.by === "Marta Roca · propietaria")
+      ok("evidence: the backdated answer and the person who gave it are kept");
+    else bad("evidence: backdated date + person persisted", JSON.stringify(saved));
+    // A backdated acceptance must land in the quarter it happened — but only
+    // where there was an open opportunity for it to decide.
+    if (opened.hadOpp) {
+      if (saved.decidedAt === backdate)
+        ok("evidence: the opportunity is decided on the answer's day, not on today");
+      else bad("evidence: decidedAt follows the answer", JSON.stringify(saved));
+    }
+    // The blob is really in the store, not merely referenced.
+    const stored = await pg.evaluate(
+      async (k) => (await ErpStore.getBlob(k)) instanceof Blob,
+      saved.key,
+    );
+    if (stored) ok("evidence: the file is in the blob store, not only pointed at");
+    else bad("evidence: blob present in store", saved.key);
+
+    // ---- it can be reopened afterwards ------------------------------------
+    const panel = await pg.evaluate(() => {
+      const side = document.querySelector("#bSide")?.textContent || "";
+      return {
+        shows: side.includes("Aceptación"),
+        link: !!document.querySelector("#bSide [data-evidence]"),
+      };
+    });
+    if (panel.shows && panel.link)
+      ok("evidence: the acceptance and its document are reachable from the builder afterwards");
+    else bad("evidence: acceptance panel", JSON.stringify(panel));
+
+    // ---- the viewer reads a PDF, not only photographs ----------------------
+    await pg.click("#bSide [data-evidence]");
+    await pg.waitForTimeout(2500);
+    const viewer = await pg.evaluate(() => {
+      const v = document.querySelector(".pview");
+      if (!v) return { open: false };
+      const ext = v.querySelector("[data-pv=ext]");
+      return {
+        open: true,
+        canvas: !!v.querySelector("canvas"),
+        // The escape hatch, for a browser too old for the bundled pdf.js.
+        ext: !!ext && /^blob:/.test(ext.href || ""),
+        dl: v.querySelector("[data-pv=dl]")?.getAttribute("download") || "",
+      };
+    });
+    if (viewer.open && viewer.canvas) ok("evidence: the viewer renders the PDF itself, in the app");
+    // Not a soft assertion. pdf.js 6.2 needs a very recent engine, and the
+    // requirement is that the document is ALWAYS reachable — drawn here when
+    // the browser can, handed to the browser's own reader when it cannot.
+    // A dead end is the only failing outcome.
+    else if (viewer.open && viewer.ext)
+      ok("evidence: where the PDF cannot be drawn, the viewer still opens the real file");
+    else bad("evidence: the pdf is reachable from the viewer", JSON.stringify(viewer));
+    if (viewer.dl === "correo-aceptacion.pdf")
+      ok("evidence: it downloads under the name it was uploaded with");
+    else bad("evidence: download name", JSON.stringify(viewer));
+    // Escape closes the document and leaves the builder standing.
+    await pg.keyboard.press("Escape");
+    await pg.waitForTimeout(300);
+    const after = await pg.evaluate(() => ({
+      viewer: !!document.querySelector(".pview"),
+      builder: !!document.querySelector(".pb"),
+    }));
+    if (!after.viewer && after.builder)
+      ok("evidence: Escape closes the document without closing what opened it");
+    else bad("evidence: escape scoping", JSON.stringify(after));
+
+    if (errs.length) bad("evidence: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("evidence: no console errors");
+  } catch (e) {
+    bad("evidence: suite completed", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/* Package 2 slide 2 (PK2-B): "No hay forma de ir a cada una de las
+   versiones" — the builder header named the version it was showing but gave
+   no way to REACH any other one. Package 2 slide 1: the send drawer's
+   channels didn't do anything channel-specific — WhatsApp needed a real
+   deep-link, email needed to go through the operator's own template, "en
+   mano" needed a backdatable date/time, and there was no way to get a PDF
+   at all. */
+async function testSendAndVersions(browser, base) {
+  const errs = [];
+  let ctx, pg;
+  async function freshPage() {
+    ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+    pg = await ctx.newPage();
+    await pg.addInitScript(() => {
+      window.__opened = [];
+      const orig = window.open;
+      window.open = (url) => {
+        window.__opened.push(url);
+        return null;
+      };
+    });
+    attachConsole(pg, errs);
+    await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+  }
+  try {
+    // ---- version navigator: the header picker and the drawer's own list ---
+    await freshPage();
+    const target = await pg.evaluate(() => {
+      const b = erp.state.budgets.find((x) => x.versions.length > 1);
+      if (!b) return null;
+      go("quotes", b.id);
+      return { id: b.id, versions: b.versions.length };
+    });
+    if (!target) {
+      bad("versions: a multi-version budget exists to navigate", "none in the seed");
+    } else {
+      await pg.waitForTimeout(700);
+      const picker = await pg.evaluate(() => {
+        const s = document.querySelector("#bVerPick");
+        return s ? { count: s.options.length, val: s.value } : null;
+      });
+      if (picker && picker.count === target.versions)
+        ok("versions: the builder header offers every version, not only the current one");
+      else bad("versions: header picker options", JSON.stringify(picker));
+
+      await pg.evaluate(() => {
+        const s = document.querySelector("#bVerPick");
+        const other = [...s.options].find((o) => o.value !== s.value);
+        s.value = other.value;
+        s.dispatchEvent(new Event("change"));
+      });
+      await pg.waitForTimeout(600);
+      const opened = await pg.evaluate(() => ({
+        title: document.querySelector("#dttl")?.textContent || "",
+      }));
+      if (/PRE-/.test(opened.title))
+        ok("versions: picking another version opens its full document");
+      else bad("versions: picked version opens a document", JSON.stringify(opened));
+
+      // Jumping between versions from inside the drawer itself, via the
+      // clickable rows in its own "Versiones" list.
+      const rows = await pg.evaluate(() => document.querySelectorAll("[data-goverid]").length);
+      if (rows >= 1) {
+        await pg.click("[data-goverid]");
+        await pg.waitForTimeout(500);
+        const after = await pg.evaluate(() => ({
+          title: document.querySelector("#dttl")?.textContent || "",
+          activeMarked: !!document.querySelector(".daylist .it.active"),
+        }));
+        if (/PRE-/.test(after.title) && after.activeMarked)
+          ok("versions: the version list inside Vista previa is itself clickable");
+        else bad("versions: in-drawer version jump", JSON.stringify(after));
+      } else bad("versions: clickable rows in the Versiones card", rows);
+    }
+
+    // ---- send: WhatsApp deep-link ------------------------------------------
+    await ctx.close();
+    await freshPage();
+    const wa = await pg.evaluate(() => {
+      const b = erp.state.budgets.find(
+        (x) =>
+          erp.budgetStage(x) === "draft" &&
+          erp.party(x.partyId).mobile &&
+          !erp.validateBudget(x.id).some((i) => i.level === "block"),
+      );
+      if (!b) return null;
+      go("quotes", b.id);
+      return { id: b.id, mobile: erp.party(b.partyId).mobile };
+    });
+    if (!wa) {
+      bad("send: a clean draft with a mobile exists", "none in the seed");
+    } else {
+      await pg.waitForTimeout(700);
+      await pg.click("#bSend");
+      await pg.waitForTimeout(400);
+      await pg.selectOption("#sbChannel", "whatsapp");
+      await pg.waitForTimeout(200);
+      await pg.click("#sbGo");
+      await pg.waitForTimeout(700);
+      const result = await pg.evaluate((bid) => {
+        const b = erp.budget(bid);
+        const v = erp.version(bid, b.currentVersionId);
+        return { issued: v.issued, channel: v.sent && v.sent.channel, opened: window.__opened };
+      }, wa.id);
+      const link = (result.opened || [])[0] || "";
+      if (result.issued && result.channel === "whatsapp")
+        ok("send: WhatsApp channel issues and freezes the version");
+      else bad("send: whatsapp issues version", JSON.stringify(result));
+      if (link.startsWith("https://wa.me/34") && /text=/.test(link))
+        ok("send: WhatsApp opens a wa.me deep-link with the covering message pre-filled");
+      else bad("send: whatsapp deep-link", link);
+    }
+
+    // ---- send: email goes through the operator's own comms template -------
+    await ctx.close();
+    await freshPage();
+    const em = await pg.evaluate(() => {
+      const b = erp.state.budgets.find(
+        (x) =>
+          erp.budgetStage(x) === "draft" &&
+          erp.party(x.partyId).email &&
+          !erp.validateBudget(x.id).some((i) => i.level === "block"),
+      );
+      if (!b) return null;
+      go("quotes", b.id);
+      return { id: b.id, email: erp.party(b.partyId).email };
+    });
+    if (!em) {
+      bad("send: a clean draft with an email exists", "none in the seed");
+    } else {
+      await pg.waitForTimeout(700);
+      await pg.click("#bSend");
+      await pg.waitForTimeout(400);
+      await pg.click("#sbGo"); // default channel is email
+      await pg.waitForTimeout(700);
+      const result = await pg.evaluate((args) => {
+        const b = erp.budget(args.id);
+        const v = erp.version(args.id, b.currentVersionId);
+        const q = erp.state.commsQueue.find((x) => x.subjectRef === b.number);
+        return {
+          issued: v.issued,
+          channel: v.sent && v.sent.channel,
+          queued: q ? { status: q.status, to: q.to, template: q.templateKey } : null,
+        };
+      }, em);
+      if (result.issued && result.channel === "email")
+        ok("send: email channel issues and freezes the version");
+      else bad("send: email issues version", JSON.stringify(result));
+      if (
+        result.queued &&
+        result.queued.status === "sent" &&
+        result.queued.to === em.email &&
+        result.queued.template === "quote-send"
+      )
+        ok("send: the covering email is recorded through the same comms queue as everything else");
+      else bad("send: email recorded via comms queue", JSON.stringify(result));
+    }
+
+    // ---- send: "en mano", backdated -----------------------------------------
+    await ctx.close();
+    await freshPage();
+    const hand = await pg.evaluate(() => {
+      const b = erp.state.budgets.find(
+        (x) =>
+          erp.budgetStage(x) === "draft" &&
+          !erp.validateBudget(x.id).some((i) => i.level === "block"),
+      );
+      if (!b) return null;
+      go("quotes", b.id);
+      return { id: b.id };
+    });
+    if (!hand) {
+      bad("send: a clean draft exists for the manual channel", "none in the seed");
+    } else {
+      await pg.waitForTimeout(700);
+      await pg.click("#bSend");
+      await pg.waitForTimeout(400);
+      await pg.selectOption("#sbChannel", "hand");
+      await pg.waitForTimeout(200);
+      const dateFields = await pg.evaluate(() => ({
+        dateVisible: getComputedStyle(document.querySelector("#sbHandDateRow")).display !== "none",
+        timeVisible: getComputedStyle(document.querySelector("#sbHandTimeRow")).display !== "none",
+      }));
+      if (dateFields.dateVisible && dateFields.timeVisible)
+        ok("send: choosing «en mano» reveals a date and time to record, not a popup on a popup");
+      else bad("send: hand-channel date/time fields appear", JSON.stringify(dateFields));
+      const backdate = await pg.evaluate(() => {
+        const d = new Date(erp.today + "T00:00:00");
+        d.setDate(d.getDate() - 2);
+        const iso = d.toISOString().slice(0, 10);
+        document.querySelector("#sbHandDate").value = iso;
+        document.querySelector("#sbHandTime").value = "10:15";
+        return iso;
+      });
+      await pg.click("#sbGo");
+      await pg.waitForTimeout(700);
+      const result = await pg.evaluate((args) => {
+        const b = erp.budget(args.id);
+        const v = erp.version(args.id, b.currentVersionId);
+        return v.sent;
+      }, hand);
+      if (result && result.date === backdate && result.time === "10:15")
+        ok("send: «en mano» records the real send date and time, backdated");
+      else bad("send: hand-channel backdate persisted", JSON.stringify({ result, backdate }));
+    }
+
+    // ---- download: the PDF print sheet --------------------------------------
+    // Needs the send drawer open, which needs an UNLOCKED draft — a version
+    // already issued or accepted has no "Enviar" button at all.
+    await ctx.close();
+    await freshPage();
+    const dlOk = await pg.evaluate(() => {
+      const b = erp.state.budgets.find(
+        (x) =>
+          erp.budgetStage(x) === "draft" &&
+          !erp.validateBudget(x.id).some((i) => i.level === "block"),
+      );
+      if (!b) return false;
+      go("quotes", b.id);
+      return true;
+    });
+    if (!dlOk) throw new Error("no clean draft left for the download-PDF check");
+    await pg.waitForTimeout(700);
+    await pg.click("#bSend");
+    await pg.waitForTimeout(400);
+    const printResult = await pg.evaluate(async () => {
+      let existsDuring = null;
+      const origPrint = window.print;
+      window.print = () => {
+        existsDuring = !!document.querySelector(".printsheet .doc");
+      };
+      document.querySelector("#sbDownload").click();
+      await new Promise((r) => setTimeout(r, 900));
+      const existsAfter = !!document.querySelector(".printsheet");
+      window.print = origPrint;
+      return { existsDuring, existsAfter };
+    });
+    if (printResult.existsDuring && !printResult.existsAfter)
+      ok("send: «⤓ Descargar» prints exactly the customer document, then cleans up");
+    else bad("send: download PDF print sheet", JSON.stringify(printResult));
+
+    if (errs.length) bad("send/versions: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("send/versions: no console errors");
+  } catch (e) {
+    bad("send/versions: suite completed", String(e).slice(0, 200));
+  } finally {
+    if (ctx) await ctx.close();
+  }
+}
+
+/* Package 1 (#2, #9): "Próxima acción" and "Condiciones de pago" were free
+   text, so the same words got retyped slightly differently every time and
+   never rolled into anything a person could act on or compare. Both are now
+   owner-maintained lists (DMC-04, DMC-05) with a "＋ Nueva…" entry that adds
+   to the list inline, without leaving the screen that needed it. */
+async function testConfigurableLists(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  await autoAnswerModals(pg, { "Nueva entrada": "E2E: valor de prueba" });
+  try {
+    // ---- DMC-04 now carries three lists, DMC-05 two ------------------------
+    await pg.goto(`${base}/erp.html#lead-sources`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+    const dmc04 = await pg.evaluate(() =>
+      [...document.querySelectorAll(".cfgtables h3")].map((h) => h.textContent),
+    );
+    if (dmc04.includes("Próximas acciones"))
+      ok("DMC-04: próximas acciones is a managed list alongside fuentes y motivos");
+    else bad("DMC-04: próximas acciones present", JSON.stringify(dmc04));
+
+    await pg.evaluate(() => (location.hash = "payment-methods"));
+    await pg.waitForTimeout(700);
+    const dmc05 = await pg.evaluate(() =>
+      [...document.querySelectorAll(".cfgtables h3")].map((h) => h.textContent),
+    );
+    if (dmc05.includes("Condiciones de pago"))
+      ok("DMC-05: condiciones de pago is a managed list alongside formas de pago");
+    else bad("DMC-05: condiciones de pago present", JSON.stringify(dmc05));
+
+    // ---- Leads: "Nueva oportunidad" offers a select, not a text box -------
+    await pg.evaluate(() => (location.hash = "leads"));
+    await pg.waitForTimeout(700);
+    await pg.click("text=＋ Nueva oportunidad");
+    await pg.waitForTimeout(500);
+    const nextTag = await pg.evaluate(() => document.querySelector("#o_next")?.tagName);
+    if (nextTag === "SELECT") ok("leads: «Próxima acción» is a select fed by the list");
+    else bad("leads: próxima acción is a select", nextTag);
+
+    // create one inline and confirm it landed in the list too
+    await pg.selectOption("#o_next", "__new__");
+    await pg.waitForTimeout(500);
+    const created = await pg.evaluate(() => document.querySelector("#o_next")?.value);
+    if (created === "E2E: valor de prueba")
+      ok("leads: a new próxima acción can be created without leaving the drawer");
+    else bad("leads: inline creation of a próxima acción", created);
+    const inEngineList = await pg.evaluate(() =>
+      erp.listAll("nextActions").some((r) => r.code === "E2E: valor de prueba"),
+    );
+    if (inEngineList) ok("leads: the new próxima acción is saved to the owner-maintained list");
+    else bad("leads: new próxima acción persisted to state.lists", "not found");
+    await pg.evaluate(() => closeDrawer());
+
+    // ---- Presupuestador: "Condiciones de pago" is a select, pre-selected --
+    const bid = await pg.evaluate(() => {
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      go("quotes", b.id);
+      return b.id;
+    });
+    await pg.waitForTimeout(800);
+    // The select lives in the "Siguiente paso" drawer, not on the bar — P5
+    // moved everything about FINISHING behind that one button.
+    await pg.click("#bcNext");
+    await pg.waitForTimeout(600);
+    const bcpay = await pg.evaluate(() => ({
+      tag: document.querySelector("#ns_pay")?.tagName,
+      value: document.querySelector("#ns_pay")?.value,
+    }));
+    const expected = await pg.evaluate(
+      (id) => erp.state.budgets.find((b) => b.id === id).paymentConditions,
+      bid,
+    );
+    if (bcpay.tag === "SELECT" && bcpay.value === expected)
+      ok("presupuestador: «Condiciones de pago» is a select, pre-selected to the stored value");
+    else
+      bad("presupuestador: condiciones select + preselection", JSON.stringify({ bcpay, expected }));
+
+    await pg.selectOption("#ns_pay", "__new__");
+    await pg.waitForTimeout(600);
+    const savedCond = await pg.evaluate(
+      (id) => erp.state.budgets.find((b) => b.id === id).paymentConditions,
+      bid,
+    );
+    if (savedCond === "E2E: valor de prueba")
+      ok("presupuestador: a new condición de pago saves to the budget without leaving the screen");
+    else bad("presupuestador: inline condición de pago saved", savedCond);
+
+    if (errs.length) bad("listas configurables: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("listas configurables: no console errors");
+  } catch (e) {
+    bad("listas configurables: suite completed", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/* COM-02 after the operator's Package 1 review. Five separate complaints, all
+   about the same screen, and each one is a check here:
+     · "+ Programar visita" chose a customer for you — it must ask which lead
+     · the date opened on a day in the past and let you schedule into it
+     · "Cámara" opened a file browser instead of the camera
+     · typing notes and then adding a photograph lost the notes
+     · a picture could not be opened or downloaded
+   plus the follow-up visit naming and completing a client without leaving. */
+async function testVisitCapture(browser, base) {
+  const ctx = await browser.newContext({
+    viewport: { width: 1440, height: 950 },
+    permissions: ["camera"],
+  });
+  const pg = await ctx.newPage();
+  const errs = [];
+  attachConsole(pg, errs);
+  await autoAnswerModals(pg);
+  try {
+    await pg.goto(`${base}/erp.html#visits`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+
+    // ---- the lead picker replaces "whichever opportunity was first" --------
+    // autoAnswerModals answers it, so drive the question directly instead.
+    const picker = await pg.evaluate(async () => {
+      const open = erp.opportunityAges();
+      return { count: open.length, hasPicker: typeof askChoice === "function" };
+    });
+    if (picker.count > 0 && picker.hasPicker)
+      ok("visitas: «+ Programar visita» has leads to choose between");
+    else bad("visitas: lead picker", JSON.stringify(picker));
+
+    // ---- schedule: floor date, defaulted time, past date refused ----------
+    const sched = await pg.evaluate(() => {
+      const o = erp.opportunityAges()[0];
+      scheduleVisitDrawer(o.id);
+      return {
+        date: document.querySelector("#sv_date").value,
+        min: document.querySelector("#sv_date").getAttribute("min"),
+        time: document.querySelector("#sv_time").value,
+      };
+    });
+    const wall = new Date().toISOString().slice(0, 10);
+    const floor =
+      wall > (await pg.evaluate(() => erp.today)) ? wall : await pg.evaluate(() => erp.today);
+    if (sched.date === floor && sched.min === floor)
+      ok(`visitas: the date opens on ${floor} and refuses anything earlier`);
+    else bad("visitas: date floor", JSON.stringify(sched) + " expected " + floor);
+    if (/^\d{2}:\d{2}$/.test(sched.time) && sched.time !== "10:00")
+      ok(`visitas: the time defaults to now (${sched.time})`);
+    else bad("visitas: time defaults to now", sched.time);
+    await pg.evaluate(() => {
+      document.querySelector("#sv_date").value = "2020-01-01";
+    });
+    await pg.click("#sv_save");
+    await pg.waitForTimeout(400);
+    const t = await pg.evaluate(() => document.querySelector("#toast").textContent);
+    if (/fecha pasada/.test(t)) ok("visitas: a past date is refused, not merely discouraged");
+    else bad("visitas: past date refused", t);
+    await pg.evaluate(() => closeDrawer());
+
+    // ---- capture: the notes bug, the viewer, the client fix ---------------
+    const opened = await pg.evaluate(() => {
+      let v = erp.state.visits.find((x) => x.status === "scheduled");
+      if (!v) {
+        const opps = erp.opportunityAges();
+        const bad2 = opps.find((o) => !erp.partyCompleteness(o.partyId).ok) || opps[0];
+        v = erp.scheduleVisit(
+          {
+            opportunityId: bad2.id,
+            propertyId: bad2.propertyId,
+            scheduledAt: erp.today,
+            scheduledTime: "10:00",
+            owner: "operations",
+            notes: "",
+          },
+          "backoffice",
+        );
+      }
+      completeVisitDrawer(v.id);
+      return v.id;
+    });
+    await pg.waitForTimeout(500);
+    const NOTE = "Humedad en la pared norte";
+    await pg.fill("#cv_notes", NOTE);
+    await pg.fill("#cv_what", "cocina");
+    await pg.evaluate(() => {
+      const f = new File([Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10])], "x.png", {
+        type: "image/png",
+      });
+      const dt = new DataTransfer();
+      dt.items.add(f);
+      const inp = document.querySelector("#cv_file");
+      inp.files = dt.files;
+      inp.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(1200);
+    const kept = await pg.evaluate(() => ({
+      notes: document.querySelector("#cv_notes").value,
+      what: document.querySelector("#cv_what").value,
+      photos: document.querySelectorAll("#cv_photos .gi").length,
+    }));
+    if (kept.notes === NOTE && kept.what === "cocina" && kept.photos === 1)
+      ok("visitas: adding a photograph no longer wipes the notes being typed");
+    else bad("visitas: notes survive a photo", JSON.stringify(kept));
+
+    // the picture opens full size, with a download and a position
+    await pg.evaluate(() => document.querySelector("#cv_photos img[data-blob]").click());
+    await pg.waitForTimeout(400);
+    const pv = await pg.evaluate(() => {
+      const n = document.querySelector(".pview");
+      return n ? { dl: n.querySelector("[data-pv=dl]").getAttribute("download") } : null;
+    });
+    if (pv && /^foto-\d+\.jpg$/.test(pv.dl))
+      ok("visitas: a photograph opens full size and offers the file");
+    else bad("visitas: photo viewer", JSON.stringify(pv));
+    await pg.keyboard.press("Escape");
+    await pg.waitForTimeout(300);
+    const afterEsc = await pg.evaluate(() => ({
+      viewer: !!document.querySelector(".pview"),
+      drawer: document.querySelector("#drawer").classList.contains("on"),
+    }));
+    if (!afterEsc.viewer && afterEsc.drawer)
+      ok("visitas: closing the photograph leaves the visit open behind it");
+    else bad("visitas: Escape scope", JSON.stringify(afterEsc));
+
+    // the camera is a real capture path, not the file picker
+    const camWired = await pg.evaluate(
+      () =>
+        typeof capturePhoto === "function" &&
+        document.querySelector("#cv_cam").tagName === "BUTTON",
+    );
+    if (camWired) ok("visitas: «Cámara» asks the device for its camera");
+    else bad("visitas: camera path", "still a file input");
+
+    // an incomplete client is completed here and hands control back
+    const fixable = await pg.evaluate(() => !!document.querySelector("#cv_fixparty"));
+    if (fixable) ok("visitas: a client missing data can be completed without leaving the visit");
+    else ok("visitas: client complete already (nothing to fix on this dataset)");
+
+    // ---- a second visit is allowed and named -----------------------------
+    const follow = await pg.evaluate((vid) => {
+      const v = erp.state.visits.find((x) => x.id === vid);
+      closeDrawer();
+      scheduleVisitDrawer(v.opportunityId);
+      return document.querySelector("#dttl").textContent;
+    }, opened);
+    if (/seguimiento/.test(follow))
+      ok("visitas: a second visit is allowed and called a seguimiento");
+    else bad("visitas: follow-up naming", follow);
+    await pg.evaluate(() => closeDrawer());
+
+    if (errs.length) bad("visitas: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("visitas: no console errors");
+  } catch (e) {
+    bad("visitas: suite completed", String(e).slice(0, 200));
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function testJourneyRealMode(browser, base) {
   const pg = await browser.newPage({
     viewport: { width: 1400, height: 1000 },
@@ -4142,7 +6069,7 @@ async function testJourneyRealMode(browser, base) {
   });
   const errs = [];
   attachConsole(pg, errs);
-  pg.on("dialog", async (d) => await d.accept());
+  await autoAnswerModals(pg);
   try {
     // Visit erp.html first so this browser context's IndexedDB has real
     // tenant data before journey.html asks for it — real mode reads the
@@ -4515,10 +6442,22 @@ async function testLanguageAcrossTabs(browser, base) {
     }
     await projects.waitForTimeout(400);
 
+    /* The switch is reached through Configuración → Idioma (DMC-09), not
+       through the floating pill this test used to click. The pill was deleted
+       in PK5-A on the operator's instruction — "I want to put the language
+       button in configuration. As it is, bothers more then helps. This is
+       across the app." — and the merge of the two branches is where the two
+       facts meet. What this test is FOR is untouched: the question is whether
+       a choice made in one document reaches a document already rendered in
+       another tab, and that has nothing to do with which control made it. */
     await tower.bringToFront();
+    await tower.evaluate(() => toggleSection("settings"));
+    await tower.waitForTimeout(500);
+    await tower.locator("#p2list button", { hasText: "Idioma" }).click();
+    await tower.waitForTimeout(500);
     await Promise.all([
       tower.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
-      tower.locator("#canei-lang-pill button", { hasText: "EN" }).click(),
+      tower.locator('[data-uilang="en"]').click(),
     ]);
     await tower.waitForSelector("#p1 .secitem", { timeout: 15000 });
     const towerLang = await tower.evaluate(() => document.documentElement.lang);
@@ -4565,19 +6504,61 @@ async function testI18n(browser, base) {
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(600);
-    const pill = await pg.locator("#canei-lang-pill button").count();
-    if (pill === 3) ok("i18n: the toggle offers all three languages (ES · CA · EN)");
-    else bad("i18n: toggle present", `buttons=${pill}, expected 3`);
+    // The switch lives in Configuración → Idioma (DMC-09) since the operator
+    // asked for it: the floating pill was reachable from everywhere and in the
+    // way everywhere, to the point that one document viewer reserved blank
+    // space purely to stop it covering the end of a contract.
+    if ((await pg.locator("#canei-lang-pill").count()) === 0)
+      ok("i18n: no floating language pill over the content");
+    else bad("i18n: pill removed", "#canei-lang-pill still injected");
     const esText = await pg.locator("body").innerText();
     if (esText.includes("Torre de control")) ok("i18n: workspace defaults to Spanish");
     else bad("i18n: workspace defaults to Spanish", esText.slice(0, 60));
 
-    // switch to EN via the pill (reloads the page)
-    await Promise.all([
-      pg.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
-      pg.locator("#canei-lang-pill button", { hasText: "EN" }).click(),
-    ]);
-    await pg.waitForTimeout(700);
+    // Reached the way a person reaches it: open Configuración and click the
+    // entry. That proves the menu lists it — a screen only a URL can open is
+    // not in Configuración in any useful sense — and it leaves the shell in
+    // the right state, because the rail's subsection panel is an absolutely
+    // positioned flyout that covers the content until a click closes it.
+    await pg.evaluate(() => toggleSection("settings"));
+    await pg.waitForTimeout(600);
+    const inMenu = await pg.evaluate(() =>
+      /Idioma/.test(document.querySelector("#p2list")?.innerText || ""),
+    );
+    await pg.locator("#p2list button", { hasText: "Idioma" }).click();
+    await pg.waitForTimeout(600);
+    const langScreen = await pg.evaluate(() => ({
+      options: [...document.querySelectorAll("[data-uilang]")].map((b) => b.dataset.uilang),
+      current: document.querySelector("[data-uilang][aria-current]")?.dataset.uilang,
+      // Each choice must be a real target, not a 13px radio behind a label:
+      // this screen exists because the old control was unusable on a phone.
+      minTarget: Math.min(
+        ...[...document.querySelectorAll("[data-uilang]")].map((b) =>
+          Math.round(b.getBoundingClientRect().height),
+        ),
+      ),
+    }));
+    if (
+      langScreen.options.join(",") === "es,ca,en" &&
+      langScreen.current === "es" &&
+      langScreen.minTarget >= 30 &&
+      inMenu
+    )
+      ok(
+        `i18n: Configuración → Idioma offers all three languages as ${langScreen.minTarget}px targets`,
+      );
+    else bad("i18n: language screen", JSON.stringify({ ...langScreen, inMenu }));
+
+    // Switching reloads the page, so the click is not awaited for a result —
+    // the assertion is what the reloaded document says. It reloads onto the
+    // language screen it was pressed from, so the workspace assertion below
+    // goes back to the Torre: what is being proven is that the CHOICE reaches
+    // the whole app, not that one screen happens to be translated.
+    await pg.locator('[data-uilang="en"]').click();
+    await pg.waitForLoadState("networkidle").catch(() => {});
+    await pg.waitForTimeout(900);
+    await pg.evaluate(() => (location.hash = "tower"));
+    await pg.waitForTimeout(800);
     // dynamic content gets translated too (MutationObserver path)
     const erpLang = await pg.evaluate(() => document.documentElement.lang);
     const erpText = await pg.locator("body").innerText();
@@ -4674,15 +6655,22 @@ async function testI18n(browser, base) {
     await pg.evaluate(() => (location.hash = "progress"));
     await pg.waitForTimeout(700);
     await openJobWithChapters(pg, "prgQ");
+    // PK3-C put the three-state control on the Gantt; PK4-A made opening the
+    // job open the Gantt, so the row click above already landed on it.
+    await pg.waitForTimeout(900);
     const pryCaText = await pg.locator("#view").innerText();
     if (
-      /Fitxa/i.test(pryCaText) &&
       /execuci/i.test(pryCaText) &&
+      /Sense començar/i.test(pryCaText) &&
       !/En ejecución/.test(pryCaText) &&
-      !/Fin comprometido/.test(pryCaText)
+      !/Sin empezar/.test(pryCaText)
     )
       ok("i18n: CA translates the PRY-01 panel and its three-state control");
     else bad("i18n: CA PRY-01", pryCaText.replace(/\n/g, " ").slice(0, 160));
+    if (await pg.locator("#gBack").count()) {
+      await pg.locator("#gBack").click();
+      await pg.waitForTimeout(500);
+    }
 
     await pg.evaluate(() => (location.hash = "economics"));
     await pg.waitForTimeout(700);
@@ -4849,14 +6837,21 @@ async function testI18n(browser, base) {
     await pg.evaluate(() => (location.hash = "progress"));
     await pg.waitForTimeout(700);
     await openJobWithChapters(pg, "prgQ");
+    // As in Catalan above: the row click already landed on the chart.
+    await pg.waitForTimeout(900);
     const pryEnText = await pg.locator("#view").innerText();
     if (
-      /Details/i.test(pryEnText) &&
       /In progress/i.test(pryEnText) &&
-      !/Fin comprometido/.test(pryEnText)
+      /Not started/i.test(pryEnText) &&
+      !/En ejecución/.test(pryEnText) &&
+      !/Sin empezar/.test(pryEnText)
     )
       ok("i18n: EN translates the PRY-01 panel and its three-state control");
     else bad("i18n: EN PRY-01", pryEnText.replace(/\n/g, " ").slice(0, 160));
+    if (await pg.locator("#gBack").count()) {
+      await pg.locator("#gBack").click();
+      await pg.waitForTimeout(500);
+    }
 
     await pg.evaluate(() => (location.hash = "economics"));
     await pg.waitForTimeout(700);

@@ -15,7 +15,8 @@
  *   - a MutationObserver keeps dynamically rendered content translated
  *   - window.CANEI_I18N.translateNode(root) lets generated documents
  *     (print windows, previews) opt in with one call
- * A floating ES | CA | EN toggle is injected on every page.
+ * The language is chosen in Configuración → Idioma and on the sign-in
+ * screen; no switch floats over the pages themselves (PK5-A).
  *
  * WHY SPANISH IS THE HUB (S3, decision 20). The dictionary is a set of
  * TRIPLES keyed on the Spanish string: `pairs` carries [es, en] and `ca`
@@ -35,7 +36,6 @@
 
   var LANGS = ["es", "ca", "en"];
   var NAMES = { es: "Español", ca: "Català", en: "English" };
-  var SHORT = { es: "ES", ca: "CA", en: "EN" };
 
   var LS_KEY = "caneiLang"; // this device's choice ("" = follow the company)
   var CACHE_KEY = "caneiLangCompany"; // last company value seen, for first paint
@@ -432,7 +432,7 @@
   }
 
   function mark(el) {
-    if (el && el.setAttribute && !el.closest("#canei-lang-pill,#canei-i18n-hud"))
+    if (el && el.setAttribute && !el.closest("#canei-i18n-hud"))
       el.setAttribute("data-i18n-miss", "");
   }
 
@@ -652,47 +652,22 @@
     window.addEventListener("storage", check);
   }
 
-  /* ---------- toggle pill ---------- */
-  function injectToggle() {
-    if (document.getElementById("canei-lang-pill")) return;
-    var css =
-      "#canei-lang-pill{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:14px;z-index:99999;display:flex;gap:0;" +
-      "background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border:1px solid #dde5d6;border-radius:999px;" +
-      "box-shadow:0 2px 4px rgba(24,32,16,.06),0 14px 30px -18px rgba(24,32,16,.3);overflow:hidden;" +
-      "font:600 11px Inter,system-ui,sans-serif;letter-spacing:.06em}" +
-      "#canei-lang-pill button{appearance:none;border:0;background:transparent;color:#8b8f80;padding:7px 12px;" +
-      "cursor:pointer;font:inherit;transition:.15s}" +
-      "#canei-lang-pill button.on{background:linear-gradient(120deg,#31532a,#48733c 70%);color:#fff}" +
-      "@media print{#canei-lang-pill{display:none}}" +
-      "@media(max-width:560px){#canei-lang-pill{bottom:calc(10px + env(safe-area-inset-bottom,0px));left:10px}#canei-lang-pill button{padding:6px 10px}}";
-    var st = document.createElement("style");
-    st.textContent = css;
-    document.head.appendChild(st);
-    var pill = document.createElement("div");
-    pill.id = "canei-lang-pill";
-    pill.setAttribute("role", "group");
-    pill.setAttribute("aria-label", "Idioma · Llengua · Language");
-    // A language switcher that translates its own labels tells you what you
-    // already chose instead of what you can choose.
-    pill.setAttribute("translate", "no");
-    LANGS.forEach(function (lang) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.textContent = SHORT[lang];
-      b.title = NAMES[lang];
-      b.setAttribute("aria-label", NAMES[lang]);
-      if (lang === target) {
-        b.className = "on";
-        b.setAttribute("aria-current", "true");
-      }
-      b.addEventListener("click", function () {
-        if (lang === target) return;
-        set(lang, "device");
-      });
-      pill.appendChild(b);
-    });
-    document.body.appendChild(pill);
-  }
+  /* ---------- where the language is chosen ----------
+     There used to be a fixed pill bottom-left of every page, injected here.
+     It was always reachable, and always in the way: it floated over content
+     on every screen, and one document viewer already had to reserve blank
+     space underneath itself purely to stop the pill covering the end of a
+     contract. The operator's verdict, from a real phone: "I want to put the
+     language button in configuration. As it is, bothers more then helps.
+     This is across the app." (PK5-A.)
+
+     A preference set once or twice a year does not earn permanent screen
+     space, so the choice lives in Configuración → Idioma (DMC-09) and on the
+     sign-in screen, and this module just exposes `set`. The satellite pages
+     carry no switch of their own — they read the same stored choice, so a
+     language picked in the ERP is the language they honour. The `SHORT`
+     table went with the pill: it existed only to label those three buttons,
+     and the sign-in screen builds its own. */
 
   /* ---------- the audit heads-up display ---------- */
   function missList() {
@@ -736,7 +711,11 @@
     var list = hud.querySelector("ol");
     var render = function () {
       var all = missList();
-      head.textContent = all.length + " sin traducir · " + SHORT[target];
+      // `target.toUpperCase()`, not a lookup table: the `SHORT` map went with
+      // the floating pill it existed to label (PK5-A), and the merge that
+      // removed it left this line referring to a name that no longer exists.
+      // Text merged clean; the code did not.
+      head.textContent = all.length + " sin traducir · " + target.toUpperCase();
       list.innerHTML = "";
       all.slice(0, 60).forEach(function (e) {
         var li = document.createElement("li");
@@ -770,7 +749,6 @@
 
   /* ---------- boot ---------- */
   function boot() {
-    injectToggle();
     fullPass();
     injectHud();
     syncCompany();

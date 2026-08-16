@@ -2757,6 +2757,706 @@ different decisions, so these ten arrived colliding. They are renumbered from
      accident and against loops, not against a person with credentials deciding to
      email someone. Ranking that risk against the customer's own inbox is the
      owner's call, and they made it.
+
+- **#149 — the browser's own prompt(), confirm() and alert() are gone from the whole site (2026-08-11).**
+  Package 1's slide 3 says the boxes are "muy malas" and asks for the review to
+  cover **every** dialog of that kind across the site, so this is not a screen
+  fix. All 36 native dialogs are replaced: 27 in `erp.html`, 4 in
+  `master-data.html`, 3 in `journey.html`, 2 in `financial-data.html`.
+  **Decisions:** (a) the replacement lives in its own file,
+  `site/erp-modal.js`, rather than inline in `erp.html` — the same boxes appear
+  on four pages, and a question box copied four times is one that only ever
+  gets fixed once. It takes its colours from the host page's CSS variables, so
+  it always belongs to the page that opened it. (b) The API is promise-based
+  (`await askText(...)`) rather than callback-based, because all 36 call sites
+  were written as `const x = prompt(); if (!x) return;` and `await` keeps that
+  shape, guard clause included; converting to callbacks would have turned every
+  handler inside out. (c) **Cancel now aborts.** Eight call sites read
+  `prompt("Motivo…") || ""`, so backing out of the question still performed the
+  action with an empty reason — anulaciones and rescisiones among them. The new
+  ones return null and the handler stops. (d) Questions that belong together
+  are now asked together: posponer (fecha + motivo), resolver (nota +
+  evidencia) and reasignar un parte (proyecto + capítulo) were two consecutive
+  boxes each. (e) Reasignar and the loss reason became **lists instead of typed
+  codes** — the loss reason was asking for a code by quoting the list inside
+  the question text, and its "motivo no reconocido" branch existed only because
+  a text box could not offer the six answers it would accept. `lossReasons` was
+  already an owner-maintained list in the engine; nothing new was added for it.
+  (f) Escape is handled in the module in the **capture phase** so it closes the
+  question and not the drawer underneath it, which is where most of these are
+  asked from.
+
+- **#150 — the visit screen, after Package 1 slides 1 and 4–7 (2026-08-11).**
+  Five complaints about one screen, and the fixes share a cause worth naming:
+  the drawer repaints itself wholesale, so anything living only in the DOM did
+  not survive. **Decisions:** (a) **the scheduling date floors at the later of
+  the wall-clock date and the dataset's `today`.** The demo lives in its own
+  exercise year, ahead of or behind real time depending on when it is opened;
+  taking the later of the two means the field opens on a day you could
+  actually go, in the demo and in production alike. The refusal is enforced in
+  the save handler, not only by the input's `min`, because `min` is advisory
+  and a typed date walks straight past it. The time defaults to the current
+  clock. (b) **The camera is `getUserMedia`, with the file input demoted to a
+  fallback.** `capture="environment"` opens the camera on a phone and a file
+  browser on a laptop, which is what the operator hit — asked to go and find a
+  photograph they had not taken yet. A denied permission, a machine without a
+  camera and an insecure origin now each produce their own message before the
+  file picker opens, rather than the picker appearing unexplained. (c) **Every
+  field the person has touched is read back into the draft before any
+  repaint** — notes, and the half-typed measurement too, which had the same
+  bug and nobody had hit yet. (d) **The photo viewer is delegated from the
+  document**, keyed on `data-blob`, so visits, adicionales, annexes and
+  captured documents all gained it at once instead of four screens gaining it
+  separately. Escape and the arrow keys are bound in the capture phase so
+  closing a photograph does not also close the drawer behind it. (e) **A
+  second visit is allowed and named** «de seguimiento», with the earlier
+  visits listed in the drawer. Blocking it would have been wrong — a revisit
+  before quoting is ordinary — and the complaint was that it looked like the
+  screen had lost track, not that it was permitted. (f) **«+ Programar visita»
+  asks which lead**, grouped so the never-visited come first and the longest
+  waiting lead each group. It used to schedule against `withOpp[0]`. (g)
+  `editPartyDrawer` takes an `onSaved` callback so the visit can borrow it to
+  complete a client and get control back, with its own draft intact — the
+  alternative was sending someone mid-capture to another screen.
+
+- **#151 — two more free-text boxes become owner-maintained lists (Package 1
+  #2, #9, 2026-08-11).** «Próxima acción» on a lead and «Condiciones de pago»
+  on a presupuesto were typed fresh every time, so the same next step or the
+  same milestone split accumulated a dozen near-identical spellings and never
+  rolled up into anything countable. `lossReasons` already had this treatment
+  (S3); these two join `state.lists` the same way. **Decisions:** (a) unlike
+  the existing lists, **the code IS the Spanish wording**, not a short
+  identifier — nobody coins `earlySplit40` for a payment split, they type the
+  split, and `addListEntry` already accepts any unique string as a code.
+  `LIST_META[kind].codeIsLabel` drops the redundant código column these two
+  tables would otherwise show a full sentence in. (b) `nextActions` ships
+  seeded with `"Programar visita"`, matching the engine's own default
+  (`addOpportunity`), so every existing lead resolves to a real list entry on
+  first render rather than a synthetic "(retirada)" one — `listOptions`
+  already tolerates an unknown code, but tolerating it is not the same as it
+  being wrong to begin with. `paymentConditions` seeds the exact string the
+  demo data already carries for the same reason. (c) **Create-if-missing is a
+  new shared primitive**, `wireCreatableSelect`, not bespoke to either field —
+  a `<select>` built by `listOptionsCreatable` ends in "＋ Nueva…"; picking it
+  asks for the wording, writes it to `state.lists[kind]` so it is there for
+  every later record too, and hands the resolved code to an optional `onSet`.
+  The two leads fields (new-opportunity, the lead drawer) pass no `onSet` —
+  they only read `.value` when their own Guardar button fires — while the
+  presupuestador's condiciones select passes one that calls `updateBudget`
+  immediately, matching how every other field on that bar auto-saves. (d)
+  DMC-04 (Fuentes de leads) now carries three tables instead of two;
+  `.cfgtables.two > :last-child:nth-child(odd) { grid-column: 1 / -1 }` gives
+  a trailing lone table the full row rather than leaving it at half width
+  with empty space beside it — general for any odd count, so a screen with an
+  even number of lists is unaffected.
+
+- **#152 — the presupuestador reworked around cost and margin (Package 1
+  slides 8 and 9, 2026-08-11).** Five complaints about "the heart of the
+  system", and they share a premise: the grid was arranged around what gets
+  STORED rather than around how a price is decided. **Decisions:** (a) the
+  columns run **descripción · unidad · coste unitario · margen unit. % ·
+  cantidad · p. unitario venta · precio total**, which is the order the work
+  is done in, and puts cost and margin BEFORE the sale price because the sale
+  price is derived from them. The operator's list wrote "UNIDADES" twice; they
+  confirmed the first is the unit of measure and the second the quantity. (b)
+  **The margin is stored nowhere.** It is `(venta − coste) / venta`, computed
+  from the two figures the line already carries, so no migration is needed and
+  the percentage can never drift out of step with the money beside it. That is
+  the same definition `budgetTotals.marginBasePct` and
+  `projectEconomics.marginForecastPct` already used, so the operator's "keep it
+  like this, everywhere" needed no change anywhere else — a line, a
+  presupuesto and a job now all mean the same thing by "40%". (c) **Editing
+  cost or margin recomputes the price, holding the other steady**; editing the
+  price back-solves the margin. The price stays typeable even though it is
+  "automatic" — quoting a round number is ordinary, and refusing it would lose
+  a direction the operator has today. A margin of 100% cannot produce a finite
+  price, so `bPriceFromMargin` returns null above 99.95% and the edit is
+  ignored rather than writing an infinity. (d) **The unit became a select over
+  DMC-03** — "OJO CON LAS UNIDADES" was the operator flagging that a free-text
+  unit is how `m2`, `M2` and `m²` end up in one budget. (e) **The catalogue
+  picker opens on the whole catalogue**, not pre-filtered by the line's
+  description: "Nueva partida" matches nothing, and a picker that opens empty
+  reads as a broken picker. Not finding one opens
+  `catalogueItemDrawer` — the SAME "＋ Nueva partida" form Configuración uses,
+  at the operator's own suggestion, rather than a second form that would drift
+  out of step with it. A picked partida with no reference price arrives marked
+  **pendiente** rather than priced at zero, matching what the catalogue screen
+  already says about a blank price. (f) **Chapters come from the catalogue's
+  own chapter list**, with already-used ones hidden (a second "Albañilería" in
+  one budget is a mistake, not a choice) and an "Otro nombre…" escape for a
+  genuine one-off. (g) **Superficie is gone entirely** — the input, the "Por
+  m²" row in the totals panel and the per-m² line in the customer document —
+  at the operator's request. `surfaceM2` stays on the record and on the
+  inmueble, so nothing already stored is lost and the property keeps its own
+  area, which is a fact about the building rather than a budget input. (h)
+  **"Siguiente paso" replaces three scattered endings** (Exclusiones, Validar,
+  and a separate Enviar in the header) with one drawer holding the money
+  terms, the exclusions, the validation and the send, in that order.
+  Validation runs on OPEN rather than behind its own button: a check somebody
+  has to remember to press is a check that gets skipped.
+
+- **#153 — i18n backfill for P1–P5 (2026-08-11).** P1–P5 introduced new
+  Spanish-only strings (the modal system's own labels, the visit screen's
+  camera/photo-viewer chrome, the two new configurable lists' UI, the
+  presupuestador rework) that `tests/i18n/coverage.mjs` did not catch, because
+  that gate checks the dictionary's own internal EN/CA consistency rather than
+  scraping the app for every literal. Closed by writing 108 new ES→EN pairs
+  into `i18n-dict.js` and 112 ES→CA pairs into `i18n-dict-ca.js` (108 shared +
+  4 that already had an EN entry but no CA one), plus 9 regex rules on each
+  side for the strings that carry a variable (visit-title suffixes, the
+  gestoría reopen/query prompts, item counts). Wrote **both** EN and CA now
+  rather than leaving CA to fall back to Spanish, per the file's own stated
+  intent that Catalan is a column reviewable by a native speaker independent
+  of the ES/EN spine — an untranslated CA entry sits in the backlog exactly
+  like every other pre-existing one, not as fresh debt. `CA_BACKLOG` in the
+  coverage test dropped from 1301 to 1297 to hold the new floor. Two things
+  were deliberately left out of scope, both consistent with how the rest of
+  the app already behaves rather than a shortcut: (a) the seed values of the
+  two new owner-maintained lists (`nextActions`, `paymentConditions`) — no
+  owner list in the app, old or new, is translated by the interface toggle,
+  because `erp.listLabel(kind, code, lang)` is never called with a `lang`
+  argument from `erp.html`; translating only the new lists would be the
+  inconsistent choice; (b) the multi-paragraph `.cfghelp` bodies on the two
+  new config screens — each is one HTML block split by inline `<b>` tags into
+  several text nodes, so a correct translation needs one dict entry per
+  fragment for background prose an admin reads rarely, not primary workflow
+  chrome; their one-line `sub` intros are translated, only the long help
+  bodies are not.
+
+- **#154 — the backing document becomes a file, and one viewer reads both
+  kinds (Package 2 slide 3, PK2-A · 2026-08-11).** Slide 3 asked for the
+  acceptance justificante to be an uploadable, reopenable document with a date
+  and a person, instead of the free-text box that held `correo-aceptacion.pdf`
+  and proved nothing. Decisions taken: (a) **the primitive is built where the
+  photo viewer already lives, not extracted into its own module.** `erp-modal.js`
+  was extracted because four pages ask questions; every consumer of evidence —
+  the client response, the contract upload, the anexo backup, the cash
+  justificante — is in `erp.html`. Two viewers, one in a module and one inline,
+  would drift exactly as CLAUDE.md warns; extracting later, when a second page
+  needs it, is the more reversible move. (b) **The photo viewer was generalised
+  rather than duplicated.** It reads a PDF page by page as well as a
+  photograph, and non-image attachments are delegated through `data-evidence`
+  the same way pictures already were through `data-blob`, so arrows and Escape
+  behave identically for both. (c) **The file reaches the blob store the moment
+  it is chosen**, before the surrounding form is saved. The cost is an orphaned
+  blob if the person abandons the form — storage the browser reclaims; the
+  alternative cost is losing the file they just attached, which is their time.
+  For the same reason **"Quitar" does not delete the blob**: on an already-saved
+  record it would destroy the real file if the edit were then abandoned.
+  (d) **The acceptance date may be backdated but not postdated**, and the
+  opportunity's `decidedAt` follows it rather than today — otherwise an answer
+  recorded a week late lands in the wrong quarter on DAS-01. A future date is
+  refused: nothing can be accepted tomorrow. (e) **`evidenceRef` was kept
+  beside the new `evidence` record** rather than migrated. The old value was a
+  typed filename with no file behind it; rewriting it into a record shape would
+  fabricate an attachment that never existed, so old rows keep their note,
+  displayed as the plain text it is, and new rows carry the document.
+  (f) **Where pdf.js cannot draw the document, the viewer hands the real file
+  to the browser's own reader** instead of stopping at "no se ha podido
+  mostrar". The bundled pdf.js 6.2.108 needs `Map.prototype.getOrInsertComputed`,
+  which Chromium 141 does not have — an office machine a few versions behind
+  lands there, and a dead end at the moment somebody wants the evidence is the
+  one outcome this feature cannot have. The two older PDF panes (purchase
+  comparison, captured document) still show that dead end and are recorded as
+  owed in `docs/worklog/WORKLOG.md`.
+
+- **#155 — version navigator + send drawer rework (Package 2 slides 1–2,
+  PK2-B · 2026-08-11).** Decisions taken: (a) **only the current version is
+  ever editable.** Picking an older version from the new `#bVerPick` header
+  select or from the "Versiones" list opens the SAME read-only document Vista
+  previa already rendered, rather than teaching the edit grid to display two
+  different versions' data — a smaller, more reversible change, and it means
+  the one invariant that matters ("a frozen version cannot be changed") never
+  has to be re-checked in a second place. (b) **WhatsApp gets a real deep-link,
+  not a promise of one.** A browser genuinely cannot attach a file to WhatsApp
+  and press send on the user's behalf — `wa.me` accepts pre-filled text only —
+  so the honest scope is: open `wa.me` addressed to the party's mobile
+  (normalised to E.164 by prefixing "34" onto the bare 9-digit Spanish numbers
+  this system already stores) with the covering message pre-filled from the
+  operator's own template. True one-tap attach-and-send needs the WhatsApp
+  Business API, a real credential this session did not add — a candidate for
+  `INTEGRATIONS_PENDING.md` if the operator wants it built later, not a gap to
+  paper over with a fake success message. (c) **Email is recorded through the
+  existing `commsQueue`, queued and marked sent in the same click** — not
+  bypassed with a special "real send" path. The mandate is explicit (no real
+  emails; fakes behind ports only) and §5.7's own note says the same; the
+  difference from an automated comms rule is that a person pressing "Enviar"
+  on one specific presupuesto IS the approval, so queue → approve → record
+  happens in one motion instead of sitting in Cola waiting for someone to
+  approve a decision they already made. (d) **A new template, `quote-send`,**
+  was seeded rather than reusing `quote-followup` — the covering message for
+  the INITIAL send is a different piece of wording from the "have you looked
+  at this yet" follow-up, and slide 1 explicitly asked for it to be editable
+  in Configuración → Comunicaciones like everything else there. (e) **"en
+  mano" reveals its date/time fields inline in the same drawer** rather than
+  opening a second pop-up on top of it — slide 1 asked for a pop-up, but the
+  send drawer already IS the one screen that question belongs to, and
+  progressive disclosure reads the same to the operator without stacking
+  modal-on-drawer. The date follows PK2-A's rule: backdatable, never
+  postdated. (f) **The PDF download reuses the exact `.doc` markup Vista
+  previa already renders** (`renderBudgetDocHtml()`, extracted out of
+  `budgetDrawer`) and prints it via the browser's own print dialog — the
+  established pattern (`#tPrint` already does this elsewhere) — rather than
+  pulling in a PDF-writing library for one button. The print is isolated on
+  its own `.printsheet` appended to `<body>`, with `@media print` hiding every
+  other direct child of body, so the rail and the drawer chrome never appear
+  on the page. (g) **A real, newly-reachable bug was fixed in passing**: the
+  Vista previa title appended "(aceptada)" whenever the BUDGET had an
+  accepted version anywhere, not only when the version on screen actually was
+  that one — invisible before this session, because nothing could open a
+  non-accepted version's document before the navigator existed, and wrong on
+  exactly the screen this session built. Fixed to check the version being
+  shown.
+
+- **#156 — contract detail layout + garantías + anexo evidence (Package 2
+  slides 5–8, PK2-C · 2026-08-11).** Decisions taken: (a) **the fix to the
+  392px panel is a grid change, not a redesign.** `minmax(392px, 1fr)`
+  replaces the fixed `392px` — the document column keeps its own cap near
+  760 (it renders a fixed-width piece of paper; more width there buys
+  nothing), and the panel takes whatever is left. This resolves both slide 5
+  (the empty strip) and slide 7 (Hitos de pago's forced horizontal scroll)
+  with one change, because they were the same bug seen from two tabs.
+  (b) **Garantías gets its own label map (`CON_GUARANTEE`)**, mirroring the
+  `CON_TRIGGER` map installment triggers already used — engine vocabulary
+  (`executionAndFinishes`/`installations`/`structural`) never belonged on a
+  customer-facing document, and the fix is scoped to `contractDocPane`
+  because that is the only place it was ever printed raw. (c) **The Anexos
+  tab reads the change record behind each entry** (`desc`, `reason`) rather
+  than adding new fields that would duplicate what the change already
+  states — an annex only exists because a change was approved, so the
+  detail already lives one lookup away. (d) **"Aprobar" became a drawer**
+  instead of a one-click button that fired `approveChange` immediately: the
+  hardcoded evidence string it wrote (`"aceptacion-cliente.png"`) was a real
+  bug of the exact same shape PK2-A fixed on the presupuesto's acceptance —
+  a fake filename with no file behind it, now a real `evidenceField()`
+  upload like every other evidence-collecting moment in this system.
+  (e) **`approveChange`'s signature changed to an options object**
+  (`{ evidenceRef, evidence }`) rather than a bare positional string, to
+  carry the new field the same way `acceptVersion` does — with no
+  backwards-compatibility shim, since every one of its six call sites (two
+  simulations, two seed builders, the history generator, the one real UI
+  site) is in this repository and was updated directly.
+
+- **#157 — creating a contract, and recording one signed elsewhere (Package 2
+  slide 4, PK2-D · 2026-08-11).** The slide reports there is no way to
+  create or upload a contract; investigation found that literally **no
+  contract could be created from the application at all** — every one came
+  from the seed — so this session had to deliver CON-01's normal path as well
+  as the manual one. Decisions taken: (a) **`registerExternalContract` is a
+  separate method, not `createContract` with a null budget.** CON-02 ("a
+  contract requires an accepted budget version") is a real rule that should
+  keep failing loudly for contracts this system draws up; a contract signed
+  on paper is a different kind of fact, not an exception to that rule, and
+  giving it its own entry point keeps the invariant intact instead of
+  weakening it for every caller. (b) **`origin` decides what the screen
+  shows, and this is the point of the field.** A generated contract renders
+  the document this system produces; an external one renders **the uploaded
+  file**, because printing our own «CONTRATO DE OBRA» over a contract drafted
+  by somebody else's lawyer would be presenting a document nobody signed as
+  though it were the agreement. The structured data still exists beside it —
+  importe vigente, anexos and the cash forecast all need it — but it is
+  explicitly an index of the contract rather than the contract. (c) **Both
+  sources live in one drawer**, chosen by a radio at the top, because "where
+  does this contract come from" is the first thing the operator must answer;
+  two separate buttons would ask them to decide before the difference is on
+  screen. (d) **Milestones are entered as rows (trigger · % · date), not as
+  the `paymentConditions` free-text list.** That list says "40% a la firma,
+  60% a la entrega", which reads well and cannot be turned into dates and
+  amounts without guessing — and these rows feed ADM-08's cash forecast,
+  where a guess is worse than a blank. The total shows amber when it does not
+  reach 100%, but does not refuse: a contract really can be part-scheduled.
+  (e) **Completeness still blocks (decision 21 / RD 1619/2012) but offers a
+  way through**: the drawer opens the client editor and returns with
+  everything already typed, the attached file included — the blob is already
+  in the store, so only the record travels. Recording a contract from paper
+  does not change what the law needs before it can be invoiced, so no
+  loophole was introduced. (f) **The default VAT for a hand-entered contract
+  is 10%**, matching what a new budget takes, so a quoted job and a
+  hand-typed one start from the same rate rather than two different ones.
+  (g) **A pre-existing bug was fixed rather than worked around**: both
+  contract paths now validate before `nextNumber` mints a number, because
+  minting is a side effect on a gap-free series (ORG-04) and validating
+  afterwards left a permanent hole whenever a contract was refused. It was
+  unreachable before this session only because nothing could create a
+  contract.
+
+- **#158 — presupuesto validity date + the contract document's sizing and
+  scroll clearance (Package 3 slides 5–6, PK3-A · 2026-08-12).** Slide 5
+  asked that a presupuesto's validity date never be typeable into the past —
+  a date already in the past has expired before anyone could read the offer,
+  which is not a state the field should accept. Slide 6 flagged the contract
+  document card as "poco profesional" (blank white space around a short
+  document) and separately, that scrolling to the end of a long contract
+  left the FIRMA section hidden. Decisions taken: (a) **the enforceable
+  check lives in `updateBudget` (erp-engine.js), the `min` attribute on
+  `#bcValid` is the UX affordance only** — a picker's `min` stops the
+  calendar offering an earlier day but does not stop a typed or
+  programmatic value, so the engine guard is what actually holds; confirmed
+  by grep that `#bcValid` is the only editable `validityDate` input
+  site-wide (three other occurrences are read-only display spans). (b) **the
+  guard rejects a past date, not a postdated one** — this is the _inverse_
+  of the backdatable-but-never-postdatable pattern used elsewhere
+  (`acceptVersion`/`issueVersion`/`signContract`), because a validity date
+  describes how long an offer stands going forward, not when a past event
+  happened. (c) **`.condoc`'s missing `align-items` was the root cause of
+  the sizing complaint**, not a `.cdoc` sizing rule — a flex container
+  defaults to `stretch`, so a short document's card was forced to the full
+  column height with nothing to fill it. `align-items: flex-start` was
+  chosen over constraining `.cdoc`'s own height because it only changes
+  behaviour for _short_ documents; a long one already grows past the
+  container on flexbox's own content-based minimum, `align-items` never
+  enters into it, verified empirically (with the fix reverted via `git
+stash`, a tall-viewport scratch check showed the short document's card
+  forced to the container's full height; with the fix, sized to its own
+  content). (d) **bottom clearance was added to `.condoc`'s padding, not to
+  `.cdoc` or to the language pill** — the pill (`#canei-lang-pill`,
+  site/i18n.js) is a fixed-position, cross-page element outside this
+  screen's control, so the document's own scroll container is the correct
+  place to reserve space for it. Verified against the seed's longest
+  contract: without the fix the card's bottom edge (2984px) sat below the
+  pill's top (2957px) at max scroll; with the fix it clears.
+
+- **#159 — Presupuestos register onto the shared list primitive, and a way
+  to start one that isn't buried in a visit (Package 3 slide 4, PK3-B ·
+  2026-08-12).** `budgetList` predated `renderMasterList` and was a raw
+  `<table>` grouped into five stage sections — no search, no export, no
+  pagination — and the only way to create a presupuesto was a "＋ Crear
+  presupuesto" button on an already-completed visit's own drawer
+  (`visitDetailDrawer`), so a lead nobody had visited yet had no path to a
+  presupuesto at all. Decisions taken: (a) **the stage grouping becomes an
+  Estado column, not a preserved table section** — `renderMasterList` is a
+  flat, searchable, paginated list by design, and every other register in
+  this app (Contratos, Facturas…) already shows its state as a pill per row
+  rather than a section heading, so this makes Presupuestos consistent with
+  the rest of the app instead of a one-off. The stage order is kept as the
+  sort key on `baseRows` (draft first, closed last), so the "what's
+  unwritten first" reading survives even though the visual grouping does
+  not. (b) **`newBudgetDrawer` offers two sources, not one** — a completed
+  visit (mirroring `visitDetailDrawer`'s existing shortcut exactly:
+  `createBudget` then `validateVisit(v.id, {budgetId}, user)` to link it
+  back) or an open lead, filtered to `opportunities` in `awaitingVisit` or
+  `awaitingBudget` status — both pre-`awaitingResponse`, i.e. no budget has
+  been issued for that party yet. A lead is offered deliberately without
+  requiring its visit to exist, per the explicit instruction that "a visit
+  should not be required" — pricing a job the operator already knows enough
+  about should not wait on a site visit being scheduled and completed
+  first. (c) **No completeness gate on this drawer** — decision 21's rule
+  (lead/visita/presupuesto proceed with whatever data exists; only
+  contrato/factura block) already covers a presupuesto, so unlike
+  `newContractDrawer` this flow needs no client-editor detour. (d) **Three
+  pre-existing site-e2e assertions that read `tr.grouphd` DOM structure had
+  to change, not just gain new checks** — they tested the group-header
+  markup the raw table produced, which no longer exists once the table is
+  `renderMasterList`'s. Updated to read the Estado pill on each row instead
+  (find the draft by pill text rather than by table position), following
+  the same precedent as PK2-C's `/392px$/` assertion: a check that tests
+  for the old shape is retargeted at the new one, not dropped.
+
+- **#160 — one progress control instead of two, and what that costs
+  (Package 3 slides 1–3, PK3-C · 2026-08-12).** PRY-01 had two controls
+  writing the same fact by different routes: the Gantt's grid, which wrote
+  the plan's bars _and_ the engine, and the «Avance» tab's three-state
+  control, which wrote only `markProgress` — so a figure typed in the tab
+  never reached the chart or the S curve. Decisions taken: (a) **the Gantt's
+  grid is the one that survives, and the tab's control is what it is now
+  built from** — the write path is the property that cannot be added later,
+  and the three-state buttons are presentation that ports in an afternoon;
+  doing it the other way round would have meant re-deriving the
+  `recordProgress`/`syncProgress` wiring on a screen that had never had it.
+  This reverses my own earlier claim, made before the grid was tested, that
+  the tab was "the only place chapter progress is recorded". (b) **The
+  quantity input is dropped with no migration and no engine change**:
+  `markLineProgress` converts `qtyMilliDone` to a percentage and persists
+  only `l.progressPct`, so there is no stored quantity to orphan. The engine
+  keeps accepting the parameter — removing a working input from the domain
+  layer to reflect a UI decision would be the wrong direction — it simply
+  has no caller in the UI. (c) **`<table>` → `.provrow` flex rows is a
+  mobile fix, not a cosmetic one.** The seven-column table forced sideways
+  scrolling at 390 px, which is exactly what the operator's
+  "desktop-and-mobile" constraint rules out; the flex row plus the existing
+  `@media (max-width:860px)` collapse of `.pstate` gives one control that is
+  three buttons on a desk and a one-tap cycle on a phone, with no second
+  markup path. (d) **The chapter percentage is read from
+  `erp.chapterProgress`, not averaged in the view** — it is value-weighted,
+  and it is the same function `syncProgress` carries onto the bars, so the
+  box and the bar directly above it cannot tell different stories. The tab
+  averaged line percentages unweighted, which was a third figure for the
+  same quantity. (e) **`markProgress`'s `null` percentage is no longer sent
+  for «En ejecución».** The tab relied on the engine's `?? 50` default, which
+  overwrote a chapter already at 40 %; the merged control passes the current
+  figure when there is one. This changes behaviour deliberately and in the
+  operator's favour. (f) **PRY-01 alone hides its list when a job is open**,
+  overriding §3.2's "the list never disappears" — it is the one screen whose
+  panel is a working surface rather than a record to read. Recovery is two
+  ways (the project selector above, the ✕ on the panel), so the override
+  costs no navigation. (g) **«Ficha» is deleted rather than moved**: every
+  figure on it is read from a screen that owns it (ADM-01, PRY-03, or the
+  panel header two lines above), so re-homing it would have re-created the
+  duplication this session exists to remove. (h) **The derive guard names
+  what it will destroy.** `mergeDerivedPlan` iterates the derived tasks, so
+  hand-added tasks/milestones and hand-drawn dependencies do not survive a
+  re-derivation while progress, baselines and pinned dates do; the
+  confirmation counts the former rather than warning generically, because a
+  generic warning on an action that is usually safe is an action people learn
+  to confirm without reading.
+
+- **#161 — PRY-01 collapses to two screens, and what that trades away
+  (Package 4 slide 1–3, PK4-A · 2026-08-12).** The operator's instruction was
+  explicit and radical: delete the project bar, replace the intermediate panel
+  with the Gantt screen itself, and add a way back to the list — "just two
+  screens", the list of jobs and one job's physical progress. Decisions taken:
+  (a) **the middle screen is deleted rather than slimmed**, because the three
+  figures it existed to state (tareas, fin de obra previsto, ruta crítica) are
+  all already on the chart — the first two as toolbar chips, the rest in the
+  Desviaciones panel — so it was a screen whose only unique content was a
+  button to the next screen. (b) **The project bar goes from PRY-01 only, not
+  globally.** The other four `PROJECT_SUBS` screens are each a single screen
+  that must be told which job it is about; PRY-01 is the only one where a list
+  of jobs is already on screen, which made the dropdown a second way to answer
+  a question the list was already asking. (c) **Switching job is now
+  back-then-click, not a dropdown** — one extra click, accepted deliberately
+  as the price of the operator's "exactly two screens", and cheap because the
+  back button lands on the list with its search still filled in.
+  (d) **`ganttFull` is set BEFORE `setProject` in the row handler**, since
+  `setProject` calls `render()` itself; the other order renders the list and
+  then the chart, which flickers. (e) **Deep links follow the screen.** All
+  five `go("progress", …)` callers — alerts, universal search, the change
+  register — now land on the chart, because that is where the job's work is;
+  the search path was still seeding a `centreState.progress` panel that no
+  longer exists. (f) **The unplanned job needed an honest empty state, and
+  this is the one thing the change actually broke.** Landing on the chart
+  directly means a job with no accepted presupuesto lands there too — and the
+  first row of the seeded list is exactly that — where the old empty state
+  offered «Derivar del presupuesto», which for such a job can only fail with
+  "no tiene presupuesto aceptado". The button is disabled there now and the
+  screen states what is missing, offering the presupuesto instead. This was
+  found by asking what the FIRST row of the list does, before writing the
+  change, rather than after. (g) **PK3-C's `hideListWhenOpen` is deleted, not
+  left dormant.** It was shipped an hour earlier to hide the list beside the
+  open panel; with the panel gone it is machinery with no purpose, and leaving
+  it would suggest a mode that no longer exists. `renderCentre` itself stays —
+  PRY-02 still wants a list beside a panel. (h) **A pre-existing bug in the
+  shared project bar, surfaced by writing the honest assertion.** With no
+  dropdown on PRY-01 the "context survives a subsection change" check had to
+  compare `gProject` to what the next screen's bar shows, instead of comparing
+  the bar to itself — and that exposed that `projectOptions()` is filtered, so
+  an active job outside the current filter left the `<select>` with no matching
+  `<option>`, which a browser renders as the FIRST option. The bar named one
+  job while the screen rendered another. The active job is now prepended to its
+  own option list rather than the filter being widened, so «Abiertos» keeps its
+  meaning and the selector cannot misname what is on screen.
+
+- **#162 — Avance económico replicates PK4-A, but only where the analogy
+  actually holds (PK4-B · 2026-08-12).** The operator asked to replicate
+  "most of the changes" from Avance Físico onto Avance Económico. Rather than
+  copying the whole PK4-A change set, a contrast was run first — measuring
+  the running app, not guessing from the diff — and only three of PK4-A's
+  seven moves turned out to have a real PRY-02 counterpart: delete the
+  project bar, promote the panel to full screen, and (found on inspection,
+  not assumed) no empty state is needed. Decisions taken: (a) **the
+  duplication was measured before being called duplication** — with a job
+  open, the project bar read `VENTA CONTRATADA 2.566 € · COSTE REAL 2.518 €
+· MARGEN ACTUAL 48 €` while the KPI cards two lines below read `Venta /
+Coste / Margen`, the same three figures twice. (b) **The "no empty state
+  needed" finding came from reading the two project-creation paths, not from
+  assuming symmetry with Físico** — `createProjectFromAcceptance` and
+  `createQuickProject` both populate `baseline.chapters` unconditionally at
+  creation (the quick path always seeds one synthetic chapter), so unlike a
+  Gantt plan — which genuinely can be absent — a project's baseline can
+  never be empty by construction. Confirmed against the seed (14/14 projects
+  non-empty) rather than asserted from the model alone, and the panel's
+  existing defensive fallback already covers the type-theoretic case, so no
+  new empty-state code was written. (c) **The four remaining PK4-A/PK3-C
+  items were not force-fit** — no duplicate progress control exists on
+  economics to merge, nothing to move, nothing to guard against
+  overwriting, and no tabs to delete — because economics never had the
+  Físico-specific problems those changes solved. Replicating them anyway
+  would have been solving problems that do not exist here. (d) **The
+  "one progress figure drives both PRY screens" test assertion is retired,
+  not patched**, because its target — PRY-02's own progress-bar display —
+  was itself part of the duplication being deleted; there is nothing left in
+  PRY-02's UI to compare against PRY-01's recorded percentage, and inventing
+  a new display just to keep an old assertion alive would reintroduce the
+  duplication the session removes. (e) **Two other assertions were reading
+  `#economics`'s dropdown to check state that had nothing to do with
+  economics** — "context survives a subsection change" and the header/
+  Recientes check both used PRY-02 only because it still had a bar when they
+  were written; with the bar gone from both PRY screens, they retarget to
+  PRY-03 (`variations`), which was never their real subject and is simply
+  the nearest screen that still carries one.
+
+- **#163 — cards that fit the phone, and a language switch that stops getting
+  in the way (PK5-A · 2026-08-12).** Two operator reports from a real iPhone,
+  both global. Decisions taken: (a) **the card bug was diagnosed by measuring
+  rather than by reading the card CSS**, which is what found it: every `td`
+  reported an identical 496px regardless of content, and a uniform width means
+  a floor, not a layout. The floor was the global `table { min-width: 520px }`
+  — correct for desktop, never reset for cards, and unbeatable by `width:100%`.
+  (b) **The fix is scoped to `table.cards`, not to the global rule**, because
+  desktop tables genuinely do need the floor; a card has no columns to preserve
+  and so has no use for it. Tables that opt out of cards (`data-nocards` — the
+  forecast grid, the Gantt, the week calendar) keep the floor and keep
+  scrolling sideways on purpose. (c) **`flex-wrap` was chosen over truncating
+  or right-aligning the value.** A long value now drops to its own line, which
+  is the specification's own "two-line card" — reached only when the line
+  actually needs two, so short values still read as one tidy label/value pair.
+  (d) **The E2E guard was proven to bite before being trusted**: the rule was
+  re-broken on purpose and the new check flagged six routes while
+  `document.scrollWidth` stayed 390 on every one of them. That gap is the
+  finding worth keeping — S14's sweep watched the document, but `.scroll`
+  carries `overflow-x:auto` and absorbed the overflow internally, so the page
+  was innocent while every card was unusable. A container-level assertion is
+  now what guards it. (e) **The language pill is deleted rather than
+  repositioned.** Moving it (higher, smaller, auto-hiding) would have kept a
+  permanent overlay for a preference set once or twice a year — and the app
+  already carried evidence of the cost, since PK3-A reserved blank space under
+  the contract viewer purely to stop the pill covering the document's last
+  line. (f) **DMC-09 is a new subsection rather than a row bolted onto an
+  existing config screen** (29 → 30). None of DMC-01…08 is a preferences
+  screen — they are all data lists — so the alternative was hiding a personal
+  setting inside somebody else's data. **This crosses a line S1B drew on
+  purpose**: `SESSION-S1B.md` refused `journey.html` a subsección with the
+  words "inventing a thirtieth would be exactly the drift the 6×29 count
+  exists to prevent". The distinction is that journey.html already had a home
+  (the profile menu) and wanted a second one, whereas the language setting had
+  no home at all once the pill was removed — the operator asked for it to live
+  in Configuración, and there was nowhere in Configuración for it to live. The
+  count is re-pinned at 30 in site-e2e for the same reason it was pinned at
+  29: so a thirty-first has to be argued for rather than appear. Three earlier
+  extensions (decisions 18, 19, 22) were logged the same way; this is the
+  fourth. (g) **The satellite pages lost their switch
+  and gained no replacement.** They read the same `localStorage` key, so the
+  ERP owns the setting and the guides, the journey page and the two data pages
+  simply honour it — which is one place to change it instead of seven.
+  (h) **The screen states what it does NOT change**, in its own card: a
+  document's language is a field on that document, chosen per customer, and
+  the interface language never rewrites an emitted presupuesto or contrato.
+  That distinction already governs `translate="no"` on the document markup;
+  saying it out loud where somebody changes the setting is cheaper than
+  letting them discover it by sending a contract in the wrong language. (i) **The
+  choices are buttons, not radios, and the test pins the target size.** The
+  first cut used radios; `elementFromPoint` at the radio's centre returned a
+  sibling `<span>`, because `class="opt"` is only styled under `.bside` and had
+  no layout on this screen. A person would not have noticed — the label still
+  toggles the input — but a 13px control that is not even its own hit target is
+  precisely the mobile failure this screen was created to fix, so it would have
+  been the wrong thing to leave in place and teach the test to work around. The
+  E2E now asserts a minimum 30px target so it cannot quietly shrink back.
+
+### 164 · The project bar's summary strip is deleted, not moved (PK5-B)
+
+The operator's instruction was to keep only "proyecto buscar, project dropdown
+list, favorit and status dropdownlist" wherever the project selector appears at
+the top of a section. That is unambiguous about what stays; it is silent about
+whether the twelve deleted figures should reappear somewhere. **Assumed: no.**
+They are not orphaned by the deletion — avance, venta contratada, coste real
+and margen actual are PRY-02's subject and are on that screen already in larger
+type; obra, cliente and estado are named by each screen's own header; próximas
+fechas is PRY-01's Gantt. The strip was a duplicate view of data that has an
+owner, and the operator's stated reason ("si requerimos ver el progreso
+económico, vamos a avance económico") is that the owner is where it belongs.
+
+Two smaller calls inside that, both taken the reversible way:
+
+(a) **The client link is dropped, not re-homed.** It was a real affordance —
+the only clickable thing in the strip — and re-siting it as a lone icon in the
+chooser row would have been defensible. But it would also be the first figure
+back in a bar the operator has just asked to empty, and DMT-01 is two clicks
+away. If it turns out to be missed, adding one button is a smaller change than
+removing one would have been.
+
+(b) **The E2E check is rewritten, not removed.** Deleting the assertion would
+have left the bar unpinned in both directions: a regression that dropped the
+dropdown would then be as invisible as the strip's return. The replacement
+pins the four controls, the single row, and the absence of `€` in the bar's
+text — that last clause is the one that will fail if somebody adds "just the
+margin" back in six months.
+
+### 165 · What the invoice generator assumes, where the operator did not say (PK6-A)
+
+The instruction was four words long — _"Where is the invoice generator?"_ — and
+the answer was that it did not exist. Building one meant deciding several
+things the question did not cover. Each was taken the reversible way.
+
+(a) **Four origins, not one.** The generator could have been a free-text form,
+which is the smallest thing that satisfies "there is a way to bill". It offers
+the contract's pending milestones, a certification against physical progress,
+approved adicionales and free lines instead, because those four are what
+`issueInvoice` already models — `installmentIdx`, `changeId` and the chapter
+progress feed exist and were unused. A form that ignored them would have made
+the operator retype amounts the system already knows, and would have left the
+contract's payment plan permanently showing "planned" against milestones that
+had in fact been billed.
+
+(b) **A certification deducts on a visible line.** Certifiable = executed to
+date − already billed. That aggregate could have been shown as one net figure.
+It is instead chapter lines plus an explicit _"Menos certificado en facturas
+anteriores"_, which is how a certificación reads on paper, and which means a
+customer holding two invoices can see where the difference went. The
+alternative — splitting the deduction back across chapters — would require a
+per-chapter history of what was billed, which the system does not have; any
+split would have been invented.
+
+(c) **The proposal is floored at zero.** A job can legitimately be billed ahead
+of its progress (a deposit precedes the work it pays for), so executed − billed
+goes negative. It reads as "nothing to certify yet" rather than proposing a
+negative certification, which would be a nonsense document rather than an
+honest one.
+
+(d) **The number is minted at issue, never at draft.** Fixing this exposed that
+two existing checks ran _after_ `nextNumber` had already consumed one. See
+entry (e).
+
+(e) **Two engine bugs were fixed rather than worked around.** Both were found
+by building on top of the code rather than by looking for them, and both are
+in scope for a session about invoicing:
+
+- `nextNumber` mutates the series. The AR-10 (abono with no original) and
+  CHG-04 (unapproved adicional) checks sat below the record literal, so a
+  refused invoice still burned a number — leaving it in a series required to
+  have no gaps and on no document. All refusals now precede minting.
+- The milestone→invoice link was written as `installment.invoiceId` and read as
+  `invoicedInvoiceId`. Rather than migrate, the writer now uses the declared
+  name and the reader accepts both, so records written before this fix resolve.
+
+(f) **The `.cdoc table` floor was removed globally, not just for the factura.**
+The global `table { min-width: 520px }` was making the invoice sheet 520 wide
+inside a 356 wide document on a phone. The fix is on `.cdoc table`, which the
+**contract** document also uses. Touching a screen this session did not ask
+about is normally drift; here the alternative was a rule that says "documents
+may not exceed the page, except the contract", which is not a rule anybody
+would write on purpose. The contract's document simply gets the same fix.
+
+### 166 · `issueInvoice` is NOT added to the server command whitelist (PK6-A)
+
+Decision 16 of the v4 plan says every session ships the server half of its own
+screens, and `apps/web/lib/erp-commands.ts` is where a command becomes callable
+from a request body. This session does not add one, and that is deliberate.
+
+`site/erp.html` **dispatches no named commands at all.** It mutates the engine
+in the page and persists the whole document through `ErpStore.saveState`, which
+in remote mode is a `PUT /api/~/erp/state`. There is not one reference to a
+command anywhere under `site/`. So the generator already persists in remote
+mode by exactly the route every other screen in the app uses, and it needs
+nothing from the whitelist to work.
+
+Against that, `apps/web/lib/erp-commands.test.ts` opens by calling the
+whitelist "a security boundary, not a convenience", pins the accepted set
+exactly so that widening it "should be a visible line in a diff", and names
+`issueInvoice` in its list of things that must be **rejected**. Adding it would
+have meant editing that rejection list to make room for the very method it
+cites as an example — to enable no caller. Reserved for whenever `apps/web`
+grows a screen that issues invoices, where it will be a change made for a
+reason rather than out of a checklist.
+
+<!-- Two branches wrote here at once: the v4 programme branch (#149–#166) and
+     main (the iOS/documents/i18n work). Both numbered from their own last
+     entry, so the numbers below repeat some above — main's #151 is not the
+     programme's #151, and main's own #95 appears twice. Nothing is renumbered:
+     these numbers are cited from other documents and from commit messages, and
+     a tidier sequence bought by breaking those references would be a worse
+     document. Entries are kept verbatim, programme first, then main's. -->
+
 - **#151 — a tab's URL is resolved as a URL, and the guard for it lives in Node
   (2026-08-10).** Every screen in the phone app answered 404 while the server
   was demonstrably healthy — `/api/health` reporting the release commit and a
@@ -3167,7 +3867,47 @@ different decisions, so these ten arrived colliding. They are renumbered from
   mailbox · ownership, bundle-safety, workbook, iOS routes.
   **Reversible: yes** — additive dictionary entries and one lookup fallback.
 
-## 2026-08-16 — translation: instrument the translator instead of scanning for it
+### 167 · The source-literal i18n ceiling was raised by the merge, and that is a debt (2026-08-16)
+
+Merging the v4 programme branch into main made two of main's i18n ratchets fail.
+They were treated differently on purpose, and the difference is the point.
+
+**The booted-workspace audit was fixed, not budgeted.** It walks twelve screens
+of the running app and found seven untranslated strings — two screen subtitles,
+a search placeholder, and a version cell. All seven were translated, so its
+ceiling comes **down** from 3 to 0. The version cell was the interesting one:
+it rendered `v1.0` and `· 2 versiones` as two separate text nodes, and a
+dictionary rule written for exactly that cell (`^v(\d+) · (\d+) versiones$`) had
+been sitting unused since the day it was added, because a translator sees text
+nodes and not the sentence a reader assembles from them. Emitting one node made
+the existing rule fire, and exposed that "1 versiones" had been wrong Spanish
+that nobody had looked at.
+
+**The source-literal audit was budgeted, and this is the honest part.** Its
+ceilings of 147 (EN) and 219 (CA) were measured on main's `erp.html`. The
+programme branch's `erp.html` is twelve sessions larger — the presupuestador,
+the Gantt, Avance económico, the invoice generator and everything around them —
+and none of that Spanish had ever been scanned by this gate. The merged
+measurement is 256 and 335, so the ceilings are set there.
+
+**Why not translate them instead.** 256 English and 335 Catalan strings is a
+translation session, not a step inside a merge. Doing it badly inside this
+commit would put machine-guessed Catalan in front of customers, which is worse
+than an honest gap; doing it well means a session with a native speaker's
+review, which is what the Catalan backlog ratchet already exists to schedule.
+
+**What stops this becoming permanent.** The ceilings are the exact measurement,
+not a round number with headroom, so the very next untranslated string written
+fails the gate. The audit that measures what an operator actually reads is at
+zero. And the number is recorded here, in the CI file, and in the merge commit,
+so nobody has to rediscover why it moved.
+
+**The objection, stated.** Raising a ratchet is the thing ratchets exist to
+prevent, and if the operator would rather hold the merge until the strings are
+translated, that is a defensible call and the ceilings should go back to
+147/219 with a translation session scheduled first.
+
+### 168 · The translator reports its own misses, instead of four scanners guessing (2026-08-16)
 
 **Context.** A photograph of the invoice-issuing screen showed English chrome
 around Spanish labels while all four translation gates were green. The mandate

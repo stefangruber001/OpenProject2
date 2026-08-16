@@ -371,6 +371,19 @@
   return {
     recognise: recognise,
     prepareOffline: prepareOffline,
+    /**
+     * pdf.js, loaded once and READY TO RENDER.
+     *
+     * Published rather than kept private because three screens outside this
+     * module open a PDF — the purchase comparison pane, the captured-document
+     * pane and the evidence viewer — and each of them used to `import()` the
+     * library directly. That import resolves, and then the first render
+     * throws `No "GlobalWorkerOptions.workerSrc" specified`, because the
+     * worker path is set HERE and nowhere else: those screens only worked at
+     * all if the capture screen happened to have run first. One loader, so
+     * "I have pdf.js" and "pdf.js can draw" cannot come apart again.
+     */
+    loadPdfjs: loadPdfjs,
     /** For a screen that wants to say what it will have to fetch. */
     vendorBase: function () {
       return V;
