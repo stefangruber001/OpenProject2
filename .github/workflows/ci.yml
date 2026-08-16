@@ -108,6 +108,24 @@ jobs:
       # gate nobody can pass is a gate that gets deleted. The ceilings are the
       # numbers measured on 2026-08-16 and only ever move down. See the header
       # of audit.mjs for what inflates them.
+      # ONE LIST OF TAB NAMES, NOT THREE.
+      #
+      # The web nav, the iOS tab bar and the Android tab bar each carried their
+      # own labels: the web translated, iOS was hardcoded English, Android
+      # hardcoded Spanish. So the app said "Sales" over a page whose breadcrumb
+      # said "Commercial" — and would have said "Sales" on a Spanish phone.
+      # i18n.js runs inside the web view and cannot reach a native bar.
+      #
+      # nav.json is generated from SECTIONS in erp.html, with every label
+      # resolved through the same dictionary, and copied to the two app bundles.
+      # This regenerates and diffs all three: rename a section without running
+      # the script and the build fails instead of the phone disagreeing with
+      # itself. The generator also refuses to emit a tab label that has no
+      # English or Catalan form, because a shell cannot run the dictionary.
+      - name: Navigation manifest is in sync (web · iOS · Android)
+        if: always()
+        run: node scripts/gen-nav-manifest.mjs --check
+
       - name: Translation completeness (dictionary)
         if: always()
         run: node tests/i18n/coverage.mjs

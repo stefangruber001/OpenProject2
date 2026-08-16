@@ -14,6 +14,7 @@ import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.tabs.TabLayout
+import org.json.JSONObject
 
 /**
  * Premium native shell around the live web app — the Android twin of the iOS
@@ -50,18 +51,68 @@ class MainActivity : AppCompatActivity() {
 
     /** The tabs of the app — same pages as the iOS shell. */
     private data class Tab(val title: String, val path: String)
-    private val tabs = listOf(
-        // The ERP shell's own sections, addressed by their v4 route keys. These
-        // used to be the four standalone pages the app was born with, which are
-        // redirect stubs today: they still resolved, but through two hops and
-        // onto whichever screen the stub pointed at rather than the one the tab
-        // is named after.
+
+    /**
+     * The tabs, READ FROM the shared `nav.json` — never written here.
+     *
+     * They used to be six hardcoded SPANISH strings, while iOS carried six
+     * hardcoded ENGLISH ones and the web had a third set that actually
+     * translated. Three lists, two of them untranslatable, nothing forcing any
+     * of them to agree: the app showed "Comercial" over a page titled
+     * "Commercial" on an English device, and iOS showed "Sales" over the same
+     * page. A WebView's translator cannot reach the native bar above it.
+     *
+     * `nav.json` is generated from SECTIONS in erp.html with every label
+     * resolved through the same dictionary the web uses, and CI diffs it, so
+     * renaming a section updates every surface at once.
+     *
+     * Read from the app's assets rather than the network: the bar is drawn
+     * before the first request completes. Refreshed on every app build.
+     */
+    private val tabs: List<Tab> by lazy { loadTabs() }
+
+    /** Device language, unless the operator chose one in the app. */
+    private fun uiLanguage(): String {
+        val chosen = getSharedPreferences("canei", MODE_PRIVATE).getString("canei_lang", null)
+        if (chosen != null && chosen in listOf("es", "ca", "en")) return chosen
+        val device = resources.configuration.locales[0].language.lowercase()
+        return if (device in listOf("es", "ca", "en")) device else "es"
+    }
+
+    /**
+     * Decode the manifest, falling back to the last known-good layout.
+     *
+     * The fallback is deliberate and is NOT a second source of truth: an app
+     * with no tab bar is unusable, and a decode failure means a packaging
+     * mistake, which should degrade to a working bar rather than a blank one.
+     */
+    private fun loadTabs(): List<Tab> {
+        return try {
+            val text = assets.open("nav.json").bufferedReader().use { it.readText() }
+            val arr = JSONObject(text).getJSONArray("tabs")
+            val lang = uiLanguage()
+            val out = ArrayList<Tab>(arr.length())
+            for (i in 0 until arr.length()) {
+                val t = arr.getJSONObject(i)
+                val label = t.getJSONObject("label")
+                // Spanish is the hub everywhere else in this product, so it is
+                // the last resort here too — never an empty tab.
+                val title = if (label.has(lang)) label.getString(lang) else label.getString("es")
+                out.add(Tab(title, t.getString("path")))
+            }
+            if (out.isEmpty()) fallbackTabs else out
+        } catch (e: Exception) {
+            fallbackTabs
+        }
+    }
+
+    private val fallbackTabs = listOf(
         Tab("Torre", "erp.html#tower"),
-        Tab("Proyectos", "erp.html#progress"),
         Tab("Comercial", "erp.html#leads"),
+        Tab("Proyectos", "erp.html#progress"),
         Tab("Admin.", "erp.html#invoicing"),
         Tab("Maestros", "erp.html#customers"),
-        Tab("Guía", "setup-guide.html"),
+        Tab("Config.", "erp.html#users"),
     )
 
     private lateinit var webView: WebView
