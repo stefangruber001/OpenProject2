@@ -325,23 +325,42 @@
       if (hit === undefined) hit = alt.get(collapsed);
     }
     if (hit === undefined) {
+      /**
+       * BOTH FORMS, the way the exact lookup above already does.
+       *
+       * A text node written across two lines of HTML arrives with a newline
+       * and indentation inside it. The exact pass handles that — it tries the
+       * trimmed string and then the whitespace-collapsed one — and the regex
+       * pass did not: it only ever tested `trimmed`, so a rule anchored with
+       * ^…$ could never match a string with a line break in the middle.
+       *
+       * The ledger then reported the COLLAPSED form, because that is what it
+       * records. So the report named strings whose rules matched perfectly
+       * when pasted into a console — which is precisely what happened, twice,
+       * and cost two rounds of hunting for a fault in the rules that was never
+       * in the rules.
+       */
+      var forRules = trimmed;
       for (var i = 0; i < rx.length; i++) {
         var m = rx[i];
         var re = m[0];
         re.lastIndex = 0;
-        if (re.test(trimmed)) {
+        if (!re.test(trimmed)) {
           re.lastIndex = 0;
-          hit = applyRule(trimmed, re, m[1]);
-          // A rule that MATCHED has handled this string. If it produced the
-          // same text, the two languages agree here — "Email: x@y" is "Email:
-          // x@y" — and that is a decision, not a gap. Without this the ledger
-          // counted every such line as untranslated: seventeen customer email
-          // rows, the payment-term codes, and a dozen others, all of them
-          // already correct on screen. A report padded with strings that need
-          // nothing is a report nobody finishes reading.
-          ruled = true;
-          break;
+          if (collapsed === trimmed || !re.test(collapsed)) continue;
+          forRules = collapsed;
         }
+        re.lastIndex = 0;
+        hit = applyRule(forRules, re, m[1]);
+        // A rule that MATCHED has handled this string. If it produced the same
+        // text, the two languages agree here — "Email: x@y" is "Email: x@y" —
+        // and that is a decision, not a gap. Without this the ledger counted
+        // every such line as untranslated: seventeen customer email rows, the
+        // payment-term codes, and a dozen others, all already correct on
+        // screen. A report padded with strings that need nothing is a report
+        // nobody finishes reading.
+        ruled = true;
+        break;
       }
     }
 
