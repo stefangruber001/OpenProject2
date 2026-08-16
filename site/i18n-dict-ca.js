@@ -2419,8 +2419,59 @@ window.CANEI_DICT.ca = {
   Datos: "Dades",
   Ciudad: "Ciutat",
   Contacto: "Contacte",
+  "Crear presupuesto": "Crear pressupost",
+  "De un lead abierto": "D'un lead obert",
+  "De una visita realizada": "D'una visita realitzada",
+  "Ir a Presupuestos": "Anar a Pressupostos",
+  "Hasta el": "Fins al",
+  "Las mediciones y notas de la visita quedan enlazadas al presupuesto.":
+    "Els mesuraments i les notes de la visita queden enllaçats al pressupost.",
+  "Arrastra aquí el contrato firmado (PDF o imagen), o búscalo en el dispositivo.":
+    "Arrossega aquí el contracte signat (PDF o imatge), o cerca'l al dispositiu.",
+  "Esta obra no tiene un presupuesto aceptado del que derivar la planificación":
+    "Aquesta obra no té un pressupost acceptat del qual derivar la planificació",
+  "Esta obra todavía no tiene un presupuesto aceptado, así que no hay capítulos ni partidas que planificar ni sobre los que registrar avance.":
+    "Aquesta obra encara no té un pressupost acceptat, així que no hi ha capítols ni partides per planificar ni sobre els quals registrar avanç.",
+  "Extracto a la izquierda, documentos candidatos a la derecha y la propuesta de emparejamiento en medio, con el porqué. La cola de movimientos sin conciliar es el indicador de salud del periodo.":
+    "Extracte a l'esquerra, documents candidats a la dreta i la proposta d'aparellament al mig, amb el perquè. La cua de moviments sense conciliar és l'indicador de salut del període.",
+  "El idioma de la interfaz, para quien está usando el programa. No cambia el idioma de los presupuestos ni de los contratos: eso se elige por cliente, en cada documento.":
+    "L'idioma de la interfície, per a qui està fent servir el programa. No canvia l'idioma dels pressupostos ni dels contractes: això es tria per client, a cada document.",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  [new RegExp("^(\\d+) meses$"), "$1 mesos"],
+  [new RegExp("^(\\d+) mes$"), "$1 mes"],
+  [new RegExp("^(\\d+) semanas$"), "$1 setmanes"],
+  [new RegExp("^(\\d+) semana$"), "$1 setmana"],
+  [
+    new RegExp(
+      "^(.+) · (\\d{2}\\/\\d{2}\\/\\d{4}) → (\\d{2}\\/\\d{2}\\/\\d{4}) · (\\d+) d · crítica$",
+    ),
+    "$1 · $2 → $3 · $4 d · crítica",
+  ],
+  [
+    new RegExp("^(.+) · (\\d{2}\\/\\d{2}\\/\\d{4}) → (\\d{2}\\/\\d{2}\\/\\d{4}) · (\\d+) d$"),
+    "$1 · $2 → $3 · $4 d",
+  ],
+  [
+    new RegExp("^(\\S+) · hito (\\d+) · ([\\d.,]+ €) · (\\d{2}\\/\\d{2}\\/\\d{4}) · facturado$"),
+    "$1 · fita $2 · $3 · $4 · facturat",
+  ],
+  [
+    new RegExp("^(\\S+) · hito (\\d+) · ([\\d.,]+ €) · (\\d{2}\\/\\d{2}\\/\\d{4})$"),
+    "$1 · fita $2 · $3 · $4",
+  ],
+  [new RegExp("^A la finalización · ([\\d.,]+ €) · (\\S+)$"), "A la finalització · $1 · $2"],
+  [
+    new RegExp("^(\\d+) traspaso\\(s\\) marcados — no cuentan como ingreso ni gasto$"),
+    "$1 traspàs(os) marcats — no compten com a ingrés ni despesa",
+  ],
+  [
+    new RegExp("^(\\d+) mensaje\\(s\\) en cola — ninguno se ha enviado$"),
+    "$1 missatge(s) a la cua — cap no s'ha enviat",
+  ],
+  [new RegExp("^Enviar (\\S+) · v([\\d.]+)$"), "Enviar $1 · v$2"],
+  [new RegExp("^(.+) · (\\d+) d · (\\d+) visita$"), "$1 · $2 d · $3 visita"],
+  [new RegExp("^(.+) · (\\d+) d · (\\d+) visitas$"), "$1 · $2 d · $3 visites"],
   [new RegExp("^(\\d+) oportunidades$"), "$1 oportunitats"],
   [new RegExp("^(\\d+) oportunidad$"), "$1 oportunitat"],
   [new RegExp("^margen previsto ([\\d.,]+\\s*€)$"), "marge previst $1"],

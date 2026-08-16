@@ -312,6 +312,7 @@
     var trimmed = text.trim();
     if (!trimmed) return null;
     lastMiss = false;
+    var ruled = false;
     var hit = map.get(trimmed);
     if (hit === undefined) {
       // collapse internal runs of whitespace (multi-line HTML text nodes)
@@ -331,6 +332,14 @@
         if (re.test(trimmed)) {
           re.lastIndex = 0;
           hit = applyRule(trimmed, re, m[1]);
+          // A rule that MATCHED has handled this string. If it produced the
+          // same text, the two languages agree here — "Email: x@y" is "Email:
+          // x@y" — and that is a decision, not a gap. Without this the ledger
+          // counted every such line as untranslated: seventeen customer email
+          // rows, the payment-term codes, and a dozen others, all of them
+          // already correct on screen. A report padded with strings that need
+          // nothing is a report nobody finishes reading.
+          ruled = true;
           break;
         }
       }
@@ -409,8 +418,9 @@
 
     if (hit === undefined || hit === trimmed) {
       // The one place in the application that knows, for certain and at the
-      // moment it matters, that a visible string has no translation.
-      record(collapsed || trimmed, where);
+      // moment it matters, that a visible string has no translation — unless a
+      // rule already claimed it, see above.
+      if (!ruled) record(collapsed || trimmed, where);
       return null;
     }
     // Whatever this call produced is now an ANSWER, and answers come back:

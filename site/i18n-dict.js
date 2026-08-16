@@ -4393,8 +4393,71 @@ window.CANEI_DICT = {
       "Se abre el generador con lo que ya se puede facturar de esa obra: los hitos del contrato pendientes, el avance certificable y los adicionales aprobados.",
       "Opens the generator with everything on that job that can already be invoiced: the contract's outstanding milestones, the progress that can be valued, and approved variations.",
     ],
+    ["Crear presupuesto", "Create quote"],
+    ["De un lead abierto", "From an open lead"],
+    ["De una visita realizada", "From a completed visit"],
+    ["Ir a Presupuestos", "Go to Quotes"],
+    ["Hasta el", "Up to"],
+    [
+      "Las mediciones y notas de la visita quedan enlazadas al presupuesto.",
+      "The visit's measurements and notes stay linked to the quote.",
+    ],
+    [
+      "Arrastra aquí el contrato firmado (PDF o imagen), o búscalo en el dispositivo.",
+      "Drag the signed contract here (PDF or image), or find it on the device.",
+    ],
+    [
+      "Esta obra no tiene un presupuesto aceptado del que derivar la planificación",
+      "This job has no accepted quote to derive the plan from",
+    ],
+    [
+      "Esta obra todavía no tiene un presupuesto aceptado, así que no hay capítulos ni partidas que planificar ni sobre los que registrar avance.",
+      "This job has no accepted quote yet, so there are no chapters or line items to plan or to record progress against.",
+    ],
+    [
+      "Extracto a la izquierda, documentos candidatos a la derecha y la propuesta de emparejamiento en medio, con el porqué. La cola de movimientos sin conciliar es el indicador de salud del periodo.",
+      "Statement on the left, candidate documents on the right and the proposed match in the middle, with the reason why. The queue of unreconciled transactions is the period's health indicator.",
+    ],
+    [
+      "El idioma de la interfaz, para quien está usando el programa. No cambia el idioma de los presupuestos ni de los contratos: eso se elige por cliente, en cada documento.",
+      "The interface language, for whoever is using the program. It does not change the language of quotes or contracts: that is chosen per customer, on each document.",
+    ],
   ],
   rxEs2En: [
+    [new RegExp("^(\\d+) meses$"), "$1 months"],
+    [new RegExp("^(\\d+) mes$"), "$1 month"],
+    [new RegExp("^(\\d+) semanas$"), "$1 weeks"],
+    [new RegExp("^(\\d+) semana$"), "$1 week"],
+    [
+      new RegExp(
+        "^(.+) · (\\d{2}\\/\\d{2}\\/\\d{4}) → (\\d{2}\\/\\d{2}\\/\\d{4}) · (\\d+) d · crítica$",
+      ),
+      "$1 · $2 → $3 · $4 d · critical",
+    ],
+    [
+      new RegExp("^(.+) · (\\d{2}\\/\\d{2}\\/\\d{4}) → (\\d{2}\\/\\d{2}\\/\\d{4}) · (\\d+) d$"),
+      "$1 · $2 → $3 · $4 d",
+    ],
+    [
+      new RegExp("^(\\S+) · hito (\\d+) · ([\\d.,]+ €) · (\\d{2}\\/\\d{2}\\/\\d{4}) · facturado$"),
+      "$1 · milestone $2 · $3 · $4 · invoiced",
+    ],
+    [
+      new RegExp("^(\\S+) · hito (\\d+) · ([\\d.,]+ €) · (\\d{2}\\/\\d{2}\\/\\d{4})$"),
+      "$1 · milestone $2 · $3 · $4",
+    ],
+    [new RegExp("^A la finalización · ([\\d.,]+ €) · (\\S+)$"), "On completion · $1 · $2"],
+    [
+      new RegExp("^(\\d+) traspaso\\(s\\) marcados — no cuentan como ingreso ni gasto$"),
+      "$1 transfer(s) flagged — they count as neither income nor expense",
+    ],
+    [
+      new RegExp("^(\\d+) mensaje\\(s\\) en cola — ninguno se ha enviado$"),
+      "$1 message(s) queued — none has been sent",
+    ],
+    [new RegExp("^Enviar (\\S+) · v([\\d.]+)$"), "Send $1 · v$2"],
+    [new RegExp("^(.+) · (\\d+) d · (\\d+) visita$"), "$1 · $2 d · $3 visit"],
+    [new RegExp("^(.+) · (\\d+) d · (\\d+) visitas$"), "$1 · $2 d · $3 visits"],
     [new RegExp("^(\\d+) industriales$"), "$1 trade contractors"],
     [new RegExp("^(\\d+) industrial$"), "$1 trade contractor"],
     [new RegExp("^Fecha (\\S+) · vigencia (.+)$"), "Date $1 · valid until $2"],
@@ -4456,7 +4519,6 @@ window.CANEI_DICT = {
       "Margin $1 · $2% — does not appear on the document",
     ],
     [new RegExp("^IRPF: aplica ([\\d.,]+)%$"), "Withholding: applies $1%"],
-    [new RegExp("^Email: (.+)$"), "Email: $1"],
     [new RegExp("^enero (\\d{4})$"), "January $1"],
     [new RegExp("^febrero (\\d{4})$"), "February $1"],
     [new RegExp("^marzo (\\d{4})$"), "March $1"],
