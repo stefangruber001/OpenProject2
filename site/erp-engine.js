@@ -10,6 +10,22 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
+  /**
+   * Document series and their prefixes (ORG-04).
+   *
+   * One table, used both to set the series up and to repair a state that never
+   * had them. Adding a document type means adding it here and nowhere else.
+   */
+  const SERIES_PREFIX = {
+    budget: "PRE-",
+    contract: "CTR-",
+    invoice: "FAC-",
+    receipt: "REC-",
+    creditNote: "ABO-",
+    purchaseOrder: "OC-",
+    subcontract: "SUB-",
+  };
+
   /* ---------------- money & misc helpers (cents everywhere) ---------------- */
   const cents = (n) => Math.round(Number(n) || 0);
   const mul = (qtyMilli, priceCents) => Math.round((qtyMilli * priceCents) / 1000); // qty in thousandths
@@ -791,23 +807,40 @@
         this.state.config || {},
         cfg,
       );
-      const mk = (t, prefix) =>
-        (this.state.series[t] = this.state.series[t] || { prefix, next: 1, issued: [] });
-      mk("budget", "PRE-");
-      mk("contract", "CTR-");
-      mk("invoice", "FAC-");
-      mk("receipt", "REC-");
-      mk("creditNote", "ABO-");
-      mk("purchaseOrder", "OC-");
-      mk("subcontract", "SUB-");
+      for (const t of Object.keys(SERIES_PREFIX)) this.ensureSeries(t);
       this._log("backoffice", "configureEntity", this.state.config.legalName);
       return this.state.config;
     }
+    /**
+     * The document series this ERP issues, and their prefixes.
+     *
+     * Hoisted out of `configureEntity` because it was the ONLY place that
+     * created them, and a state that never went through that call had
+     * `series: {}` — so the first attempt to issue anything threw "Unknown
+     * series: budget" at the operator, from a button whose whole job is to
+     * open the quote builder. Nothing was wrong with the quote, the visit or
+     * the customer; the numbering had simply never been set up, and no screen
+     * said so.
+     */
+    ensureSeries(type) {
+      const prefix = SERIES_PREFIX[type];
+      // A type that is not a document series at all is still a programming
+      // error and still throws — this only stops a KNOWN series from being
+      // missing.
+      if (!prefix) throw new Error("Unknown series: " + type);
+      if (!this.state.series) this.state.series = {};
+      if (!this.state.series[type]) {
+        this.state.series[type] = { prefix, next: 1, issued: [] };
+      }
+      return this.state.series[type];
+    }
+
     nextNumber(type) {
       // ORG-04: controlled, gap-free, no manual overwriting.
       // Series restart at 0001 each fiscal year (FAC-2027-0001 after FAC-2026-nnnn).
-      const s = this.state.series[type];
-      if (!s) throw new Error("Unknown series: " + type);
+      // Created on demand: see ensureSeries. A missing series is a setup step
+      // nobody performed, not a reason to refuse the operator's work.
+      const s = this.ensureSeries(type);
       const year = this.state.today.slice(0, 4);
       s.byYear = s.byYear || {};
       if (s.byYear[year] == null)

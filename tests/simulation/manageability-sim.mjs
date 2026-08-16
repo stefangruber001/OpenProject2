@@ -25,6 +25,46 @@ const throws = (fn, name) => {
   }
 };
 
+/**
+ * A STATE THAT NEVER WENT THROUGH configureEntity CAN STILL ISSUE DOCUMENTS.
+ *
+ * Reported from production: pressing "+ Create quote" on a completed visit did
+ * nothing and raised "⚠ Unknown series: budget". Nothing was wrong with the
+ * visit, the customer or the quote — the document series lived only inside
+ * configureEntity, a fresh state has `series: {}`, and every issuing path threw
+ * at the operator instead. Quotes, contracts, invoices, receipts, credit notes,
+ * purchase orders and subcontracts were all equally unreachable.
+ *
+ * Checked before the configured engine below, on a deliberately unconfigured
+ * one, because that is the state the report came from.
+ */
+{
+  const bare = new ERP("2026-03-02");
+  assert(
+    Object.keys(bare.state.series).length === 0,
+    "a fresh state genuinely starts with no series (or this test proves nothing)",
+  );
+  for (const type of [
+    "budget",
+    "contract",
+    "invoice",
+    "receipt",
+    "creditNote",
+    "purchaseOrder",
+    "subcontract",
+  ]) {
+    let number = "";
+    try {
+      number = bare.nextNumber(type);
+    } catch (e) {
+      number = "THREW: " + e.message;
+    }
+    assert(/^[A-Z]+-\d{4}-0001$/.test(number), `unconfigured state can issue ${type} (${number})`);
+  }
+  // A type that is not a document series at all is still a programming error.
+  throws(() => bare.nextNumber("nonsense"), "an unknown series type still throws");
+}
+
 const erp = new ERP("2026-03-02");
 erp.configureEntity({
   legalName: "Canei Subirats, S.L.",
