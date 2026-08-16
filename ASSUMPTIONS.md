@@ -3127,3 +3127,42 @@ different decisions, so these ten arrived colliding. They are renumbered from
   **Still open and named:** `journey.html` (22 EN / 88 CA) — the walkthrough
   page reachable from the profile menu, not the ERP itself.
   **Reversible: yes.**
+
+- **#102 — "go line by line": the audit that enumerated positions instead of
+  reading content (2026-08-16).** After #101 an operator still photographed a
+  Spanish customer list on an English device. The cause was in my own tool.
+  **`source-audit.mjs` matched a hand-written list of PLACES a label appears** —
+  `<label>`, `<option>`, `placeholder=`, `toast(`. The customer list is built
+  from column descriptors: `label: "Contacto"`. Not on the list, so a whole
+  screen of field names reported clean. Enumerating positions means enumerating
+  the ones you thought of, and there is no way to know what was left out.
+  It now scans **every string literal and every markup text run**, and decides
+  by CONTENT, not by position.
+  **Deciding by content needed the file's own language.** A Spanish-authored
+  file (erp.html) has a rule with no hole: EVERY prose literal must have an
+  entry. Trying to detect Spanish there is what let `"Guardar cliente"` past —
+  no accent, no function word, invisible to any content test. English-authored
+  files get the opposite rule: their literals need nothing, except the Spanish
+  ones, which are a source bug no dictionary can fix, because when the reader
+  picks English the translator correctly does nothing at all.
+  **The cost is noise, and it was paid deliberately:** 7,440 literals scanned,
+  1,348 of them CSS and class names. Filters reject by SHAPE (a semicolon, a hex
+  colour, a `[data-` selector) and never by vocabulary, so a real label cannot be
+  filtered out for being an unexpected word.
+  **589 entries added across four passes.** erp.html: **406 → ~140 EN**, and
+  what remains is code fragments, identifiers and the contract document's own
+  Spanish/Catalan text — that last one correctly untranslated, because a
+  document is written in the CUSTOMER's language, not the operator's.
+  Dictionary **2287 → 2882**, CA backlog **1158 → 1052**.
+  **Logic review, as asked.** The whole change is data: `git diff` over
+  `site/`, `apps/` and `packages/` is two dictionary files, nothing else. The
+  one behavioural change (#101's matcher) can only mutate DOM text nodes,
+  attributes in a fixed list, and the language cookie — verified by grep. The
+  single place a form value could be rewritten is guarded to
+  `INPUT[type=button|submit]`, so typed data is never touched, and nothing in
+  the translator writes to ErpDocs, IndexedDB or `erp.state`.
+  **Verified green:** 126 unit · 337/337 e2e (drives all three languages) ·
+  149/149 + 214/214 + 226/226 invariants · 48/48 migrations · 25/25 import ·
+  30/30 scheduling · 28/28 PDF · 21 documents printable · 17/17 sync · 55/55
+  mailbox · ownership, bundle-safety, workbook, iOS routes.
+  **Reversible: yes** — additive dictionary entries and one lookup fallback.
