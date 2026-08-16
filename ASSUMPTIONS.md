@@ -3086,3 +3086,44 @@ different decisions, so these ten arrived colliding. They are renumbered from
   `\/evil` all answer `Location: /`; the login POST still lands users where
   they were going, bad password and good.
   **Reversible: yes.**
+
+- **#101 — the dictionary was right and the lookup never asked (2026-08-16).**
+  An operator on English photographed five screens still in Spanish, an hour
+  after a gate reported **3 untranslated**. Two independent causes, and the
+  larger one was not missing translations at all.
+  **`Teléfono` had an English entry — "Phone" — and always had.** The screens
+  compose their rows in one breath: `Teléfono: ${phone} · Móvil: ${mobile}`.
+  The browser hands the translator ONE text node containing the label, the
+  punctuation AND the data, and an exact-match dictionary can hold no key for
+  that — the phone number differs per customer. Whole identity cards, address
+  blocks and origin lines rendered in Spanish on entries that existed.
+  `tr()` now reads such a line the way a person does: split on `·`, translate
+  each `Label: value` half, leave anything unknown alone. A separate pass
+  strips surrounding punctuation for the simpler `"Teléfono: "` shape. Both run
+  only AFTER an exact match fails, so keys containing punctuation still win
+  first. **Value-only rows count too:** "IRPF: no aplica" has a label that is
+  identical in all three languages, and translating only when the LABEL moved
+  left that row Spanish forever.
+  **The second cause: 269 user-visible strings in erp.html had no entry.**
+  Every one is inside a modal, a toast, a validation message or a `<select>`
+  placeholder — none of it in the DOM until somebody taps something. Both
+  existing audits measured what happened to be ON SCREEN, so neither could ever
+  have seen them, and walking 12 of the 28 routes made it worse.
+  **`tests/i18n/source-audit.mjs` reads the SOURCE instead** — labels, options,
+  placeholders, thrown messages, toasts — so a string counts the moment it is
+  written rather than if a crawler reaches it. erp.html: **269 → 5 EN, 69 → 7
+  CA**, the remainder being identifiers (`ALB-...`, `quote-followup`, a
+  filename, a doc reference).
+  **The audit had a directional bug of its own**, found while reading its
+  output: it checked `ca[text]` for every file, but `journey.html`,
+  `master-data.html` and `financial-data.html` are authored in ENGLISH and
+  reach Catalan as EN → ES → CA. It reported ~150 correctly-translated labels
+  as gaps. A report that cries wolf is one nobody reads, so both directions are
+  resolved now.
+  **Dictionary: 2287 → 2561 entries, EN complete, CA backlog 1158 → 1094.**
+  **Negative-controlled:** removing one modal label fails the source gate;
+  disabling the labelled-segment pass puts 7 Spanish strings back on the
+  customer sheet.
+  **Still open and named:** `journey.html` (22 EN / 88 CA) — the walkthrough
+  page reachable from the profile menu, not the ERP itself.
+  **Reversible: yes.**

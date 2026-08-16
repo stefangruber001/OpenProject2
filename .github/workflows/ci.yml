@@ -132,6 +132,18 @@ jobs:
           node tests/i18n/workspace-audit.mjs --lang en --max 3
           node tests/i18n/workspace-audit.mjs --lang ca --max 3
 
+      # Neither audit above can see a modal, a toast or a validation message:
+      # none of it is in the DOM until somebody taps something, and a crawler
+      # never performs the exact gesture. That is how 269 untranslated strings
+      # in erp.html sat behind a gate reporting three. This one reads the
+      # SOURCE — labels, options, placeholders, thrown messages — so a string
+      # counts the moment it is written, not if a crawler happens to reach it.
+      - name: Translation coverage (source literals)
+        if: always()
+        run: |
+          node tests/i18n/source-audit.mjs --lang en --max 31
+          node tests/i18n/source-audit.mjs --lang ca --max 119
+
   bundle:
     name: Capability bundle (build, browser-safety, drift)
     runs-on: ubuntu-latest

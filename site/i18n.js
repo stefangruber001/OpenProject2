@@ -149,6 +149,78 @@
         }
       }
     }
+
+    /**
+     * THE DECORATION PASS — and the reason most of the workspace stayed Spanish
+     * while its dictionary said otherwise.
+     *
+     * The screens compose their field rows in one breath:
+     *
+     *     <div class="it">Teléfono: <b>${phone}</b> · Móvil: <b>${mobile}</b></div>
+     *
+     * so the text nodes handed to this function are `"Teléfono: "` and
+     * `" · Móvil: "` — never `"Teléfono"`. The dictionary HAS "Teléfono" →
+     * "Phone" and had it all along; the lookup simply never asked, because a
+     * trailing colon makes it a different string. Whole screens of labels,
+     * every one of them already translated, rendered in Spanish for want of
+     * one punctuation mark.
+     *
+     * So on a miss, the surrounding punctuation is set aside, the word inside
+     * is looked up, and the punctuation is put back exactly as it was. Only on
+     * a MISS: an entry whose own key contains punctuation ("← Contenido",
+     * "Cobros / Pagos (DSO / DPO)") still matches exactly, first, unchanged.
+     */
+    if (hit === undefined) {
+      var parts = /^([^\p{L}\p{N}]*)([\s\S]*?)([^\p{L}\p{N}]*)$/u.exec(collapsed || trimmed);
+      if (parts && parts[2] && parts[2].length > 1 && (parts[1] || parts[3])) {
+        var core = map.get(parts[2]);
+        if (core !== undefined && core !== parts[2]) hit = parts[1] + core + parts[3];
+      }
+    }
+
+    /**
+     * THE LABELLED-SEGMENT PASS — for rows where the label and the DATA share
+     * one text node.
+     *
+     *     <div class="it">Teléfono: ${phone} · Móvil: ${mobile}</div>
+     *
+     * Nothing wraps those values, so the browser hands this function the whole
+     * line: `"Teléfono: 934771208 · Móvil: 600111222"`. The phone number is
+     * different for every customer, so there is no key any dictionary could
+     * hold, and stripping punctuation does not help — the noise is in the
+     * MIDDLE. Whole identity cards, address blocks and origin lines stayed
+     * Spanish for this reason alone, on entries that existed.
+     *
+     * So the line is read the way a person reads it: split on "·" into
+     * segments, and in each `Label: value` translate the label, and the value
+     * too when the dictionary happens to know it (a lead source, a status).
+     * Anything unknown is left exactly as it was — a phone number, a date and
+     * a postcode pass straight through, which is what should happen to them.
+     */
+    if (hit === undefined && (collapsed || trimmed).indexOf(":") > 0) {
+      var line = collapsed || trimmed;
+      var touched = false;
+      var rebuilt = line.split("·").map(function (seg) {
+        var m2 = /^(\s*)([^:]{2,60}?)(\s*:\s*)([\s\S]*)$/.exec(seg);
+        if (!m2) return seg;
+        var lab = map.get(m2[2]);
+        // The value is translated only when the dictionary has an opinion on
+        // it, so data is never mangled by a partial match.
+        var val = m2[4];
+        var bare = val.trim();
+        var valHit = map.get(bare);
+        var newVal = valHit !== undefined && valHit !== bare ? val.replace(bare, valHit) : val;
+        var newLab = lab !== undefined && lab !== m2[2] ? lab : m2[2];
+        // Either half is enough. "IRPF: no aplica" has a label that is the same
+        // word in all three languages and a value that is not — translating
+        // only when the LABEL moved left that row in Spanish forever.
+        if (newLab === m2[2] && newVal === val) return seg;
+        touched = true;
+        return m2[1] + newLab + m2[3] + newVal;
+      });
+      if (touched) hit = rebuilt.join("·");
+    }
+
     if (hit === undefined || hit === trimmed) return null;
     // keep original leading / trailing whitespace
     var lead = text.match(/^\s*/)[0];
