@@ -1,0 +1,909 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Canei Subirats — Environment status &amp; proposal</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --ink: #1d2118;
+        --mute: #6d7466;
+        --line: #d8ded1;
+        --green: #31532a;
+        --green2: #48733c;
+        --paper: #fff;
+        --wash: #f4f6f1;
+        --red: #b3261e;
+        --amber: #b26a00;
+        --ok: #2f6b34;
+      }
+      html {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      body {
+        font: 9pt/1.4 "Helvetica Neue", Helvetica, Arial, sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+      }
+      .page {
+        width: 210mm;
+        height: 297mm;
+        padding: 12mm 12mm 10mm;
+        display: flex;
+        flex-direction: column;
+        page-break-after: always;
+        overflow: hidden;
+      }
+      .page:last-child {
+        page-break-after: auto;
+      }
+
+      /* ---------- header ---------- */
+      header {
+        display: flex;
+        align-items: flex-end;
+        gap: 8mm;
+        border-bottom: 2.4pt solid var(--green);
+        padding-bottom: 2.5mm;
+        margin-bottom: 4mm;
+      }
+      header .t {
+        flex: 1;
+      }
+      h1 {
+        font-size: 17pt;
+        letter-spacing: -0.4pt;
+        color: var(--green);
+        line-height: 1.05;
+      }
+      h1 small {
+        display: block;
+        font-size: 8.5pt;
+        font-weight: 400;
+        color: var(--mute);
+        letter-spacing: 0;
+        margin-top: 1.2mm;
+      }
+      .stamp {
+        text-align: right;
+        font-size: 7.2pt;
+        color: var(--mute);
+        line-height: 1.5;
+        white-space: nowrap;
+      }
+      .stamp b {
+        color: var(--ink);
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+      }
+
+      h2 {
+        font-size: 9.5pt;
+        text-transform: uppercase;
+        letter-spacing: 1.1pt;
+        color: var(--green);
+        margin: 4mm 0 2mm;
+        display: flex;
+        align-items: center;
+        gap: 2.5mm;
+      }
+      h2::after {
+        content: "";
+        flex: 1;
+        height: 0.6pt;
+        background: var(--line);
+      }
+      h2:first-of-type {
+        margin-top: 0;
+      }
+
+      /* ---------- pipeline ---------- */
+      .pipe {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+      }
+      .step {
+        flex: 1;
+        border: 0.8pt solid var(--line);
+        border-radius: 2mm;
+        padding: 2mm 2mm;
+        text-align: center;
+        background: var(--wash);
+      }
+      .step .n {
+        font-size: 6.4pt;
+        letter-spacing: 0.7pt;
+        color: var(--mute);
+        text-transform: uppercase;
+      }
+      .step .l {
+        font-weight: 700;
+        font-size: 8.4pt;
+        margin-top: 0.6mm;
+      }
+      .step .s {
+        font-size: 6.8pt;
+        color: var(--mute);
+        margin-top: 0.5mm;
+        line-height: 1.3;
+      }
+      .step.gate {
+        background: #eef4ea;
+        border-color: var(--green2);
+      }
+      .step.live {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+      }
+      .step.live .n,
+      .step.live .s {
+        color: #c9dcc0;
+      }
+      .arw {
+        align-self: center;
+        color: var(--green2);
+        font-size: 11pt;
+        padding: 0 1.4mm;
+        font-weight: 700;
+      }
+
+      /* ---------- env cards ---------- */
+      .cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 3mm;
+      }
+      .card {
+        border: 0.8pt solid var(--line);
+        border-radius: 2mm;
+        padding: 2.6mm 3mm;
+        position: relative;
+      }
+      .card .dot {
+        width: 2.4mm;
+        height: 2.4mm;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 1.4mm;
+        vertical-align: 0.2mm;
+      }
+      .card h3 {
+        font-size: 8.6pt;
+        display: flex;
+        align-items: center;
+      }
+      .card .u {
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        font-size: 6.6pt;
+        color: var(--green2);
+        margin: 1mm 0 1.6mm;
+        word-break: break-all;
+      }
+      .card dl {
+        font-size: 7pt;
+        line-height: 1.45;
+      }
+      .card dt {
+        color: var(--mute);
+        float: left;
+        clear: left;
+        width: 15mm;
+      }
+      .card dd {
+        margin-left: 15mm;
+      }
+      .real {
+        border-color: var(--green);
+        border-width: 1.4pt;
+        background: #f7faf5;
+      }
+
+      /* ---------- table ---------- */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 7.4pt;
+      }
+      th {
+        text-align: left;
+        font-size: 6.6pt;
+        letter-spacing: 0.6pt;
+        text-transform: uppercase;
+        color: var(--mute);
+        border-bottom: 0.8pt solid var(--line);
+        padding: 0 1.6mm 1mm 0;
+      }
+      td {
+        padding: 1.1mm 1.6mm 1.1mm 0;
+        border-bottom: 0.4pt solid #edf0e9;
+        vertical-align: middle;
+      }
+      td.mono {
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        font-size: 6.8pt;
+      }
+      .bar {
+        display: inline-block;
+        height: 2.2mm;
+        border-radius: 1.1mm;
+        vertical-align: -0.2mm;
+      }
+      .bar.a {
+        background: var(--green2);
+      }
+      .bar.b {
+        background: #d9b3ae;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 6.2pt;
+        font-weight: 700;
+        letter-spacing: 0.4pt;
+        padding: 0.5mm 1.4mm;
+        border-radius: 1mm;
+        text-transform: uppercase;
+      }
+      .tag.keep {
+        background: #e3efdd;
+        color: var(--ok);
+      }
+      .tag.merge {
+        background: #dfeaf6;
+        color: #1c4f80;
+      }
+      .tag.drop {
+        background: #f6e4e2;
+        color: var(--red);
+      }
+      .tag.ask {
+        background: #f8eeda;
+        color: var(--amber);
+      }
+
+      /* ---------- problems ---------- */
+      .probs {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 3mm;
+      }
+      .prob {
+        border-left: 1.6pt solid var(--red);
+        padding-left: 2.4mm;
+      }
+      .prob b {
+        display: block;
+        font-size: 8pt;
+        margin-bottom: 0.8mm;
+      }
+      .prob span {
+        font-size: 7pt;
+        color: #4a5044;
+        line-height: 1.4;
+      }
+
+      /* ---------- metrics ---------- */
+      .mets {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 2.5mm;
+      }
+      .met {
+        border: 0.8pt solid var(--line);
+        border-radius: 2mm;
+        padding: 2mm;
+        text-align: center;
+      }
+      .met .v {
+        font-size: 14pt;
+        font-weight: 700;
+        color: var(--green);
+        line-height: 1;
+      }
+      .met .k {
+        font-size: 6.4pt;
+        color: var(--mute);
+        text-transform: uppercase;
+        letter-spacing: 0.5pt;
+        margin-top: 1mm;
+        line-height: 1.25;
+      }
+      .met.warn .v {
+        color: var(--amber);
+      }
+
+      footer {
+        margin-top: auto;
+        padding-top: 2.5mm;
+        border-top: 0.6pt solid var(--line);
+        font-size: 6.6pt;
+        color: var(--mute);
+        display: flex;
+        justify-content: space-between;
+      }
+
+      /* ---------- page 2 ---------- */
+      .target {
+        display: flex;
+        align-items: center;
+        gap: 3mm;
+        background: var(--wash);
+        border: 0.8pt solid var(--line);
+        border-radius: 2mm;
+        padding: 3mm;
+      }
+      .target .col {
+        text-align: center;
+        flex: 1;
+      }
+      .target .col .b {
+        border: 0.8pt dashed var(--mute);
+        border-radius: 1.5mm;
+        padding: 1.6mm 1mm;
+        font-size: 7.2pt;
+        color: var(--mute);
+        margin-bottom: 1mm;
+      }
+      .target .col .b.on {
+        border: 1.2pt solid var(--green);
+        border-style: solid;
+        color: var(--green);
+        font-weight: 700;
+        background: #fff;
+      }
+      .target .big {
+        flex: 1.15;
+        background: var(--green);
+        color: #fff;
+        border-radius: 2mm;
+        padding: 3.4mm 2mm;
+        text-align: center;
+      }
+      .target .big .h {
+        font-size: 12pt;
+        font-weight: 700;
+        letter-spacing: -0.2pt;
+      }
+      .target .big .s {
+        font-size: 6.8pt;
+        color: #c9dcc0;
+        margin-top: 0.8mm;
+        line-height: 1.3;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3mm 4mm;
+      }
+      .grp {
+        border: 0.8pt solid var(--line);
+        border-radius: 2mm;
+        overflow: hidden;
+      }
+      .grp .hd {
+        background: var(--green);
+        color: #fff;
+        padding: 1.6mm 2.4mm;
+        font-size: 8pt;
+        font-weight: 700;
+        display: flex;
+        justify-content: space-between;
+      }
+      .grp .hd em {
+        font-style: normal;
+        font-weight: 400;
+        font-size: 6.8pt;
+        color: #c9dcc0;
+      }
+      .grp.ask .hd {
+        background: var(--amber);
+      }
+      .grp.ask .hd em {
+        color: #f6e2bd;
+      }
+      .grp table {
+        font-size: 7pt;
+      }
+      .grp td {
+        padding: 1.2mm 2.4mm;
+      }
+      .grp td:first-child {
+        width: 7mm;
+        font-weight: 700;
+        color: var(--green2);
+      }
+      .grp .why {
+        color: var(--mute);
+        font-size: 6.6pt;
+        display: block;
+        line-height: 1.35;
+      }
+
+      .decide {
+        border: 1.4pt solid var(--amber);
+        border-radius: 2mm;
+        padding: 3mm;
+        background: #fdf8ef;
+      }
+      .decide h3 {
+        font-size: 9pt;
+        color: var(--amber);
+        margin-bottom: 1.6mm;
+      }
+      .opts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3mm;
+      }
+      .opt {
+        background: #fff;
+        border: 0.8pt solid var(--line);
+        border-radius: 1.5mm;
+        padding: 2.2mm 2.6mm;
+      }
+      .opt.rec {
+        border: 1.2pt solid var(--green);
+      }
+      .opt b {
+        font-size: 8pt;
+      }
+      .opt .r {
+        font-size: 6pt;
+        background: var(--green);
+        color: #fff;
+        padding: 0.4mm 1.2mm;
+        border-radius: 1mm;
+        letter-spacing: 0.4pt;
+        margin-left: 1.4mm;
+      }
+      .opt ul {
+        margin: 1.2mm 0 0 3.4mm;
+        font-size: 6.9pt;
+        line-height: 1.45;
+      }
+      .note {
+        font-size: 7pt;
+        color: #4a5044;
+        line-height: 1.45;
+      }
+      .note b {
+        color: var(--ink);
+      }
+      .keepbox {
+        border-left: 1.6pt solid var(--ok);
+        padding-left: 2.6mm;
+        font-size: 7.2pt;
+        line-height: 1.45;
+        color: #4a5044;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ══════════════════════ PAGE 1 — SITUATION ══════════════════════ -->
+    <section class="page">
+      <header>
+        <div class="t">
+          <h1>
+            Where everything runs today
+            <small>Canei Subirats ERP — environments, branches and what is actually live</small>
+          </h1>
+        </div>
+        <div class="stamp">
+          16 Aug 2026<br />
+          <code>main</code> = <b>7e0f9ce</b><br />
+          work branch = <b>24e433b</b>
+        </div>
+      </header>
+
+      <h2>How code reaches the customer</h2>
+      <div class="pipe">
+        <div class="step">
+          <div class="n">1 · commit</div>
+          <div class="l">main</div>
+          <div class="s">the only branch that can deploy</div>
+        </div>
+        <div class="arw">▶</div>
+        <div class="step">
+          <div class="n">2 · build</div>
+          <div class="l">GHCR images</div>
+          <div class="s">app + migrate, tagged by commit only</div>
+        </div>
+        <div class="arw">▶</div>
+        <div class="step gate">
+          <div class="n">3 · gate</div>
+          <div class="l">smoke test</div>
+          <div class="s">real image, real Postgres, restricted role</div>
+        </div>
+        <div class="arw">▶</div>
+        <div class="step gate">
+          <div class="n">4 · release</div>
+          <div class="l">promote :main</div>
+          <div class="s">retag only — same bytes that were tested</div>
+        </div>
+        <div class="arw">▶</div>
+        <div class="step live">
+          <div class="n">5 · live</div>
+          <div class="l">the server</div>
+          <div class="s">VPS pulls every 60 seconds</div>
+        </div>
+      </div>
+
+      <h2>Three places serve the screens — only one holds data</h2>
+      <div class="cards">
+        <div class="card real">
+          <h3><span class="dot" style="background: #2f6b34"></span>Production</h3>
+          <div class="u">178-105-10-156.sslip.io</div>
+          <dl>
+            <dt>Built from</dt>
+            <dd><b>main</b></dd>
+            <dt>Data</dt>
+            <dd><b>Yes — the real ERP</b></dd>
+            <dt>Used by</dt>
+            <dd>office, phones, iOS + Android apps</dd>
+          </dl>
+        </div>
+        <div class="card">
+          <h3><span class="dot" style="background: #b26a00"></span>Public demo</h3>
+          <div class="u">…github.io/OpenProject2/</div>
+          <dl>
+            <dt>Built from</dt>
+            <dd>main → <code>site/</code></dd>
+            <dt>Data</dt>
+            <dd>None — static copy</dd>
+            <dt>Used by</dt>
+            <dd>demonstrations only</dd>
+          </dl>
+        </div>
+        <div class="card">
+          <h3><span class="dot" style="background: #b3261e"></span>Dev preview</h3>
+          <div class="u">…github.io/OpenProject2/preview/</div>
+          <dl>
+            <dt>Built from</dt>
+            <dd>a hard-coded branch name</dd>
+            <dt>Data</dt>
+            <dd>None — static copy</dd>
+            <dt>Used by</dt>
+            <dd><b>nobody, since the apps moved</b></dd>
+          </dl>
+        </div>
+      </div>
+
+      <h2>Ten branches — two of them matter</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 62mm">Branch</th>
+            <th style="width: 44mm">Ahead of / behind main</th>
+            <th style="width: 22mm">Verdict</th>
+            <th>What it is</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono"><b>main</b></td>
+            <td><span class="bar a" style="width: 1mm"></span> production</td>
+            <td><span class="tag keep">live</span></td>
+            <td>What the customer runs</td>
+          </tr>
+          <tr>
+            <td class="mono">claude/orin-project-status-1q50dt</td>
+            <td>
+              <span class="bar a" style="width: 5mm"></span> 5 ahead · 0 behind
+            </td>
+            <td><span class="tag merge">merge</span></td>
+            <td>Today's translation work — fully verified, not yet live</td>
+          </tr>
+          <tr>
+            <td class="mono">claude/candi-programme-session-4-07amo8</td>
+            <td>0 ahead · 0 behind</td>
+            <td><span class="tag drop">retire</span></td>
+            <td>Identical to main. Only job: feeding the unused preview</td>
+          </tr>
+          <tr>
+            <td class="mono">claude/remove-optional-work-xh1wbw</td>
+            <td>
+              <span class="bar a" style="width: 12mm"></span
+              ><span class="bar b" style="width: 16mm"></span> 100 / 133
+            </td>
+            <td><span class="tag ask">decide</span></td>
+            <td>Abandoned 20 Jul — is "remove Optional Work" still wanted?</td>
+          </tr>
+          <tr>
+            <td class="mono">dependabot · npm dependencies</td>
+            <td>
+              <span class="bar a" style="width: 1mm"></span
+              ><span class="bar b" style="width: 4mm"></span> 1 / 29
+            </td>
+            <td><span class="tag merge">merge</span></td>
+            <td>27 package updates, current</td>
+          </tr>
+          <tr>
+            <td class="mono">dependabot · upload-artifact 7</td>
+            <td>
+              <span class="bar a" style="width: 1mm"></span
+              ><span class="bar b" style="width: 4mm"></span> 1 / 29
+            </td>
+            <td><span class="tag merge">merge</span></td>
+            <td>Current</td>
+          </tr>
+          <tr>
+            <td class="mono">dependabot · 4 more (actions)</td>
+            <td>
+              <span class="bar a" style="width: 14mm"></span
+              ><span class="bar b" style="width: 16mm"></span> up to 152 / 133
+            </td>
+            <td><span class="tag drop">close</span></td>
+            <td>Rebased onto an ancient base — reopen fresh, don't rebase</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Why it feels confusing — three real causes</h2>
+      <div class="probs">
+        <div class="prob">
+          <b>Two "dev" branches, one wired up</b>
+          <span
+            >The preview is pinned to a branch <i>name</i> written into the workflow. Today's work
+            sits on the other one, so it is invisible to the preview — while the watched branch is
+            an exact copy of main and adds nothing.</span
+          >
+        </div>
+        <div class="prob">
+          <b>It has drifted silently before</b>
+          <span
+            >The same hard-coded name once served nine-session-old content. Nothing failed, nothing
+            went red — it was only noticed when somebody opened the link expecting to review recent
+            work.</span
+          >
+        </div>
+        <div class="prob">
+          <b>The instructions name both</b>
+          <span
+            >The project's own guide lists two branches, so each session picks one and work lands
+            where the tooling is not looking. The rule and the workflow drift apart independently.</span
+          >
+        </div>
+      </div>
+
+      <h2>State of the work waiting to go live</h2>
+      <div class="mets">
+        <div class="met">
+          <div class="v">435</div>
+          <div class="k">end-to-end tests passing</div>
+        </div>
+        <div class="met">
+          <div class="v">3 100</div>
+          <div class="k">dictionary entries</div>
+        </div>
+        <div class="met">
+          <div class="v">33</div>
+          <div class="k">screens now audited (was 12)</div>
+        </div>
+        <div class="met warn">
+          <div class="v">239</div>
+          <div class="k">English gaps found</div>
+        </div>
+        <div class="met warn">
+          <div class="v">341</div>
+          <div class="k">Catalan gaps found</div>
+        </div>
+      </div>
+      <p class="note" style="margin-top: 2.5mm">
+        <b>The two amber numbers are good news, not bad.</b> The ERP now reports its own
+        untranslated text instead of waiting for somebody to photograph it. The previous figure of
+        “6” came from a check that walked 12 screens; this walks 33, including sixteen that no
+        translation check had ever opened. Nothing got worse — the measurement got honest.
+      </p>
+
+      <footer>
+        <span>Canei Subirats, S.L. — internal status note</span>
+        <span>Page 1 of 2 · situation</span>
+      </footer>
+    </section>
+
+    <!-- ══════════════════════ PAGE 2 — PROPOSAL ══════════════════════ -->
+    <section class="page">
+      <header>
+        <div class="t">
+          <h1>
+            Getting everything into main
+            <small>One trunk, one live system, no branch that only some tools know about</small>
+          </h1>
+        </div>
+        <div class="stamp">
+          proposal<br />
+          16 Aug 2026<br />
+          <b>awaiting your line items</b>
+        </div>
+      </header>
+
+      <h2>Target picture</h2>
+      <div class="target">
+        <div class="col">
+          <div class="b on">short-lived work branch</div>
+          <div class="b on">short-lived work branch</div>
+          <div class="b">no long-lived dev branch</div>
+        </div>
+        <div class="arw">▶</div>
+        <div class="big">
+          <div class="h">main</div>
+          <div class="s">
+            merged the same day · every check runs here<br />the single source of what is live
+          </div>
+        </div>
+        <div class="arw">▶</div>
+        <div class="col">
+          <div class="b on">the server (real data)</div>
+          <div class="b on">public demo copy</div>
+          <div class="b">preview removed</div>
+        </div>
+      </div>
+
+      <h2>What changes, where, and why</h2>
+      <div class="steps">
+        <div class="grp">
+          <div class="hd"><span>A · Land the work</span><em>ready now</em></div>
+          <table>
+            <tr>
+              <td>A1</td>
+              <td>
+                Write the measured translation ceilings into the build checks
+                <span class="why">Where: CI configuration — the current numbers were taken before
+                  the merge, by a run that skipped five screens</span>
+              </td>
+            </tr>
+            <tr>
+              <td>A2</td>
+              <td>
+                Move <b>main</b> forward to the verified work branch
+                <span class="why">Where: main — puts the self-reporting translation layer, the
+                  audit view and 3 100 dictionary entries in front of the customer</span>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="grp">
+          <div class="hd"><span>B · Retire the dev branch</span><em>config only</em></div>
+          <table>
+            <tr>
+              <td>B1</td>
+              <td>
+                Publish the demo copy from <b>main</b> only; delete the preview build
+                <span class="why">Where: Pages workflow — removes the hard-coded branch name that
+                  caused the drift</span>
+              </td>
+            </tr>
+            <tr>
+              <td>B2</td>
+              <td>
+                Delete the preview-refresh job
+                <span class="why">Where: workflows — it exists only to rebuild the preview</span>
+              </td>
+            </tr>
+            <tr>
+              <td>B3</td>
+              <td>
+                Update the warning banner wording
+                <span class="why">Where: published pages — it currently describes two copies</span>
+              </td>
+            </tr>
+            <tr>
+              <td>B4</td>
+              <td>
+                Rewrite the branch rule: short-lived branches, merged same day
+                <span class="why">Where: project guide — the rule that named two branches</span>
+              </td>
+            </tr>
+            <tr>
+              <td>B5</td>
+              <td>
+                Record the change and the reason
+                <span class="why">Where: decision log + progress file — read first every session</span>
+              </td>
+            </tr>
+            <tr>
+              <td>B6</td>
+              <td>
+                Correct the audit finding about the mobile apps
+                <span class="why">Where: audit report — it still says the betas load the preview.
+                  They no longer do; both point at the live server</span>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="grp ask" style="grid-column: 1 / -1">
+          <div class="hd">
+            <span>C · Branch clean-up</span><em>needs your explicit go-ahead — the project rules forbid me deleting branches</em>
+          </div>
+          <table>
+            <tr>
+              <td>C1</td>
+              <td>
+                Delete the old dev branch
+                <span class="why">Nothing is lost — it is byte-identical to main</span>
+              </td>
+              <td>C3</td>
+              <td>
+                Close 4 stale dependency branches, merge the 2 current ones
+                <span class="why">133 commits of drift — a fresh request beats a rebase</span>
+              </td>
+            </tr>
+            <tr>
+              <td>C2</td>
+              <td>
+                Delete today's work branch once merged
+                <span class="why">Kept until this session ends</span>
+              </td>
+              <td>C4</td>
+              <td>
+                Decide the "remove Optional Work" branch
+                <span class="why">100 commits, a month old — only you know if it is still wanted</span>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <h2>One decision needed on A1</h2>
+      <div class="decide">
+        <h3>How high should the translation ceiling be when we go live?</h3>
+        <div class="opts">
+          <div class="opt rec">
+            <b>Land the true numbers now</b><span class="r">RECOMMENDED</span>
+            <ul>
+              <li>Ceiling set at the honest 239 EN / 341 CA</li>
+              <li>Today's verified work reaches the customer immediately</li>
+              <li>The number may only fall from here — it cannot creep back up</li>
+              <li>The audit view works for you today either way</li>
+            </ul>
+          </div>
+          <div class="opt">
+            <b>Translate the bulk first</b>
+            <ul>
+              <li>Five screens hold roughly half the gaps</li>
+              <li>Lands a much lower ceiling</li>
+              <li>Delays everything already tested and ready</li>
+              <li>Catalan still needs a native speaker regardless</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <h2>Deliberately not touched</h2>
+      <div class="keepbox">
+        <b>The release pipeline stays exactly as it is.</b> Build → test the real image against a
+        real database with the restricted role → only then move the live tag → the server pulls it
+        within a minute. There is no login key in the build system and no open door on the server;
+        a bad release is undone by pointing the tag back, not by anyone logging in. Two past
+        outages shaped that design and it is working.
+      </div>
+
+      <h2>The one thing we give up</h2>
+      <p class="note">
+        Removing the preview leaves <b>no non-production place to look at screen changes</b> before
+        they are live. Today that costs nothing — the preview has been an exact copy of main and
+        nothing loads it. If you would rather keep a look-before-live step, the replacement is a
+        review request with the built pages attached, not a branch name written into a workflow.
+        Say the word and I will point the preview at <b>main</b> instead of deleting it — one line,
+        same protection against drift.
+      </p>
+
+      <footer>
+        <span>Tell me which line items to implement — nothing on main changes until you do</span>
+        <span>Page 2 of 2 · proposal</span>
+      </footer>
+    </section>
+  </body>
+</html>
