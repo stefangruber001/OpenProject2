@@ -3056,3 +3056,33 @@ different decisions, so these ten arrived colliding. They are renumbered from
   fix the second document reports `lang=es` and renders "UN ÚNICO ENTORNO"; with
   it, `lang=en`.
   **Reversible: yes.**
+
+- **#100 — the redirect that named the container instead of the site
+  (2026-08-16).** With the 401 fixed, the login page's CA/EN buttons sent the
+  phone to `https://0.0.0.0:3000/login` — the container's own bind address.
+  `/api/lang` built an ABSOLUTE redirect from `req.url`, which a route handler
+  reconstructs from the socket, not from the Host header the proxy forwards.
+  **The repo already knew.** `api/auth/login/route.ts` carries a comment saying
+  exactly this and uses a relative Location for exactly this reason; I wrote a
+  fresh absolute redirect two files away without reading it. Worse: the
+  evidence was in my own verification an hour earlier — my curl to `127.0.0.1`
+  came back `location: http://localhost:3111/...`, the bind address, not the
+  host I asked for — and I noted it and waved it off. A verification whose
+  anomalies get waved off is a ritual, not a verification.
+  **Fix: relative Location**, resolved by the browser against the address it
+  actually used — correct under any proxy, port or hostname. Middleware
+  redirects are untouched: they build from the Host header, which Caddy
+  preserves, and demonstrably work in production.
+  **Going relative made the validator load-bearing, and it had a hole.** All
+  three copies of `startsWith("/") && !startsWith("//")` pass `"/\evil.com"`,
+  and the WHATWG parser treats that backslash as a second slash:
+  `new URL("/\\evil.com", base)` → `https://evil.com/` — measured, not
+  recalled. One shared `safeReturnPath()` in `lib/return-path.ts` now gates the
+  language switch, the login route and the login page, with tests pinning every
+  escape shape.
+  **Verified against the rebuilt server binary with the lock on:** the
+  screenshot's exact URL → 303 `Location: /login?next=%2F` + cookie; followed
+  end-to-end it renders "Contrasenya"; `//evil`, `/\evil`, `https://evil`,
+  `\/evil` all answer `Location: /`; the login POST still lands users where
+  they were going, bad password and good.
+  **Reversible: yes.**

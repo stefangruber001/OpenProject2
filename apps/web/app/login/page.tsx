@@ -27,6 +27,7 @@ import { redirect } from "next/navigation";
 import { loginConfigured } from "@/lib/auth";
 import { defaultTenant, sharedAccessEnabled } from "@/lib/access";
 import { loadUiSettings } from "@/lib/erp-runtime";
+import { safeReturnPath } from "@/lib/return-path";
 import { SESSION_COOKIE, readSession } from "@/lib/session-token";
 import {
   LANGUAGES,
@@ -90,9 +91,10 @@ export default async function LoginPage({
   const rateLimited = params.error === "rate";
   const retryAfter = Number(typeof params.retry === "string" ? params.retry : 0) || 0;
   const retryMinutes = Math.max(1, Math.ceil(retryAfter / 60));
-  const nextRaw = typeof params.next === "string" ? params.next : "/";
-  // Same rule as the route handler: only ever a path on this site.
-  const nextPath = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/";
+  // Same rule as the route handler: only ever a path on this site. The shared
+  // validator, so this copy cannot drift behind the one that gates the actual
+  // redirect.
+  const nextPath = safeReturnPath(params.next);
   // Never send somebody from the login page back to the login page.
   const next = nextPath.startsWith("/login") ? "/" : nextPath;
   const shared = sharedAccessEnabled();
