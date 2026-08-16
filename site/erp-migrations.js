@@ -27,6 +27,26 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
+  /**
+   * The starter price book (site/erp-catalogue-pack.js), needed by migration 16.
+   *
+   * Resolved loudly rather than defensively. A migration that silently skips
+   * its work still stamps the new schemaVersion, so it never runs again — the
+   * catalogue would stay empty for ever and nothing would say why. Failing here
+   * is recoverable; failing silently is not.
+   */
+  function cataloguePack() {
+    if (typeof module === "object" && module.exports && typeof require === "function") {
+      return require("./erp-catalogue-pack.js");
+    }
+    var g = typeof globalThis !== "undefined" ? globalThis : root;
+    if (g && g.ErpCataloguePack) return g.ErpCataloguePack;
+    throw new Error(
+      "erp-catalogue-pack.js is not loaded — migration 16 cannot seed the catalogue. " +
+        "Its <script> must come before erp-migrations.js.",
+    );
+  }
+
   /* A blob with no schemaVersion predates versioning and is, by definition, v1. */
   var IMPLICIT_V1 = 1;
 
@@ -570,6 +590,77 @@
         walk(s.bills, "allocations");
         walk(s.captured, "allocations");
         walk(s.movements, "allocations");
+        return s;
+      },
+    },
+    {
+      to: 16,
+      name: "starter price book: 20 chapters, 200 partidas",
+      /*
+       * A company cannot build a quote without a catalogue, and typing two
+       * hundred line items before the first quote is not a start anybody makes.
+       * This installs a realistic Barcelona-area reformas price book — twenty
+       * chapters, ten partidas each, with unit, type, cost and reference price
+       * filled in — so the quote builder is usable on day one.
+       *
+       * PURELY ADDITIVE, AND THAT IS THE WHOLE DESIGN. A chapter or a code that
+       * already exists is left exactly as it is: a company that has already
+       * priced its own work keeps every figure it typed, including the eight
+       * items the demo seed creates. Re-running changes nothing.
+       *
+       * The prices are a starting point, not a quote. They are meant to be
+       * edited, and the screen says so.
+       */
+      up: function (s) {
+        var pack = cataloguePack();
+        if (!s.lists || typeof s.lists !== "object") s.lists = {};
+        if (!Array.isArray(s.lists.itemChapters)) s.lists.itemChapters = [];
+        if (!Array.isArray(s.catalogue)) s.catalogue = [];
+
+        var haveChapter = {};
+        for (var c = 0; c < s.lists.itemChapters.length; c++) {
+          haveChapter[s.lists.itemChapters[c].code] = true;
+        }
+        for (var k = 0; k < pack.CHAPTERS.length; k++) {
+          var ch = pack.CHAPTERS[k];
+          if (haveChapter[ch.code]) continue;
+          s.lists.itemChapters.push({ code: ch.code, es: ch.es, ca: ch.ca, active: true });
+        }
+
+        var haveCode = {};
+        for (var i = 0; i < s.catalogue.length; i++) haveCode[s.catalogue[i].code] = true;
+
+        // Ids follow the engine's own `cat_<n>` shape and continue past the
+        // highest number already present, so an id can never be reused by a
+        // record the company created.
+        var maxId = 0;
+        for (var m = 0; m < s.catalogue.length; m++) {
+          var got = /^cat_(\d+)$/.exec(String(s.catalogue[m].id || ""));
+          if (got) maxId = Math.max(maxId, Number(got[1]));
+        }
+
+        var rows = pack.rows();
+        for (var r = 0; r < rows.length; r++) {
+          var row = rows[r];
+          if (haveCode[row.code]) continue;
+          maxId += 1;
+          s.catalogue.push({
+            id: "cat_" + maxId,
+            code: row.code,
+            desc: row.desc,
+            customerWording: "",
+            unit: row.unit,
+            type: row.type,
+            chapter: row.chapter,
+            active: true,
+            imageRefs: [],
+            defaultCostCents: row.defaultCostCents,
+            defaultPriceCents: row.defaultPriceCents,
+            brand: row.brand,
+            model: row.model,
+            quality: row.quality,
+          });
+        }
         return s;
       },
     },

@@ -1310,6 +1310,8 @@
      keeps its separate "caneiJourney" database; these three scripts are
      additive and degrade silently if, for any reason, they fail to load. -->
     <script src="erp-engine.js"></script>
+    <!-- The starter price book, read by migration 16. MUST precede the migrations. -->
+    <script src="erp-catalogue-pack.js"></script>
     <script src="erp-migrations.js"></script>
     <script src="erp-store.js"></script>
   </head>

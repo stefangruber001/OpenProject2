@@ -93,8 +93,23 @@ function additiveViolations(before, after, path = "") {
   const at = path || "(root)";
   if (Array.isArray(before)) {
     if (!Array.isArray(after)) return [`${at}: array -> ${typeof after}`];
-    if (before.length !== after.length)
-      return [`${at}: length ${before.length} -> ${after.length}`];
+    /*
+     * AN ARRAY MAY GROW, AND MAY NOT DO ANYTHING ELSE.
+     *
+     * This used to demand identical lengths, which was stricter than the name
+     * "additive" and stricter than the purpose: what must never happen is that
+     * a company loses or has altered something it typed. Appending does
+     * neither. Migration 16 is the first step that seeds DATA rather than
+     * reshaping structure — a 200-partida starter price book, without which
+     * nobody can build a quote — and equal-length would have made that
+     * impossible to express.
+     *
+     * Every original element is still compared position by position, so a
+     * truncation, a reorder, an insertion at the front or an edit to an
+     * existing row all still fail. Only appending passes.
+     */
+    if (after.length < before.length)
+      return [`${at}: length ${before.length} -> ${after.length} (shrank)`];
     return before.flatMap((x, i) => additiveViolations(x, after[i], `${path}[${i}]`));
   }
   if (before && typeof before === "object") {
@@ -289,6 +304,107 @@ assert(r2.applied.length === 0, "a current blob applies no further migrations");
   assert(
     JSON.stringify(a.alerts()) === JSON.stringify(b.alerts()),
     "alerts identical before and after migration",
+  );
+}
+
+/* ---- the starter price book (migration 16) --------------------------------
+ *
+ * A company cannot build a quote without a catalogue, so migration 16 installs
+ * one. It is purely additive, and these checks are about that word: a company
+ * that has priced its own work must keep every figure it typed, and re-running
+ * must change nothing.
+ */
+{
+  const pack = (await import("../../site/erp-catalogue-pack.js")).default;
+  assert(
+    pack.CHAPTERS.length === 20,
+    "the pack declares 20 chapters",
+    String(pack.CHAPTERS.length),
+  );
+  const rows = pack.rows();
+  assert(rows.length === 200, "the pack declares 200 partidas", String(rows.length));
+
+  const perChapter = {};
+  for (const r of rows) perChapter[r.chapter] = (perChapter[r.chapter] || 0) + 1;
+  assert(
+    Object.values(perChapter).every((n) => n === 10) && Object.keys(perChapter).length === 20,
+    "every chapter holds exactly ten partidas",
+    JSON.stringify(perChapter),
+  );
+
+  const codes = rows.map((r) => r.code);
+  assert(new Set(codes).size === codes.length, "no duplicate codes in the pack");
+
+  const UNITS = new Set(["m2", "ml", "m3", "ud", "pa", "h", "kg"]);
+  const TYPES = new Set([
+    "material",
+    "ownLabour",
+    "subcontract",
+    "machinery",
+    "professional",
+    "waste",
+    "other",
+  ]);
+  assert(
+    rows.every((r) => UNITS.has(r.unit)),
+    "every unit is one the units list knows",
+  );
+  assert(
+    rows.every((r) => TYPES.has(r.type)),
+    "every type is one the catalogue knows",
+  );
+  // Quote-ready means priced. A zero price is allowed only where it is the
+  // point — a partida alzada the operator fills in per job.
+  const unpriced = rows.filter((r) => r.defaultPriceCents === 0);
+  assert(
+    unpriced.length <= 1,
+    "at most one deliberately unpriced partida",
+    JSON.stringify(unpriced.map((r) => r.code)),
+  );
+  assert(
+    rows.every((r) => r.defaultPriceCents === 0 || r.defaultPriceCents > r.defaultCostCents),
+    "every priced partida sells above its cost",
+  );
+
+  // Additive against a state that already has the operator's own work.
+  const own = M.migrate({ ...v1, schemaVersion: 15 }).state;
+  own.lists = own.lists || {};
+  own.lists.itemChapters = [{ code: "DEM", es: "Mis demoliciones", ca: "—", active: true }];
+  own.catalogue = [
+    {
+      id: "cat_9",
+      code: "DEM-101",
+      desc: "Mi precio",
+      unit: "m2",
+      chapter: "DEM",
+      defaultPriceCents: 12345,
+    },
+  ];
+  const after = M.MIGRATIONS.find((m) => m.to === 16).up(JSON.parse(JSON.stringify(own)));
+  const kept = after.catalogue.find((i) => i.code === "DEM-101");
+  assert(
+    kept.desc === "Mi precio" && kept.defaultPriceCents === 12345,
+    "an existing code is never overwritten",
+  );
+  const chap = after.lists.itemChapters.find((c) => c.code === "DEM");
+  assert(chap.es === "Mis demoliciones", "an existing chapter keeps the operator's name");
+  assert(
+    after.lists.itemChapters.length === 20,
+    "the other nineteen chapters are added",
+    String(after.lists.itemChapters.length),
+  );
+  assert(
+    after.catalogue.length === 200,
+    "199 partidas added beside the operator's one",
+    String(after.catalogue.length),
+  );
+  const ids = after.catalogue.map((i) => i.id);
+  assert(new Set(ids).size === ids.length, "no id collides with one the company already had");
+
+  const twice = M.MIGRATIONS.find((m) => m.to === 16).up(JSON.parse(JSON.stringify(after)));
+  assert(
+    twice.catalogue.length === after.catalogue.length,
+    "re-running the migration adds nothing",
   );
 }
 

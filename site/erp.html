@@ -4037,6 +4037,8 @@
      documents with it as soon as the first read comes back. Without it
      the page still works, it just never notices a change made elsewhere. -->
     <script src="erp-sync.js"></script>
+    <!-- The starter price book, read by migration 16. MUST precede erp-migrations.js. -->
+    <script src="erp-catalogue-pack.js"></script>
     <script src="erp-migrations.js"></script>
     <script src="erp-store.js"></script>
     <!-- Typed capability layer: erp-factory.js is GENERATED from packages/erp-browser
