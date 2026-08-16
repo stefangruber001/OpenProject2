@@ -410,8 +410,19 @@ async function crawl(browser, base, lang) {
   const failed = [];
   for (const [file, hash] of pages) {
     try {
-      await page.goto(`${base}/${file}${hash}`, { waitUntil: "networkidle", timeout: 30000 });
-      if (file === "erp.html") await page.waitForSelector("#p1 .secitem", { timeout: 20000 });
+      await page.goto(`${base}/${file}${hash}`, { waitUntil: "networkidle", timeout: 45000 });
+      // Wait for the shell only if we are still IN the shell. Two of the
+      // workspace's own routes are links to satellite pages — `#financials`
+      // lands on financial-data.html — and demanding the shell's nav there
+      // reports a working link as a broken page. The satellite still painted,
+      // still ran i18n.js, and is still measured; it simply has no #p1.
+      const inShell = page.url().includes("erp.html");
+      if (file === "erp.html" && inShell) {
+        // 20s was not enough once the crawl grew to thirty routes: #quotes
+        // renders in under eight seconds alone and timed out inside the run.
+        // A slow machine is not an untranslated screen.
+        await page.waitForSelector("#p1 .secitem", { timeout: 45000 });
+      }
       await page.waitForTimeout(600);
       const first = await page.evaluate(`(${DRAIN})()`);
       if (first === null) {
