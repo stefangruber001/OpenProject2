@@ -67,26 +67,35 @@ const JSON_OUT = argOf("--json", "");
 /** How many controls to press per route. Enough to open every panel. */
 const CLICKS = Number(argOf("--clicks", "40"));
 
-const PAGES = [
-  ["erp.html", "#tower"],
-  ["erp.html", "#leads"],
-  ["erp.html", "#visits"],
-  ["erp.html", "#projects"],
-  ["erp.html", "#economics"],
-  ["erp.html", "#changes"],
-  ["erp.html", "#invoices"],
-  ["erp.html", "#purchases"],
-  ["erp.html", "#capture"],
-  ["erp.html", "#cash"],
-  ["erp.html", "#quotes"],
-  ["erp.html", "#contracts"],
-  ["erp.html", "#alerts"],
-  ["erp.html", "#settings"],
+/**
+ * The pages to drive. `erp.html` carries no route list here ON PURPOSE.
+ *
+ * It used to: fourteen hashes copied out of the application. Then a merge
+ * renamed two of them, five pages stopped rendering, and the run reported a
+ * total as though it had walked them — the exact "measured the wrong thing"
+ * failure this file was written to end, reproduced inside the file itself.
+ *
+ * A hard-coded copy of somebody else's list is a copy that drifts. The
+ * workspace declares its own sections in `SECTIONS`, so the routes are read
+ * from the running application and cannot disagree with it.
+ */
+const STATIC_PAGES = [
   ["journey.html", ""],
   ["master-data.html", ""],
   ["financial-data.html", ""],
 ];
 
+/** Every sub-section the workspace declares, in the order the nav shows them. */
+const DISCOVER_ROUTES = `() => {
+  try {
+    if (typeof SECTIONS === "undefined" || !SECTIONS) return [];
+    const out = [];
+    for (const s of SECTIONS) for (const sub of s.subs || []) if (sub && sub.k) out.push(sub.k);
+    return out;
+  } catch (e) {
+    return [];
+  }
+}`;
 /**
  * Controls this crawler will not press.
  *
@@ -373,14 +382,44 @@ async function crawl(browser, base, lang) {
     }
   };
 
+  /* The workspace's own route list, read from the workspace. A boot that
+     yields no routes is a failure, not an empty walk — it would otherwise
+     report zero untranslated strings for the largest page in the product. */
+  let pages = [];
+  try {
+    await page.goto(`${base}/erp.html`, { waitUntil: "networkidle", timeout: 30000 });
+    await page.waitForSelector("#p1 .secitem", { timeout: 20000 });
+    const routes = await page.evaluate(`(${DISCOVER_ROUTES})()`);
+    if (!routes.length) throw new Error("SECTIONS declared no routes");
+    pages = routes.map((k) => ["erp.html", `#${k}`]).concat(STATIC_PAGES);
+    console.log(`  ${routes.length} workspace routes discovered: ${routes.join(" ")}`);
+  } catch (e) {
+    console.error(`FAIL: could not read the workspace's route list — ${e.message}`);
+    await ctx.close();
+    return {
+      found,
+      booted: 0,
+      data,
+      vocabulary,
+      failed: ["erp.html — route discovery"],
+      pages: [],
+    };
+  }
+
   let booted = 0;
-  for (const [file, hash] of PAGES) {
+  const failed = [];
+  for (const [file, hash] of pages) {
     try {
       await page.goto(`${base}/${file}${hash}`, { waitUntil: "networkidle", timeout: 30000 });
       if (file === "erp.html") await page.waitForSelector("#p1 .secitem", { timeout: 20000 });
       await page.waitForTimeout(600);
       const first = await page.evaluate(`(${DRAIN})()`);
-      if (first === null) continue; // i18n.js absent, or base language == target
+      if (first === null) {
+        // No ledger on the page: i18n.js absent, or it never ran. Either way
+        // this page contributed nothing and must say so.
+        failed.push(`${file}${hash} — no translation ledger on the page`);
+        continue;
+      }
       booted++;
       absorb(first, `${file}${hash}`);
       for (const [top, v] of await page.evaluate(`(${DATA_VALUES})()`)) {
@@ -409,12 +448,21 @@ async function crawl(browser, base, lang) {
           /* a control that navigates away or throws is not this file's problem */
         }
       }
-    } catch {
-      /* a page that does not render is a different bug; the E2E owns it */
+    } catch (e) {
+      // A page that will not render contributes NOTHING, and a run that stays
+      // quiet about it reports a smaller number for a better-looking reason.
+      // The merge that brought twelve sessions of new screens also renamed the
+      // selector this waits for, and five pages dropped out of a run that still
+      // printed a total. Never again silently.
+      failed.push(
+        `${file}${hash} — ${String(e.message || e)
+          .split("\n")[0]
+          .slice(0, 120)}`,
+      );
     }
   }
   await ctx.close();
-  return { found, booted, data, vocabulary };
+  return { found, booted, data, vocabulary, failed, pages };
 }
 
 /* ---------------------------------------------------------------- run ---- */
@@ -450,11 +498,15 @@ try {
  * the application: if fewer than half the pages booted far enough to expose the
  * ledger, the number below is not a measurement and is not reported as one.
  */
-if (result.booted < PAGES.length / 2) {
+if (result.failed.length) {
+  console.error(`\n✗ ${result.failed.length} of ${result.pages.length} pages did not run:`);
+  for (const f of result.failed) console.error(`    ${f}`);
   console.error(
-    `FAIL: only ${result.booted}/${PAGES.length} pages exposed a translation ledger. ` +
-      `Either the pages did not boot or site/i18n.js is not recording misses — ` +
-      `either way this run measured nothing.`,
+    `\nFAIL: a page that does not render contributes no strings, so the total below ` +
+      `would be smaller for the WRONG REASON. This was a half-measure once: the guard ` +
+      `read "more than half the pages booted", the merge renamed the selector this ` +
+      `waits for, five pages dropped out — and the run still printed a number as if it ` +
+      `had walked them. Fix the page, or fix the route list it came from; never lower the ceiling to fit.`,
   );
   process.exit(1);
 }
@@ -494,7 +546,7 @@ for (const m of all) {
 
 console.log(`\n──── translator miss ledger: es → ${TARGET} ────`);
 console.log(
-  `${result.booted}/${PAGES.length} pages driven · ${all.length} untranslated strings · ` +
+  `${result.booted}/${result.pages.length} pages driven · ${all.length} untranslated strings · ` +
     `${asData} excused as company records (${result.data.size} values across ${RECORDS.size} ` +
     `record collections; ${result.vocabulary.size} shipped-vocabulary values NOT excused)\n`,
 );
