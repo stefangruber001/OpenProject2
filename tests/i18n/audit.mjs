@@ -16,7 +16,29 @@
  * language-neutral cases — numbers, money, dates, codes, brand names, and the
  * words Spanish and English genuinely share.
  *
- * It reports; it does not assert. `--max N` turns it into a gate.
+ * It reports; it does not assert. `--max N` turns it into a gate, and CI runs
+ * it that way — as a RATCHET at the numbers measured today, so the count can go
+ * down but never back up.
+ *
+ * WHAT THE NUMBER IS AND IS NOT. It is an upper bound on untranslated text, not
+ * a translation debt. Two things inflate it, and both are known:
+ *
+ *   · `erp.html`, `index.html` and `dashboard.html` are measured on a static
+ *     file server where the workspace shell never boots, so what is read is the
+ *     pre-boot chrome, not the screens the operator uses. The BOOTED workspace
+ *     is covered far better by tests/site-e2e/run.mjs, which drives every
+ *     screen in all three languages and asserts on the visible strings.
+ *   · A string is counted when it appears anywhere in both renders. A label
+ *     that is correctly translated in the page body but survives untranslated
+ *     in one `<select>` is counted once, and reads as a whole missing entry.
+ *
+ * Measured 2026-08-16 after the Master Data / Financial Data batch:
+ * master-data.html reached 0 (was 72) and financial-data.html 22 (was 75) — the
+ * residue there is one section dropdown whose options carry the group name.
+ * `setup-guide.html` is 457 of the Catalan total on its own: a 20-minute prose
+ * guide whose translation is content work for a native speaker, not a side
+ * effect of a feature session. It is counted in the open here rather than
+ * excused by a check scoped small enough to pass.
  *
  * Run:  node tests/i18n/audit.mjs [--lang ca] [--max 0] [--json out.json]
  */
@@ -76,7 +98,26 @@ const NEUTRAL = [
   /^[\w.+-]+@[\w.-]+$/, // email addresses
   /^https?:\/\//,
   /^[A-Z0-9]{6,}$/, // NIF/CIF-ish, IBAN fragments
+  /^B2[BC]$/, // customer segment codes
+  /^[\d.,\s]+\/[\d.,\s]*d?$/, // paired metrics: "38 / 38d"
 ];
+
+/**
+ * The demonstration customers.
+ *
+ * A person's or a building's name is the same in all three languages, so it is
+ * flagged by a test whose question is "did this come out the same" — and it is
+ * the one class of string where translating it would be the bug. Listed by name
+ * rather than by a "looks like a proper noun" rule, because such a rule would
+ * also swallow real labels and quietly shrink what this audit can see.
+ */
+const PROPER_NOUNS = new Set([
+  "Familia Roca Puig",
+  "Comunidad Prop. Balmes 120",
+  "Nou Local Gràcia S.L.",
+  "Marta Roca Puig",
+  "Elena Duran Mas",
+]);
 
 /** Words that ARE the same in Spanish, Catalan and English. */
 const SHARED = new Set(
@@ -143,6 +184,7 @@ function loadDeliberate(target) {
 function isNeutral(text) {
   const t = text.trim();
   if (t.length < 2) return true;
+  if (PROPER_NOUNS.has(t)) return true;
   if (NEUTRAL.some((re) => re.test(t))) return true;
   // A phrase made entirely of shared words / numbers is not evidence of a gap.
   const words = t

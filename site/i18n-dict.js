@@ -3068,6 +3068,30 @@ window.CANEI_DICT = {
     ["Subtotal", "Subtotal"],
     ["Mampara de ducha de vidrio templado", "Tempered-glass shower screen"],
     ["Backend ↗", "Backend ↗"],
+    /* Master Data and Financial Data: the rail composes
+       "section — subsection" and the subsection half was still authored in
+       English, so the composite the operator reads had no entry at all. */
+    ["Libros", "Ledgers"],
+    ["Tax", "Tax"],
+    ["Sin datos del ERP.", "No ERP data."],
+    [
+      "Esta sesión no tiene estado del ERP cargado, así que las cifras que se ven son las de demostración de esta página.",
+      "This session has no ERP state loaded, so the figures shown are this page's demonstration data.",
+    ],
+    ["Resumen — KPI cockpit", "Overview — KPI cockpit"],
+    ["Estados financieros — Profit & Loss", "Statements — Profit & Loss"],
+    ["Estados financieros — Balance sheet", "Statements — Balance sheet"],
+    ["Estados financieros — Cash flow", "Statements — Cash flow"],
+    ["Capital circulante — AR / AP aging", "Working capital — AR / AP aging"],
+    ["Capital circulante — Receivables", "Working capital — Receivables"],
+    ["Capital circulante — Payables", "Working capital — Payables"],
+    ["Capital circulante — VAT & tax", "Working capital — VAT & tax"],
+    ["Libros — Chart of accounts", "Ledgers — Chart of accounts"],
+    ["Libros — P&L ledger", "Ledgers — P&L ledger"],
+    ["Libros — Balance sheet input", "Ledgers — Balance sheet input"],
+    ["Libros — Bank & cash", "Ledgers — Bank & cash"],
+    ["Libros — Loans", "Ledgers — Loans"],
+    ["Libros — Drivers", "Ledgers — Drivers"],
   ],
   rxEs2En: [
     [new RegExp("^Programar visita — (.+)$"), "Schedule visit — $1"],

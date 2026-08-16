@@ -63,6 +63,13 @@ jobs:
         if: always()
         run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
 
+      # The template and translation gates render real pages in a real browser,
+      # which is the whole point of them — so they need one. The runner has no
+      # browser until this step, and `pnpm install` does not fetch it.
+      - name: Install Playwright browser (document + translation gates render pages)
+        if: always()
+        run: pnpm --filter web exec playwright install --with-deps chromium
+
       # The writer behind every quote and invoice: paginates instead of
       # truncating, keeps Spanish accents, stays clear of the printable border.
       - name: PDF writer
@@ -76,15 +83,27 @@ jobs:
         if: always()
         run: pnpm test:docs
 
-      # Renders every page in every language and counts the strings that came out
-      # identical in two of them. Budgeted rather than zero: the documentation
-      # pages are still Spanish-only, and a gate nobody can pass is a gate that
-      # gets deleted. The number only ever moves down.
-      - name: Translation coverage
+      # Two questions, two checks, and they are not the same question.
+      #
+      # coverage.mjs asks whether every entry exists in all three languages —
+      # cheap, exact, and blind to whether the page uses it.
+      # audit.mjs renders every page in every language and counts what came out
+      # identical in two of them, which is what the operator actually sees.
+      #
+      # The audit is budgeted rather than zero: setup-guide.html alone is 457 of
+      # the Catalan total and is prose a native speaker should translate, and a
+      # gate nobody can pass is a gate that gets deleted. The ceilings are the
+      # numbers measured on 2026-08-16 and only ever move down. See the header
+      # of audit.mjs for what inflates them.
+      - name: Translation completeness (dictionary)
+        if: always()
+        run: node tests/i18n/coverage.mjs
+
+      - name: Translation coverage (rendered pages)
         if: always()
         run: |
-          node tests/i18n/audit.mjs --lang en --max 620
-          node tests/i18n/audit.mjs --lang ca --max 610
+          node tests/i18n/audit.mjs --lang en --max 668
+          node tests/i18n/audit.mjs --lang ca --max 845
 
   bundle:
     name: Capability bundle (build, browser-safety, drift)

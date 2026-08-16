@@ -2853,3 +2853,45 @@ different decisions, so these ten arrived colliding. They are renumbered from
   squeezes the spaces out of each line and fails when a document-type word
   appears only after squeezing — and the gate was verified by reverting one file
   to .1em and confirming it exits 1.
+
+- **#95 — the merge where both sides had built the same feature, and the
+  measurement that kept pointing the wrong way (2026-08-16).**
+  `origin/main` was 50 commits ahead with its own trilingual layer, its own
+  Catalan dictionary and its own completeness gate; this branch had the reach —
+  sign-in switcher, company-wide language, a gate that reads the rendered page.
+  **Resolution rule, decided once and applied to all eight conflicts:** main's
+  artifact wins wherever it is larger or a gate depends on it; this branch's
+  deltas are re-applied on top. Nothing was dropped from either side.
+  **The business simulation was mis-diagnosed here as environment-dependent.**
+  It was not: main's `erp-engine.js` change fixes it, and it passes on the
+  merged branch (149/149 and 214/214). A failure that only reproduces on CI is
+  a hypothesis, not a finding, and this one was wrong.
+  **The cookie outranks localStorage, and that broke 18 assertions.** The device
+  choice now lives in both, and main's E2E set only localStorage — so after the
+  first pill click every later "switch to Catalan" was ignored and the suite
+  reported that Catalan does not translate. The application always writes both;
+  the harness now goes through one `chooseLang()` helper that does the same.
+  **The audit read `D.ca` as a list when main's is an object.** That does not
+  make it fail — it makes it OVER-report, demanding fixes for strings somebody
+  already decided stay as they are. It now asserts the shape.
+  **Three wrong theories about master-data.html/financial-data.html, in order:**
+  that the pages lacked the translation layer (they load it); that their content
+  was Spanish under a wrong `lang="en"` (flipping it made the count worse — the
+  content is English); that the residue was a measurement artefact (it is one
+  real `<select>`). What finally worked was rendering the page and looking at
+  where the string survived. master-data went 72 → **0**, financial-data 75 → 22.
+  **Renaming the four Financial Data nav groups to English collided with the
+  dictionary**: two Spanish strings map to "Overview", so the Spanish render
+  picked "Visión" and the spec's §3.2 group names stopped matching. Reverted —
+  a spec-derived E2E assertion outranks a 12-string audit residue.
+  **`tests/doc-print/render.mjs` imported an absolute path under /home/user**
+  and launched an absolute browser path. It ran on one machine and could not run
+  on CI at all — the same class of mistake as a gate that reports a clean sheet
+  on a file it never opened. Now resolved by specifier, with CHROME_PATH still
+  winning where an environment pins one.
+  **The audit is a ratchet, not a target:** EN ≤ 668, CA ≤ 845, the numbers
+  measured today. `setup-guide.html` is 457 of the Catalan total on its own and
+  is prose for a native speaker, counted in the open rather than excused by a
+  check scoped small enough to pass.
+  **Reversible: yes** — every decision is a dictionary entry, a test helper or a
+  ceiling, and the merge is an ordinary merge commit with no history rewritten.

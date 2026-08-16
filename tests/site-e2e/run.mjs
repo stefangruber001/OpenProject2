@@ -165,6 +165,32 @@ async function bootedShell(pg) {
   await pg.waitForTimeout(200);
 }
 
+/**
+ * Choose a language the way the application does — BOTH places, always.
+ *
+ * The device choice lives in two stores on purpose: a cookie, because the
+ * sign-in page is rendered on the server and carries no JavaScript so a cookie
+ * is the only thing it can read; and localStorage, so a choice made by an
+ * earlier version is not lost. `site/i18n.js` reads the cookie FIRST, and the
+ * app's own `set()` writes both together, so the two can never disagree in real
+ * use.
+ *
+ * A test that writes only localStorage can make them disagree, and then every
+ * assertion after it silently measures the previous language rather than the
+ * one it asked for — which is how a suite reports "CA does not translate" when
+ * the truth is that CA was never selected. Setting a language goes through here.
+ */
+async function chooseLang(pg, code) {
+  await pg.evaluate((c) => {
+    try {
+      localStorage.setItem("caneiLang", c);
+    } catch (e) {
+      /* private mode */
+    }
+    document.cookie = "canei_lang=" + c + ";path=/;max-age=31536000;samesite=lax";
+  }, code);
+}
+
 async function openJobWithChapters(pg, searchId) {
   const code = await pg.evaluate(() => {
     const p = erp.state.projects.find((x) => x.baseline && (x.baseline.chapters || []).length);
@@ -616,7 +642,7 @@ async function testMobile(browser, base) {
     // that has caught a gap in ten consecutive sessions. The language is a
     // stored preference read at boot, so this reloads rather than poking the
     // translator, which is how a real user changes it.
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "ca"));
+    await chooseLang(pg, "ca");
     await pg.reload({ waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(900);
@@ -626,7 +652,17 @@ async function testMobile(browser, base) {
     if (/Part d'hores/i.test(caMenu) && !/Parte de horas/.test(caMenu))
       ok("i18n: CA translates the site-action button");
     else bad("i18n: CA site actions", caMenu.replace(/\n/g, " ").slice(0, 140));
-    await pg.evaluate(() => localStorage.removeItem("caneiLang"));
+    // Back to the default. Both stores, for the same reason chooseLang writes
+    // both: clearing one leaves the other deciding the language for every
+    // check after this one.
+    await pg.evaluate(() => {
+      try {
+        localStorage.removeItem("caneiLang");
+      } catch (e) {
+        /* private mode */
+      }
+      document.cookie = "canei_lang=;path=/;max-age=0;samesite=lax";
+    });
     await pg.reload({ waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(900);
@@ -4496,7 +4532,7 @@ async function testI18n(browser, base) {
     // Catalan (S3, decision 20). The navigation is the surface a Catalan user
     // hits first, so it is the one asserted: the six secciones must actually
     // read as Catalan, not fall back to Spanish.
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "ca"));
+    await chooseLang(pg, "ca");
     // reload(), not goto(): the page is already at erp.html#tower after the EN
     // toggle, and navigating to the identical URL+hash is a no-op that would
     // leave the previous language in place and quietly pass nothing.
@@ -4704,7 +4740,7 @@ async function testI18n(browser, base) {
     // And the same two screens under EN, so both new-string additions are
     // proven in both directions, not just the CA one that happened to be
     // built last.
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "en"));
+    await chooseLang(pg, "en");
     await pg.reload({ waitUntil: "networkidle" });
     await pg.waitForTimeout(500);
     await pg.evaluate(() => (location.hash = "leads"));
@@ -4880,7 +4916,7 @@ async function testI18n(browser, base) {
     } else bad("i18n: a draft quote to preview", "none in draft");
 
     // Back to Catalan for the COM-03 interface check.
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "ca"));
+    await chooseLang(pg, "ca");
     await pg.reload({ waitUntil: "networkidle" });
     await pg.waitForTimeout(700);
     await pg.evaluate(() => (location.hash = "quotes"));
@@ -4904,7 +4940,7 @@ async function testI18n(browser, base) {
     else bad("i18n: three forms", JSON.stringify(trio));
 
     // English-base page flips to Spanish when ES is chosen
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "es"));
+    await chooseLang(pg, "es");
     await pg.goto(`${base}/journey.html`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(500);
     const jLang = await pg.evaluate(() => document.documentElement.lang);

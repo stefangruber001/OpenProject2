@@ -1,7 +1,44 @@
-import pw from "/home/user/OpenProject2/node_modules/.pnpm/playwright-core@1.61.1/node_modules/playwright-core/index.js";
-const { chromium } = pw;
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+/**
+ * Find Playwright and a browser WITHOUT hardcoding either.
+ *
+ * This file used to import an absolute path under /home/user and launch an
+ * absolute path under /opt/pw-browsers — the two places they happen to live on
+ * one developer machine. It ran there and could not run anywhere else, CI
+ * included, which is the same class of mistake as a gate that reports a clean
+ * sheet on a file it never opened: it works exactly where nobody needed it to.
+ *
+ * So: resolve the package by specifier and let Playwright find its own browser
+ * when no explicit path is set. CHROME_PATH still wins where an environment
+ * pins one.
+ */
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+async function loadChromium() {
+  const local = path.join(
+    ROOT,
+    "node_modules/.pnpm/playwright-core@1.61.1/node_modules/playwright-core/index.js",
+  );
+  for (const spec of [fs.existsSync(local) ? local : null, "playwright-core", "playwright"]) {
+    if (!spec) continue;
+    try {
+      const m = await import(spec);
+      const c = (m.default || m).chromium;
+      if (c) return c;
+    } catch {
+      /* try the next specifier */
+    }
+  }
+  console.error("FAIL: playwright-core not found — run `pnpm install`.");
+  process.exit(1);
+}
+const chromium = await loadChromium();
+const CHROME =
+  process.env.CHROME_PATH ||
+  ["/opt/pw-browsers/chromium-1194/chrome-linux/chrome"].find((p) => fs.existsSync(p)) ||
+  undefined;
 
 const SRC = process.argv[2],
   OUT = process.argv[3];
@@ -26,9 +63,7 @@ files.sort((a, b) => {
   return ai.localeCompare(bi);
 });
 
-const browser = await chromium.launch({
-  executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
-});
+const browser = await chromium.launch({ executablePath: CHROME });
 const made = [];
 for (const f of files) {
   const page = await browser.newPage();
