@@ -4631,8 +4631,64 @@
         // rather than on the way out means no screen can strand the next one without
         // its navigation, whatever route the person took to leave.
         document.body.classList.remove("fs");
-        if (VIEWS[cur]) VIEWS[cur](v);
-        else unknownRouteView(cur, v);
+        // A SCREEN THAT THROWS MUST SAY SO, NOT GO BLANK.
+        //
+        // Every view sets its description into #sub and THEN builds its body.
+        // So a throw between the two leaves the heading and the description on
+        // screen with nothing underneath — which looks exactly like a screen
+        // that legitimately has no data. That is what the operator
+        // photographed: the control tower, correct heading, correct
+        // description, empty below, on a phone, while the same screen filled
+        // normally in a desktop browser. Nothing was reported anywhere,
+        // because an uncaught error in a render is invisible to everyone
+        // except a console nobody has open on a phone.
+        //
+        // Catching here cannot fix the underlying fault, and is not meant to:
+        // it turns a silent blank into a message naming the screen and the
+        // error, which is the difference between a bug that gets reported and
+        // one that gets lived with.
+        try {
+          if (VIEWS[cur]) VIEWS[cur](v);
+          else unknownRouteView(cur, v);
+        } catch (err) {
+          const detail = (err && (err.stack || err.message)) || String(err);
+          console.error("view failed:", cur, err);
+          // Self-contained on purpose: an error handler that calls into the
+          // rest of the file can fail for the same reason the view did, and
+          // then there is no message at all. This one uses nothing but the
+          // DOM, so it works even when the module around it does not.
+          const box = document.createElement("div");
+          box.className = "card";
+          box.style.borderColor = "#e5c9c5";
+          const head = document.createElement("div");
+          head.className = "ch";
+          const h = document.createElement("h3");
+          h.textContent = "Esta pantalla no ha podido cargarse";
+          head.appendChild(h);
+          const body = document.createElement("div");
+          body.setAttribute("style", "padding:12px 14px;font-size:13px;line-height:1.5");
+          const p = document.createElement("p");
+          p.textContent =
+            "La pantalla «" +
+            cur +
+            "» ha fallado al dibujarse. Los datos no se han tocado: esto es un " +
+            "error al mostrar, no al guardar.";
+          const pre = document.createElement("pre");
+          pre.setAttribute(
+            "style",
+            "white-space:pre-wrap;word-break:break-word;background:#f6f7f4;" +
+              "padding:10px;border-radius:8px;font-size:11.5px;margin:10px 0 0",
+          );
+          // textContent, never innerHTML: the message carries an exception
+          // string, which is attacker-adjacent input in the general case and
+          // is certainly not markup.
+          pre.textContent = String(detail).slice(0, 800);
+          body.appendChild(p);
+          body.appendChild(pre);
+          box.appendChild(head);
+          box.appendChild(body);
+          v.replaceChildren(box);
+        }
         autoCards(v);
       }
 
