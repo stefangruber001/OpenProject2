@@ -642,6 +642,26 @@
     window.addEventListener("storage", check);
   }
 
+  /**
+   * The ledger, sorted for reading: most frequent first.
+   *
+   * Deleted by accident when the on-screen audit was removed — it sat inside
+   * the span that came out — and every page then reported "no translation
+   * ledger" on the next crawl. That the crawl SAID so, on all 33 pages, rather
+   * than quietly reporting zero untranslated strings, is the guard added
+   * earlier today doing exactly its job.
+   */
+  function missList() {
+    var out = [];
+    misses.forEach(function (e) {
+      out.push(e);
+    });
+    out.sort(function (a, b) {
+      return b.n - a.n || (a.text < b.text ? -1 : 1);
+    });
+    return out;
+  }
+
   /* ---------- the ES · CA · EN toggle ----------
    *
    * REINSTATED ON INSTRUCTION, after being removed in PK5-A.
