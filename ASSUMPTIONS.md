@@ -2947,3 +2947,53 @@ different decisions, so these ten arrived colliding. They are renumbered from
   whitespace — still a real check, since a truncated document lacks the string
   entirely.
   **Reversible: yes.**
+
+- **#97 — the audit that could not see the screen the app opens on
+  (2026-08-16).** An operator on English photographed the control tower reading
+  Spanish: the description, the "Calculado a las" timestamp, the Recalcular and
+  Imprimir buttons, "0 proyectos activos". Every one of those had passed the
+  translation gate.
+  **Because the gate read a page that never booted.** `audit.mjs` opens each
+  page on a static file server; for `erp.html` that means the login chrome, not
+  the workspace, so it reported 43 strings where the operator sees 439.
+  `tests/i18n/workspace-audit.mjs` now waits for the shell and walks twelve
+  screens. **88 untranslated → 3**, and the three left are a site address and
+  two version labels.
+  **Most of what it found was interpolated**, which an exact-match dictionary
+  can never reach: "Calculado a las X", "N proyectos activos", "Factura X
+  vencida N días (Name)", every pagination footer. 27 anchored regex rules, in
+  BOTH directions — Catalan had two rules to English's 247, so every
+  interpolated string had been silently Spanish in Catalan since the language
+  shipped.
+  **A real bug in the translation layer, not just missing entries.**
+  `translateNode` passed added elements to `querySelectorAll("*")`, which never
+  returns the element it is called on. The full pass starts at document.body so
+  the omission was invisible; the MutationObserver hands it each ADDED element,
+  and the workspace builds its section buttons after boot with the label on the
+  button. Their visible text was translated and their `aria-label` was not — a
+  screen reader on English read "Torre de control" while the screen said
+  "Control tower". Six strings, one line of code.
+  **Demo data is excused by asking the ERP, not by guessing.** A harvested
+  string is excluded only when it is literally a value in `erp.state`, or is
+  mostly one with no prose around it. "Skip anything that looks like a proper
+  noun" would also swallow real labels, which is how a coverage check stops
+  being worth running. The audit REFUSES to run if it reads fewer than 20 data
+  values: an exclusion list that is empty for the wrong reason excuses nothing
+  or everything, and neither is a measurement.
+  **The letter-spacing explanation was only two thirds right.** Zeroing it took
+  CI from 16 shattered documents to 8 and the word count from 7584 to 7184, not
+  to this machine's 6785 — so something else also splits. Kerning is the only
+  remaining source of intra-glyph placement, and it is now off in all 21
+  templates. **This is a second reasoned fix that this machine cannot verify**,
+  for the same reason as the first: the proxy refuses the browser download, so
+  CI is the only place the question can be asked.
+  **I wrote a probe to measure the gaps directly and deleted it.** It parsed
+  literal PDF strings; Chromium writes hex strings, so it reported "worst gap 0"
+  on 21 files it had not read — a clean sheet from an unread file, which is
+  precisely the failure this project keeps meeting. An unvalidatable probe is
+  worse than none.
+  **`font:ok` was lying on CI.** It compared Roboto Serif against Georgia, which
+  does not exist on a Linux runner, so it compared two different fallbacks and
+  answered "yes" whether or not the webfont had loaded — on the machine where
+  it mattered most. It now compares against a family that cannot exist.
+  **Reversible: yes.**

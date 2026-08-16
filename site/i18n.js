@@ -187,12 +187,22 @@
       var out = tr(n.nodeValue);
       if (out !== null) n.nodeValue = out;
     }
-    var els =
-      root.nodeType === 1 || root.nodeType === 9
-        ? root.querySelectorAll
-          ? root.querySelectorAll("*")
-          : []
-        : [];
+    // THE ROOT ITSELF, not only its descendants.
+    //
+    // `querySelectorAll("*")` never returns the element it is called on. The
+    // full pass starts at document.body, so that omission is invisible; the
+    // MutationObserver hands this function each ADDED element, and for those
+    // the omission is the whole bug. The workspace builds its section buttons
+    // after boot with the label on the button — so the visible text was
+    // translated (the text walker does start at root) and the aria-label was
+    // not, and a screen reader on English read "Torre de control" while the
+    // screen said "Control tower".
+    var els = [];
+    if (root.nodeType === 1) els.push(root);
+    if ((root.nodeType === 1 || root.nodeType === 9) && root.querySelectorAll) {
+      var kids = root.querySelectorAll("*");
+      for (var q = 0; q < kids.length; q++) els.push(kids[q]);
+    }
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
       if (SKIP[el.nodeName]) continue;

@@ -105,6 +105,20 @@ jobs:
           node tests/i18n/audit.mjs --lang en --max 668
           node tests/i18n/audit.mjs --lang ca --max 845
 
+      # The one above reads erp.html on a static server, where the workspace
+      # shell never finishes booting — so it sees the login chrome and misses
+      # the screens the operator actually uses. That gap SHIPPED: an operator on
+      # English read the control tower's description, its timestamp, its buttons
+      # and "0 proyectos activos" in Spanish, on the screen the app opens on.
+      # This one waits for the shell and walks twelve screens. The ceilings are
+      # today's measurement and only move down; what remains is a site address
+      # and two version labels, which are data.
+      - name: Translation coverage (booted workspace)
+        if: always()
+        run: |
+          node tests/i18n/workspace-audit.mjs --lang en --max 3
+          node tests/i18n/workspace-audit.mjs --lang ca --max 3
+
   bundle:
     name: Capability bundle (build, browser-safety, drift)
     runs-on: ubuntu-latest

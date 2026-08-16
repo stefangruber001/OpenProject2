@@ -11,6 +11,17 @@ body{font:400 9.3pt/1.45 Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-ser
 .sheet{width:210mm;min-height:297mm;margin:10mm auto;padding:15mm 16mm 12mm;background:#fff;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.05),0 30px 60px -30px rgba(0,0,0,.22);overflow:hidden}
 .inner{position:relative;z-index:1;display:flex;flex-direction:column;min-height:267mm}
 @media print{body{background:#fff}.sheet{margin:0;box-shadow:none;width:auto;min-height:auto;padding:11mm 13mm 8mm;overflow:visible}@page{size:A4;margin:0}
+    /* Kerning off, ligatures off.
+       With letter-spacing at zero, kerning is the only thing left that places
+       one glyph away from the next, and a text extractor turns a large enough
+       gap into a space — which is what made "FACTURA" extract as "FACT URA"
+       and stop being findable with Ctrl+F. The effect is invisible at these
+       sizes; being searchable is not optional. */
+    *, *::before, *::after {
+      font-kerning: none;
+      font-variant-ligatures: none;
+      font-feature-settings: "kern" 0, "liga" 0;
+    }
 tr,.box,.note,.sig,.facts,.meta,.docfoot{break-inside:avoid}.band,h2,tr.chapter{break-after:avoid}thead{display:table-header-group}
 h1{margin-top:4.5mm;font-size:16.5pt}
 .facts{margin-top:4mm}.fig{font-size:12.5pt}.fig.hero{font-size:16pt}

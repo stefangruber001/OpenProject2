@@ -90,7 +90,14 @@ for (const f of files) {
       s.remove();
       return w;
     };
-    return Math.abs(probe("'Roboto Serif', Georgia, serif") - probe("Georgia, serif")) > 0.5;
+    // Compared against a family that CANNOT exist, not against Georgia.
+    // Georgia is a Windows/macOS face and is absent on a Linux CI runner, so
+    // "Roboto Serif vs Georgia" there compared Roboto Serif against DejaVu and
+    // reported a difference whether or not the webfont had loaded — a check
+    // that answers "yes" on the machine where it matters most. A nonsense
+    // family always resolves to the same generic serif, so a difference now
+    // means the webfont really is in use.
+    return Math.abs(probe("'Roboto Serif', serif") - probe("'NoSuchFace-9x7', serif")) > 0.5;
   });
   const rel = path
     .relative(SRC, f)
