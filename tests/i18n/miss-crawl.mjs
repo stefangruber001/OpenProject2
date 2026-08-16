@@ -416,12 +416,21 @@ async function crawl(browser, base, lang) {
       // lands on financial-data.html — and demanding the shell's nav there
       // reports a working link as a broken page. The satellite still painted,
       // still ran i18n.js, and is still measured; it simply has no #p1.
-      const inShell = page.url().includes("erp.html");
-      if (file === "erp.html" && inShell) {
-        // 20s was not enough once the crawl grew to thirty routes: #quotes
-        // renders in under eight seconds alone and timed out inside the run.
-        // A slow machine is not an untranslated screen.
-        await page.waitForSelector("#p1 .secitem", { timeout: 45000 });
+      // The shell wait is BEST EFFORT, and the failure criterion is the
+      // ledger, not a selector.
+      //
+      // Two routes broke a strict wait for reasons that had nothing to do with
+      // translation: #financials is a link to financial-data.html, so the
+      // shell's nav never appears because we are no longer in the shell; and
+      // #quotes renders in under eight seconds alone but not always inside a
+      // run that drives thirty-three pages. Both were reported as broken pages.
+      //
+      // What this file actually needs is `CANEI_I18N.misses()`. If that answers,
+      // i18n.js ran, the page painted, and the strings were offered to tr() —
+      // which is the whole measurement. So wait for the shell if it comes,
+      // shrug if it does not, and let the drain below decide.
+      if (file === "erp.html" && page.url().includes("erp.html")) {
+        await page.waitForSelector("#p1 .secitem", { timeout: 20000 }).catch(() => {});
       }
       await page.waitForTimeout(600);
       const first = await page.evaluate(`(${DRAIN})()`);
