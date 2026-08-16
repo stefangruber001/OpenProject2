@@ -3994,3 +3994,40 @@ These are ordinary labels, not prose, and are the obvious next session's work.
 The Catalan excess over English is the historical backlog counted in
 `coverage.mjs` (1 048 entries), now visible because the screens carrying it are
 finally being walked.
+
+### 170 · The dev branch and the `/preview` copy are deleted (2026-08-16)
+
+**What changed.** `pages.yml` publishes `main` at the site root and nothing
+else. `preview-refresh.yml` is deleted. `CLAUDE.md` now names `main` as the
+trunk and the only long-lived branch, with short-lived `claude/**` branches
+merged the same day and pushed to `main` directly once the gates are green.
+
+**Why.** The preview was built from a branch named by hand in `pages.yml`, and
+the trigger that refreshed it named the same branch by hand in a second file.
+The two had to be changed together, they were not, and `/preview` served
+nine-session-old content while nothing failed and nothing went red — noticed
+only when somebody opened the link expecting recent work. The same shape
+repeated this session: two dev branches existed, only one was wired to the
+preview, and the day's work landed on the other.
+
+**Why deleting rather than parametrizing.** `AUDIT_REPORT.md` F-005 recommended
+replacing the hardcoded name with a repo variable. A variable is still a second
+source of truth that drifts from `CLAUDE.md` independently — the failure was
+never that the name was hard to change, it was that there were two of them and
+nothing forced them to agree.
+
+**What it cost.** Nothing measurable. The branch `/preview` tracked was
+byte-identical to `main`, and the copy had no consumer: both mobile shells pin
+the live server, and have since before the audit that said otherwise. The one
+genuine loss is a non-production place to look at `site/` changes before they
+are live; the operator was offered the alternative of pointing `/preview` at
+`main` instead and chose removal. If it is wanted again, the replacement is a
+pull request with the built pages attached, not a branch name in a workflow.
+
+**Also corrected.** F-005 asserted the iOS and Android betas load `/preview`.
+That stopped being true earlier; both wrapper files pin
+`https://178-105-10-156.sslip.io/workspace/` and carry comments explaining why
+(a static copy saved to phone storage, so a record entered on a laptop was
+simply absent, with nothing reporting an error). The finding was verified by
+reading the two files rather than trusting the audit's description of them —
+the audit was the stale source. Closed by removal, not by parametrization.

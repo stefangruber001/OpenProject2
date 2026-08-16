@@ -1,19 +1,27 @@
-name: Deploy site + dev preview (GitHub Pages)
+name: Deploy site (GitHub Pages)
 
-# Publishes TWO copies of the site in one Pages deployment:
-#   • main            → site root      (production)
-#   • the dev branch  → /preview/      (development preview)
-# Runs whenever EITHER branch changes, and rebuilds both from scratch each time,
-# so production and the preview are always current no matter which side pushed.
-# Both you and a collaborator can iterate on the dev branch and watch /preview/;
-# once aligned, merge the dev branch into main and the root updates.
+# Publishes ONE copy of the site: main, at the root.
+#
+# There used to be a second, under /preview/, built from a long-lived dev branch
+# named by hand in this file. It is gone, and the reason is worth keeping: the
+# branch name here and the trigger in preview-refresh.yml had to be changed
+# together, they were not, and /preview quietly served nine-session-old content
+# while nothing failed and nothing went red. It was noticed only when somebody
+# opened the link expecting recent work.
+#
+# By the end the preview had no consumer at all — the iOS and Android shells
+# had already been moved to the live server — and the branch it tracked was
+# byte-identical to main. A second publishing target that nobody reads and that
+# can silently disagree with the trunk is a liability, not a safety net.
+#
+# Work now happens on short-lived branches merged into main the same day. If a
+# look-before-live step is ever wanted again, the replacement is a pull request
+# with the built pages attached, not a branch name written into a workflow.
 
 on:
   push:
     # Deploy runs only from main — the github-pages environment rejects other
-    # branches. Dev-branch pushes refresh the preview via preview-refresh.yml,
-    # which dispatches THIS workflow on main; the deploy always rebuilds /preview
-    # from the dev branch by name, so it picks up the latest dev content.
+    # branches, and main is now the only thing published.
     branches: [main]
     paths:
       - "site/**"
@@ -33,19 +41,6 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
-env:
-  # The branch published under /preview.
-  #
-  # Sessions 1-3 ran on claude/orin-project-status-1q50dt; session 4 moved the
-  # programme to the branch below and this value did NOT move with it, so
-  # /preview quietly kept serving session-3 content for the whole of sessions
-  # 4-12. Nothing failed and nothing was red — the preview was simply built
-  # from a branch nobody was committing to any more, which is exactly the kind
-  # of drift that only shows up when somebody opens the link expecting to
-  # review the latest work. If the programme branch changes again, change it
-  # here in the SAME commit.
-  DEV_BRANCH: claude/candi-programme-session-4-07amo8
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -59,13 +54,7 @@ jobs:
           ref: main
           path: prod
 
-      - name: Checkout development branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.DEV_BRANCH }}
-          path: dev
-
-      - name: Assemble site (main at root, dev under /preview)
+      - name: Assemble site (main at root)
         env:
           # The only address where the company's data actually lives. Everything
           # this job publishes is a read-only copy pointing back at it.
@@ -74,24 +63,19 @@ jobs:
           set -euo pipefail
           mkdir -p _site
           cp -R prod/site/. _site/
-          mkdir -p _site/preview
-          cp -R dev/site/. _site/preview/
 
-          # Mark EVERY published page as not-the-live-system. Both copies, not
-          # just the preview: the root is equally a static copy with no database
-          # behind it, and it is the one that looks most like the real thing.
+          # Mark EVERY published page as not-the-live-system. The root is a
+          # static copy with no database behind it, and it is the one that looks
+          # most like the real thing.
           #
           # This replaces a `perl -0pi -e 's{</body>}{...}'` one-liner that
           # missed three of eleven pages in silence and injected its banner into
           # journey.html's generated emails instead of onto the page. See the
           # header of the script for the full account.
-          # ORDER MATTERS. The script recurses, so `_site` also reaches
-          # `_site/preview`. Stamping the preview FIRST and relying on the
-          # script's idempotence (it skips a file that already carries the
-          # warning) is what gives each copy its own wording. Reversed, the
-          # root's pass would claim the preview is the public demo copy.
-          python3 prod/.github/scripts/stamp-pages-warning.py \
-            _site/preview "una vista previa de desarrollo" "a development preview" "$LIVE_URL"
+          #
+          # There were two passes here, ordered so the /preview copy got its own
+          # wording before the root's pass claimed it. With the preview gone
+          # there is one copy and one pass, and no ordering to get wrong.
           python3 prod/.github/scripts/stamp-pages-warning.py \
             _site "la copia pública de demostración" "the public demonstration copy" "$LIVE_URL"
 
@@ -104,7 +88,7 @@ jobs:
           echo "warning present on ${marked}/${total} pages"
           [ "$marked" = "$total" ] || { echo "::error::${total} pages published, only ${marked} carry the warning"; exit 1; }
 
-          echo "Assembled root=$(ls _site | wc -l) entries; preview=$(ls _site/preview | wc -l) entries."
+          echo "Assembled root=$(ls _site | wc -l) entries."
 
       - name: Configure Pages (enable if needed)
         uses: actions/configure-pages@v5

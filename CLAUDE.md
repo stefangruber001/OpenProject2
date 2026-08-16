@@ -86,9 +86,19 @@ CI rebuilds and diffs them, so never edit them by hand. See
 
 ## Git rules
 
-- Branch: whichever the session mandate designates. Sessions 1-3 used
-  `claude/orin-project-status-1q50dt`; the v4 programme uses
-  `claude/candi-programme-session-4-07amo8`. Never push elsewhere.
+- **`main` is the trunk and the only long-lived branch.** Work on a short-lived
+  `claude/**` branch if you want one — CI runs on those too — and merge it into
+  `main` the same day. Push to `main` directly when the gates are green; that is
+  the instruction, not a shortcut.
+  - There is no dev branch and no `/preview` any more. There were two named dev
+    branches and only one was wired to the preview, so work landed where the
+    tooling was not looking, and the preview once served nine-session-old
+    content while nothing failed and nothing went red. A branch name written
+    into a workflow is a second source of truth that drifts from this file
+    independently. Do not reintroduce one; if a look-before-live step is wanted,
+    use a pull request with the built pages attached.
+  - Never leave finished work sitting on a branch. `main` is what deploys, and
+    a change that is verified but unmerged protects nobody.
 - **Never content-copy `site/` between branches.** Merge, or port file by file
   against a diff you have read. Copying is silent: the screens arrive, the
   branch you copied _from_ stays green, and the work you overwrote on the branch

@@ -1361,7 +1361,10 @@ the behaviour actually lives — is fully tested.
 
 Work lands on the branch designated for the session — `claude/orin-project-
 status-1q50dt` for sessions 1-3, `claude/candi-programme-session-4-07amo8` for
-sessions 4-12. Small conventional commits, every commit green, no force-push, no
+sessions 4-12. **Both are retired as of 2026-08-16**: `main` is the trunk and the
+only long-lived branch, short-lived `claude/**` branches merge into it the same
+day, and there is no `/preview` copy. See ASSUMPTIONS #170 and `CLAUDE.md` →
+Git rules.
 history rewrite.
 
 - **S0 — CANEI v4 mapping (2026-08-08)**: `docs/CANEI-V4-MAPPING.md`. Answers the doc's six

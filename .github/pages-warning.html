@@ -2,16 +2,17 @@
   ============================================================================
   "This is not the live system."
 
-  Stamped into EVERY page published to GitHub Pages by .github/workflows/pages.yml
-  — both the production copy at the root and the development copy under /preview/.
+  Stamped into EVERY page published to GitHub Pages by .github/workflows/pages.yml.
 
   WHY THIS LIVES IN THE PUBLISHER AND NOT IN site/
   Being a read-only copy is a fact about WHERE a page is served from, not about
   what the page contains. The same HTML is also served by the real server out of
   apps/web/public/workspace, where this warning would be a lie. Putting it in the
-  publisher means it attaches to exactly the copies that deserve it, cannot be
-  removed by an unrelated content edit, and — importantly — covers the /preview/
-  copy, which is built from a different branch that this file does not live on.
+  publisher means it attaches to exactly the copy that deserves it and cannot be
+  removed by an unrelated content edit. It also used to cover a second copy
+  under /preview/, built from a different branch that this file did not live on;
+  that copy is gone, and the argument for living in the publisher is unchanged
+  without it.
 
   WHAT WENT WRONG WITHOUT IT
   Someone entered a real customer into the Pages copy and went looking for it on
@@ -78,8 +79,8 @@
      *
      * This started as a fixed bar across the bottom, which read better — until
      * it was measured. Driving all eleven pages at three widths found it
-     * burying real controls on six of them: the ES/EN language toggle sits in a
-     * `position: fixed` element at the bottom of EVERY page, and on
+     * burying real controls on six of them: the ES · CA · EN language toggle
+     * sits in a `position: fixed` element at the bottom of EVERY page, and on
      * financial-data.html it also covered Guardar / Cancelar / Eliminar. A
      * warning that hides the Save button teaches people to get rid of the
      * warning. The top edge is no better — every screen has its own fixed

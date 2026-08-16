@@ -5,11 +5,16 @@ name: Site E2E (autonomous journey)
 # P&L ledger, exports the project ZIP, and asserts no console errors or mobile
 # overflow. Runs on every push/PR that touches the site or the test.
 #
-# claude/** is included because that is the development branch: every push to
-# it republishes /preview via preview-refresh.yml + pages.yml, and /preview is
-# exactly what the iOS TestFlight and Android beta builds load (see
-# ios/CaneiSubirats/Support/Config.swift baseURL). Before this branch was added
-# here, code could reach beta users with zero browser-level test coverage.
+# claude/** is included because work happens on short-lived branches that are
+# merged into main the same day, and main is what deploys to the server the
+# mobile shells load (ios/CaneiSubirats/Support/Config.swift baseURL). Running
+# here means a branch is already proven before it becomes production, rather
+# than after.
+#
+# The original reason was different and is now obsolete: every push to the dev
+# branch republished /preview, which was what the TestFlight and Android betas
+# loaded. Both shells were moved to the live server, and /preview was deleted
+# with the dev branch it tracked.
 
 on:
   push:
