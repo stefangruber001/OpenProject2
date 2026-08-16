@@ -6504,13 +6504,19 @@ async function testI18n(browser, base) {
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(600);
-    // The switch lives in Configuración → Idioma (DMC-09) since the operator
-    // asked for it: the floating pill was reachable from everywhere and in the
-    // way everywhere, to the point that one document viewer reserved blank
-    // space purely to stop it covering the end of a contract.
-    if ((await pg.locator("#canei-lang-pill").count()) === 0)
-      ok("i18n: no floating language pill over the content");
-    else bad("i18n: pill removed", "#canei-lang-pill still injected");
+    // BOTH DOORS, and this assertion has been inverted once already.
+    //
+    // PK5-A removed the floating pill on the operator's words ("bothers more
+    // then helps") and this check asserted its ABSENCE. The operator has since
+    // asked for the three-way button back, so it asserts presence — and the
+    // Configuración → Idioma route below is still exercised, because the pill
+    // returning does not mean the settings screen stopped mattering.
+    //
+    // Written as "three buttons", not "an element exists": a pill that renders
+    // with one language would satisfy the weaker check and be useless.
+    const pillButtons = await pg.locator("#canei-lang-pill button").count();
+    if (pillButtons === 3) ok("i18n: the ES · CA · EN pill is on the page");
+    else bad("i18n: ES · CA · EN pill", `expected 3 buttons, found ${pillButtons}`);
     const esText = await pg.locator("body").innerText();
     if (esText.includes("Torre de control")) ok("i18n: workspace defaults to Spanish");
     else bad("i18n: workspace defaults to Spanish", esText.slice(0, 60));
