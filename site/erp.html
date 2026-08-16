@@ -7763,7 +7763,11 @@
      </button>`,
               )
               .join("") ||
-            `<div class="empty" style="padding:18px">Ninguna partida coincide con «${esc(q)}». Créala con el botón de abajo y queda en el catálogo para la próxima vez.</div>`;
+            (rows.length === 0
+              ? `<div class="empty" style="padding:18px">El catálogo está vacío todavía. Crea la primera partida con el botón de abajo, o añádelas en Configuración › Partidas y subpartidas.</div>`
+              : q
+                ? `<div class="empty" style="padding:18px">Ninguna partida coincide con «${esc(q)}». Créala con el botón de abajo y queda en el catálogo para la próxima vez.</div>`
+                : `<div class="empty" style="padding:18px">Escribe para buscar entre las ${rows.length} partidas del catálogo.</div>`);
           $("#cp_list")
             .querySelectorAll("[data-pick]")
             .forEach(
@@ -10868,18 +10872,35 @@
                 // and a picker that opens empty reads as a broken picker. The
                 // search box is right there for anyone who knows what they want.
                 catalogueSearchModal((it) => {
-                  // Everything the catalogue knows, in one go — including the
+                  // EVERYTHING the catalogue knows, in one go — including the
                   // cost, which is the whole reason to have looked it up.
                   mutate(() => {
                     erp.editLine(
                       id,
                       lid,
                       {
+                        // The link back to the catalogue entry. Without it the
+                        // line forgets where its figures came from the moment
+                        // it is written, so nothing can later say "this price
+                        // is stale" or "the catalogue moved and this quote did
+                        // not".
+                        itemId: it.id,
                         code: it.code,
-                        desc: it.customerWording || it.desc,
+                        // Both descriptions, not one. This used to write
+                        // `customerWording || desc` into `desc`, which threw
+                        // away the internal wording whenever a customer-facing
+                        // one existed — and the two exist precisely because
+                        // they differ. Documents print `customerWording ||
+                        // desc`, so what the customer reads is unchanged.
+                        desc: it.desc,
+                        customerWording: it.customerWording || "",
                         unit: it.unit,
                         costCents: it.defaultCostCents || 0,
                         priceCents: it.defaultPriceCents || 0,
+                        // The catalogue's photographs seed the line's graphic
+                        // annex, so a partida that has always been quoted with
+                        // a picture arrives with it.
+                        imageRefs: (it.imageRefs || []).slice(),
                         // A partida with no reference price arrives marked
                         // pending rather than priced at zero — the catalogue
                         // screen says so and the line has to agree.
