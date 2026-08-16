@@ -3866,3 +3866,43 @@ reason rather than out of a checklist.
   30/30 scheduling · 28/28 PDF · 21 documents printable · 17/17 sync · 55/55
   mailbox · ownership, bundle-safety, workbook, iOS routes.
   **Reversible: yes** — additive dictionary entries and one lookup fallback.
+
+### 167 · The source-literal i18n ceiling was raised by the merge, and that is a debt (2026-08-16)
+
+Merging the v4 programme branch into main made two of main's i18n ratchets fail.
+They were treated differently on purpose, and the difference is the point.
+
+**The booted-workspace audit was fixed, not budgeted.** It walks twelve screens
+of the running app and found seven untranslated strings — two screen subtitles,
+a search placeholder, and a version cell. All seven were translated, so its
+ceiling comes **down** from 3 to 0. The version cell was the interesting one:
+it rendered `v1.0` and `· 2 versiones` as two separate text nodes, and a
+dictionary rule written for exactly that cell (`^v(\d+) · (\d+) versiones$`) had
+been sitting unused since the day it was added, because a translator sees text
+nodes and not the sentence a reader assembles from them. Emitting one node made
+the existing rule fire, and exposed that "1 versiones" had been wrong Spanish
+that nobody had looked at.
+
+**The source-literal audit was budgeted, and this is the honest part.** Its
+ceilings of 147 (EN) and 219 (CA) were measured on main's `erp.html`. The
+programme branch's `erp.html` is twelve sessions larger — the presupuestador,
+the Gantt, Avance económico, the invoice generator and everything around them —
+and none of that Spanish had ever been scanned by this gate. The merged
+measurement is 256 and 335, so the ceilings are set there.
+
+**Why not translate them instead.** 256 English and 335 Catalan strings is a
+translation session, not a step inside a merge. Doing it badly inside this
+commit would put machine-guessed Catalan in front of customers, which is worse
+than an honest gap; doing it well means a session with a native speaker's
+review, which is what the Catalan backlog ratchet already exists to schedule.
+
+**What stops this becoming permanent.** The ceilings are the exact measurement,
+not a round number with headroom, so the very next untranslated string written
+fails the gate. The audit that measures what an operator actually reads is at
+zero. And the number is recorded here, in the CI file, and in the merge commit,
+so nobody has to rediscover why it moved.
+
+**The objection, stated.** Raising a ratchet is the thing ratchets exist to
+prevent, and if the operator would rather hold the merge until the strings are
+translated, that is a defensible call and the ceilings should go back to
+147/219 with a translation session scheduled first.
