@@ -4031,3 +4031,39 @@ That stopped being true earlier; both wrapper files pin
 simply absent, with nothing reporting an error). The finding was verified by
 reading the two files rather than trusting the audit's description of them —
 the audit was the stale source. Closed by removal, not by parametrization.
+
+### 171 · A client can be filed from inside the lead form (2026-08-16)
+
+**What changed.** The client picker in «Nueva oportunidad» now ends with
+`＋ Nuevo cliente…`. Choosing it opens the ordinary client form; saving returns
+to the lead with the new client selected and everything already typed still in
+place, and cancelling returns to the same lead unchanged.
+
+**Why.** A first call is by definition from somebody not yet on file, so the
+first field of the lead form was a dropdown that could not answer its own
+question. The operator's route was: abandon the form, go to Maestros → Clientes,
+create the client, come back to an empty lead form and retype it. Nothing was
+broken on either screen; what was missing was the door between them.
+
+**What was deliberately NOT done.** No second client form, and no lightweight
+"just the name for now" record. `newPartyDrawer` is opened as-is, so the record
+that arrives carries the same required fields, the same MDM-03 tax-id check and
+the same duplicate warning as one created from Maestros, and appears there
+because it IS the same record. A quick-create with fewer fields would have made
+the lead form the cheaper way to file a client, and within a month the customer
+file would have been half-complete records nobody could invoice.
+
+**The mechanism.** `openDrawer(title, onDismiss)` gained one optional argument:
+a thunk run when the drawer on top is abandoned. There is one panel, so opening
+a second drawer destroys the first; the opener snapshots its own fields and the
+thunk rebuilds it. One slot, not a stack — a form that opens a form that opens a
+form is a design mistake and a stack would permit it. `finishDrawer()` is the
+close that does not go back, for the path where the second drawer supersedes the
+first rather than interrupting it. Nothing is written until «Crear oportunidad»
+is pressed: an abandoned draft leaves no trace.
+
+**Where else this applies, and why it was left alone.** «Nuevo proyecto»
+(`#n_party`) and the paper-contract drawer (`#cn_party`) have the same
+customer-only dropdown and the same gap. They are one call each away from the
+same treatment now that the mechanism exists; the mandate named the lead, so the
+lead is what changed.

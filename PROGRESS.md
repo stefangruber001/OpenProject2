@@ -1426,3 +1426,42 @@ fail), an unembedded custom font, removing a Catalan entry, removing a regex
 rule, a dictionary read in the wrong shape, and `.35em` tracking against a
 ceiling of 0. A probe that reported "worst gap 0" on 21 PDFs it could not parse
 was deleted rather than shipped.
+
+## S15 — the door between the lead and the client file (2026-08-16)
+
+Filing a client no longer costs you the lead you were filling in.
+
+**The complaint.** «Nueva oportunidad» opens with `Cliente *` — a dropdown. A
+first call is by definition from somebody not yet on file, so the first field of
+the form could not answer its own question, and the route was: abandon the form,
+go to Maestros → Clientes, create the client, come back to an empty form and
+retype everything. Neither screen was broken. The door between them was missing.
+
+**What was built.** `＋ Nuevo cliente…` at the end of the client picker. It
+opens `newPartyDrawer` — the _real_ client form, not a copy — and on save the
+lead comes back with the new client selected and everything typed still in it.
+Cancelling comes back to the same lead, unchanged. Nothing is written until
+«Crear oportunidad» is pressed, so an abandoned draft leaves no trace.
+
+**Why it is not a quick-create.** A shorter form would have made the lead the
+cheaper way to file a client, and within a month the customer file would be
+half-complete records nobody can invoice. The record that arrives carries the same
+required fields, the same MDM-03 tax-id check, the same duplicate warning and
+the same audit entry, and shows up in Maestros because it IS that record.
+
+**The mechanism, and its limit.** `openDrawer(title, onDismiss)` gained one
+optional argument: a thunk run when the drawer on top is abandoned (✕, scrim,
+Escape, or the new Cancelar). There is one panel, so opening a second drawer
+destroys the first; the opener snapshots its own fields and the thunk rebuilds
+it. `finishDrawer()` is the close that does NOT go back, for the path where the
+second drawer supersedes the first. **One slot, not a stack** — a form that
+opens a form that opens a form is a design mistake, and a stack would permit it.
+
+**Left deliberately.** «Nuevo proyecto» and the paper-contract drawer have the
+same customer-only dropdown and the same gap; each is one call from the same
+treatment now that the mechanism exists. The mandate named the lead.
+
+Verified: site E2E, including nine new checks that walk the detour both ways —
+cancelled and completed — and confirm the record lands on the Clientes list via
+that screen's own search. i18n coverage clean with the three new strings in all
+three languages.

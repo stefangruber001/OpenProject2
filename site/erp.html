@@ -15298,15 +15298,41 @@
          erp-modal.js, loaded before this script. */
 
       /* =============================== drawers =============================== */
-      function openDrawer(title) {
+      /* There is ONE panel. Opening a drawer from inside another one therefore
+   destroys the first, including whatever had already been typed into it —
+   which is exactly the interruption that sends an operator to Maestros to
+   file a client and back to the beginning of the form they were filling.
+
+   `drawerDismiss` is the way back: a thunk the opener supplies, run when the
+   drawer on top is ABANDONED (the ✕, the scrim, Escape). It rebuilds the
+   form underneath from a snapshot its opener took, so nothing typed is lost.
+   Completing rather than abandoning goes through `finishDrawer()`, which
+   drops the return path first — a drawer that did its job supersedes the one
+   below it and must not bounce back to a stale copy of it.
+
+   One slot, not a stack: a form that opens a form that opens a form is a
+   design mistake, and a stack would make it possible. */
+      let drawerDismiss = null;
+      function openDrawer(title, onDismiss) {
+        drawerDismiss = typeof onDismiss === "function" ? onDismiss : null;
         $("#dttl").textContent = title;
         $("#scrim").classList.add("on");
         $("#drawer").classList.add("on");
         return $("#dbody");
       }
       function closeDrawer() {
+        const back = drawerDismiss;
+        drawerDismiss = null;
         $("#scrim").classList.remove("on");
         $("#drawer").classList.remove("on");
+        // Runs last: `back` reopens the panel this one covered, so it has to
+        // act on a closed drawer or its own openDrawer would be undone here.
+        if (back) back();
+      }
+      /** Close because the drawer's work is done — never returning to the opener. */
+      function finishDrawer() {
+        drawerDismiss = null;
+        closeDrawer();
       }
       $("#dClose").onclick = closeDrawer;
       $("#scrim").onclick = closeDrawer;
@@ -15508,8 +15534,18 @@
    a supplier filed in the customer list. Only the generic "Nuevo tercero"
    entry under Maestros, which genuinely does not know, still shows it.
    The fields mirror the Clientes table column for column, so a client created
-   here is complete on the list instead of arriving with three empty cells. */
-      function newPartyDrawer(role) {
+   here is complete on the list instead of arriving with three empty cells.
+
+   `opts` is how another form borrows this one instead of copying it. A drawer
+   that needs a party which is not on file yet passes `{back, onCreated}`:
+   `back` restores that drawer when this one is abandoned, `onCreated(rec)`
+   receives the new record so the caller can carry on with it selected. The
+   party is still created HERE, by this one form, with the same validation,
+   the same duplicate warning and the same audit entry — Maestros stays the
+   single place a tercero comes into existence, it just no longer has to be
+   the place you were standing when it happened. */
+      function newPartyDrawer(role, opts) {
+        const { back, onCreated } = opts || {};
         const KNOWN = {
           customer: ["Nuevo cliente", "Guardar cliente", "Cliente creado"],
           supplier: ["Nuevo proveedor", "Guardar proveedor", "Proveedor creado"],
@@ -15520,7 +15556,7 @@
           "Guardar tercero",
           "Tercero creado",
         ];
-        const db = openDrawer(title);
+        const db = openDrawer(title, back);
         const ROLE = [
           ["customer", "Cliente"],
           ["supplier", "Proveedor"],
@@ -15540,7 +15576,13 @@
    <div class="field"><label>Población *</label><input id="f_city"></div>
    <div class="field"><label>Provincia</label><input id="f_prov" value="Barcelona"></div>
    <div class="field"><label>Origen del contacto *</label><select id="f_src">${listOptions("leadSources")}</select></div>
-   <div class="field full" style="margin-top:8px"><button class="btn primary" id="f_save">${cta}</button></div></div>`;
+   <div class="field full" style="margin-top:8px${back ? ";flex-direction:row;gap:8px" : ""}"><button class="btn primary" id="f_save"${back ? ` style="flex:1"` : ""}>${cta}</button>${back ? `<button class="btn" id="f_back">Cancelar</button>` : ""}</div></div>`;
+        // Only when this drawer was opened from another one: the ✕, the scrim
+        // and Escape all lead back there too, but a visible way out is what an
+        // operator who did not mean to open this form actually looks for.
+        // `.field` is a COLUMN flex box, so the row has to be asked for — left
+        // as it was, the two buttons would stack full-width on top of each other.
+        if (back) $("#f_back").onclick = closeDrawer;
         $("#f_save").onclick = () => {
           // A duplicate suspect is a soft warning (findDuplicateParty), never a
           // refusal — the record is still created, but the toast that would
@@ -15566,7 +15608,7 @@
               },
               "backoffice",
             );
-            closeDrawer();
+            finishDrawer();
           });
           if (rec && rec.duplicateSuspect) {
             const other = erp.state.parties.find((x) => x.id === rec.duplicateSuspect);
@@ -15576,6 +15618,11 @@
           } else if (rec) {
             toast(done);
           }
+          // After the toast, so the caller's drawer opens over a message the
+          // operator has already seen rather than under one that arrives late.
+          // Only on success: a rejected record leaves this form standing with
+          // what was typed in it, which is what the error toast refers to.
+          if (rec && onCreated) onCreated(rec);
         };
       }
       /* The three creations the global "+ Crear" offers. They call the engine's own
@@ -15587,6 +15634,43 @@
           .filter((p) => p.active && filter(p))
           .map((p) => `<option value="${p.id}">${esc(p.name)} (${p.code})</option>`)
           .join("");
+      }
+      /** The sentinel a picker uses for "the one I want is not in this list yet".
+    Same string `listOptionsCreatable` already uses, on purpose: one convention
+    for one idea, so a reader who has met one picker has met them all. */
+      const NEW_PARTY = "__new__";
+      /**
+       * The customer picker, with the way to file one that is not on record yet.
+       *
+       * A first call is a client who does not exist in the system, so the very
+       * first field of "nueva oportunidad" was a dropdown that could not answer
+       * its own question: the operator had to abandon the form, walk to
+       * Maestros → Clientes, create the client, and start the lead again from
+       * an empty screen. Nothing was wrong with either screen; what was missing
+       * was the door between them.
+       *
+       * `＋ Nuevo cliente…` is that door. It does NOT duplicate the client form
+       * — it opens the real one (`newPartyDrawer`), so the record that arrives
+       * in Maestros is the same record, made the same way, with the same
+       * validation and duplicate check. One place a client is created; two
+       * places you can be standing when you create it.
+       */
+      function customerOptions(selected) {
+        const rows = erp.state.parties.filter((p) => p.active && p.roles.includes("customer"));
+        // With nothing on file the sentinel would be the option the select
+        // already shows, and a <select> fires no change event for that — the
+        // operator would click "＋ Nuevo cliente…" and nothing would happen.
+        // The placeholder keeps choosing it a deliberate act.
+        return (
+          (rows.length ? "" : `<option value="">— sin clientes todavía —</option>`) +
+          rows
+            .map(
+              (p) =>
+                `<option value="${p.id}"${p.id === selected ? " selected" : ""}>${esc(p.name)} (${p.code})</option>`,
+            )
+            .join("") +
+          `<option value="${NEW_PARTY}">＋ Nuevo cliente…</option>`
+        );
       }
       /** Every inmueble on file for one client — "" is always offered first (a lead
     with no known address yet is normal; the client record itself is not). */
@@ -15887,28 +15971,76 @@
         };
         paint();
       }
-      function newOpportunityDrawer() {
+      /**
+       * COM-01 · a new lead.
+       *
+       * `draft` is the same form's own contents, handed back to it. Filing a
+       * client mid-form replaces this drawer (there is one panel), so the
+       * client picker snapshots what has been typed, and whichever way that
+       * detour ends — created, or abandoned — this function is called again
+       * with the snapshot and rebuilds the form around it. Nothing is stored
+       * and nothing is half-created in the meantime: a draft that never
+       * reaches `addOpportunity` leaves no trace, which is the point.
+       */
+      function newOpportunityDrawer(draft) {
+        const d = draft || {};
         const custs = erp.state.parties.filter((p) => p.active && p.roles.includes("customer"));
+        // A client the draft names but that is no longer selectable (the detour
+        // was abandoned, or the record was deactivated meanwhile) falls back to
+        // the first on the list rather than leaving the picker on a dead value.
+        const partyId = custs.some((c) => c.id === d.partyId)
+          ? d.partyId
+          : (custs[0] && custs[0].id) || "";
         const db = openDrawer("Nueva oportunidad");
         db.innerHTML = `<div class="fgrid">
-   <div class="field full"><label>Cliente *</label><select id="o_party">${partyOptions((p) => p.roles.includes("customer"))}</select></div>
-   <div class="field full"><label>Inmueble</label><select id="o_prop">${propertyOptions(custs[0] && custs[0].id, null)}</select></div>
-   <div class="field full"><label>Trabajo solicitado *</label><input id="o_work" placeholder="Reforma integral de baño"></div>
-   <div class="field"><label>Origen *</label><select id="o_src">${listOptions("leadSources")}</select></div>
-   <div class="field"><label>Valor estimado (€)</label><input id="o_val" type="number" min="0" step="100" value="0"></div>
-   <div class="field full"><label>Próxima acción</label><select id="o_next">${listOptionsCreatable("nextActions", "Programar visita")}</select></div>
+   <div class="field full"><label>Cliente *</label><select id="o_party">${customerOptions(partyId)}</select></div>
+   <div class="field full"><label>Inmueble</label><select id="o_prop">${propertyOptions(partyId, d.propertyId || null)}</select></div>
+   <div class="field full"><label>Trabajo solicitado *</label><input id="o_work" placeholder="Reforma integral de baño" value="${esc(d.requestedWork || "")}"></div>
+   <div class="field"><label>Origen *</label><select id="o_src">${listOptions("leadSources", d.source)}</select></div>
+   <div class="field"><label>Valor estimado (€)</label><input id="o_val" type="number" min="0" step="100" value="${esc(d.expectedValue == null ? "0" : String(d.expectedValue))}"></div>
+   <div class="field full"><label>Próxima acción</label><select id="o_next">${listOptionsCreatable("nextActions", d.nextAction || "Programar visita")}</select></div>
    <div class="field full" style="margin-top:8px"><button class="btn primary" id="o_save">Crear oportunidad</button></div></div>`;
+        // The last real client picked — NOT the select's current value, which is
+        // the sentinel at the moment the detour starts. Without this, cancelling
+        // out of the client form would come back with a different client
+        // selected than the one that was showing when it opened.
+        let chosen = partyId;
+        /** Everything typed so far, in the shape this function reads back. */
+        const takeDraft = () => ({
+          partyId: chosen,
+          propertyId: $("#o_prop").value,
+          requestedWork: $("#o_work").value,
+          source: $("#o_src").value,
+          expectedValue: $("#o_val").value,
+          nextAction: $("#o_next").value,
+        });
         // The property list depends on which client is selected, so it is rebuilt
         // on every change rather than loaded once for whichever client happened
         // to be first in the list.
         $("#o_party").onchange = (e) => {
-          $("#o_prop").innerHTML = propertyOptions(e.target.value, null);
+          if (e.target.value === NEW_PARTY) {
+            const draftNow = takeDraft();
+            newPartyDrawer("customer", {
+              back: () => newOpportunityDrawer(draftNow),
+              // The client the operator just described is the one they meant to
+              // pick, so it arrives selected. Its inmueble is cleared because it
+              // belonged to the previous client and a brand-new one has none.
+              onCreated: (rec) =>
+                newOpportunityDrawer(
+                  Object.assign({}, draftNow, { partyId: rec.id, propertyId: "" }),
+                ),
+            });
+            return;
+          }
+          chosen = e.target.value;
+          $("#o_prop").innerHTML = propertyOptions(chosen, null);
         };
         wireCreatableSelect("#o_next", "nextActions", "Próxima acción");
         $("#o_save").onclick = () =>
           mutate(() => {
             const work = $("#o_work").value.trim();
-            if (!$("#o_party").value) throw new Error("Hace falta un cliente");
+            if (!$("#o_party").value || $("#o_party").value === NEW_PARTY)
+              throw new Error("Hace falta un cliente");
             if (!work) throw new Error("Describe el trabajo solicitado");
             erp.addOpportunity(
               {

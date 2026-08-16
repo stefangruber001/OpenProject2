@@ -90,6 +90,7 @@ async function main() {
     await testControlTowerAndDay(browser, base);
     await testVisitCapture(browser, base);
     await testConfigurableLists(browser, base);
+    await testInlineCustomer(browser, base);
     await testPresupuestadorRework(browser, base);
     await testEvidence(browser, base);
     await testSendAndVersions(browser, base);
@@ -5896,6 +5897,149 @@ async function testConfigurableLists(browser, base) {
     else ok("listas configurables: no console errors");
   } catch (e) {
     bad("listas configurables: suite completed", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/* COM-01 · filing a client without abandoning the lead.
+   The operator's words: "you can start adding the opportunity without stopping,
+   going to the Master data customer, add customer and then start the lead
+   process again." A first call is by definition from somebody not yet on file,
+   so the first field of "nueva oportunidad" was a dropdown that could not
+   answer its own question.
+
+   Three things have to hold at once, and each is a check below:
+     · the detour is REVERSIBLE — cancelling out of the client form comes back
+       to the lead with everything already typed still in it;
+     · the client that arrives is the SAME record Maestros holds, created by
+       the same form with the same validation, not a shadow copy;
+     · after creating one, the lead continues from where it was, with the new
+       client selected.
+   The third is the feature; the first is what makes it safe to try; the second
+   is what stops it becoming a second place clients come from. */
+async function testInlineCustomer(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  const WORK = "E2E: reforma de cocina sin salir del lead";
+  const NAME = "E2E Cliente En Línea";
+  const TAX = "99999990S"; // valid NIF check letter; MDM-03 rejects anything else
+  try {
+    await pg.goto(`${base}/erp.html#leads`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+    await pg.click("text=＋ Nueva oportunidad");
+    await pg.waitForTimeout(500);
+
+    const hasNew = await pg.evaluate(() =>
+      [...(document.querySelector("#o_party")?.options || [])].some((o) => o.value === "__new__"),
+    );
+    if (hasNew) ok("lead: the client picker offers «＋ Nuevo cliente…»");
+    else bad("lead: client picker offers inline creation", "no __new__ option");
+
+    // Type something first — the whole point is that it survives the detour.
+    await pg.fill("#o_work", WORK);
+    await pg.fill("#o_val", "4500");
+    const before = await pg.evaluate(() => document.querySelector("#o_party").value);
+
+    // ---- abandoning the client form comes back to the lead, intact ---------
+    await pg.selectOption("#o_party", "__new__");
+    await pg.waitForTimeout(400);
+    const onForm = await pg.evaluate(() => ({
+      title: document.querySelector("#dttl")?.textContent,
+      name: !!document.querySelector("#f_name"),
+      back: !!document.querySelector("#f_back"),
+    }));
+    if (onForm.title === "Nuevo cliente" && onForm.name && onForm.back)
+      ok("lead: picking it opens the real client form, with a way back");
+    else bad("lead: inline client form opens", JSON.stringify(onForm));
+
+    await pg.click("#f_back");
+    await pg.waitForTimeout(400);
+    const restored = await pg.evaluate(() => ({
+      title: document.querySelector("#dttl")?.textContent,
+      work: document.querySelector("#o_work")?.value,
+      val: document.querySelector("#o_val")?.value,
+      party: document.querySelector("#o_party")?.value,
+    }));
+    if (
+      restored.title === "Nueva oportunidad" &&
+      restored.work === WORK &&
+      restored.val === "4500" &&
+      restored.party === before
+    )
+      ok("lead: cancelling the client form restores the lead with what was typed");
+    else bad("lead: draft survives an abandoned detour", JSON.stringify(restored));
+
+    // ---- creating one continues the lead with it selected -----------------
+    await pg.selectOption("#o_party", "__new__");
+    await pg.waitForTimeout(400);
+    await pg.fill("#f_name", NAME);
+    await pg.fill("#f_tax", TAX);
+    // Deliberately not a number the seed already carries: findDuplicateParty
+    // matches on mobile, and this test is about the ordinary path, not the
+    // duplicate warning (which has its own coverage).
+    await pg.fill("#f_mob", "600999888");
+    await pg.fill("#f_street", "Carrer de Prova 7");
+    await pg.fill("#f_cp", "08001");
+    await pg.fill("#f_city", "Barcelona");
+    await pg.click("#f_save");
+    await pg.waitForTimeout(700);
+
+    const after = await pg.evaluate((tax) => {
+      const p = erp.state.parties.find((x) => x.taxId === tax);
+      return {
+        exists: !!p,
+        id: p && p.id,
+        roles: p ? p.roles : null,
+        title: document.querySelector("#dttl")?.textContent,
+        party: document.querySelector("#o_party")?.value,
+        work: document.querySelector("#o_work")?.value,
+        val: document.querySelector("#o_val")?.value,
+      };
+    }, TAX);
+    if (after.exists && after.roles && after.roles.includes("customer"))
+      ok("lead: the client is created as a customer in the one party file");
+    else bad("lead: inline client reaches state.parties", JSON.stringify(after));
+    if (after.title === "Nueva oportunidad" && after.party === after.id)
+      ok("lead: the lead comes back with the new client selected");
+    else bad("lead: returns to the lead with the new client", JSON.stringify(after));
+    if (after.work === WORK && after.val === "4500")
+      ok("lead: nothing typed before the detour was lost");
+    else bad("lead: draft survives creating a client", JSON.stringify(after));
+
+    // ---- and the lead can then actually be created ------------------------
+    await pg.click("#o_save");
+    await pg.waitForTimeout(700);
+    const opp = await pg.evaluate((id) => {
+      const o = erp.state.opportunities.find((x) => x.partyId === id);
+      return o ? { work: o.requestedWork, value: o.expectedValue } : null;
+    }, after.id);
+    if (opp && opp.work === WORK && opp.value === 450000)
+      ok("lead: the opportunity is created for the client filed a moment ago");
+    else bad("lead: opportunity created for the inline client", JSON.stringify(opp));
+
+    // ---- Maestros holds that same record, not a copy ----------------------
+    // Through the screen's own search box, because Clientes pages at 25 and a
+    // record created last is exactly the one that falls off page one — an
+    // assertion against the whole page would pass or fail on seed size.
+    await pg.evaluate(() => (location.hash = "customers"));
+    await pg.waitForTimeout(800);
+    await pg.fill("#cliQ", NAME);
+    await pg.waitForTimeout(500);
+    const inMaster = await pg.evaluate(
+      (tax) =>
+        [...document.querySelectorAll("table tbody tr")].some((tr) => tr.textContent.includes(tax)),
+      TAX,
+    );
+    if (inMaster) ok("maestros: the client filed from the lead is on the Clientes list");
+    else bad("maestros: inline client appears in master data", "no row for its NIF");
+
+    if (errs.length) bad("cliente en línea: no console errors", errs.slice(0, 2).join(" | "));
+    else ok("cliente en línea: no console errors");
+  } catch (e) {
+    bad("cliente en línea: suite completed", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }

@@ -3208,6 +3208,7 @@ window.CANEI_DICT = {
     ["⤓ Descargar", "⤓ Download"],
     ["＋ Nueva partida", "＋ New item"],
     ["＋ Nueva…", "＋ New…"],
+    ["＋ Nuevo cliente…", "＋ New customer…"],
     ["＋ Programar visita de seguimiento", "＋ Schedule follow-up visit"],
     // PK2-A: the evidence field and the viewer that reads a PDF.
     ["Abriendo el documento…", "Opening the document…"],
@@ -3463,6 +3464,7 @@ window.CANEI_DICT = {
     ["Todas las partidas", "All line items"],
     ["Desactivado", "Disabled"],
     ["— sin inmueble asociado —", "— no property linked —"],
+    ["— sin clientes todavía —", "— no customers yet —"],
     ["No se ha podido conectar con el servidor", "Could not connect to the server"],
     ["Ir a la Torre", "Go to the Tower"],
     ["Hay datos de demostración más recientes", "Newer demonstration data is available"],
