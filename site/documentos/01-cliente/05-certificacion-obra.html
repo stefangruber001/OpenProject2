@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Certificación CERT-2026-0002-02 · CaneiSubirats</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font:400 9.3pt/1.45 Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:#3D3D3D;background:#EDEDEB;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sheet{width:210mm;min-height:297mm;margin:10mm auto;padding:15mm 16mm 12mm;background:#fff;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.05),0 30px 60px -30px rgba(0,0,0,.22);overflow:hidden}
+.inner{position:relative;z-index:1;display:flex;flex-direction:column;min-height:267mm}
+@media print{body{background:#fff}.sheet{margin:0;box-shadow:none;width:auto;min-height:auto;padding:11mm 13mm 8mm;overflow:visible}@page{size:A4;margin:0}
+    /* Kerning off, ligatures off.
+       With letter-spacing at zero, kerning is the only thing left that places
+       one glyph away from the next, and a text extractor turns a large enough
+       gap into a space — which is what made "FACTURA" extract as "FACT URA"
+       and stop being findable with Ctrl+F. The effect is invisible at these
+       sizes; being searchable is not optional. */
+    *, *::before, *::after {
+      font-kerning: none;
+      font-variant-ligatures: none;
+      font-feature-settings: "kern" 0, "liga" 0;
+    }
+tr,.box,.note,.sig,.facts,.meta,.docfoot{break-inside:avoid}.band,h2,tr.chapter{break-after:avoid}thead{display:table-header-group}
+h1{margin-top:4.5mm;font-size:16.5pt}
+.facts{margin-top:4mm}.fig{font-size:12.5pt}.fig.hero{font-size:16pt}
+.meta>div{padding:5px 10px 6px}
+.parties{margin-top:3.5mm}.pdet{font-size:8pt}
+.band{margin:4mm 0 2.5mm}
+tbody td{padding:4px 8px}
+.note{margin:3mm 0;padding:7px 10px}
+.sig .line{margin-top:9mm}
+.docfoot{padding-top:3mm}}
+.serif{font-family:"Roboto Serif",Georgia,serif}
+.wm{position:absolute;top:0;right:0;width:96mm;height:64mm;overflow:hidden;z-index:0;pointer-events:none}
+.wm svg{position:absolute;top:-36mm;right:-32mm;width:128mm;height:auto;display:block}
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:12mm}
+.lockup{display:flex;align-items:center;gap:11px}
+.sym{width:33px;height:auto;flex:none}
+.wordmark{font:400 16pt/1 "Roboto Serif",Georgia,serif;color:#000;letter-spacing:0}
+.tagline{font-family:"Roboto Serif",Georgia,serif;font-weight:200;font-variation-settings:'wght' 200;font-size:7.4pt;color:#48733C;margin-top:3px;letter-spacing:0}
+.docref{text-align:right;flex:none}
+.doctype{font-family:"Roboto Serif",Georgia,serif;font-weight:500;font-size:9pt;letter-spacing:0;text-transform:uppercase;color:#48733C}
+.docnum{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:18pt;color:#000;font-variant-numeric:tabular-nums;margin-top:2px;letter-spacing:0}
+.meta{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border-top:1px solid #E0E0E0;border-bottom:1px solid #E0E0E0;margin-top:5mm}
+.meta>div{padding:6px 11px 7px;border-left:1px solid #E0E0E0}
+.meta>div:first-child{border-left:0;padding-left:0}
+.lbl{font:600 6.6pt Inter,sans-serif;letter-spacing:0;text-transform:uppercase;color:#767676;margin-bottom:3px}
+.val{font:600 9.2pt Inter,sans-serif;color:#000;font-variant-numeric:tabular-nums}
+.val .badge{margin-top:-2px}
+h1{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:17.5pt;letter-spacing:-.01em;color:#000;margin:5.5mm 0 0;text-wrap:pretty}
+.subject{font-size:9.4pt;color:#3D3D3D;margin-top:1.5mm;max-width:155mm;text-wrap:pretty}
+.facts{display:flex;flex-wrap:wrap;row-gap:3mm;margin-top:5mm}
+.facts>div{padding:0 12mm 0 0;margin-right:12mm;border-right:1px solid #E0E0E0}
+.facts>div:last-child{border-right:0;margin-right:0;padding-right:0}
+.fig{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:13.5pt;color:#000;font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap}
+.fig.hero{font-size:17pt}
+.fig .unit{font-size:9pt;font-weight:500;color:#3D3D3D}
+.punct{display:inline-block;width:11px;height:auto;margin-right:7px;vertical-align:baseline}
+.band{font-family:"Roboto Serif",Georgia,serif;font-weight:500;font-size:8.4pt;letter-spacing:0;text-transform:uppercase;color:#000;padding:4px 10px;margin:4.5mm 0 3mm;display:flex;justify-content:space-between;align-items:baseline;gap:8mm}
+.band .bandnote{font:400 7.4pt Inter,sans-serif;letter-spacing:0;text-transform:none;color:#3D3D3D}
+.band.blue{background:#C2D2F2}.band.yellow{background:#F2D64B}.band.grey{background:#F2F2F2}
+.parties{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin-top:4.5mm}
+.plabel{font:600 6.6pt Inter,sans-serif;letter-spacing:0;text-transform:uppercase;color:#48733C;margin-bottom:4px}
+.pname{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:10.5pt;color:#000;margin-bottom:2px}
+.pdet{font-size:8.3pt;line-height:1.5;color:#3D3D3D}
+table{width:100%;border-collapse:collapse;font-size:8.6pt}
+thead th{background:#F2F2F2;font:600 6.7pt Inter,sans-serif;letter-spacing:0;text-transform:uppercase;color:#3D3D3D;text-align:left;padding:5px 8px;border-bottom:1px solid #E0E0E0}
+thead th.num{text-align:right}
+tbody td{padding:5px 8px;border-bottom:1px solid #ECECEA;vertical-align:top;color:#3D3D3D}
+tbody td b,tbody td strong{color:#000}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.chapter td{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:9.2pt;color:#375A2E;padding:10px 8px 4px;border-bottom:1.5px solid #48733C;background:#fff}
+tr.first td{padding-top:4px}
+tr.sub td{font-weight:600;color:#000;background:#FAFAF8;border-bottom:1px solid #E0E0E0}
+tr.sub td.cap{font-weight:400;color:#767676;text-align:right}
+tfoot td{padding:7px 9px;font-weight:600;color:#000;border-top:1.5px solid #48733C;font-variant-numeric:tabular-nums}
+.small{font-size:8pt;line-height:1.5}
+.muted{color:#767676}
+.notecell{color:#767676;font-size:7.8pt}
+.totals{margin-left:auto;min-width:76mm;width:auto;margin-top:4mm}
+.totals td{padding:3px 10px;border:0;font-size:9pt;color:#000}
+.totals td:first-child{color:#767676}
+.totals tr.grand td{border-top:2px solid #48733C;background:#F2F2F2;padding-top:8px;padding-bottom:7px;font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:12.5pt;color:#000;letter-spacing:-.01em}
+.note{border-left:3px solid #48733C;background:#F4F7F1;padding:8px 11px;font-size:8.6pt;margin:3.5mm 0}
+.note.warn{border-left-color:#F2D64B;background:#FBF5DA}
+.note.plain{border-left-color:#767676;background:#F7F7F6}
+.badge{display:inline-block;padding:3px 9px;font:600 6.8pt Inter,sans-serif;letter-spacing:0;text-transform:uppercase}
+.badge.ok{background:#E4EBE1;color:#375A2E}
+.badge.warn{background:#F2D64B;color:#000}
+.badge.info{background:#F2F2F2;color:#3D3D3D}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 16px;font-size:8.9pt;margin:0}
+.kv dt{color:#767676}
+.kv dd{margin:0;color:#000}
+.box{border:1px solid #E0E0E0;padding:10px 13px;background:#fff}
+h2{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:10.5pt;color:#000;margin:4.5mm 0 2mm;letter-spacing:-.005em}
+ul.clean{margin:2mm 0 0;padding-left:14px}
+ul.clean li{margin-bottom:1.2mm}
+.bar{display:flex;height:15px;margin:3mm 0 2.5mm}
+.bar span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:3px 12px;font-size:7.3pt;color:#3D3D3D}
+.legend i{display:inline-block;width:8px;height:8px;margin-right:5px;vertical-align:baseline}
+.prog{height:6px;background:#F2F2F2;position:relative}
+.prog i{position:absolute;top:0;left:0;height:100%;display:block}
+.flow{display:flex;align-items:center;flex-wrap:wrap;gap:4px 7px;margin-top:3mm;font:500 6.8pt Inter,sans-serif;letter-spacing:0;text-transform:uppercase;color:#B0B0AC}
+.flow i{font-style:normal;color:#C9C9C5}
+.flow b{color:#375A2E;font-weight:700;padding:2.5px 8px;background:#E4EBE1;white-space:nowrap}
+.flow .done{color:#48733C;white-space:nowrap}
+.flow .next{white-space:nowrap}
+.sig{display:grid;grid-template-columns:1fr 1fr;gap:14mm}
+.sig .line{border-top:1px solid #000;margin-top:11mm;padding-top:5px;font-size:7.8pt;color:#767676}
+.terms{margin-top:auto;padding-top:4.5mm}
+.docfoot{margin-top:auto;padding-top:4mm}
+footer.brand{border-top:2px solid #48733C;padding-top:4mm;display:flex;justify-content:space-between;gap:12mm;align-items:flex-start}
+.legal{font-family:"Roboto Serif",Georgia,serif;font-size:6.8pt;line-height:1.6;color:#48733C;max-width:132mm}
+.site{text-align:right;font-family:"Roboto Serif",Georgia,serif;color:#48733C;flex:none}
+.site .url{font-weight:700;font-size:8.6pt}
+.site .loc{font-weight:200;font-variation-settings:'wght' 200;font-size:6.8pt;margin-top:2px}
+a{color:#48733C;text-decoration:none}
+a:hover{color:#375A2E;text-decoration:underline;text-underline-offset:2px}
+
+</style>
+<style>/* CANEI-PRINT-FIX */
+/* ---- print: margins on @page so EVERY page gets them ---- */
+@page{size:A4;margin:11mm 13mm 10mm}
+@media print{
+  html,body{background:#fff!important}
+  .sheet{margin:0!important;padding:0!important;width:auto!important;min-height:0!important;
+    box-shadow:none!important;border:0!important;overflow:visible!important}
+  /* The watermark is decorative and bleeds off the corner. Inside a margin box
+     it would sit in the middle of nowhere, so it is dropped when printing. */
+  .wm{display:none!important}
+  /* Never strand a heading at the foot of a page, never split a row, a box or
+     a signature line across two. */
+  thead{display:table-header-group}
+  tfoot{display:table-footer-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .box,.note,.sig,.facts,.meta,.docfoot,.totals,.parties,.party,.bandnote,.kv{
+    break-inside:avoid;page-break-inside:avoid}
+  h1,h2,h3,.band,tr.chapter,.doctype{break-after:avoid;page-break-after:avoid}
+  tr.chapter+tr{break-before:avoid;page-break-before:avoid}
+  p,li,td{orphans:3;widows:3}
+  table{break-inside:auto}
+  /* A hair of print scale. The documents sit at 82-89%% of the page height and
+     their legal footer needs another 8-10%% — just over, so eleven of the
+     twenty sent nothing but a company-registry line to a sheet of its own.
+     Five percent recovers it: 10.5pt body becomes 10pt, which nobody notices,
+     while a page carrying one line is visible to everybody. Also saves five
+     sheets across the set. */
+  .sheet{zoom:0.95}
+
+}
+</style>
+<link rel="stylesheet" href="../../assets/canei-fonts.css">
+</head>
+<body>
+<div class="sheet">
+
+<div class="inner">
+<header class="hdr">
+  <div class="lockup"><svg class="sym" viewBox="0 0 118.391 137.002" xmlns="http://www.w3.org/2000/svg"><path fill="#48733C" fill-rule="nonzero" d="M60.449 0 0 38.374V137.002H118.391V38.445ZM107.462 126.073H71.480L56.137 122.671V71.986L82.416 65.524H45.953V126.073H10.929V44.382L60.318 13.028L107.462 44.311Z"/></svg>
+    <div><div class="wordmark">CaneiSubirats</div><div class="tagline">Reformes senzillament complexes</div></div>
+  </div>
+  <div class="docref"><div class="doctype">Certificación de obra</div><div class="docnum">CERT-2026-0002-02</div></div>
+</header>
+<div class="meta"><div><div class="lbl">Periodo</div><div class="val">01/06 – 15/06/2026</div></div><div><div class="lbl">Proyecto</div><div class="val">P-2026-0002</div></div><div><div class="lbl">Contrato</div><div class="val">CTR-2026-0009</div></div><div><div class="lbl">Certificación</div><div class="val">Nº 2</div></div></div>
+<div class="flow"><span class="done">Presupuesto</span><i>→</i><span class="done">Aceptación</span><i>→</i><span class="done">Contrato</span><i>→</i><span class="done">Obra</span><i>→</i><b>Certificación</b><i>→</i><span class="next">Factura</span><i>→</i><span class="next">Cobro</span><i>→</i><span class="next">Entrega</span></div>
+<h1>Certificación nº 2 de obra ejecutada</h1>
+
+
+<div class="facts">
+  <div><div class="lbl">A facturar (IVA incl.)</div><div class="fig hero"><svg class="punct" viewBox="0 0 118.391 137.002" xmlns="http://www.w3.org/2000/svg"><path fill="#F2D64B" fill-rule="nonzero" d="M60.449 0 0 38.374V137.002H118.391V38.445ZM107.462 126.073H71.480L56.137 122.671V71.986L82.416 65.524H45.953V126.073H10.929V44.382L60.318 13.028L107.462 44.311Z"/></svg>2.918,91 €</div></div>
+  <div><div class="lbl">Avance global</div><div class="fig">53 %</div></div>
+  <div><div class="lbl">Ejecutado a origen</div><div class="fig">5.363,35 €</div></div>
+  <div><div class="lbl">Periodo</div><div class="fig">01–15/06</div></div>
+</div>
+
+<div class="parties"><div><div class="plabel">Contratista</div><div class="pname">Canei Subirats, S.L.</div><div class="pdet">NIF B-6712 3456<br>Carrer de la Creu 18, baixos<br>08960 Sant Just Desvern<br>if@2iberia.com</div></div><div><div class="plabel">Cliente</div><div class="pname">Comunidad de Propietarios Balmes 120</div><div class="pdet">NIF H-0857 1730<br>Jordi Vives (administrador de fincas)<br>Carrer de Balmes 120, esc. A<br>08008 Barcelona<br>vives@fincasvives.example</div></div></div>
+<div class="band blue"><span>Avance por capítulo</span><span class="bandnote">barra: verde = % anterior · claro = % actual</span></div>
+<table>
+  <thead><tr><th style="width:34%">Capítulo</th><th class="num">Contratado</th><th class="num">% anterior</th><th class="num">% actual</th><th class="num">A origen</th><th class="num">En este periodo</th></tr></thead>
+  <tbody><tr><td>01 · Demolición y trabajos previos<div class="prog" style="margin-top:5px;max-width:52mm"><i style="width:100%;background:#B6C7B1"></i><i style="width:100%;background:#48733C"></i></div></td>
+<td class="num">1.109,30 €</td><td class="num">100 %</td><td class="num"><b>100 %</b></td><td class="num">1.109,30 €</td><td class="num"><b>0,00 €</b></td></tr>
+<tr><td>02 · Impermeabilización<div class="prog" style="margin-top:5px;max-width:52mm"><i style="width:100%;background:#B6C7B1"></i><i style="width:100%;background:#48733C"></i></div></td>
+<td class="num">466,70 €</td><td class="num">100 %</td><td class="num"><b>100 %</b></td><td class="num">466,70 €</td><td class="num"><b>0,00 €</b></td></tr>
+<tr><td>03 · Fontanería<div class="prog" style="margin-top:5px;max-width:52mm"><i style="width:95%;background:#B6C7B1"></i><i style="width:60%;background:#48733C"></i></div></td>
+<td class="num">1.587,00 €</td><td class="num">60 %</td><td class="num"><b>95 %</b></td><td class="num">1.507,65 €</td><td class="num"><b>555,45 €</b></td></tr>
+<tr><td>04 · Calefacción y climatización<div class="prog" style="margin-top:5px;max-width:52mm"><i style="width:40%;background:#B6C7B1"></i><i style="width:0%;background:#48733C"></i></div></td>
+<td class="num">3.590,00 €</td><td class="num">0 %</td><td class="num"><b>40 %</b></td><td class="num">1.436,00 €</td><td class="num"><b>1.436,00 €</b></td></tr>
+<tr><td>05 · Electricidad<div class="prog" style="margin-top:5px;max-width:52mm"><i style="width:65%;background:#B6C7B1"></i><i style="width:20%;background:#48733C"></i></div></td>
+<td class="num">908,00 €</td><td class="num">20 %</td><td class="num"><b>65 %</b></td><td class="num">590,20 €</td><td class="num"><b>408,60 €</b></td></tr>
+<tr><td>06 · Revestimientos y acabados<div class="prog" style="margin-top:5px;max-width:52mm"><i style="width:10%;background:#B6C7B1"></i><i style="width:0%;background:#48733C"></i></div></td>
+<td class="num">2.535,00 €</td><td class="num">0 %</td><td class="num"><b>10 %</b></td><td class="num">253,50 €</td><td class="num"><b>253,50 €</b></td></tr></tbody>
+</table>
+<table class="totals">
+  <tbody>
+  <tr><td>Ejecutado a origen</td><td class="num">5.363,35 €</td></tr>
+  <tr><td>Certificado anteriormente</td><td class="num">−2.709,80 €</td></tr>
+  <tr><td>Base de esta certificación</td><td class="num">2.653,55 €</td></tr>
+  <tr><td>IVA 10 %</td><td class="num">265,36 €</td></tr>
+  <tr class="grand"><td>A facturar</td><td class="num">2.918,91 €</td></tr>
+  </tbody>
+</table>
+
+<div class="sig" style="margin-top:6mm">
+  <div><div class="line">Jefe de obra — Canei Subirats, S.L.</div></div>
+  <div><div class="line">Conforme — la dirección facultativa / el cliente</div></div>
+</div>
+<div class="docfoot">
+
+<div class="small muted" style="margin-bottom:3mm">Esta certificación da lugar a la factura del hito 2 del contrato CTR-2026-0009.</div>
+<footer class="brand">
+  <div class="legal">Canei Subirats, S.L. · NIF B-6712 3456 · Carrer de la Creu 18, baixos, 08960 Sant Just Desvern (Barcelona)<br>+34 934 77 12 08 · if@2iberia.com · Inscrita en el Registro Mercantil de Barcelona, Tomo 46.812, Folio 118, Hoja B-529.441</div>
+  <div class="site"><div class="url">www.caneisubirats.com</div><div class="loc">Sant Just Desvern · Barcelona</div></div>
+</footer>
+</div>
+</div>
+</div>
+</body>
+</html>

@@ -2612,6 +2612,35 @@ different decisions, so these ten arrived colliding. They are renumbered from
   environment has — `ios-testflight.yml` runs that on a macOS runner. The web
   half of the change is fully tested here, which is where the behaviour
   actually lives. **Reversible: yes.**
+- **#149 — v101 goes to `main` by merge, and the previous state is named v100
+  rather than tagged (2026-08-10).** The operator asked for the programme to
+  land on `main`, for the pre-existing state to be recoverable as "v100", and
+  for `main` to become "v101". `main` had gained nine commits of its own, so the
+  merge ran into the branch first and its six conflicts were each resolved on
+  the merits — never "take theirs" — and the whole suite re-run on the merged
+  tree before the PR went in. Git tags could not be pushed (the environment's
+  git proxy answers 403 on tag refs), so the versions are recorded in
+  `RELEASES.md` against full commit SHAs instead, with the tag commands for a
+  machine that can push them. **The rollback lever is not the tag anyway**: every
+  build publishes a `sha-<full-sha>` image, so going back is re-pointing `:main`
+  at v100's image — two commands, verified to exist before the merge. The one
+  schema change is additive, so the database needs no undoing.
+  **Reversible: yes — that was the acceptance criterion, and it was checked
+  before the merge rather than asserted after it.**
+- **#150 — the Apple certificate cap is documented, not cleared (2026-08-10).**
+  The TestFlight rebuild from `main` failed because the developer account has
+  reached its certificate limit; cloud-managed signing mints a new one per CI
+  run and run 16 took the last slot. Apple's own remedy is to revoke a
+  certificate, which is irreversible and lands on the operator's account — the
+  wrong one breaks signing on their own machine. So it is written up in
+  `INTEGRATIONS_PENDING.md` with the two-minute fix and the durable one, and
+  nothing was revoked. **The app is not stranded by this**: TestFlight build 6
+  is the post-S15 shell and loads `site/` from the server, so it started serving
+  v101 the moment deploy promoted it. What is frozen is the Face ID lock
+  screen's wording, and only that. **Reversible: yes — nothing was done.**
+  _Closed the same morning:_ the operator revoked the stale CI-minted
+  certificates themselves and the re-run uploaded v1.1 build 7 from `main`
+  (run `31359895269`), so the shell now matches `main` exactly.
 - **#91 — The mailbox is somewhere to PUT A DRAFT, never somewhere to send from
   (2026-08-08).** The operator asked to link `if@2iberia.com` so the ERP's
   generated emails use it, showed the provider's IMAP/SMTP page, and said not to
@@ -3419,3 +3448,421 @@ have meant editing that rejection list to make room for the very method it
 cites as an example — to enable no caller. Reserved for whenever `apps/web`
 grows a screen that issues invoices, where it will be a change made for a
 reason rather than out of a checklist.
+
+<!-- Two branches wrote here at once: the v4 programme branch (#149–#166) and
+     main (the iOS/documents/i18n work). Both numbered from their own last
+     entry, so the numbers below repeat some above — main's #151 is not the
+     programme's #151, and main's own #95 appears twice. Nothing is renumbered:
+     these numbers are cited from other documents and from commit messages, and
+     a tidier sequence bought by breaking those references would be a worse
+     document. Entries are kept verbatim, programme first, then main's. -->
+
+- **#151 — a tab's URL is resolved as a URL, and the guard for it lives in Node
+  (2026-08-10).** Every screen in the phone app answered 404 while the server
+  was demonstrably healthy — `/api/health` reporting the release commit and a
+  connected database. `WebTab.url` built its address with
+  `appendingPathComponent`, which treats its argument as one path segment and
+  percent-encodes anything illegal in one, including `#`. The tabs had just
+  moved onto the shell's hash routes, so five of six asked the server for a file
+  called `erp.html#tower`. Guide survived because it is the only path with no
+  fragment. **Fixed with `URL(string:relativeTo:)`**, which treats a fragment as
+  a fragment and never sends it to the server.
+  **The guard is deliberately not a Swift test.** The Xcode project builds on a
+  macOS runner, so a test living there runs after the decision to ship, and only
+  when someone touches `ios/`. What breaks a tab is a page being renamed in
+  `site/` or a section key changing — neither of which is an iOS change at all,
+  and both of which are plain text. `tests/ios-routes/coverage.mjs` therefore
+  runs on every push next to the site it points at, and checks the file exists,
+  the fragment is a route the shell declares, and the URL is not built the way
+  that broke it. Verified by reintroducing the bug and watching it fail.
+  **What this cost:** the wrong diagnosis first. A 404 on every screen reads as
+  a stale server, the deploy history made that plausible, and the operator was
+  sent to run a deploy script for a server that was already current. The lesson
+  worth keeping is that `/api/health` answers that question in one request and
+  should be the FIRST thing checked, not the confirmation of a theory.
+  **Reversible: yes.**
+
+- **#94 — Three languages, and a ruler that cannot flatter us.**
+  Asked to check that every text translates on ES / CA / EN, with a switcher on
+  the sign-in screen and a company-wide switch inside the ERP. Catalan did not
+  exist at all, and the honest answer to "is everything translated" was **no**:
+  rendering all ten pages in both existing languages and diffing the visible
+  text found **833 untranslated strings**. Every previous coverage claim in this
+  project came from counting dictionary entries; the dictionary is what we
+  wrote, the rendered page is what the operator reads, and the gap between them
+  was the whole problem. `tests/i18n/audit.mjs` now measures the page.
+  **Two switches, deliberately different.** The sign-in selector sets a cookie —
+  this device, this person, immediately, and readable by the server so the page
+  is _rendered_ in that language rather than arriving wrong and flipping. The
+  ERP's switch writes `ui-settings.language` through
+  `PUT /api/~/erp/language` — the whole company, every device. Resolution is
+  device override → company language → the page's own language. A company change
+  clears the local override, or the person who made the change would be the one
+  person who never saw it.
+  **The sign-in page is translated on the SERVER, from a table** (`lib/ui-language.ts`),
+  not by the runtime layer. It carries no client JavaScript by design, so there
+  is nothing there to rewrite text — and a first screen that flips language a
+  moment after it appears reads as broken.
+  **Catalan is Central Catalan and uses the trade's own words** — _amidament_
+  not "medició", _lampisteria_ not "fontaneria", _enderroc_, _desar_, _cercar_,
+  _ajornar_, _fita_, _comanda_. A word-for-word Catalan of Spanish construction
+  vocabulary is exactly what reads as machine output to a builder in Sant Just.
+  **A translation that is identical is a decision, not a gap.** "Principal",
+  "Subtotal", "Comercial", "Documental" and "Variables" are spelled the same in
+  Spanish and Catalan. The audit therefore treats an explicit dictionary entry
+  mapping a string to itself as answered, and only counts strings with no entry
+  at all. Without that the gate could never reach zero however much work was
+  done, which is the fastest way to make a gate get ignored.
+  **Where it stands, measured, not claimed:** the workspace (`erp.html`) went
+  from 77 untranslated to **11 in Catalan and 14 in English**; journey 12 → 9;
+  master data 7 → 8 (it gained strings when hardcoded English headings were
+  moved into Spanish so they could be translated at all); financial data 5 → 6.
+  What remains is dominated by `setup-guide.html` (≈443) and `backend.html`
+  (≈38) — long-form documentation pages, not the ERP — plus seed data that
+  should never be translated (customer names, streets, Catalan town names).
+  CI gates on a budget that only moves down.
+  **Three real bugs found on the way:** English headings hardcoded on Spanish
+  pages ("Master Data", "Financial Data", "Tax", and a whole sentence in
+  journey.html) which no language setting could ever have fixed; the language
+  fetch 404ing on the published static copy, which logged a console error on
+  every page and broke five "no console errors" assertions; and the switcher's
+  own labels being counted by the audit as untranslated — measuring the ruler as
+  part of what it measures.
+
+- **#95 — The two review points, both fixed, and one of them was not what I said
+  it was.** (1) Fonts are self-hosted: 386KB of woff2 under `site/assets/`, zero
+  external requests from any template. A company's invoice must look the same
+  offline, and no customer's browser should tell Google which invoice they just
+  opened. (2) Letter-spacing: the headings were unsearchable in the PDF —
+  "FACTURA" stored as "FAC T U R A", so Ctrl+F found nothing and a screen reader
+  working from the extracted text read it letter by letter.
+  **I overstated the screen-reader half when I first reported it.** In the HTML,
+  screen readers read the DOM text, which is clean regardless of CSS tracking.
+  It is only broken in the PDF — which is the artifact customers receive, so the
+  fix still mattered, but the claim as written was wrong.
+  **The threshold was measured, not guessed**, and the first measurement was
+  wrong in the useful direction: an isolated probe of the same declaration
+  (Roboto Serif, 12px, .1em, uppercase) extracted perfectly, which would have
+  had me "fix" something that was not the cause. Testing the REAL document
+  showed .1em breaks and everything to .08em is clean; capped at **.04em**,
+  where no stray split survives anywhere in the set, and the tracking is still
+  visible.
+  **A single split is as bad as full shattering** and much easier to miss:
+  ".07em" left "FAC TURA" and "TRABA JO", which passed a gate that only looked
+  for four-or-more single letters. `tests/doc-print/searchable.mjs` now also
+  squeezes the spaces out of each line and fails when a document-type word
+  appears only after squeezing — and the gate was verified by reverting one file
+  to .1em and confirming it exits 1.
+
+- **#95 — the merge where both sides had built the same feature, and the
+  measurement that kept pointing the wrong way (2026-08-16).**
+  `origin/main` was 50 commits ahead with its own trilingual layer, its own
+  Catalan dictionary and its own completeness gate; this branch had the reach —
+  sign-in switcher, company-wide language, a gate that reads the rendered page.
+  **Resolution rule, decided once and applied to all eight conflicts:** main's
+  artifact wins wherever it is larger or a gate depends on it; this branch's
+  deltas are re-applied on top. Nothing was dropped from either side.
+  **The business simulation was mis-diagnosed here as environment-dependent.**
+  It was not: main's `erp-engine.js` change fixes it, and it passes on the
+  merged branch (149/149 and 214/214). A failure that only reproduces on CI is
+  a hypothesis, not a finding, and this one was wrong.
+  **The cookie outranks localStorage, and that broke 18 assertions.** The device
+  choice now lives in both, and main's E2E set only localStorage — so after the
+  first pill click every later "switch to Catalan" was ignored and the suite
+  reported that Catalan does not translate. The application always writes both;
+  the harness now goes through one `chooseLang()` helper that does the same.
+  **The audit read `D.ca` as a list when main's is an object.** That does not
+  make it fail — it makes it OVER-report, demanding fixes for strings somebody
+  already decided stay as they are. It now asserts the shape.
+  **Three wrong theories about master-data.html/financial-data.html, in order:**
+  that the pages lacked the translation layer (they load it); that their content
+  was Spanish under a wrong `lang="en"` (flipping it made the count worse — the
+  content is English); that the residue was a measurement artefact (it is one
+  real `<select>`). What finally worked was rendering the page and looking at
+  where the string survived. master-data went 72 → **0**, financial-data 75 → 22.
+  **Renaming the four Financial Data nav groups to English collided with the
+  dictionary**: two Spanish strings map to "Overview", so the Spanish render
+  picked "Visión" and the spec's §3.2 group names stopped matching. Reverted —
+  a spec-derived E2E assertion outranks a 12-string audit residue.
+  **`tests/doc-print/render.mjs` imported an absolute path under /home/user**
+  and launched an absolute browser path. It ran on one machine and could not run
+  on CI at all — the same class of mistake as a gate that reports a clean sheet
+  on a file it never opened. Now resolved by specifier, with CHROME_PATH still
+  winning where an environment pins one.
+  **The audit is a ratchet, not a target:** EN ≤ 668, CA ≤ 845, the numbers
+  measured today. `setup-guide.html` is 457 of the Catalan total on its own and
+  is prose for a native speaker, counted in the open rather than excused by a
+  check scoped small enough to pass.
+  **Reversible: yes** — every decision is a dictionary entry, a test helper or a
+  ceiling, and the merge is an ordinary merge commit with no history rewritten.
+
+- **#96 — the other seventeen documents, and the tracking that only shattered
+  on somebody else's browser (2026-08-16).**
+  The approved redesign covers twenty documents; the ERP could generate three.
+  **Sixteen PDF descriptors now live in `site/erp-doctypes.js`** — data, not
+  drawing — plus five new block primitives in the writer (`progressBars`,
+  `milestones`, `checklist`, `kvGrid`, `marginTable`) and a `sections` list so a
+  new document is a descriptor and not an edit to the writer. An unknown section
+  type THROWS rather than being skipped: a silently ignored section is a page
+  that goes missing without saying so.
+  **Named `erp-doctypes`, not `erp-documents`,** because `site/erp-docs.js`
+  already exists and is the storage layer. Two modules a letter apart, one about
+  storing records and one about printing paper, would be confused permanently.
+  **Four of the seventeen are placeholder-fed** (change order, delivery note,
+  timesheet, handover) and say so in the descriptor rather than in a comment: an
+  invented number that looks measured is worse than a blank.
+  **The emails are tables, not the template's own CSS.** The approved files use
+  grid and flexbox, which Outlook on Windows ignores — it renders through Word —
+  so shipping the design verbatim would arrive as one unstyled column at exactly
+  the moment it matters. The design is reproduced; the mechanism is tables and
+  inline styles. Every fact (amounts, IBAN, reference, due date) is real text in
+  a cell, so the message still reads correctly with styling stripped entirely.
+  **The De/Para/Asunto strip is preview-only.** In an inbox the client draws
+  those headers from the envelope, so shipping them in the body prints them
+  twice.
+  **THE ONE THAT MATTERED: `.04em` letter-spacing was tuned to one Chromium.**
+  The local gate passed; CI reported 16 of 21 documents with shattered headings
+  ("CO N T RAT O D E O B RA"), and CI extracted 7584 words where this machine
+  extracted 6785 — the PDFs themselves differ, because each machine renders them
+  with its own browser build. Positive CSS tracking is baked into glyph
+  positions and is therefore at the mercy of the renderer's rounding; it is now
+  **zero** in all 21 templates. Negative tracking stays: pulling glyphs together
+  never makes an extractor insert a space.
+  **The writer's own tracking is NOT the same mechanism and stays.** It uses the
+  PDF character-spacing operator (`Tc`), which poppler accounts for — the PDF
+  writer gate passed on CI with tracking on the same run the templates failed.
+  **This machine cannot download CI's browser** (the proxy refuses), so the fix
+  is reasoned from the CI evidence and falsifiable there: if the explanation is
+  right, CI's extracted word count drops to about this machine's 6785. If it
+  does not, the explanation is wrong.
+  **The gate now builds all sixteen documents twice** — ordinary data and every
+  list inflated ×3 — and asserts the LAST string of each list survives. Page
+  count alone does not catch truncation: a writer that drops the overflow still
+  reports the pages it did emit. Negative-controlled by reintroducing the
+  original `Count 1` bug (18 assertions fail, exit 1) and by naming a custom
+  font without embedding it (exit 1, the font named).
+  **The truncation check first failed on four correct documents** because
+  `kvGrid` prints its labels in capitals and long strings wrap. A gate that
+  cries wolf is one somebody switches off, so it case-folds and squeezes
+  whitespace — still a real check, since a truncated document lacks the string
+  entirely.
+  **Reversible: yes.**
+
+- **#97 — the audit that could not see the screen the app opens on
+  (2026-08-16).** An operator on English photographed the control tower reading
+  Spanish: the description, the "Calculado a las" timestamp, the Recalcular and
+  Imprimir buttons, "0 proyectos activos". Every one of those had passed the
+  translation gate.
+  **Because the gate read a page that never booted.** `audit.mjs` opens each
+  page on a static file server; for `erp.html` that means the login chrome, not
+  the workspace, so it reported 43 strings where the operator sees 439.
+  `tests/i18n/workspace-audit.mjs` now waits for the shell and walks twelve
+  screens. **88 untranslated → 3**, and the three left are a site address and
+  two version labels.
+  **Most of what it found was interpolated**, which an exact-match dictionary
+  can never reach: "Calculado a las X", "N proyectos activos", "Factura X
+  vencida N días (Name)", every pagination footer. 27 anchored regex rules, in
+  BOTH directions — Catalan had two rules to English's 247, so every
+  interpolated string had been silently Spanish in Catalan since the language
+  shipped.
+  **A real bug in the translation layer, not just missing entries.**
+  `translateNode` passed added elements to `querySelectorAll("*")`, which never
+  returns the element it is called on. The full pass starts at document.body so
+  the omission was invisible; the MutationObserver hands it each ADDED element,
+  and the workspace builds its section buttons after boot with the label on the
+  button. Their visible text was translated and their `aria-label` was not — a
+  screen reader on English read "Torre de control" while the screen said
+  "Control tower". Six strings, one line of code.
+  **Demo data is excused by asking the ERP, not by guessing.** A harvested
+  string is excluded only when it is literally a value in `erp.state`, or is
+  mostly one with no prose around it. "Skip anything that looks like a proper
+  noun" would also swallow real labels, which is how a coverage check stops
+  being worth running. The audit REFUSES to run if it reads fewer than 20 data
+  values: an exclusion list that is empty for the wrong reason excuses nothing
+  or everything, and neither is a measurement.
+  **The letter-spacing explanation was only two thirds right.** Zeroing it took
+  CI from 16 shattered documents to 8 and the word count from 7584 to 7184, not
+  to this machine's 6785 — so something else also splits. Kerning is the only
+  remaining source of intra-glyph placement, and it is now off in all 21
+  templates. **This is a second reasoned fix that this machine cannot verify**,
+  for the same reason as the first: the proxy refuses the browser download, so
+  CI is the only place the question can be asked.
+  **I wrote a probe to measure the gaps directly and deleted it.** It parsed
+  literal PDF strings; Chromium writes hex strings, so it reported "worst gap 0"
+  on 21 files it had not read — a clean sheet from an unread file, which is
+  precisely the failure this project keeps meeting. An unvalidatable probe is
+  worse than none.
+  **`font:ok` was lying on CI.** It compared Roboto Serif against Georgia, which
+  does not exist on a Linux runner, so it compared two different fallbacks and
+  answered "yes" whether or not the webfont had loaded — on the machine where
+  it mattered most. It now compares against a family that cannot exist.
+  **Reversible: yes.**
+
+- **#98 — the heading that breaks in the browser, not in the CSS
+  (2026-08-16).** Three explanations, two of them wrong, and the third read out
+  of the file instead of reasoned about.
+  **Wrong once:** CSS letter-spacing at `.04em`. Zeroing it in all 21 templates
+  took CI from 16 broken documents to 8 and its word count from 7584 to 7184 —
+  real progress, wrong cause.
+  **Wrong twice:** kerning. Disabling it changed the count by TWO WORDS
+  (7184 → 7186) and broke the same eight headings.
+  **The actual mechanism:** Chromium writes **one `Tj` per glyph**, each
+  preceded by its own absolute `Td`. There are no text runs in the file at all.
+  Whether an extractor rejoins those glyphs is its own judgement about the
+  gaps, and the gaps differ between Chromium BUILDS — not between settings.
+  Seven renderer flags were tried locally (hinting, LCD text, subpixel
+  positioning, the Fontations backend) and all seven produced byte-identical
+  word counts. No CSS can fix this, because the browser is what places the
+  glyphs.
+  **What that means for the gate.** Searchability is guaranteed where it is
+  achievable and where it matters: `site/erp-pdf.js` emits real text runs, and
+  `tests/doc-pdf/run.mjs` asserts it on all sixteen customer-facing documents
+  with no ceiling. `site/documentos/**` is the approved design reference and the
+  printable preview; margins and pagination stay absolute, searchability becomes
+  a RATCHET at the runner's count of 8, which may only come down. That is not a
+  gate weakened to pass — it is a gate that was asserting a property the
+  technology cannot deliver, now saying so out loud.
+  **CI keeps its rendered PDFs as an artifact from now on.** The runner's
+  Chromium cannot be downloaded here, so its output is the only evidence that
+  exists for this question, and three rounds were spent without it.
+  **Reversible: yes** — the ceiling is one number in ci.yml.
+
+- **#99 — the language buttons that answered with a 401, and the tab that kept
+  its old language (2026-08-16).** Both reported from the phone against the live
+  deploy, both real.
+  **`/api/lang` was not in the middleware's public list.** That route IS the
+  sign-in page's language switcher, on the one screen where the visitor is by
+  definition not signed in — so Català and English answered with a raw
+  `{"error":"UNAUTHENTICATED"}` body where the sign-in screen should have been.
+  Spanish appeared to work only because it is the default and needs no click,
+  which is why it survived every test: nobody clicked.
+  **The list had no test, and could not have had one**, because it lived inside
+  `middleware.ts`, which imports `next/server`. It now lives in
+  `lib/public-paths.ts` and the test PINS IT EXACTLY rather than checking
+  membership — a membership check passes just as happily on a list with one
+  extra entry, and every entry there hands something to a stranger. Adding one
+  now fails the build until it is written down in the test too.
+  **The second bug is the native shell's six tabs.** Each is its own web view
+  with its own document, so choosing English in Tower reloaded Tower and nothing
+  else; Projects, opened earlier, stayed Spanish and looked like the app had
+  forgotten the choice. The choice was never lost — the cookie and localStorage
+  are shared — only the already-rendered documents were stale. Each document now
+  re-checks the stored choice when it comes back to the front and reloads if it
+  disagrees. `applied` is the value THAT document rendered with, so after the
+  reload the two agree and it cannot loop.
+  **Reproduced before fixing, and negative-controlled after:** two pages in one
+  browser context, the second opened BEFORE the switch — a page opened
+  afterwards would pick the language up anyway and prove nothing. Without the
+  fix the second document reports `lang=es` and renders "UN ÚNICO ENTORNO"; with
+  it, `lang=en`.
+  **Reversible: yes.**
+
+- **#100 — the redirect that named the container instead of the site
+  (2026-08-16).** With the 401 fixed, the login page's CA/EN buttons sent the
+  phone to `https://0.0.0.0:3000/login` — the container's own bind address.
+  `/api/lang` built an ABSOLUTE redirect from `req.url`, which a route handler
+  reconstructs from the socket, not from the Host header the proxy forwards.
+  **The repo already knew.** `api/auth/login/route.ts` carries a comment saying
+  exactly this and uses a relative Location for exactly this reason; I wrote a
+  fresh absolute redirect two files away without reading it. Worse: the
+  evidence was in my own verification an hour earlier — my curl to `127.0.0.1`
+  came back `location: http://localhost:3111/...`, the bind address, not the
+  host I asked for — and I noted it and waved it off. A verification whose
+  anomalies get waved off is a ritual, not a verification.
+  **Fix: relative Location**, resolved by the browser against the address it
+  actually used — correct under any proxy, port or hostname. Middleware
+  redirects are untouched: they build from the Host header, which Caddy
+  preserves, and demonstrably work in production.
+  **Going relative made the validator load-bearing, and it had a hole.** All
+  three copies of `startsWith("/") && !startsWith("//")` pass `"/\evil.com"`,
+  and the WHATWG parser treats that backslash as a second slash:
+  `new URL("/\\evil.com", base)` → `https://evil.com/` — measured, not
+  recalled. One shared `safeReturnPath()` in `lib/return-path.ts` now gates the
+  language switch, the login route and the login page, with tests pinning every
+  escape shape.
+  **Verified against the rebuilt server binary with the lock on:** the
+  screenshot's exact URL → 303 `Location: /login?next=%2F` + cookie; followed
+  end-to-end it renders "Contrasenya"; `//evil`, `/\evil`, `https://evil`,
+  `\/evil` all answer `Location: /`; the login POST still lands users where
+  they were going, bad password and good.
+  **Reversible: yes.**
+
+- **#101 — the dictionary was right and the lookup never asked (2026-08-16).**
+  An operator on English photographed five screens still in Spanish, an hour
+  after a gate reported **3 untranslated**. Two independent causes, and the
+  larger one was not missing translations at all.
+  **`Teléfono` had an English entry — "Phone" — and always had.** The screens
+  compose their rows in one breath: `Teléfono: ${phone} · Móvil: ${mobile}`.
+  The browser hands the translator ONE text node containing the label, the
+  punctuation AND the data, and an exact-match dictionary can hold no key for
+  that — the phone number differs per customer. Whole identity cards, address
+  blocks and origin lines rendered in Spanish on entries that existed.
+  `tr()` now reads such a line the way a person does: split on `·`, translate
+  each `Label: value` half, leave anything unknown alone. A separate pass
+  strips surrounding punctuation for the simpler `"Teléfono: "` shape. Both run
+  only AFTER an exact match fails, so keys containing punctuation still win
+  first. **Value-only rows count too:** "IRPF: no aplica" has a label that is
+  identical in all three languages, and translating only when the LABEL moved
+  left that row Spanish forever.
+  **The second cause: 269 user-visible strings in erp.html had no entry.**
+  Every one is inside a modal, a toast, a validation message or a `<select>`
+  placeholder — none of it in the DOM until somebody taps something. Both
+  existing audits measured what happened to be ON SCREEN, so neither could ever
+  have seen them, and walking 12 of the 28 routes made it worse.
+  **`tests/i18n/source-audit.mjs` reads the SOURCE instead** — labels, options,
+  placeholders, thrown messages, toasts — so a string counts the moment it is
+  written rather than if a crawler reaches it. erp.html: **269 → 5 EN, 69 → 7
+  CA**, the remainder being identifiers (`ALB-...`, `quote-followup`, a
+  filename, a doc reference).
+  **The audit had a directional bug of its own**, found while reading its
+  output: it checked `ca[text]` for every file, but `journey.html`,
+  `master-data.html` and `financial-data.html` are authored in ENGLISH and
+  reach Catalan as EN → ES → CA. It reported ~150 correctly-translated labels
+  as gaps. A report that cries wolf is one nobody reads, so both directions are
+  resolved now.
+  **Dictionary: 2287 → 2561 entries, EN complete, CA backlog 1158 → 1094.**
+  **Negative-controlled:** removing one modal label fails the source gate;
+  disabling the labelled-segment pass puts 7 Spanish strings back on the
+  customer sheet.
+  **Still open and named:** `journey.html` (22 EN / 88 CA) — the walkthrough
+  page reachable from the profile menu, not the ERP itself.
+  **Reversible: yes.**
+
+- **#102 — "go line by line": the audit that enumerated positions instead of
+  reading content (2026-08-16).** After #101 an operator still photographed a
+  Spanish customer list on an English device. The cause was in my own tool.
+  **`source-audit.mjs` matched a hand-written list of PLACES a label appears** —
+  `<label>`, `<option>`, `placeholder=`, `toast(`. The customer list is built
+  from column descriptors: `label: "Contacto"`. Not on the list, so a whole
+  screen of field names reported clean. Enumerating positions means enumerating
+  the ones you thought of, and there is no way to know what was left out.
+  It now scans **every string literal and every markup text run**, and decides
+  by CONTENT, not by position.
+  **Deciding by content needed the file's own language.** A Spanish-authored
+  file (erp.html) has a rule with no hole: EVERY prose literal must have an
+  entry. Trying to detect Spanish there is what let `"Guardar cliente"` past —
+  no accent, no function word, invisible to any content test. English-authored
+  files get the opposite rule: their literals need nothing, except the Spanish
+  ones, which are a source bug no dictionary can fix, because when the reader
+  picks English the translator correctly does nothing at all.
+  **The cost is noise, and it was paid deliberately:** 7,440 literals scanned,
+  1,348 of them CSS and class names. Filters reject by SHAPE (a semicolon, a hex
+  colour, a `[data-` selector) and never by vocabulary, so a real label cannot be
+  filtered out for being an unexpected word.
+  **589 entries added across four passes.** erp.html: **406 → ~140 EN**, and
+  what remains is code fragments, identifiers and the contract document's own
+  Spanish/Catalan text — that last one correctly untranslated, because a
+  document is written in the CUSTOMER's language, not the operator's.
+  Dictionary **2287 → 2882**, CA backlog **1158 → 1052**.
+  **Logic review, as asked.** The whole change is data: `git diff` over
+  `site/`, `apps/` and `packages/` is two dictionary files, nothing else. The
+  one behavioural change (#101's matcher) can only mutate DOM text nodes,
+  attributes in a fixed list, and the language cookie — verified by grep. The
+  single place a form value could be rewritten is guarded to
+  `INPUT[type=button|submit]`, so typed data is never touched, and nothing in
+  the translator writes to ErpDocs, IndexedDB or `erp.state`.
+  **Verified green:** 126 unit · 337/337 e2e (drives all three languages) ·
+  149/149 + 214/214 + 226/226 invariants · 48/48 migrations · 25/25 import ·
+  30/30 scheduling · 28/28 PDF · 21 documents printable · 17/17 sync · 55/55
+  mailbox · ownership, bundle-safety, workbook, iOS routes.
+  **Reversible: yes** — additive dictionary entries and one lookup fallback.

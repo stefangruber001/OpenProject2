@@ -10179,7 +10179,15 @@
               label: "Versión",
               html: (b) => {
                 const cv = b.versions[b.versions.length - 1];
-                return `v${cv.vNumber} <span>· ${b.versions.length} versiones</span>`;
+                const n = b.versions.length;
+                /* ONE text node, not a number beside a <span>. The dictionary
+                   already carries a rule for "v1.0 · 2 versiones", written for
+                   exactly this cell, and it could never fire because the two
+                   halves were separate nodes — the translator sees text nodes,
+                   not the sentence a reader assembles from them. Split into
+                   the bargain: "1 versiones" was wrong Spanish nobody had
+                   looked at. */
+                return `v${cv.vNumber} · ${n} ${n === 1 ? "versión" : "versiones"}`;
               },
             },
             {

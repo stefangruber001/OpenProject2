@@ -15,7 +15,8 @@
  *   - a MutationObserver keeps dynamically rendered content translated
  *   - window.CANEI_I18N.translateNode(root) lets generated documents
  *     (print windows, previews) opt in with one call
- * A floating ES | CA | EN toggle is injected on every page.
+ * The language is chosen in Configuración → Idioma and on the sign-in
+ * screen; no switch floats over the pages themselves (PK5-A).
  *
  * WHY SPANISH IS THE HUB (S3, decision 20). The dictionary is a set of
  * TRIPLES keyed on the Spanish string: `pairs` carries [es, en] and `ca`
@@ -34,14 +35,58 @@
   "use strict";
 
   var LANGS = ["es", "ca", "en"];
-  var LS_KEY = "caneiLang";
-  var target = "es";
-  try {
-    target = localStorage.getItem(LS_KEY) || "es";
-  } catch (e) {
-    /* storage unavailable → stay on base */
+  var NAMES = { es: "Español", ca: "Català", en: "English" };
+
+  var LS_KEY = "caneiLang"; // this device's choice ("" = follow the company)
+  var CACHE_KEY = "caneiLangCompany"; // last company value seen, for first paint
+  var COOKIE = "canei_lang";
+  var API = "/api/~/erp/language";
+
+  function valid(lang) {
+    return LANGS.indexOf(lang) >= 0 ? lang : "";
   }
-  if (LANGS.indexOf(target) < 0) target = "es";
+  function readLocal(key) {
+    try {
+      return localStorage.getItem(key) || "";
+    } catch (e) {
+      return "";
+    }
+  }
+  function writeLocal(key, value) {
+    try {
+      if (value) localStorage.setItem(key, value);
+      else localStorage.removeItem(key);
+    } catch (e) {
+      /* private mode — the choice lasts for this page only */
+    }
+  }
+
+  /**
+   * The device's choice lives in a COOKIE as well as in localStorage.
+   *
+   * The sign-in page is rendered on the server and carries no JavaScript, so it
+   * can only know a preference the server can see. Keeping the choice in a
+   * cookie means picking Català on the sign-in screen and picking it in the
+   * workspace are the same act, recorded in the same place — rather than two
+   * settings that drift apart and make the app look like it forgot.
+   *
+   * localStorage is still read, so anybody carrying a choice made by the
+   * previous version does not silently lose it.
+   */
+  function readCookie(name) {
+    var parts = ("; " + document.cookie).split("; " + name + "=");
+    return parts.length === 2 ? valid(decodeURIComponent(parts.pop().split(";").shift())) : "";
+  }
+  function writeCookie(name, value) {
+    var year = 60 * 60 * 24 * 365;
+    document.cookie = value
+      ? name + "=" + encodeURIComponent(value) + ";path=/;max-age=" + year + ";samesite=lax"
+      : name + "=;path=/;max-age=0;samesite=lax";
+  }
+
+  var device = readCookie(COOKIE) || valid(readLocal(LS_KEY));
+  var company = valid(readLocal(CACHE_KEY));
+  var target = device || company || "es";
 
   var base = (document.documentElement.getAttribute("lang") || "en").slice(0, 2);
   if (LANGS.indexOf(base) < 0) base = "en";
@@ -104,6 +149,78 @@
         }
       }
     }
+
+    /**
+     * THE DECORATION PASS — and the reason most of the workspace stayed Spanish
+     * while its dictionary said otherwise.
+     *
+     * The screens compose their field rows in one breath:
+     *
+     *     <div class="it">Teléfono: <b>${phone}</b> · Móvil: <b>${mobile}</b></div>
+     *
+     * so the text nodes handed to this function are `"Teléfono: "` and
+     * `" · Móvil: "` — never `"Teléfono"`. The dictionary HAS "Teléfono" →
+     * "Phone" and had it all along; the lookup simply never asked, because a
+     * trailing colon makes it a different string. Whole screens of labels,
+     * every one of them already translated, rendered in Spanish for want of
+     * one punctuation mark.
+     *
+     * So on a miss, the surrounding punctuation is set aside, the word inside
+     * is looked up, and the punctuation is put back exactly as it was. Only on
+     * a MISS: an entry whose own key contains punctuation ("← Contenido",
+     * "Cobros / Pagos (DSO / DPO)") still matches exactly, first, unchanged.
+     */
+    if (hit === undefined) {
+      var parts = /^([^\p{L}\p{N}]*)([\s\S]*?)([^\p{L}\p{N}]*)$/u.exec(collapsed || trimmed);
+      if (parts && parts[2] && parts[2].length > 1 && (parts[1] || parts[3])) {
+        var core = map.get(parts[2]);
+        if (core !== undefined && core !== parts[2]) hit = parts[1] + core + parts[3];
+      }
+    }
+
+    /**
+     * THE LABELLED-SEGMENT PASS — for rows where the label and the DATA share
+     * one text node.
+     *
+     *     <div class="it">Teléfono: ${phone} · Móvil: ${mobile}</div>
+     *
+     * Nothing wraps those values, so the browser hands this function the whole
+     * line: `"Teléfono: 934771208 · Móvil: 600111222"`. The phone number is
+     * different for every customer, so there is no key any dictionary could
+     * hold, and stripping punctuation does not help — the noise is in the
+     * MIDDLE. Whole identity cards, address blocks and origin lines stayed
+     * Spanish for this reason alone, on entries that existed.
+     *
+     * So the line is read the way a person reads it: split on "·" into
+     * segments, and in each `Label: value` translate the label, and the value
+     * too when the dictionary happens to know it (a lead source, a status).
+     * Anything unknown is left exactly as it was — a phone number, a date and
+     * a postcode pass straight through, which is what should happen to them.
+     */
+    if (hit === undefined && (collapsed || trimmed).indexOf(":") > 0) {
+      var line = collapsed || trimmed;
+      var touched = false;
+      var rebuilt = line.split("·").map(function (seg) {
+        var m2 = /^(\s*)([^:]{2,60}?)(\s*:\s*)([\s\S]*)$/.exec(seg);
+        if (!m2) return seg;
+        var lab = map.get(m2[2]);
+        // The value is translated only when the dictionary has an opinion on
+        // it, so data is never mangled by a partial match.
+        var val = m2[4];
+        var bare = val.trim();
+        var valHit = map.get(bare);
+        var newVal = valHit !== undefined && valHit !== bare ? val.replace(bare, valHit) : val;
+        var newLab = lab !== undefined && lab !== m2[2] ? lab : m2[2];
+        // Either half is enough. "IRPF: no aplica" has a label that is the same
+        // word in all three languages and a value that is not — translating
+        // only when the LABEL moved left that row in Spanish forever.
+        if (newLab === m2[2] && newVal === val) return seg;
+        touched = true;
+        return m2[1] + newLab + m2[3] + newVal;
+      });
+      if (touched) hit = rebuilt.join("·");
+    }
+
     if (hit === undefined || hit === trimmed) return null;
     // keep original leading / trailing whitespace
     var lead = text.match(/^\s*/)[0];
@@ -142,12 +259,22 @@
       var out = tr(n.nodeValue);
       if (out !== null) n.nodeValue = out;
     }
-    var els =
-      root.nodeType === 1 || root.nodeType === 9
-        ? root.querySelectorAll
-          ? root.querySelectorAll("*")
-          : []
-        : [];
+    // THE ROOT ITSELF, not only its descendants.
+    //
+    // `querySelectorAll("*")` never returns the element it is called on. The
+    // full pass starts at document.body, so that omission is invisible; the
+    // MutationObserver hands this function each ADDED element, and for those
+    // the omission is the whole bug. The workspace builds its section buttons
+    // after boot with the label on the button — so the visible text was
+    // translated (the text walker does start at root) and the aria-label was
+    // not, and a screen reader on English read "Torre de control" while the
+    // screen said "Control tower".
+    var els = [];
+    if (root.nodeType === 1) els.push(root);
+    if ((root.nodeType === 1 || root.nodeType === 9) && root.querySelectorAll) {
+      var kids = root.querySelectorAll("*");
+      for (var q = 0; q < kids.length; q++) els.push(kids[q]);
+    }
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
       if (SKIP[el.nodeName]) continue;
@@ -233,40 +360,150 @@
     if (mo) mo.disconnect();
   }
 
-  /* ---------- language, chosen in Configuración ----------
-     There used to be a fixed pill bottom-left of every page. It was always
-     reachable, and always in the way: it floated over content on every
-     screen, and one document viewer already had to reserve blank space
-     underneath itself purely to stop the pill covering the end of a contract.
-     A preference set once or twice a year does not earn permanent screen
-     space, so the choice moved into Configuración (DMC-09) and this module
-     just exposes the setter. The satellite pages carry no switch of their
-     own — they read the same `localStorage` key, so a choice made in the ERP
-     is the choice they honour. */
-  function setLang(lang) {
-    if (LANGS.indexOf(lang) < 0 || lang === target) return false;
-    try {
-      localStorage.setItem(LS_KEY, lang);
-    } catch (e) {}
+  /* ---------- choosing ---------- */
+
+  /**
+   * Adopt a language.
+   *
+   * `scope` is "device" or "company". A company change is written to the server
+   * and only then applied, because a switch that appears to work and did not
+   * reach the server is the failure this project keeps meeting: everyone else
+   * carries on in the old language while the person who changed it believes
+   * they changed it for everyone.
+   */
+  function set(lang, scope) {
+    lang = valid(lang) || "";
+    if (scope === "company") {
+      return fetch(API, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ language: lang || "es" }),
+      }).then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        writeLocal(CACHE_KEY, lang || "es");
+        // A company change also clears this device's override, or the person
+        // who just set the company language would be the one person who does
+        // not see it.
+        writeLocal(LS_KEY, "");
+        writeCookie(COOKIE, "");
+        location.reload();
+      });
+    }
+    writeLocal(LS_KEY, lang);
+    writeCookie(COOKIE, lang);
     location.reload();
-    return true;
+    return Promise.resolve();
   }
+
+  /** Ask the server what the company language is, and follow it if we should. */
+  function syncCompany() {
+    if (!window.fetch || location.protocol === "file:") return;
+    // ONLY WHERE THERE IS A SERVER TO ASK. These same files are published as a
+    // static copy with no API behind them, and a fetch that 404s is not a
+    // silent no-op: the browser logs it as a console error, on every page, for
+    // every visitor. `ErpDocs.isRemote()` is the app's existing answer to "am I
+    // talking to the server", so it is the one used here rather than a second
+    // guess that could disagree with it.
+    var docs = window.ErpDocs;
+    if (!docs || typeof docs.isRemote !== "function" || !docs.isRemote()) return;
+    fetch(API, { credentials: "same-origin", headers: { accept: "application/json" } })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (body) {
+        var value = body && valid(body.language);
+        if (!value || value === company) return;
+        writeLocal(CACHE_KEY, value);
+        // Only reload when it actually changes what this page is showing. A
+        // device override means the company value is cached for later and
+        // nothing on screen moves.
+        if (!device && value !== target) location.reload();
+      })
+      .catch(function () {
+        /* offline, or the static copy with no API behind it */
+      });
+  }
+
+  /**
+   * Adopt a language chosen somewhere ELSE in the app.
+   *
+   * THE PHONE IS WHY THIS EXISTS. The native shell is six tabs, and each tab is
+   * its own web view with its own document. Choosing English in Tower reloads
+   * Tower and nothing else, so Projects — already loaded, still Spanish — looked
+   * like the app had forgotten the choice a second after making it. The choice
+   * was never lost: the cookie and localStorage are shared across the tabs, and
+   * only the already-rendered documents were stale.
+   *
+   * So each document checks, whenever it comes back to the front, whether the
+   * stored choice still matches what it rendered with, and reloads if it does
+   * not. `applied` is the value THIS document used, so after the reload the two
+   * agree and it cannot loop.
+   *
+   * `storage` covers real browser tabs, which do get that event. Separate web
+   * views in the native shell do not, which is why visibility and pageshow are
+   * the ones that carry the fix on the phone.
+   */
+  function currentChoice() {
+    return readCookie(COOKIE) || valid(readLocal(LS_KEY)) || valid(readLocal(CACHE_KEY)) || "es";
+  }
+
+  function followLanguageChosenElsewhere() {
+    var applied = target;
+    var check = function () {
+      if (document.visibilityState === "hidden") return;
+      if (currentChoice() !== applied) location.reload();
+    };
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("pageshow", check);
+    window.addEventListener("focus", check);
+    window.addEventListener("storage", check);
+  }
+
+  /* ---------- where the language is chosen ----------
+     There used to be a fixed pill bottom-left of every page, injected here.
+     It was always reachable, and always in the way: it floated over content
+     on every screen, and one document viewer already had to reserve blank
+     space underneath itself purely to stop the pill covering the end of a
+     contract. The operator's verdict, from a real phone: "I want to put the
+     language button in configuration. As it is, bothers more then helps.
+     This is across the app." (PK5-A.)
+
+     A preference set once or twice a year does not earn permanent screen
+     space, so the choice lives in Configuración → Idioma (DMC-09) and on the
+     sign-in screen, and this module just exposes `set`. The satellite pages
+     carry no switch of their own — they read the same stored choice, so a
+     language picked in the ERP is the language they honour. The `SHORT`
+     table went with the pill: it existed only to label those three buttons,
+     and the sign-in screen builds its own. */
 
   /* ---------- boot ---------- */
   function boot() {
     fullPass();
+    syncCompany();
+    // Registered even when this page needs no translating: a Spanish page has
+    // to notice a switch to Catalan just as much as the other way round, and
+    // `active` is false in exactly that case.
+    followLanguageChosenElsewhere();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 
   window.CANEI_I18N = {
+    LANGS: LANGS,
+    NAMES: NAMES,
     lang: function () {
       return target;
     },
-    langs: LANGS.slice(),
-    set: setLang,
+    deviceChoice: function () {
+      return device;
+    },
+    companyLanguage: function () {
+      return company;
+    },
     base: base,
     active: active,
+    set: set,
     translateNode: translateNode,
     tr: tr,
   };

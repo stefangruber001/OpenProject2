@@ -42,6 +42,10 @@ jobs:
       - name: Draft mailbox adapter
         run: pnpm test:mailbox
 
+      # THE CORE GATES COME FIRST, AND THE DOCUMENT ONES MAY NOT MASK THEM.
+      # Previously a failure in the PDF gate marked every later step "skipped",
+      # so a run could go red without unit tests or the build ever executing —
+      # the cheapest, most important checks hidden behind the newest ones.
       - name: Unit tests
         run: pnpm test
 
@@ -50,6 +54,111 @@ jobs:
         env:
           DATABASE_URL: postgresql://user:pass@localhost:5432/db
           NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+      # The document gates read the produced PDFs with poppler. Without it they
+      # can extract nothing — and they now fail rather than report a clean sheet,
+      # which is how a missing binary here turned into a green tick on a file
+      # nobody had read.
+      - name: Install poppler (PDF text extraction for the document gates)
+        if: always()
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+
+      # The template and translation gates render real pages in a real browser,
+      # which is the whole point of them — so they need one. The runner has no
+      # browser until this step, and `pnpm install` does not fetch it.
+      - name: Install Playwright browser (document + translation gates render pages)
+        if: always()
+        run: pnpm --filter web exec playwright install --with-deps chromium
+
+      # The writer behind every quote and invoice: paginates instead of
+      # truncating, keeps Spanish accents, stays clear of the printable border.
+      - name: PDF writer
+        if: always()
+        run: pnpm test:pdf
+
+      # Every approved template rendered and measured: no ink within 9.5mm of the
+      # paper edge on any page. The redesign shipped with 0.8mm on continuation
+      # pages, which no printer can reproduce.
+      - name: Documents are printable
+        if: always()
+        run: pnpm test:docs
+
+      # The runner's Chromium places glyphs differently from any machine this is
+      # developed on, and its build cannot be downloaded here — so its PDFs are
+      # the only evidence that exists for the heading-splitting question. Kept
+      # so the next person diagnoses it from the artifact instead of guessing.
+      - name: Keep the runner's rendered PDFs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-documents
+          path: dist/doc-print-check/*.pdf
+          retention-days: 14
+          if-no-files-found: warn
+
+      # Two questions, two checks, and they are not the same question.
+      #
+      # coverage.mjs asks whether every entry exists in all three languages —
+      # cheap, exact, and blind to whether the page uses it.
+      # audit.mjs renders every page in every language and counts what came out
+      # identical in two of them, which is what the operator actually sees.
+      #
+      # The audit is budgeted rather than zero: setup-guide.html alone is 457 of
+      # the Catalan total and is prose a native speaker should translate, and a
+      # gate nobody can pass is a gate that gets deleted. The ceilings are the
+      # numbers measured on 2026-08-16 and only ever move down. See the header
+      # of audit.mjs for what inflates them.
+      - name: Translation completeness (dictionary)
+        if: always()
+        run: node tests/i18n/coverage.mjs
+
+      - name: Translation coverage (rendered pages)
+        if: always()
+        run: |
+          node tests/i18n/audit.mjs --lang en --max 668
+          node tests/i18n/audit.mjs --lang ca --max 845
+
+      # The one above reads erp.html on a static server, where the workspace
+      # shell never finishes booting — so it sees the login chrome and misses
+      # the screens the operator actually uses. That gap SHIPPED: an operator on
+      # English read the control tower's description, its timestamp, its buttons
+      # and "0 proyectos activos" in Spanish, on the screen the app opens on.
+      # This one waits for the shell and walks twelve screens. The ceilings are
+      # today's measurement and only move down; what remains is a site address
+      # and two version labels, which are data.
+      # Merging the v4 programme branch brought twelve sessions of screens this
+      # audit had never walked, and the seven strings it found were translated
+      # rather than budgeted for — so the ceiling comes DOWN to zero. The two
+      # version labels the note above excused as data are gone too: they were
+      # one cell rendering "v1.0" and "· 2 versiones" as separate text nodes,
+      # which no dictionary rule could ever match, and a rule written for
+      # exactly that cell had been sitting unused since it was added.
+      - name: Translation coverage (booted workspace)
+        if: always()
+        run: |
+          node tests/i18n/workspace-audit.mjs --lang en --max 0
+          node tests/i18n/workspace-audit.mjs --lang ca --max 0
+
+      # Neither audit above can see a modal, a toast or a validation message:
+      # none of it is in the DOM until somebody taps something, and a crawler
+      # never performs the exact gesture. That is how 269 untranslated strings
+      # in erp.html sat behind a gate reporting three. This one reads the
+      # SOURCE — labels, options, placeholders, thrown messages — so a string
+      # counts the moment it is written, not if a crawler happens to reach it.
+      #
+      # RAISED BY THE MERGE, AND SAID SO PLAINLY. 147/219 were measured against
+      # main's erp.html; the v4 programme branch's is twelve sessions larger —
+      # the presupuestador, the Gantt, the invoice generator and everything
+      # around them — and none of that Spanish had ever been scanned here. The
+      # ceilings below are the merged measurement exactly, so the ratchet still
+      # fails on the next untranslated string written. It is a debt, not a
+      # dispensation: see ASSUMPTIONS #167. The booted-workspace audit above,
+      # which measures what an operator actually reads, is at zero.
+      - name: Translation coverage (source literals)
+        if: always()
+        run: |
+          node tests/i18n/source-audit.mjs --lang en --max 256
+          node tests/i18n/source-audit.mjs --lang ca --max 335
 
   bundle:
     name: Capability bundle (build, browser-safety, drift)
@@ -159,6 +268,14 @@ jobs:
       # dataset, not against the source text.
       - name: Workbook coverage (the field dictionary is still true)
         run: node tests/workbook/coverage.mjs
+
+      # The phone app is six URLs pointed at this site, and it is built on a
+      # macOS runner — so nothing here would notice a tab addressing a page
+      # that no longer exists, a section that was renamed, or the URL being
+      # assembled in the one way that percent-encodes a fragment. All three are
+      # readable as text, so they are checked next to the site they point at.
+      - name: iOS tab routes (every tab addresses a real screen)
+        run: node tests/ios-routes/coverage.mjs
 
   persistence:
     name: Durable adapters (Postgres + RLS contract tests)

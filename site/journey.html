@@ -1294,13 +1294,14 @@
         margin-top: 2px;
       }
     </style>
+    <script src="erp-modal.js"></script>
+    <script src="erp-pdf.js"></script>
     <script src="i18n-dict.js"></script>
     <script src="i18n-dict-ca.js"></script>
     <script src="i18n.js"></script>
     <!-- erp-sync.js must load BEFORE the stores: they register their
      documents with it as soon as the first read comes back. Without it
      the page still works, it just never notices a change made elsewhere. -->
-    <script src="erp-modal.js"></script>
     <script src="erp-sync.js"></script>
     <script src="erp-docs.js"></script>
     <!-- Real-project mode (§2.3, Improvement #3) reads the SAME tenant data
@@ -1422,8 +1423,8 @@
            tells the operator their work is device-local is a page that will one
            day talk somebody out of trusting a record that was perfectly safe. -->
           <div class="hint" style="margin-top: 8px">
-            Photos, documents, the quote &amp; invoice PDFs and every email are filed per step —
-            saved on the company server.
+            Las fotos, los documentos, los PDF de presupuesto y factura y cada correo se archivan
+            por paso — guardados en el servidor de la empresa.
           </div>
         </div>
         <div class="card">
@@ -1599,7 +1600,7 @@
             price: 38,
           },
         ],
-        optional: { desc: "Premium tempered-glass shower screen", amount: 480 },
+        optional: { desc: "Mampara de ducha de vidrio templado", amount: 480 },
         vatPct: 10,
         quoteNo: "PRE-2026-0031",
         invoiceNo: "FAC-2026-0007",
@@ -2357,6 +2358,11 @@
               `Adjuntamos su presupuesto aceptado por un importe de <b>${eur(S.baseline || S.revenue)}</b> (IVA no incluido). Programaremos los trabajos y le mantendremos informado/a en cada hito, con un único punto de contacto durante todo el proyecto y 2 años de garantía sobre los trabajos.`,
             ],
             cta: { label: "Ver mi proyecto" },
+            summary: [
+              ["Presupuesto aceptado", eur(S.baseline || S.revenue)],
+              ["Version", "1.0"],
+              ["Proyecto", S.address || "-"],
+            ],
             attach: { name: "Canei-presupuesto-" + S.quoteNo + ".pdf", doc: () => quoteDoc(true) },
           };
         if (kind === "invoice")
@@ -2368,7 +2374,14 @@
               `Gracias por confiar en nosotros para su reforma. Adjuntamos su factura.`,
               `Total a pagar: <b>${eur(total)}</b> (base ${eur(S.revenue)} + IVA ${eur(vat)}). Forma de pago: transferencia a ${terms} días.`,
             ],
-            cta: { label: "Realizar el pago" },
+            cta: { label: "Descargar la factura (PDF)" },
+            summary: [
+              ["Base imponible", eur(S.revenue)],
+              ["IVA " + vp + " %", eur(vat)],
+              ["Total", eur(total), "strong"],
+              ["Vencimiento", fmtDate(addDaysISO(todayISO(), terms))],
+            ],
+            pay: { holder: BRAND.legal, iban: BRAND.iban, reference: S.invoiceNo },
             attach: { name: S.invoiceNo + ".pdf", doc: () => invoiceDoc() },
           };
         if (kind === "reminder")
@@ -2381,6 +2394,12 @@
               `Si ya ha realizado el pago, disculpe este mensaje — y muchas gracias.`,
             ],
             cta: { label: "Pagar la factura" },
+            summary: [
+              ["Factura", S.invoiceNo],
+              ["Importe pendiente", eur(total), "strong"],
+              ["Emitida", fmtDate(todayISO())],
+            ],
+            pay: { holder: BRAND.legal, iban: BRAND.iban, reference: S.invoiceNo },
           };
         if (kind === "review") {
           // The platform chosen at stage 13 used to change nothing: the label said
@@ -2412,42 +2431,117 @@
         Houzz: { name: "Houzz", url: "https://www.houzz.es/professionals/" },
         Facebook: { name: "Facebook", url: "https://www.facebook.com/" },
       };
-      function renderEmail(c) {
+      /**
+       * The customer emails, in the approved design.
+       *
+       * WHY TABLES AND NOT THE TEMPLATE'S OWN CSS. The approved file in
+       * site/documentos/01-cliente/17..20 is laid out with CSS grid and flexbox,
+       * which is right for a page a browser renders. An email is not that: Outlook
+       * on Windows renders through Word, which ignores grid, flex, border-radius and
+       * box-shadow, so a design shipped verbatim arrives as one unstyled column at
+       * exactly the moment it matters — in the customer's inbox. The DESIGN is
+       * reproduced (De/Para/Asunto chrome, square corners, white dominant, the
+       * amount block, the highlighted IBAN, the green rule above the legal footer);
+       * the MECHANISM is tables and inline styles, which every client has rendered
+       * the same way for twenty years.
+       *
+       * Everything a mail client may drop is decoration. Every fact — amounts, IBAN,
+       * reference, due date — is real text in a table cell, so the email still reads
+       * correctly with styling stripped entirely.
+       */
+      function renderEmail(c, opts) {
         const B = BRAND;
+        // The De/Para/Asunto strip belongs to the PREVIEW, not to the message. In a
+        // real inbox the client draws those headers itself from the envelope, so
+        // shipping them inside the body would print them twice.
+        const chromeData = (opts && opts.chrome) || null;
+        const esc = (s) => String(s == null ? "" : s);
+        const row = (label, value, strong) => `<tr>
+    <td style="padding:7px 0;font:600 11px Inter,Arial,sans-serif;color:#767676;text-transform:uppercase">${esc(label)}</td>
+    <td align="right" style="padding:7px 0;font:${strong ? "700 17px Georgia,'Times New Roman',serif" : "400 14px Inter,Arial,sans-serif"};color:#14160f">${esc(value)}</td></tr>`;
+
         const paras = c.paras
           .map(
             (p) =>
-              `<p style="margin:0 0 14px;font-size:15px;line-height:1.62;color:${B.body}">${p}</p>`,
+              `<p style="margin:0 0 13px;font:400 15px/1.62 Inter,Arial,sans-serif;color:${B.body}">${p}</p>`,
           )
           .join("");
-        const cta = c.cta
-          ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 6px"><tr>
-    <td style="border-radius:12px;background:${B.green};box-shadow:0 12px 22px -12px rgba(72,115,60,.6)">
-    <a href="${c.cta.href || "#"}" style="display:inline-block;padding:13px 28px;color:#fff;font:600 14px Inter,Arial,sans-serif;text-decoration:none;letter-spacing:-.01em">${c.cta.label}</a>
+
+        const summary =
+          c.summary && c.summary.length
+            ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 4px;border-top:1px solid #E0E0E0;border-bottom:2px solid ${B.green}">
+    ${c.summary.map((r) => row(r[0], r[1], r[2] === "strong")).join("")}</table>`
+            : "";
+
+        // The IBAN is the one string a customer retypes into their bank. It is given
+        // its own block, in a serif face at a size that survives a phone screen, and
+        // never wrapped mid-number.
+        const pay = c.pay
+          ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 4px;background:#F6F8F4;border-left:3px solid ${B.green}">
+    <tr><td style="padding:14px 16px">
+      <div style="font:600 11px Inter,Arial,sans-serif;color:#767676;text-transform:uppercase;margin-bottom:7px">Datos para el pago</div>
+      <div style="font:400 13px Inter,Arial,sans-serif;color:${B.body};margin-bottom:3px">Titular: ${esc(c.pay.holder)}</div>
+      <div style="font:600 16px Georgia,'Times New Roman',serif;color:#14160f;white-space:nowrap;margin-bottom:3px">${esc(c.pay.iban)}</div>
+      <div style="font:400 13px Inter,Arial,sans-serif;color:${B.body}">Concepto: <b style="color:#14160f">${esc(c.pay.reference)}</b></div>
     </td></tr></table>`
           : "";
-        const attach = c.attach
-          ? `<div style="margin:18px 0 2px;display:flex;align-items:center;gap:11px;border:1px solid ${B.line};border-radius:12px;padding:12px 14px;background:#fafaf7">
-    <div style="width:34px;height:34px;border-radius:8px;background:${B.soft};display:flex;align-items:center;justify-content:center;font-size:15px">📄</div>
-    <div><div style="font:600 13px Inter,Arial,sans-serif;color:${B.ink}">${c.attach.name}</div>
-    <div style="font-size:11px;color:#9a9d90">PDF · attached to this email</div></div></div>`
+
+        const cta = c.cta
+          ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 6px"><tr>
+    <td style="background:${B.green}">
+    <a href="${c.cta.href || "#"}" style="display:inline-block;padding:13px 26px;color:#ffffff;font:600 14px Inter,Arial,sans-serif;text-decoration:none">${c.cta.label}</a>
+    </td></tr></table>`
           : "";
-        return `<div style="margin:0;padding:26px 14px;background:#f4f3ef;font-family:Inter,-apple-system,Segoe UI,Arial,sans-serif">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:18px;overflow:hidden;border:1px solid ${B.line};box-shadow:0 24px 60px -34px rgba(20,30,15,.5)">
-    <div style="height:5px;background:linear-gradient(90deg,${B.green},${B.greenLt} 70%,${B.spark})"></div>
-    <div style="padding:26px 32px 4px;display:flex;align-items:center;gap:12px">${MARK}
-      <div><div style="font:600 18px Georgia,serif;color:${B.ink};line-height:1.05">${B.name}</div>
-      <div style="font-size:11px;font-style:italic;color:#9a9d90">${B.slogan}</div></div></div>
-    <div style="padding:14px 32px 0"><div style="font:600 25px Georgia,serif;color:${B.ink};letter-spacing:-.01em">${c.title}</div></div>
-    <div style="padding:12px 32px 28px">
-      <p style="margin:0 0 14px;font-size:15px;color:${B.ink};font-weight:600">${c.greeting}</p>
-      ${paras}${cta}${attach}
-      <p style="margin:20px 0 0;font-size:14px;color:${B.body}">Un cordial saludo,<br><b style="color:${B.ink}">El equipo de ${B.name}</b></p>
-    </div>
-    <div style="padding:18px 32px;background:${B.soft};border-top:1px solid ${B.line};font-size:11.5px;color:#7c8072;line-height:1.6">
-      <b style="color:${B.ink}">${B.legal}</b> · ${B.address}<br>${B.from} · ${B.phone} · 2-year guarantee on the works
-    </div>
-  </div></div>`;
+
+        const attach = c.attach
+          ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0 2px;border:1px solid #E0E0E0"><tr>
+    <td width="42" align="center" style="padding:11px 0;background:#F6F8F4;font-size:16px">PDF</td>
+    <td style="padding:11px 13px">
+      <div style="font:600 13px Inter,Arial,sans-serif;color:${B.ink}">${esc(c.attach.name)}</div>
+      <div style="font:400 11px Inter,Arial,sans-serif;color:#9a9d90">Adjunto a este correo</div></td></tr></table>`
+          : "";
+
+        // The client chrome. It is part of the approved design and it is honest: this
+        // is a preview of a message, and the preview says who it is from and to.
+        const chrome = chromeData
+          ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2F2F2;border-bottom:1px solid #E0E0E0">
+    <tr><td style="padding:14px 30px">
+      ${[
+        ["De", chromeData.from],
+        ["Para", chromeData.to],
+        ["Asunto", c.subject],
+      ]
+        .map(
+          ([k, v]) =>
+            `<div style="font:400 12px Inter,Arial,sans-serif;color:#000;margin:2px 0"><span style="display:inline-block;min-width:52px;font-weight:600;font-size:10px;color:#767676;text-transform:uppercase">${k}</span>${esc(v)}</div>`,
+        )
+        .join("")}
+    </td></tr></table>`
+          : "";
+
+        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;padding:0;background:#EDEDEA">
+  <tr><td align="center" style="padding:22px 12px">
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #E0E0E0">
+    <tr><td style="height:4px;background:${B.green};font-size:0;line-height:0">&nbsp;</td></tr>
+    <tr><td>${chrome}</td></tr>
+    <tr><td style="padding:24px 30px 0">
+      <div style="font:400 17px Georgia,'Times New Roman',serif;color:${B.ink};line-height:1.15">${B.name}</div>
+      <div style="font:italic 400 11px Inter,Arial,sans-serif;color:#9a9d90">${B.slogan}</div>
+    </td></tr>
+    <tr><td style="padding:16px 30px 0">
+      <div style="font:700 24px Georgia,'Times New Roman',serif;color:${B.ink};line-height:1.2">${c.title}</div>
+    </td></tr>
+    <tr><td style="padding:12px 30px 26px">
+      <p style="margin:0 0 13px;font:600 15px Inter,Arial,sans-serif;color:${B.ink}">${c.greeting}</p>
+      ${paras}${summary}${pay}${cta}${attach}
+      <p style="margin:20px 0 0;font:400 14px Inter,Arial,sans-serif;color:${B.body}">Un cordial saludo,<br><b style="color:${B.ink}">El equipo de ${B.name}</b></p>
+    </td></tr>
+    <tr><td style="height:2px;background:${B.green};font-size:0;line-height:0">&nbsp;</td></tr>
+    <tr><td style="padding:16px 30px;background:#F6F8F4;font:400 11px/1.6 Inter,Arial,sans-serif;color:#7c8072">
+      <b style="color:${B.ink}">${B.legal}</b> · ${B.cif} · ${B.address}<br>${B.phone} · ${B.from}<br>
+      <span style="color:#9a9d90">Este mensaje y sus adjuntos son confidenciales. Si lo ha recibido por error, comuniquenoslo y eliminelo. Sus datos se tratan conforme al RGPD (UE) 2016/679; puede ejercer sus derechos escribiendo a ${B.from}.</span>
+    </td></tr>
+  </table></td></tr></table>`;
       }
       function emailDoc(c) {
         return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${c.subject}</title></head><body style="margin:0">${renderEmail(c)}</body></html>`;
@@ -2482,163 +2576,30 @@
         if (cur) out.push(cur);
         return out.length ? out : [""];
       }
+      /**
+       * The document PDF.
+       *
+       * The layout lives in erp-pdf.js — a paginating writer with real font metrics,
+       * built to the approved design. This is the seam that feeds it, kept under the
+       * old name and returning base64 exactly as before so that every caller, the
+       * .eml attachments included, needed no change.
+       *
+       * What the previous writer here did wrong is worth remembering: its page tree
+       * said `Count 1`, so any document longer than one page lost the remainder in
+       * silence. The sample data fitted, so nothing ever complained.
+       */
       function buildDocPdf(d) {
-        const G = "0.282 0.451 0.235",
-          INK = "0.078 0.086 0.059",
-          GREY = "0.5 0.52 0.46",
-          BODY = "0.29 0.31 0.26",
-          LN = "0.85 0.88 0.82";
-        let c = "";
-        const escp = (s) =>
-          tr(s).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-        const T = (x, y, sz, f, col, s) => {
-          c += `${col} rg BT /${f} ${sz} Tf ${x} ${y} Td (${escp(s)}) Tj ET\n`;
+        const brand = {
+          wordmark: "CaneiSubirats",
+          legal: BRAND.legal,
+          slogan: BRAND.slogan,
+          cif: BRAND.cif,
+          address: BRAND.address,
+          phone: BRAND.phone,
+          from: BRAND.from,
+          iban: BRAND.iban,
         };
-        const TR = (rx, y, sz, f, col, s) => {
-          const w = tr(s).length * sz * 0.5;
-          T(rx - w, y, sz, f, col, s);
-        };
-        const rect = (x, y, w, h, col) => {
-          c += `${col} rg ${x} ${y} ${w} ${h} re f\n`;
-        };
-        const hr = (x, y, w, col) => {
-          c += `${col} rg ${x} ${y} ${w} 0.8 re f\n`;
-        };
-        // header band
-        rect(0, 792, 595, 50, G);
-        T(42, 812, 19, "F2", "1 1 1", BRAND.name);
-        T(42, 799, 9.5, "F1", "0.93 0.86 0.62", BRAND.slogan);
-        TR(553, 812, 20, "F2", "1 1 1", d.docType);
-        // seller (left) + meta (right)
-        let y = 764;
-        T(42, y, 9.5, "F2", INK, BRAND.legal);
-        y -= 13;
-        [BRAND.cif, BRAND.address, BRAND.from + "   " + BRAND.phone].forEach((l) => {
-          T(42, y, 8.5, "F1", GREY, l);
-          y -= 12;
-        });
-        let my = 764;
-        [
-          ["No.", d.number],
-          [d.dateLabel + ":", d.dateIssued],
-          [d.dueLabel + ":", d.dueOrValid],
-        ].forEach(([k, v]) => {
-          TR(468, my, 9, "F1", GREY, k);
-          TR(553, my, 9, "F2", INK, v);
-          my -= 15;
-        });
-        // bill-to
-        y -= 10;
-        T(42, y, 8.5, "F2", G, "BILL TO / FACTURAR A");
-        y -= 15;
-        T(42, y, 11, "F2", INK, d.buyer.name);
-        y -= 14;
-        [d.buyer.nif, d.buyer.address].filter(Boolean).forEach((l) => {
-          T(42, y, 9, "F1", BODY, l);
-          y -= 12;
-        });
-        // lines table
-        y -= 16;
-        if (d.groups) {
-          T(42, y, 8, "F2", GREY, "CONCEPTO / DESCRIPTION");
-          TR(432, y, 8, "F2", GREY, "CANT.");
-          TR(492, y, 8, "F2", GREY, "PRECIO");
-          TR(553, y, 8, "F2", GREY, "IMPORTE");
-          y -= 7;
-          hr(42, y, 511, G);
-          y -= 15;
-          d.groups.forEach((g) => {
-            T(42, y, 9.5, "F2", G, g.chapter);
-            y -= 14;
-            g.rows.forEach((r) => {
-              const wr = wrapTxt(r.item, 50);
-              wr.forEach((w, i) => T(54, y - i * 11, 9.5, "F1", BODY, w));
-              TR(432, y, 9.5, "F1", BODY, r.qtyLabel);
-              TR(492, y, 9.5, "F1", BODY, r.priceLabel);
-              TR(553, y, 9.5, "F1", INK, r.amount);
-              y -= Math.max(1, wr.length) * 11 + 5;
-            });
-            hr(300, y + 5, 253, LN);
-            TR(432, y - 3, 8.5, "F1", GREY, "Subtotal");
-            TR(553, y - 3, 9.5, "F2", INK, g.subtotal);
-            y -= 18;
-          });
-        } else {
-          T(42, y, 8.5, "F2", GREY, "CONCEPTO / DESCRIPTION");
-          TR(553, y, 8.5, "F2", GREY, "IMPORTE / AMOUNT");
-          y -= 7;
-          hr(42, y, 511, G);
-          y -= 17;
-          d.lines.forEach((li) => {
-            const wr = wrapTxt(li.desc, 64);
-            wr.forEach((w, i) => T(42, y - i * 12, 10, "F1", BODY, w));
-            TR(553, y, 10, "F1", INK, li.amount);
-            y -= Math.max(1, wr.length) * 12 + 7;
-            hr(42, y + 5, 511, LN);
-          });
-        }
-        // totals
-        y -= 10;
-        d.totals.forEach((t, i) => {
-          const bold = i === d.totals.length - 1;
-          if (bold) {
-            hr(330, y + 14, 223, G);
-          }
-          TR(468, y, bold ? 11 : 9.5, bold ? "F2" : "F1", bold ? INK : BODY, t[0]);
-          TR(553, y, bold ? 11 : 9.5, bold ? "F2" : "F1", bold ? INK : BODY, t[1]);
-          y -= 17;
-        });
-        // payment
-        if (d.payment && d.payment.length) {
-          y -= 8;
-          T(42, y, 8.5, "F2", G, "PAGO / PAYMENT");
-          y -= 14;
-          d.payment.forEach((l) => {
-            wrapTxt(l, 92).forEach((w) => {
-              T(42, y, 9, "F1", BODY, w);
-              y -= 12;
-            });
-          });
-        }
-        // legal notes
-        if (d.notes && d.notes.length) {
-          y -= 6;
-          T(42, y, 8.5, "F2", GREY, "NOTAS / NOTES");
-          y -= 13;
-          d.notes.forEach((l) => {
-            wrapTxt("- " + l, 104).forEach((w) => {
-              T(42, y, 8, "F1", GREY, w);
-              y -= 10.5;
-            });
-          });
-        }
-        // footer
-        hr(42, 52, 511, G);
-        T(42, 40, 8.5, "F1", GREY, BRAND.legal + "   -   " + BRAND.address);
-        T(42, 29, 8.5, "F1", GREY, BRAND.from + "   -   " + BRAND.phone + "   -   " + BRAND.cif);
-        // assemble
-        const objs = [
-          "<</Type/Catalog/Pages 2 0 R>>",
-          "<</Type/Pages/Kids[3 0 R]/Count 1>>",
-          "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R/F2 5 0 R>>>>/Contents 6 0 R>>",
-          "<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>",
-          "<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/WinAnsiEncoding>>",
-          "<</Length " + c.length + ">>\nstream\n" + c + "\nendstream",
-        ];
-        let pdf = "%PDF-1.4\n";
-        const off = [];
-        objs.forEach((o2, i) => {
-          off.push(pdf.length);
-          pdf += i + 1 + " 0 obj\n" + o2 + "\nendobj\n";
-        });
-        const xref = pdf.length;
-        pdf += "xref\n0 " + (objs.length + 1) + "\n0000000000 65535 f \n";
-        off.forEach((o2) => {
-          pdf += String(o2).padStart(10, "0") + " 00000 n \n";
-        });
-        pdf +=
-          "trailer\n<</Size " + (objs.length + 1) + "/Root 1 0 R>>\nstartxref\n" + xref + "\n%%EOF";
-        return btoa(pdf);
+        return btoa(CaneiPdf.build(d, brand, tr));
       }
       function docGroups(includeOptional) {
         const by = {};
@@ -2734,13 +2695,45 @@
         ];
         if (irpf > 0) totals.push(["Retencion IRPF -" + irpf + "%", "-" + eurTxt(irpfAmt)]);
         totals.push(["Total a pagar", eurTxt(baseCents + vat - irpfAmt)]);
+        const dueTxt = fmtDate(addDaysISO(issueISO, S.termsDays));
         return {
           docType,
           number: S.invoiceNo,
           dateLabel: "Fecha",
           dateIssued: fmtDate(issueISO),
           dueLabel: "Vencimiento",
-          dueOrValid: fmtDate(addDaysISO(issueISO, S.termsDays)),
+          dueOrValid: dueTxt,
+          audience: "cobro",
+          title: "Factura de obra",
+          subtitle: S.address || "",
+          meta: [
+            ["Fecha", fmtDate(issueISO)],
+            ["Vencimiento", dueTxt],
+            ["Forma de pago", "Transferencia"],
+            ["Plazo", S.termsDays + " dias"],
+          ],
+          // Same base as the totals block below, deliberately. A part-payment invoice
+          // that summarises the whole project value at the top and charges a fraction
+          // at the bottom is a discrepancy the customer finds, not us.
+          facts: [
+            ["Total a pagar", eurTxt(baseCents + vat - irpfAmt)],
+            ["Base imponible", eurTxt(baseCents)],
+            ["IVA", vp + " %"],
+            ["Vencimiento", dueTxt],
+          ],
+          parties: [
+            {
+              label: "Expedidor",
+              name: BRAND.legal,
+              lines: [BRAND.cif, BRAND.address, BRAND.from],
+            },
+            {
+              label: "Destinatario",
+              name: S.customer,
+              lines: [S.buyerNif ? "NIF/CIF: " + S.buyerNif : "", S.address],
+            },
+          ],
+          tableLabel: "Detalle de la obra",
           buyer: {
             name: S.customer,
             nif: S.buyerNif ? "NIF/CIF: " + S.buyerNif : "",
@@ -2775,6 +2768,7 @@
           totals.push(["Aceptado (con opcional)", eurTxt(base + S.optional.amount)]);
         const sd3 = sdOf(3);
         const validity = num(sd3.validityDays) || 30;
+        const validTxt = addDays(validity);
         // The note the operator types at stage 4 is labelled "shown on the quote";
         // it used to reach details.txt and nothing else.
         const clientNote = (sd3.clientNote || "").trim();
@@ -2787,12 +2781,38 @@
         ];
         if (clientNote) notes.unshift(clientNote);
         return {
-          docType: "PRESUPUESTO · QUOTE",
+          docType: accepted ? "PRESUPUESTO ACEPTADO" : "PRESUPUESTO",
           number: S.quoteNo,
           dateLabel: "Fecha",
           dateIssued: today(),
           dueLabel: "Valido hasta",
-          dueOrValid: addDays(validity),
+          dueOrValid: validTxt,
+          audience: "cliente",
+          title: accepted ? "Presupuesto aceptado — version congelada" : "Presupuesto de obra",
+          subtitle: S.address || "",
+          meta: [
+            ["Fecha", today()],
+            ["Valido hasta", validTxt],
+            ["Version", "1.0"],
+            ["Contacto", BRAND.phone],
+          ],
+          facts: [
+            ["Base (IVA no incl.)", eurTxt(base)],
+            ["Capitulos", String(S.chapters.length)],
+            ["Opcional", hasOpt ? eurTxt(S.optional.amount) : "-"],
+            ["Validez", validity + " dias"],
+          ],
+          parties: [
+            { label: "Emisor", name: BRAND.legal, lines: [BRAND.cif, BRAND.address, BRAND.from] },
+            {
+              label: "Cliente",
+              name: S.customer,
+              lines: [S.buyerNif ? "NIF/CIF: " + S.buyerNif : "", S.address],
+            },
+          ],
+          tableLabel: "Detalle por capitulos",
+          tableNote: "precios unitarios sin IVA",
+          signatures: ["Por " + BRAND.legal, "Conforme — el cliente (firma y fecha)"],
           buyer: {
             name: S.customer,
             nif: S.buyerNif ? "NIF/CIF: " + S.buyerNif : "",
@@ -4765,7 +4785,18 @@
           const c = emailContent(f.email.kind);
           const box = el("div", "maily");
           box.append(el("div", "lbl", `Auto-drafted email · full CI · to ${esc(S.email)}`));
-          box.append(el("div", "mailframe", renderEmail(c)));
+          box.append(
+            el(
+              "div",
+              "mailframe",
+              renderEmail(c, {
+                chrome: {
+                  from: BRAND.name + " <" + BRAND.from + ">",
+                  to: S.customer + " <" + (S.email || "") + ">",
+                },
+              }),
+            ),
+          );
           const bar = el("div", "mailbar");
           // No transport is wired yet (see INTEGRATIONS_PENDING.md). The button used
           // to say "Sent", which is the one lie a system must never tell about a

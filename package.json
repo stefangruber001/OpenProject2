@@ -23,7 +23,11 @@
     "prepare": "husky",
     "test:sync": "node tests/site-sync/run.mjs",
     "test:i18n": "node tests/i18n/coverage.mjs",
+    "test:i18n-audit": "node tests/i18n/audit.mjs",
     "test:workbook": "node tests/workbook/coverage.mjs",
+    "test:ios-routes": "node tests/ios-routes/coverage.mjs",
+    "test:pdf": "node tests/doc-pdf/run.mjs",
+    "test:docs": "node tests/doc-print/run.mjs",
     "test:mailbox": "tsx tests/mailbox/run.mts"
   },
   "devDependencies": {

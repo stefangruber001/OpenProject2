@@ -9,6 +9,7 @@
 import { isSharedPassword, loginConfigured } from "@/lib/auth";
 import { defaultTenant, sharedAccessEnabled } from "@/lib/access";
 import { authenticateUser } from "@/lib/user-admin";
+import { safeReturnPath } from "@/lib/return-path";
 import { sessionCookie, signSession } from "@/lib/session-token";
 import { check, clientKey, recordFailure, recordSuccess } from "@/lib/rate-limit";
 import { randomUUID } from "node:crypto";
@@ -21,13 +22,14 @@ export const dynamic = "force-dynamic";
  * Only a path on this site. Without this check, `?next=https://evil.example`
  * turns our login page into a convincing way to hand somebody to a site of
  * one's choosing — they signed in at the real address, so the redirect is
- * trusted. Protocol-relative `//evil.example` is the case that gets missed: it
- * starts with a slash and is still a different host.
+ * trusted. The shared validator also closes the two slash-shaped cases this
+ * file's own copy missed nothing by but the language switch's did:
+ * protocol-relative `//evil.example`, and `/\evil.example` — a backslash after
+ * the first slash IS a second slash to every browser's URL parser, which
+ * matters precisely because these redirects are relative and the browser is
+ * the one resolving them.
  */
-function safeNext(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
-  return raw;
-}
+const safeNext = safeReturnPath;
 
 function isSecureRequest(req: Request): boolean {
   // Behind a TLS-terminating proxy the connection to the app is plain HTTP, so

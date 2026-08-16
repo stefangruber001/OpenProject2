@@ -96,6 +96,7 @@ async function main() {
     await testJourneyRealMode(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
+    await testLanguageAcrossTabs(browser, base);
   } finally {
     await browser.close();
     server.kill("SIGKILL");
@@ -230,6 +231,32 @@ async function autoAnswerModals(pg, answers = {}) {
 async function bootedShell(pg) {
   await pg.waitForSelector("#p1 .secitem", { timeout: 15000 });
   await pg.waitForTimeout(200);
+}
+
+/**
+ * Choose a language the way the application does — BOTH places, always.
+ *
+ * The device choice lives in two stores on purpose: a cookie, because the
+ * sign-in page is rendered on the server and carries no JavaScript so a cookie
+ * is the only thing it can read; and localStorage, so a choice made by an
+ * earlier version is not lost. `site/i18n.js` reads the cookie FIRST, and the
+ * app's own `set()` writes both together, so the two can never disagree in real
+ * use.
+ *
+ * A test that writes only localStorage can make them disagree, and then every
+ * assertion after it silently measures the previous language rather than the
+ * one it asked for — which is how a suite reports "CA does not translate" when
+ * the truth is that CA was never selected. Setting a language goes through here.
+ */
+async function chooseLang(pg, code) {
+  await pg.evaluate((c) => {
+    try {
+      localStorage.setItem("caneiLang", c);
+    } catch (e) {
+      /* private mode */
+    }
+    document.cookie = "canei_lang=" + c + ";path=/;max-age=31536000;samesite=lax";
+  }, code);
 }
 
 async function openJobWithChapters(pg, searchId) {
@@ -694,7 +721,7 @@ async function testMobile(browser, base) {
     // that has caught a gap in ten consecutive sessions. The language is a
     // stored preference read at boot, so this reloads rather than poking the
     // translator, which is how a real user changes it.
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "ca"));
+    await chooseLang(pg, "ca");
     await pg.reload({ waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(900);
@@ -704,7 +731,17 @@ async function testMobile(browser, base) {
     if (/Part d'hores/i.test(caMenu) && !/Parte de horas/.test(caMenu))
       ok("i18n: CA translates the site-action button");
     else bad("i18n: CA site actions", caMenu.replace(/\n/g, " ").slice(0, 140));
-    await pg.evaluate(() => localStorage.removeItem("caneiLang"));
+    // Back to the default. Both stores, for the same reason chooseLang writes
+    // both: clearing one leaves the other deciding the language for every
+    // check after this one.
+    await pg.evaluate(() => {
+      try {
+        localStorage.removeItem("caneiLang");
+      } catch (e) {
+        /* private mode */
+      }
+      document.cookie = "canei_lang=;path=/;max-age=0;samesite=lax";
+    });
     await pg.reload({ waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(900);
@@ -6371,11 +6408,98 @@ async function testErp(browser, base) {
   }
 }
 
-// ── Language toggle: ES default, EN translates Spanish-base pages, and the
-//    choice carries to English-base pages (html lang flips to the target).
+// ── Language: three of them, the choice remembered, and English-base pages
+//    adopting it too.
+//
+//    index.html is a redirect stub to erp.html — asserting on "the home page"
+//    means asserting on the workspace, which is why the strings checked here
+//    are the workspace's.
+/**
+ * Choosing a language in one tab changes the whole app.
+ *
+ * THE PHONE IS THE CASE THAT MATTERS. The native shell is six tabs and each one
+ * is its own web view with its own document. Choosing English in Tower reloaded
+ * Tower and nothing else, so Projects — opened earlier, still Spanish — looked
+ * like the app had forgotten the choice a second after it was made. The choice
+ * was never lost; the already-rendered documents were stale.
+ *
+ * Two pages in ONE context reproduces that exactly: same cookies, same
+ * localStorage, two documents rendered at different moments. The second page is
+ * opened BEFORE the switch on purpose — a page loaded afterwards would pick the
+ * language up anyway and prove nothing.
+ */
+async function testLanguageAcrossTabs(browser, base) {
+  const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+  try {
+    const tower = await ctx.newPage();
+    const projects = await ctx.newPage();
+    for (const [pg, hash] of [
+      [tower, "#tower"],
+      [projects, "#projects"],
+    ]) {
+      await pg.goto(`${base}/erp.html${hash}`, { waitUntil: "networkidle" });
+      await pg.waitForSelector("#p1 .secitem", { timeout: 15000 });
+    }
+    await projects.waitForTimeout(400);
+
+    /* The switch is reached through Configuración → Idioma (DMC-09), not
+       through the floating pill this test used to click. The pill was deleted
+       in PK5-A on the operator's instruction — "I want to put the language
+       button in configuration. As it is, bothers more then helps. This is
+       across the app." — and the merge of the two branches is where the two
+       facts meet. What this test is FOR is untouched: the question is whether
+       a choice made in one document reaches a document already rendered in
+       another tab, and that has nothing to do with which control made it. */
+    await tower.bringToFront();
+    await tower.evaluate(() => toggleSection("settings"));
+    await tower.waitForTimeout(500);
+    await tower.locator("#p2list button", { hasText: "Idioma" }).click();
+    await tower.waitForTimeout(500);
+    await Promise.all([
+      tower.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
+      tower.locator('[data-uilang="en"]').click(),
+    ]);
+    await tower.waitForSelector("#p1 .secitem", { timeout: 15000 });
+    const towerLang = await tower.evaluate(() => document.documentElement.lang);
+
+    await projects.bringToFront();
+    // Waited for, not slept for: the other document reloads when it comes back
+    // to the front, and how long that takes is a property of the machine.
+    const followed = await projects
+      .waitForFunction(() => document.documentElement.lang === "en", null, { timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    const projectsLang = await projects.evaluate(() => document.documentElement.lang);
+
+    if (towerLang === "en" && followed && projectsLang === "en")
+      ok("i18n: a language chosen in one tab reaches the tab already open");
+    else bad("i18n: language across tabs", `tower=${towerLang} other=${projectsLang}`);
+  } catch (e) {
+    bad("i18n: language across tabs", String(e).slice(0, 160));
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function testI18n(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+  // The choice now lives in a cookie so the server-rendered sign-in page can
+  // see it too. Cleared first: a cookie set by an earlier test in this context
+  // would otherwise decide the language before this one gets a say.
+  const clear = () =>
+    pg.evaluate(() => {
+      document.cookie = "canei_lang=;path=/;max-age=0";
+      try {
+        localStorage.removeItem("caneiLang");
+        localStorage.removeItem("caneiLangCompany");
+      } catch (e) {}
+    });
   try {
+    // The device choice now lives in a cookie, and a cookie outranks
+    // localStorage. Clear it first or a value left by an earlier test decides
+    // the language before the writes below get a say.
+    await pg.goto(`${base}/erp.html`, { waitUntil: "domcontentloaded" });
+    await clear();
     // The workspace is the entry screen now, so the toggle is exercised there.
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
     await bootedShell(pg);
@@ -6445,7 +6569,7 @@ async function testI18n(browser, base) {
     // Catalan (S3, decision 20). The navigation is the surface a Catalan user
     // hits first, so it is the one asserted: the six secciones must actually
     // read as Catalan, not fall back to Spanish.
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "ca"));
+    await chooseLang(pg, "ca");
     // reload(), not goto(): the page is already at erp.html#tower after the EN
     // toggle, and navigating to the identical URL+hash is a no-op that would
     // leave the previous language in place and quietly pass nothing.
@@ -6660,7 +6784,7 @@ async function testI18n(browser, base) {
     // And the same two screens under EN, so both new-string additions are
     // proven in both directions, not just the CA one that happened to be
     // built last.
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "en"));
+    await chooseLang(pg, "en");
     await pg.reload({ waitUntil: "networkidle" });
     await pg.waitForTimeout(500);
     await pg.evaluate(() => (location.hash = "leads"));
@@ -6843,7 +6967,7 @@ async function testI18n(browser, base) {
     } else bad("i18n: a draft quote to preview", "none in draft");
 
     // Back to Catalan for the COM-03 interface check.
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "ca"));
+    await chooseLang(pg, "ca");
     await pg.reload({ waitUntil: "networkidle" });
     await pg.waitForTimeout(700);
     await pg.evaluate(() => (location.hash = "quotes"));
@@ -6867,13 +6991,13 @@ async function testI18n(browser, base) {
     else bad("i18n: three forms", JSON.stringify(trio));
 
     // English-base page flips to Spanish when ES is chosen
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "es"));
+    await chooseLang(pg, "es");
     await pg.goto(`${base}/journey.html`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(500);
     const jLang = await pg.evaluate(() => document.documentElement.lang);
     if (jLang === "es") ok("i18n: English-base page adopts Spanish choice");
     else bad("i18n: journey adopts ES", `lang=${jLang}`);
-    await pg.evaluate(() => localStorage.setItem("caneiLang", "es"));
+    await clear();
   } catch (e) {
     bad("i18n toggle", String(e).slice(0, 160));
   } finally {

@@ -144,6 +144,32 @@ export async function saveMailSettings(
 }
 
 /**
+ * Company-wide interface settings — today, the working language.
+ *
+ * Its own key rather than a field on the mailbox document, because these have
+ * nothing to do with each other and sharing a row would mean a mailbox save and
+ * a language change could overwrite one another. Same versioned table, same
+ * tenant isolation, and the same deliberate swallowing of version conflicts:
+ * two people changing the company language at once is last-one-wins, exactly as
+ * it would be in any settings screen.
+ */
+export async function loadUiSettings(tenantId: string): Promise<Record<string, unknown> | null> {
+  const store = await stateStore(tenantId, "ui-settings");
+  const { state } = await store.load<Record<string, unknown>>();
+  return state ?? null;
+}
+
+export async function saveUiSettings(
+  tenantId: string,
+  settings: Record<string, unknown>,
+  user: string,
+): Promise<void> {
+  const store = await stateStore(tenantId, "ui-settings");
+  const { version } = await store.load();
+  await store.save(settings, version, user);
+}
+
+/**
  * The store for binary attachments (site photographs).
  *
  * Same tenant assertion and same DATABASE_URL requirement as the documents: a

@@ -744,7 +744,7 @@
           />
           <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230" />
         </svg>
-        <span class="nm">Canei Subirats<small>Financial Data</small></span>
+        <span class="nm">Canei Subirats<small>Financial data</small></span>
       </div>
       <span class="tb-spacer"></span>
       <div class="tb-actions">
@@ -1696,7 +1696,7 @@
     ${tile("Net profit", euro(k.net), `${pctf(k.nm)} net margin`)}
     ${tile("Cash position", euro(k.cash), `Net ${k.netDebt < 0 ? "cash" : "debt"} ${euro(Math.abs(k.netDebt))}`, 1)}
     ${tile("Current ratio", k.currentRatio.toFixed(2), `Quick ${k.quick.toFixed(2)} · WC ${euro(k.workingCap)}`)}
-    ${tile("DSO / DPO", `${Math.round(k.dso)} / ${Math.round(k.dpo)}d`, "Collection vs payment days")}
+    ${tile("Cobros / Pagos (DSO / DPO)", `${Math.round(k.dso)} / ${Math.round(k.dpo)}d`, "Días de cobro frente a días de pago")}
     ${tile("Backlog", euro(k.backlog), `${euro(k.pipeline)} open pipeline`)}
    </div>
    <div class="grid2">
