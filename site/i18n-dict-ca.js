@@ -2436,8 +2436,30 @@ window.CANEI_DICT.ca = {
     "Extracte a l'esquerra, documents candidats a la dreta i la proposta d'aparellament al mig, amb el perquè. La cua de moviments sense conciliar és l'indicador de salut del període.",
   "El idioma de la interfaz, para quien está usando el programa. No cambia el idioma de los presupuestos ni de los contratos: eso se elige por cliente, en cada documento.":
     "L'idioma de la interfície, per a qui està fent servir el programa. No canvia l'idioma dels pressupostos ni dels contractes: això es tria per client, a cada document.",
+  "Visita realizada": "Visita realitzada",
+  "¿De dónde sale este presupuesto?": "D'on surt aquest pressupost?",
+  "No hace falta esperar a la visita para preparar el presupuesto.":
+    "No cal esperar la visita per preparar el pressupost.",
+  "Parte diario por trabajador, con la semana al lado; y el resumen por proyecto y capítulo con la conciliación de horas.":
+    "Part diari per treballador, amb la setmana al costat; i el resum per projecte i capítol amb la conciliació d'hores.",
+  TQ1: "TQ1",
+  TQ2: "TQ2",
+  TQ3: "TQ3",
+  TQ4: "TQ4",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  [new RegExp("^(\\S+) — (.+) \\(cerrada\\)$"), "$1 — $2 (tancada)"],
+  [new RegExp("^(\\S+) — (.+) \\(activa\\)$"), "$1 — $2 (activa)"],
+  [new RegExp("^Siguiente paso · (\\S+)$"), "Següent pas · $1"],
+  [
+    new RegExp("^(\\d+) excepción sin justificar bloquean el envío del (\\S+)\\.$"),
+    "$1 excepció sense justificar bloqueja l'enviament del $2.",
+  ],
+  [
+    new RegExp("^(\\d+) excepciones sin justificar bloquean el envío del (\\S+)\\.$"),
+    "$1 excepcions sense justificar bloquegen l'enviament del $2.",
+  ],
+  [new RegExp("^outstanding ([\\d.,]+ €)$"), "pendent $1"],
   [new RegExp("^(\\d+) meses$"), "$1 mesos"],
   [new RegExp("^(\\d+) mes$"), "$1 mes"],
   [new RegExp("^(\\d+) semanas$"), "$1 setmanes"],

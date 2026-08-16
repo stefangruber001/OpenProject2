@@ -4422,8 +4422,33 @@ window.CANEI_DICT = {
       "El idioma de la interfaz, para quien está usando el programa. No cambia el idioma de los presupuestos ni de los contratos: eso se elige por cliente, en cada documento.",
       "The interface language, for whoever is using the program. It does not change the language of quotes or contracts: that is chosen per customer, on each document.",
     ],
+    ["Visita realizada", "Visit completed"],
+    ["¿De dónde sale este presupuesto?", "Where does this quote come from?"],
+    [
+      "No hace falta esperar a la visita para preparar el presupuesto.",
+      "There is no need to wait for the visit to prepare the quote.",
+    ],
+    [
+      "Parte diario por trabajador, con la semana al lado; y el resumen por proyecto y capítulo con la conciliación de horas.",
+      "Daily worksheet per worker, with the week alongside; and the summary by project and chapter with the hours reconciliation.",
+    ],
+    ["TQ1", "TQ1"],
+    ["TQ2", "TQ2"],
+    ["TQ3", "TQ3"],
+    ["TQ4", "TQ4"],
   ],
   rxEs2En: [
+    [new RegExp("^(\\S+) — (.+) \\(cerrada\\)$"), "$1 — $2 (closed)"],
+    [new RegExp("^(\\S+) — (.+) \\(activa\\)$"), "$1 — $2 (active)"],
+    [new RegExp("^Siguiente paso · (\\S+)$"), "Next step · $1"],
+    [
+      new RegExp("^(\\d+) excepción sin justificar bloquean el envío del (\\S+)\\.$"),
+      "$1 unjustified exception blocks the $2 filing.",
+    ],
+    [
+      new RegExp("^(\\d+) excepciones sin justificar bloquean el envío del (\\S+)\\.$"),
+      "$1 unjustified exceptions block the $2 filing.",
+    ],
     [new RegExp("^(\\d+) meses$"), "$1 months"],
     [new RegExp("^(\\d+) mes$"), "$1 month"],
     [new RegExp("^(\\d+) semanas$"), "$1 weeks"],
