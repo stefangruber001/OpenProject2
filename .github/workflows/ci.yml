@@ -172,15 +172,33 @@ jobs:
       # the app — every route, then every control on it — and reads them off. It
       # cannot miss a screen it has opened, and it opens the ones a click away.
       #
-      # Ceilings are the measurement of 2026-08-16 and only move down. What is
-      # left in EN is message-template content and budget chapter names, which
-      # are the company's records; the Catalan figure is the visible part of the
-      # historical backlog counted in tests/i18n/coverage.mjs.
+      # THE CEILINGS BELOW WENT UP, AND THAT IS THE HONEST DIRECTION.
+      #
+      # They were 6 / 79. Those came from a run that drove TWELVE pages: the
+      # route list was fourteen hashes copied out of erp.html, the v4 merge
+      # renamed five of them, and the guard said "more than half booted" so the
+      # run reported a total for screens it never opened. Reading the route list
+      # from the application instead — SECTIONS, where the workspace declares
+      # its own nav — turns up THIRTY, and the crawl now covers 33 pages
+      # including sixteen no translation gate had ever walked: the
+      # presupuestador, the Gantt, invoicing, purchasing, supplier invoices,
+      # banking, petty cash, the accountant screens, customers, suppliers,
+      # staff, the price list, messaging.
+      #
+      # So 239 / 341 is not a regression against 6 / 79; the two numbers measure
+      # different things, and only one of them measured the product. Raising a
+      # ratchet is normally the thing a ratchet exists to prevent, which is why
+      # it is spelled out here rather than adjusted quietly — see ASSUMPTIONS
+      # #168, and the same argument for the source-literal ceilings in #167.
+      #
+      # From here it only goes down. Every string behind these numbers is one an
+      # operator can see in the wrong language; `?i18n=audit` on the live site
+      # lists them per screen.
       - name: Translation coverage (translator miss ledger)
         if: always()
         run: |
-          node tests/i18n/miss-crawl.mjs --lang en --max 6
-          node tests/i18n/miss-crawl.mjs --lang ca --max 79
+          node tests/i18n/miss-crawl.mjs --lang en --max 239
+          node tests/i18n/miss-crawl.mjs --lang ca --max 341
 
   bundle:
     name: Capability bundle (build, browser-safety, drift)

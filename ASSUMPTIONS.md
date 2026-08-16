@@ -3961,3 +3961,36 @@ shape. It is a rewrite of a 15 000-line file that is live in front of a customer
 and it would have to land in one commit to avoid a half-migrated screen. The
 ledger makes the current architecture self-reporting, which removes the reason
 the rewrite felt urgent; it can now be done incrementally, or not at all.
+
+### 169 · The translator-ledger ceilings were raised from 6/79 to 239/341 (2026-08-16)
+
+The lower pair was never a measurement of the product. `miss-crawl.mjs` held
+fourteen route hashes copied out of `erp.html`; the v4 merge renamed five of
+them; the guard read "more than half the pages booted", which 12/17 satisfies;
+and the run printed a total as though it had walked all seventeen.
+
+Reading the route list from the application instead — `SECTIONS`, where the
+workspace declares its own navigation — yields **thirty** routes. The crawl now
+covers 33 pages, sixteen of which no translation gate had ever opened: the
+presupuestador, the Gantt, invoicing, purchasing, supplier invoices, banking,
+petty cash, the accountant screens, customers, suppliers, subcontractors,
+staff, items, the price list, lead sources, messaging.
+
+**So the two numbers are not comparable.** 239 EN / 341 CA is the first
+measurement taken across the whole workspace. Against it, 310 and 380 strings
+respectively were excused as the company's own records, drawn from 2 721 values
+across 47 collections — the filter is doing real work, not hiding the total.
+
+**The objection, stated.** Raising a ratchet is the thing ratchets exist to
+prevent. The alternative was to translate the bulk first and land a smaller
+number, and the operator was offered exactly that choice with both costs named;
+they chose to ship the verified work now. The ceiling may only fall from here,
+and a single new untranslated string still fails the build.
+
+**What is behind the number.** Roughly half sits in five screens — `#progress`
+(45), `#price-list` (18–30), `#staff` (17), `#lead-sources` (16), `#accountant`
+(16) — all built during the v4 programme in Spanish, none previously scanned.
+These are ordinary labels, not prose, and are the obvious next session's work.
+The Catalan excess over English is the historical backlog counted in
+`coverage.mjs` (1 048 entries), now visible because the screens carrying it are
+finally being walked.
