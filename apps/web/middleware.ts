@@ -18,6 +18,7 @@
  * identity, in every mode.
  */
 import { NextResponse, type NextRequest } from "next/server";
+import { isPublic } from "@/lib/public-paths";
 import {
   SESSION_COOKIE,
   readSession,
@@ -36,29 +37,10 @@ export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
 
-/** Reachable without signing in. Keep this list as short as it is now. */
-function isPublic(pathname: string): boolean {
-  return (
-    pathname === "/login" ||
-    pathname === "/api/auth/login" ||
-    pathname === "/api/auth/logout" ||
-    // Accepting an invitation. The whole point is that the person following the
-    // link has no account yet — putting this behind the login would mean you
-    // must sign in to be able to sign in. The link itself is the credential:
-    // 32 random bytes, single use, seven days.
-    pathname === "/activate" ||
-    pathname === "/api/auth/activate" ||
-    // Health is how the machine checks itself, from inside, with no browser and
-    // no cookie. It reports whether the process is up and the database is
-    // reachable — it exposes no company data.
-    pathname === "/api/health" ||
-    // The link preview. WhatsApp and Slack fetch the page and its image with no
-    // session at all, so an image behind the login produces a card with no
-    // thumbnail — the exact symptom this is here to avoid. Nothing under
-    // /brand/ is company data; it is a logo and a picture of a logo.
-    pathname.startsWith("/brand/")
-  );
-}
+/* The exception surface lives in lib/public-paths.ts so it can be unit-tested:
+   this file imports next/server, which kept the list out of reach of a test —
+   and an untested allowlist is how `/api/lang` came to answer the sign-in
+   page's own language buttons with a 401. */
 
 export async function middleware(req: NextRequest) {
   const secret = process.env.SESSION_SECRET?.trim();

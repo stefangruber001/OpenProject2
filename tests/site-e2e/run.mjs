@@ -87,6 +87,7 @@ async function main() {
     await testJourneyRealMode(browser, base);
     await testErp(browser, base);
     await testI18n(browser, base);
+    await testLanguageAcrossTabs(browser, base);
   } finally {
     await browser.close();
     server.kill("SIGKILL");
@@ -4486,6 +4487,61 @@ async function testErp(browser, base) {
 //    index.html is a redirect stub to erp.html — asserting on "the home page"
 //    means asserting on the workspace, which is why the strings checked here
 //    are the workspace's.
+/**
+ * Choosing a language in one tab changes the whole app.
+ *
+ * THE PHONE IS THE CASE THAT MATTERS. The native shell is six tabs and each one
+ * is its own web view with its own document. Choosing English in Tower reloaded
+ * Tower and nothing else, so Projects — opened earlier, still Spanish — looked
+ * like the app had forgotten the choice a second after it was made. The choice
+ * was never lost; the already-rendered documents were stale.
+ *
+ * Two pages in ONE context reproduces that exactly: same cookies, same
+ * localStorage, two documents rendered at different moments. The second page is
+ * opened BEFORE the switch on purpose — a page loaded afterwards would pick the
+ * language up anyway and prove nothing.
+ */
+async function testLanguageAcrossTabs(browser, base) {
+  const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+  try {
+    const tower = await ctx.newPage();
+    const projects = await ctx.newPage();
+    for (const [pg, hash] of [
+      [tower, "#tower"],
+      [projects, "#projects"],
+    ]) {
+      await pg.goto(`${base}/erp.html${hash}`, { waitUntil: "networkidle" });
+      await pg.waitForSelector("#p1 .secitem", { timeout: 15000 });
+    }
+    await projects.waitForTimeout(400);
+
+    await tower.bringToFront();
+    await Promise.all([
+      tower.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
+      tower.locator("#canei-lang-pill button", { hasText: "EN" }).click(),
+    ]);
+    await tower.waitForSelector("#p1 .secitem", { timeout: 15000 });
+    const towerLang = await tower.evaluate(() => document.documentElement.lang);
+
+    await projects.bringToFront();
+    // Waited for, not slept for: the other document reloads when it comes back
+    // to the front, and how long that takes is a property of the machine.
+    const followed = await projects
+      .waitForFunction(() => document.documentElement.lang === "en", null, { timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    const projectsLang = await projects.evaluate(() => document.documentElement.lang);
+
+    if (towerLang === "en" && followed && projectsLang === "en")
+      ok("i18n: a language chosen in one tab reaches the tab already open");
+    else bad("i18n: language across tabs", `tower=${towerLang} other=${projectsLang}`);
+  } catch (e) {
+    bad("i18n: language across tabs", String(e).slice(0, 160));
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function testI18n(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   // The choice now lives in a cookie so the server-rendered sign-in page can

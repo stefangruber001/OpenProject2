@@ -3026,3 +3026,33 @@ different decisions, so these ten arrived colliding. They are renumbered from
   Chromium cannot be downloaded here, so its output is the only evidence that
   exists for this question, and three rounds were spent without it.
   **Reversible: yes** — the ceiling is one number in ci.yml.
+
+- **#99 — the language buttons that answered with a 401, and the tab that kept
+  its old language (2026-08-16).** Both reported from the phone against the live
+  deploy, both real.
+  **`/api/lang` was not in the middleware's public list.** That route IS the
+  sign-in page's language switcher, on the one screen where the visitor is by
+  definition not signed in — so Català and English answered with a raw
+  `{"error":"UNAUTHENTICATED"}` body where the sign-in screen should have been.
+  Spanish appeared to work only because it is the default and needs no click,
+  which is why it survived every test: nobody clicked.
+  **The list had no test, and could not have had one**, because it lived inside
+  `middleware.ts`, which imports `next/server`. It now lives in
+  `lib/public-paths.ts` and the test PINS IT EXACTLY rather than checking
+  membership — a membership check passes just as happily on a list with one
+  extra entry, and every entry there hands something to a stranger. Adding one
+  now fails the build until it is written down in the test too.
+  **The second bug is the native shell's six tabs.** Each is its own web view
+  with its own document, so choosing English in Tower reloaded Tower and nothing
+  else; Projects, opened earlier, stayed Spanish and looked like the app had
+  forgotten the choice. The choice was never lost — the cookie and localStorage
+  are shared — only the already-rendered documents were stale. Each document now
+  re-checks the stored choice when it comes back to the front and reloads if it
+  disagrees. `applied` is the value THAT document rendered with, so after the
+  reload the two agree and it cannot loop.
+  **Reproduced before fixing, and negative-controlled after:** two pages in one
+  browser context, the second opened BEFORE the switch — a page opened
+  afterwards would pick the language up anyway and prove nothing. Without the
+  fix the second document reports `lang=es` and renders "UN ÚNICO ENTORNO"; with
+  it, `lang=en`.
+  **Reversible: yes.**

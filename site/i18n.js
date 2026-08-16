@@ -353,6 +353,41 @@
       });
   }
 
+  /**
+   * Adopt a language chosen somewhere ELSE in the app.
+   *
+   * THE PHONE IS WHY THIS EXISTS. The native shell is six tabs, and each tab is
+   * its own web view with its own document. Choosing English in Tower reloads
+   * Tower and nothing else, so Projects — already loaded, still Spanish — looked
+   * like the app had forgotten the choice a second after making it. The choice
+   * was never lost: the cookie and localStorage are shared across the tabs, and
+   * only the already-rendered documents were stale.
+   *
+   * So each document checks, whenever it comes back to the front, whether the
+   * stored choice still matches what it rendered with, and reloads if it does
+   * not. `applied` is the value THIS document used, so after the reload the two
+   * agree and it cannot loop.
+   *
+   * `storage` covers real browser tabs, which do get that event. Separate web
+   * views in the native shell do not, which is why visibility and pageshow are
+   * the ones that carry the fix on the phone.
+   */
+  function currentChoice() {
+    return readCookie(COOKIE) || valid(readLocal(LS_KEY)) || valid(readLocal(CACHE_KEY)) || "es";
+  }
+
+  function followLanguageChosenElsewhere() {
+    var applied = target;
+    var check = function () {
+      if (document.visibilityState === "hidden") return;
+      if (currentChoice() !== applied) location.reload();
+    };
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("pageshow", check);
+    window.addEventListener("focus", check);
+    window.addEventListener("storage", check);
+  }
+
   /* ---------- toggle pill ---------- */
   function injectToggle() {
     if (document.getElementById("canei-lang-pill")) return;
@@ -400,6 +435,10 @@
     injectToggle();
     fullPass();
     syncCompany();
+    // Registered even when this page needs no translating: a Spanish page has
+    // to notice a switch to Catalan just as much as the other way round, and
+    // `active` is false in exactly that case.
+    followLanguageChosenElsewhere();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
