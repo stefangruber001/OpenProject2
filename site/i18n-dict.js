@@ -772,6 +772,19 @@ window.CANEI_DICT = {
     ["Cargar el conjunto de datos inicial", "Load the starter data set"],
     ["↻ Datos iniciales", "↻ Starter data"],
     ["Eliminar", "Delete"],
+    /* Removing things from a presupuesto — the chapter delete, the line
+       delete, their tooltips, the confirmation and the toasts. Every one was
+       written straight into the markup and shipped Spanish to an English
+       reader, under a source-audit ceiling with room to spare. */
+    ["✕ capítulo", "✕ chapter"],
+    ["Eliminar partida", "Delete line item"],
+    ["Eliminar esta partida", "Delete this line item"],
+    ["Eliminar el capítulo y todas sus partidas", "Delete the chapter and all its line items"],
+    ["Capítulo eliminado", "Chapter deleted"],
+    [
+      "El capítulo está vacío. No se puede deshacer.",
+      "The chapter is empty. This cannot be undone.",
+    ],
     ["Cancelar", "Cancel"],
     ["Guardar registro", "Save record"],
     ["Organización", "Organisation"],
@@ -4620,6 +4633,18 @@ window.CANEI_DICT = {
     [new RegExp("^Todos los capítulos \\((\\d+)\\)$"), "All chapters ($1)"],
     [new RegExp("^(\\d+) partida del catálogo$"), "$1 line item from the catalogue"],
     [new RegExp("^(\\d+) partidas del catálogo$"), "$1 line items from the catalogue"],
+    [new RegExp("^¿Eliminar el capítulo «(.+)»\\?$"), "Delete the chapter “$1”?"],
+    [
+      new RegExp("^Se eliminan también sus (\\d+) partidas\\. No se puede deshacer\\.$"),
+      "Its $1 line items go with it. This cannot be undone.",
+    ],
+    [
+      new RegExp("^Se eliminan también su (\\d+) partida\\. No se puede deshacer\\.$"),
+      "Its $1 line item goes with it. This cannot be undone.",
+    ],
+    [new RegExp("^Capítulo eliminado · (\\d+) partidas$"), "Chapter deleted · $1 line items"],
+    [new RegExp("^Capítulo eliminado · (\\d+) partida$"), "Chapter deleted · $1 line item"],
+    [new RegExp("^(\\d+) partida del catálogo$"), "$1 line item from the catalogue"],
     [
       new RegExp(
         "^Ninguna partida coincide con «(.+)» en este capítulo\\. Prueba en «Todos los capítulos», o créala con el botón de abajo y queda en el catálogo para la próxima vez\\.$",

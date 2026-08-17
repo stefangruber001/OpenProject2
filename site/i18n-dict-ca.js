@@ -1458,6 +1458,12 @@ window.CANEI_DICT.ca = {
   Prospecto: "Prospecte",
   Editar: "Editar",
   Eliminar: "Eliminar",
+  "✕ capítulo": "✕ capítol",
+  "Eliminar partida": "Eliminar partida",
+  "Eliminar esta partida": "Eliminar aquesta partida",
+  "Eliminar el capítulo y todas sus partidas": "Eliminar el capítol i totes les seves partides",
+  "Capítulo eliminado": "Capítol eliminat",
+  "El capítulo está vacío. No se puede deshacer.": "El capítol és buit. No es pot desfer.",
   Cancelar: "Cancel·lar",
   "Guardar registro": "Desar registre",
   "Buscar registros…": "Cercar registres…",
@@ -3830,6 +3836,18 @@ window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Todos los capítulos \\((\\d+)\\)$"), "Tots els capítols ($1)"],
   [new RegExp("^(\\d+) partida del catálogo$"), "$1 partida del catàleg"],
   [new RegExp("^(\\d+) partidas del catálogo$"), "$1 partides del catàleg"],
+  [new RegExp("^¿Eliminar el capítulo «(.+)»\\?$"), "Voleu eliminar el capítol «$1»?"],
+  [
+    new RegExp("^Se eliminan también sus (\\d+) partidas\\. No se puede deshacer\\.$"),
+    "Les seves $1 partides se'n van amb ell. No es pot desfer.",
+  ],
+  [
+    new RegExp("^Se eliminan también su (\\d+) partida\\. No se puede deshacer\\.$"),
+    "La seva $1 partida se'n va amb ell. No es pot desfer.",
+  ],
+  [new RegExp("^Capítulo eliminado · (\\d+) partidas$"), "Capítol eliminat · $1 partides"],
+  [new RegExp("^Capítulo eliminado · (\\d+) partida$"), "Capítol eliminat · $1 partida"],
+  [new RegExp("^(\\d+) partida del catálogo$"), "$1 partida del catàleg"],
   [
     new RegExp(
       "^Ninguna partida coincide con «(.+)» en este capítulo\\. Prueba en «Todos los capítulos», o créala con el botón de abajo y queda en el catálogo para la próxima vez\\.$",

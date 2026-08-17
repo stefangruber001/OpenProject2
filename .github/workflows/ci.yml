@@ -175,8 +175,17 @@ jobs:
       - name: Translation coverage (source literals)
         if: always()
         run: |
-          node tests/i18n/source-audit.mjs --lang en --max 256
-          node tests/i18n/source-audit.mjs --lang ca --max 335
+          node tests/i18n/source-audit.mjs --lang en --max 234
+          node tests/i18n/source-audit.mjs --lang ca --max 234
+
+      # THE CEILINGS ARE THE MEASUREMENT, NOT A BUDGET. They were 256 and 335
+      # against an actual 239 and 234 — a hundred strings of headroom in
+      # Catalan — and headroom is exactly what a ratchet must not have. Six
+      # controls added to the quote builder (the chapter delete, the line
+      # delete, their tooltips and toasts) shipped Spanish to an English reader
+      # and nothing went red, because they fitted in the slack. Both numbers
+      # now sit ON the count, so the next untranslated string fails on the
+      # commit that writes it instead of on a photograph weeks later.
 
       # THE ONE THAT DOES NOT GUESS. The four gates above each answer "what is
       # untranslated" by enumerating places a string might live — an entry, a
