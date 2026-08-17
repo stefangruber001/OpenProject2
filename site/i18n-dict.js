@@ -3092,7 +3092,6 @@ window.CANEI_DICT = {
     ["partida", "line item"],
     // The line's own catalogue dropdown (phone).
     ["— elegir del catálogo —", "— choose from the catalogue —"],
-    ["Buscar en todo el catálogo…", "Search the whole catalogue…"],
     ["Elegir una subpartida del catálogo", "Choose a sub-item from the catalogue"],
     ["Completar los datos ahora", "Complete the details now"],
     ["Consulta a la gestoría", "Query to the accountant"],

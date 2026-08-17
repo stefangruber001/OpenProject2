@@ -1110,7 +1110,6 @@ window.CANEI_DICT.ca = {
   "contador y suministro": "comptador i subministrament",
   partida: "partida",
   "— elegir del catálogo —": "— triar del catàleg —",
-  "Buscar en todo el catálogo…": "Cerca a tot el catàleg…",
   "Elegir una subpartida del catálogo": "Triar una subpartida del catàleg",
   "Completar los datos ahora": "Completa les dades ara",
   "Consulta a la gestoría": "Consulta a la gestoria",

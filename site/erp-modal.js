@@ -210,6 +210,23 @@
     max-height: 92vh;
     border-radius: 16px 16px 0 0;
   }
+  /* THE FOOTER WRAPS INSTEAD OF PUSHING ITS OWN LABEL OFF THE EDGE.
+     Three buttons and a count do not fit across 390px, and justify-content
+     flex-end with a flex-1 spacer between them shoves the leftmost item
+     past the left edge rather than shrinking anything — so the catalogue's
+     "N seleccionadas" read as "…ccionadas". The count is the one thing on that
+     row telling the operator what pressing "Añadir" will do. */
+  .modal .ma {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .modal .ma .sp {
+    flex-basis: 100%;
+    order: -1;
+  }
+  .modal .ma .tag {
+    order: -2;
+  }
 }
 /* THE LANGUAGE PILL STANDS DOWN WHILE A DIALOG IS OPEN.
    It is fixed to the bottom-left corner, and on a phone the modal is a bottom

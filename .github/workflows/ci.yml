@@ -345,6 +345,16 @@ jobs:
       - name: Price-book pictograms (shapes, mapping, both renderers)
         run: node tests/pictograms/run.mjs
 
+      # Milliseconds, and it earns them. A stray backtick inside a template
+      # literal in erp-modal.js — in a COMMENT, quoting a CSS property — made
+      # the whole file a syntax error, taking every dialog on four pages with
+      # it. The browser reports the parse failure to the console and carries on
+      # with the module absent, so it presented as an unstyled catalogue and a
+      # dead button in two other files. Caught four minutes into a browser run;
+      # this asks the same question before anything is built.
+      - name: Site scripts parse (a syntax error takes a whole module with it)
+        run: node tests/site-syntax/run.mjs
+
   persistence:
     name: Durable adapters (Postgres + RLS contract tests)
     runs-on: ubuntu-latest

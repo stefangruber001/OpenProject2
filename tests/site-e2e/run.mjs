@@ -854,60 +854,67 @@ async function testMobile(browser, base) {
           .join(" · "),
       );
 
-    /* THE CATALOGUE IS A LIST YOU CAN SEE AND PICK FROM.
-       "I miss the drop down menu that you can select for example DEM-101 for
-       this chapter with all prices and info pre-filled already." The 🔍 did
-       exactly that and told nobody: at phone size it is a 24px emoji with no
-       label beside an empty box.
+    /* THE LINE'S CATALOGUE CHOOSER OPENS THE CATALOGUE.
+       It used to be a native `<select>`, and on iOS that is a grey wheel of
+       truncated names with no price, no unit, no search and no way to take more
+       than one — "that grey box with some favorites", in the operator's words.
+       It now opens the same ticked sheet "+ partida del catálogo" opens.
 
-       Asserted on the EFFECT, not on the control's presence — a dropdown that
-       renders and copies nothing across is the same defect wearing a better
-       hat. Picking must move the code, the description, the unit and the money
-       onto the line in one step. */
+       Asserted on the EFFECT and not on the control: a chooser that opens
+       something and copies nothing across is the same defect wearing a better
+       hat. Picking must move the code, description, unit and money onto the
+       line in one step. */
     await pg.evaluate(() => document.querySelector('#pbMTabs [data-mtab="lines"]').click());
     await pg.waitForTimeout(400);
     const pick = await pg.evaluate(async () => {
-      const sel = document.querySelector("#bRows select.bcat");
-      if (!sel) return { err: "no per-line catalogue dropdown" };
-      if (getComputedStyle(sel).display === "none") return { err: "dropdown is not visible" };
-      // A real catalogue option: not the placeholder, not "search everything".
-      const opt = [...sel.options].find((o) => o.value && o.value !== "__all__");
-      if (!opt) return { err: "dropdown offers no catalogue item" };
-      const item = erp.state.catalogue.find((x) => x.id === opt.value);
-      const lineId = sel.dataset.cat;
-      sel.value = opt.value;
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
-      await new Promise((r) => setTimeout(r, 600));
+      const btn = document.querySelector("#bRows button.bcat");
+      if (!btn) return { err: "no per-line catalogue chooser" };
+      if (getComputedStyle(btn).display === "none") return { err: "chooser is not visible" };
+      const r = btn.getBoundingClientRect();
+      const lineId = btn.dataset.cat;
+      btn.click();
+      await new Promise((x) => setTimeout(x, 800));
+      const sheet = document.querySelector("#catpick");
+      if (!sheet) return { err: "pressing the chooser did not open the catalogue" };
+      const row = sheet.querySelector(".cpi.pick");
+      if (!row) return { err: "the catalogue opened with nothing in it" };
+      const code = row.querySelector(".cpc").textContent.trim();
+      const item = erp.state.catalogue.find((x) => x.code === code);
+      row.click();
+      sheet.querySelector("#cp_add").click();
+      await new Promise((x) => setTimeout(x, 800));
       let line = null;
       for (const b of erp.state.budgets)
         for (const v of b.versions)
           for (const c of v.chapters) for (const l of c.lines) if (l.id === lineId) line = l;
       return {
+        tall: Math.round(r.height),
         want: { code: item.code, desc: item.desc, unit: item.unit, cost: item.defaultCostCents },
         got: line && { code: line.code, desc: line.desc, unit: line.unit, cost: line.costCents },
-        options: sel.options.length,
+        label: (btn.textContent || "").slice(0, 20),
       };
     });
-    if (pick.err) bad("mobile: the line's catalogue dropdown", pick.err);
+    if (pick.err) bad("mobile: the line's catalogue chooser", pick.err);
     else if (
       pick.got &&
       pick.got.code === pick.want.code &&
       pick.got.desc === pick.want.desc &&
       pick.got.unit === pick.want.unit &&
-      pick.got.cost === pick.want.cost
+      pick.got.cost === pick.want.cost &&
+      pick.tall >= 44
     )
       ok(
-        `mobile: picking from the line's dropdown fills code, description, unit and cost (${pick.options} options)`,
+        `mobile: the line's chooser opens the catalogue and the pick fills code, description, unit and cost (${pick.tall}px target)`,
       );
-    else bad("mobile: dropdown prefills the line", JSON.stringify(pick).slice(0, 200));
+    else bad("mobile: chooser fills the line", JSON.stringify(pick).slice(0, 220));
 
     /* "…the subitems DEM-101 FOR THIS CHAPTER."
-       The check above ran against a chapter named "Pavimentos", which matches
-       no chapter in the price book, so it exercised the fallback — the whole
-       catalogue, 210 options — and passed while saying nothing about the
-       narrowing the request was actually about. A chapter that DOES map is
-       built here rather than hoped for, the way the milestone test had to be
-       taught to ask the engine instead of picking a project by hope. */
+       A chapter the price book KNOWS is built here rather than hoped for — the
+       default fixture's "Pavimentos" exercises the fallback and would say
+       nothing about narrowing. Asserted on what the opened sheet offers, not on
+       a hidden control's contents: a `display:none` element still answers
+       `.options`, which is how an earlier version of this check reported
+       correct narrowing on a control nobody could reach. */
     const narrow = await pg.evaluate(async () => {
       const chapName = (erp.listAll("itemChapters")[0] || {}).es;
       const want = (erp.listAll("itemChapters")[0] || {}).code;
@@ -923,31 +930,34 @@ async function testMobile(browser, base) {
       const row = [...document.querySelectorAll("#bRows tr.pbrow")].find(
         (tr) => tr.dataset.chap === chap.id,
       );
-      const sel = row && row.querySelector("select.bcat");
-      if (!sel) return { err: "no dropdown on the new chapter's line" };
-      /* A hidden <select> still answers `.options`, so without this the check
-         reported correct narrowing on a control the operator cannot reach —
-         it passed against the build with the dropdown display:none'd. What a
-         list contains is only worth asserting once somebody can see it. */
-      if (getComputedStyle(sel).display === "none") return { err: "dropdown is not visible" };
-      const items = [...sel.options]
-        .filter((o) => o.value && o.value !== "__all__")
-        .map((o) => erp.state.catalogue.find((x) => x.id === o.value))
+      const btn = row && row.querySelector("button.bcat");
+      if (!btn) return { err: "no catalogue chooser on the new chapter's line" };
+      if (getComputedStyle(btn).display === "none") return { err: "chooser is not visible" };
+      btn.click();
+      await new Promise((r) => setTimeout(r, 800));
+      const sheet = document.querySelector("#catpick");
+      if (!sheet) return { err: "the chooser did not open the catalogue" };
+      const items = [...sheet.querySelectorAll(".cpi.pick")]
+        .map((x) => x.querySelector(".cpc")?.textContent.trim())
+        .map((c) => erp.state.catalogue.find((i) => i.code === c))
         .filter(Boolean);
-      return {
+      const out = {
         chapName,
         want,
         count: items.length,
         strays: items.filter((i) => i.chapter !== want).length,
         inBook: erp.state.catalogue.filter((i) => i.active !== false && i.chapter === want).length,
       };
+      document.querySelector("#cp_cancel")?.click();
+      await new Promise((r) => setTimeout(r, 300));
+      return out;
     });
-    if (narrow.err) bad("mobile: the dropdown narrows to the chapter", narrow.err);
+    if (narrow.err) bad("mobile: the chooser narrows to the chapter", narrow.err);
     else if (narrow.count > 0 && narrow.strays === 0 && narrow.count === narrow.inBook)
       ok(
-        `mobile: on a chapter the price book knows, the dropdown offers only its ${narrow.count} subpartidas (${narrow.chapName})`,
+        `mobile: on a chapter the price book knows, the chooser opens on its ${narrow.count} subpartidas and nothing else (${narrow.chapName})`,
       );
-    else bad("mobile: dropdown narrows to the chapter", JSON.stringify(narrow));
+    else bad("mobile: chooser narrows to the chapter", JSON.stringify(narrow));
 
     /* ===== THE CATALOGUE PICKER OPENS WHERE THE OPERATOR IS LOOKING =====
        This is the regression that shipped and was reported. `catalogueSearchModal`
@@ -2007,34 +2017,40 @@ async function testBudgetBuilder(browser, base) {
       const chap = v.chapters[0];
       go("quotes", b.id);
       await new Promise((r) => setTimeout(r, 900));
-      const sel = document.querySelector(`#bRows tr[data-chap="${chap.id}"] select.bcat`);
-      let lineId = null;
-      let item = null;
-      let want = "";
-      if (sel) {
-        /* TAKEN FROM WHAT THIS CHAPTER ACTUALLY OFFERS, not from a partida
-           chosen by name. The first version picked an "alicatado" out of the
-           whole price book and then demanded the chapter offer it — which was
-           true only while the chapter matcher was broken and the picker showed
-           all 208. Fixing the matcher broke the test, on a change that made the
-           feature more right. Ask the control what it has.
+      const btn = document.querySelector(`#bRows tr[data-chap="${chap.id}"] button.bcat`);
+      if (!btn) return { err: "no catalogue chooser on the line" };
+      const lineId = btn.dataset.cat;
+      btn.click();
+      await new Promise((r) => setTimeout(r, 800));
+      const sheet = document.querySelector("#catpick");
+      if (!sheet) return { err: "the chooser did not open the catalogue" };
+      /* TAKEN FROM WHAT THIS CHAPTER ACTUALLY OFFERS, not from a partida
+         chosen by name. The first version picked an "alicatado" out of the
+         whole price book and demanded the chapter offer it — true only while
+         the chapter matcher was broken and the picker showed all 208. Fixing
+         the matcher broke the test, on a change that made the feature more
+         right. Ask the control what it has.
 
-           Whichever partida that is, its drawing must be one the words earn:
-           `generic` would pass a "same drawing throughout" check while proving
-           nothing, since every unrecognised line draws it. */
-        const opt = [...sel.options].find((o) => {
-          if (!o.value || o.value === "__all__") return false;
-          const it = erp.state.catalogue.find((x) => x.id === o.value);
-          return it && ErpPictograms.pick(it) !== "generic";
-        });
-        if (!opt) return { err: "this chapter offers no partida with a drawing of its own" };
-        item = erp.state.catalogue.find((x) => x.id === opt.value);
-        want = ErpPictograms.label(ErpPictograms.pick(item));
-        lineId = sel.dataset.cat;
-        sel.value = item.id;
-        sel.dispatchEvent(new Event("change", { bubbles: true }));
-        await new Promise((r) => setTimeout(r, 700));
-      } else return { err: "no catalogue dropdown on the line" };
+         Whichever partida that is, its drawing must be one the words earn:
+         `generic` would satisfy a "same drawing throughout" check while
+         proving nothing, since every unrecognised line draws it. */
+      const row0 = [...sheet.querySelectorAll(".cpi.pick")].find((x) => {
+        const it = erp.state.catalogue.find(
+          (i) => i.code === x.querySelector(".cpc")?.textContent.trim(),
+        );
+        return it && ErpPictograms.pick(it) !== "generic";
+      });
+      if (!row0) {
+        document.querySelector("#cp_cancel")?.click();
+        return { err: "this chapter offers no partida with a drawing of its own" };
+      }
+      const item = erp.state.catalogue.find(
+        (i) => i.code === row0.querySelector(".cpc").textContent.trim(),
+      );
+      const want = ErpPictograms.label(ErpPictograms.pick(item));
+      row0.click();
+      sheet.querySelector("#cp_add").click();
+      await new Promise((r) => setTimeout(r, 800));
       const row = document.querySelector(`#bRows tr[data-row="${lineId}"] svg.pict`);
       const inBuilder = row && row.getAttribute("aria-label");
       // …and onto the document the customer receives.
@@ -6044,17 +6060,48 @@ async function testPresupuestadorRework(browser, base) {
     else bad("presupuestador: catalogue picker opens populated", `items=${items}`);
     await pg.fill("#cp_q", "alicatado");
     await pg.waitForTimeout(300);
-    await pg.evaluate(() => document.querySelector(".cpi")?.click());
-    await pg.waitForTimeout(600);
-    const picked = await pg.evaluate(() => {
+    /* TICK, THEN ADD. The 🔍 is multi-select now — the operator asked to go
+       through the catalogue once, mark everything needed and take the lot —
+       so clicking a row marks it and the sheet stays open. Clicking one and
+       expecting the row to change was the old single-pick behaviour.
+
+       And the assertion compares against the PARTIDA THAT WAS PICKED. It used
+       to check only that the row's four fields were non-empty, which they
+       already were from the margin edits above — so it passed without the pick
+       having done anything at all, and would have gone on passing if the
+       picker had stopped working entirely. */
+    const picked = await pg.evaluate(async () => {
+      const row = document.querySelector(".cpi.pick");
+      if (!row) return { err: "the catalogue offered nothing for «alicatado»" };
+      const code = row.querySelector(".cpc").textContent.trim();
+      const item = erp.state.catalogue.find((i) => i.code === code);
+      row.click();
+      document.querySelector("#cp_add").click();
+      await new Promise((r) => setTimeout(r, 700));
       const g = (f) => document.querySelector(`tr.pbrow [data-f="${f}"]`).value;
-      return { code: g("code"), desc: g("desc"), unit: g("unit"), cost: +g("cost") };
+      return {
+        want: {
+          code: item.code,
+          desc: item.desc,
+          unit: item.unit,
+          cost: (item.defaultCostCents / 100).toFixed(2),
+        },
+        got: { code: g("code"), desc: g("desc"), unit: g("unit"), cost: g("cost") },
+        closed: !document.querySelector("#catpick"),
+      };
     });
-    if (picked.code && picked.desc && picked.unit && picked.cost > 0)
+    if (picked.err) bad("presupuestador: catalogue pick fills the row", picked.err);
+    else if (
+      picked.closed &&
+      picked.got.code === picked.want.code &&
+      picked.got.desc === picked.want.desc &&
+      picked.got.unit === picked.want.unit &&
+      picked.got.cost === picked.want.cost
+    )
       ok(
-        `presupuestador: picking a partida fills código, descripción, unidad and coste (${picked.code})`,
+        `presupuestador: picking a partida fills código, descripción, unidad and coste (${picked.want.code})`,
       );
-    else bad("presupuestador: catalogue pick fills the row", JSON.stringify(picked));
+    else bad("presupuestador: catalogue pick fills the row", JSON.stringify(picked).slice(0, 220));
 
     /* ---- the whole row is visible without scrolling sideways -------------
        "Still not all line visible, fix it once for all." Measured rather than
