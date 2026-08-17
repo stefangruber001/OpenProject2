@@ -529,6 +529,98 @@ assert(r2.applied.length === 0, "a current blob applies no further migrations");
   );
 }
 
+/* ---- v18: a project records who owes for it --------------------------------
+ *
+ * A general contractor hired by the end customer sub-hires Canei, so part of
+ * one job is owed by the contractor and part by the end customer. The shape
+ * that makes this expressible has to arrive without changing a single existing
+ * project's behaviour: exactly ONE payer each, the customer they already had.
+ *
+ * The array is the risk. Every other migration sets a scalar or an object key,
+ * where "already done" is obvious; appending to a list is the one shape where a
+ * re-run can silently double something — and a duplicated payer would mean a
+ * job billed twice. Both directions are asserted below.
+ */
+{
+  const migrated = r1.state.projects || [];
+  assert(migrated.length > 0, "the fixture actually carries projects to migrate");
+  assert(
+    migrated.every((p) => Array.isArray(p.billing) && p.billing.length === 1),
+    "every existing project gets exactly one payer",
+    JSON.stringify(migrated.filter((p) => (p.billing || []).length !== 1).map((p) => p.code)),
+  );
+  assert(
+    migrated.every((p) => p.billing[0].partyId === p.partyId),
+    "that payer is the customer the project already had",
+  );
+  assert(
+    migrated.every((p) => p.billing[0].vatBp === p.vatBp),
+    "on the tax rate it already had — the migration changes no money",
+  );
+  assert(
+    migrated.every((p) => p.billing[0].taxTreatment === "standard"),
+    "and no tax treatment is inferred for it",
+  );
+  assert(
+    migrated.every((p) =>
+      ((p.baseline && p.baseline.chapters) || []).every((c) => c.billToPartyId === p.partyId),
+    ),
+    "every baseline chapter names that same payer as owing for it",
+  );
+
+  const m18 = M.MIGRATIONS.find((m) => m.to === 18);
+
+  // Re-running must not append a second payer to a one-payer project.
+  const twice = m18.up(JSON.parse(JSON.stringify(r1.state)));
+  assert(
+    (twice.projects || []).every((p) => p.billing.length === 1),
+    "re-running does not give a project a second payer",
+  );
+
+  /* And the one that actually matters once this feature is in use: a project
+     an operator has SPLIT between two payers must survive the ladder
+     untouched. A migration that "helpfully" reset it to one payer would
+     silently re-point invoices at the wrong company. */
+  const split = {
+    projects: [
+      {
+        id: "prj_x",
+        code: "P-X",
+        partyId: "pty_end",
+        vatBp: 1000,
+        billing: [
+          { partyId: "pty_end", role: "customer", vatBp: 1000, taxTreatment: "standard" },
+          { partyId: "pty_gc", role: "mainContractor", vatBp: 0, taxTreatment: "reverseCharge" },
+        ],
+        baseline: {
+          chapters: [
+            { num: "1", billToPartyId: "pty_end" },
+            { num: "2", billToPartyId: "pty_gc" },
+          ],
+        },
+      },
+    ],
+  };
+  const kept = m18.up(JSON.parse(JSON.stringify(split)));
+  assert(
+    kept.projects[0].billing.length === 2 &&
+      kept.projects[0].billing[1].partyId === "pty_gc" &&
+      kept.projects[0].billing[1].taxTreatment === "reverseCharge",
+    "a project already split between two payers keeps both",
+  );
+  assert(
+    kept.projects[0].baseline.chapters[1].billToPartyId === "pty_gc",
+    "and a chapter already assigned is never reassigned",
+  );
+
+  // A project with no baseline at all must not throw the ladder.
+  const bare = m18.up({ projects: [{ id: "prj_y", partyId: "pty_z" }] });
+  assert(
+    bare.projects[0].billing.length === 1 && bare.projects[0].billing[0].partyId === "pty_z",
+    "a project with no baseline survives the walk instead of throwing",
+  );
+}
+
 // ---- the dangerous direction is refused ------------------------------------
 throws(
   () => M.migrate({ ...v1, schemaVersion: M.CURRENT_VERSION + 1 }),

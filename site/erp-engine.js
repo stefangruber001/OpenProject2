@@ -543,6 +543,48 @@
     "billCountry",
   ];
 
+  /**
+   * The BILLING ARRANGEMENT of a project: who owes for it, and on what terms.
+   *
+   * One job does not always have one payer. A general contractor hired by the
+   * end customer sub-hires Canei; part of the work is then owed by the
+   * contractor and part directly by the end customer — one project, one budget,
+   * one set of costs and one margin, two people to invoice.
+   *
+   * Every project has this array. A job with a single payer holds exactly one
+   * entry, which is what `defaultBilling` returns and what every project
+   * created before this existed is migrated to, so the ordinary case is not a
+   * special case of the split one — it is the same structure with one row.
+   *
+   * `vatBp` and `taxTreatment` live HERE and not on the project, because two
+   * payers on one job are routinely taxed differently: work billed to a private
+   * individual on their dwelling and the same work billed to a contractor are
+   * not the same transaction in tax terms. `taxJustification` is the operator's
+   * written reason, persisted on every invoice issued under it — this system
+   * records tax decisions with their justification rather than re-deriving them
+   * later from a rule that may since have changed.
+   *
+   * NOTHING here is inferred. `taxTreatment` defaults to "standard" and only an
+   * operator moves it; see LEGAL_REVIEW.md. Guessing a reverse charge from the
+   * shape of a party is how a filing goes wrong quietly.
+   *
+   * `paymentTermsDays: null` means "ask the party", which is what `issueInvoice`
+   * already did — a second copy of a number the party record owns would go
+   * stale the first time somebody renegotiated terms.
+   */
+  function defaultBilling(partyId, vatBp) {
+    return [
+      {
+        partyId: partyId,
+        role: "customer", // "customer" | "mainContractor"
+        vatBp: vatBp,
+        taxTreatment: "standard", // "standard" | "reverseCharge" | "exempt"
+        taxJustification: "",
+        paymentTermsDays: null,
+      },
+    ];
+  }
+
   /* =============================================================================
      ERP — the aggregate. `state` is plain JSON (persist/restore friendly).
      ========================================================================== */
@@ -2735,8 +2777,17 @@
               name: c.name,
               saleCents: c.saleCents,
               costCents: c.costCents,
+              // WHO OWES FOR THIS CHAPTER. In the baseline, and therefore
+              // frozen with everything else in it: moving a chapter from one
+              // payer to another after work has started changes what each of
+              // them was told they were buying, which is a change order and not
+              // an edit — exactly the rule the baseline already enforces for
+              // money. Defaults to the project's own customer, so a job with
+              // one payer reads as it always has.
+              billToPartyId: b.partyId,
             })),
         }),
+        billing: defaultBilling(b.partyId, b.vatBp),
         vatBp: b.vatBp,
         surfaceM2: b.surfaceM2,
         dates: { start: null, targetEnd: null, actualEnd: null },
@@ -2768,8 +2819,17 @@
           revenueCents: valueCents,
           costCents: 0,
           marginCents: valueCents,
-          chapters: [{ num: "1", name: desc, saleCents: valueCents, costCents: 0 }],
+          chapters: [
+            {
+              num: "1",
+              name: desc,
+              saleCents: valueCents,
+              costCents: 0,
+              billToPartyId: partyId,
+            },
+          ],
         }),
+        billing: defaultBilling(partyId, 2100),
         vatBp: 2100,
         surfaceM2: 0,
         dates: { start: this.state.today, targetEnd: null, actualEnd: null },
@@ -8194,6 +8254,11 @@
     LISTS,
     LIST_DEFAULTS,
     LIST_KINDS,
+    // Exported so migration 18 seeds the SAME shape a new project gets, the
+    // way `LIST_DEFAULTS` is already shared with the ladder. Two copies of a
+    // record's default shape drift, and the failure is quiet: a migrated
+    // company and a new one would bill differently and nothing would say why.
+    defaultBilling,
     validTaxId,
     validIban,
     validEmail,

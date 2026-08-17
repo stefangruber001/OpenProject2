@@ -717,7 +717,89 @@
         return s;
       },
     },
+    {
+      to: 18,
+      name: "a project records who owes for it, chapter by chapter",
+      /*
+       * ONE JOB, MORE THAN ONE PAYER.
+       *
+       * A general contractor hired by the end customer sub-hires Canei. Part of
+       * the work is then owed by the contractor and part directly by the end
+       * customer — one project, one budget, one set of costs and one margin,
+       * two people to invoice. Until now `issueInvoice` took the bill-to from
+       * the project and there was nowhere else for it to come from.
+       *
+       * This step adds the two places that answer "who owes":
+       *   · `project.billing[]` — the payers, each with its own tax treatment,
+       *     because two payers on one job are routinely taxed differently.
+       *   · `baseline.chapters[].billToPartyId` — which of them owes for each
+       *     chapter. Without this the payer would be a free choice per invoice
+       *     and nothing would stop the same work being billed to both.
+       *
+       * Purely additive and idempotent. Every project gets exactly ONE payer —
+       * the customer it already had, on the terms it already had — so this
+       * migration changes no behaviour whatever. It cannot know that a job was
+       * secretly a split one; it knows what the fields ARE. Splitting is an
+       * operator decision taken afterwards, on purpose.
+       *
+       * The default shape comes from the engine (`defaultBilling`) rather than
+       * being written out again here, for the same reason `listSeed` below
+       * borrows `LIST_DEFAULTS`: two copies of a record's default shape drift,
+       * and the failure is quiet — a migrated company and a new one would bill
+       * differently and nothing would say why.
+       */
+      up: function (s) {
+        var mk = billingSeed();
+        var projects = Array.isArray(s.projects) ? s.projects : [];
+        for (var i = 0; i < projects.length; i++) {
+          var p = projects[i];
+          if (!Array.isArray(p.billing) || !p.billing.length) {
+            p.billing = mk(p.partyId || null, typeof p.vatBp === "number" ? p.vatBp : 2100);
+          }
+          var chapters =
+            p.baseline && Array.isArray(p.baseline.chapters) ? p.baseline.chapters : [];
+          for (var c = 0; c < chapters.length; c++) {
+            // A chapter that already names a payer is left exactly as it is —
+            // a re-run must not reassign work somebody has been invoiced for.
+            if (!chapters[c].billToPartyId) chapters[c].billToPartyId = p.partyId || null;
+          }
+        }
+        return s;
+      },
+    },
   ];
+
+  /**
+   * The default billing arrangement, taken from the engine rather than copied.
+   * Same resolver shape as `listSeed` below, and the same reason. The fallback
+   * keeps the ladder runnable in isolation instead of throwing mid-migration;
+   * it is deliberately the minimum that satisfies the invariant "every project
+   * has exactly one payer", not a second opinion about what a payer is.
+   */
+  function billingSeed() {
+    var E = null;
+    try {
+      E =
+        (typeof module === "object" && module.exports && require("./erp-engine.js")) ||
+        (typeof globalThis !== "undefined" && globalThis.ErpEngine) ||
+        null;
+    } catch (e) {
+      E = typeof globalThis !== "undefined" ? globalThis.ErpEngine || null : null;
+    }
+    if (E && typeof E.defaultBilling === "function") return E.defaultBilling;
+    return function (partyId, vatBp) {
+      return [
+        {
+          partyId: partyId,
+          role: "customer",
+          vatBp: vatBp,
+          taxTreatment: "standard",
+          taxJustification: "",
+          paymentTermsDays: null,
+        },
+      ];
+    };
+  }
 
   /**
    * The seed for `state.lists`, taken from the engine rather than copied.
