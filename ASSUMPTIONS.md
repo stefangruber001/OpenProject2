@@ -4477,3 +4477,34 @@ accent-folded on both sides, and ranks by **first mention** rather than longest
 keyword, because "Limpieza y retirada" is a chapter about cleaning that ends
 with a lorry. The gate had reported one mark per row throughout. **Counting
 marks is not the same as looking at them.**
+
+## The miss ledger learns that the price book translates itself (2026-08-17)
+
+**Decision.** `tests/i18n/miss-crawl.mjs` now reads `ErpCatalogueI18n` as well as
+`erp.state`, so a price-book description rendered in the reader's language is
+excused the way its Spanish original always was. The CI ceilings drop from
+239/341 to 80/124 (measured 76 English, 119 Catalan).
+
+**Why this is not lowering a bar to fit.** The ledger's rule is that a rendered
+string is excused when it matches something the company stores. What the company
+stores for a price-book line is the Spanish text. Publishing the pack in English
+and Catalan therefore made 238 descriptions reportable **because they had been
+translated** — the rendered English no longer matched the stored Spanish. The
+gate was not detecting missing translations; it was detecting the presence of
+them. `lists` and `commsTemplates` already carry their own `es`/`ca` columns and
+are excused on exactly this ground; the price book now joins them.
+
+**The control that says the exemption did not overreach.** The report's own
+line — `82 shipped-vocabulary values NOT excused` — is identical before and
+after, and the excused count rose by precisely the number the reported count
+fell by (835 → 1073, 314 → 76). Nothing moved except the catalogue. That number
+is the guard against the failure this file records elsewhere: a rule meant to
+excuse customer names once swallowed twenty-five alert rules, and the number
+went down, which is the most dangerous direction for a number to move.
+
+**Four strings of slack, and what they are.** The crawl presses a bounded number
+of controls in DOM order, so changing the markup changes which controls fall
+inside the budget and moves the count by a string or two — measured at one
+across two runs. The alternative, a ceiling pinned to the exact figure, goes red
+on the next layout commit for a reason it is not about. Reversible: lower it
+whenever the crawl is made deterministic.

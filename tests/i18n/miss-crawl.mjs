@@ -152,6 +152,13 @@ const RECORDS = new Set([
   "properties",
   "opportunities",
   "visits",
+  // The price book, in every language it is published in — see the second
+  // `visit` in DATA_VALUES. Its Spanish descriptions have always been exempt
+  // here; when the pack gained English and Catalan, the SAME description
+  // started being reported the moment it was translated, because the rendered
+  // English no longer matched the stored Spanish. A hundred and ninety of them,
+  // every one already translated. Translating a string must not be what makes
+  // it reportable.
   "catalogue",
   "packages",
   "prices",
@@ -218,6 +225,15 @@ const DATA_VALUES = `() => {
   // Reached by bare name: erp.html declares it with const at the top level of a
   // classic script, which does not create a window property.
   try { visit(typeof erp !== "undefined" && erp ? erp.state : null, 0, "?"); } catch (e) {}
+  // The price book's OWN translation table, counted as catalogue values in the
+  // reader's language. Same arrangement \`lists\` already has: a collection that
+  // carries its own columns is translated through them, not through the
+  // dictionary. Depth 1, not 0, so every string lands under "catalogue" instead
+  // of under the table's own top-level key names.
+  try {
+    var CAT = typeof ErpCatalogueI18n !== "undefined" ? ErpCatalogueI18n : (globalThis.ErpCatalogueI18n || null);
+    if (CAT) visit(CAT, 1, "catalogue");
+  } catch (e) {}
   return out;
 }`;
 

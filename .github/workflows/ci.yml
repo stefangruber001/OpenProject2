@@ -221,11 +221,28 @@ jobs:
       # From here it only goes down. Every string behind these numbers is one an
       # operator can see in the wrong language. Run this locally with --json to get
       # the full list grouped by screen.
+      #
+      # 239 -> 80 and 341 -> 124. Not translation work: the ledger excuses a
+      # rendered string when it matches a value the company stores, and the
+      # value it stored for a price-book line is the Spanish one. Publishing the
+      # price book in English and Catalan therefore made 238 already-translated
+      # descriptions reportable — translating them was what broke the
+      # translation gate. The ledger now reads the pack's own table (see the
+      # second `visit` in DATA_VALUES), which is how `lists` has always worked.
+      # Measured: 76 English, 119 Catalan.
+      #
+      # The four strings of slack are the crawl's own variance, not headroom: it
+      # presses a bounded number of controls in DOM order, so a change to the
+      # markup shifts which controls fall inside that budget and moves the count
+      # by a string or two. Measured at one between two runs. A ceiling pinned
+      # to the exact figure would go red on the next layout commit, for a reason
+      # it is not about — and a check that fails for the wrong reason teaches
+      # you to edit the check.
       - name: Translation coverage (translator miss ledger)
         if: always()
         run: |
-          node tests/i18n/miss-crawl.mjs --lang en --max 239
-          node tests/i18n/miss-crawl.mjs --lang ca --max 341
+          node tests/i18n/miss-crawl.mjs --lang en --max 80
+          node tests/i18n/miss-crawl.mjs --lang ca --max 124
 
   bundle:
     name: Capability bundle (build, browser-safety, drift)
