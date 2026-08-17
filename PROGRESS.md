@@ -1564,3 +1564,68 @@ cost a full cycle this session.
 run over existing data; `ErpSeed.build()` produces eight catalogue items and
 skips the ladder entirely. An existing workspace has the two hundred partidas
 because it migrated; a fresh tenant would not.
+
+## S16 — the quote builder finds the catalogue, and the clock finds today (2026-08-17)
+
+Landed on `main` at `ad8e8ae`, E2E 464/464. Seven operator reports, four of
+which shared one root.
+
+**The root.** «+ partida» made a BLANK line. The catalogue picker existed, but
+behind a 🔍 tucked into the row's código cell — so the obvious button gave
+«Nueva partida» at 0,00 €, there was no dropdown to be found, and the price book
+built the day before looked like it had never arrived. That button now opens the
+picker itself, scoped to the chapter, with tick boxes: five sub-items become
+five complete lines in one round trip.
+
+**The data model was the other half.** The catalogue records `type`, `brand`,
+`model` and `quality`; the budget line recorded none of them. "All that info is
+not transferred" was true and could not be fixed on the screen. Migration 17
+adds the four fields; `lineFromCatalogueItem()` is the single place the
+catalogue fills a line, used by both the button and the 🔍 so they cannot drift.
+Images go through `attachLineImage` — `editLine` strips `imageRefs` by design,
+so the previous commit's copy had been silently discarded.
+
+**154 of the 200 price-book rows had no marca/modelo/calidad at all.** Every row
+now states a calidad; 108 name a marca and modelo. Demolition, waste and
+professional fees keep an honest blank rather than an invented manufacturer, and
+the migration simulation fails on a blank calidad or a half-named product.
+
+**Two layout bugs, both invisible until measured.** A grid item set to
+`display:none` is REMOVED from the grid, so folding the chapter tree slid the
+line grid into the 0 px track and spread the totals pane across it — everything
+rendered, the 🔍 was merely underneath something. And `.bgrid input` is
+`width:100%`, so a declared column width pushed the button out of its cell. The
+grid now fits: 1298 px of columns in 1298 px of pane.
+
+**The clock was five months slow.** `state.today` is stored and nothing ever
+advanced it. It now moves to the real date at boot, forward only — winding back
+would re-date issued documents. The date also came from `toISOString()`, which
+is UTC: between midnight and 02:00 in summer that is yesterday here, and a visit
+booked for today was refused as past. The Gantt opens ON today rather than at
+its far-left past, because drawn is not seen.
+
+**What the real clock then exposed** — four red checks, none a clock bug. A
+March quote is genuinely expired in August. The hours sheet defaulted its
+assignment to a CLOSED project, which `recordHours` rightly refuses, so it
+offered a row that could never be filled and said so only after the hours were
+typed: a real defect the frozen date had hidden. "Repeat the previous day" had
+no next day to move to on a Sunday. And the full-screen check asserted three
+VISIBLE panes rather than three tracks.
+
+**Also:** the logo goes home on all three pages; top-bar menus are clamped
+inside the viewport (`.menu` hangs from `right:0`, which is wrong once the bar
+wraps on a phone); a missing tax id shows an amber ⚠ instead of reading as a
+refusal, with the block left where the law puts it, on issuing; and the iOS
+shell stops drawing a second header over the workspace's own.
+
+**A brand-new workspace now gets the price book.** Migrations replay over a
+stored blob and a fresh seed never touches the ladder, so a first tenant would
+have had eight partidas and no way to notice. Migration 16's body is exported as
+`applyCataloguePack` and called by both the ladder and `seedWorkspace()`.
+Measured on a fresh browser context: 208 entries, 20 chapters.
+
+**Tooling.** `--only <suite>` on the browser runner, and failures repeated at
+the end of the report. Diagnosing one broken suite by re-running all thirty-five
+is how a fix takes an afternoon; reading a 450-line report through `| tail`
+keeps the count and discards the lines that say what broke. Both earned
+themselves back the same session.

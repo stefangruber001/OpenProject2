@@ -47,6 +47,73 @@
     );
   }
 
+  /**
+   * Install the starter price book into a state blob. Idempotent and purely
+   * additive: a chapter or a código already present is left exactly as it is,
+   * so a company that has priced its own work keeps every figure it typed and
+   * re-running changes nothing.
+   *
+   * Exported as well as used by migration 16 because a BRAND-NEW workspace
+   * never runs a migration. `ErpSeed.build()` produces a fresh state and boot
+   * uses it directly — the ladder only ever replays over a STORED blob — so a
+   * first tenant got the eight demo partidas and none of the two hundred, and
+   * the quote builder that this whole price book exists to make usable opened
+   * empty on exactly the day it mattered most. One implementation, two callers,
+   * rather than a second installer that would drift from this one.
+   */
+  function applyCataloguePack(s) {
+    var pack = cataloguePack();
+    if (!s.lists || typeof s.lists !== "object") s.lists = {};
+    if (!Array.isArray(s.lists.itemChapters)) s.lists.itemChapters = [];
+    if (!Array.isArray(s.catalogue)) s.catalogue = [];
+
+    var haveChapter = {};
+    for (var c = 0; c < s.lists.itemChapters.length; c++) {
+      haveChapter[s.lists.itemChapters[c].code] = true;
+    }
+    for (var k = 0; k < pack.CHAPTERS.length; k++) {
+      var ch = pack.CHAPTERS[k];
+      if (haveChapter[ch.code]) continue;
+      s.lists.itemChapters.push({ code: ch.code, es: ch.es, ca: ch.ca, active: true });
+    }
+
+    var haveCode = {};
+    for (var i = 0; i < s.catalogue.length; i++) haveCode[s.catalogue[i].code] = true;
+
+    // Ids follow the engine's own `cat_<n>` shape and continue past the
+    // highest number already present, so an id can never be reused by a
+    // record the company created.
+    var maxId = 0;
+    for (var m = 0; m < s.catalogue.length; m++) {
+      var got = /^cat_(\d+)$/.exec(String(s.catalogue[m].id || ""));
+      if (got) maxId = Math.max(maxId, Number(got[1]));
+    }
+
+    var rows = pack.rows();
+    for (var r = 0; r < rows.length; r++) {
+      var row = rows[r];
+      if (haveCode[row.code]) continue;
+      maxId += 1;
+      s.catalogue.push({
+        id: "cat_" + maxId,
+        code: row.code,
+        desc: row.desc,
+        customerWording: "",
+        unit: row.unit,
+        type: row.type,
+        chapter: row.chapter,
+        active: true,
+        imageRefs: [],
+        defaultCostCents: row.defaultCostCents,
+        defaultPriceCents: row.defaultPriceCents,
+        brand: row.brand,
+        model: row.model,
+        quality: row.quality,
+      });
+    }
+    return s;
+  }
+
   /* A blob with no schemaVersion predates versioning and is, by definition, v1. */
   var IMPLICIT_V1 = 1;
 
@@ -611,58 +678,7 @@
        * The prices are a starting point, not a quote. They are meant to be
        * edited, and the screen says so.
        */
-      up: function (s) {
-        var pack = cataloguePack();
-        if (!s.lists || typeof s.lists !== "object") s.lists = {};
-        if (!Array.isArray(s.lists.itemChapters)) s.lists.itemChapters = [];
-        if (!Array.isArray(s.catalogue)) s.catalogue = [];
-
-        var haveChapter = {};
-        for (var c = 0; c < s.lists.itemChapters.length; c++) {
-          haveChapter[s.lists.itemChapters[c].code] = true;
-        }
-        for (var k = 0; k < pack.CHAPTERS.length; k++) {
-          var ch = pack.CHAPTERS[k];
-          if (haveChapter[ch.code]) continue;
-          s.lists.itemChapters.push({ code: ch.code, es: ch.es, ca: ch.ca, active: true });
-        }
-
-        var haveCode = {};
-        for (var i = 0; i < s.catalogue.length; i++) haveCode[s.catalogue[i].code] = true;
-
-        // Ids follow the engine's own `cat_<n>` shape and continue past the
-        // highest number already present, so an id can never be reused by a
-        // record the company created.
-        var maxId = 0;
-        for (var m = 0; m < s.catalogue.length; m++) {
-          var got = /^cat_(\d+)$/.exec(String(s.catalogue[m].id || ""));
-          if (got) maxId = Math.max(maxId, Number(got[1]));
-        }
-
-        var rows = pack.rows();
-        for (var r = 0; r < rows.length; r++) {
-          var row = rows[r];
-          if (haveCode[row.code]) continue;
-          maxId += 1;
-          s.catalogue.push({
-            id: "cat_" + maxId,
-            code: row.code,
-            desc: row.desc,
-            customerWording: "",
-            unit: row.unit,
-            type: row.type,
-            chapter: row.chapter,
-            active: true,
-            imageRefs: [],
-            defaultCostCents: row.defaultCostCents,
-            defaultPriceCents: row.defaultPriceCents,
-            brand: row.brand,
-            model: row.model,
-            quality: row.quality,
-          });
-        }
-        return s;
-      },
+      up: applyCataloguePack,
     },
     {
       to: 17,
@@ -796,5 +812,6 @@
     MIGRATIONS: MIGRATIONS,
     versionOf: versionOf,
     migrate: migrate,
+    applyCataloguePack: applyCataloguePack,
   };
 });

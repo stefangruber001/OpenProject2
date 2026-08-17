@@ -4241,3 +4241,38 @@ a real company as its file ages.
    Below 1 720 px the chapter tree folds to a 0 px track (§173), so the
    assertion now accepts either width for the side track and keeps checking the
    shape it actually cares about.
+
+### 179 · A brand-new workspace gets the price book too (2026-08-17)
+
+**The gap.** Migrations replay over a STORED blob. A brand-new workspace is
+built by `ErpSeed.build()` and used directly — it never touches the ladder — so
+migration 16 gave every EXISTING tenant the 200-partida price book while a
+first tenant would have got the eight demo partidas and nothing else. The quote
+builder that the whole price book exists to make usable would have opened
+almost empty on precisely the day it mattered most, and nothing would have said
+why: no error, no empty state, just a very short catalogue.
+
+**Why it stayed invisible.** Every workspace in existence had migrated. The
+only way to see it was to open the app with no IndexedDB, which no test did and
+no developer does twice. It was found by asking what a fresh install actually
+receives, not by anything going red.
+
+**The fix, and why it is not a second installer.** Migration 16's body is lifted
+verbatim into `applyCataloguePack(state)`, exported from `erp-migrations.js`;
+migration 16 now _is_ that function, and `seedWorkspace()` in the shell calls it
+on a freshly seeded state. One implementation, two callers. Writing a separate
+seed-time installer would have created a second description of what the starter
+catalogue is, and the two would have drifted the first time a chapter was added
+to one of them — which is the same failure this repo already had with three
+navigation label lists (§ADR/nav manifest) and with the `/preview` branch name.
+
+It is idempotent and purely additive by construction, so calling it on a state
+that already has the pack — or on the demo-data reload path, which also goes
+through `seedWorkspace()` — changes nothing.
+
+**Verified on the thing itself.** A fresh browser context with no stored data
+boots to 208 catalogue entries across 20 chapters (200 from the pack, 8 from the
+demo seed). The migration simulation asserts the export exists, installs the
+whole book into an empty object, and is unchanged on a second run; removing the
+export was checked to fail that gate cleanly rather than crash it, because a
+gate that throws takes every check after it down with it.

@@ -392,6 +392,38 @@ assert(r2.applied.length === 0, "a current blob applies no further migrations");
     `${named.length} of ${rows.length}`,
   );
 
+  /* The price book reaches a workspace that never runs a migration.
+     Migrations replay over a STORED blob. A brand-new workspace is built by
+     `ErpSeed.build()` and used directly, so it never touches the ladder — and
+     every existing tenant had the 200 partidas through migration 16 while a
+     first tenant would have had the eight demo ones and no way to notice.
+     `applyCataloguePack` is migration 16's own body, exported so boot can call
+     it on a fresh seed; this asserts it is exported, works from nothing, and is
+     safe to run twice. */
+  assert(
+    typeof M.applyCataloguePack === "function",
+    "the price-book installer is exported for a fresh workspace to call",
+  );
+  // Guarded, so a missing export reports one failed check instead of throwing
+  // and taking every check after it down with it.
+  if (typeof M.applyCataloguePack === "function") {
+    const blank = {};
+    M.applyCataloguePack(blank);
+    const once = { cat: blank.catalogue.length, chap: blank.lists.itemChapters.length };
+    M.applyCataloguePack(blank);
+    const twice = { cat: blank.catalogue.length, chap: blank.lists.itemChapters.length };
+    assert(
+      once.cat === rows.length && once.chap === pack.CHAPTERS.length,
+      "a state with nothing in it gets the whole price book",
+      JSON.stringify(once),
+    );
+    assert(
+      twice.cat === once.cat && twice.chap === once.chap,
+      "running it a second time changes nothing",
+      JSON.stringify({ once, twice }),
+    );
+  }
+
   // Additive against a state that already has the operator's own work.
   const own = M.migrate({ ...v1, schemaVersion: 15 }).state;
   own.lists = own.lists || {};

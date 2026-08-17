@@ -4282,6 +4282,27 @@
    place — everything on that single machine is already fully visible. */
       let SESSION = { email: "", role: "admin", bankRead: true };
       /**
+       * A brand-new workspace, price book included.
+       *
+       * `ErpSeed.build()` alone is NOT a complete starting state, and the gap
+       * was invisible because it only ever showed on a first run. Migrations
+       * replay over a STORED blob; a fresh seed is used directly and never
+       * touches the ladder — so every existing workspace received the 200-partida
+       * price book through migration 16 while a first tenant got the eight demo
+       * partidas and nothing else. The quote builder this price book exists to
+       * make usable opened empty on precisely the day it mattered most.
+       *
+       * `applyCataloguePack` is migration 16's own body, exported rather than
+       * reimplemented: idempotent, purely additive, and the only description of
+       * what the starter catalogue IS. A second installer here would have been
+       * a second thing to keep in step.
+       */
+      function seedWorkspace() {
+        const e = ErpSeed.build();
+        ErpMigrations.applyCataloguePack(e.state);
+        return e;
+      }
+      /**
        * Move the workspace's clock up to the real date. FORWARD ONLY.
        *
        * `state.today` is stored, because the engine dates every record it writes
@@ -4316,7 +4337,7 @@
           if (loaded.state) {
             erp = ErpEngine.ERP.from(loaded.state);
           } else {
-            erp = ErpSeed.build();
+            erp = seedWorkspace();
             fresh = true;
           }
         } catch (e) {
@@ -4348,7 +4369,7 @@
               "Vuelva a intentarlo cuando esté disponible.</p></div>";
             return;
           }
-          erp = ErpSeed.build();
+          erp = seedWorkspace();
           fresh = true;
         }
 
@@ -18814,7 +18835,7 @@
           }))
         )
           return;
-        erp = ErpSeed.build();
+        erp = seedWorkspace();
         seedPlans();
         persist();
         render();
