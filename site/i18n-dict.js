@@ -4760,7 +4760,13 @@ window.CANEI_DICT = {
     [new RegExp("^(.+) en juego$"), "$1 at stake"],
     [new RegExp("^visitas pendientes — (.+)$"), "pending visits — $1"],
     [new RegExp("^hitos de obra esta semana (.+)$"), "site milestones this week $1"],
-    [new RegExp("^(\\d+)% · falta (\\d+)$"), "$1% · $2 missing"],
+    /* Patterns kept identical to the Catalan pair — `coverage.mjs` asserts
+       that parity, and it caught this the moment the Catalan side was widened
+       to accept a decimal percentage and split for singular agreement. English
+       needs no singular form ("1 missing" reads correctly), but the PATTERN
+       has to match or the check cannot pair them. */
+    [new RegExp("^([\\d.,]+)% · falta 1$"), "$1% · 1 missing"],
+    [new RegExp("^([\\d.,]+)% · falta (\\d+)$"), "$1% · $2 missing"],
     [new RegExp("^(\\d+) abiertas$"), "$1 open"],
     [new RegExp("^Perdida · (.+)$"), "Lost · $1"],
     [new RegExp("^v([\\d.]+) · (\\d+) versiones$"), "v$1 · $2 versions"],

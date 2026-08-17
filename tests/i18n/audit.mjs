@@ -32,13 +32,26 @@
  *     that is correctly translated in the page body but survives untranslated
  *     in one `<select>` is counted once, and reads as a whole missing entry.
  *
- * Measured 2026-08-16 after the Master Data / Financial Data batch:
- * master-data.html reached 0 (was 72) and financial-data.html 22 (was 75) — the
- * residue there is one section dropdown whose options carry the group name.
- * `setup-guide.html` is 457 of the Catalan total on its own: a 20-minute prose
- * guide whose translation is content work for a native speaker, not a side
- * effect of a feature session. It is counted in the open here rather than
- * excused by a check scoped small enough to pass.
+ * Measured 2026-08-17, after the Catalan backlog was cleared to zero:
+ * master-data.html and financial-data.html are at 0, and the DICTIONARY is
+ * complete in all three languages — `coverage.mjs` now enforces that
+ * absolutely rather than against a declining ceiling.
+ *
+ * WHAT THE RESIDUE IS, honestly, because the number is not zero and saying
+ * "translated" without this sentence would be a lie:
+ *
+ *   · Company DATA. "Marta Roca Puig", "C/ Balmes 120", "P-R014",
+ *     "Forn Sant Jordi S.L." — names, addresses and document codes rendered by
+ *     the demo seed. They must NEVER be translated, and every one of them is a
+ *     false positive of this check rather than a gap in the product. They are
+ *     left counted rather than pattern-matched away: a rule broad enough to
+ *     catch a person's name is broad enough to hide a real label, which is the
+ *     exact failure this file exists to prevent. Better a known, explained
+ *     residue than a clean report bought with a rule nobody can bound.
+ *   · English-source documents — see ENGLISH_BY_DESIGN below.
+ *
+ * So the honest claim is: the ERP's INTERFACE is fully translated; what is
+ * still reported is the company's own data and two English documents.
  *
  * Run:  node tests/i18n/audit.mjs [--lang ca] [--max 0] [--json out.json]
  */
@@ -78,9 +91,31 @@ const PAGES = [
   "master-data.html",
   "financial-data.html",
   "frontend.html",
-  "backend.html",
-  "setup-guide.html",
 ];
+
+/**
+ * Documents written IN ENGLISH, on purpose, and therefore not measured here.
+ *
+ * These are not screens with missing translations — they are English-source
+ * technical documents, and the distinction matters because counting them makes
+ * a completed job read as 80% done for ever:
+ *
+ *   · setup-guide.html — the go-live runbook. The operator's decision, taken
+ *     2026-08-17: "setup guide we keep English only." Translating it is not
+ *     457 missing Catalan entries but ~914 translations, because the page is
+ *     `lang="en"` and every string would need a Spanish key INVENTED as well
+ *     as a Catalan form written. It is read once, by whoever installs the
+ *     system, and English is the language that audience already works in.
+ *   · backend.html — captured HTTP traffic and API paths. `GET`,
+ *     `…/invoices/{id}` and "captured from the running server" are not phrases
+ *     with a Catalan form.
+ *
+ * The rule this follows is the one the miss-crawler already applies to company
+ * records: split by ORIGIN, not by storage. A page authored in English is a
+ * different thing from a Spanish screen that lost its translation, and a check
+ * that cannot tell them apart reports a number nobody can act on.
+ */
+const ENGLISH_BY_DESIGN = ["setup-guide.html", "backend.html"];
 
 /**
  * Strings that being identical in two languages says nothing about.

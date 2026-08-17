@@ -67,27 +67,26 @@ const pairs = D.pairs || [];
 const ca = D.ca || {};
 
 /**
- * Entries still awaiting a Catalan form.
+ * Entries still awaiting a Catalan form. NONE — the ratchet has reached zero.
  *
- * THIS NUMBER MAY ONLY GO DOWN. It is not a target and not an allowance for
- * new work: every string added from S3 onward must ship with Catalan, and the
- * check enforces that automatically, because one more untranslated entry
- * makes the real count exceed this ceiling and fails the build.
+ * THIS NUMBER MAY ONLY GO DOWN, and it has run out of room. It is no longer a
+ * declining allowance but an absolute rule: a string added without a Catalan
+ * form now fails the build exactly as one added without English does, which is
+ * where this was always heading.
  *
- * It exists because Catalan arrived in S3 against a dictionary that twelve
- * earlier sessions had already filled in Spanish and English. Translating the
- * historical backlog is content work a native speaker should review, not a
- * side effect of a feature session — so it is counted in the open here rather
- * than excused by a check scoped small enough to pass.
+ * It existed because Catalan arrived in S3 against a dictionary that twelve
+ * earlier sessions had already filled in Spanish and English. Until 2026-08-17
+ * a Catalan reader saw SPANISH wherever an entry was missing — the layer falls
+ * back to the hub language, so the gap was invisible to everyone except the
+ * person reading it, and no amount of "the interface is translated" was true
+ * for them. The remaining 1.036 were translated in one pass and sit in a marked
+ * block at the end of `i18n-dict-ca.js`, machine-authored and labelled as such
+ * so a native speaker's review has a scope rather than a rumour.
  *
- * Lower it whenever you translate a batch; the check tells you the new value.
+ * Leave it at 0. There is nothing left to lower and raising it would be
+ * reintroducing the debt this took a session to clear.
  */
-/* 1048 after the merge of the v4 programme branch into main — LOWER than
-   either side's ceiling on its own (1294 on the programme branch, 1052 on
-   main), because each branch had translated strings the other had not and the
-   union keeps both. Recomputed rather than chosen: taking either side's number
-   would have been wrong in one direction or the other. */
-const CA_BACKLOG = 1036;
+const CA_BACKLOG = 0;
 
 const problems = [];
 const note = (kind, detail) => problems.push({ kind, detail });

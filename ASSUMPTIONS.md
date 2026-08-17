@@ -4379,3 +4379,52 @@ billed for another's scope and it found an unrelated arithmetic fault on its
 first contact with real data. A rule that states what must be true tends to
 catch more than the case that motivated it; the value is in stating it, not in
 the case.
+
+### 182 · Catalan reaches zero; the setup guide stays English (2026-08-17)
+
+**The backlog is cleared.** 1 036 entries had no Catalan form, so a Catalan
+reader saw SPANISH wherever one was missing — the layer falls back to the hub
+language, which means the gap was invisible to everyone except the person
+reading it. All 1 036 are translated; `coverage.mjs` reports 3 264 entries
+complete in all three languages and `CA_BACKLOG` is now **0**, turning a
+declining ceiling into an absolute rule: a string added without Catalan fails
+the build exactly as one added without English does.
+
+They are **machine-authored**, stated plainly in the file so a native speaker's
+review has a scope rather than a rumour: one marked block at the end of
+`i18n-dict-ca.js`, not two thousand entries to re-read. Negative-controlled —
+removing a single entry fails the gate and names the string.
+
+**The setup guide stays English, by the operator's decision.** It is not 457
+missing Catalan entries: the page is `lang="en"`, so every string would need a
+Spanish key INVENTED as well as a Catalan form written — roughly 914
+translations for a document read once, by whoever installs the system, in the
+language that audience already works in. `backend.html` joins it: `GET` and
+`…/invoices/{id}` are not phrases with a Catalan form. Both are now listed in
+`audit.mjs` as `ENGLISH_BY_DESIGN` rather than counted for ever, which follows
+the rule the miss-crawler already applies to company records — **split by
+ORIGIN, not by storage.**
+
+**What the audit still reports, and why it is not zero.** 72 strings, and every
+one is company DATA: "Marta Roca Puig", "C/ Balmes 120", "P-R014",
+"Forn Sant Jordi S.L.". They must never be translated. They are left counted
+rather than pattern-matched away, because a rule broad enough to catch a
+person's name is broad enough to hide a real label — better a known, explained
+residue than a clean report bought with a rule nobody can bound. The honest
+claim is therefore: **the ERP's interface is fully translated; what remains
+reported is the company's own data and two English documents.**
+
+**A real bug found by dumping the residue instead of trusting it.** Among the
+72 sat `50% · falta 4`. A Catalan rule matched it and mapped it to ITSELF —
+`"$1% · falta $2"` — which is the worst possible way to be untranslated: a rule
+that matches has handled the string, so the layer reported success and the miss
+ledger never recorded it. Only the rendered-page audit, comparing the two
+renders and finding them identical, could see it. Now `en falta 1` /
+`en falten N`, split for verb agreement, with the percentage widened to accept a
+decimal. **An identity rule is not a decision that two languages agree; it is a
+gap wearing the costume of one.**
+
+Swept for the same shape afterwards: 32 further Catalan identity rules, all
+checked and all legitimate — _seleccionada, mes, Factura, Oferta, Tarifa,
+crítica, incompleta, mín._ really are the same word in Catalan. `falta` was the
+only impostor.
