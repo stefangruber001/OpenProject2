@@ -27,8 +27,13 @@ const { createContext, runInContext } = await import("node:vm");
 const sandbox = { globalThis: null, module: undefined, console };
 sandbox.globalThis = sandbox;
 createContext(sandbox);
+// erp-pictograms.js FIRST, exactly as the page loads it: the writer takes it
+// from the global at factory time, so loading it after would leave the marks
+// permanently absent while every other check still passed.
+runInContext(fs.readFileSync(resolve(ROOT, "site/erp-pictograms.js"), "utf8"), sandbox);
 runInContext(fs.readFileSync(resolve(ROOT, "site/erp-pdf.js"), "utf8"), sandbox);
 const { build } = sandbox.CaneiPdf;
+if (!sandbox.ErpPictograms) throw new Error("erp-pictograms.js did not publish its global");
 
 // The same WinAnsi mapping journey.html uses.
 const tr = (s) =>
@@ -178,6 +183,57 @@ check(
   `1..${pageCount} of ${pageCount}`,
 );
 check("the legal footer is on the page", txt.includes("Canei Subirats, S.L."));
+
+/* ONE LINE DRAWING PER PARTIDA, ACTUALLY IN THE FILE.
+   The writer takes the pictogram module from the global at factory time and
+   draws nothing at all if it is absent — which is the right way to degrade and
+   the worst way to fail silently: every other check on this page passes on a
+   document with no marks on it. `q`/`Q` appear nowhere else in the writer, so
+   counting saved-state blocks counts pictograms exactly.
+
+   Counted against the number of ROWS, not "more than zero": a writer that drew
+   one mark for the whole table and a writer that drew one per line would both
+   satisfy a presence check, and only one of them is the feature. */
+{
+  const zlib = await import("node:zlib");
+  const raw = bytes.toString("latin1");
+  let marks = 0;
+  let strokes = 0;
+  for (const m of raw.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
+    let d;
+    try {
+      d = zlib.inflateSync(Buffer.from(m[1], "latin1")).toString("latin1");
+    } catch {
+      d = m[1];
+    }
+    marks += (d.match(/(^|\n)q\n/g) || []).length;
+    strokes += (d.match(/\bS\b/g) || []).length;
+  }
+  const rowCount = doc.groups.reduce((s, g) => s + g.rows.length, 0);
+  check(
+    "every partida carries its line drawing into the PDF",
+    marks === rowCount,
+    `${marks} marks for ${rowCount} rows`,
+  );
+  check("…and the drawings are stroked, not empty", strokes >= marks * 2, `${strokes} strokes`);
+  // Saved and restored in pairs, or the stroke colour of everything after the
+  // first mark is whatever the last pictogram left behind.
+  let balance = 0;
+  for (const m of raw.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
+    let d;
+    try {
+      d = zlib.inflateSync(Buffer.from(m[1], "latin1")).toString("latin1");
+    } catch {
+      d = m[1];
+    }
+    balance += (d.match(/(^|\n)q\n/g) || []).length - (d.match(/(^|\n)Q\n/g) || []).length;
+  }
+  check(
+    "…and every one restores the graphics state it borrowed",
+    balance === 0,
+    `q−Q = ${balance}`,
+  );
+}
 
 // The margin rule the HTML templates are held to, applied to the writer too.
 const bbox = spawnSync("pdftotext", ["-bbox", file, "-"], { encoding: "utf8" }).stdout || "";

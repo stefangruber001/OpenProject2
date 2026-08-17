@@ -32,9 +32,10 @@
  * mapping.
  */
 (function (root, factory) {
-  if (typeof module === "object" && module.exports) module.exports = factory();
-  else root.CaneiPdf = factory();
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  if (typeof module === "object" && module.exports)
+    module.exports = factory(require("./erp-pictograms.js"));
+  else root.CaneiPdf = factory(root.ErpPictograms);
+})(typeof globalThis !== "undefined" ? globalThis : this, function (PICT) {
   "use strict";
 
   /* ---------------------------------------------------------------- metrics
@@ -314,12 +315,27 @@
   };
 
   /* ------------------------------------------------------------ the table */
+  /* The line drawing's gutter, ahead of the description.
+     A fixed indent rather than a column: the mark hangs in the margin of the
+     description the way a bullet does, so a partida that wraps to three lines
+     still reads as one item under one picture. `descW` loses the same amount,
+     which is what keeps the wrap honest — text measured against a width it is
+     not given is how a table runs into the column beside it. */
+  const PICT_W = 14;
   const COLS = () => {
     const qty = X1 - 250,
       unit = X1 - 205,
       price = X1 - 120,
       amt = X1;
-    return { desc: X0, descW: qty - X0 - 55, qty, unit, price, amt };
+    return {
+      desc: X0 + PICT_W,
+      descW: qty - X0 - 55 - PICT_W,
+      mark: X0,
+      qty,
+      unit,
+      price,
+      amt,
+    };
   };
 
   Doc.prototype.tableHead = function () {
@@ -353,6 +369,20 @@
         const extra = r.note ? this.wrap(r.note, FONT.sans, 7.5, c.descW) : [];
         const h = desc.length * 11 + extra.length * 9 + 7;
         if (this.need(h)) this.tableHead();
+        /* The line's drawing, in the gutter beside the first line of the
+           description. DERIVED HERE from the item's own words unless the caller
+           named one, so every producer of `groups` — the presupuestador, the
+           doctype descriptors, anything added later — gets the same picture for
+           the same partida without being changed, and none of them can hand the
+           writer a mark that disagrees with the catalogue's. */
+        if (PICT)
+          this.c += PICT.pdfOps(
+            PICT.pick({ pictogram: r.pictogram, desc: r.item, chapterName: g.chapter }),
+            c.mark,
+            this.y - 17,
+            10,
+            C.muted + " RG",
+          );
         desc.forEach((l, i) => this.text(c.desc, this.y - 9 - i * 11, 9, FONT.sans, C.body, l));
         extra.forEach((l, i) =>
           this.text(c.desc, this.y - 9 - desc.length * 11 - i * 9, 7.5, FONT.sans, C.muted, l),

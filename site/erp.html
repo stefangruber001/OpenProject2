@@ -833,8 +833,24 @@
       .chapline {
         display: flex;
         justify-content: space-between;
-        gap: 10px;
+        align-items: center;
+        gap: 8px;
         padding: 3px 0;
+      }
+      /* The line's drawing on the quote itself. The description takes the room
+         it is given, so the mark is fixed and the text flexes — otherwise a
+         long partida squeezes the picture away on exactly the lines that most
+         need explaining. */
+      .chapline .chapmark {
+        flex: 0 0 auto;
+        line-height: 0;
+      }
+      .chapline > span:not(.chapmark) {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .chapline .pict {
+        color: #8a8f80;
       }
 
       /* ---------- Gantt (spec §3.3 · §4.3) ---------- */
@@ -2429,6 +2445,33 @@
       }
       .pbfind input {
         min-width: 0;
+      }
+      /* ---------- the price book's line drawings ----------
+         Sized in `em` so a mark tracks the text it sits beside, and given the
+         muted ink rather than the green: it is a signpost to the description,
+         not a second thing competing with it. `flex-shrink:0` because a
+         drawing squeezed to four pixels is worse than no drawing. */
+      .pict {
+        display: block;
+        color: var(--muted);
+        flex: 0 0 auto;
+      }
+      .pictcell {
+        width: 26px;
+        padding-right: 0 !important;
+      }
+      .descell {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+      .descell input {
+        min-width: 0;
+      }
+      .pictwrap {
+        flex: 0 0 auto;
+        line-height: 0;
       }
       /* The line's catalogue dropdown is a PHONE control. Stated here, above
          the media query that turns it on, because a base rule written after an
@@ -4483,6 +4526,11 @@
     <script src="erp-sync.js"></script>
     <!-- The starter price book, read by migration 16. MUST precede erp-migrations.js. -->
     <script src="erp-catalogue-pack.js"></script>
+    <!-- Line drawings for the price book. No blobs, no requests: the same
+     definition renders as inline SVG here and as PDF path operators in
+     erp-pdf.js, so the catalogue, the quote builder and the printed quote
+     cannot show three different pictures of one partida. -->
+    <script src="erp-pictograms.js"></script>
     <script src="erp-migrations.js"></script>
     <script src="erp-store.js"></script>
     <!-- Typed capability layer: erp-factory.js is GENERATED from packages/erp-browser
@@ -11793,6 +11841,27 @@
         waste: "residuos",
         other: "otros",
       };
+      /**
+       * The line drawing for a price-book entry or a quote line.
+       *
+       * DERIVED, NOT STORED — no migration, no new field, nothing added to the
+       * state blob that re-serialises on every keystroke. The drawing follows
+       * the description, and an issued version deep-copies its lines, so a
+       * frozen document keeps the picture it was sent with for the same reason
+       * it keeps the price: the words it was computed from are frozen too.
+       *
+       * `pick` still honours an explicit `pictogram` if one is ever set, so the
+       * operator can be given an override later without a migration now. That
+       * is the reversible order to do these two things in.
+       *
+       * Degrades to nothing at all if the module failed to load: a quote that
+       * prices the work correctly and shows no pictures is a worse-looking
+       * quote, not a wrong one.
+       */
+      function pict(item, size) {
+        if (typeof ErpPictograms === "undefined" || !item) return "";
+        return ErpPictograms.svg(ErpPictograms.pick(item), size || 18);
+      }
       function lineSpecLine(l) {
         const bits = [l.brand, l.model, l.quality].filter(Boolean);
         if (l.type && LINE_TYPE[l.type]) bits.push(LINE_TYPE[l.type]);
@@ -11833,7 +11902,7 @@
       <td><input data-line="${l.id}" data-f="num" value="${esc(l.num)}" style="width:56px"
         title="${l.manualNum ? "Número escrito a mano — se mantiene al reordenar" : "Número automático — cambia con la posición"}"${locked ? " disabled" : ""}></td>
       <td class="pbfind"><div>${locked ? "" : `<button class="bfind" data-find="${l.id}" title="Buscar en el catálogo">🔍</button>`}<input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="5"${locked ? " disabled" : ""}>${locked ? "" : `<select class="bcat" data-cat="${l.id}" data-catchap="${c.id}" title="Elegir una subpartida del catálogo">${lineCatalogueOptions(chapCat[c.id], l.code)}</select>`}</div></td>
-      <td><input data-line="${l.id}" data-f="desc" value="${esc(l.desc)}"${locked ? " disabled" : ""}>${lineSpecLine(l)}</td>
+      <td><div class="descell"><span class="pictwrap">${pict({ ...l, chapterName: c.name }, 16)}</span><input data-line="${l.id}" data-f="desc" value="${esc(l.desc)}"${locked ? " disabled" : ""}></div>${lineSpecLine(l)}</td>
       <td><select data-line="${l.id}" data-f="unit" style="width:88px"${locked ? " disabled" : ""}>${listOptionsUnits(l.unit)}</select></td>
       <td class="int"><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>
       <td class="int"><input class="r" data-line="${l.id}" data-f="marginPct" type="number" step="0.1" max="99.9" value="${bMarginPct(l)}"${locked ? " disabled" : ""} title="Margen sobre el precio de venta. Al escribirlo, el precio unitario se recalcula."></td>
@@ -15085,7 +15154,7 @@
         style="flex:0 1 300px;min-width:190px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)">
       <span class="tag">${rows.length} partida${rows.length === 1 ? "" : "s"}</span></div>
     <div class="card"><div class="scroll"><table class="mlist"><thead><tr>
-      <th>Código</th><th>Descripción</th><th>Capítulo</th><th>Ud</th><th>Tipo</th>
+      <th></th><th>Código</th><th>Descripción</th><th>Capítulo</th><th>Ud</th><th>Tipo</th>
       <th>Marca</th><th>Modelo</th><th>Calidad</th>
       <th class="num">Coste</th><th class="num">Precio</th><th class="num">Margen</th><th class="num">Fotos</th></tr></thead><tbody>
     ${
@@ -15097,6 +15166,7 @@
               ) / 10
             : null;
           return `<tr class="click" data-item="${i.id}">
+      <td class="pictcell" data-th="">${pict(i)}</td>
       <td class="k" data-th="Código">${esc(i.code)}</td>
       <td class="k" data-th="Descripción">${esc(i.desc)}</td>
       <td data-th="Capítulo">${i.chapter ? esc(erp.listLabel("itemChapters", i.chapter)) : '<span class="pill y">sin capítulo</span>'}</td>
@@ -15111,7 +15181,7 @@
       <td class="num" data-th="Fotos">${(i.imageRefs || []).length || "—"}</td></tr>`;
         })
         .join("") ||
-      '<tr><td colspan="12"><div class="empty">Ninguna partida coincide.</div></td></tr>'
+      '<tr><td colspan="13"><div class="empty">Ninguna partida coincide.</div></td></tr>'
     }
     </tbody></table></div></div>
     <div class="card"><div class="ch"><h3>Paquetes de trabajo</h3><span class="tag">rendimiento · merma · compra mínima · envase</span></div>
@@ -17612,7 +17682,7 @@
         (
           c,
         ) => `<div style="margin-bottom:8px"><b style="color:var(--greenDeep)">${esc(c.num)}. ${esc(c.name)}${SEC[c.section] || ""}</b>
-      ${c.lines.map((l) => `<div class="chapline"><span>${esc(l.num)} ${esc(l.desc)} — ${l.qty} ${esc(l.unit)} × ${eur(l.priceCents)}${marked.has(l.num) ? '<span class="amark" title="Ver anexo gráfico">A</span>' : ""}</span><b>${eur(l.totalCents)}</b></div>`).join("")}</div>`,
+      ${c.lines.map((l) => `<div class="chapline item"><span class="chapmark">${pict({ ...l, chapterName: c.name }, 13)}</span><span>${esc(l.num)} ${esc(l.desc)} — ${l.qty} ${esc(l.unit)} × ${eur(l.priceCents)}${marked.has(l.num) ? '<span class="amark" title="Ver anexo gráfico">A</span>' : ""}</span><b>${eur(l.totalCents)}</b></div>`).join("")}</div>`,
       )
       .join("")}
     <div style="border-top:2px solid var(--green);padding-top:8px;margin-top:8px">

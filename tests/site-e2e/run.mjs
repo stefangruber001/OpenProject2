@@ -1778,6 +1778,109 @@ async function testBudgetBuilder(browser, base) {
       ok("annex: switching it off drops the pages and the marks together");
     else bad("annex: switch off", `pages=${offPages} marks=${offMarks}`);
 
+    /* ===== THE PRICE BOOK'S LINE DRAWINGS, END TO END =====
+       "Add a picture which represents the task … check that the picture is
+       also on the quote builder when I add the sub-item and finally also get
+       on the pdf quote." Three surfaces, and the whole point is that they are
+       ONE definition — so the check follows a single partida through all
+       three and fails if any of them shows a different drawing, not merely if
+       one of them shows none. Three separate presence checks would pass on a
+       build where the catalogue drew a tap and the quote drew a door. */
+    await pg.evaluate(() => go("items"));
+    await pg.waitForTimeout(700);
+    const cat = await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("#view table.mlist tbody tr.click")];
+      const withMark = rows.filter((r) => r.querySelector("svg.pict"));
+      const labels = new Set(
+        withMark.map((r) => r.querySelector("svg.pict")?.getAttribute("aria-label")),
+      );
+      return { rows: rows.length, marked: withMark.length, distinct: labels.size };
+    });
+    if (cat.rows > 20 && cat.marked === cat.rows && cat.distinct >= 8)
+      ok(
+        `catalogue: every partida shows a drawing of its job (${cat.marked}/${cat.rows} rows, ${cat.distinct} different drawings)`,
+      );
+    else bad("catalogue: line drawings", JSON.stringify(cat));
+
+    /* No requests and no blobs — the whole reason these are drawings. A build
+       that quietly moved to <img src> would satisfy every other check here and
+       cost the operator a megabyte a screen on a phone. */
+    const cheap = await pg.evaluate(() => {
+      const svgs = [...document.querySelectorAll("svg.pict")];
+      const html = svgs.map((s) => s.outerHTML).join("");
+      return {
+        n: svgs.length,
+        bytes: html.length,
+        external: /<image|xlink:href|url\(|https?:/.test(html),
+      };
+    });
+    if (cheap.n > 20 && !cheap.external && cheap.bytes / cheap.n < 1400)
+      ok(
+        `catalogue: the drawings fetch nothing and cost ~${Math.round(cheap.bytes / cheap.n)} bytes each`,
+      );
+    else bad("catalogue: drawings stay lean", JSON.stringify(cheap));
+
+    /* Now the same partida, taken into a quote from the catalogue, and then
+       printed. Picked through the engine so the drawing is compared against
+       the item that was actually added rather than against a row index. */
+    const chain = await pg.evaluate(async () => {
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      const v = b.versions[b.versions.length - 1];
+      const chap = v.chapters[0];
+      // A partida whose own words name a job, so the drawing cannot come from
+      // the chapter fallback and still look right.
+      const item = erp.state.catalogue.find((i) => /alicatado/i.test(i.desc));
+      if (!item) return { err: "no recognisable partida in the price book" };
+      const want = ErpPictograms.label(ErpPictograms.pick(item));
+      go("quotes", b.id);
+      await new Promise((r) => setTimeout(r, 900));
+      const sel = document.querySelector(`#bRows tr[data-chap="${chap.id}"] select.bcat`);
+      let lineId = null;
+      if (sel) {
+        const opt = [...sel.options].find((o) => o.value === item.id);
+        if (!opt) return { err: "the added partida is not offered on this chapter" };
+        lineId = sel.dataset.cat;
+        sel.value = item.id;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 700));
+      } else return { err: "no catalogue dropdown on the line" };
+      const row = document.querySelector(`#bRows tr[data-row="${lineId}"] svg.pict`);
+      const inBuilder = row && row.getAttribute("aria-label");
+      // …and onto the document the customer receives.
+      document.querySelector("#bPreview").click();
+      await new Promise((r) => setTimeout(r, 900));
+      /* `.chapline.item` and not `.chapline`: the same row class carries the
+         totals, the exclusions and the assumptions, and demanding a drawing on
+         "Base imponible" is asking the document to be wrong. The first version
+         of this check did exactly that and reported 2 of 5 marked, which read
+         as three missing pictures and was in fact three rows that are not
+         partidas. The class now says which is which in the markup rather than
+         leaving the test to guess. */
+      const lines = [...document.querySelectorAll("#dbody .chapline.item")];
+      const onDoc = lines
+        .filter((l) => /alicatado/i.test(l.textContent))
+        .map((l) => l.querySelector("svg.pict")?.getAttribute("aria-label"));
+      return {
+        want,
+        inBuilder,
+        onDoc,
+        docLines: lines.length,
+        docMarked: lines.filter((l) => l.querySelector("svg.pict")).length,
+      };
+    });
+    if (chain.err) bad("the drawing follows the partida", chain.err);
+    else if (
+      chain.inBuilder === chain.want &&
+      chain.onDoc.length > 0 &&
+      chain.onDoc.every((l) => l === chain.want) &&
+      chain.docMarked === chain.docLines
+    )
+      ok(
+        `the same drawing follows one partida from the price book to the builder to the quote ("${chain.want}", ${chain.docMarked}/${chain.docLines} lines marked)`,
+      );
+    else bad("the drawing follows the partida", JSON.stringify(chain).slice(0, 240));
+
     if (errs.length === 0) ok("builder: no console errors");
     else bad("builder: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

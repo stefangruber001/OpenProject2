@@ -4428,3 +4428,52 @@ Swept for the same shape afterwards: 32 further Catalan identity rules, all
 checked and all legitimate — _seleccionada, mes, Factura, Oferta, Tarifa,
 crítica, incompleta, mín._ really are the same word in Catalan. `falta` was the
 only impostor.
+
+## The price book's pictures are DRAWINGS, and they are DERIVED, not stored
+
+The instruction was "add for each sub-item a picture which represents the task…
+keep it simple and lean to avoid using super a lot of data". Two hundred and
+eight photographs is somewhere north of forty megabytes, each one to be shot,
+licensed, stored, backed up and restored so a thumbnail can sit beside a line
+of a quote. So each partida gets a **line drawing** instead: 54 shapes, a few
+dozen numbers each, the whole set smaller than one photograph.
+
+**Three reasons, and only the first is about size.**
+
+_It is the only thing that reaches the paper._ `site/erp-pdf.js` has no image
+support at all — no XObject pipeline, no colour space, no decoder. It draws
+with PDF path operators, and its house mark already says why: "Vector rather
+than an image so it stays crisp at any size and adds no bytes worth counting."
+A raster picture could not have been printed without building all of that.
+
+_It cannot be mistaken for evidence._ `ensureDemoImages` already refuses to
+write invented pictures into the company's real attachment store, on the
+grounds that a fiction indistinguishable from a photograph of an actual wall is
+worse than no picture. These are symbols, they live in code rather than in the
+blob store, and nothing about them can ever be read as a record of a site.
+
+_One definition, three surfaces._ The catalogue, the quote builder and the
+printed quote render the same shape through two writers (inline SVG, PDF path
+operators). They cannot show three different pictures of one partida, and the
+browser suite follows a single partida through all three and compares the
+drawings rather than merely counting them.
+
+**Derived, not stored — the reversible order.** No migration and no new field:
+the drawing is resolved from the partida's own words, then from the words of
+the chapter above it, then from the chapter code. Nothing is added to the state
+blob that re-serialises on every keystroke, and a frozen version keeps the
+picture it was sent with for the same reason it keeps the price — the words it
+was computed from are frozen too. `pick()` already honours an explicit
+`pictogram` field if one is ever set, so the operator can be given an override
+later without a migration now.
+
+**Two things the first version got wrong, both found by looking at the page.**
+The rendered quote came out as five pages of identical boxes: the fixture's
+lines read "Partida 3 del capítulo" and carry their meaning in the heading
+above them, which the resolver ignored. And the document writer transliterates
+to Latin-1, so its chapters spell "Demolicion" while the price book spells it
+"Demolición" — two spellings of one word, matching nothing. Matching is now
+accent-folded on both sides, and ranks by **first mention** rather than longest
+keyword, because "Limpieza y retirada" is a chapter about cleaning that ends
+with a lorry. The gate had reported one mark per row throughout. **Counting
+marks is not the same as looking at them.**

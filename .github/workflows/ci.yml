@@ -335,6 +335,16 @@ jobs:
       - name: iOS tab routes (every tab addresses a real screen)
         run: node tests/ios-routes/coverage.mjs
 
+      # The price book's line drawings. Pure data and pure string work, so it
+      # runs here with the other simulations rather than in the browser job:
+      # the shapes, the mapping from a partida to its drawing, and both
+      # renderers (inline SVG and PDF path operators) are checked without a
+      # page. Whether the drawings actually REACH the quote is asserted in the
+      # document gate and the browser suite, which is where a picture can go
+      # missing between a module and a page.
+      - name: Price-book pictograms (shapes, mapping, both renderers)
+        run: node tests/pictograms/run.mjs
+
   persistence:
     name: Durable adapters (Postgres + RLS contract tests)
     runs-on: ubuntu-latest

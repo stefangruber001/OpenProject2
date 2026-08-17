@@ -1295,6 +1295,10 @@
       }
     </style>
     <script src="erp-modal.js"></script>
+    <!-- MUST precede erp-pdf.js: the writer takes the pictograms from the
+     global at factory time, so loading this after would leave every quote line
+     unmarked while nothing failed. -->
+    <script src="erp-pictograms.js"></script>
     <script src="erp-pdf.js"></script>
     <script src="i18n-dict.js"></script>
     <script src="i18n-dict-ca.js"></script>
