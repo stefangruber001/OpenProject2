@@ -2567,8 +2567,7 @@ window.CANEI_DICT = {
     ["Fuera de presupuesto", "Outside the quote"],
     ["Pendientes de precio", "Awaiting a price"],
     ["Por m²", "Per m²"],
-    ["Coste y margen", "Cost and margin"],
-    ["no salen del documento", "never leave the document"],
+    ["Coste y margen no salen del documento", "Cost and margin never leave the document"],
     ["Anexo gráfico", "Graphic annex"],
     [
       "Este presupuesto no tiene ninguna visita asociada.",

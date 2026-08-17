@@ -605,8 +605,7 @@ window.CANEI_DICT.ca = {
   "Fuera de presupuesto": "Fora de pressupost",
   "Pendientes de precio": "Pendents de preu",
   "Por m²": "Per m²",
-  "Coste y margen": "Cost i marge",
-  "no salen del documento": "no surten del document",
+  "Coste y margen no salen del documento": "Cost i marge no surten del document",
   "Anexo gráfico": "Annex gràfic",
   "Este presupuesto no tiene ninguna visita asociada.":
     "Aquest pressupost no té cap visita associada.",

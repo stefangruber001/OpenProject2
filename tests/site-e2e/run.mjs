@@ -2720,7 +2720,20 @@ async function testPresupuestador(browser, base) {
     // sideways. What this asserts is the shape — the workspace rail gone, the
     // grid between two side tracks, its own bar carrying the total — and not
     // which of the side panes today's viewport chose to show.
-    if (shell.fs && shell.rail === "none" && /^(260px|0px) .* 300px$/.test(shell.cols) && shell.bar)
+    /* The SHAPE, in numbers rather than in a pixel literal. The old form
+       spelled the side pane's width into the regex, so tightening it by 22px
+       to give the description room failed a test about whether the rail is
+       hidden — a check that fails for a reason it is not about teaches you to
+       edit the check. Three tracks; the grid is the widest of them; the totals
+       pane is present and side-pane-sized. */
+    const tracks = shell.cols.split(/\s+/).map(parseFloat);
+    const shaped =
+      tracks.length === 3 &&
+      tracks[1] > tracks[0] &&
+      tracks[1] > tracks[2] &&
+      tracks[2] >= 200 &&
+      tracks[2] <= 320;
+    if (shell.fs && shell.rail === "none" && shaped && shell.bar)
       ok(`COM-03: full screen — rail hidden, three panes at ${shell.cols}, own bar with the total`);
     else bad("COM-03: full-screen layout", JSON.stringify(shell));
     if (shell.cond) ok("COM-03: the conditions bar sits below the panes");
@@ -6225,6 +6238,69 @@ async function testPresupuestadorRework(browser, base) {
         "presupuestador: columns run descripción → unidad → coste → margen % → cantidad → venta → total",
       );
     else bad("presupuestador: column order", JSON.stringify(heads));
+
+    /* ---- the grid is READ, not merely rendered -----------------------------
+       Three geometric facts, because every one of them was false on a screen
+       whose every other check passed. A screenshot showed four different
+       partidas all reading the same truncated code, four descriptions cut
+       mid-word, and five column headings run together into one string — and
+       nothing failed, because counting cells is not the same as looking at
+       them.
+
+       Codes and numbers are FIXED-LENGTH values. A truncated one is not
+       cosmetic: two partidas become indistinguishable, which is a quote the
+       estimator cannot check. Zero tolerance there. The description is free
+       text and can always be made longer than any column, so what is asserted
+       of it is a floor on the width it is given — a share of the pane, so it
+       cannot be quietly eaten by a column added later. */
+    const grid = await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("#bRows tr.pbrow")];
+      const clipped = (sel) =>
+        rows
+          .map((r) => r.querySelector(sel))
+          .filter((el) => el && el.scrollWidth > el.clientWidth + 1)
+          .map((el) => (el.value || el.textContent || "").trim());
+      const th = [...document.querySelectorAll(".bgrid thead th")];
+      // A heading wider than its column does not widen it under a fixed table
+      // layout — it runs into the next one.
+      const overflowing = th
+        .filter((t) => t.scrollWidth > t.clientWidth + 1)
+        .map((t) => t.textContent.trim());
+      const desc = rows[0] && rows[0].querySelector("td.c-desc");
+      const table = document.querySelector(".bgrid table");
+      return {
+        codes: clipped('[data-f="code"]'),
+        nums: clipped('[data-f="num"]'),
+        units: clipped('[data-f="unit"]'),
+        amounts: clipped(".out"),
+        overflowing,
+        descShare:
+          desc && table
+            ? Math.round(
+                (desc.getBoundingClientRect().width / table.getBoundingClientRect().width) * 100,
+              )
+            : 0,
+      };
+    });
+    const stuck = [
+      ...grid.codes.map((v) => `código ${v}`),
+      ...grid.nums.map((v) => `nº ${v}`),
+      ...grid.units.map((v) => `unidad ${v}`),
+      ...grid.amounts.map((v) => `importe ${v}`),
+    ];
+    if (!stuck.length)
+      ok("presupuestador: no code, number, unit or amount is cut off by its column");
+    else bad("presupuestador: fixed-length values truncated", stuck.slice(0, 6).join(" · "));
+
+    if (!grid.overflowing.length) ok("presupuestador: every column heading fits its column");
+    else
+      bad("presupuestador: headings run into each other", grid.overflowing.slice(0, 6).join(" · "));
+
+    // 30%: measured at 33% on a 1600px window with the tree folded. A floor,
+    // not a target — the free-text column is the one the estimator reads.
+    if (grid.descShare >= 30)
+      ok(`presupuestador: the description keeps ${grid.descShare}% of the grid`);
+    else bad("presupuestador: description column squeezed", `${grid.descShare}% of the table`);
 
     // "Ojo con las unidades": the unit is picked from DMC-03, not typed.
     const unitTag = await pg.evaluate(() => document.querySelector('[data-f="unit"]')?.tagName);
