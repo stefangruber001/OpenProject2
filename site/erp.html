@@ -17883,7 +17883,12 @@
             ? [
                 {
                   desc: `Hito de contrato · ${CON_TRIGGER[m.trigger] || m.trigger || "sin motivo"}`,
-                  amountCents: m.amountCents,
+                  // `baseCents`, not `amountCents`. The contract states its
+                  // instalments WITH VAT, an invoice line is a base and the
+                  // document adds VAT itself — using the stated figure here
+                  // charged the tax twice. The engine does the division; see
+                  // invoiceBases.
+                  amountCents: m.baseCents,
                 },
               ]
             : [];

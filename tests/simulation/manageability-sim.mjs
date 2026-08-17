@@ -1744,6 +1744,290 @@ assert(
   );
 }
 
+/* =============================================================================
+   ONE JOB, TWO PAYERS.
+
+   A general contractor hired by the end customer sub-hires Canei. Part of the
+   work is owed by the contractor and part directly by the end customer — one
+   project, one budget, one set of costs and one margin, two people to invoice.
+
+   The feature is not "let the operator pick who to bill". That much is one
+   line. The feature is that picking wrongly is REFUSED: with a free choice of
+   payer per invoice, nothing stops the same chapter being billed to both, and
+   the error surfaces months later as a dispute over two sealed, immutable
+   documents in a gapless series.
+
+   So every check below is about the guard, not the convenience.
+   ========================================================================== */
+{
+  const e = new ERP("2026-03-02");
+  e.configureEntity(
+    {
+      legalName: "Canei Subirats, S.L.",
+      taxId: "B12345674",
+      street: "C/ X 1",
+      postalCode: "08960",
+      city: "Sant Just",
+      iban: "ES9121000418450200051332",
+    },
+    "bo",
+  );
+  const mkParty = (name, taxId, roles) =>
+    e.addParty(
+      {
+        roles,
+        name,
+        taxId,
+        billStreet: "C/ Y 2",
+        billPostalCode: "08001",
+        billCity: "BCN",
+        billProvince: "Barcelona",
+        mobile: "600000001",
+        email: "x@y.example",
+        leadSource: "referral",
+      },
+      "bo",
+    );
+  const endCust = mkParty("Propietaria Final", "12345678Z", ["customer"]);
+  const gc = mkParty("Constructora General SA", "A58818501", ["customer"]);
+
+  // One budget, two chapters: one each.
+  const bud = e.createBudget({ partyId: endCust.id }, "bo");
+  const cA = e.addChapter(bud.id, { name: "Baño" }, "bo");
+  const cB = e.addChapter(bud.id, { name: "Estructura" }, "bo");
+  e.addLine(
+    bud.id,
+    cA.id,
+    { desc: "Alicatado", unit: "m2", qtyMilli: 1000, priceCents: 100000, costCents: 50000 },
+    "bo",
+  );
+  e.addLine(
+    bud.id,
+    cB.id,
+    { desc: "Refuerzo", unit: "m2", qtyMilli: 1000, priceCents: 300000, costCents: 150000 },
+    "bo",
+  );
+  e.issueVersion(bud.id, {}, "bo");
+  e.acceptVersion(bud.id, e.currentVersion(bud.id).id, { evidenceRef: "ok" }, "bo");
+  const prj = e.createProjectFromAcceptance(bud.id, "bo");
+
+  // Default: one payer, everything theirs — the ordinary job, unchanged.
+  assert(
+    prj.billing.length === 1 && prj.billing[0].partyId === endCust.id,
+    "a new project starts with one payer",
+  );
+  assert(
+    prj.baseline.chapters.every((c) => c.billToPartyId === endCust.id),
+    "and every chapter is owed by that payer",
+  );
+
+  // Split it: chapter 2 is owed by the general contractor.
+  e.addProjectPayer(
+    prj.id,
+    {
+      partyId: gc.id,
+      role: "mainContractor",
+      vatBp: 0,
+      taxTreatment: "reverseCharge",
+      taxJustification: "Ejecución de obra — art. 84.Uno.2.f LIVA",
+    },
+    "bo",
+  );
+  e.assignChapterPayer(prj.id, "2", gc.id, "bo");
+  assert(e.project(prj.id).billing.length === 2, "a second payer can be added");
+
+  const basesEnd = e.invoiceBases(prj.id, endCust.id);
+  const basesGc = e.invoiceBases(prj.id, gc.id);
+  assert(
+    basesEnd.attributedCents === 100000,
+    "the end customer is attributed only their chapter",
+    String(basesEnd.attributedCents),
+  );
+  assert(
+    basesGc.attributedCents === 300000,
+    "the contractor only theirs",
+    String(basesGc.attributedCents),
+  );
+  assert(
+    basesEnd.attributedCents + basesGc.attributedCents === prj.baseline.revenueCents,
+    "and together they are the whole job, exactly once",
+  );
+
+  // THE GUARD. Billing the contractor for the end customer's scope is refused.
+  throws(
+    () =>
+      e.issueInvoice(
+        { projectId: prj.id, billToPartyId: gc.id, baseCents: 400000, desc: "todo" },
+        "bo",
+      ),
+    "billing one payer for more than their own scope is refused",
+  );
+  const seriesBefore = e.state.series.invoice.next;
+  try {
+    e.issueInvoice({ projectId: prj.id, billToPartyId: gc.id, baseCents: 400000 }, "bo");
+  } catch (err) {
+    /* expected */
+  }
+  assert(
+    e.state.series.invoice.next === seriesBefore,
+    "and the refusal mints no invoice number",
+    `${seriesBefore} -> ${e.state.series.invoice.next}`,
+  );
+
+  // Each payer billed their own scope: two invoices, two parties, two treatments.
+  const iEnd = e.issueInvoice(
+    { projectId: prj.id, billToPartyId: endCust.id, baseCents: 100000, desc: "Baño" },
+    "bo",
+  );
+  const iGc = e.issueInvoice(
+    { projectId: prj.id, billToPartyId: gc.id, baseCents: 300000, desc: "Estructura" },
+    "bo",
+  );
+  assert(
+    iEnd.partyId === endCust.id && iGc.partyId === gc.id,
+    "each invoice carries its own payer",
+  );
+  assert(iEnd.vatBp === prj.vatBp, "the end customer keeps the project's tax rate");
+  assert(
+    iGc.vatBp === 0 && iGc.taxTreatment === "reverseCharge",
+    "the contractor's invoice is on its own treatment",
+  );
+  assert(
+    /84\.Uno\.2\.f/.test(iGc.taxJustification || ""),
+    "and records WHY, on the document, not as a rule to re-derive later",
+    iGc.taxJustification,
+  );
+
+  /* Neither payer can now be billed again for the same work.
+     A MATERIAL amount, deliberately: the cap carries a few cents of slack for
+     VAT round-tripping (see AR-11), so asserting that one extra cent is
+     refused would be asserting the tolerance away. What must be refused is a
+     second helping of somebody else's scope, and that is made of euros. */
+  throws(
+    () =>
+      e.issueInvoice(
+        { projectId: prj.id, billToPartyId: gc.id, baseCents: 10000, desc: "otra vez" },
+        "bo",
+      ),
+    "a payer already billed in full cannot be billed again",
+  );
+  assert(
+    e.invoiceBases(prj.id).billedBaseCents === 400000,
+    "the project-wide total is still the whole job, billed once",
+    String(e.invoiceBases(prj.id).billedBaseCents),
+  );
+
+  /* A CONTRACT MILESTONE IS BILLED ONCE, NOT WITH VAT ON VAT.
+     A contract states its schedule the way the customer reads it — a
+     percentage of `totalCents`, which is value PLUS VAT. An invoice line is a
+     base and the document adds VAT itself, so handing the stated figure
+     straight to the generator charged the tax twice: on a 1.000 € + 10%
+     contract the 100% milestone came out at 1.210 € against a 1.100 €
+     contract. That was live and shipped; the over-billing guard found it.
+     Asserted on the arithmetic rather than on the screen, so it holds however
+     the generator is rewritten. */
+  {
+    const v = new ERP("2026-03-02");
+    v.configureEntity(
+      {
+        legalName: "C",
+        taxId: "B12345674",
+        street: "s",
+        postalCode: "08960",
+        city: "c",
+        iban: "ES9121000418450200051332",
+      },
+      "bo",
+    );
+    const cli = v.addParty(
+      {
+        roles: ["customer"],
+        name: "Cli",
+        taxId: "12345678Z",
+        billStreet: "s",
+        billPostalCode: "08001",
+        billCity: "BCN",
+        billProvince: "B",
+        mobile: "600111222",
+        email: "a@b.c",
+        leadSource: "referral",
+      },
+      "bo",
+    );
+    const bg = v.createBudget({ partyId: cli.id }, "bo");
+    v.updateBudget(bg.id, { vatBp: 1000 }, "bo");
+    const cp = v.addChapter(bg.id, { name: "Obra" }, "bo");
+    v.addLine(
+      bg.id,
+      cp.id,
+      { desc: "L", unit: "ud", qtyMilli: 1000, priceCents: 100000, costCents: 50000 },
+      "bo",
+    );
+    v.issueVersion(bg.id, {}, "bo");
+    v.acceptVersion(bg.id, v.currentVersion(bg.id).id, { evidenceRef: "ok" }, "bo");
+    const ct = v.createContract(
+      bg.id,
+      {
+        installments: [{ pct: 100, trigger: "onSignature", expectedDate: v.today }],
+        duration: { estimatedDays: 10 },
+      },
+      "bo",
+    );
+    v.signContract(ct.id, { method: "paper" }, "bo");
+    const pj = v.createProjectFromAcceptance(bg.id, "bo");
+    const ms = v.invoiceBases(pj.id).milestones[0];
+    assert(
+      ms.amountCents === 110000,
+      "the contract states its milestone with VAT, as the customer reads it",
+      String(ms.amountCents),
+    );
+    assert(
+      ms.baseCents === 100000,
+      "and the engine hands the screen the base, not that figure",
+      String(ms.baseCents),
+    );
+    const issued = v.issueInvoice(
+      { projectId: pj.id, installmentIdx: 0, lines: [{ desc: "Hito", amountCents: ms.baseCents }] },
+      "bo",
+    );
+    assert(
+      issued.totalCents === 110000,
+      "so the invoice totals the contract, not the contract plus VAT twice",
+      `${issued.totalCents} (base ${issued.baseCents} + IVA ${issued.vatCents})`,
+    );
+  }
+
+  // A party who is not a payer on this project is refused outright.
+  const stranger = mkParty("Ajena SL", "B10000008", ["customer"]);
+  throws(
+    () =>
+      e.issueInvoice(
+        { projectId: prj.id, billToPartyId: stranger.id, baseCents: 100, desc: "x" },
+        "bo",
+      ),
+    "a party who is not a payer on the project cannot be invoiced for it",
+  );
+
+  // A credit note is not capped — it REDUCES what a payer has been billed.
+  const abono = e.issueInvoice(
+    {
+      projectId: prj.id,
+      billToPartyId: gc.id,
+      kind: "creditNote",
+      rectifies: iGc.id,
+      rectifyReason: "error",
+      baseCents: 50000,
+    },
+    "bo",
+  );
+  assert(abono.partyId === gc.id, "a credit note follows its payer");
+  assert(
+    e.invoiceBases(prj.id, gc.id).billedBaseCents === 250000,
+    "and reduces that payer's billed total",
+    String(e.invoiceBases(prj.id, gc.id).billedBaseCents),
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

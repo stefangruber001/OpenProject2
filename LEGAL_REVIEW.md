@@ -60,7 +60,39 @@ date) → how it's implemented → gate.
   reference the original and use their own series. Simplified-invoice rules not
   yet modelled. **legally_verified: false.**
 
-## 5. Still to research before production (tracked, not blocking P0/P1)
+## 5. Split billing — one job, an end customer AND a general contractor
+
+- **The situation:** a general contractor hired by the end customer sub-hires
+  Canei. Part of the work is invoiced to the contractor, part directly to the
+  end customer — one project, one budget, one margin, two recipients.
+- **Why this needs an asesor and not a rule in code:** the two recipients are
+  usually taxed differently, and one of the two treatments is a determination
+  rather than a rate. Work invoiced to a private individual on their own
+  dwelling may qualify for the reduced rate (§2 above). The same work invoiced
+  to a contractor within a construction execution chain points at **inversión
+  del sujeto pasivo** — the recipient self-assesses, the issuer charges no VAT,
+  and the invoice must carry the legal mention. Whether a given engagement is
+  inside that chain depends on the contractual relationship, not on the shape of
+  either party's record.
+- **What the system does, deliberately:** nothing automatic. Each payer on a
+  project carries `taxTreatment` (`standard` | `reverseCharge` | `exempt`) and a
+  free-text `taxJustification`, both set by the operator. `issueInvoice`
+  persists **both** on the invoice, so the document records the decision and its
+  stated reason rather than leaving it to be re-derived years later from a rule
+  that may since have changed (mandate §6.3, same treatment as §2).
+- **What is NOT modelled:** no inference of reverse charge from party type,
+  role or activity code; no check that the chain condition actually holds; no
+  automatic legal-mention wording beyond what the operator writes. A wrong
+  determination here is a wrong filing, and guessing it silently is the failure
+  this entry exists to prevent.
+- **Open questions for the asesor:** whether an engagement of this shape is
+  inside the execution chain; the exact mention required on the invoice; how a
+  mixed invoice (some lines chain, some not) must be split — the system
+  currently requires one treatment per payer, which forces the split to be made
+  as scope rather than hidden inside one document.
+  **legally_verified: false.**
+
+## 6. Still to research before production (tracked, not blocking P0/P1)
 
 Facturae 3.2.x + FACe for public-sector clients; B2B e-invoice under Ley Crea y
 Crece (development pending its reglamento); Modelo 303/390/347/111/115/190 data

@@ -3857,20 +3857,78 @@
     _invoiceBlocks(draft) {
       const out = [];
       const p = this.project(draft.projectId);
-      const comp = this.partyCompleteness(p.partyId);
-      if (!comp.ok)
+      /* WHO IS BEING BILLED — the payer named on the draft, not the project's
+         own customer. A job with one payer answers the same as it always did. */
+      const billTo = draft.billToPartyId || p.partyId;
+      const payer = this._billingFor(p, billTo);
+      if (!payer)
         out.push({
-          code: "MDM-10",
-          label: "Datos fiscales del cliente incompletos",
-          detail: comp.missing.join(", "),
+          code: "AR-12",
+          label: "Ese cliente no paga esta obra",
+          detail: "Añádalo como pagador del proyecto antes de emitirle una factura.",
         });
+      // THEIR fiscal data, not the project customer's. A contractor with no NIF
+      // must block its own invoice and leave the end customer's alone.
+      if (this.state.parties.some((x) => x.id === billTo)) {
+        const comp = this.partyCompleteness(billTo);
+        if (!comp.ok)
+          out.push({
+            code: "MDM-10",
+            label: "Datos fiscales del cliente incompletos",
+            detail: comp.missing.join(", "),
+          });
+      }
+      /* AR-11 — the guard the whole split rests on.
+         Nobody may be billed for more than they owe. Without it the payer is a
+         free choice per invoice and the same chapter can be billed to both, on
+         two sealed documents in a gapless series, discovered months later.
+         Credit notes are exempt: an abono REDUCES what a payer has been billed,
+         so capping it would refuse the very correction that fixes an overbill. */
+      /* An extra has its OWN rule and does not need this one as well.
+         CHG-04 below already refuses an unapproved adicional, by name and with
+         the reason an operator can act on; AR-11 fired alongside it only
+         because an unapproved extra is not yet in the ceiling, which is a
+         restatement of the same fact in worse words. Once approved the extra
+         IS in the ceiling, so nothing is left unguarded either way. */
+      if (payer && draft.kind !== "creditNote" && !draft.changeId) {
+        const bases = this.invoiceBases(p.id, billTo);
+        const room = bases.attributedCents - bases.billedBaseCents;
+        const want = this._invoiceBase(draft);
+        /* Rounding slack, and ONLY rounding slack.
+           `projectBilling.remainingToInvoiceCents` is VAT-INCLUSIVE, so the
+           natural way to size a final invoice is to divide it back down by the
+           rate — and that round trip is worth up to a cent each time. The
+           allowance is one cent per invoice this payer already has, plus one:
+           the most the arithmetic can drift, and orders of magnitude below the
+           euros a real scope error is made of. The year simulation issued its
+           own final invoice one cent over and was refused. */
+        const slack = (bases.issued || []).length + 1;
+        if (want > room + slack)
+          out.push({
+            code: "AR-11",
+            label: "Excede lo que este cliente debe por esta obra",
+            detail: `Pendiente ${(room / 100).toFixed(2)} €, factura ${(want / 100).toFixed(2)} €`,
+          });
+      }
       const contract = p.contractId
         ? this.state.contracts.find((c) => c.id === p.contractId)
         : null;
-      const firstForProject = !this.state.invoices.some(
-        (i) => i.projectId === p.id && i.kind !== "creditNote",
+      /* The contract binds the payer it NAMES. A second payer who signed
+         nothing is not blocked by the first one's unsigned contract, and — the
+         direction that matters — the first payer's own first invoice is still
+         blocked even if the second has already been invoiced. Scoping this to
+         the project would have let one payer's invoice quietly unlock the
+         other's. */
+      const contractParty = contract ? contract.partyId || p.partyId : null;
+      const firstForPayer = !this.state.invoices.some(
+        (i) => i.projectId === p.id && i.partyId === billTo && i.kind !== "creditNote",
       );
-      if (contract && firstForProject && !contract.signature.customerSignedAt)
+      if (
+        contract &&
+        contractParty === billTo &&
+        firstForPayer &&
+        !contract.signature.customerSignedAt
+      )
         out.push({
           code: "CON-11",
           label: "Contrato sin firmar",
@@ -3896,6 +3954,140 @@
       return out;
     }
 
+    /**
+     * The payer an invoice is for, and the terms that go with them.
+     *
+     * Returns null when the party named is not a payer on this project, rather
+     * than throwing: `previewInvoice` has to keep rendering a draft that names
+     * the wrong party, and `issueInvoice` has to turn it into a BLOCK — one
+     * that fires before a number is minted. A throw from here would do neither.
+     *
+     * A project written before billing existed, or one whose array was somehow
+     * emptied, falls back to its own customer on its own rate: the same
+     * single-payer arrangement `defaultBilling` produces. The ordinary job
+     * therefore never depends on the migration having run.
+     */
+    _billingFor(p, billToPartyId) {
+      const rows =
+        Array.isArray(p.billing) && p.billing.length
+          ? p.billing
+          : defaultBilling(p.partyId, p.vatBp);
+      const wanted = billToPartyId || p.partyId;
+      return rows.find((r) => r.partyId === wanted) || null;
+    }
+
+    /**
+     * What one payer owes for on this project — their scope, not their progress.
+     *
+     * This is the ceiling the over-billing guard uses, and it is deliberately
+     * SCOPE and not executed work: a deposit invoice legitimately precedes the
+     * work it pays for, so capping against progress would refuse a perfectly
+     * ordinary 40% up-front. What must never happen is billing somebody for
+     * work that was never theirs.
+     *
+     * A single-payer job is attributed the baseline's own revenue figure rather
+     * than the sum of its chapters. The two differ whenever the budget carried
+     * a discount — `revenueCents` is the taxable total, chapter `saleCents` are
+     * before it — and every other screen in the system quotes the baseline.
+     * Summing chapters unconditionally would have made this guard refuse
+     * legitimate invoices on every discounted job, which is a worse failure
+     * than the one it exists to prevent.
+     *
+     * An approved extra belongs to whoever owes for the chapter it affects:
+     * `change.chapterNum` already records which chapter that is, so nothing new
+     * had to be stored to know who pays for it. An extra with no chapter falls
+     * to the project's own customer, which is where it was always billed.
+     */
+    _attributedCents(p, partyId) {
+      const chapters = (p.baseline && p.baseline.chapters) || [];
+      const mine = chapters.filter((c) => (c.billToPartyId || p.partyId) === partyId);
+      const base =
+        mine.length === chapters.length
+          ? p.baseline.revenueCents
+          : sum(mine, (c) => c.saleCents || 0);
+      const nums = new Set(mine.map((c) => String(c.num)));
+      /* The SAME three statuses `projectEconomics` counts as revenue, and it
+         has to stay that way. "invoiced" belongs here: issuing an invoice for
+         an extra moves it to that status, and dropping it from the ceiling
+         while it stays in `currentRevenueCents` made the cap fall below what
+         the project legitimately still had to bill — the year simulation
+         refused its own final invoice by 1 565 €. An extra that has been
+         invoiced is still part of what the payer owes; it is already counted on
+         the other side of the subtraction, in `billedBaseCents`. */
+      const extras = this.state.changes.filter(
+        (c) =>
+          c.projectId === p.id &&
+          ["approved", "executed", "invoiced"].includes(c.status) &&
+          (c.chapterNum ? nums.has(String(c.chapterNum)) : partyId === p.partyId),
+      );
+      return base + sum(extras, (c) => c.priceCents || 0);
+    }
+
+    /**
+     * Add a payer to a project — the general contractor beside the end customer.
+     *
+     * Their tax treatment is theirs, not the project's: see `defaultBilling`.
+     * Nothing about it is inferred from the party's shape.
+     */
+    addProjectPayer(projectId, payer, user) {
+      const p = this.project(projectId);
+      const party = this.party(payer.partyId); // throws on an unknown party
+      if (!Array.isArray(p.billing) || !p.billing.length)
+        p.billing = defaultBilling(p.partyId, p.vatBp);
+      if (p.billing.some((b) => b.partyId === party.id))
+        throw new Error("Already a payer on this project: " + party.name);
+      p.billing.push({
+        partyId: party.id,
+        role: payer.role || "mainContractor",
+        vatBp: payer.vatBp != null ? payer.vatBp : p.vatBp,
+        taxTreatment: payer.taxTreatment || "standard",
+        taxJustification: payer.taxJustification || "",
+        paymentTermsDays: payer.paymentTermsDays != null ? payer.paymentTermsDays : null,
+      });
+      this._log(user, "addProjectPayer", p.code);
+      return p.billing;
+    }
+
+    /** Correct a payer's terms — the tax treatment above all, which is the one
+     an operator sets after asking their gestor. Never their identity: that is
+     `addProjectPayer` plus a reassignment, and both are refused once invoiced. */
+    updateProjectPayer(projectId, partyId, patch, user) {
+      const p = this.project(projectId);
+      const row = this._billingFor(p, partyId);
+      if (!row) throw new Error("Not a payer on this project");
+      for (const k of ["role", "vatBp", "taxTreatment", "taxJustification", "paymentTermsDays"])
+        if (k in patch) row[k] = patch[k];
+      this._log(user, "updateProjectPayer", p.code);
+      return row;
+    }
+
+    /**
+     * Say which payer owes for a chapter.
+     *
+     * Refused once ANYTHING has been invoiced on the project. Before the first
+     * invoice this is arrangement; after it, somebody has been told what they
+     * are buying and moving a chapter between payers changes that silently —
+     * which is a change order, not an edit. `Object.freeze` on the baseline is
+     * shallow and would not have stopped it, so the rule is stated here rather
+     * than assumed from the freeze.
+     */
+    assignChapterPayer(projectId, chapterNum, partyId, user) {
+      const p = this.project(projectId);
+      if (!this._billingFor(p, partyId))
+        throw new Error("Not a payer on this project — add them first");
+      if (this.state.invoices.some((i) => i.projectId === p.id))
+        throw new Error(
+          "Cannot reassign a chapter once the project has been invoiced — raise a change order",
+        );
+      const ch = ((p.baseline && p.baseline.chapters) || []).find(
+        (c) => String(c.num) === String(chapterNum),
+      );
+      if (!ch) throw new Error("Chapter not found: " + chapterNum);
+      ch.billToPartyId = partyId;
+      this._log(user, "assignChapterPayer", p.code + " · " + chapterNum);
+      return ch;
+    }
+
     /** The base of a draft: its own lines when it has them, `baseCents` otherwise. */
     _invoiceBase(draft) {
       if (draft.baseCents != null) return cents(draft.baseCents);
@@ -3912,12 +4104,20 @@
      * before it ever reaches this screen. The generator's job is to let
      * somebody pick one, not to make them add it up again.
      */
-    invoiceBases(projectId) {
+    invoiceBases(projectId, billToPartyId) {
       const p = this.project(projectId);
       const contract = p.contractId
         ? this.state.contracts.find((c) => c.id === p.contractId)
         : null;
-      const invs = this.state.invoices.filter((i) => i.projectId === p.id);
+      /* Scoped to ONE payer when asked, project-wide when not.
+         Both are wanted and they are different questions: the invoice generator
+         asks what this payer may still be billed, the economics screens ask what
+         the whole job has billed. Keeping one function answering both is what
+         stops the two drifting into different definitions of "billed". */
+      const forParty = billToPartyId || null;
+      const invs = this.state.invoices.filter(
+        (i) => i.projectId === p.id && (!forParty || i.partyId === forParty),
+      );
       // Already billed, as BASE and net of abonos — the figure a certification
       // has to subtract. Totals would be the wrong number: VAT is not revenue.
       const billedBase =
@@ -3930,32 +4130,56 @@
           (i) => i.baseCents,
         );
       const prog = this.chapterProgress(p.id);
-      const chapters = (p.baseline.chapters || []).map((c) => {
-        const hit = prog.find((x) => x.num === c.num);
-        const progressPct = hit ? hit.progressPct : 0;
-        return {
-          num: c.num,
-          name: c.name,
-          valueCents: c.saleCents,
-          progressPct,
-          doneCents: Math.round((c.saleCents * progressPct) / 100),
-        };
-      });
+      const chapters = (p.baseline.chapters || [])
+        .filter((c) => !forParty || (c.billToPartyId || p.partyId) === forParty)
+        .map((c) => {
+          const hit = prog.find((x) => x.num === c.num);
+          const progressPct = hit ? hit.progressPct : 0;
+          return {
+            num: c.num,
+            name: c.name,
+            valueCents: c.saleCents,
+            progressPct,
+            doneCents: Math.round((c.saleCents * progressPct) / 100),
+          };
+        });
       const executedCents = sum(chapters, (c) => c.doneCents);
       return {
         billedBaseCents: billedBase,
-        milestones: contract
-          ? contract.installments
-              .map((i, idx) => ({
-                idx,
-                trigger: i.trigger,
-                pct: i.pct != null ? i.pct : null,
-                amountCents: i.amountCents,
-                expectedDate: i.expectedDate || null,
-                status: i.status,
-              }))
-              .filter((i) => i.status === "planned")
-          : [],
+        // What this payer owes in total — the ceiling AR-11 enforces. Without a
+        // payer it is the whole job, which is the same number it always was.
+        attributedCents: this._attributedCents(p, forParty || p.partyId),
+        // A milestone belongs to the payer the CONTRACT names. Offering the end
+        // customer's instalments while invoicing the contractor would propose
+        // billing one person on another's payment plan.
+        milestones:
+          contract && (!forParty || (contract.partyId || p.partyId) === forParty)
+            ? contract.installments
+                .map((i, idx) => ({
+                  idx,
+                  trigger: i.trigger,
+                  pct: i.pct != null ? i.pct : null,
+                  amountCents: i.amountCents,
+                  /* THE INSTALMENT WITH ITS VAT TAKEN BACK OFF.
+                     A contract states its payment schedule the way a customer
+                     reads it — "40% a la firma" of `totalCents`, which is
+                     `valueCents + vatCents`. An invoice is built from a BASE
+                     and adds VAT itself, so feeding the instalment straight in
+                     charged the tax twice: on a 1.000 € + 10% contract the
+                     100% milestone billed 1.210 € against a 1.100 € contract.
+                     That was live, and the over-billing guard is what found it.
+                     The engine hands over the base so the screen never has to
+                     do this division — the same reason the rest of this method
+                     exists ("the generator's job is to let somebody pick one,
+                     not to make them add it up again").
+                     Stripped at the project's own rate, because that is the
+                     rate baked into the figure the contract was signed on. */
+                  baseCents: Math.round(i.amountCents / (1 + (p.vatBp || 0) / 10000)),
+                  expectedDate: i.expectedDate || null,
+                  status: i.status,
+                }))
+                .filter((i) => i.status === "planned")
+            : [],
         certification: {
           chapters,
           executedCents,
@@ -3988,9 +4212,15 @@
      */
     previewInvoice(draft) {
       const p = this.project(draft.projectId);
-      const party = this.party(p.partyId);
+      // Same resolution as issueInvoice, through the same helper — the promise
+      // this method's docstring makes ("a preview cannot show one figure and
+      // the emitted document another") is only kept if the payer, the rate and
+      // the terms are worked out in one place rather than twice.
+      const payer =
+        this._billingFor(p, draft.billToPartyId) || defaultBilling(p.partyId, p.vatBp)[0];
+      const party = this.party(payer.partyId);
       const baseCents = this._invoiceBase(draft);
-      const vatBp = draft.vatBp != null ? draft.vatBp : p.vatBp;
+      const vatBp = draft.vatBp != null ? draft.vatBp : payer.vatBp != null ? payer.vatBp : p.vatBp;
       const vatCents = pctOf(baseCents, vatBp);
       const irpfBp = draft.irpfBp || 0;
       const irpfCents = pctOf(baseCents, irpfBp);
@@ -3999,7 +4229,9 @@
         number: null, // minted at issue, never before — see nextNumber
         kind: draft.kind || "progress",
         date: this.state.today,
-        partyId: p.partyId,
+        partyId: payer.partyId,
+        taxTreatment: payer.taxTreatment || "standard",
+        taxJustification: payer.taxJustification || "",
         projectId: p.id,
         budgetNumber: p.budgetNumber,
         worksAddress: draft.worksAddress || "",
@@ -4010,7 +4242,10 @@
         irpfBp,
         irpfCents,
         totalCents: baseCents + vatCents - irpfCents,
-        dueDate: addDays(this.state.today, party.paymentTermsDays || 30),
+        // A payer may carry terms of their own — a contractor at 60 days
+        // beside an end customer at 30 — falling back to the party record so a
+        // renegotiated term is not stale in a second copy.
+        dueDate: addDays(this.state.today, payer.paymentTermsDays || party.paymentTermsDays || 30),
         paymentMethod: party.paymentMethod,
         iban: this.state.config.iban,
         rectifies: draft.rectifies || null,
@@ -4116,9 +4351,15 @@
       const contract = p.contractId
         ? this.state.contracts.find((c) => c.id === p.contractId)
         : null;
-      const party = this.party(p.partyId);
+      /* The payer, resolved once. `_invoiceBlocks` has already refused a party
+         who does not pay for this project (AR-12), so the fallback below is
+         unreachable in practice — it is there so a project whose billing array
+         is somehow absent still issues on its own customer rather than throwing
+         after the blocks have passed. */
+      const payer = this._billingFor(p, inv.billToPartyId) || defaultBilling(p.partyId, p.vatBp)[0];
+      const party = this.party(payer.partyId);
       const baseCents = this._invoiceBase(inv);
-      const vatBp = inv.vatBp != null ? inv.vatBp : p.vatBp;
+      const vatBp = inv.vatBp != null ? inv.vatBp : payer.vatBp != null ? payer.vatBp : p.vatBp;
       const vatCents = pctOf(baseCents, vatBp);
       const irpfBp = inv.irpfBp || 0; // AR-07 customer withholds
       const irpfCents = pctOf(baseCents, irpfBp);
@@ -4128,7 +4369,14 @@
         number: this.nextNumber(isCredit ? "creditNote" : "invoice"),
         kind: inv.kind || "progress",
         date: this.state.today,
-        partyId: p.partyId,
+        partyId: payer.partyId,
+        /* The tax decision AND its justification, on the artifact.
+           This system records why a rate was applied rather than leaving the
+           document to be re-derived years later from a rule that may since have
+           changed — and a reverse charge in particular has to carry its legal
+           mention on the invoice itself. */
+        taxTreatment: payer.taxTreatment || "standard",
+        taxJustification: payer.taxJustification || "",
         projectId: p.id,
         budgetNumber: p.budgetNumber, // AR-03
         worksAddress: inv.worksAddress || "",
@@ -4139,7 +4387,10 @@
         irpfBp,
         irpfCents,
         totalCents: baseCents + vatCents - irpfCents,
-        dueDate: addDays(this.state.today, party.paymentTermsDays || 30),
+        // A payer may carry terms of their own — a contractor at 60 days
+        // beside an end customer at 30 — falling back to the party record so a
+        // renegotiated term is not stale in a second copy.
+        dueDate: addDays(this.state.today, payer.paymentTermsDays || party.paymentTermsDays || 30),
         paymentMethod: party.paymentMethod,
         iban: this.state.config.iban, // AR-02
         rectifies: inv.rectifies || null,

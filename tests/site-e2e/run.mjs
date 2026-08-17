@@ -3442,10 +3442,30 @@ async function testInvoiceGenerator(browser, base) {
       else bad("ADM-01: certification", JSON.stringify(cert));
     } else bad("ADM-01: certification", "no seeded job has anything left to certify");
 
-    // Milestone → issue. The whole point: a number is minted, the contract's
-    // payment plan learns which invoice covered the milestone, and the series
-    // stays gapless.
-    await pg.evaluate((p) => invOpen(p), pid);
+    /* Milestone → issue. The whole point: a number is minted, the contract's
+       payment plan learns which invoice covered the milestone, and the series
+       stays gapless.
+
+       Run on a job with a planned milestone AND room left to bill it, asked of
+       the engine rather than hoping the first contracted project qualifies —
+       the same correction the certification block above already carries. The
+       seed contains jobs that were invoiced in full directly, without ever
+       going through their payment plan, so their instalments sit "planned"
+       against a contract with nothing left owing. Billing one of those is
+       refused, correctly, and the refusal is not what this check is about. */
+    const msPid = await pg.evaluate(() => {
+      const hit = erp.state.projects
+        .filter((p) => p.contractId)
+        .find((p) => {
+          const b = erp.invoiceBases(p.id);
+          const room = b.attributedCents - b.billedBaseCents;
+          return b.milestones.some((m) => m.baseCents > 0 && m.baseCents <= room);
+        });
+      return hit ? hit.id : null;
+    });
+    if (!msPid) bad("ADM-01: milestone draft", "no contracted job has a billable milestone left");
+    const pidMs = msPid || pid;
+    await pg.evaluate((p) => invOpen(p), pidMs);
     await pg.waitForTimeout(600);
     await pg.click('[data-invbasis="milestone"]');
     await pg.waitForTimeout(400);

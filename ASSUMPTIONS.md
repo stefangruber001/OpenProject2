@@ -4276,3 +4276,106 @@ demo seed). The migration simulation asserts the export exists, installs the
 whole book into an empty object, and is unchanged on a second run; removing the
 export was checked to fail that gate cleanly rather than crash it, because a
 gate that throws takes every check after it down with it.
+
+### 180 · One job, more than one payer (2026-08-17)
+
+**What changed.** A project records who owes for it: `project.billing[]` (the
+payers, each with its own `vatBp`, `taxTreatment` and `taxJustification`) and
+`baseline.chapters[].billToPartyId` (which payer owes for each chapter).
+`issueInvoice` takes the bill-to from the draft, refuses a party who is not a
+payer (AR-12) and refuses billing anyone for more than their own scope (AR-11).
+
+**Why the attribution, and not just a payer field.** Making the bill-to
+selectable is one line. The danger is everything that assumed it could not
+vary: `invoiceBases` proposed a valuation as `executed − billed` over ALL the
+project's invoices, so a free choice of payer per invoice would have proposed
+billing the contractor for work already billed to the end customer — two
+sealed, immutable documents in a gapless series, discovered months later as a
+dispute. Scope is attributed once; invoicing follows the attribution.
+Negative-controlled: with AR-11 disabled the split fixture bills 1 210 000
+against a 400 000 job.
+
+**The cap is SCOPE, not progress.** A deposit invoice legitimately precedes the
+work it pays for, so capping against executed progress would refuse an ordinary
+40 % up-front. What must never happen is billing somebody for work that was
+never theirs.
+
+**A single-payer job is attributed `baseline.revenueCents`, not the sum of its
+chapters.** Those two differ whenever the budget carried a discount —
+`revenueCents` is the taxable total, chapter `saleCents` are before it — and
+every other screen quotes the baseline. Summing chapters unconditionally would
+have made the new guard refuse legitimate invoices on every discounted job:
+a wrong refusal, which is worse than the gap being closed.
+
+**The cap carries a few cents of slack, on purpose.**
+`projectBilling.remainingToInvoiceCents` is VAT-inclusive, so sizing a final
+invoice means dividing it back down, and that round trip is worth up to a cent
+each time. The allowance is one cent per invoice the payer already has, plus
+one — the most the arithmetic can drift. The year simulation refused its own
+final invoice by exactly one cent before this existed. The cost is real and is
+recorded rather than hidden: a cent-sized over-bill is not refused, and the
+manageability check was rewritten to assert a MATERIAL over-bill instead,
+because asserting the cent away would have been asserting the tolerance away.
+
+**Two bugs the existing simulations caught in this work**, both worth keeping
+in the record because both were mine:
+
+1. `projectEconomics` counts change orders as `approved|executed|invoiced`; the
+   new ceiling counted only the first two, so an extra dropped out of the cap
+   the moment it was invoiced while remaining in revenue — year-sim refused its
+   own final invoice by 1 565 €. The two lists must agree.
+2. The contract-signature block was project-wide. Left that way, one payer's
+   invoice would have quietly unlocked the other's: it is now scoped to the
+   payer the contract names, and to that payer's own first invoice.
+
+**Chapter reassignment is refused once anything has been invoiced.** Before the
+first invoice it is arrangement; after it, somebody has been told what they are
+buying. `Object.freeze` on the baseline is shallow and would not have stopped
+it, so the rule is stated rather than assumed from the freeze.
+
+**Not decided here.** `profitability("customer")` still groups by the project's
+own `partyId`, so a split job credits its revenue to one customer. "Who is this
+project for" and "who paid which invoice" are different questions and the
+second is already answered per invoice; splitting the first is reversible and
+can be done if it is ever wanted. The tax treatment itself is an asesor's call,
+not the system's — LEGAL_REVIEW.md §5, `legally_verified: false`.
+
+### 181 · Milestone invoices were charging VAT twice (2026-08-17)
+
+**The bug, which was live.** A contract stores `totalCents = valueCents +
+vatCents` and its instalments are percentages of that — correct, and how a
+Spanish contract states a payment schedule ("40% a la firma" of the total the
+customer will pay). The invoice generator handed that VAT-inclusive figure to
+the draft as the line's `amountCents`, which `issueInvoice` treats as the
+taxable BASE and then adds VAT to. Measured on a 1.000 € + 10% contract: the
+100% milestone produced an invoice of 1.210 € against a 1.100 € contract.
+
+Every milestone invoice ever issued through that screen carries it. Nothing
+detected it because both figures are internally consistent — the document adds
+up, the series is gapless, the totals reconcile with themselves. It is only
+wrong against the contract, and nothing compared the two.
+
+**How it surfaced.** The split-billing over-billing guard (§180, AR-11) refuses
+an invoice whose base exceeds what that payer owes. 1.210 does not fit inside
+1.100, so the guard refused a milestone the E2E expected to succeed. The first
+reading was "my new guard is too strict"; the measurement said otherwise.
+
+**The fix.** `invoiceBases` returns `baseCents` beside `amountCents` on every
+milestone — the instalment with its VAT taken back off, stripped at the
+project's own rate because that is the rate baked into the figure the contract
+was signed on. The picker still shows the stated, customer-facing amount; the
+line gets the base. The division belongs to the engine for the reason that
+method's docstring already gives: "the generator's job is to let somebody pick
+one, not to make them add it up again."
+
+**Not corrected retroactively.** Invoices already issued are immutable and
+hash-chained (VFU-01), and rewriting them is neither possible nor lawful. Any
+that were over-charged are corrected the way the system already corrects an
+invoice — a factura rectificativa naming the original. That is an operator
+decision on real documents, not something a migration may do quietly.
+
+**What this says about the guard.** It was written to stop one payer being
+billed for another's scope and it found an unrelated arithmetic fault on its
+first contact with real data. A rule that states what must be true tends to
+catch more than the case that motivated it; the value is in stating it, not in
+the case.
