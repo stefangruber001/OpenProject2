@@ -331,6 +331,82 @@ assert(enOf.size > 100, "the dictionaries loaded", `${enOf.size} English entries
 assert(!noEn.length, `every drawing's name has an English entry (${keys.length})`, noEn.join(", "));
 assert(!noCa.length, `every drawing's name has a Catalan entry (${keys.length})`, noCa.join(", "));
 
+/* ------------------------------------------------- the trade colour plates */
+/* SIX COLOURS FOR TWENTY CHAPTERS, ON PURPOSE. Twenty categorical colours do
+   not exist: past about eight, some pair is indistinguishable, and a plate list
+   scrolls so ANY two can end up adjacent — the all-pairs case. These six were
+   chosen by running the validator, not by eye, and the numbers are recorded in
+   the module. What this gate holds is that nobody widens the set without
+   re-running it, and that colour is never asked to carry identity on its own. */
+const PALETTE = Object.values(P.FAMILY_COLOUR);
+assert(
+  PALETTE.length === 6,
+  `six trade colours, no more (${PALETTE.length})`,
+  "adding a seventh means re-running scripts/validate_palette.js --pairs all",
+);
+assert(
+  new Set(PALETTE).size === PALETTE.length,
+  "…and no two families share one",
+  PALETTE.join(","),
+);
+assert(
+  PALETTE.every((c) => /^#[0-9a-f]{6}$/i.test(c)),
+  "…each a plain hex the PDF writer can convert",
+  PALETTE.join(","),
+);
+/* Every chapter is placed. An unmapped chapter falls to the neutral grey, which
+   looks deliberate and means "nobody decided" — the failure mode that hides. */
+const packChapters = PACK.CHAPTERS.map((c) => c.code);
+const unplaced = packChapters.filter((c) => !P.familyFor(c));
+assert(
+  !unplaced.length,
+  `every chapter belongs to a trade family (${packChapters.length})`,
+  unplaced.join(", "),
+);
+assert(
+  Object.keys(P.FAMILY_NAME).length === PALETTE.length,
+  "every family is named in words, not only coloured",
+  Object.keys(P.FAMILY_NAME).join(","),
+);
+
+/* THE CODE IS THE IDENTITY, AND IT IS ALWAYS THERE. Six colours cannot name
+   twenty chapters and are not asked to; the plate carries the partida's code so
+   a reader can check the picture against the line. A plate that renders the
+   drawing and drops the code would look right and be unverifiable. */
+const pl = P.plate("brickwall", "ALB-101", "ALB", 34);
+assert(/ALB-101/.test(pl), "the plate prints the partida's code", pl.slice(0, 120));
+assert(
+  pl.includes(P.colourFor("ALB")),
+  "…and is tinted with its trade's colour",
+  P.colourFor("ALB"),
+);
+assert(
+  /aria-label="ALB-101 · fábrica de ladrillo"/.test(pl),
+  "…and names both the code and the drawing for a screen reader",
+  pl.slice(0, 200),
+);
+assert(!/\bhttp|<image|url\(/.test(pl), "…while still fetching nothing", pl.slice(0, 120));
+
+const pp = P.pdfPlate("brickwall", "ALB", 40, 700, 12);
+assert(
+  (pp.match(/(^|\n)q\n/g) || []).length === 1 && (pp.match(/(^|\n)Q\n/g) || []).length === 1,
+  "the PDF plate is ONE saved-state block, so one plate counts as one",
+  pp.slice(0, 80),
+);
+assert(
+  /re f\n/.test(pp) && /\bS\b/.test(pp),
+  "…with a filled ground and a stroked drawing",
+  pp.slice(0, 120),
+);
+// The tint is mixed against white rather than drawn with alpha: this writer has
+// no ExtGState, so a transparent fill would silently come out opaque.
+const ground = /([\d.]+) ([\d.]+) ([\d.]+) rg/.exec(pp);
+assert(
+  ground && Number(ground[1]) > 0.7 && Number(ground[2]) > 0.7 && Number(ground[3]) > 0.7,
+  "…and the ground is a pale tint, not the full-strength hue",
+  ground && ground[0],
+);
+
 const failed = checks.filter((c) => !c.pass);
 console.log("──── price-book pictograms ────");
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);

@@ -321,7 +321,11 @@
      still reads as one item under one picture. `descW` loses the same amount,
      which is what keeps the wrap honest — text measured against a width it is
      not given is how a table runs into the column beside it. */
-  const PICT_W = 14;
+  /* Wide enough for the CODE, not just the plate. At 18pt the plate fitted and
+     "DEM-101" under it did not — the code ran under the description's second
+     line, which is the one place on the page a reader is following a sentence.
+     The gutter is sized to the longest thing in it, which is the text. */
+  const PICT_W = 26;
   const COLS = () => {
     const qty = X1 - 250,
       unit = X1 - 205,
@@ -375,15 +379,23 @@
            doctype descriptors, anything added later — gets the same picture for
            the same partida without being changed, and none of them can hand the
            writer a mark that disagrees with the catalogue's. */
-        if (PICT)
-          this.c += PICT.pdfOps(
-            PICT.pick({ pictogram: r.pictogram, desc: r.item, chapterName: g.chapter }),
-            c.mark,
-            this.y - 17,
-            10,
-            C.muted + " RG",
-          );
+        /* The line's plate: the drawing on a wash of its trade's colour, with
+           the code beside the description below. Colour groups the trade and
+           the code names the partida — six hues cannot identify twenty
+           chapters and are not asked to. */
+        if (PICT) {
+          var pkey = PICT.pick({
+            pictogram: r.pictogram,
+            desc: r.item,
+            chapter: r.chapter,
+            chapterName: g.chapter,
+          });
+          this.c += PICT.pdfPlate(pkey, r.chapter || "", c.mark, this.y - 18, 12);
+        }
         desc.forEach((l, i) => this.text(c.desc, this.y - 9 - i * 11, 9, FONT.sans, C.body, l));
+        // The code under the plate, small and quiet: it is what makes the
+        // picture checkable rather than decorative.
+        if (r.code) this.text(c.mark, this.y - 24.5, 5, FONT.sansB, C.muted, String(r.code));
         extra.forEach((l, i) =>
           this.text(c.desc, this.y - 9 - desc.length * 11 - i * 9, 7.5, FONT.sans, C.muted, l),
         );

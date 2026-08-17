@@ -73,9 +73,16 @@ const CH = [
   "08 · Vidrio y mamparas",
   "09 · Limpieza y entrega",
 ];
+/* Price-book chapter codes for the nine fixture chapters. They are what give a
+   line its trade colour and its partida code on the page: without them every
+   plate rendered the neutral grey and carried no code, and the gate below could
+   not tell a coloured plate from an absent one. */
+const CH_CODE = ["DEM", "AIS", "FON", "CLI", "ELE", "REV", "CAR", "VEN", "LIM"];
 const groups = CH.map((chapter, i) => ({
   chapter,
   rows: Array.from({ length: 5 }, (_, j) => ({
+    chapter: CH_CODE[i],
+    code: `${CH_CODE[i]}-1${String(j + 1).padStart(2, "0")}`,
     item: `Partida ${j + 1} del capítulo — descripción larga que debe ajustarse a la columna sin desbordar el ancho disponible`,
     note: j === 0 ? "Incluye protección de accesos y retirada de escombros" : "",
     qtyLabel: (12.5 + j).toFixed(2).replace(".", ","),

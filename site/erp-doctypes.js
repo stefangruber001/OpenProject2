@@ -83,6 +83,10 @@
       chapter: c.code + " · " + c.name,
       rows: c.rows.map((r) => ({
         item: r.item,
+        // Carried through so the writer can draw the line's plate and print
+        // its code — the two things that let a reader check the picture.
+        code: r.code || "",
+        chapter: r.chapter || c.code || "",
         note: r.note || "",
         qtyLabel: r.qty,
         unit: r.unit || "",
@@ -999,6 +1003,24 @@
     const o = opts || {};
     const chapterCount = o.chapters || 9;
     const rowsPer = o.rowsPerChapter || 5;
+    /* Chapter names AND their price-book codes. The codes are what give a line
+       its trade colour and its partida code on the page — without them every
+       plate rendered the neutral grey and carried no code, which is a demo
+       document that cannot show what a real one looks like. */
+    const chapCodes = [
+      "DEM",
+      "AIS",
+      "FON",
+      "CLI",
+      "ELE",
+      "REV",
+      "CAR",
+      "PIN",
+      "LIM",
+      "ALB",
+      "FON",
+      "CLI",
+    ];
     const names = [
       "Demolicion y trabajos previos",
       "Impermeabilizacion",
@@ -1020,6 +1042,8 @@
         const qty = 2 + ((i * 7 + j * 3) % 18);
         const price = 1800 + ((i * 311 + j * 977) % 9000);
         rows.push({
+          chapter: chapCodes[i % chapCodes.length],
+          code: chapCodes[i % chapCodes.length] + "-1" + String(j + 1).padStart(2, "0"),
           item: names[i % names.length] + " — partida " + (j + 1),
           note:
             j === 0

@@ -741,6 +741,80 @@
     ],
   };
 
+  /* --------------------------------------------------------- trade colour */
+  /**
+   * SIX COLOURS FOR TWENTY CHAPTERS, AND THAT IS THE DESIGN.
+   *
+   * Twenty categorical colours do not exist. Past about eight, any two of them
+   * are a pair somebody cannot tell apart, and a plate list scrolls — so any
+   * two can end up side by side, which is the all-pairs case and the hardest
+   * one. Running the numbers rather than trusting an eye: the eight-slot
+   * reference palette fails it outright (green↔orange at ΔE 3.2 for a protan
+   * reader), and the largest subset that clears both floors is SIX.
+   *
+   * So colour groups the trades and the CODE names the partida. That is the
+   * composite encoding the method asks for — identity is never colour alone —
+   * and it is also how a price book is actually read: nobody identifies a
+   * partida by its tint, they read DEM-101.
+   *
+   * Measured, light surface, all pairs:
+   *   normal-vision worst  ΔE 15.6  (hard floor 15)
+   *   CVD worst            ΔE  6.9  (6–8 band, legal WITH the code beside it)
+   * Two hues sit under 3:1 against the surface, which obliges a visible label —
+   * which is the code, on every plate, by construction.
+   */
+  var FAMILY = {
+    // Getting in, taking out, taking away.
+    AUX: "site",
+    DEM: "site",
+    RES: "site",
+    // What holds the building up and divides it.
+    ALB: "structure",
+    TAB: "structure",
+    AIS: "structure",
+    // What keeps the weather out.
+    CUB: "envelope",
+    FAC: "envelope",
+    VEN: "envelope",
+    // Water in, water out.
+    FON: "water",
+    SAN: "water",
+    // Current and air.
+    ELE: "energy",
+    CLI: "energy",
+    // Everything the customer sees at the end.
+    SOL: "finish",
+    REV: "finish",
+    PIN: "finish",
+    CAR: "finish",
+    COC: "finish",
+    LIM: "finish",
+    VAR: "finish",
+  };
+  var FAMILY_COLOUR = {
+    site: "#2a78d6",
+    structure: "#008300",
+    envelope: "#4a3aa7",
+    water: "#1baf7a",
+    energy: "#e34948",
+    finish: "#eda100",
+  };
+  var FAMILY_NAME = {
+    site: "Obra y desmontaje",
+    structure: "Estructura y particiones",
+    envelope: "Envolvente",
+    water: "Agua",
+    energy: "Energía y aire",
+    finish: "Acabados y remates",
+  };
+  /** The trade colour for a chapter code, or a neutral for one nobody mapped. */
+  function colourFor(chapter) {
+    return FAMILY_COLOUR[FAMILY[String(chapter || "").toUpperCase()]] || "#6b705c";
+  }
+  function familyFor(chapter) {
+    return FAMILY[String(chapter || "").toUpperCase()] || "";
+  }
+
   /* ------------------------------------------------------------- choosing */
   /* Keyword before chapter, longest match first.
      A chapter answers "what trade" and the description answers "what job", and
@@ -1001,6 +1075,104 @@
     return Object.keys(SHAPES);
   }
 
+  /* --------------------------------------------------------------- plates */
+  /**
+   * The drawing as a small COLOURED plate carrying its own code.
+   *
+   * Asked for so the operator can tell at a glance that the picture on a line
+   * is the right one. A 16px monochrome mark could be checked only by knowing
+   * every shape; a tinted plate that says "DEM-101" underneath can be checked
+   * by reading it.
+   *
+   * The tint is the trade family and the CODE is the identity — see the note on
+   * FAMILY above for why it cannot be the other way round. The drawing is
+   * stroked in the family colour at full strength on a 12%-alpha wash of the
+   * same hue, so the plate reads as one object and stays legible in greyscale,
+   * which is how half of these will be printed.
+   */
+  function plate(key, code, chapter, size, opts) {
+    var o = opts || {};
+    var s = shape(key);
+    var col = colourFor(chapter);
+    var px = size || 34;
+    var box = plateOps(s[1]);
+    return (
+      '<span class="plate" style="--plate:' +
+      col +
+      '" title="' +
+      esc(String(code || "") + " · " + s[0]) +
+      '">' +
+      '<svg viewBox="0 0 1 1" width="' +
+      px +
+      '" height="' +
+      px +
+      '" fill="none" role="img" aria-label="' +
+      esc(String(code || "") + " · " + s[0]) +
+      '">' +
+      "<title>" +
+      esc(String(code || "") + " · " + s[0]) +
+      "</title>" +
+      box +
+      "</svg>" +
+      (o.code === false ? "" : '<b class="platec">' + esc(String(code || "")) + "</b>") +
+      "</span>"
+    );
+  }
+  function esc(t) {
+    return String(t)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  /* The drawing inset inside the plate, so the stroke never touches the edge —
+     a line drawing that runs into its own border reads as a broken box. */
+  function plateOps(ops) {
+    var d = [];
+    var extra = [];
+    var INSET = 0.16;
+    var X = function (v) {
+      return n2(INSET + v * (1 - 2 * INSET));
+    };
+    var Y = function (v) {
+      return n2(1 - (INSET + v * (1 - 2 * INSET)));
+    };
+    for (var i = 0; i < ops.length; i++) {
+      var op = ops[i];
+      if (op[0] === "M") d.push("M" + X(op[1]) + " " + Y(op[2]));
+      else if (op[0] === "L") d.push("L" + X(op[1]) + " " + Y(op[2]));
+      else if (op[0] === "R")
+        extra.push(
+          '<rect x="' +
+            X(op[1]) +
+            '" y="' +
+            Y(op[2] + op[4]) +
+            '" width="' +
+            n2(op[3] * (1 - 2 * INSET)) +
+            '" height="' +
+            n2(op[4] * (1 - 2 * INSET)) +
+            '"/>',
+        );
+      else if (op[0] === "C")
+        extra.push(
+          '<circle cx="' +
+            X(op[1]) +
+            '" cy="' +
+            Y(op[2]) +
+            '" r="' +
+            n2(op[3] * (1 - 2 * INSET)) +
+            '"/>',
+        );
+    }
+    return (
+      '<rect x="0" y="0" width="1" height="1" rx="0.18" fill="var(--plate)" fill-opacity="0.12"/>' +
+      '<g stroke="var(--plate)" stroke-width="0.062" stroke-linecap="round" stroke-linejoin="round">' +
+      (d.length ? '<path d="' + d.join(" ") + '"/>' : "") +
+      extra.join("") +
+      "</g>"
+    );
+  }
+
   /* ------------------------------------------------------------- rendering */
   var n2 = function (v) {
     return Math.round(v * 100) / 100;
@@ -1075,9 +1247,13 @@
    * that quietly changes the stroke of everything drawn after it is a bug that
    * shows up three sections down the page.
    */
-  function pdfOps(key, x, y, size, rg) {
+  function pdfOps(key, x, y, size, rg, bare) {
     var ops = shape(key)[1];
-    var out = "q\n" + (rg || "0.4 0.4 0.4 RG") + " " + n2(size * 0.075) + " w 1 J 1 j\n";
+    // `bare` leaves the q/Q off, for a caller that is already inside its own
+    // saved state — the plate wraps the ground and the drawing together, so
+    // one plate is ONE saved-state block and can be counted as one.
+    var out =
+      (bare ? "" : "q\n") + (rg || "0.4 0.4 0.4 RG") + " " + n2(size * 0.075) + " w 1 J 1 j\n";
     var X = function (v) {
       return n2(x + v * size);
     };
@@ -1165,12 +1341,71 @@
       }
     }
     if (open) out += "S\n";
+    return out + (bare ? "" : "Q\n");
+  }
+
+  /** "#rrggbb" → "r g b" in PDF's 0..1 space. */
+  function rgbOf(hex) {
+    var h = String(hex).replace("#", "");
+    return (
+      n2(parseInt(h.slice(0, 2), 16) / 255) +
+      " " +
+      n2(parseInt(h.slice(2, 4), 16) / 255) +
+      " " +
+      n2(parseInt(h.slice(4, 6), 16) / 255)
+    );
+  }
+  /**
+   * The plate as a PDF fragment: a tinted rounded ground with the drawing on
+   * it, both in the trade's colour.
+   *
+   * The wash is drawn as a light tint of the same hue rather than a grey, so a
+   * colour reader gets the family at a glance and a greyscale printer still
+   * gets a legible line drawing on a pale ground. No alpha: PDF transparency
+   * needs an ExtGState and this writer has none, so the tint is mixed against
+   * white here — which is what the paper is anyway.
+   */
+  function pdfPlate(key, chapter, x, y, size) {
+    var hex = colourFor(chapter);
+    var h = String(hex).replace("#", "");
+    var mix = function (i) {
+      var c = parseInt(h.slice(i, i + 2), 16) / 255;
+      return n2(c * 0.12 + 1 * 0.88); // 12% of the hue over white
+    };
+    var out = "q\n";
+    // The ground. A plain rectangle: a rounded one costs four beziers for a
+    // corner nobody reads at twelve points.
+    out +=
+      mix(0) +
+      " " +
+      mix(2) +
+      " " +
+      mix(4) +
+      " rg\n" +
+      n2(x) +
+      " " +
+      n2(y) +
+      " " +
+      n2(size) +
+      " " +
+      n2(size) +
+      " re f\n";
+    // …and the drawing on it, inset so the stroke never touches the edge.
+    var inset = size * 0.16;
+    out += pdfOps(key, x + inset, y + inset, size - 2 * inset, rgbOf(hex) + " RG", true);
     return out + "Q\n";
   }
 
   return {
     SHAPES: SHAPES,
     BY_CHAPTER: BY_CHAPTER,
+    FAMILY: FAMILY,
+    FAMILY_COLOUR: FAMILY_COLOUR,
+    FAMILY_NAME: FAMILY_NAME,
+    colourFor: colourFor,
+    familyFor: familyFor,
+    plate: plate,
+    pdfPlate: pdfPlate,
     pick: pick,
     shape: shape,
     label: label,

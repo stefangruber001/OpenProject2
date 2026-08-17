@@ -2108,7 +2108,11 @@ async function testBudgetBuilder(browser, base) {
       row0.click();
       sheet.querySelector("#cp_add").click();
       await new Promise((r) => setTimeout(r, 800));
-      const row = document.querySelector(`#bRows tr[data-row="${lineId}"] svg.pict`);
+      /* The builder line and the printed quote now carry the coloured PLATE —
+         drawing plus the partida's code — not the bare mark. Reading its
+         accessible name gets both at once, which is a stronger check than the
+         drawing alone: a plate that lost its code would still name the shape. */
+      const row = document.querySelector(`#bRows tr[data-row="${lineId}"] .plate svg`);
       const inBuilder = row && row.getAttribute("aria-label");
       // …and onto the document the customer receives.
       document.querySelector("#bPreview").click();
@@ -2121,17 +2125,18 @@ async function testBudgetBuilder(browser, base) {
          partidas. The class now says which is which in the markup rather than
          leaving the test to guess. */
       const lines = [...document.querySelectorAll("#dbody .chapline.item")];
+      const wantPlate = item.code + " · " + want;
       // The row this partida became, found by the description it carries
       // rather than by a word written into the test.
       const onDoc = lines
         .filter((l) => (l.textContent || "").includes(item.desc.slice(0, 24)))
-        .map((l) => l.querySelector("svg.pict")?.getAttribute("aria-label"));
+        .map((l) => l.querySelector(".plate svg")?.getAttribute("aria-label"));
       return {
-        want,
+        want: wantPlate,
         inBuilder,
         onDoc,
         docLines: lines.length,
-        docMarked: lines.filter((l) => l.querySelector("svg.pict")).length,
+        docMarked: lines.filter((l) => l.querySelector(".plate svg")).length,
       };
     });
     if (chain.err) bad("the drawing follows the partida", chain.err);

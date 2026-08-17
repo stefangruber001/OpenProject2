@@ -2200,6 +2200,13 @@
             .filter((l) => !l.pending)
             .map((l) => ({
               num: l.num,
+              /* The price-book code and the link behind it. Not money and not
+                 a cost — the code is already printed on any quote an estimator
+                 would recognise, and it is what lets the document draw the
+                 partida's own mark and let a reader check the two against each
+                 other. `itemId` carries the trade, which is what colours it. */
+              code: l.code || "",
+              itemId: l.itemId || null,
               desc: l.customerWording || l.desc,
               unit: l.unit,
               qty: (l.subLines.length ? this._aggSubLines(l.subLines) : l.qtyMilli) / 1000,
