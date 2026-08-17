@@ -93,6 +93,21 @@
         align-items: center;
         gap: 10px;
         min-width: 0;
+        /* It is a <button>, so the browser's own button chrome has to go before
+           it looks like a logo again. Everything below is reset, not styling. */
+        appearance: none;
+        border: 0;
+        background: none;
+        padding: 0;
+        margin: 0;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+      .brand:focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 3px;
+        border-radius: 12px;
       }
       .brand .nm {
         font-family: var(--serif);
@@ -233,6 +248,10 @@
         padding: 5px;
         display: none;
         z-index: 45;
+        /* A 214 px panel on a 320 px phone, once `clampMenu` has pushed it back
+           inside, still has to fit. Without this the min-width wins and the
+           clamp just moves which edge it overflows. */
+        max-width: calc(100vw - 16px);
       }
       .menu.on {
         display: block;
@@ -1782,15 +1801,19 @@
       .btree .bl.pend {
         color: var(--amber);
       }
+      /* Below this the row stops being readable rather than merely tight, so
+     the scrollbar is the honest outcome — but with the declared column widths
+     and a folded side pane it is reached on a phone, not on a laptop, which is
+     the whole point of the change. */
       .bgrid table {
-        min-width: 940px;
+        min-width: 860px;
       }
       .bgrid tbody td {
-        padding: 3px 6px;
+        padding: 3px 4px;
         vertical-align: middle;
       }
       .bgrid thead th {
-        padding: 8px 7px;
+        padding: 8px 5px;
       }
       .bgrid input,
       .bgrid select {
@@ -1820,6 +1843,17 @@
       .bgrid input.r {
         text-align: right;
         font-variant-numeric: tabular-nums;
+      }
+      /* Marca · modelo · calidad · tipo, under the description. Small and grey
+     because it is context, not a field: it is what the catalogue said, and the
+     way to change it is to change the catalogue or pick a different partida. */
+      .bgrid .lspec {
+        font: 11px var(--sans);
+        color: var(--muted);
+        padding: 0 7px 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .bgrid tr.chaprow td {
         background: var(--greenSoft);
@@ -1988,6 +2022,63 @@
         grid-template-columns: 260px minmax(0, 1fr) 300px;
         min-height: 0;
       }
+      /* Folding a side pane gives its width to the grid rather than shrinking
+     the row. `display:none` as well as a zero track, so a collapsed pane
+     cannot be reached by Tab — a keyboard user landing inside something they
+     cannot see is worse than the space it saved.
+
+     The three explicit `grid-column`s are what make that safe. A grid item set
+     to `display:none` is REMOVED from the grid, not merely hidden, so with
+     auto-placement the survivors each shift one track left: folding the tree
+     put the line grid into the 0 px track and spread the totals pane across
+     the whole row, on top of it. Everything still rendered and the 🔍 was
+     still "visible" — it was simply underneath something, which is the kind of
+     break that looks like nothing at all until a click goes nowhere. Pinned to
+     a column, a pane cannot take another pane's place. */
+      #pbLeft {
+        grid-column: 1;
+      }
+      .pbpane.mid {
+        grid-column: 2;
+      }
+      #pbRight {
+        grid-column: 3;
+      }
+      .pbpanes.foldL {
+        grid-template-columns: 0 minmax(0, 1fr) 300px;
+      }
+      .pbpanes.foldR {
+        grid-template-columns: 260px minmax(0, 1fr) 0;
+      }
+      .pbpanes.foldL.foldR {
+        grid-template-columns: 0 minmax(0, 1fr) 0;
+      }
+      .pbpanes.foldL #pbLeft,
+      .pbpanes.foldR #pbRight {
+        display: none;
+      }
+      .pbfold {
+        appearance: none;
+        border: 1px solid var(--line);
+        background: var(--paper);
+        color: var(--muted);
+        border-radius: 6px;
+        width: 20px;
+        height: 20px;
+        line-height: 1;
+        padding: 0;
+        cursor: pointer;
+        font-size: 11px;
+      }
+      .pbfold:hover {
+        border-color: var(--greenLt);
+        color: var(--greenDeep);
+      }
+      .pbfold.on {
+        background: var(--greenSoft);
+        border-color: var(--green);
+        color: var(--greenDeep);
+      }
       .pbpane {
         min-height: 0;
         overflow: auto;
@@ -2104,6 +2195,25 @@
         border-color: var(--greenLt);
         background: var(--greenSoft);
       }
+      /* Multi-select. The tick is a glyph rather than an <input type=checkbox>
+     because the whole row is the hit target — a real checkbox inside a button
+     would give the row two clickable things that do the same thing, and on a
+     phone the wrong one is 20 px wide. */
+      .cpi.pick {
+        grid-template-columns: 22px 74px minmax(0, 1fr) auto;
+      }
+      .cpi .cpx {
+        font-size: 15px;
+        line-height: 1;
+        color: var(--muted);
+      }
+      .cpi.on {
+        border-color: var(--green);
+        background: var(--greenSoft);
+      }
+      .cpi.on .cpx {
+        color: var(--greenDeep);
+      }
       .cpi .cpc {
         font: 600 11.5px var(--mono);
         color: var(--muted);
@@ -2124,9 +2234,39 @@
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
       }
-      /* The 🔍 that opens it, tucked in beside the código cell. */
+      /* "Missing, and that is allowed for now."
+     A tax identifier is not always to hand when a client first calls, and a
+     form that refuses the record until it is produces the thing it was meant
+     to prevent: the client gets filed later, or somewhere else, or not at all.
+     So the field takes an amber ⚠ rather than a red asterisk — the record is
+     created, the gap is visible on the ficha and in the list, and the block
+     stays where it belongs, on issuing (MDM-10 `_requireComplete`), where the
+     law actually requires the number. */
+      .lateflag {
+        color: var(--amber);
+        font-size: 12px;
+        cursor: help;
+      }
+      /* The 🔍 that opens it, tucked in beside the código cell.
+     The inner div is load-bearing: `.bgrid input` is `width:100%`, so once the
+     column got a declared width the input claimed all of it and pushed the
+     button out of the cell — still in the DOM, off the visible grid, and
+     unclickable. Flex with `min-width:0` lets the input give way instead.
+     `display:flex` sits on the div and not the <td> on purpose: a table cell
+     that stops being a table cell stops sharing the column's width. */
       .pbfind {
         white-space: nowrap;
+      }
+      .pbfind > div {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      .pbfind .bfind {
+        flex: 0 0 auto;
+      }
+      .pbfind input {
+        min-width: 0;
       }
       .bfind {
         border: 0;
@@ -3916,8 +4056,17 @@
   </head>
   <body>
     <div class="topbar">
-      <div class="brand">
-        <svg width="29" height="29" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
+      <!-- The logo is the way home, on every screen. It is a real <button> and
+           not a div with a click handler: a control that a mouse can use and a
+           keyboard cannot is not a control, and "top left goes home" is the one
+           navigation convention every user already has. -->
+      <button
+        class="brand"
+        id="brandHome"
+        title="Ir a la Torre de control"
+        aria-label="Ir a la Torre de control"
+      >
+        <svg width="29" height="29" viewBox="0 0 40 40" fill="none" aria-hidden="true">
           <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c" />
           <path
             d="M11 21.5 L20 13 L29 21.5"
@@ -3936,7 +4085,7 @@
           <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230" />
         </svg>
         <span class="nm">Canei Subirats<small>ERP · un único entorno</small></span>
-      </div>
+      </button>
       <div class="gsearch">
         <input
           id="q"
@@ -4132,6 +4281,32 @@
    local IndexedDB mode has no server-side identity to ask in the first
    place — everything on that single machine is already fully visible. */
       let SESSION = { email: "", role: "admin", bankRead: true };
+      /**
+       * Move the workspace's clock up to the real date. FORWARD ONLY.
+       *
+       * `state.today` is stored, because the engine dates every record it writes
+       * from it and a demo history is built by walking it. Nothing advanced it,
+       * so a workspace seeded in March still believed it was March in August:
+       * the Gantt drew its today line five months back, every date field opened
+       * on a day long past, and nothing was overdue that should have been. The
+       * operator's words — "this avoids that it looks we are running 6 months
+       * behind."
+       *
+       * Never backward, and that is the whole of the care here. A device with a
+       * wrong clock, a traveller's laptop, a container started with the wrong
+       * timezone: winding the date back would re-date documents already issued,
+       * put invoices in the future relative to "today", and make a filing built
+       * from them wrong. Refusing to go back costs nothing — the clock catches
+       * up on the next boot with a correct date — and it cannot corrupt.
+       *
+       * Returns whether it moved, so the caller only persists when it did.
+       */
+      function advanceClock() {
+        const wall = wallToday();
+        if (!erp || wall <= erp.today) return false;
+        erp.setToday(wall);
+        return true;
+      }
       async function boot() {
         let migration = null,
           fresh = false;
@@ -4240,6 +4415,14 @@
             if (sz) getListState(id, 25).pageSize = sz;
           }
         } catch (e) {}
+        // Which of the presupuestador's side panes are folded away. Only read
+        // if the operator has ever folded one; otherwise the width decides, and
+        // it decides again on every machine they open the workspace on.
+        try {
+          const pf = await ErpStore.getMeta("ui.pbfold");
+          if (pf && typeof pf.l === "boolean" && typeof pf.r === "boolean") bFold = pf;
+        } catch (e) {}
+        if (advanceClock()) persist();
 
         const rawHash = location.hash.slice(1),
           hashKey = resolveRoute(rawHash);
@@ -4759,13 +4942,26 @@
         ["range", "Rango"],
       ];
       let PERIOD = { mode: "year", from: null, to: null };
+      /**
+       * Today, by the clock on the wall in front of the operator.
+       *
+       * NOT `toISOString().slice(0,10)`, which is UTC: in Spain that is
+       * yesterday's date between midnight and 02:00 in summer, so a form opened
+       * late in the evening would default to the day before and a visit
+       * scheduled for "today" would be refused as being in the past.
+       */
+      function wallToday() {
+        const d = new Date();
+        return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+      }
       const pad2 = (n) => String(n).padStart(2, "0");
       const lastDay = (y, m) => `${y}-${pad2(m)}-${new Date(Date.UTC(y, m, 0)).getUTCDate()}`;
-      /* The reference date is the dataset's today, not the wall clock: this dataset
-   lives in its own exercise year and a wall-clock period would empty every
-   table for reasons the user cannot see. */
+      /* The reference date is the dataset's today, which `advanceClock()` keeps
+   on the wall clock. Reading `erp.today` rather than the wall directly is
+   still right: it is the one clock every screen and the engine agree on, and
+   a demo dataset built forward in time is allowed to be ahead of it. */
       function periodRange() {
-        const t = (erp && erp.today) || new Date().toISOString().slice(0, 10);
+        const t = (erp && erp.today) || wallToday();
         const Y = +t.slice(0, 4),
           M = +t.slice(5, 7);
         if (PERIOD.mode === "month")
@@ -4854,6 +5050,31 @@
         if (was) return;
         m.classList.add("on");
         $(btnSel).setAttribute("aria-expanded", "true");
+        clampMenu(m);
+      }
+      /**
+       * Nudge an opened menu back inside the window.
+       *
+       * `.menu` hangs from `right: 0` of its button, which is correct while the
+       * bar's buttons are on the right of a wide screen. On a phone the bar
+       * wraps and «＋ Crear» ends up near the LEFT edge — so a 214 px panel
+       * anchored to its right edge ran off the side of the screen and the
+       * operator saw a sliver of white. Reported from an iPhone, and it would
+       * have happened to any menu the bar ever grows.
+       *
+       * Measured and shifted rather than flipped to `left: 0`, because that
+       * only moves the problem to whichever button sits nearest the other edge.
+       * The transform is cleared first so a re-open measures the true position
+       * and not the last correction.
+       */
+      function clampMenu(m) {
+        m.style.transform = "";
+        const r = m.getBoundingClientRect(),
+          pad = 8;
+        let dx = 0;
+        if (r.left < pad) dx = pad - r.left;
+        else if (r.right > window.innerWidth - pad) dx = window.innerWidth - pad - r.right;
+        if (dx) m.style.transform = `translateX(${Math.round(dx)}px)`;
       }
       document.addEventListener("click", (e) => {
         if (!e.target.closest(".menuwrap") && !e.target.closest(".gsearch")) closeMenus();
@@ -5127,6 +5348,7 @@
         });
       }
       $("#btnCreate").onclick = () => toggleMenu("#btnCreate", "#mCreate");
+      $("#brandHome").onclick = () => go("tower");
 
       /* ---------- alert bell ---------- */
       function gotoAlert(ref) {
@@ -5493,9 +5715,14 @@
         for (let r = 0; r <= rows; r++)
           grid += `<line class="growline" x1="0" y1="${G_HEAD + r * G_ROW}" x2="${W}" y2="${G_HEAD + r * G_ROW}"/>`;
 
+        /* `data-today` is read by ganttWire to scroll the chart to today.
+     The window always includes today (`touch(erp.today)` above), so the line
+     is always drawn — but on a plan that started two years ago "drawn" means
+     eighteen thousand pixels to the right of where the chart opens, and a line
+     you have to go looking for is not one you see. */
         return `<div class="gwrap">
     <div class="gnames"><div class="gh"></div>${names}</div>
-    <div class="gscroll"><svg class="gsvg" id="gSvg" width="${W}" height="${H}" data-from="${from}">
+    <div class="gscroll"><svg class="gsvg" id="gSvg" width="${W}" height="${H}" data-from="${from}" data-today="${x(erp.today) + gZoom / 2}">
       ${axis}${grid}${deps}${bars}</svg></div>
   </div>`;
       }
@@ -5506,6 +5733,26 @@
       function ganttWire(v, pid, plan, sch) {
         const svg = v.querySelector("#gSvg");
         if (!svg) return;
+        /* Open the chart where the work is NOW.
+     The operator's words: "when you open the giant chart, then you see the
+     line at the actual date today." A plan that began two years ago produces
+     an eighteen-thousand-pixel chart whose left edge is 2024, so opening at
+     scroll zero shows finished work and nothing else. Today is put a third of
+     the way in, so recent past and near future are both on screen — the two
+     things a person opening a plan is actually asking about.
+     Clamped by the browser: a chart narrower than its pane just stays at 0. */
+        const scroller = v.querySelector(".gscroll");
+        const todayX = Number(svg.dataset.today);
+        const focusToday = () => {
+          // Before the container is laid out its clientWidth is 0 and a
+          // scrollLeft assignment is silently clamped to 0 — which is exactly
+          // what happened, and what makes this look like it works while doing
+          // nothing. Retry on the next frame, by which time it is on screen.
+          if (!scroller || !Number.isFinite(todayX) || !scroller.clientWidth) return false;
+          scroller.scrollLeft = Math.max(0, todayX - scroller.clientWidth / 3);
+          return true;
+        };
+        if (!focusToday()) requestAnimationFrame(focusToday);
         const B = ganttApi(),
           cal = plan.calendar || B.defaultCalendar(),
           C = B.calendar;
@@ -7315,7 +7562,16 @@
             if (!pids.length) throw new Error("El día anterior no tiene horas que repetir");
             pids.forEach((pid) => erp.repeatDay(pid, prev, hDay, "operations"));
           }, "Jornada repetida desde el día anterior");
-        $("#hAssign").onclick = () => assignWorkerDrawer(gProject || erp.state.projects[0].id);
+        // The first OPEN job, not simply the first. `recordHours` refuses hours
+        // against a closed project — correctly, since a closed job's cost is
+        // settled — so defaulting the assignment to one meant the sheet offered
+        // a row that could never be filled in, and said so only after the
+        // operator had typed the hours.
+        $("#hAssign").onclick = () =>
+          assignWorkerDrawer(
+            gProject ||
+              (erp.state.projects.find((p) => !p.closed) || erp.state.projects[0] || {}).id,
+          );
         $("#hAdd").onclick = () => newHoursDrawer(hDay);
         document.querySelectorAll(".hsheet input.hin").forEach(
           (inp) =>
@@ -7708,25 +7964,45 @@
 
    Not finding one opens `catalogueItemDrawer` — the SAME "＋ Nueva partida"
    form the Configuración screen uses (operator's own suggestion), rather than
-   a second form written for this popup that would drift out of step with it. */
-      function catalogueSearchModal(onPick, initialQuery) {
+   a second form written for this popup that would drift out of step with it.
+
+   `opts` (all optional):
+     query    text the search box starts with
+     chapter  a chapter CODE to open filtered on, with a way to widen to the
+              whole catalogue. Adding lines to «Fontanería» should start among
+              the plumbing, not among two hundred partidas of everything.
+     multi    tick several and take them in one go — `onPick` then receives an
+              ARRAY. A chapter is ten sub-partidas and quoting one usually means
+              quoting six of them; making that six round trips through a modal
+              is how a price book stops being used.
+
+   Second argument still accepts a bare string, which is what the two older
+   callers pass. */
+      function catalogueSearchModal(onPick, opts) {
+        const o = typeof opts === "string" ? { query: opts } : opts || {};
         const rows = erp.state.catalogue.filter((i) => i.active !== false);
         const chapLabel = (code) => (code ? erp.listLabel("itemChapters", code) : "sin capítulo");
-        const scrim = $("#mscrim") || document.getElementById("mscrim");
+        // A chapter with nothing in it would open on an empty list that looks
+        // broken, so the filter only applies when it has something to show.
+        let chapter = o.chapter && rows.some((i) => i.chapter === o.chapter) ? o.chapter : "";
+        const multi = !!o.multi;
+        const chosen = new Set();
         // Its own overlay rather than `ask()`: this is a searchable list that
         // re-renders as you type, which the field-based modal does not model.
         const node = el("div", "mscrim on");
         node.id = "catpick";
         const box = el("div", "modal wide");
         box.innerHTML = `<div class="mh"><h3>Buscar en el catálogo</h3>
-    <p>Por código, descripción o cómo se le dice al cliente.</p></div>
+    <p>${multi ? "Marca las subpartidas que entran en el capítulo. Cada una llega con su unidad, su coste y su precio." : "Por código, descripción o cómo se le dice al cliente."}</p></div>
    <div class="mb">
-    <div class="mf"><input id="cp_q" placeholder="alicatado, ALB-010, tabique…" value="${esc(initialQuery || "")}"></div>
+    <div class="mf"><input id="cp_q" placeholder="alicatado, ALB-010, tabique…" value="${esc(o.query || "")}"></div>
+    <div class="mf"><select id="cp_chap">${cpChapterOptions(rows, chapter)}</select></div>
     <div class="cplist" id="cp_list"></div>
    </div>
-   <div class="ma"><span class="sp"></span>
+   <div class="ma">${multi ? '<span class="tag" id="cp_count"></span>' : ""}<span class="sp"></span>
     <button class="btn sm" id="cp_cancel">Cancelar</button>
-    <button class="btn sm primary" id="cp_new">＋ Nueva partida</button></div>`;
+    <button class="btn sm" id="cp_new">＋ Nueva partida</button>
+    ${multi ? '<button class="btn sm primary" id="cp_add" disabled>Añadir</button>' : ""}</div>`;
         node.appendChild(box);
         document.body.appendChild(node);
         box.onclick = (e) => e.stopPropagation();
@@ -7747,46 +8023,96 @@
           const hits = rows
             .filter(
               (i) =>
-                !q ||
-                (i.code || "").toLowerCase().includes(q) ||
-                (i.desc || "").toLowerCase().includes(q) ||
-                (i.customerWording || "").toLowerCase().includes(q),
+                (!chapter || i.chapter === chapter) &&
+                (!q ||
+                  (i.code || "").toLowerCase().includes(q) ||
+                  (i.desc || "").toLowerCase().includes(q) ||
+                  (i.customerWording || "").toLowerCase().includes(q)),
             )
             .slice(0, 60);
           $("#cp_list").innerHTML =
             hits
-              .map(
-                (i) => `<button class="cpi" data-pick="${i.id}">
+              .map((i) => {
+                // What the catalogue knows about this partida beyond its name.
+                // Shown HERE as well as on the line, because "which of the two
+                // mixers is this" is a question you answer while choosing, not
+                // after choosing.
+                const spec = [i.brand, i.model, i.quality].filter(Boolean).join(" · ");
+                return `<button class="cpi${multi ? " pick" : ""}${chosen.has(i.id) ? " on" : ""}" data-pick="${i.id}">
+      ${multi ? `<span class="cpx">${chosen.has(i.id) ? "☑" : "☐"}</span>` : ""}
       <span class="cpc">${esc(i.code)}</span>
-      <span class="cpd"><b>${esc(i.desc)}</b><i>${esc(chapLabel(i.chapter))} · ${esc(i.unit)}</i></span>
+      <span class="cpd"><b>${esc(i.desc)}</b><i>${esc(chapLabel(i.chapter))} · ${esc(i.unit)}${spec ? " · " + esc(spec) : ""}</i></span>
       <span class="cpm">${i.defaultPriceCents ? eur(i.defaultPriceCents) : '<span class="pill y">sin precio</span>'}</span>
-     </button>`,
-              )
+     </button>`;
+              })
               .join("") ||
             (rows.length === 0
               ? `<div class="empty" style="padding:18px">El catálogo está vacío todavía. Crea la primera partida con el botón de abajo, o añádelas en Configuración › Partidas y subpartidas.</div>`
               : q
-                ? `<div class="empty" style="padding:18px">Ninguna partida coincide con «${esc(q)}». Créala con el botón de abajo y queda en el catálogo para la próxima vez.</div>`
-                : `<div class="empty" style="padding:18px">Escribe para buscar entre las ${rows.length} partidas del catálogo.</div>`);
+                ? `<div class="empty" style="padding:18px">Ninguna partida coincide con «${esc(q)}»${chapter ? " en este capítulo" : ""}. ${chapter ? "Prueba en «Todos los capítulos», o créala" : "Créala"} con el botón de abajo y queda en el catálogo para la próxima vez.</div>`
+                : `<div class="empty" style="padding:18px">Este capítulo no tiene partidas todavía. Elige «Todos los capítulos» o crea la primera.</div>`);
+          if (multi) {
+            $("#cp_count").textContent = chosen.size
+              ? `${chosen.size} seleccionada${chosen.size === 1 ? "" : "s"}`
+              : "ninguna seleccionada";
+            $("#cp_add").disabled = !chosen.size;
+          }
           $("#cp_list")
             .querySelectorAll("[data-pick]")
             .forEach(
               (b) =>
                 (b.onclick = () => {
                   const it = rows.find((x) => x.id === b.dataset.pick);
-                  close();
-                  onPick(it);
+                  if (!multi) {
+                    close();
+                    onPick(it);
+                    return;
+                  }
+                  // Ticking re-paints in place rather than closing: the list is
+                  // where the choosing happens, and a modal that shut on every
+                  // tick would be the round trip this mode exists to remove.
+                  if (chosen.has(it.id)) chosen.delete(it.id);
+                  else chosen.add(it.id);
+                  paint();
                 }),
             );
         };
         $("#cp_q").oninput = paint;
+        $("#cp_chap").onchange = (e) => {
+          chapter = e.target.value;
+          paint();
+        };
         $("#cp_cancel").onclick = close;
         $("#cp_new").onclick = () => {
           close();
           catalogueItemDrawer(null);
         };
+        if (multi)
+          $("#cp_add").onclick = () => {
+            // In catalogue order, not tick order: a chapter reads in the order
+            // the work is done, and that is the order the lines should land in.
+            const picked = rows.filter((i) => chosen.has(i.id));
+            close();
+            onPick(picked);
+          };
         paint();
         setTimeout(() => $("#cp_q").focus(), 60);
+      }
+      /** Chapters that actually hold something, plus the way back to everything. */
+      function cpChapterOptions(rows, selected) {
+        const count = new Map();
+        for (const i of rows) count.set(i.chapter || "", (count.get(i.chapter || "") || 0) + 1);
+        return (
+          `<option value=""${selected ? "" : " selected"}>Todos los capítulos (${rows.length})</option>` +
+          erp
+            .listActive("itemChapters")
+            .filter((c) => count.get(c.code))
+            .map(
+              (c) =>
+                `<option value="${esc(c.code)}"${c.code === selected ? " selected" : ""}>${esc(c.es)} (${count.get(c.code)})</option>`,
+            )
+            .join("")
+        );
       }
 
       /** Unit picker over the owner-maintained list, keeping a retired unit visible. */
@@ -9269,7 +9595,7 @@
         {
           label: "NIF/CIF",
           get: (p) => p.taxId || "",
-          html: (p) => (p.taxId ? esc(p.taxId) : '<span class="pill r">Falta</span>'),
+          html: (p) => (p.taxId ? esc(p.taxId) : TAX_PENDING),
         },
         {
           label: "Contacto",
@@ -10445,6 +10771,54 @@
    so that editing a row does not throw the estimator back to Totales while
    they are reading the visit report they are pricing from. */
       let bTab = "totals";
+      /* Which side panes are folded away, or `null` for "nobody has said".
+   Thirteen columns, a 260 px chapter tree and a 300 px totals pane do not fit
+   side by side on a laptop: measured, the row needs about 1 150 px and a
+   1 440 px screen leaves the grid about 880. The old answer was a horizontal
+   scrollbar, which put the sale price off the right-hand edge of the one
+   screen where an estimator reads it.
+
+   So on a narrow screen the CHAPTER TREE folds by default — it is the most
+   redundant of the three, because every chapter it lists is already a row in
+   the grid beside it. An explicit choice wins over the measurement and is
+   remembered; the width only decides for somebody who has never chosen. */
+      let bFold = null;
+      /* Measured, not chosen: the row needs about 1 150 px, the two side panes
+   560 px, and there are two borders between them — so all three coexist from
+   roughly 1 720 px and not before. A 1 440 or 1 600 px laptop folds the tree;
+   a 1 920 px monitor keeps everything. Widen a column and this number has to
+   move with it, which is why the E2E measures the fit rather than trusting it. */
+      const PB_FOLD_WIDTH = 1720;
+      function pbFold() {
+        if (!bFold) bFold = { l: window.innerWidth < PB_FOLD_WIDTH, r: false };
+        return bFold;
+      }
+      function pbApplyFold() {
+        const f = pbFold();
+        const panes = $("#pbPanes");
+        if (!panes) return;
+        panes.classList.toggle("foldL", f.l);
+        panes.classList.toggle("foldR", f.r);
+        // The chevron points at what pressing it does: outward to give the pane
+        // back, inward to take the space.
+        const mark = (btn, folded, closed, open) => {
+          if (!btn) return;
+          btn.classList.toggle("on", !folded);
+          btn.textContent = folded ? closed : open;
+        };
+        mark($("#pbFoldL"), f.l, "⟩", "⟨");
+        mark($("#pbFoldR"), f.r, "⟨", "⟩");
+      }
+      function pbToggleFold(side) {
+        const f = pbFold();
+        f[side] = !f[side];
+        pbApplyFold();
+        try {
+          ErpStore.setMeta("ui.pbfold", { l: f.l, r: f.r });
+        } catch (e) {
+          /* a remembered pane is a convenience, never a reason to fail a render */
+        }
+      }
 
       /** The visit this presupuesto is being written from, if there is one.
     Preferring the explicit link (S4's `visit.budgetId`) and falling back to
@@ -10518,15 +10892,25 @@
      </div>
     </div>
 
-    <div class="pbpanes">
-     <div class="pbpane">
-      <div class="pbh">Capítulos<span style="flex:1"></span>
-       ${locked ? "" : '<button class="btn sm" id="bAddChap">+</button>'}</div>
+    <div class="pbpanes" id="pbPanes">
+     <div class="pbpane" id="pbLeft">
+      <div class="pbh">Capítulos</div>
       <div class="btree" id="bTree" style="max-height:none"></div>
      </div>
 
      <div class="pbpane mid bgrid">
-      <div class="pbh">Partidas<span style="flex:1"></span><span class="tag" id="bGridTag"></span></div>
+      <!-- The two side panes fold away from HERE, not from their own headers:
+           a control that vanishes with the thing it controls cannot bring it
+           back. Thirteen columns do not fit beside a 260 px tree and a 300 px
+           totals pane on a laptop, and the answer to that is not a horizontal
+           scrollbar over the sale price. -->
+      <!-- «+ capítulo» lives HERE and not over the tree, because the tree folds
+           and the button went with it: with the pane closed there was no way
+           left to add a chapter at all. Every add now sits in the one pane that
+           is always on screen. -->
+      <div class="pbh"><button class="pbfold" id="pbFoldL" title="Mostrar u ocultar los capítulos">⟨</button>
+       Partidas${locked ? "" : '<button class="btn sm" id="bAddChap" style="margin-left:8px">+ capítulo</button>'}<span style="flex:1"></span><span class="tag" id="bGridTag"></span>
+       <button class="pbfold" id="pbFoldR" title="Mostrar u ocultar los totales">⟩</button></div>
       <!-- Column order and names come from Package 1 slide 9, and they are the
            order the work is actually done in: say what it is, in what unit, what
            it costs us, what we put on it, how much of it, and only then what the
@@ -10534,14 +10918,21 @@
            sale price is derived from them (see bPriceFromMargin), not typed
            alongside them. -->
       <div class="scroll"><table><thead><tr>
-        <th style="width:16px"></th><th>Nº</th><th>Código</th><th>Descripción</th><th>Unidad</th>
-        <th class="num int">Coste unitario</th><th class="num int">Margen unit. %</th>
-        <th class="num">Cantidad</th><th class="num">P. unitario venta</th><th class="num">Precio total</th>
-        <th>Estado</th><th>Imágenes</th>${locked ? "" : "<th></th>"}
+        <!-- Widths are declared, not left to the content. A table that sizes
+             itself gives the description whatever the eleven numeric columns do
+             not want, and what they want depends on how long today's figures
+             are — so the column an estimator reads moved every time a price
+             gained a digit. Descripción is the one column with no width: it
+             takes what is left, which is the right rule for the only free text
+             on the row. -->
+        <th style="width:16px"></th><th style="width:54px">Nº</th><th style="width:88px">Código</th><th>Descripción</th><th style="width:84px">Unidad</th>
+        <th class="num int" style="width:76px">Coste ud.</th><th class="num int" style="width:74px">Margen %</th>
+        <th class="num" style="width:76px">Cantidad</th><th class="num" style="width:80px">P. venta ud.</th><th class="num" style="width:86px">Total</th>
+        <th style="width:92px">Estado</th><th style="width:56px">Imág.</th>${locked ? "" : '<th style="width:34px"></th>'}
       </tr></thead><tbody id="bRows"></tbody></table></div>
      </div>
 
-     <div class="pbpane">
+     <div class="pbpane" id="pbRight">
       <div class="pbtabs">
        <button data-tab="totals"${bTab === "totals" ? ' class="on"' : ""}>Totales</button>
        <button data-tab="visit"${bTab === "visit" ? ' class="on"' : ""}>Visita</button>
@@ -10585,6 +10976,9 @@
             // builder is now showing it, which it is not.
             verPick.value = vsel;
           };
+        pbApplyFold();
+        $("#pbFoldL").onclick = () => pbToggleFold("l");
+        $("#pbFoldR").onclick = () => pbToggleFold("r");
         const addChap = $("#bAddChap");
         if (addChap)
           /* Package 1, slide 8: "los Capítulos deberían ser un dropdown list de
@@ -10814,6 +11208,93 @@
         });
       }
 
+      /**
+       * Everything a catalogue entry contributes to a budget line.
+       *
+       * ONE function, used by both the row's 🔍 and «+ partida». They used to
+       * be one copy and one blank line, which is how «+ partida» came to
+       * produce a row at 0,00 € — and had they merely been two copies, they
+       * would have drifted the first time either learned a new field.
+       *
+       * `imageRefs` is deliberately absent: `editLine` strips it (images have
+       * guarded methods so a version diff cannot be forged through a patch), so
+       * putting it here would look like it worked and silently do nothing —
+       * which is exactly what it did. `attachCatalogueImages` is the real path.
+       */
+      function lineFromCatalogueItem(it) {
+        return {
+          // The link back to the catalogue entry. Without it the line forgets
+          // where its figures came from the moment it is written, so nothing can
+          // later say "this price is stale" or "the catalogue moved and this
+          // quote did not".
+          itemId: it.id,
+          code: it.code,
+          // Both descriptions, not one. This used to write `customerWording ||
+          // desc` into `desc`, which threw away the internal wording whenever a
+          // customer-facing one existed — and the two exist precisely because
+          // they differ. Documents print `customerWording || desc`, so what the
+          // customer reads is unchanged.
+          desc: it.desc,
+          customerWording: it.customerWording || "",
+          unit: it.unit,
+          // What the work IS, as the price book states it. These four were
+          // visible on the catalogue screen and absent from every quote made
+          // from it; see the note in the engine's `addLine`.
+          type: it.type || "",
+          brand: it.brand || "",
+          model: it.model || "",
+          quality: it.quality || "",
+          costCents: it.defaultCostCents || 0,
+          priceCents: it.defaultPriceCents || 0,
+          // A partida with no reference price arrives marked pending rather than
+          // priced at zero — the catalogue screen says so and the line has to
+          // agree.
+          pending: !it.defaultPriceCents,
+        };
+      }
+      /** The catalogue's photographs seed the line's graphic annex, so a partida
+    always quoted with a picture arrives with it. Through the guarded method,
+    marked `catalogue` so the annex can say where each picture came from. */
+      function attachCatalogueImages(budgetId, lineId, it) {
+        for (const img of it.imageRefs || [])
+          erp.attachLineImage(
+            budgetId,
+            lineId,
+            Object.assign({}, img, { id: undefined, source: "catalogue" }),
+            "backoffice",
+          );
+      }
+      /** The catalogue chapter a budget chapter came from, by name.
+    `addChapter` stores the chapter's NAME (it also accepts a free-text one that
+    belongs to no chapter), so the code is recovered rather than stored. Returns
+    "" for a free-text chapter, which opens the picker on the whole catalogue —
+    the honest answer when there is no chapter to narrow to. */
+      function chapterCatalogueCode(budgetId, vsel, chapterId) {
+        const c = erp.version(budgetId, vsel).chapters.find((x) => x.id === chapterId);
+        if (!c) return "";
+        const hit = erp.listAll("itemChapters").find((x) => x.es === c.name);
+        return hit ? hit.code : "";
+      }
+      /* What a line IS, under its description: marca · modelo · calidad, plus
+   what kind of cost it is. Deliberately a SUB-LINE and not three more columns
+   — the grid is already thirteen columns in a pane that has to fit on a
+   laptop, and three more would push the sale price off the right-hand edge to
+   show information you read once while choosing. Empty on a line typed by
+   hand, which is the honest answer: nothing claimed it. */
+      const LINE_TYPE = {
+        material: "material",
+        ownLabour: "mano de obra propia",
+        subcontract: "subcontrata",
+        machinery: "maquinaria",
+        professional: "honorarios",
+        waste: "residuos",
+        other: "otros",
+      };
+      function lineSpecLine(l) {
+        const bits = [l.brand, l.model, l.quality].filter(Boolean);
+        if (l.type && LINE_TYPE[l.type]) bits.push(LINE_TYPE[l.type]);
+        return bits.length ? `<div class="lspec">${esc(bits.join(" · "))}</div>` : "";
+      }
       /** Renders the grid body. Called once per builder render — never on keystroke,
     which would move the caret out from under the person typing. */
       function builderRows(id, vsel, locked, SECL) {
@@ -10828,7 +11309,12 @@
             .map(
               (c) => `
     <tr class="chaprow" data-chaprow="${c.id}"><td colspan="${cols}">${esc(c.num)}. ${esc(c.name)} · ${SECL[c.section] || c.section}
-      ${locked ? "" : `<button class="btn sm" data-addline="${c.id}" style="margin-left:8px">+ partida</button>`}</td></tr>
+      ${
+        locked
+          ? ""
+          : `<button class="btn sm primary" data-addline="${c.id}" style="margin-left:8px">+ partida del catálogo</button>
+      <button class="btn sm" data-blankline="${c.id}" style="margin-left:6px" title="Una partida que todavía no está en el catálogo">+ partida en blanco</button>`
+      }</td></tr>
     ${c.lines
       .map((l) => {
         const a = bLineAmt(l);
@@ -10837,8 +11323,8 @@
       <td class="pbdrag" data-handle="${l.id}" title="Arrastrar para reordenar">${locked ? "" : "⠿"}</td>
       <td><input data-line="${l.id}" data-f="num" value="${esc(l.num)}" style="width:56px"
         title="${l.manualNum ? "Número escrito a mano — se mantiene al reordenar" : "Número automático — cambia con la posición"}"${locked ? " disabled" : ""}></td>
-      <td class="pbfind">${locked ? "" : `<button class="bfind" data-find="${l.id}" title="Buscar en el catálogo">🔍</button>`}<input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="5"${locked ? " disabled" : ""}></td>
-      <td><input data-line="${l.id}" data-f="desc" value="${esc(l.desc)}"${locked ? " disabled" : ""}></td>
+      <td class="pbfind"><div>${locked ? "" : `<button class="bfind" data-find="${l.id}" title="Buscar en el catálogo">🔍</button>`}<input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="5"${locked ? " disabled" : ""}></div></td>
+      <td><input data-line="${l.id}" data-f="desc" value="${esc(l.desc)}"${locked ? " disabled" : ""}>${lineSpecLine(l)}</td>
       <td><select data-line="${l.id}" data-f="unit" style="width:88px"${locked ? " disabled" : ""}>${listOptionsUnits(l.unit)}</select></td>
       <td class="int"><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>
       <td class="int"><input class="r" data-line="${l.id}" data-f="marginPct" type="number" step="0.1" max="99.9" value="${bMarginPct(l)}"${locked ? " disabled" : ""} title="Margen sobre el precio de venta. Al escribirlo, el precio unitario se recalcula."></td>
@@ -10867,47 +11353,23 @@
             (btn) =>
               (btn.onclick = () => {
                 const lid = btn.dataset.find;
-                // Opens on the WHOLE catalogue rather than pre-filtered by the
-                // line's current description: "Nueva partida" matches nothing,
-                // and a picker that opens empty reads as a broken picker. The
-                // search box is right there for anyone who knows what they want.
+                /* The WHOLE catalogue, deliberately — searching is global,
+           adding is local. This 🔍 is reached from a line that already
+           exists, often one whose chapter does not match where its partida
+           is filed, and a magnifier that quietly hides most of the catalogue
+           is the failure it is supposed to fix. «+ partida del catálogo»
+           below opens narrowed, because there you are adding TO a chapter.
+           The chapter selector is in the modal either way.
+
+           Not pre-filtered by the line's DESCRIPTION either: "Nueva partida"
+           matches nothing, and a picker that opens empty reads as broken. */
                 catalogueSearchModal((it) => {
-                  // EVERYTHING the catalogue knows, in one go — including the
-                  // cost, which is the whole reason to have looked it up.
                   mutate(() => {
-                    erp.editLine(
-                      id,
-                      lid,
-                      {
-                        // The link back to the catalogue entry. Without it the
-                        // line forgets where its figures came from the moment
-                        // it is written, so nothing can later say "this price
-                        // is stale" or "the catalogue moved and this quote did
-                        // not".
-                        itemId: it.id,
-                        code: it.code,
-                        // Both descriptions, not one. This used to write
-                        // `customerWording || desc` into `desc`, which threw
-                        // away the internal wording whenever a customer-facing
-                        // one existed — and the two exist precisely because
-                        // they differ. Documents print `customerWording ||
-                        // desc`, so what the customer reads is unchanged.
-                        desc: it.desc,
-                        customerWording: it.customerWording || "",
-                        unit: it.unit,
-                        costCents: it.defaultCostCents || 0,
-                        priceCents: it.defaultPriceCents || 0,
-                        // The catalogue's photographs seed the line's graphic
-                        // annex, so a partida that has always been quoted with
-                        // a picture arrives with it.
-                        imageRefs: (it.imageRefs || []).slice(),
-                        // A partida with no reference price arrives marked
-                        // pending rather than priced at zero — the catalogue
-                        // screen says so and the line has to agree.
-                        pending: !it.defaultPriceCents,
-                      },
-                      { audit: true, user: "backoffice" },
-                    );
+                    erp.editLine(id, lid, lineFromCatalogueItem(it), {
+                      audit: true,
+                      user: "backoffice",
+                    });
+                    attachCatalogueImages(id, lid, it);
                   }, "Partida tomada del catálogo");
                 });
               }),
@@ -10916,14 +11378,51 @@
           .querySelectorAll("[data-addline]")
           .forEach(
             (btn) =>
+              (btn.onclick = () => {
+                /* «+ partida» used to create a BLANK line, and that one decision
+           is what made a two-hundred-partida price book invisible: the
+           operator pressed it, got «Nueva partida» at 0,00 €, looked for a
+           dropdown to choose from and found only a 🔍 tucked inside the
+           código cell. So the button now opens the catalogue itself,
+           already narrowed to this chapter, with ticks — a chapter is ten
+           subpartidas and quoting one of them usually means quoting six.
+
+           The blank line survives as the SECOND button, because a partida
+           that is not in the price book yet is a normal thing to quote and
+           must not require a detour through Configuración first. */
+                const chapId = btn.dataset.addline;
+                catalogueSearchModal(
+                  (items) => {
+                    mutate(
+                      () => {
+                        for (const it of items) {
+                          const line = erp.addLine(
+                            id,
+                            chapId,
+                            Object.assign(lineFromCatalogueItem(it), { qtyMilli: 1000 }),
+                          );
+                          attachCatalogueImages(id, line.id, it);
+                        }
+                      },
+                      `${items.length} partida${items.length === 1 ? "" : "s"} del catálogo`,
+                    );
+                  },
+                  { chapter: chapterCatalogueCode(id, vsel, chapId), multi: true },
+                );
+              }),
+          );
+        $("#bRows")
+          .querySelectorAll("[data-blankline]")
+          .forEach(
+            (btn) =>
               (btn.onclick = () =>
                 mutate(() => {
-                  erp.addLine(id, btn.dataset.addline, {
+                  erp.addLine(id, btn.dataset.blankline, {
                     desc: "Nueva partida",
                     unit: "ud",
                     qtyMilli: 1000,
                   });
-                }, "Partida añadida")),
+                }, "Partida en blanco añadida")),
           );
         $("#bRows")
           .querySelectorAll("[data-delline]")
@@ -12817,7 +13316,7 @@
               {
                 label: "NIF/CIF",
                 get: (p) => p.taxId || "",
-                html: (p) => (p.taxId ? esc(p.taxId) : '<span class="pill r">Falta</span>'),
+                html: (p) => (p.taxId ? esc(p.taxId) : TAX_PENDING),
               },
               {
                 label: "Categoría",
@@ -12903,7 +13402,7 @@
               {
                 label: "NIF/CIF",
                 get: (p) => p.taxId || "",
-                html: (p) => (p.taxId ? esc(p.taxId) : '<span class="pill r">Falta</span>'),
+                html: (p) => (p.taxId ? esc(p.taxId) : TAX_PENDING),
               },
               {
                 label: "Contacto",
@@ -15400,7 +15899,7 @@
         ];
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Nombre o razón social *</label><input id="e_name" value="${esc(p.name)}"></div>
-   <div class="field"><label>NIF / CIF / NIE *</label><input id="e_tax" value="${esc(p.taxId || "")}"></div>
+   <div class="field"><label>NIF / CIF / NIE <span class="lateflag" id="e_taxflag" title="Sin NIF no se puede facturar ni contratar — la ficha existe igual y se completa después">⚠</span></label><input id="e_tax" value="${esc(p.taxId || "")}"></div>
    <div class="field"><label>Tipo</label><select id="e_type">${[
      ["individual", "Particular"],
      ["company", "Empresa"],
@@ -15445,6 +15944,7 @@
      <button class="btn primary" id="e_save">Guardar cambios</button>
      <span style="flex:1"></span>
      <button class="btn danger" id="e_del">🗑 Eliminar</button></div></div>`;
+        wireLateFlag("#e_tax", "#e_taxflag");
         /* §3.1: a party carrying economic documents is never deleted, it is
      deactivated — an issued invoice must still be explainable years later,
      and it cannot be if the customer behind it is gone. The engine refuses
@@ -15565,7 +16065,7 @@
         ];
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Nombre o razón social *</label><input id="f_name"></div>
-   <div class="field"><label>NIF / CIF / NIE *</label><input id="f_tax" placeholder="12345678Z"></div>
+   <div class="field"><label>NIF / CIF / NIE <span class="lateflag" id="f_taxflag" title="Sin NIF no se puede facturar ni contratar — la ficha se crea igual y se completa después">⚠</span></label><input id="f_tax" placeholder="12345678Z"></div>
    ${role ? "" : `<div class="field"><label>Rol</label><select id="f_role">${ROLE.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></div>`}
    <div class="field"><label>Persona de contacto</label><input id="f_contact"></div>
    <div class="field"><label>Teléfono</label><input id="f_land"></div>
@@ -15583,6 +16083,7 @@
         // `.field` is a COLUMN flex box, so the row has to be asked for — left
         // as it was, the two buttons would stack full-width on top of each other.
         if (back) $("#f_back").onclick = closeDrawer;
+        wireLateFlag("#f_tax", "#f_taxflag");
         $("#f_save").onclick = () => {
           // A duplicate suspect is a soft warning (findDuplicateParty), never a
           // refusal — the record is still created, but the toast that would
@@ -15635,6 +16136,23 @@
           .map((p) => `<option value="${p.id}">${esc(p.name)} (${p.code})</option>`)
           .join("");
       }
+      /** Shows the amber ⚠ beside a field only while it is empty, live as it is
+    typed. The flag is a statement about the RECORD, not a validation error:
+    nothing is refused, and the same mark appears on the list so the gap is
+    still visible tomorrow, when whoever has to chase it is looking. */
+      function wireLateFlag(inputSel, flagSel) {
+        const inp = $(inputSel),
+          flag = $(flagSel);
+        if (!inp || !flag) return;
+        const sync = () => (flag.hidden = !!inp.value.trim());
+        inp.addEventListener("input", sync);
+        sync();
+      }
+      /** The list marker for a tax identifier that is still to come. Amber and
+    not red: the record is legitimate and usable, it simply cannot be invoiced
+    yet. Red says "broken"; this is "unfinished", and an ERP that cannot tell
+    those apart trains its operator to ignore both. */
+      const TAX_PENDING = `<span class="pill y" title="Sin NIF no se puede facturar ni contratar">⚠ Pendiente</span>`;
       /** The sentinel a picker uses for "the one I want is not in this list yet".
     Same string `listOptionsCreatable` already uses, on purpose: one convention
     for one idea, so a reader who has met one picker has met them all. */
@@ -16165,11 +16683,11 @@
 
       /* ---------- COM-02 · scheduling and capturing a visit (S4) ---------- */
       /* A visit is scheduled in the real world, so its floor is the real date —
-   but never earlier than the dataset's own today, which is ahead of the wall
-   clock on the demo. Taking the later of the two means the field opens on a
-   day you could actually go, in both. */
+   but never earlier than the dataset's own today, which can be ahead of the
+   wall clock on a demo that was built forward. Taking the later of the two
+   means the field opens on a day you could actually go, in both. */
       function visitFloorDate() {
-        const wall = new Date().toISOString().slice(0, 10);
+        const wall = wallToday();
         return wall > erp.today ? wall : erp.today;
       }
       function nowHHMM() {

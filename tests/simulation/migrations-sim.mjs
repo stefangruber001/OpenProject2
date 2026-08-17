@@ -365,6 +365,32 @@ assert(r2.applied.length === 0, "a current blob applies no further migrations");
     rows.every((r) => r.defaultPriceCents === 0 || r.defaultPriceCents > r.defaultCostCents),
     "every priced partida sells above its cost",
   );
+  /* What the work IS, not only what it costs. These three reach the budget line
+     now, so a blank here is a blank on the quote — and the rule for filling
+     them is stated in the pack's own header: a specification on every row, a
+     manufacturer only where one exists. */
+  const noQuality = rows.filter((r) => !String(r.quality || "").trim());
+  assert(
+    noQuality.length === 0,
+    "every partida states a calidad",
+    JSON.stringify(noQuality.map((r) => r.code)).slice(0, 160),
+  );
+  const halfNamed = rows.filter(
+    (r) => !!String(r.brand || "").trim() !== !!String(r.model || "").trim(),
+  );
+  assert(
+    halfNamed.length === 0,
+    "no partida names a marca without a modelo, or the reverse",
+    JSON.stringify(halfNamed.map((r) => r.code)).slice(0, 160),
+  );
+  // A price book where nothing is branded would satisfy the two rules above and
+  // be useless, so the floor is stated rather than left to the reader's trust.
+  const named = rows.filter((r) => String(r.brand || "").trim());
+  assert(
+    named.length >= 90,
+    "the partidas that ARE a product name one",
+    `${named.length} of ${rows.length}`,
+  );
 
   // Additive against a state that already has the operator's own work.
   const own = M.migrate({ ...v1, schemaVersion: 15 }).state;
@@ -405,6 +431,69 @@ assert(r2.applied.length === 0, "a current blob applies no further migrations");
   assert(
     twice.catalogue.length === after.catalogue.length,
     "re-running the migration adds nothing",
+  );
+}
+
+/* ---- what the work IS, on the line as well as in the catalogue (mig 17) ----
+ *
+ * The catalogue recorded `type`, `brand`, `model` and `quality`; the budget line
+ * recorded none of them, so a quote made from the price book could not say which
+ * of two mixers had been sold. This backfills the shape on every existing line.
+ */
+{
+  const SPEC = ["type", "brand", "model", "quality"];
+  const old = JSON.parse(JSON.stringify(v1));
+  old.budgets = [
+    {
+      id: "bud_x",
+      versions: [
+        {
+          id: "ver_x",
+          chapters: [
+            {
+              id: "chp_x",
+              lines: [
+                { id: "lin_1", desc: "Punto de agua", priceCents: 9000 },
+                { id: "lin_2", desc: "Alicatado", priceCents: 3900, brand: "Porcelanosa" },
+              ],
+            },
+            { id: "chp_empty" },
+          ],
+        },
+        { id: "ver_noch" },
+      ],
+    },
+    { id: "bud_bare" },
+  ];
+  const out = M.migrate(old).state;
+  const lines = out.budgets[0].versions[0].chapters[0].lines;
+  assert(
+    SPEC.every((f) => typeof lines[0][f] === "string"),
+    "every existing budget line gains type/brand/model/quality",
+    JSON.stringify(lines[0]),
+  );
+  assert(
+    lines[1].brand === "Porcelanosa",
+    "a value already on a line is left alone",
+    lines[1].brand,
+  );
+  assert(
+    lines[0].desc === "Punto de agua" && lines[0].priceCents === 9000,
+    "nothing else on the line is touched",
+  );
+  // A chapter with no `lines`, a version with no `chapters`, a budget with no
+  // `versions`: all three exist in real blobs and all three used to be a
+  // TypeError waiting for the one company that had them.
+  assert(
+    Array.isArray(out.budgets[0].versions[0].chapters) &&
+      out.budgets[0].versions[0].chapters.length === 2 &&
+      out.budgets.length === 2,
+    "a half-shaped budget survives the walk instead of throwing",
+  );
+  const again = M.MIGRATIONS.find((m) => m.to === 17).up(JSON.parse(JSON.stringify(out)));
+  assert(
+    again.budgets[0].versions[0].chapters[0].lines[1].brand === "Porcelanosa",
+    "re-running it changes nothing",
   );
 }
 

@@ -62,42 +62,59 @@ async function main() {
   await waitForServer(base);
 
   const browser = await chromium.launch({ executablePath: CHROME });
+  /* Every suite, in order. A list rather than thirty-four await statements so
+     that `--only <substring>` can pick one out: the whole run takes about
+     twelve minutes, and diagnosing one broken suite by re-running all of them
+     is how a fix takes an afternoon. CI passes no argument and gets everything,
+     which is the only mode that may report a pass. */
+  const SUITES = [
+    testJourney,
+    testNoOverflow,
+    testMobile,
+    testNativeShell,
+    testSmoke,
+    testDataTabs,
+    testRetired,
+    testShell,
+    testGantt,
+    testBudgetBuilder,
+    testPresupuestador,
+    testCapture,
+    testProjectTracking,
+    testInvoicing,
+    testInvoiceGenerator,
+    testCashFlow,
+    testFinancials,
+    testBankAndCash,
+    testContract,
+    testChangeApprovalEvidence,
+    testContractCreation,
+    testBudgetCreation,
+    testProcurement,
+    testAdmin,
+    testControlTowerAndDay,
+    testVisitCapture,
+    testConfigurableLists,
+    testInlineCustomer,
+    testPresupuestadorRework,
+    testEvidence,
+    testSendAndVersions,
+    testJourneyRealMode,
+    testErp,
+    testI18n,
+    testLanguageAcrossTabs,
+  ];
+  const onlyAt = process.argv.indexOf("--only");
+  const only = onlyAt > 0 ? String(process.argv[onlyAt + 1] || "").toLowerCase() : "";
+  const chosen = only ? SUITES.filter((f) => f.name.toLowerCase().includes(only)) : SUITES;
+  if (only && !chosen.length) {
+    console.error(
+      `--only ${only} matched no suite. Known: ${SUITES.map((f) => f.name).join(", ")}`,
+    );
+    process.exit(2);
+  }
   try {
-    await testJourney(browser, base);
-    await testNoOverflow(browser, base);
-    await testMobile(browser, base);
-    await testNativeShell(browser, base);
-    await testSmoke(browser, base);
-    await testDataTabs(browser, base);
-    await testRetired(browser, base);
-    await testShell(browser, base);
-    await testGantt(browser, base);
-    await testBudgetBuilder(browser, base);
-    await testPresupuestador(browser, base);
-    await testCapture(browser, base);
-    await testProjectTracking(browser, base);
-    await testInvoicing(browser, base);
-    await testInvoiceGenerator(browser, base);
-    await testCashFlow(browser, base);
-    await testFinancials(browser, base);
-    await testBankAndCash(browser, base);
-    await testContract(browser, base);
-    await testChangeApprovalEvidence(browser, base);
-    await testContractCreation(browser, base);
-    await testBudgetCreation(browser, base);
-    await testProcurement(browser, base);
-    await testAdmin(browser, base);
-    await testControlTowerAndDay(browser, base);
-    await testVisitCapture(browser, base);
-    await testConfigurableLists(browser, base);
-    await testInlineCustomer(browser, base);
-    await testPresupuestadorRework(browser, base);
-    await testEvidence(browser, base);
-    await testSendAndVersions(browser, base);
-    await testJourneyRealMode(browser, base);
-    await testErp(browser, base);
-    await testI18n(browser, base);
-    await testLanguageAcrossTabs(browser, base);
+    for (const suite of chosen) await suite(browser, base);
   } finally {
     await browser.close();
     server.kill("SIGKILL");
@@ -109,6 +126,14 @@ async function main() {
   for (const r of results) {
     console.log(`${r.pass ? "✓" : "✗"} ${r.name}${r.detail ? `  → ${r.detail}` : ""}`);
   }
+  // Failures repeated at the END as well as in place. The report is ~450 lines
+  // and the natural way to read a long run is `| tail`, which keeps the count
+  // and throws away the four lines that say what broke.
+  if (failed.length) {
+    console.log(`\n──── ${failed.length} failed ────`);
+    for (const r of failed) console.log(`✗ ${r.name}${r.detail ? `  → ${r.detail}` : ""}`);
+  }
+  if (only) console.log(`(--only ${only}: ${chosen.length} of ${SUITES.length} suites)`);
   console.log(`${results.length - failed.length}/${results.length} passed`);
   if (failed.length) process.exit(1);
 }
@@ -674,6 +699,44 @@ async function testMobile(browser, base) {
       ok(`mobile: the header moves onto each line and the row stacks (${card.cells} labelled)`);
     else bad("mobile: card shape", JSON.stringify(card));
 
+    /* Every top-bar menu opens INSIDE the phone.
+       `.menu` hangs from `right: 0` of its button, which is right on a wide bar
+       and wrong once the bar wraps: «＋ Crear» ends up near the left edge and a
+       214 px panel anchored to its right ran off the side of the screen. Both
+       menus are checked, not just the one that was reported — the next button
+       added to that bar inherits the same geometry. */
+    const offscreen = [];
+    for (const [btn, menu] of [
+      ["#btnCreate", "#mCreate"],
+      ["#btnBell", "#mBell"],
+    ]) {
+      const box = await pg.evaluate(
+        ([b, m]) => {
+          const btnEl = document.querySelector(b);
+          if (!btnEl || btnEl.hidden) return null;
+          btnEl.click();
+          const r = document.querySelector(m).getBoundingClientRect();
+          return { left: Math.round(r.left), right: Math.round(r.right), vw: window.innerWidth };
+        },
+        [btn, menu],
+      );
+      await pg.waitForTimeout(200);
+      if (box && (box.left < 0 || box.right > box.vw))
+        offscreen.push(`${menu}:${JSON.stringify(box)}`);
+      await pg.evaluate(() => closeMenus());
+    }
+    if (!offscreen.length) ok("mobile: the top-bar menus open inside the screen, not off its edge");
+    else bad("mobile: menus stay on screen", offscreen.join(" · "));
+
+    // The logo is the way home, and on a phone it is the only one visible.
+    await pg.evaluate(() => (location.hash = "invoicing"));
+    await pg.waitForTimeout(500);
+    await pg.click("#brandHome");
+    await pg.waitForTimeout(600);
+    const home = await pg.evaluate(() => location.hash);
+    if (home === "#tower") ok("mobile: the logo goes home from anywhere");
+    else bad("mobile: logo goes home", home);
+
     // A grid is NOT a list: the forecast keeps its columns and scrolls inside
     // its own container, which is the whole reason it opts out.
     await pg.evaluate(() => (location.hash = "cash-flow"));
@@ -1191,9 +1254,64 @@ async function testGantt(browser, base) {
       ok(`gantt: derives ${bars} chained tasks from the budget`);
     else bad("gantt: derives from the budget", `bars=${bars} rows=${rows} deps=${deps0}`);
 
+    /* The today line is at TODAY, and on the chart.
+       "always use the actual date when you go in… when you open the giant
+       chart, then you see the line at the actual date today." `state.today` is
+       stored and nothing advanced it, so a workspace seeded in March still drew
+       its today line in March in August. Two things have to hold: the clock
+       equals the wall, and the window includes it — a line at the right date
+       painted past the right-hand edge is no better than one at the wrong
+       date. */
+    const nowLine = await pg.evaluate(() => {
+      const svg = document.querySelector("#gSvg");
+      const line = svg && svg.querySelector(".gtoday");
+      const d = new Date();
+      const p = (n) => String(n).padStart(2, "0");
+      return {
+        wall: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+        erpToday: erp.today,
+        x: line ? Math.round(+line.getAttribute("x1")) : null,
+        width: svg ? Math.round(+svg.getAttribute("width")) : 0,
+        from: svg ? svg.dataset.from : null,
+      };
+    });
+    if (nowLine.erpToday === nowLine.wall)
+      ok(`gantt: the workspace clock is the real date (${nowLine.wall})`);
+    else
+      bad(
+        "gantt: workspace clock follows the wall clock",
+        `erp.today=${nowLine.erpToday} wall=${nowLine.wall}`,
+      );
+    if (nowLine.x !== null && nowLine.x >= 0 && nowLine.x <= nowLine.width)
+      ok(`gantt: the today line is drawn on the chart (x=${nowLine.x} of ${nowLine.width})`);
+    else bad("gantt: today line inside the chart", JSON.stringify(nowLine));
+    // Drawn is not seen. On a plan that began two years ago the line is 18 000 px
+    // right of where the chart used to open, so the chart opens ON it. Measured
+    // HERE, before any check calls scrollIntoViewIfNeeded on a 2024 bar and
+    // scrolls this container back to zero.
+    const view = await pg.evaluate(() => {
+      const sc = document.querySelector(".gscroll");
+      const x = Number(document.querySelector("#gSvg").dataset.today);
+      return {
+        left: Math.round(sc.scrollLeft),
+        w: sc.clientWidth,
+        sw: sc.scrollWidth,
+        x: Math.round(x),
+        canScroll: sc.scrollWidth > sc.clientWidth,
+      };
+    });
+    if (view.x >= view.left && view.x <= view.left + view.w)
+      ok(`gantt: the chart opens on today, not on its far-left past (${view.left}→${view.x})`);
+    else bad("gantt: today is in view when the chart opens", JSON.stringify(view));
+
     // Bars must render at their real height — an SVG rect is subject to CSS
     // geometry, so a stray `.bar {height}` rule elsewhere silently flattens
     // the whole chart. That regression happened once; this pins it.
+    // The chart now opens ON today, so a bar from the demo plan's own year can
+    // start scrolled off the left. Bring it into view before measuring it —
+    // a bounding box taken outside the viewport gives coordinates the mouse
+    // cannot reach, and the drag silently does nothing.
+    await pg.locator("#gSvg .gbar").first().scrollIntoViewIfNeeded();
     const box = await pg.locator("#gSvg .gbar").first().boundingBox();
     if (box && box.height > 15) ok("gantt: bars render at full height");
     else bad("gantt: bar height", JSON.stringify(box));
@@ -1218,6 +1336,7 @@ async function testGantt(browser, base) {
     else bad("gantt: drag reschedules", `finish unchanged: ${finishBefore}`);
 
     // Edge-drag to lengthen: the toast reports the new duration in WORKING days.
+    await pg.locator("#gSvg .ggrip").first().scrollIntoViewIfNeeded();
     const gb = await pg.locator("#gSvg .ggrip").first().boundingBox();
     await pg.mouse.move(gb.x + gb.width / 2, gb.y + gb.height / 2);
     await pg.mouse.down();
@@ -1229,6 +1348,7 @@ async function testGantt(browser, base) {
     else bad("gantt: edge-drag resizes", resizeToast);
 
     // Drag the link knob onto another bar → a new dependency.
+    await pg.locator("#gSvg .gknob").nth(0).scrollIntoViewIfNeeded();
     const kb = await pg.locator("#gSvg .gknob").nth(0).boundingBox();
     const tb = await pg.locator("#gSvg .gbar").nth(2).boundingBox();
     const before = await pg.locator("#gSvg path.gdep").count();
@@ -1843,7 +1963,12 @@ async function testPresupuestador(browser, base) {
       bar: !!document.querySelector(".pbbar #pbTotal"),
       cond: !!document.querySelector(".pbcond"),
     }));
-    if (shell.fs && shell.rail === "none" && /^260px .* 300px$/.test(shell.cols) && shell.bar)
+    // Three TRACKS, not three visible panes: below 1 720 px the chapter tree is
+    // folded to a 0 px track so the thirteen-column grid fits without scrolling
+    // sideways. What this asserts is the shape — the workspace rail gone, the
+    // grid between two side tracks, its own bar carrying the total — and not
+    // which of the side panes today's viewport chose to show.
+    if (shell.fs && shell.rail === "none" && /^(260px|0px) .* 300px$/.test(shell.cols) && shell.bar)
       ok(`COM-03: full screen — rail hidden, three panes at ${shell.cols}, own bar with the total`);
     else bad("COM-03: full-screen layout", JSON.stringify(shell));
     if (shell.cond) ok("COM-03: the conditions bar sits below the panes");
@@ -2014,6 +2139,18 @@ async function testPresupuestador(browser, base) {
             erp.editLine(id, l.id, { priceCents: 5000 }, { user: "e2e" });
         }),
       );
+      render();
+    }, draftId);
+    /* Give the offer a validity that has not already lapsed.
+       `createBudget` stamps `validityDate = today + 30`, so a budget the seed
+       wrote in March is expired by August — and `budgetStage` then reports
+       "expired" rather than "issued" no matter how correctly it was sent. That
+       is the right answer for a real quote and the wrong fixture for this
+       check, so the test does what the screen makes an operator do: the
+       validity field carries `min="${erp.today}"` and refuses a past date. */
+    await pg.evaluate((id) => {
+      const future = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+      erp.updateBudget(id, { validityDate: future }, "e2e");
       render();
     }, draftId);
     await pg.waitForTimeout(300);
@@ -4300,6 +4437,23 @@ async function testProcurement(browser, base) {
             erp.state.labour.filter((l) => l.date === hDay).reduce((s, l) => s + l.hoursMilli, 0) /
             1000,
         );
+      /* Point the row at a job that is still open.
+         `recordHours` refuses hours against a closed project, and the demo file
+         has closed ones — so whether this passed used to depend on which job
+         happened to be first for the day the sheet opened on. Choosing openly
+         is what the operator does with the row's own selector, and it stops the
+         check reporting a calendar bug when the engine had refused upstream. */
+      await pg.evaluate(() => {
+        const open = erp.state.projects.find((p) => !p.closed);
+        if (!open) return;
+        document.querySelectorAll("[data-newproj]").forEach((s) => {
+          if ([...s.options].some((o) => o.value === open.id)) {
+            s.value = open.id;
+            s.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        });
+      });
+      await pg.waitForTimeout(200);
       const beforeH = await hoursOnDay();
       // The first row may already carry hours, in which case typing 6 CORRECTS
       // it rather than adding to the day. Either way the arithmetic is known.
@@ -4312,11 +4466,24 @@ async function testProcurement(browser, base) {
       const shown = Number(dayTotal.replace(/[^\d,.]/g, "").replace(",", "."));
       if (afterH === beforeH - prev + 6 && shown === afterH)
         ok("ADM-04: hours entered on the sheet show in the day's calendar cell");
-      else
+      else {
+        // The engine refuses some entries (a closed project, no project chosen)
+        // and says so in a toast. Reporting the arithmetic alone left the last
+        // failure looking like a calendar bug when it was a refusal upstream.
+        const why = await pg.evaluate(() => {
+          const t = document.querySelector(".toast, #toast, .toasts");
+          return {
+            toast: t ? t.textContent.trim().slice(0, 120) : "",
+            day: typeof hDay === "string" ? hDay : null,
+            rows: document.querySelectorAll(".hsheet tbody tr").length,
+            projSel: document.querySelector("[data-newproj]")?.value ?? null,
+          };
+        });
         bad(
           "ADM-04: calendar total after entry",
-          `${beforeH}-${prev}+6 → ${afterH}, shown ${dayTotal}`,
+          `${beforeH}-${prev}+6 → ${afterH}, shown ${dayTotal} · ${JSON.stringify(why)}`,
         );
+      }
 
       await pg.locator("[data-approve]").first().click();
       await pg.waitForTimeout(600);
@@ -4329,12 +4496,20 @@ async function testProcurement(browser, base) {
       if (lockedRows > 0) ok("ADM-04: approving the week turns its row into a locked figure");
       else bad("ADM-04: approve locks the row", `locked=${lockedRows}`);
 
-      // Repeat copies the PREVIOUS day, so move on one day first — otherwise
-      // the button is being asked to copy a day that has nothing on it.
+      /* Repeat copies the PREVIOUS day, so move on one day first — otherwise
+         the button is being asked to copy a day that has nothing on it.
+         Advanced by DATE rather than by clicking the next calendar cell: the
+         sheet opens on the real date now, and when that is a Sunday there is no
+         next cell — the week ends there and the calendar has no way forward.
+         The check then failed for a reason that had nothing to do with
+         repeating a day, which is the kind of failure that gets a real one
+         dismissed. */
       await pg.evaluate(() => {
-        const cells = [...document.querySelectorAll(".hcal .hday")];
-        const i = cells.findIndex((c) => c.classList.contains("on"));
-        cells[Math.min(i + 1, cells.length - 1)].click();
+        const d = new Date(hDay + "T00:00:00");
+        d.setDate(d.getDate() + 1);
+        const p = (n) => String(n).padStart(2, "0");
+        hDay = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+        render();
       });
       await pg.waitForTimeout(500);
       await pg.click("#hRepeat");
@@ -5199,14 +5374,19 @@ async function testPresupuestadorRework(browser, base) {
         .map((t) => t.textContent.trim())
         .filter(Boolean),
     );
+    // The headings were shortened when the column widths were declared — the
+    // long forms cost about 80 px of a pane that had none to give. What this
+    // asserts is the ORDER, which is the operator's decision (cost and margin
+    // before the sale price, because the sale price is derived from them); the
+    // wording is free to get shorter.
     const want = [
       "Descripción",
       "Unidad",
-      "Coste unitario",
-      "Margen unit. %",
+      "Coste ud.",
+      "Margen %",
       "Cantidad",
-      "P. unitario venta",
-      "Precio total",
+      "P. venta ud.",
+      "Total",
     ];
     const idx = want.map((w) => heads.indexOf(w));
     if (idx.every((n, i) => n >= 0 && (i === 0 || n > idx[i - 1])))
@@ -5280,6 +5460,168 @@ async function testPresupuestadorRework(browser, base) {
         `presupuestador: picking a partida fills código, descripción, unidad and coste (${picked.code})`,
       );
     else bad("presupuestador: catalogue pick fills the row", JSON.stringify(picked));
+
+    /* ---- the whole row is visible without scrolling sideways -------------
+       "Still not all line visible, fix it once for all." Measured rather than
+       eyeballed: thirteen columns need about 1 150 px and a 1 440 px laptop
+       leaves the middle pane about 880, so the sale price sat off the right
+       edge of the one screen an estimator reads it on. The chapter tree now
+       folds by default below 1 600 px — it is the most redundant pane, since
+       every chapter it lists is already a row in the grid.
+
+       This assertion is the point of the change. Without it "it fits" is a
+       claim, and the next column added takes it back with nothing going red. */
+    const fit = await pg.evaluate(() => {
+      const pane = document.querySelector(".pbpane.mid .scroll");
+      const table = pane && pane.querySelector("table");
+      return {
+        pane: pane ? pane.clientWidth : 0,
+        table: table ? table.scrollWidth : 0,
+        foldedLeft: document.querySelector("#pbPanes")?.classList.contains("foldL"),
+        leftShown: !!document.querySelector("#pbLeft")?.offsetParent,
+      };
+    });
+    if (fit.pane > 0 && fit.table <= fit.pane)
+      ok(`presupuestador: the whole row fits — ${fit.table}px of columns in ${fit.pane}px of pane`);
+    else bad("presupuestador: line grid fits without horizontal scrolling", JSON.stringify(fit));
+    if (fit.foldedLeft === true && fit.leftShown === false)
+      ok("presupuestador: on a laptop the chapter tree folds away to make the room");
+    else bad("presupuestador: narrow-screen default folds the tree", JSON.stringify(fit));
+
+    // Folding is reversible, and the control to reverse it is in the pane that
+    // stays — a toggle that disappears with what it toggles cannot undo itself.
+    await pg.click("#pbFoldL");
+    await pg.waitForTimeout(300);
+    const unfolded = await pg.evaluate(() => ({
+      leftShown: !!document.querySelector("#pbLeft")?.offsetParent,
+      control: !!document.querySelector("#pbFoldL")?.offsetParent,
+    }));
+    if (unfolded.leftShown && unfolded.control)
+      ok("presupuestador: the tree comes back, and its control is still reachable");
+    else bad("presupuestador: fold is reversible", JSON.stringify(unfolded));
+    await pg.click("#pbFoldL");
+    await pg.waitForTimeout(300);
+
+    /* ---- «+ partida» IS the catalogue, not a blank row -------------------
+       The operator's complaint: "when I add item and trying to add subitems I
+       can't select them in the drop down menu… I want to add from catalog
+       items and below catalog sub items and automatically see the prices and
+       all the other information in each line." The button used to create
+       «Nueva partida» at 0,00 €, which is what made a two-hundred-partida
+       price book invisible from the one screen that needs it. */
+    const chapButtons = await pg.evaluate(() => ({
+      fromCatalogue: !!document.querySelector("tr.chaprow [data-addline]"),
+      blank: !!document.querySelector("tr.chaprow [data-blankline]"),
+    }));
+    if (chapButtons.fromCatalogue && chapButtons.blank)
+      ok("presupuestador: a chapter offers both the catalogue and a blank partida");
+    else bad("presupuestador: chapter add buttons", JSON.stringify(chapButtons));
+
+    const linesBefore = await pg.evaluate(() => document.querySelectorAll("tr.pbrow").length);
+    await pg.click("tr.chaprow [data-addline]");
+    await pg.waitForTimeout(600);
+    const multi = await pg.evaluate(() => ({
+      ticks: document.querySelectorAll(".cpi.pick .cpx").length,
+      addDisabled: document.querySelector("#cp_add")?.disabled,
+      // Scoped to the chapter it was pressed on — adding is local, even though
+      // the 🔍 above searches globally.
+      chapter: document.querySelector("#cp_chap")?.value || "",
+      chapterChoices: document.querySelectorAll("#cp_chap option").length,
+    }));
+    if (multi.ticks > 0 && multi.addDisabled === true)
+      ok(`presupuestador: «+ partida del catálogo» opens ticked-list mode (${multi.ticks} shown)`);
+    else bad("presupuestador: multi-select picker opens", JSON.stringify(multi));
+    // Scoped when the budget chapter is one of the catalogue's own, and on the
+    // whole catalogue when it is a free-text chapter that belongs to none —
+    // asserting a non-empty code would only be asserting which fixture ran.
+    const expectScope = await pg.evaluate(() => {
+      const name = document
+        .querySelector("tr.chaprow td")
+        .childNodes[0].textContent.replace(/^\s*[\d.]+\.\s*/, "")
+        .split("·")[0]
+        .trim();
+      const hit = erp.listAll("itemChapters").find((x) => x.es === name);
+      return hit ? hit.code : "";
+    });
+    if (multi.chapter === expectScope && multi.chapterChoices > 1)
+      ok(
+        `presupuestador: it opens on ${expectScope || "the whole catalogue"}, with every chapter one click away`,
+      );
+    else
+      bad(
+        "presupuestador: picker scoped to the chapter",
+        JSON.stringify(multi) + " expected " + JSON.stringify(expectScope),
+      );
+
+    // Tick two and take them in one go — the round trip this mode removes.
+    const wanted = await pg.evaluate(() => {
+      const list = [...document.querySelectorAll(".cpi.pick")].slice(0, 2);
+      list.forEach((b) => b.click());
+      return list.map((b) => b.querySelector(".cpc").textContent.trim());
+    });
+    await pg.waitForTimeout(300);
+    const armed = await pg.evaluate(() => ({
+      on: document.querySelectorAll(".cpi.on").length,
+      addDisabled: document.querySelector("#cp_add")?.disabled,
+    }));
+    if (armed.on === 2 && armed.addDisabled === false)
+      ok("presupuestador: ticking two arms «Añadir» without closing the list");
+    else bad("presupuestador: ticks accumulate", JSON.stringify(armed));
+
+    await pg.click("#cp_add");
+    await pg.waitForTimeout(800);
+    const added = await pg.evaluate((codes) => {
+      const rows = [...document.querySelectorAll("tr.pbrow")];
+      const found = codes.map((c) => {
+        const tr = rows.find((r) => r.querySelector('[data-f="code"]')?.value === c);
+        if (!tr) return null;
+        const g = (f) => tr.querySelector(`[data-f="${f}"]`).value;
+        return {
+          code: g("code"),
+          desc: g("desc"),
+          unit: g("unit"),
+          cost: +g("cost"),
+          price: +g("price"),
+          qty: +g("qty"),
+          spec: tr.querySelector(".lspec")?.textContent || "",
+        };
+      });
+      return { total: rows.length, found };
+    }, wanted);
+    if (added.total === linesBefore + 2)
+      ok("presupuestador: two ticks become two lines in one round trip");
+    else
+      bad(
+        "presupuestador: both picked partidas land",
+        `${linesBefore} -> ${added.total}, wanted +2`,
+      );
+    const complete = added.found.filter(
+      (r) => r && r.desc && r.unit && r.cost > 0 && r.price > 0 && r.qty === 1,
+    );
+    if (complete.length === 2)
+      ok("presupuestador: each arrives priced from the catalogue, not at 0,00 €");
+    else bad("presupuestador: catalogue figures reach the line", JSON.stringify(added.found));
+    // The four fields that were on the catalogue record and nowhere else.
+    if (added.found.some((r) => r && r.spec))
+      ok("presupuestador: the line shows what the catalogue says it IS (marca · modelo · calidad)");
+    else
+      bad(
+        "presupuestador: brand/model/quality/type reach the line",
+        JSON.stringify(added.found.map((r) => r && r.spec)),
+      );
+
+    await pg.click("tr.chaprow [data-blankline]");
+    await pg.waitForTimeout(600);
+    const blank = await pg.evaluate(
+      (n) => ({
+        total: document.querySelectorAll("tr.pbrow").length,
+        expected: n + 3,
+      }),
+      linesBefore,
+    );
+    if (blank.total === blank.expected)
+      ok("presupuestador: a partida not in the price book can still be written by hand");
+    else bad("presupuestador: blank partida still available", JSON.stringify(blank));
 
     // ---- chapters come from the catalogue --------------------------------
     await pg.click("#bAddChap");
@@ -6035,6 +6377,46 @@ async function testInlineCustomer(browser, base) {
     );
     if (inMaster) ok("maestros: the client filed from the lead is on the Clientes list");
     else bad("maestros: inline client appears in master data", "no row for its NIF");
+
+    /* A client with no tax identifier yet is still a client.
+       "If you don't have the Tax number always from beginning available, still
+       make it possible to add customer… no tax number should not block the
+       creation of the entry." It never blocked in the engine — `addParty` only
+       validates a tax id that is PRESENT — but the field was marked `*`, which
+       is the same thing to the person reading it. It carries an amber ⚠
+       instead, and the block stays where the law puts it: on issuing. */
+    await pg.evaluate(() => (location.hash = "customers"));
+    await pg.waitForTimeout(700);
+    await pg.evaluate(() => newPartyDrawer("customer"));
+    await pg.waitForTimeout(400);
+    const flagWhileEmpty = await pg.evaluate(() => !document.querySelector("#f_taxflag").hidden);
+    await pg.fill("#f_name", "E2E Cliente sin NIF");
+    await pg.fill("#f_mob", "600555444");
+    await pg.fill("#f_street", "Carrer Sense 3");
+    await pg.fill("#f_cp", "08002");
+    await pg.fill("#f_city", "Barcelona");
+    await pg.click("#f_save");
+    await pg.waitForTimeout(800);
+    const untaxed = await pg.evaluate(() => {
+      const p = erp.state.parties.find((x) => x.name === "E2E Cliente sin NIF");
+      return {
+        created: !!p,
+        taxId: p ? p.taxId : null,
+        // Still refused for the one thing the number is legally required for.
+        canInvoice: p ? erp.partyCompleteness(p.id).ok : null,
+        onList: document.body.innerHTML.includes("⚠ Pendiente"),
+      };
+    });
+    if (flagWhileEmpty) ok("cliente: an absent NIF shows an amber ⚠, not a red required mark");
+    else bad("cliente: the ⚠ appears while the NIF is empty", "flag hidden");
+    if (untaxed.created && untaxed.taxId === "") ok("cliente: the record is created without a NIF");
+    else bad("cliente: no NIF does not block creation", JSON.stringify(untaxed));
+    if (untaxed.canInvoice === false)
+      ok("cliente: …and is still refused for invoicing until the NIF arrives");
+    else bad("cliente: incomplete party still blocked from issuing", JSON.stringify(untaxed));
+    if (untaxed.onList)
+      ok("cliente: the gap is visible on the Clientes list, not only in the form");
+    else bad("cliente: pending NIF marked on the list", JSON.stringify(untaxed));
 
     if (errs.length) bad("cliente en línea: no console errors", errs.slice(0, 2).join(" | "));
     else ok("cliente en línea: no console errors");

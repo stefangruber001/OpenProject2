@@ -83,6 +83,21 @@ CI rebuilds and diffs them, so never edit them by hand. See
 - `pnpm factory <resolve|validate|new-tenant|demo> …` — the factory CLI
 - `make bootstrap && make demo` — clean-machine path to tenant #1 artifacts
 - DB (when used): `pnpm db:migrate`, `pnpm db:studio` (root `.env`, see runbook)
+- `node tests/site-e2e/run.mjs [--only <suite>]` — the browser suite. The full
+  run is ~12 minutes; `--only presupuestador` runs one of the thirty-five and
+  takes about four. Use it to DIAGNOSE, never to certify: only the unfiltered
+  run may be called green, and CI passes no argument. Failures are printed
+  again at the end of the report, because the report is ~450 lines and reading
+  it through `| tail` keeps the count while discarding the lines that say what
+  broke.
+
+### While a browser run is in flight, do not touch the tree
+
+The suite serves `site/` over HTTP from disk and the harness is already parsed,
+so editing either mid-run measures a tree that no longer exists. Committing is
+worse than editing: the pre-commit hook stashes and restores the working copy,
+which rewrites the very files the browser is loading. Two runs were thrown away
+this way before it was written down. Wait, then commit.
 
 ## Git rules
 

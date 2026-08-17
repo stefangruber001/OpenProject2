@@ -4067,3 +4067,177 @@ is pressed: an abandoned draft leaves no trace.
 customer-only dropdown and the same gap. They are one call each away from the
 same treatment now that the mechanism exists; the mandate named the lead, so the
 lead is what changed.
+
+### 172 · The price book reaches the quote (2026-08-16)
+
+**What changed.** «+ partida» on a chapter now opens the catalogue, narrowed to
+that chapter, with ticks: mark six subpartidas and six complete lines appear.
+Each carries código, descripción, unidad, coste, precio, the catalogue's
+photographs, and — new — `type`, `brand`, `model` and `quality`. A second
+button, «+ partida en blanco», keeps the old behaviour for work that is not in
+the price book yet.
+
+**Why.** «+ partida» created an empty row. The catalogue picker existed, but
+behind a 🔍 tucked inside the código cell, so the operator pressed the obvious
+button, got «Nueva partida» at 0,00 €, looked for a dropdown and found none.
+Two hundred priced partidas were installed by migration 16 and were invisible
+from the one screen that needs them.
+
+**Three faults behind one symptom.** (1) The button made a blank line.
+(2) `addLine`'s record had no `type`/`brand`/`model`/`quality`, so those four
+could not transfer even from a correct pick — they existed on the catalogue
+record and nowhere else, which is why the price-book screen could say «Grohe
+Grohtherm, termostática» and the quote made from it could not. (3) `editLine`
+strips `imageRefs` by design (images have guarded methods), so the pick wrote
+them into a patch that discarded them silently; the previous session's claim
+that photographs transferred was wrong, and `attachLineImage` is now the path.
+
+**Copied onto the line, not looked up through `itemId`.** A quote is a promise
+made on a date. Re-reading today's catalogue when the document is printed would
+silently restate what was offered when a price moves. `itemId` still records the
+provenance, so drift can be reported rather than applied.
+
+**Shown as a sub-line, not three columns.** The grid was already thirteen
+columns; marca · modelo · calidad · tipo sit small and grey under the
+descripción. Three more columns would have pushed the sale price further off the
+right-hand edge to show something you read once, while choosing.
+
+**Searching is global, adding is local.** The row's 🔍 still opens the whole
+catalogue — it is reached from a line that may be filed under the wrong chapter,
+and a magnifier that hides most of the catalogue is the failure it exists to
+fix. «+ partida» opens narrowed, because there you are adding TO a chapter. The
+chapter selector is in the modal either way.
+
+### 173 · The presupuestador's side panes fold (2026-08-16)
+
+**What changed.** Two chevrons in the Partidas header fold the Capítulos tree
+and the Totales pane. Below 1 720 px of viewport the tree starts folded; an
+explicit choice wins over the measurement and is remembered.
+
+**Why, measured.** Thirteen columns need about 1 150 px; the two side panes take
+560 px; a 1 440 px laptop left the grid about 880. The old answer was a
+horizontal scrollbar, which put «P. venta ud.» and «Total» off the right edge of
+the one screen an estimator reads them on. Column widths are now declared rather
+than left to the content, so the description column stops moving every time a
+figure gains a digit.
+
+**Why the tree and not the totals.** It is the most redundant of the three:
+every chapter it lists is already a row in the grid beside it.
+
+**Why the controls are in the middle pane.** A toggle that disappears with the
+thing it toggles cannot bring it back.
+
+**The claim has a gate.** The E2E measures `table.scrollWidth` against the
+pane's `clientWidth` and fails if the row does not fit. "It fits" was a claim
+twice before; the next column added now turns something red instead.
+
+### 174 · The workspace clock follows the wall clock (2026-08-16)
+
+**What changed.** `advanceClock()` runs at boot and moves `state.today` up to
+the real date. Every date default, the Gantt's today line, every overdue
+calculation and every `max` on a date field follow from it, because they all
+already read `erp.today`. The Gantt additionally opens scrolled to today.
+
+**Why.** `state.today` is stored — the engine dates every record it writes from
+it, and the demo history is built by walking it — and nothing ever advanced it.
+A workspace seeded in March still believed it was March in August. The
+operator's words: "this avoids that it looks we are running 6 months behind."
+
+**Forward only, and that is the whole of the care.** A device with a wrong
+clock, a laptop carried across timezones, a container started with the wrong TZ:
+winding the date backwards would re-date documents already issued, put invoices
+in the future relative to "today", and make a filing built from them wrong.
+Refusing to go back costs nothing — the clock catches up on the next boot with a
+correct date — and it cannot corrupt.
+
+**Local, not UTC.** The app computed today as `toISOString().slice(0,10)`, which
+is UTC. In Spain, between midnight and 02:00 in summer, that is YESTERDAY — so a
+visit scheduled for "today" late in the evening was refused as being in the
+past. `wallToday()` reads the operator's own calendar day.
+
+**The demo history was NOT re-based.** It still runs January–June 2026, which
+with a real clock reads correctly as finished work rather than as lateness. Re-
+basing the seed around the current date is a wider change (it moves every date
+assertion in the suite) and was flagged to the operator rather than folded in.
+
+### 175 · A tax identifier can arrive later (2026-08-16)
+
+**What changed.** The NIF/CIF/NIE field lost its red `*` and gained an amber ⚠
+that clears as it is typed. The Clientes, Proveedores and Industriales lists
+show `⚠ Pendiente` in amber where they showed a red `Falta`.
+
+**What did NOT change, and is the point.** Nothing about creation: `addParty`
+only ever validated a tax id that was PRESENT, and `_assertTaxIdFree` returns
+early on an empty one. The block was never in the engine — it was the asterisk,
+which is the same thing to the person reading the form. And nothing about
+issuing: `partyCompleteness` still refuses an invoice or a contract until the
+number exists, because that is where the law actually requires it.
+
+**Amber, not red.** Red says "broken"; this is "unfinished". A record with no
+tax id yet is legitimate and usable — it simply cannot be invoiced. An ERP that
+paints those the same colour teaches its operator to ignore both.
+
+### 176 · The logo goes home, and menus stay on screen (2026-08-16)
+
+**The logo.** `.brand` was a `<div>` with no handler on all three pages. It is
+now a `<button>` in the workspace (`go("tower")`) and an `<a href>` on the two
+standalone pages. A button rather than a div with a click handler: a control a
+mouse can use and a keyboard cannot is not a control.
+
+**The menus.** `.menu` hangs from `right: 0` of its button, which is correct
+while the bar's buttons are on the right of a wide screen and wrong once the bar
+wraps: on a phone «＋ Crear» sits near the LEFT edge, so a 214 px panel anchored
+to its right ran off the side. `clampMenu()` measures after opening and shifts
+it back inside. Done in `toggleMenu()` rather than on the Create button, so the
+bell — and whatever the bar grows next — inherit the fix.
+
+### 177 · The iOS shell stops drawing its own header (2026-08-16)
+
+**What changed.** `TopBar.swift` is deleted and `WebContainerView` is just the
+web view. The workspace draws its own header — the brand mark, the search,
+«＋ Crear», the bell — and the native bar put a SECOND brand mark and the tab's
+name above it. On a phone that is two headers and a wasted 56 px.
+
+**Where each capability went.** back → `allowsBackForwardNavigationGestures`
+was already on, so the edge swipe did this anyway. reload → pull-to-refresh,
+already wired in `WebView`. progress → the web app has its own loading state.
+**share → still reachable through the `share` bridge action, but there is no
+longer a native button for it.** That is a real loss and was reported rather
+than absorbed: if a share control is wanted it belongs in the web header beside
+the other global actions, where it also works on a desktop.
+
+**Not verified by a build.** There is no macOS here. The change is small and
+`WebContainerView` had exactly one call site, but the compile is the proof and
+it has not run.
+
+### 178 · What the real clock exposed in the demo file (2026-08-16)
+
+Advancing `state.today` to the wall clock (§174) turned four E2E checks red.
+None was a bug in the clock; each was something the frozen date had been
+hiding, and all four are worth recording because the same things will happen to
+a real company as its file ages.
+
+1. **A quote whose validity has lapsed reports `expired`, not `issued`.**
+   `createBudget` stamps `validityDate = today + 30`, so a budget written in
+   March is expired in August — correct, and the reason `updateBudget` already
+   refuses a validity in the past and the field carries `min="today"`. The test
+   now sets a future validity before sending, which is what the screen makes an
+   operator do.
+
+2. **The hours sheet defaulted its assignment to a CLOSED project.**
+   `assignWorkerDrawer(gProject || erp.state.projects[0].id)` took the first
+   project whatever its state, and `recordHours` rightly refuses hours against a
+   closed job — so the sheet offered a row that could never be filled, and said
+   so only after the hours were typed. Fixed to take the first OPEN job. This
+   was a real defect; the old clock hid it because the first project happened to
+   be open on the date the sheet used to open.
+
+3. **"Repeat the previous day" had no next day to move to.** The test advanced
+   by clicking the next calendar cell, and the real date landed on a Sunday —
+   the last cell of the week, with no week navigation to go further. It advances
+   by DATE now.
+
+4. **The presupuestador's full-screen check asserted three VISIBLE panes.**
+   Below 1 720 px the chapter tree folds to a 0 px track (§173), so the
+   assertion now accepts either width for the side track and keeps checking the
+   shape it actually cares about.

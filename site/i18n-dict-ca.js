@@ -1127,6 +1127,32 @@ window.CANEI_DICT.ca = {
   "Otro nombre…": "Un altre nom…",
   "P. unitario venta": "P. unitari venda",
   "Partida tomada del catálogo": "Partida agafada del catàleg",
+  "⚠ Pendiente": "⚠ Pendent",
+  "Sin NIF no se puede facturar ni contratar": "Sense NIF no es pot facturar ni contractar",
+  "Sin NIF no se puede facturar ni contratar — la ficha se crea igual y se completa después":
+    "Sense NIF no es pot facturar ni contractar — la fitxa es crea igualment i es completa després",
+  "Sin NIF no se puede facturar ni contratar — la ficha existe igual y se completa después":
+    "Sense NIF no es pot facturar ni contractar — la fitxa existeix igualment i es completa després",
+  "Ir a la Torre de control": "Anar a la Torre de control",
+  "+ capítulo": "+ capítol",
+  "Coste ud.": "Cost ut.",
+  "P. venta ud.": "P. venda ut.",
+  "Imág.": "Imat.",
+  "Mostrar u ocultar los capítulos": "Mostrar o amagar els capítols",
+  "Mostrar u ocultar los totales": "Mostrar o amagar els totals",
+  "+ partida del catálogo": "+ partida del catàleg",
+  "+ partida en blanco": "+ partida en blanc",
+  "Una partida que todavía no está en el catálogo": "Una partida que encara no és al catàleg",
+  "Marca las subpartidas que entran en el capítulo. Cada una llega con su unidad, su coste y su precio.":
+    "Marca les subpartides que entren al capítol. Cadascuna arriba amb la seva unitat, el seu cost i el seu preu.",
+  "ninguna seleccionada": "cap de seleccionada",
+  "Este capítulo no tiene partidas todavía. Elige «Todos los capítulos» o crea la primera.":
+    "Aquest capítol encara no té partides. Tria «Tots els capítols» o crea la primera.",
+  "Partida en blanco añadida": "Partida en blanc afegida",
+  "mano de obra propia": "mà d'obra pròpia",
+  maquinaria: "maquinària",
+  honorarios: "honoraris",
+  residuos: "residus",
   "Por código, descripción o cómo se le dice al cliente.":
     "Per codi, descripció o com se li diu al client.",
   Posponer: "Posposa",
@@ -2509,6 +2535,23 @@ window.CANEI_DICT.ca = {
   "Limpieza y remates": "Neteja i acabats",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  [new RegExp("^(\\d+) seleccionada$"), "$1 seleccionada"],
+  [new RegExp("^(\\d+) seleccionadas$"), "$1 seleccionades"],
+  [new RegExp("^Todos los capítulos \\((\\d+)\\)$"), "Tots els capítols ($1)"],
+  [new RegExp("^(\\d+) partida del catálogo$"), "$1 partida del catàleg"],
+  [new RegExp("^(\\d+) partidas del catálogo$"), "$1 partides del catàleg"],
+  [
+    new RegExp(
+      "^Ninguna partida coincide con «(.+)» en este capítulo\\. Prueba en «Todos los capítulos», o créala con el botón de abajo y queda en el catálogo para la próxima vez\\.$",
+    ),
+    "Cap partida coincideix amb «$1» en aquest capítol. Prova a «Tots els capítols», o crea-la amb el botó de sota i queda al catàleg per a la propera vegada.",
+  ],
+  [
+    new RegExp(
+      "^Ninguna partida coincide con «(.+)»\\. Créala con el botón de abajo y queda en el catálogo para la próxima vez\\.$",
+    ),
+    "Cap partida coincideix amb «$1». Crea-la amb el botó de sota i queda al catàleg per a la propera vegada.",
+  ],
   [new RegExp("^(\\S+) — (.+) \\(cerrada\\)$"), "$1 — $2 (tancada)"],
   [new RegExp("^(\\S+) — (.+) \\(activa\\)$"), "$1 — $2 (activa)"],
   [new RegExp("^Siguiente paso · (\\S+)$"), "Següent pas · $1"],

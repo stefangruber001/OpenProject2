@@ -93,6 +93,16 @@
         align-items: center;
         gap: 10px;
         min-width: 0;
+        /* It is an <a> now, so the link underline and colour have to go before it
+           looks like a logo again. Reset, not styling. */
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+      }
+      .brand:focus-visible {
+        outline: 2px solid var(--green, #48733c);
+        outline-offset: 3px;
+        border-radius: 12px;
       }
       .brand .nm {
         font-family: var(--serif);
@@ -727,8 +737,11 @@
   </head>
   <body>
     <div class="topbar">
-      <div class="brand">
-        <svg width="30" height="30" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">
+      <!-- The logo is the way home on every screen. A link, not a handler:
+           these pages are plain documents and the browser already knows how to
+           follow a link, open it in a tab, and give it a keyboard focus ring. -->
+      <a class="brand" href="erp.html#tower" title="Ir a la Torre de control">
+        <svg width="30" height="30" viewBox="0 0 40 40" fill="none" aria-hidden="true">
           <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c" />
           <path
             d="M11 21.5 L20 13 L29 21.5"
@@ -747,7 +760,7 @@
           <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230" />
         </svg>
         <span class="nm">Canei Subirats<small>Financial data</small></span>
-      </div>
+      </a>
       <span class="tb-spacer"></span>
       <div class="tb-actions">
         <label class="period"

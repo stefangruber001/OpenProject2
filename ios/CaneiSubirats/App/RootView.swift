@@ -19,12 +19,14 @@ struct RootView: View {
             // Hidden tabs still load in the background for instant switching.
             ZStack {
                 ForEach(Config.tabs) { tab in
-                    WebContainerView(store: app.store(for: tab.id)) { url in
-                        app.shareURL = url
-                    }
-                    .opacity(app.selection == tab.id ? 1 : 0)
-                    .allowsHitTesting(app.selection == tab.id)
-                    .zIndex(app.selection == tab.id ? 1 : 0)
+                    // Sharing still reaches `app.shareURL`, through the store's
+                    // own `onShare` (see AppState) which the page's `share`
+                    // bridge action calls. The container no longer needs to be
+                    // handed a closure it had only to give to a top bar.
+                    WebContainerView(store: app.store(for: tab.id))
+                        .opacity(app.selection == tab.id ? 1 : 0)
+                        .allowsHitTesting(app.selection == tab.id)
+                        .zIndex(app.selection == tab.id ? 1 : 0)
                 }
             }
             // The tab bar is a proper bottom safe-area inset, so the web content

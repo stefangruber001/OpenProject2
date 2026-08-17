@@ -664,6 +664,43 @@
         return s;
       },
     },
+    {
+      to: 17,
+      name: "budget lines carry what the catalogue says the work IS",
+      /*
+       * The catalogue records `type`, `brand`, `model` and `quality`; the budget
+       * line recorded none of them. So the price-book screen could show that a
+       * water point is a Grohe Grohtherm thermostatic mixer while the quote made
+       * from it showed a description and a number, and six months later the only
+       * document either party kept said nothing about which one was sold.
+       *
+       * Purely additive and idempotent: every existing line gets the four fields
+       * as empty strings, which is the honest value — this migration knows what
+       * the fields ARE, not what any particular line should have said. Lines
+       * written from now on get them from the catalogue at the moment of
+       * picking. A line that already carries a value (impossible today, but a
+       * re-run must be safe) is left alone.
+       */
+      up: function (s) {
+        var FIELDS = ["type", "brand", "model", "quality"];
+        var budgets = Array.isArray(s.budgets) ? s.budgets : [];
+        for (var b = 0; b < budgets.length; b++) {
+          var versions = Array.isArray(budgets[b].versions) ? budgets[b].versions : [];
+          for (var v = 0; v < versions.length; v++) {
+            var chapters = Array.isArray(versions[v].chapters) ? versions[v].chapters : [];
+            for (var c = 0; c < chapters.length; c++) {
+              var lines = Array.isArray(chapters[c].lines) ? chapters[c].lines : [];
+              for (var l = 0; l < lines.length; l++) {
+                for (var f = 0; f < FIELDS.length; f++) {
+                  if (typeof lines[l][FIELDS[f]] !== "string") lines[l][FIELDS[f]] = "";
+                }
+              }
+            }
+          }
+        }
+        return s;
+      },
+    },
   ];
 
   /**

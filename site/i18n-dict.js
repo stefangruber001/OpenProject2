@@ -3138,6 +3138,46 @@ window.CANEI_DICT = {
     ["Otro nombre…", "Other name…"],
     ["P. unitario venta", "Unit sale price"],
     ["Partida tomada del catálogo", "Item taken from the catalogue"],
+    ["⚠ Pendiente", "⚠ Pending"],
+    [
+      "Sin NIF no se puede facturar ni contratar",
+      "Without a tax ID you cannot invoice or contract",
+    ],
+    [
+      "Sin NIF no se puede facturar ni contratar — la ficha se crea igual y se completa después",
+      "Without a tax ID you cannot invoice or contract — the record is created anyway and completed later",
+    ],
+    [
+      "Sin NIF no se puede facturar ni contratar — la ficha existe igual y se completa después",
+      "Without a tax ID you cannot invoice or contract — the record exists anyway and is completed later",
+    ],
+    ["Ir a la Torre de control", "Go to the Control tower"],
+    ["+ capítulo", "+ chapter"],
+    ["Coste ud.", "Unit cost"],
+    ["P. venta ud.", "Unit sale price"],
+    ["Imág.", "Pics"],
+    ["Mostrar u ocultar los capítulos", "Show or hide the chapters"],
+    ["Mostrar u ocultar los totales", "Show or hide the totals"],
+    ["+ partida del catálogo", "+ line item from the catalogue"],
+    ["+ partida en blanco", "+ blank line item"],
+    [
+      "Una partida que todavía no está en el catálogo",
+      "A line item that is not in the catalogue yet",
+    ],
+    [
+      "Marca las subpartidas que entran en el capítulo. Cada una llega con su unidad, su coste y su precio.",
+      "Tick the sub-items that belong in this chapter. Each one arrives with its unit, its cost and its price.",
+    ],
+    ["ninguna seleccionada", "none selected"],
+    [
+      "Este capítulo no tiene partidas todavía. Elige «Todos los capítulos» o crea la primera.",
+      "This chapter has no line items yet. Choose «All chapters» or create the first one.",
+    ],
+    ["Partida en blanco añadida", "Blank line item added"],
+    ["mano de obra propia", "own labour"],
+    ["maquinaria", "machinery"],
+    ["honorarios", "fees"],
+    ["residuos", "waste"],
     [
       "Por código, descripción o cómo se le dice al cliente.",
       "By code, description or how it is described to the customer.",
@@ -4491,6 +4531,23 @@ window.CANEI_DICT = {
     ["Limpieza y remates", "Cleaning and snagging"],
   ],
   rxEs2En: [
+    [new RegExp("^(\\d+) seleccionada$"), "$1 selected"],
+    [new RegExp("^(\\d+) seleccionadas$"), "$1 selected"],
+    [new RegExp("^Todos los capítulos \\((\\d+)\\)$"), "All chapters ($1)"],
+    [new RegExp("^(\\d+) partida del catálogo$"), "$1 line item from the catalogue"],
+    [new RegExp("^(\\d+) partidas del catálogo$"), "$1 line items from the catalogue"],
+    [
+      new RegExp(
+        "^Ninguna partida coincide con «(.+)» en este capítulo\\. Prueba en «Todos los capítulos», o créala con el botón de abajo y queda en el catálogo para la próxima vez\\.$",
+      ),
+      "No line item matches «$1» in this chapter. Try «All chapters», or create it with the button below and it stays in the catalogue for next time.",
+    ],
+    [
+      new RegExp(
+        "^Ninguna partida coincide con «(.+)»\\. Créala con el botón de abajo y queda en el catálogo para la próxima vez\\.$",
+      ),
+      "No line item matches «$1». Create it with the button below and it stays in the catalogue for next time.",
+    ],
     [new RegExp("^(\\S+) — (.+) \\(cerrada\\)$"), "$1 — $2 (closed)"],
     [new RegExp("^(\\S+) — (.+) \\(activa\\)$"), "$1 — $2 (active)"],
     [new RegExp("^Siguiente paso · (\\S+)$"), "Next step · $1"],

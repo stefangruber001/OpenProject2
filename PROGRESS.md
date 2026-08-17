@@ -1465,3 +1465,102 @@ Verified: site E2E, including nine new checks that walk the detour both ways —
 cancelled and completed — and confirm the record lands on the Clientes list via
 that screen's own search. i18n coverage clean with the three new strings in all
 three languages.
+
+## S16 — the price book reaches the quote (2026-08-16)
+
+Two hundred priced partidas were installed last session and were invisible from
+the one screen that needs them.
+
+**The symptom, in the operator's words.** "when I add item and trying to add
+subitems I can't select them in the drop down menu… I want to add from catalog
+items and below catalog sub items and automatically see the prices and all the
+other information in each line of the quote" — and "I see them in the catalog,
+so needs to be an issue that all those info is not transferred for the quote
+line." Three complaints, one root and three separate faults.
+
+**The root.** «+ partida» created a blank row. The catalogue picker existed, but
+behind a 🔍 tucked inside the código cell — so the obvious button gave «Nueva
+partida» at 0,00 € and there was no dropdown anywhere. It now opens the
+catalogue itself, narrowed to that chapter, with ticks: mark six subpartidas and
+six complete lines appear. «+ partida en blanco» keeps the old behaviour for
+work that is not in the price book yet.
+
+**The second fault.** `addLine`'s record had no `type`, `brand`, `model` or
+`quality`. Those four lived on the catalogue record and nowhere else, so the
+price-book screen could say «Grohe Grohtherm, termostática» and no quote made
+from it could. Migration 17 backfills the shape; the pick fills it; the grid
+shows it as a small grey line under the descripción rather than three more
+columns.
+
+**The third fault, and a correction.** `editLine` strips `imageRefs` by design —
+images have guarded methods so a version diff cannot be forged through a patch.
+Last session's pick wrote them into a patch that discarded them silently, and
+the claim that photographs transferred was wrong. `attachLineImage` is the path,
+marked `catalogue` so the annex can say where each picture came from.
+
+**One mapping, not two.** `lineFromCatalogueItem` is the only place the
+catalogue→line correspondence lives. It was one copy and one blank line; two
+copies would have drifted the first time either learned a field.
+
+**The grid fits, and that is now measured.** Thirteen columns need ~1 150 px; the
+side panes take 560; a 1 440 px laptop left the grid ~880. Column widths are
+declared, and the Capítulos tree folds below 1 720 px — the most redundant pane,
+since every chapter it lists is already a row in the grid. The E2E asserts
+`table.scrollWidth ≤ pane.clientWidth`: "it fits" was a claim twice, and is a
+gate now.
+
+**The price book says what the work is.** 154 of the 200 rows carried no
+marca/modelo/calidad. Every row now states a calidad; 62 name a marca and modelo
+— the ones whose price is dominated by a named product. A demolition does not
+get a manufacturer, because inventing one would be worse than an honest blank.
+
+## S17 — the clock, the logo, the menu and the missing NIF (2026-08-16)
+
+Four operator reports, all small, all real.
+
+**The clock was five months slow.** `state.today` is stored and nothing ever
+advanced it, so a workspace seeded in March still believed it was March in
+August: the Gantt drew its today line in March, every date field opened on a day
+long past, nothing was overdue that should have been. `advanceClock()` moves it
+up to the wall clock at boot — **forward only**, because a device with a wrong
+clock winding the date back would re-date documents already issued. Every screen
+already read `erp.today`, so one change fixed all of them.
+
+Two things fell out of it. The Gantt's line was _at_ today but eighteen thousand
+pixels right of where the chart opened, so the chart now opens on today. And the
+app computed "today" from `toISOString()`, which is UTC — in Spain that is
+yesterday between midnight and 02:00 in summer, so an evening visit scheduled
+for today was refused as being in the past. `wallToday()` reads the local day.
+
+**The logo did nothing.** A `<div>` with no handler on all three pages. Now a
+`<button>` in the workspace and an `<a>` on the standalone pages — a control a
+keyboard cannot reach is not a control.
+
+**The «＋ Crear» menu opened off the screen.** `.menu` hangs from `right: 0` of
+its button, which is right on a wide bar; on a phone the bar wraps and that
+button sits near the left edge, so the panel ran off the side. Clamped in
+`toggleMenu()`, so the bell and any future button inherit the fix rather than
+each needing its own.
+
+**A missing NIF read as a refusal.** It never was one — `addParty` only
+validates a tax id that is present — but the field carried a red `*`, which is
+the same thing to the person filling it in. Amber ⚠ now, clearing as it is
+typed, and `⚠ Pendiente` on the lists instead of a red `Falta`. Issuing is still
+blocked until the number arrives, which is where the law puts it.
+
+**Also.** The 154 blank rows of the price book gained their specification: every
+one of the 200 states a calidad, 108 name a marca and modelo. Gates in the
+migration sim fail on a blank, on a marca without a modelo, and if fewer than 90
+rows name a product.
+
+**Harness.** `node tests/site-e2e/run.mjs --only <suite>` runs one of the
+thirty-five suites. Diagnosing one broken suite used to cost a twelve-minute
+run; today it cost three four-minute ones. Failures are also repeated at the END
+of the report, because the natural way to read 450 lines is `| tail`, which
+keeps the count and throws away the lines that say what broke — that mistake
+cost a full cycle this session.
+
+**Known and NOT fixed:** a brand-new install gets no price book. Migrations only
+run over existing data; `ErpSeed.build()` produces eight catalogue items and
+skips the ladder entirely. An existing workspace has the two hundred partidas
+because it migrated; a fresh tenant would not.

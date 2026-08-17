@@ -1545,6 +1545,24 @@
           desc: "",
           customerWording: "",
           unit: "ud",
+          // What the catalogue entry SAYS this line is, carried onto the line.
+          //
+          // These four were on the catalogue record and nowhere else, so a line
+          // taken from the catalogue arrived without them and the information
+          // was visible on the price-book screen and invisible on the quote —
+          // which is the one place it settles an argument. `addCatalogueItem`
+          // already says why brand and model exist: the same water point at two
+          // qualities is two jobs and two prices, and six months later the only
+          // record of which was sold is the presupuesto.
+          //
+          // Copied, not looked up through `itemId`: a quote is a promise made on
+          // a date, and re-reading today's catalogue would silently restate what
+          // was offered when the price book moves. `itemId` still records where
+          // the figures came from, so drift can be REPORTED without rewriting.
+          type: "", // material | ownLabour | subcontract | machinery | professional | waste | other
+          brand: "",
+          model: "",
+          quality: "",
           qtyMilli: 0,
           priceCents: 0,
           costCents: 0,
