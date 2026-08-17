@@ -3138,6 +3138,11 @@ window.CANEI_DICT = {
     ["Otro nombre…", "Other name…"],
     ["P. unitario venta", "Unit sale price"],
     ["Partida tomada del catálogo", "Item taken from the catalogue"],
+    ["Rendimiento de la cartera", "Portfolio performance"],
+    ["Coste incurrido", "Cost incurred"],
+    ["Pendiente hasta terminar", "Still to spend"],
+    ["Por encima del presupuesto", "Over budget"],
+    ["Presupuesto aprobado", "Approved budget"],
     ["⚠ Pendiente", "⚠ Pending"],
     [
       "Sin NIF no se puede facturar ni contratar",
@@ -4531,6 +4536,13 @@ window.CANEI_DICT = {
     ["Limpieza y remates", "Cleaning and snagging"],
   ],
   rxEs2En: [
+    [new RegExp("^([\\d.,]+)% margen$"), "$1% margin"],
+    [new RegExp("^(\\d+) obra abierta$"), "$1 job open"],
+    [new RegExp("^(\\d+) obras abiertas$"), "$1 jobs open"],
+    [
+      new RegExp("^Margen previsto sobre (.+) de presupuesto aprobado$"),
+      "Forecast margin on $1 of approved budget",
+    ],
     [new RegExp("^(\\d+) seleccionada$"), "$1 selected"],
     [new RegExp("^(\\d+) seleccionadas$"), "$1 selected"],
     [new RegExp("^Todos los capítulos \\((\\d+)\\)$"), "All chapters ($1)"],

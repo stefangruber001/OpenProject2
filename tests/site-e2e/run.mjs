@@ -4854,6 +4854,65 @@ async function testControlTowerAndDay(browser, base) {
     await bootedShell(pg);
     await pg.waitForTimeout(900);
 
+    /* Rendimiento de la cartera — cost against approved budget, per open job.
+       What is asserted is the IDENTITY the chart draws, not that some bars
+       appeared: for every row, approved budget = incurred + still to spend +
+       margin. A chart that computed its own total would drift from the
+       Económicos screen, and the one a director glances at is the one that
+       would be wrong. The overrun case is forced rather than hoped for — the
+       seeded jobs happen to have nothing left to spend, so the amber and red
+       marks would otherwise never be exercised. */
+    const perf = await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll(".perfrow")];
+      const reconciles = rows.every((r) => {
+        const e = erp.projectEconomics(r.dataset.perf);
+        return (
+          e.currentRevenueCents ===
+          e.actualCents + Math.max(0, e.forecastCostCents - e.actualCents) + e.marginForecastCents
+        );
+      });
+      return {
+        rows: rows.length,
+        reconciles,
+        keys: document.querySelectorAll(".perfkey span").length,
+      };
+    });
+    if (perf.rows > 0 && perf.reconciles && perf.keys === 4)
+      ok(`TC-01: cartera — ${perf.rows} jobs, budget = incurred + to go + margin on every one`);
+    else bad("TC-01: cartera reconciles", JSON.stringify(perf));
+
+    const overrun = await pg.evaluate(() => {
+      const open = erp.state.projects.filter((p) => !p.closed);
+      const sup = erp.state.parties.find((p) => p.active && p.roles.includes("supplier"));
+      if (!open.length || !sup) return null;
+      const e = erp.projectEconomics(open[0].id);
+      erp.registerBill(
+        {
+          supplierId: sup.id,
+          number: "E2E-OVERRUN",
+          baseCents: e.currentRevenueCents,
+          vatBp: 2100,
+          allocations: [{ projectId: open[0].id, amountCents: e.currentRevenueCents }],
+        },
+        "bo",
+      );
+      render();
+      const row = document.querySelector(`.perfrow[data-perf="${open[0].id}"]`);
+      if (!row) return null;
+      const tick = parseFloat(row.querySelector(".tick").style.left);
+      const over = row.querySelector(".over");
+      const fig = row.querySelector(".fig");
+      return {
+        tick: Math.round(tick),
+        overWidth: over ? Math.round(parseFloat(over.style.width)) : 0,
+        overStartsAtTick: over ? Math.abs(parseFloat(over.style.left) - tick) < 1.5 : false,
+        negative: !!fig && fig.classList.contains("neg"),
+      };
+    });
+    if (overrun && overrun.overWidth > 0 && overrun.overStartsAtTick && overrun.negative)
+      ok(`TC-01: a job over budget shows red past the tick (${overrun.tick}% → 100%)`);
+    else bad("TC-01: overrun mark", JSON.stringify(overrun));
+
     // TC-01: four indicators, no sparkline, no customiser. The doc is explicit
     // that adding one means removing another, so the COUNT is the check.
     const cardCount = await pg.locator(".tcard").count();

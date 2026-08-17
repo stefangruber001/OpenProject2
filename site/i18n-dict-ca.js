@@ -1127,6 +1127,11 @@ window.CANEI_DICT.ca = {
   "Otro nombre…": "Un altre nom…",
   "P. unitario venta": "P. unitari venda",
   "Partida tomada del catálogo": "Partida agafada del catàleg",
+  "Rendimiento de la cartera": "Rendiment de la cartera",
+  "Coste incurrido": "Cost incorregut",
+  "Pendiente hasta terminar": "Pendent fins a acabar",
+  "Por encima del presupuesto": "Per sobre del pressupost",
+  "Presupuesto aprobado": "Pressupost aprovat",
   "⚠ Pendiente": "⚠ Pendent",
   "Sin NIF no se puede facturar ni contratar": "Sense NIF no es pot facturar ni contractar",
   "Sin NIF no se puede facturar ni contratar — la ficha se crea igual y se completa después":
@@ -2535,6 +2540,13 @@ window.CANEI_DICT.ca = {
   "Limpieza y remates": "Neteja i acabats",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  [new RegExp("^([\\d.,]+)% margen$"), "$1% marge"],
+  [new RegExp("^(\\d+) obra abierta$"), "$1 obra oberta"],
+  [new RegExp("^(\\d+) obras abiertas$"), "$1 obres obertes"],
+  [
+    new RegExp("^Margen previsto sobre (.+) de presupuesto aprobado$"),
+    "Marge previst sobre $1 de pressupost aprovat",
+  ],
   [new RegExp("^(\\d+) seleccionada$"), "$1 seleccionada"],
   [new RegExp("^(\\d+) seleccionadas$"), "$1 seleccionades"],
   [new RegExp("^Todos los capítulos \\((\\d+)\\)$"), "Tots els capítols ($1)"],

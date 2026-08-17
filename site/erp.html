@@ -1453,6 +1453,157 @@
           grid-template-columns: 1fr;
         }
       }
+      /* ---------- Rendimiento de la cartera: cost against budget ------------
+   A BULLET CHART, one row per open job: how much of the approved budget the
+   job has spent, how much it still expects to spend, and where the budget
+   line sits. Bar past the tick = the margin is gone.
+
+   Each row is scaled to its OWN budget rather than to the biggest job on the
+   list. The question this answers is "is this job on budget", not "which job
+   is largest" — a common scale would shrink a 12.000 € bathroom to a sliver
+   beside a 300.000 € rehabilitation and hide precisely the overrun that
+   matters. Size is carried by the figure beside the bar, where it belongs.
+
+   The three colours are ORDERED SEVERITY and not identity: spent, still to
+   spend, spent past the budget. Validated as a set rather than eyeballed —
+   Canei's own greens and blues fail a categorical check (they sit below the
+   chroma floor and read gray, and green↔blue separate by only 12 ΔE for
+   normal vision). These three clear every check with margin. */
+      .perf {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .perfhero {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        padding: 2px 16px 12px;
+        border-bottom: 1px solid var(--hair);
+        margin-bottom: 8px;
+      }
+      .perfhero b {
+        font: 600 30px var(--sans);
+        color: var(--ink);
+        line-height: 1;
+      }
+      .perfhero .pct {
+        font: 600 15px var(--sans);
+        color: var(--muted);
+      }
+      .perfhero .lab {
+        font: 11px var(--sans);
+        color: var(--muted);
+        margin-left: auto;
+        text-align: right;
+        max-width: 46%;
+      }
+      .perfrow {
+        display: grid;
+        grid-template-columns: 84px minmax(0, 1fr) 116px;
+        align-items: center;
+        gap: 12px;
+        padding: 7px 16px;
+        cursor: pointer;
+      }
+      .perfrow:hover {
+        background: var(--greenSoft);
+      }
+      .perfrow .code {
+        font: 600 12px var(--mono);
+        color: var(--body);
+      }
+      .perfrow .nm {
+        font: 11px var(--sans);
+        color: var(--muted);
+        display: block;
+      }
+      /* The track is the job's own budget; `--over` widens it when the forecast
+     has passed the budget, so the tick keeps its meaning and the bar is what
+     grows past it. */
+      .blt {
+        position: relative;
+        height: 18px;
+        background: var(--hair);
+        border-radius: 4px;
+      }
+      .blt i {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        display: block;
+      }
+      /* 4px rounded data-end, square at the baseline — the bar grows from the
+     left and only its leading edge is rounded. */
+      .blt .spent {
+        left: 0;
+        background: #31702f;
+        border-radius: 4px 0 0 4px;
+      }
+      /* The 2px surface gap is what separates the two segments. Never a border:
+     a stroke around a mark adds ink that is not data. */
+      .blt .togo {
+        background: #e0a411;
+        border-left: 2px solid var(--paper);
+      }
+      .blt .over {
+        background: #b4402f;
+        border-left: 2px solid var(--paper);
+        border-radius: 0 4px 4px 0;
+      }
+      .blt .tick {
+        position: absolute;
+        top: -3px;
+        height: 24px;
+        width: 2px;
+        background: var(--ink);
+        border-radius: 1px;
+      }
+      .perfrow .fig {
+        text-align: right;
+        font: 600 12.5px var(--sans);
+        font-variant-numeric: tabular-nums;
+        color: var(--greenDeep);
+      }
+      .perfrow .fig.neg {
+        color: var(--danger);
+      }
+      .perfrow .fig small {
+        display: block;
+        font-weight: 400;
+        font-size: 10.5px;
+        color: var(--muted);
+      }
+      /* Identity never rests on colour alone: a key is always present for two
+     or more marks, and the swatch carries the hue while the text stays ink. */
+      .perfkey {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        padding: 10px 16px 2px;
+        font: 11px var(--sans);
+        color: var(--muted);
+      }
+      .perfkey span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .perfkey b {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        display: inline-block;
+      }
+      @media (max-width: 560px) {
+        .perfrow {
+          grid-template-columns: minmax(0, 1fr) 104px;
+          row-gap: 6px;
+        }
+        .perfrow .blt {
+          grid-column: 1 / -1;
+        }
+      }
       .tcard {
         background: var(--paper);
         border: 1px solid var(--line);
@@ -9132,6 +9283,86 @@
           dot: (c) => c.bankBalance.nowCents < 0,
         },
       ];
+      /**
+       * Cost against approved budget, per open job — the Torre's answer to
+       * "where is the margin going".
+       *
+       * The four figures come from `projectEconomics` and reconcile by
+       * construction, which is why this draws them rather than adding up its
+       * own: `forecastCost` is never below `actual`, and
+       * `margin = currentRevenue − forecastCost`, so
+       *
+       *     approved budget = incurred + still to spend + margin
+       *
+       * exactly, for every job, including the ones in overrun (where margin is
+       * negative and the bar runs past the tick). A chart that computed its own
+       * total would eventually disagree with the Económicos screen, and the one
+       * a director glances at is the one that would be wrong.
+       */
+      function perfRows() {
+        return erp.state.projects
+          .filter((p) => !p.closed)
+          .map((p) => {
+            const e = erp.projectEconomics(p.id);
+            const budget = e.currentRevenueCents;
+            const spent = e.actualCents;
+            const toGo = Math.max(0, e.forecastCostCents - e.actualCents);
+            // The track has to hold whichever is larger, or an overrun would be
+            // drawn inside the budget it exceeded.
+            const track = Math.max(budget, e.forecastCostCents, 1);
+            return {
+              id: p.id,
+              code: p.code,
+              name: erp.party(p.partyId).name,
+              budget,
+              spent,
+              toGo,
+              marginCents: e.marginForecastCents,
+              marginPct: e.marginForecastPct,
+              pct: (c) => Math.max(0, Math.min(100, (c / track) * 100)),
+              budgetAt: (budget / track) * 100,
+              over: e.forecastCostCents > budget,
+            };
+          })
+          .sort((a, b) => a.marginPct - b.marginPct);
+      }
+      function torrePerformance() {
+        const rows = perfRows();
+        if (!rows.length) return "";
+        const totBudget = rows.reduce((s, r) => s + r.budget, 0);
+        const totMargin = rows.reduce((s, r) => s + r.marginCents, 0);
+        const totPct = totBudget ? Math.round((totMargin / totBudget) * 1000) / 10 : 0;
+        return `<div class="card" style="margin-bottom:14px"><div class="ch"><h3>Rendimiento de la cartera</h3>
+    <span class="tag">${rows.length} obra${rows.length === 1 ? "" : "s"} abierta${rows.length === 1 ? "" : "s"}</span></div>
+   <div class="perfhero"><b>${eur0(totMargin)}</b><span class="pct">${totPct}%</span>
+    <span class="lab">Margen previsto sobre ${eur0(totBudget)} de presupuesto aprobado</span></div>
+   <div class="perfkey">
+    <span><b style="background:#31702f"></b>Coste incurrido</span>
+    <span><b style="background:#e0a411"></b>Pendiente hasta terminar</span>
+    <span><b style="background:#b4402f"></b>Por encima del presupuesto</span>
+    <span><b style="background:var(--ink)"></b>Presupuesto aprobado</span>
+   </div>
+   <div class="perf">${rows
+     .map((r) => {
+       const spentW = r.pct(r.spent);
+       const toGoW = Math.max(0, r.pct(r.spent + r.toGo) - spentW);
+       // The overrun is the slice of the forecast that sits past the tick — drawn
+       // as its own mark so "over budget" is visible without reading the figure.
+       const overW = r.over ? Math.max(0, r.pct(r.spent + r.toGo) - r.budgetAt) : 0;
+       const bodyW = Math.max(0, spentW + toGoW - overW);
+       return `<div class="perfrow" data-perf="${r.id}" title="${esc(r.code)} · ${esc(r.name)}">
+      <span class="code">${esc(r.code)}<span class="nm">${esc(r.name)}</span></span>
+      <span class="blt">
+       <i class="spent" style="width:${Math.min(spentW, bodyW).toFixed(1)}%"></i>
+       <i class="togo" style="left:${Math.min(spentW, bodyW).toFixed(1)}%;width:${Math.max(0, bodyW - spentW).toFixed(1)}%"></i>
+       ${overW > 0 ? `<i class="over" style="left:${bodyW.toFixed(1)}%;width:${overW.toFixed(1)}%"></i>` : ""}
+       <span class="tick" style="left:${r.budgetAt.toFixed(1)}%"></span>
+      </span>
+      <span class="fig${r.marginCents < 0 ? " neg" : ""}">${eur0(r.marginCents)}<small>${r.marginPct}% margen</small></span>
+     </div>`;
+     })
+     .join("")}</div></div>`;
+      }
       function torre(v) {
         $("#sub").textContent =
           "Los cuatro indicadores de la empresa, el estado de cada proyecto y lo que necesita atención. Todo abre su detalle; aquí no se edita nada.";
@@ -9154,6 +9385,7 @@
      </div>`;
    }).join("")}
    </div>
+   ${torrePerformance()}
    <div class="grid2">
     <div class="card"><div class="ch"><h3>Proyectos</h3><span class="tag">avance · venta · coste · margen · desviación</span></div>
       <div class="scroll"><table><thead><tr><th></th><th>Proyecto</th><th>Cliente</th><th>Avance</th>
@@ -9190,6 +9422,12 @@
    </div>`;
         v.querySelectorAll("[data-go]").forEach(
           (n) => (n.onclick = () => go(n.dataset.go, n.dataset.arg)),
+        );
+        // A bullet row opens the job it describes. The chart says which job is
+        // losing money; the next question is always "why", and that is one
+        // screen away rather than a search.
+        v.querySelectorAll("[data-perf]").forEach(
+          (n) => (n.onclick = () => go("progress", erp.project(n.dataset.perf).code)),
         );
         v.querySelectorAll("[data-pin]").forEach(
           (b) =>
