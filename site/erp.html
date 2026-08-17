@@ -2430,6 +2430,14 @@
       .pbfind input {
         min-width: 0;
       }
+      /* The line's catalogue dropdown is a PHONE control. Stated here, above
+         the media query that turns it on, because a base rule written after an
+         equal-specificity one inside a media query loses on source order and
+         the control silently never appears — which is exactly how the mobile
+         pane tabs shipped invisible once already. */
+      .pbfind .bcat {
+        display: none;
+      }
       .bfind {
         border: 0;
         background: transparent;
@@ -2556,6 +2564,76 @@
            because there is nothing below it to be separated from. */
         .pbpane {
           border-bottom: 0;
+        }
+        /* THE HEADER STOPS PRINTING ON TOP OF ITSELF.
+           `.pbbar` was a 56px row that could not wrap, with the total held in
+           the middle by `margin: 0 auto`. On a laptop there is room for all of
+           it; on a phone the budget number, the state pill and the total were
+           laid over each other — reported with a photograph of "PRE-2026-0003 ·
+           v1.0" and "TOTAL 0,00 €" sharing the same six millimetres.
+
+           Auto-centring is the part that had to go: it holds the total in the
+           middle of the bar REGARDLESS of what is already there, so it collides
+           rather than yields. Here the bar wraps instead, and the total drops
+           onto a second row beside the actions — which also puts the figure
+           next to the buttons that change it. */
+        .pbbar {
+          flex: none;
+          flex-wrap: wrap;
+          row-gap: 6px;
+          padding: 8px 12px;
+          height: auto;
+        }
+        .pbbar .who {
+          flex: 1 1 120px;
+        }
+        /* The number may now shorten rather than push the row wider. It is
+           still one line — a wrapped document number reads as two documents. */
+        .pbbar .who b {
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        /* An empty flex item of full width: the row break, without a wrapper
+           element in the markup that desktop would then have to ignore. */
+        .pbbar::before {
+          content: "";
+          order: 1;
+          flex: 0 0 100%;
+          height: 0;
+        }
+        .pbbar .tot {
+          order: 2;
+          margin: 0;
+          display: flex;
+          align-items: baseline;
+          gap: 8px;
+          text-align: left;
+        }
+        .pbbar .tot span {
+          display: inline;
+        }
+        .pbbar .acts {
+          order: 3;
+          margin-left: auto;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+        /* THE CATALOGUE, AS A LIST YOU CAN SEE.
+           The 🔍 stands down here: it and the dropdown do the same job, and two
+           controls for one job on a phone is how the operator ends up trusting
+           neither. Whole-catalogue search survives as the last option in the
+           list, so nothing is lost with it. */
+        .pbfind .bcat {
+          display: block;
+          width: 100%;
+          margin-top: 3px;
+        }
+        .pbfind .bfind {
+          display: none;
+        }
+        .pbfind > div {
+          flex-wrap: wrap;
+          justify-content: flex-end;
         }
       }
       /* ---------- ADM-03: document validation, full screen (S6) ----------
@@ -11628,6 +11706,78 @@
         const hit = erp.listAll("itemChapters").find((x) => x.es === c.name);
         return hit ? hit.code : "";
       }
+      /**
+       * The chapter's subpartidas, as a native dropdown on the line itself.
+       *
+       * On a phone the código cell was a lone 🔍 with an empty box beside it,
+       * and an operator looking at "Nueva partida · 0,00 €" reported the same
+       * thing twice: there is no way to pick DEM-101 from the price book. The
+       * magnifier does exactly that, but a magnifier is not a chooser — it
+       * gives no clue that two hundred priced partidas are behind it, and at
+       * phone size it is a 24px emoji with no label.
+       *
+       * A native `<select>` is the right control here and not a fashion
+       * choice: iOS draws it as a full-height wheel, it is reachable by
+       * keyboard and screen reader for free, and it says "there is a list" by
+       * existing. Scoped to the line's own chapter, because that is the
+       * question being asked — "what goes in Demoliciones" — with the whole
+       * catalogue still one option away for the times it isn't.
+       *
+       * Desktop keeps the input and the 🔍: the código column is 88px, a
+       * dropdown would not fit in it, and the search there is already a
+       * pointer away.
+       */
+      function lineCatalogueOptions(chapterCode, currentCode) {
+        const active = erp.state.catalogue.filter((i) => i.active !== false);
+        /* NARROWED ONLY WHEN THERE IS SOMETHING TO NARROW TO.
+           A builder chapter is free text and the price book's chapters are a
+           list, so "Pavimentos" matches nothing while "Demoliciones" matches
+           DEM. Falling back to the whole book is the right answer — the same
+           rule catalogueSearchModal already follows — because an empty
+           dropdown reads as a broken one, and the operator is then stuck on
+           the one screen that was supposed to unstick them. */
+        const narrowed = chapterCode ? active.filter((i) => i.chapter === chapterCode) : [];
+        const rows = narrowed.length ? narrowed : active;
+        const cut = (s, n) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+        // Sorted by code, which is how the price book is read aloud and how the
+        // operator already knows it — not by insertion order, which is nothing.
+        const byCode = (a, b) => String(a.code).localeCompare(String(b.code), "es");
+        const opt = (i) =>
+          `<option value="${esc(i.id)}"${i.code === currentCode ? " selected" : ""}>${esc(
+            i.code,
+          )} · ${esc(cut(i.customerWording || i.desc, 44))}</option>`;
+        let body;
+        if (narrowed.length) {
+          body = rows.slice().sort(byCode).map(opt).join("");
+        } else {
+          /* Two hundred partidas in one flat wheel is a list you scroll past,
+             not one you choose from. Grouped by the chapter each belongs to,
+             so the fallback stays usable at phone size — iOS renders optgroup
+             headers in its picker. */
+          const groups = new Map();
+          for (const i of rows.slice().sort(byCode)) {
+            const k = i.chapter || "";
+            if (!groups.has(k)) groups.set(k, []);
+            groups.get(k).push(i);
+          }
+          body = [...groups.entries()]
+            .map(
+              ([code, items]) =>
+                `<optgroup label="${esc(
+                  code ? erp.listLabel("itemChapters", code) : "Sin capítulo",
+                )}">${items.map(opt).join("")}</optgroup>`,
+            )
+            .join("");
+        }
+        const known = rows.some((i) => i.code === currentCode);
+        return (
+          `<option value=""${known ? "" : " selected"}>${
+            currentCode ? esc(currentCode) + " · escrito a mano" : "— elegir del catálogo —"
+          }</option>` +
+          body +
+          `<option value="__all__">Buscar en todo el catálogo…</option>`
+        );
+      }
       /* What a line IS, under its description: marca · modelo · calidad, plus
    what kind of cost it is. Deliberately a SUB-LINE and not three more columns
    — the grid is already thirteen columns in a pane that has to fit on a
@@ -11657,6 +11807,12 @@
           ? "capítulo seleccionado"
           : `${V.chapters.length} capítulos`;
         const cols = locked ? 12 : 13;
+        /* Resolved ONCE per render, not once per line. `chapterCatalogueCode`
+           walks the chapter list and then the itemChapters list; on a quote with
+           a hundred partidas that is a hundred redundant walks, on the screen
+           where typing already re-renders. */
+        const chapCat = {};
+        for (const c of V.chapters) chapCat[c.id] = chapterCatalogueCode(id, vsel, c.id);
         $("#bRows").innerHTML =
           chapters
             .map(
@@ -11676,7 +11832,7 @@
       <td class="pbdrag" data-handle="${l.id}" title="Arrastrar para reordenar">${locked ? "" : "⠿"}</td>
       <td><input data-line="${l.id}" data-f="num" value="${esc(l.num)}" style="width:56px"
         title="${l.manualNum ? "Número escrito a mano — se mantiene al reordenar" : "Número automático — cambia con la posición"}"${locked ? " disabled" : ""}></td>
-      <td class="pbfind"><div>${locked ? "" : `<button class="bfind" data-find="${l.id}" title="Buscar en el catálogo">🔍</button>`}<input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="5"${locked ? " disabled" : ""}></div></td>
+      <td class="pbfind"><div>${locked ? "" : `<button class="bfind" data-find="${l.id}" title="Buscar en el catálogo">🔍</button>`}<input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="5"${locked ? " disabled" : ""}>${locked ? "" : `<select class="bcat" data-cat="${l.id}" data-catchap="${c.id}" title="Elegir una subpartida del catálogo">${lineCatalogueOptions(chapCat[c.id], l.code)}</select>`}</div></td>
       <td><input data-line="${l.id}" data-f="desc" value="${esc(l.desc)}"${locked ? " disabled" : ""}>${lineSpecLine(l)}</td>
       <td><select data-line="${l.id}" data-f="unit" style="width:88px"${locked ? " disabled" : ""}>${listOptionsUnits(l.unit)}</select></td>
       <td class="int"><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>
@@ -11727,6 +11883,44 @@
                 });
               }),
           );
+        /* The line's own catalogue dropdown. Same effect as the 🔍 beside it —
+           one `editLine` carrying every field the price book holds — so the two
+           can never disagree about what "taking a partida from the catalogue"
+           means. Picking is by item ID and not by code, because a code is
+           editable free text and two entries may share one. */
+        $("#bRows")
+          .querySelectorAll("[data-cat]")
+          .forEach((sel) => {
+            sel.onchange = () => {
+              const lid = sel.dataset.cat;
+              const v = sel.value;
+              if (!v) return; // back to "written by hand" — the line keeps what it has
+              if (v === "__all__") {
+                // Reset first: if the operator cancels the modal, the select must
+                // not be left showing a choice that was never applied.
+                sel.value = "";
+                catalogueSearchModal((it) => {
+                  mutate(() => {
+                    erp.editLine(id, lid, lineFromCatalogueItem(it), {
+                      audit: true,
+                      user: "backoffice",
+                    });
+                    attachCatalogueImages(id, lid, it);
+                  }, "Partida tomada del catálogo");
+                });
+                return;
+              }
+              const it = erp.state.catalogue.find((x) => x.id === v);
+              if (!it) return;
+              mutate(() => {
+                erp.editLine(id, lid, lineFromCatalogueItem(it), {
+                  audit: true,
+                  user: "backoffice",
+                });
+                attachCatalogueImages(id, lid, it);
+              }, `${it.code} · tomada del catálogo`);
+            };
+          });
         $("#bRows")
           .querySelectorAll("[data-addline]")
           .forEach(

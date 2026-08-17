@@ -3035,6 +3035,10 @@ window.CANEI_DICT = {
     ["Asignar la alerta", "Assign the alert"],
     ["Añadida a la lista", "Added to the list"],
     ["Buscar en el catálogo", "Search the catalogue"],
+    // The line's own catalogue dropdown (phone).
+    ["— elegir del catálogo —", "— choose from the catalogue —"],
+    ["Buscar en todo el catálogo…", "Search the whole catalogue…"],
+    ["Elegir una subpartida del catálogo", "Choose a sub-item from the catalogue"],
     ["Completar los datos ahora", "Complete the details now"],
     ["Consulta a la gestoría", "Query to the accountant"],
     ["Continuar", "Continue"],
@@ -4883,6 +4887,10 @@ window.CANEI_DICT = {
       new RegExp("^Gracias — su proyecto está confirmado \\((P-\\d+)\\)$"),
       "Thank you — your project is confirmed ($1)",
     ],
+    // The line's catalogue dropdown: a code the price book does not hold, and
+    // the toast that confirms one it does.
+    [new RegExp("^(.+) · escrito a mano$"), "$1 · written by hand"],
+    [new RegExp("^(.+) · tomada del catálogo$"), "$1 · taken from the catalogue"],
     [new RegExp("^Factura (FAC-\\d{4}-\\d{4}) — (.+)$"), "Invoice $1 — $2"],
     [new RegExp("^Recordatorio amable — factura de (.+)$"), "Friendly reminder — invoice for $1"],
     [new RegExp("^Contacto — (\\d+) proyecto\\(s\\)$"), "Lead — $1 project(s)"],

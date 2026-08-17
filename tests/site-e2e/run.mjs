@@ -793,6 +793,162 @@ async function testMobile(browser, base) {
       ok("mobile: the builder shows one pane at a time, chosen from a tab bar");
     else bad("mobile: builder pane tabs", JSON.stringify({ barShown, counts }));
 
+    /* NOTHING IN THE HEADER BAR PRINTS ON TOP OF ANYTHING ELSE.
+       Reported with a photograph: the budget number, the state pill and the
+       total occupying the same six millimetres. The cause was `margin: 0 auto`
+       on the total, which centres it in the bar regardless of what is already
+       there — so it collides instead of yielding.
+
+       Measured as overlapping RECTANGLES and not as a style, because a style
+       assertion would have passed against the old CSS too: `margin:0 auto` is
+       a perfectly ordinary declaration and only the geometry says it is wrong
+       here. Pairwise, so the report names which two pieces are on top of each
+       other rather than saying the bar is bad. */
+    const overlap = await pg.evaluate(() => {
+      const bar = document.querySelector(".pbbar");
+      if (!bar) return { err: "no .pbbar" };
+      const parts = [...bar.children]
+        .filter((el) => getComputedStyle(el).display !== "none")
+        .map((el) => ({
+          name: el.id || el.className || el.tagName.toLowerCase(),
+          r: el.getBoundingClientRect(),
+        }))
+        .filter((p) => p.r.width > 0 && p.r.height > 0);
+      const hits = [];
+      for (let i = 0; i < parts.length; i++)
+        for (let j = i + 1; j < parts.length; j++) {
+          const a = parts[i].r,
+            b = parts[j].r;
+          // 1px of slack: adjacent boxes may share an edge, and a shared edge
+          // is not an overlap.
+          const dx = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+          const dy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (dx > 1 && dy > 1) hits.push(`${parts[i].name}×${parts[j].name}`);
+        }
+      /* TEXT PAINTING OUTSIDE ITS OWN BOX, which is what the photograph
+         actually showed. Flex items do not overlap each other, so rectangles
+         alone would have reported the bar as fine: what collided was the
+         budget number, `white-space: nowrap` with nothing to clip it, drawn
+         straight across the total beside it. Boxes intact, words on top of
+         each other. */
+      const spill = [];
+      for (const el of bar.querySelectorAll("b, span, .who")) {
+        if (getComputedStyle(el).display === "none") continue;
+        if (el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflow === "visible")
+          spill.push(el.className || el.tagName.toLowerCase());
+      }
+      return { hits, spill, parts: parts.length, wide: bar.scrollWidth > bar.clientWidth + 1 };
+    });
+    if (overlap.err) bad("mobile: builder header has no overlapping text", overlap.err);
+    else if (!overlap.hits.length && !overlap.spill.length && !overlap.wide)
+      ok(`mobile: the builder header lays out without overlap (${overlap.parts} pieces)`);
+    else
+      bad(
+        "mobile: builder header overlap",
+        [
+          overlap.hits.length ? `boxes: ${overlap.hits.join(",")}` : "",
+          overlap.spill.length ? `text spills: ${overlap.spill.join(",")}` : "",
+          overlap.wide ? "bar scrolls sideways" : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      );
+
+    /* THE CATALOGUE IS A LIST YOU CAN SEE AND PICK FROM.
+       "I miss the drop down menu that you can select for example DEM-101 for
+       this chapter with all prices and info pre-filled already." The 🔍 did
+       exactly that and told nobody: at phone size it is a 24px emoji with no
+       label beside an empty box.
+
+       Asserted on the EFFECT, not on the control's presence — a dropdown that
+       renders and copies nothing across is the same defect wearing a better
+       hat. Picking must move the code, the description, the unit and the money
+       onto the line in one step. */
+    await pg.evaluate(() => document.querySelector('#pbMTabs [data-mtab="lines"]').click());
+    await pg.waitForTimeout(400);
+    const pick = await pg.evaluate(async () => {
+      const sel = document.querySelector("#bRows select.bcat");
+      if (!sel) return { err: "no per-line catalogue dropdown" };
+      if (getComputedStyle(sel).display === "none") return { err: "dropdown is not visible" };
+      // A real catalogue option: not the placeholder, not "search everything".
+      const opt = [...sel.options].find((o) => o.value && o.value !== "__all__");
+      if (!opt) return { err: "dropdown offers no catalogue item" };
+      const item = erp.state.catalogue.find((x) => x.id === opt.value);
+      const lineId = sel.dataset.cat;
+      sel.value = opt.value;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 600));
+      let line = null;
+      for (const b of erp.state.budgets)
+        for (const v of b.versions)
+          for (const c of v.chapters) for (const l of c.lines) if (l.id === lineId) line = l;
+      return {
+        want: { code: item.code, desc: item.desc, unit: item.unit, cost: item.defaultCostCents },
+        got: line && { code: line.code, desc: line.desc, unit: line.unit, cost: line.costCents },
+        options: sel.options.length,
+      };
+    });
+    if (pick.err) bad("mobile: the line's catalogue dropdown", pick.err);
+    else if (
+      pick.got &&
+      pick.got.code === pick.want.code &&
+      pick.got.desc === pick.want.desc &&
+      pick.got.unit === pick.want.unit &&
+      pick.got.cost === pick.want.cost
+    )
+      ok(
+        `mobile: picking from the line's dropdown fills code, description, unit and cost (${pick.options} options)`,
+      );
+    else bad("mobile: dropdown prefills the line", JSON.stringify(pick).slice(0, 200));
+
+    /* "…the subitems DEM-101 FOR THIS CHAPTER."
+       The check above ran against a chapter named "Pavimentos", which matches
+       no chapter in the price book, so it exercised the fallback — the whole
+       catalogue, 210 options — and passed while saying nothing about the
+       narrowing the request was actually about. A chapter that DOES map is
+       built here rather than hoped for, the way the milestone test had to be
+       taught to ask the engine instead of picking a project by hope. */
+    const narrow = await pg.evaluate(async () => {
+      const chapName = (erp.listAll("itemChapters")[0] || {}).es;
+      const want = (erp.listAll("itemChapters")[0] || {}).code;
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      const v = b.versions[b.versions.length - 1];
+      const chap = erp.addChapter(b.id, { name: chapName, section: v.chapters[0].section });
+      erp.addLine(b.id, chap.id, { desc: "Nueva partida", unit: "ud", qtyMilli: 1000 });
+      go("quotes", b.id);
+      await new Promise((r) => setTimeout(r, 1200));
+      document.querySelector('#pbMTabs [data-mtab="lines"]').click();
+      await new Promise((r) => setTimeout(r, 400));
+      const row = [...document.querySelectorAll("#bRows tr.pbrow")].find(
+        (tr) => tr.dataset.chap === chap.id,
+      );
+      const sel = row && row.querySelector("select.bcat");
+      if (!sel) return { err: "no dropdown on the new chapter's line" };
+      /* A hidden <select> still answers `.options`, so without this the check
+         reported correct narrowing on a control the operator cannot reach —
+         it passed against the build with the dropdown display:none'd. What a
+         list contains is only worth asserting once somebody can see it. */
+      if (getComputedStyle(sel).display === "none") return { err: "dropdown is not visible" };
+      const items = [...sel.options]
+        .filter((o) => o.value && o.value !== "__all__")
+        .map((o) => erp.state.catalogue.find((x) => x.id === o.value))
+        .filter(Boolean);
+      return {
+        chapName,
+        want,
+        count: items.length,
+        strays: items.filter((i) => i.chapter !== want).length,
+        inBook: erp.state.catalogue.filter((i) => i.active !== false && i.chapter === want).length,
+      };
+    });
+    if (narrow.err) bad("mobile: the dropdown narrows to the chapter", narrow.err);
+    else if (narrow.count > 0 && narrow.strays === 0 && narrow.count === narrow.inBook)
+      ok(
+        `mobile: on a chapter the price book knows, the dropdown offers only its ${narrow.count} subpartidas (${narrow.chapName})`,
+      );
+    else bad("mobile: dropdown narrows to the chapter", JSON.stringify(narrow));
+
     // The logo is the way home, and on a phone it is the only one visible.
     await pg.evaluate(() => (location.hash = "invoicing"));
     await pg.waitForTimeout(500);
