@@ -4871,6 +4871,9 @@
     <script src="erp-sync.js"></script>
     <!-- The starter price book, read by migration 16. MUST precede erp-migrations.js. -->
     <script src="erp-catalogue-pack.js"></script>
+    <!-- The same price book in English and Catalan. Read by catalogueDesc();
+     absent, every partida simply shows its Spanish and nothing breaks. -->
+    <script src="erp-catalogue-i18n.js"></script>
     <!-- Line drawings for the price book. No blobs, no requests: the same
      definition renders as inline SVG here and as PDF path operators in
      erp-pdf.js, so the catalogue, the quote builder and the printed quote
@@ -8690,7 +8693,7 @@
       function catalogueSearchModal(onPick, opts) {
         const o = typeof opts === "string" ? { query: opts } : opts || {};
         const rows = erp.state.catalogue.filter((i) => i.active !== false);
-        const chapLabel = (code) => (code ? erp.listLabel("itemChapters", code) : "sin capítulo");
+        const chapLabel = (code) => (code ? chapterLabel(code) : "sin capítulo");
         // A chapter with nothing in it would open on an empty list that looks
         // broken, so the filter only applies when it has something to show.
         let chapter = o.chapter && rows.some((i) => i.chapter === o.chapter) ? o.chapter : "";
@@ -8743,6 +8746,7 @@
                 (!q ||
                   (i.code || "").toLowerCase().includes(q) ||
                   (i.desc || "").toLowerCase().includes(q) ||
+                  catalogueDesc(i).toLowerCase().includes(q) ||
                   (i.customerWording || "").toLowerCase().includes(q)),
             )
             .slice(0, 60);
@@ -8757,7 +8761,7 @@
                 return `<button class="cpi${multi ? " pick" : ""}${chosen.has(i.id) ? " on" : ""}" data-pick="${i.id}">
       ${multi ? `<span class="cpx">${chosen.has(i.id) ? "☑" : "☐"}</span>` : ""}
       <span class="cpc">${esc(i.code)}</span>
-      <span class="cpd"><b>${esc(i.desc)}</b><i>${esc(chapLabel(i.chapter))} · ${esc(i.unit)}${spec ? " · " + esc(spec) : ""}</i></span>
+      <span class="cpd"><b>${esc(catalogueDesc(i))}</b><i>${esc(chapLabel(i.chapter))} · ${esc(i.unit)}${spec ? " · " + esc(spec) : ""}</i></span>
       <span class="cpm">${i.defaultPriceCents ? eur(i.defaultPriceCents) : '<span class="pill y">sin precio</span>'}</span>
      </button>`;
               })
@@ -8825,7 +8829,7 @@
             .filter((c) => count.get(c.code))
             .map(
               (c) =>
-                `<option value="${esc(c.code)}"${c.code === selected ? " selected" : ""}>${esc(c.es)} (${count.get(c.code)})</option>`,
+                `<option value="${esc(c.code)}"${c.code === selected ? " selected" : ""}>${esc(chapterLabel(c.code))} (${count.get(c.code)})</option>`,
             )
             .join("")
         );
@@ -9426,7 +9430,7 @@
             `<option value="${val}"${tpl.attach === val ? " selected" : ""}>${l}</option>`,
         )
         .join("")}</select></div>
-      <div class="field"><label>Idioma</label><select id="cm_lang">${["es", "ca"].map((l) => `<option value="${l}"${tpl.lang === l ? " selected" : ""}>${l === "es" ? "Español" : "Català"}</option>`).join("")}</select></div>
+      <div class="field"><label>Idioma</label><select id="cm_lang">${["es", "ca", "en"].map((l) => `<option value="${l}"${tpl.lang === l ? " selected" : ""}>${LANG_NAME[l]}</option>`).join("")}</select></div>
       <div class="field full" style="margin-top:6px"><button class="btn primary" id="cm_save">Guardar como nueva versión</button></div>
      </div></div>
     <div class="card" style="margin:0"><div class="ch"><h3>Previsualización</h3><span class="tag">con datos reales del primer registro que encaja</span></div>
@@ -9496,7 +9500,7 @@
    <div class="field"><label>Familia</label><select id="nt_fam">${Object.entries(COM_FAMILY)
      .map(([k, l]) => `<option value="${k}">${l}</option>`)
      .join("")}</select></div>
-   <div class="field"><label>Idioma</label><select id="nt_lang"><option value="es">Español</option><option value="ca">Català</option></select></div>
+   <div class="field"><label>Idioma</label><select id="nt_lang"><option value="es">Español</option><option value="ca">Català</option><option value="en">English</option></select></div>
    <div class="field full"><label>Asunto</label><input id="nt_subject" placeholder="Su presupuesto {{number}}"></div>
    <div class="field full"><label>Cuerpo</label><textarea class="tplbody" id="nt_body" placeholder="Hola {{cliente}},"></textarea></div>
    <div class="field full" style="margin-top:6px"><button class="btn primary" id="nt_save">Crear plantilla</button></div>
@@ -11517,6 +11521,9 @@
    `budget.language` is a field an estimator sets per customer, and it must not
    move because a colleague prefers to work in English. Keeping the document
    out of the toggle is what makes both behaviours correct at once. */
+      /* The three languages a DOCUMENT can be written in, named in themselves —
+         a language list that translates tells you what you already chose. */
+      const LANG_NAME = { es: "Español", ca: "Català", en: "English" };
       const DOCL = {
         es: {
           doc: "PRESUPUESTO",
@@ -11560,6 +11567,45 @@
             optional: " (opcional — a part)",
             outOfScope: " (fora de pressupost)",
             extras: " (extres)",
+          },
+        },
+        /* English, for a customer who reads it — a second home on the coast, a
+           foreign landlord, a relocation agency. The interface already offered
+           three languages while the DOCUMENT offered two, so the one artefact
+           that leaves the building was the one that could not be written in the
+           reader's language.
+
+           EVERY WORD HERE IS THE DICTIONARY'S OWN ENGLISH, not a second set.
+           The first draft of this block invented its own wording for the base,
+           the annex and the validity, while the dictionary had been shipping
+           different English for those same three labels to the same reader for
+           months — two English vocabularies for one document, which is how a
+           customer comes to see a quote whose headings do not match the screen
+           it was written on. The source audit is what caught it: six strings it
+           had never seen before, in a file it knows is authored in Spanish.
+           (Quoting the rejected wording here would have re-created it: the
+           audit reads a quoted phrase in a comment as a literal, and two of
+           them came straight back.) */
+        en: {
+          doc: "QUOTATION",
+          base: "Taxable base",
+          options: "Optional items (separate)",
+          vat: "VAT",
+          total: "TOTAL",
+          perM2: "Total per m²",
+          pending: "⚠ Lines awaiting price (not included)",
+          annex: "Graphic annex",
+          page: "page",
+          of: "of",
+          item: "line item",
+          validity: "Validity",
+          exclusions: "Exclusions",
+          assumptions: "Assumptions",
+          sections: {
+            base: "",
+            optional: " (optional — separate)",
+            outOfScope: " (outside the quote)",
+            extras: " (extras)",
           },
         },
       };
@@ -11771,6 +11817,7 @@
       <select id="bcLang"${dis}>
        <option value="es"${b.language === "es" ? " selected" : ""}>Español</option>
        <option value="ca"${b.language === "ca" ? " selected" : ""}>Català</option>
+       <option value="en"${b.language === "en" ? " selected" : ""}>English</option>
       </select></label>
      <span style="flex:1"></span>
      <button class="btn sm primary" id="bcNext">Siguiente paso →</button>
@@ -12255,12 +12302,100 @@
        * closes. One picker, reached from two places, instead of a second
        * cheaper one that had to be learned separately.
        */
+      /* ================= THE PRICE BOOK, IN THE READER'S LANGUAGE =========
+         The interface translates; two hundred partidas inside it did not, so an
+         operator reading English met the whole price book in Spanish — in every
+         list, every picker and every line of the builder.
+
+         THE LINE THIS DRAWS, and it is the important part. Everywhere else the
+         company OWNS its data and this system leaves it alone: a customer name,
+         a site address, a partida the estimator typed — because inventing a
+         translation of somebody else's words is worse than leaving them in the
+         language they were written in. That rule stands. The STARTER price book
+         is different: it is data this system ships, like the word
+         "Presupuesto", and it has an authored English and Catalan.
+
+         So the test is provenance, not appearance: a partida that came from the
+         pack is shown translated; a partida somebody typed is shown exactly as
+         typed, in every language. */
+      function uiLang() {
+        /* `lang()`, not `active`. `active` is a BOOLEAN — "does this page need
+           translating at all" — and calling it as a function threw, was caught
+           by the guard below, and returned Spanish forever: every partida
+           rendered untranslated while the dictionary was complete and every
+           other check passed. The guard was hiding the bug it was written to
+           survive, so it now falls back only when the module is genuinely
+           absent. */
+        return (
+          (typeof CANEI_I18N !== "undefined" &&
+            typeof CANEI_I18N.lang === "function" &&
+            CANEI_I18N.lang()) ||
+          "es"
+        );
+      }
+      /** The pack's entry for a catalogue item, or null if nobody shipped it. */
+      function packDesc(code) {
+        return (typeof ErpCatalogueI18n !== "undefined" && ErpCatalogueI18n.DESC[code]) || null;
+      }
+      /**
+       * A catalogue item's description in the reader's language.
+       *
+       * Falls back to what is stored the moment anything is uncertain — an item
+       * the operator added, a code the pack does not know, an edited
+       * description. A wrong translation on a price is worse than an untranslated
+       * one, because only the second is obviously untranslated.
+       */
+      function catalogueDesc(item, lang) {
+        if (!item) return "";
+        const t = packDesc(item.code);
+        if (!t) return item.desc || "";
+        const l = lang || uiLang();
+        // Only when the stored text is still the pack's own Spanish. If the
+        // operator has edited it, those are their words now.
+        const pack = (ErpCataloguePack.rows() || []).find((r) => r.code === item.code);
+        if (pack && item.desc && item.desc !== pack.desc) return item.desc;
+        if (l === "en") return t[0] || item.desc || "";
+        if (l === "ca") return t[1] || item.desc || "";
+        return item.desc || "";
+      }
+      /** A price-book chapter's name. The list carries es and ca; en ships here. */
+      function chapterLabel(code, lang) {
+        const l = lang || uiLang();
+        if (l === "en" && typeof ErpCatalogueI18n !== "undefined") {
+          const en = ErpCatalogueI18n.CHAPTERS_EN[code];
+          if (en) return en;
+        }
+        return erp.listLabel("itemChapters", code, l);
+      }
+      /**
+       * A quote LINE's description in the reader's language.
+       *
+       * A line is a snapshot: it carries the words it was given, and those words
+       * are what the customer's document prints. This translates the DISPLAY
+       * only, and only while the line still says exactly what the catalogue said
+       * — in any of the three languages, since the operator may have taken it
+       * while reading English. One keystroke of editing and it is their text,
+       * shown as typed from then on.
+       */
+      function lineDesc(l, lang) {
+        if (!l || !l.itemId) return (l && l.desc) || "";
+        const item = erp.state.catalogue.find((x) => x.id === l.itemId);
+        if (!item) return l.desc || "";
+        const t = packDesc(item.code);
+        if (!t) return l.desc || "";
+        const known = [item.desc, t[0], t[1]].filter(Boolean);
+        if (!known.includes(l.desc)) return l.desc || "";
+        const lg = lang || uiLang();
+        if (lg === "en") return t[0] || l.desc;
+        if (lg === "ca") return t[1] || l.desc;
+        return item.desc || l.desc;
+      }
       function lineCatalogueLabel(l) {
         if (!l.code) return "— elegir del catálogo —";
         const it = erp.state.catalogue.find(
           (i) => i.id === l.itemId || (!l.itemId && i.code === l.code),
         );
-        return it ? `${it.code} · ${it.desc}` : `${l.code} · escrito a mano`;
+        return it ? `${it.code} · ${catalogueDesc(it)}` : `${l.code} · escrito a mano`;
       }
       /* What a line IS, under its description: marca · modelo · calidad, plus
    what kind of cost it is. Deliberately a SUB-LINE and not three more columns
@@ -12339,7 +12474,7 @@
       <td class="c-num"><input data-line="${l.id}" data-f="num" value="${esc(l.num)}" style="width:56px"
         title="${l.manualNum ? "Número escrito a mano — se mantiene al reordenar" : "Número automático — cambia con la posición"}"${locked ? " disabled" : ""}></td>
       <td class="pbfind c-code"><div>${locked ? "" : `<button class="bfind" data-find="${l.id}" title="Buscar en el catálogo">🔍</button>`}<input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="5"${locked ? " disabled" : ""}>${locked ? "" : `<button type="button" class="bcat" data-cat="${l.id}" data-catchap="${c.id}" title="Elegir una subpartida del catálogo">${esc(lineCatalogueLabel(l))}<span class="bcatch">›</span></button>`}</div></td>
-      <td class="c-desc"><div class="descell"><span class="pictwrap">${pict({ ...l, chapterName: c.name }, 16)}</span><input data-line="${l.id}" data-f="desc" value="${esc(l.desc)}"${locked ? " disabled" : ""}></div>${lineSpecLine(l)}</td>
+      <td class="c-desc"><div class="descell"><span class="pictwrap">${pict({ ...l, chapterName: c.name }, 16)}</span><input data-line="${l.id}" data-f="desc" value="${esc(lineDesc(l))}"${locked ? " disabled" : ""}></div>${lineSpecLine(l)}</td>
       <td class="c-unit"><select data-line="${l.id}" data-f="unit" style="width:88px"${locked ? " disabled" : ""}>${listOptionsUnits(l.unit)}</select></td>
       <td class="int c-cost"><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>
       <td class="int c-marg"><input class="r" data-line="${l.id}" data-f="marginPct" type="number" step="0.1" max="99.9" value="${bMarginPct(l)}"${locked ? " disabled" : ""} title="Margen sobre el precio de venta. Al escribirlo, el precio unitario se recalcula."></td>
@@ -13405,7 +13540,7 @@
     <div class="it"><span>Base imponible</span><span style="flex:1"></span><b>${eur(t.taxableCents)}</b></div>
     <div class="it"><span>IVA</span><span style="flex:1"></span><b>${t.vatBp / 100}%</b></div>
     <div class="it"><span>Idioma del documento</span><span style="flex:1"></span>
-      <b>${b.language === "ca" ? "Català" : "Español"}</b></div>
+      <b>${LANG_NAME[b.language] || LANG_NAME.es}</b></div>
     <div class="it"><span>Validez</span><span style="flex:1"></span><b>${fmtD(b.validityDate)}</b></div>
    </div></div>
    ${
@@ -15529,6 +15664,7 @@
                 !q ||
                 i.code.toLowerCase().includes(q) ||
                 i.desc.toLowerCase().includes(q) ||
+                catalogueDesc(i).toLowerCase().includes(q) ||
                 (i.brand || "").toLowerCase().includes(q) ||
                 (i.model || "").toLowerCase().includes(q),
             )
@@ -15587,8 +15723,8 @@
           return `<tr class="click" data-item="${i.id}">
       <td class="pictcell" data-th="">${pict(i)}</td>
       <td class="k" data-th="Código">${esc(i.code)}</td>
-      <td class="k" data-th="Descripción">${esc(i.desc)}</td>
-      <td data-th="Capítulo">${i.chapter ? esc(erp.listLabel("itemChapters", i.chapter)) : '<span class="pill y">sin capítulo</span>'}</td>
+      <td class="k" data-th="Descripción">${esc(catalogueDesc(i))}</td>
+      <td data-th="Capítulo">${i.chapter ? esc(chapterLabel(i.chapter)) : '<span class="pill y">sin capítulo</span>'}</td>
       <td data-th="Ud">${esc(i.unit)}</td>
       <td data-th="Tipo">${esc(TYPE[i.type] || i.type)}</td>
       <td data-th="Marca">${esc(i.brand || "—")}</td>
@@ -18101,7 +18237,7 @@
         (
           c,
         ) => `<div style="margin-bottom:8px"><b style="color:var(--greenDeep)">${esc(c.num)}. ${esc(c.name)}${SEC[c.section] || ""}</b>
-      ${c.lines.map((l) => `<div class="chapline item"><span class="chapmark">${pict({ ...l, chapterName: c.name }, 13)}</span><span>${esc(l.num)} ${esc(l.desc)} — ${l.qty} ${esc(l.unit)} × ${eur(l.priceCents)}${marked.has(l.num) ? '<span class="amark" title="Ver anexo gráfico">A</span>' : ""}</span><b>${eur(l.totalCents)}</b></div>`).join("")}</div>`,
+      ${c.lines.map((l) => `<div class="chapline item"><span class="chapmark">${pict({ ...l, chapterName: c.name }, 13)}</span><span>${esc(l.num)} ${esc(lineDesc(l, doc.language))} — ${l.qty} ${esc(l.unit)} × ${eur(l.priceCents)}${marked.has(l.num) ? '<span class="amark" title="Ver anexo gráfico">A</span>' : ""}</span><b>${eur(l.totalCents)}</b></div>`).join("")}</div>`,
       )
       .join("")}
     <div style="border-top:2px solid var(--green);padding-top:8px;margin-top:8px">
@@ -19400,7 +19536,7 @@
     <div class="who"><b>${esc(d.number)}</b><span>${esc(d.customer.name)}</span></div>
     ${val.differs ? `<span class="pill y">${val.annexes === 1 ? "1 anexo" : val.annexes + " anexos"}</span>` : ""}
     <div class="tot"><span>Importe vigente</span><b>${eur(val.currentCents)}</b></div>
-    <div class="acts"><span class="tag">${esc(d.language === "ca" ? "Català" : "Español")}</span></div>
+    <div class="acts"><span class="tag">${esc(LANG_NAME[d.language] || LANG_NAME.es)}</span></div>
    </div>
    <div class="con2">
     <div class="condoc"><div class="cdoc" translate="no" id="conDoc"></div></div>

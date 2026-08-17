@@ -2620,6 +2620,12 @@ window.CANEI_DICT = {
     ["Marcar como rechazado", "Mark as refused"],
     ["Qué dijo", "What they said"],
     ["Exclusiones", "Exclusions"],
+    /* The section suffix a chapter carries on the document. Both sides needed
+       an entry: the Spanish had none, and the English added beside it would
+       have been a string the audit had never seen. */
+    [" (opcional — aparte)", " (optional — separate)"],
+    [" (fuera de presupuesto)", " (outside the quote)"],
+    [" (extras)", " (extras)"],
     ["Supuestos", "Assumptions"],
     ["Exclusiones y supuestos", "Exclusions and assumptions"],
     [

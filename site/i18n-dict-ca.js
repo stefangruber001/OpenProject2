@@ -646,6 +646,9 @@ window.CANEI_DICT.ca = {
   "Marcar como rechazado": "Marcar com a rebutjat",
   "Qué dijo": "Què va dir",
   Exclusiones: "Exclusions",
+  " (opcional — aparte)": " (opcional — a part)",
+  " (fuera de presupuesto)": " (fora de pressupost)",
+  " (extras)": " (extres)",
   Supuestos: "Supòsits",
   "Exclusiones y supuestos": "Exclusions i supòsits",
   "Lo que el precio NO incluye. Se imprime bajo los totales.":

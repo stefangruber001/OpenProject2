@@ -364,6 +364,15 @@ jobs:
       - name: Site scripts parse (a syntax error takes a whole module with it)
         run: node tests/site-syntax/run.mjs
 
+      # The starter price book in three languages. Two hundred partidas ship
+      # with this system, so an operator reading English met two hundred lines
+      # of Spanish inside a translated interface. Checks that every partida has
+      # both, that neither column is the Spanish copied across, and that the
+      # figures — 60×60, 15+46+15, 16 A — survive translation, because a
+      # description that loses one is quoting different work at the same price.
+      - name: Price book, three languages
+        run: node tests/catalogue-i18n/run.mjs
+
   persistence:
     name: Durable adapters (Postgres + RLS contract tests)
     runs-on: ubuntu-latest

@@ -281,7 +281,8 @@ console.log(`\n──── source audit: strings with no ${TARGET.toUpperCase()
 console.log(`${scanned} candidate literals scanned across ${FILES.length} files\n`);
 for (const [file, list] of Object.entries(byFile)) {
   console.log(`✗ ${file.padEnd(22)} ${String(list.length).padStart(4)} untranslated`);
-  for (const m of list.slice(0, 12)) console.log(`      · [${m.kind}] ${m.text.slice(0, 88)}`);
+  for (const m of list.slice(0, Number(process.env.AUDIT_SHOW || 12)))
+    console.log(`      · [${m.kind}] ${m.text.slice(0, 88)}`);
   if (list.length > 12) console.log(`      … and ${list.length - 12} more`);
 }
 console.log(`\n${missing.length} user-visible strings have no ${TARGET.toUpperCase()} entry`);

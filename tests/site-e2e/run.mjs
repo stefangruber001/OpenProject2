@@ -2146,6 +2146,88 @@ async function testBudgetBuilder(browser, base) {
       );
     else bad("the drawing follows the partida", JSON.stringify(chain).slice(0, 240));
 
+    /* ===== THE PRICE BOOK SPEAKS THE LANGUAGE THE ERP IS IN =====
+       "The data in catalog items/chapter and subitems should be shown in the
+       language which the ERP is in at the time … also then in the quote
+       builder."
+
+       Asserted by switching the interface and reading the SAME partida back on
+       two surfaces. Not that a translation exists — the catalogue-i18n gate
+       does that — but that the screens ASK for it. A dictionary can be complete
+       while every screen still renders the Spanish column, which is exactly the
+       state this replaced.
+
+       Driven from here and not from inside one evaluate: `CANEI_I18N.set()`
+       ends in `location.reload()`, so a single evaluate spanning three
+       languages is three destroyed execution contexts. */
+    const useLang = async (l) => {
+      await pg.evaluate((x) => CANEI_I18N.set(x), l);
+      await pg.waitForLoadState("networkidle");
+      await bootedShell(pg);
+      await pg.waitForTimeout(600);
+    };
+    const readCatalogueRow = async () => {
+      await pg.evaluate(() => go("items"));
+      await pg.waitForTimeout(800);
+      return pg.evaluate(() => {
+        const row = [...document.querySelectorAll("#view table.mlist tbody tr.click")].find((tr) =>
+          /DEM-101/.test(tr.textContent),
+        );
+        return row ? row.children[2].textContent.trim() : null;
+      });
+    };
+    const trio = {};
+    for (const l of ["es", "en", "ca"]) {
+      await useLang(l);
+      trio[l] = await readCatalogueRow();
+    }
+    if (trio.es && trio.en && trio.ca && trio.es !== trio.en && trio.es !== trio.ca)
+      ok(`catalogue: a partida reads in the ERP's own language ("${trio.en}" in English)`);
+    else bad("catalogue: follows the interface language", JSON.stringify(trio));
+
+    /* And the same partida on a quote LINE, which is a snapshot and had to be
+       taught the difference between "still the catalogue's words" and "the
+       operator's words now". */
+    const openDraft = async () => {
+      await pg.evaluate(() => {
+        const b =
+          erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+        go("quotes", b.id);
+      });
+      await pg.waitForTimeout(900);
+    };
+    const readLine = () =>
+      pg.evaluate(() => {
+        const el = document.querySelector('#bRows tr.pbrow input[data-f="desc"]');
+        return el ? el.value : null;
+      });
+    await useLang("es");
+    await openDraft();
+    const lineEs = await readLine();
+    await useLang("en");
+    await openDraft();
+    const lineEn = await readLine();
+    /* Now EDIT it. From here the words are the operator's, and switching
+       language must not overwrite them — that would be the system quietly
+       rewriting what somebody typed onto a customer's quote. */
+    await pg.evaluate(() => {
+      const input = document.querySelector('#bRows tr.pbrow input[data-f="desc"]');
+      input.value = "Mi propia partida";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(800);
+    await useLang("ca");
+    await openDraft();
+    const lineAfterEdit = await readLine();
+    await useLang("es");
+    if (lineEs && lineEn && lineEs !== lineEn && lineAfterEdit === "Mi propia partida")
+      ok(
+        `builder: a catalogue line follows the interface language, and stops the moment the operator edits it ("${lineEn}")`,
+      );
+    else
+      bad("builder: line follows the language", JSON.stringify({ lineEs, lineEn, lineAfterEdit }));
+
     if (errs.length === 0) ok("builder: no console errors");
     else bad("builder: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
