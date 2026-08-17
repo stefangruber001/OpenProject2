@@ -2757,9 +2757,6 @@
         .pbdel .delx {
           display: none;
         }
-        .pbdel {
-          justify-content: flex-end !important;
-        }
         /* A real touch target. `.btn.sm` is 26px, which is fine under a mouse
            and under the 44px minimum every phone platform asks for — and this
            is the one button on the row that destroys something, so a mis-tap
@@ -4264,6 +4261,263 @@
         table.cards td.k:before,
         table.cards td[data-th=""]:before {
           display: none;
+        }
+
+        /* ================= THE QUOTE'S LINES, ON A PHONE =================
+           The generic card gives every cell a labelled row of its own. On the
+           budget grid that is thirteen rows and about 700px per partida, so a
+           chapter of six is four screens of scrolling and the operator cannot
+           see what belongs to what: "I want to see immediately the chapters and
+           what falls below each chapter."
+
+           The same markup is re-laid out here rather than rendered twice —
+           one source of truth for what a line IS, two arrangements of it. Each
+           cell was given a name (`c-desc`, `c-qty`, …) so this reads as a
+           layout rather than as a column of nth-child guesses.
+
+           The order is what the estimator actually reads:
+             · what it is        — number, description, the drawing, the money
+             · where it came from — the catalogue chooser
+             · what is sold      — quantity × unit at a price
+             · what it costs US  — cost and margin, on the grey wash that
+                                   already means "internal" everywhere else
+             · what to do to it  — state, pictures, delete
+
+           Four compact rows instead of thirteen labelled ones: about 210px. */
+        .bgrid table.cards tr.pbrow {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-areas:
+            "num  .    amt"
+            "hd   hd   hd"
+            "code code code"
+            "qty  unit price"
+            "cost marg marg"
+            "stat img  del";
+          gap: 5px 8px;
+          align-items: end;
+          padding: 9px 11px 10px;
+          /* NESTED UNDER THE CHAPTER, VISIBLY. The rail and the indent are the
+             whole answer to "what falls below each chapter" — a card that
+             starts at the same margin as its heading belongs to nothing. */
+          margin: 0 0 7px 12px;
+          /* `table.cards tr` sets width:100%, and 100% PLUS a 12px indent is
+             12px wider than the card can be — which pushed the total and the
+             sale price off the right edge. The indent is the point, so the
+             width gives way. */
+          width: auto;
+          border-left: 3px solid var(--greenLt, #a9c39c);
+          border-radius: 0 11px 11px 0;
+        }
+        .bgrid table.cards tr.pbrow > td {
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 2px;
+          min-width: 0;
+        }
+        /* Small caps ABOVE the value, not beside it: beside it, a label and a
+           right-aligned number make a dotted-leader line the eye has to travel.
+           Above it, four figures read as one strip. */
+        .bgrid table.cards tr.pbrow > td:before {
+          font: 600 9.5px var(--sans);
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--faint);
+        }
+        .bgrid table.cards tr.pbrow input,
+        .bgrid table.cards tr.pbrow select {
+          width: 100%;
+          min-height: 34px;
+        }
+        /* LABELS ONLY WHERE THE VALUE CANNOT SPEAK.
+           A caption over "1.1", over the description, over a chooser that
+           already reads "SOL-101 · Pavimento cerámico…" says nothing and costs
+           a line each — and four wasted lines per partida is what made a
+           chapter of six into four screens. The figures keep theirs, because
+           28 · 42,00 · 26,00 · 38,1 are indistinguishable without them. */
+        .bgrid table.cards tr.pbrow > td.c-num:before,
+        .bgrid table.cards tr.pbrow > td.c-amt:before,
+        .bgrid table.cards tr.pbrow > td.c-desc:before,
+        .bgrid table.cards tr.pbrow > td.c-code:before,
+        .bgrid table.cards tr.pbrow > td.c-stat:before,
+        .bgrid table.cards tr.pbrow > td.c-img:before,
+        .bgrid table.cards tr.pbrow > td.c-del:before {
+          display: none;
+        }
+        /* The number is a reference, not a heading: quiet, and the same size as
+           the caption it replaced. */
+        .bgrid table.cards tr.pbrow > td.c-num input {
+          border-color: transparent;
+          background: transparent;
+          padding-left: 0;
+          font-size: 12px;
+          color: var(--muted);
+          min-height: 26px;
+        }
+        /* The head: number and description on one line, with the drawing. */
+        .bgrid table.cards tr.pbrow > td.c-desc {
+          grid-area: hd;
+        }
+        /* The number stays: it is editable, a manual one survives reordering,
+           and it is how a partida is referred to on the telephone. Kept small
+           and next to the money rather than given a labelled row of its own. */
+        .bgrid table.cards tr.pbrow > td.c-num {
+          grid-area: num;
+        }
+        .bgrid table.cards tr.pbrow > td.c-num input {
+          max-width: 86px;
+          font-weight: 600;
+        }
+        /* One line, ellipsised. The chooser is a label for what the line holds;
+           wrapped to two lines it becomes a paragraph and costs the row it was
+           meant to save. */
+        .bgrid table.cards tr.pbrow > td.c-code .bcat {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: block;
+          /* The full 44px, unlike the numeric fields beside it. This is the
+             most-pressed control on the card and the one that reaches the whole
+             price book; the compact 34px belongs to boxes you focus and type
+             into, not to the primary target. Eight pixels against a card that
+             went from 700 to 291 is not a trade worth making. */
+          line-height: 42px;
+          padding-top: 0;
+          padding-bottom: 0;
+          min-height: 44px;
+          position: relative;
+          padding-right: 22px;
+        }
+        .bgrid table.cards tr.pbrow > td.c-code .bcatch {
+          position: absolute;
+          right: 9px;
+          top: 0;
+          line-height: 42px;
+        }
+        .bgrid table.cards tr.pbrow > td.c-drag {
+          display: none;
+        }
+        .bgrid table.cards tr.pbrow > td.c-amt {
+          grid-area: amt;
+          align-items: flex-end;
+        }
+        .bgrid table.cards tr.pbrow > td.c-amt .out {
+          font: 600 15px var(--serif);
+          color: var(--ink);
+          font-variant-numeric: tabular-nums;
+          white-space: nowrap;
+        }
+        /* The typed code and the chooser on ONE line. Both earn their place —
+           the chooser is how a partida comes out of the price book, the box is
+           how a code that is not in it gets written — but stacked they cost two
+           rows to say one thing. */
+        .bgrid table.cards tr.pbrow > td.c-code {
+          grid-area: code;
+        }
+        /* Block, not a flex column: as a flex ITEM the inner row was sized from
+           its own content — 82px of code box plus a whole partida description —
+           and hung 60px off the right of the card no matter how many
+           `min-width: 0`s were added below it. A block child is simply the
+           width of its parent, which is the thing that needed saying. */
+        .bgrid table.cards tr.pbrow > td.c-code {
+          display: block;
+          overflow: hidden;
+        }
+        .bgrid table.cards tr.pbrow > td.c-code > div {
+          display: flex;
+          flex-wrap: nowrap;
+          align-items: center;
+          gap: 6px;
+          width: 100%;
+          min-width: 0;
+        }
+        .bgrid table.cards tr.pbrow > td.c-code input {
+          flex: 0 0 82px;
+          width: 82px;
+        }
+        .bgrid table.cards tr.pbrow > td.c-code .bcat {
+          /* basis 0, not auto: with `auto` the chooser's starting size is its
+             own text, which is a whole partida description. */
+          flex: 1 1 0;
+          margin-top: 0;
+          min-width: 0;
+          overflow: hidden;
+        }
+        .bgrid table.cards tr.pbrow > td.c-qty {
+          grid-area: qty;
+        }
+        .bgrid table.cards tr.pbrow > td.c-unit {
+          grid-area: unit;
+        }
+        .bgrid table.cards tr.pbrow > td.c-price {
+          grid-area: price;
+        }
+        .bgrid table.cards tr.pbrow > td.c-cost {
+          grid-area: cost;
+        }
+        .bgrid table.cards tr.pbrow > td.c-marg {
+          grid-area: marg;
+        }
+        /* Cost and margin keep the grey that means "internal" on the laptop —
+           the cheapest guard there is against reading a cost aloud to a
+           customer. Extended to the label and the padding so it reads as one
+           block rather than two tinted cells. */
+        .bgrid table.cards tr.pbrow > td.int {
+          background: var(--hair);
+          border-radius: 8px;
+          padding: 5px 7px 6px;
+        }
+        .bgrid table.cards tr.pbrow > td.c-stat {
+          grid-area: stat;
+        }
+        .bgrid table.cards tr.pbrow > td.c-img {
+          grid-area: img;
+        }
+        .bgrid table.cards tr.pbrow > td.c-del {
+          grid-area: del;
+        }
+        .bgrid table.cards tr.pbrow > td.c-img .bimg {
+          width: 100%;
+          min-height: 38px;
+        }
+        /* The one destructive control on the card keeps the full 44px. */
+        .bgrid table.cards tr.pbrow > td.c-del .btn {
+          width: 100%;
+          min-height: 44px;
+        }
+        /* The description is the sentence, so it gets the weight the money and
+           the codes around it do not. */
+        .bgrid table.cards tr.pbrow .descell input {
+          font-weight: 600;
+          border-color: transparent;
+          background: transparent;
+          padding-left: 0;
+        }
+        .bgrid table.cards tr.pbrow .descell input:focus {
+          border-color: var(--green);
+          background: var(--paper);
+          padding-left: 9px;
+        }
+        .bgrid table.cards tr.pbrow .lspec {
+          font-size: 11px;
+        }
+        /* The chapter, and everything under it.
+           A filled band rather than another bordered card: at a glance the eye
+           needs to find the HEADINGS first and read the partidas as their
+           consequence, and a heading that looks like its own children is a list
+           with no shape. */
+        .bgrid table.cards tr.chaprow {
+          border: 0;
+          border-radius: 11px 11px 0 0;
+          background: var(--greenSoft);
+          margin-bottom: 7px;
+          padding: 10px 12px 11px;
+        }
+        .bgrid table.cards tr.chaprow .chapttl {
+          font: 600 14.5px var(--serif);
+          color: var(--greenDeep);
         }
       }
 
@@ -12006,7 +12260,7 @@
         const it = erp.state.catalogue.find(
           (i) => i.id === l.itemId || (!l.itemId && i.code === l.code),
         );
-        return it ? `${it.code} · ${it.desc.slice(0, 34)}` : `${l.code} · escrito a mano`;
+        return it ? `${it.code} · ${it.desc}` : `${l.code} · escrito a mano`;
       }
       /* What a line IS, under its description: marca · modelo · calidad, plus
    what kind of cost it is. Deliberately a SUB-LINE and not three more columns
@@ -12081,23 +12335,23 @@
         const a = bLineAmt(l);
         const m = a.saleCents - a.costCents;
         return `<tr class="pbrow" data-row="${l.id}" data-chap="${c.id}">
-      <td class="pbdrag" data-handle="${l.id}" title="Arrastrar para reordenar">${locked ? "" : "⠿"}</td>
-      <td><input data-line="${l.id}" data-f="num" value="${esc(l.num)}" style="width:56px"
+      <td class="pbdrag c-drag" data-handle="${l.id}" title="Arrastrar para reordenar">${locked ? "" : "⠿"}</td>
+      <td class="c-num"><input data-line="${l.id}" data-f="num" value="${esc(l.num)}" style="width:56px"
         title="${l.manualNum ? "Número escrito a mano — se mantiene al reordenar" : "Número automático — cambia con la posición"}"${locked ? " disabled" : ""}></td>
-      <td class="pbfind"><div>${locked ? "" : `<button class="bfind" data-find="${l.id}" title="Buscar en el catálogo">🔍</button>`}<input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="5"${locked ? " disabled" : ""}>${locked ? "" : `<button type="button" class="bcat" data-cat="${l.id}" data-catchap="${c.id}" title="Elegir una subpartida del catálogo">${esc(lineCatalogueLabel(l))}<span class="bcatch">›</span></button>`}</div></td>
-      <td><div class="descell"><span class="pictwrap">${pict({ ...l, chapterName: c.name }, 16)}</span><input data-line="${l.id}" data-f="desc" value="${esc(l.desc)}"${locked ? " disabled" : ""}></div>${lineSpecLine(l)}</td>
-      <td><select data-line="${l.id}" data-f="unit" style="width:88px"${locked ? " disabled" : ""}>${listOptionsUnits(l.unit)}</select></td>
-      <td class="int"><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>
-      <td class="int"><input class="r" data-line="${l.id}" data-f="marginPct" type="number" step="0.1" max="99.9" value="${bMarginPct(l)}"${locked ? " disabled" : ""} title="Margen sobre el precio de venta. Al escribirlo, el precio unitario se recalcula."></td>
-      <td><input class="r" data-line="${l.id}" data-f="qty" type="number" step="0.001" value="${l.qtyMilli / 1000}"${locked || l.subLines.length ? " disabled" : ""}></td>
-      <td><input class="r" data-line="${l.id}" data-f="price" type="number" step="0.01" value="${(l.priceCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>
-      <td><span class="out${m < 0 ? " neg" : ""}" data-out="amt-${l.id}">${eur(a.saleCents)}</span></td>
-      <td><select data-line="${l.id}" data-f="status"${locked ? " disabled" : ""}>
+      <td class="pbfind c-code"><div>${locked ? "" : `<button class="bfind" data-find="${l.id}" title="Buscar en el catálogo">🔍</button>`}<input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="5"${locked ? " disabled" : ""}>${locked ? "" : `<button type="button" class="bcat" data-cat="${l.id}" data-catchap="${c.id}" title="Elegir una subpartida del catálogo">${esc(lineCatalogueLabel(l))}<span class="bcatch">›</span></button>`}</div></td>
+      <td class="c-desc"><div class="descell"><span class="pictwrap">${pict({ ...l, chapterName: c.name }, 16)}</span><input data-line="${l.id}" data-f="desc" value="${esc(l.desc)}"${locked ? " disabled" : ""}></div>${lineSpecLine(l)}</td>
+      <td class="c-unit"><select data-line="${l.id}" data-f="unit" style="width:88px"${locked ? " disabled" : ""}>${listOptionsUnits(l.unit)}</select></td>
+      <td class="int c-cost"><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>
+      <td class="int c-marg"><input class="r" data-line="${l.id}" data-f="marginPct" type="number" step="0.1" max="99.9" value="${bMarginPct(l)}"${locked ? " disabled" : ""} title="Margen sobre el precio de venta. Al escribirlo, el precio unitario se recalcula."></td>
+      <td class="c-qty"><input class="r" data-line="${l.id}" data-f="qty" type="number" step="0.001" value="${l.qtyMilli / 1000}"${locked || l.subLines.length ? " disabled" : ""}></td>
+      <td class="c-price"><input class="r" data-line="${l.id}" data-f="price" type="number" step="0.01" value="${(l.priceCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>
+      <td class="c-amt"><span class="out${m < 0 ? " neg" : ""}" data-out="amt-${l.id}">${eur(a.saleCents)}</span></td>
+      <td class="c-stat"><select data-line="${l.id}" data-f="status"${locked ? " disabled" : ""}>
         <option value="normal"${bStatus(l) === "normal" ? " selected" : ""}>Normal</option>
         <option value="pending"${bStatus(l) === "pending" ? " selected" : ""}>Pendiente</option>
         <option value="optional"${bStatus(l) === "optional" ? " selected" : ""}>Opcional</option></select></td>
-      <td><button class="bimg${l.imageRefs.length ? " has" : ""}" data-gal="${l.id}">🖼 ${l.imageRefs.length}</button></td>
-      ${locked ? "" : `<td class="pbdel" data-th=""><button class="btn sm danger" data-delline="${l.id}" title="Eliminar esta partida"><span class="delx">✕</span><span class="dellbl">Eliminar partida</span></button></td>`}
+      <td class="c-img"><button class="bimg${l.imageRefs.length ? " has" : ""}" data-gal="${l.id}">🖼 ${l.imageRefs.length}</button></td>
+      ${locked ? "" : `<td class="pbdel c-del" data-th=""><button class="btn sm danger" data-delline="${l.id}" title="Eliminar esta partida"><span class="delx">✕</span><span class="dellbl">Eliminar partida</span></button></td>`}
     </tr>`;
       })
       .join("")}`,

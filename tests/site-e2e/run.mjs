@@ -959,6 +959,63 @@ async function testMobile(browser, base) {
       );
     else bad("mobile: chooser narrows to the chapter", JSON.stringify(narrow));
 
+    /* ===== YOU CAN SEE WHAT BELONGS TO WHAT =====
+       "I want to see immediately the chapters and what falls below each
+       chapter", and "the subitems are very high build … less height would be
+       more structured and premium."
+
+       The generic card gives every cell a labelled row of its own: thirteen
+       rows and about 700px per partida, so a chapter of six was four screens
+       and the shape of the quote was invisible. Three things are asserted, and
+       none of them is a style:
+
+         · HEIGHT, as a ceiling that may only come down. A card is a real
+           measurement, and 380px is already generous against the 291px it
+           takes now — the point is that it can never quietly go back.
+         · NESTING, geometrically: a partida must start to the RIGHT of the
+           chapter heading it belongs to. A card flush with its heading belongs
+           to nothing, which is the complaint in one sentence.
+         · CONTAINMENT: no cell may reach past its own card. The chooser did
+           exactly that — a flex row sized from its own content, hanging 60px
+           off the right edge — and it is invisible to every check that only
+           counts elements. */
+    const shape = await pg.evaluate(() => {
+      const chap = document.querySelector("#bRows tr.chaprow");
+      const rows = [...document.querySelectorAll("#bRows tr.pbrow")];
+      if (!chap || !rows.length) return { err: "no chapter with partidas under it" };
+      const cr = chap.getBoundingClientRect();
+      const heights = rows.map((r) => Math.round(r.getBoundingClientRect().height));
+      const indents = rows.map((r) => Math.round(r.getBoundingClientRect().left - cr.left));
+      // Any cell whose ink lands outside the card that holds it.
+      const spills = [];
+      for (const r of rows) {
+        const b = r.getBoundingClientRect();
+        for (const td of r.querySelectorAll("td")) {
+          const t = td.getBoundingClientRect();
+          if (t.width && t.right > b.right + 1) spills.push(td.className || td.tagName);
+        }
+      }
+      return {
+        tallest: Math.max(...heights),
+        rows: rows.length,
+        minIndent: Math.min(...indents),
+        chapTinted:
+          getComputedStyle(chap).backgroundColor !== getComputedStyle(rows[0]).backgroundColor,
+        spills: [...new Set(spills)],
+      };
+    });
+    if (shape.err) bad("mobile: the quote's shape is readable", shape.err);
+    else if (
+      shape.tallest <= 380 &&
+      shape.minIndent >= 6 &&
+      shape.chapTinted &&
+      !shape.spills.length
+    )
+      ok(
+        `mobile: partidas sit indented under their chapter and fit in ${shape.tallest}px each, nothing overflowing (${shape.rows} rows)`,
+      );
+    else bad("mobile: chapter/partida structure", JSON.stringify(shape));
+
     /* ===== THE CATALOGUE PICKER OPENS WHERE THE OPERATOR IS LOOKING =====
        This is the regression that shipped and was reported. `catalogueSearchModal`
        builds its own `.mscrim` instead of going through erp-modal.js, and the
