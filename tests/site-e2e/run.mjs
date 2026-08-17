@@ -80,6 +80,7 @@ async function main() {
     testBudgetBuilder,
     testPresupuestador,
     testCapture,
+    testSupplierBillEntry,
     testProjectTracking,
     testInvoicing,
     testInvoiceGenerator,
@@ -2313,6 +2314,149 @@ async function testBudgetBuilder(browser, base) {
     else bad("builder: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("budget builder", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── AP-01: a supplier invoice can be recorded THROUGH THE PRODUCT.
+//    `registerBill` and `allocateBill` have been complete and tested in the
+//    engine since it was written, and until now no line of `erp.html` called
+//    either. The only bill action in the interface was "Pay" on a row the seed
+//    had put there, so on a real workspace there were no bills at all — and
+//    bank reconciliation matches a movement against a BILL.
+//
+//    Two doors, both checked here: a blank invoice typed in, and a
+//    photographed document promoted. The promotion is the one that matters,
+//    because it is the one that leaves the reader's work connected to the
+//    money instead of stranded in an inbox.
+async function testSupplierBillEntry(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#supplier-invoices`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+    await pg.evaluate(() => {
+      const b = [...document.querySelectorAll(".tabstrip .tab")].find(
+        (x) => x.dataset.tab === "_supplierBills",
+      );
+      if (b) b.click();
+    });
+    await pg.waitForTimeout(500);
+
+    // The button is REACHABLE, not merely present: a control the operator
+    // cannot press is the exact failure this whole suite exists to catch.
+    const btn = await pg.evaluate(() => {
+      const b = document.getElementById("sb_new");
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top) };
+    });
+    if (btn && btn.w > 60 && btn.h >= 24 && btn.top >= 0)
+      ok(`AP-01: the payables screen offers a way to record an invoice (${btn.w}×${btn.h})`);
+    else bad("AP-01: new-invoice button reachable", JSON.stringify(btn));
+
+    const before = await pg.evaluate(() => erp.state.bills.length);
+    await pg.click("#sb_new");
+    await pg.waitForTimeout(400);
+    const formed = await pg.evaluate(
+      () => !!document.getElementById("bd_sup") && !!document.getElementById("bd_base"),
+    );
+    if (formed) ok("AP-01: it opens a form with a supplier and a taxable base");
+    else bad("AP-01: bill drawer opens", "no #bd_sup/#bd_base");
+
+    await pg.evaluate(() => {
+      document.getElementById("bd_num").value = "E2E-001";
+      document.getElementById("bd_base").value = "1000";
+      document.getElementById("bd_base").dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await pg.waitForTimeout(200);
+    await pg.click("#bd_go");
+    await pg.waitForTimeout(700);
+
+    const made = await pg.evaluate((n) => {
+      const b = erp.state.bills.find((x) => x.number === "E2E-001");
+      return {
+        grew: erp.state.bills.length === n + 1,
+        base: b ? b.baseCents : null,
+        name: b ? b.supplierName : null,
+        taxId: b ? b.supplierTaxId : null,
+      };
+    }, before);
+    if (made.grew && made.base === 100000)
+      ok("AP-01: pressing Registrar files a supplier invoice at the base that was typed");
+    else bad("AP-01: bill registered", JSON.stringify(made));
+    if (made.name && made.taxId)
+      ok(`AP-01: the bill carries its issuer's name and tax id (${made.name} · ${made.taxId})`);
+    else bad("AP-01: issuer stamped on the bill", JSON.stringify(made));
+
+    // ── a photographed document becomes that invoice ──
+    const capId = await pg.evaluate(() => {
+      const sup = erp.state.parties.find((p) =>
+        (p.roles || []).some((r) => ["supplier", "subcontractor", "selfEmployed"].includes(r)),
+      );
+      const c = erp.captureDocument({ docType: "supplierInvoice", imageRef: "e2e_blob" }, "bo");
+      erp.confirmCapture(
+        c.id,
+        {
+          issuerName: sup.name,
+          issuerTaxId: sup.taxId,
+          docNumber: "E2E-CAP-7",
+          date: erp.state.today,
+          baseCents: 50000,
+          vatCents: 10500,
+          totalCents: 60500,
+        },
+        "bo",
+      );
+      return c.id;
+    });
+    await pg.evaluate((id) => captureDrawer(id), capId);
+    await pg.waitForTimeout(400);
+    const promoteBtn = await pg.evaluate(() => {
+      const b = document.getElementById("cd_bill");
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height) };
+    });
+    if (promoteBtn && promoteBtn.w > 60 && promoteBtn.h >= 24)
+      ok("AP-01: a validated document offers to become a supplier invoice");
+    else bad("AP-01: promote button", JSON.stringify(promoteBtn));
+
+    await pg.click("#cd_bill");
+    await pg.waitForTimeout(400);
+    // The supplier read off the page is PROPOSED, and the number and base come
+    // across so the operator confirms rather than retypes.
+    const prefilled = await pg.evaluate(() => ({
+      num: document.getElementById("bd_num").value,
+      base: document.getElementById("bd_base").value,
+      sup: document.getElementById("bd_sup").value,
+    }));
+    if (prefilled.num === "E2E-CAP-7" && Number(prefilled.base) === 500 && prefilled.sup)
+      ok("AP-01: the reading is carried into the form instead of being retyped");
+    else bad("AP-01: capture prefills the bill", JSON.stringify(prefilled));
+
+    await pg.click("#bd_go");
+    await pg.waitForTimeout(700);
+    const linked = await pg.evaluate((id) => {
+      const c = erp.state.captured.find((x) => x.id === id);
+      const b = erp.state.bills.find((x) => x.number === "E2E-CAP-7");
+      return {
+        billId: c ? c.billId : null,
+        capId: b ? b.capId : null,
+        base: b ? b.baseCents : null,
+      };
+    }, capId);
+    if (linked.billId && linked.capId === capId && linked.base === 50000)
+      ok("AP-01: the document and the invoice end up pointing at each other");
+    else bad("AP-01: capture → bill link", JSON.stringify(linked));
+
+    if (!errs.length) ok("AP-01: no console errors");
+    else bad("AP-01: console", errs.slice(0, 2).join(" | "));
+  } catch (e) {
+    bad("supplier bill entry", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }

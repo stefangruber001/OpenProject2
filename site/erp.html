@@ -13249,6 +13249,12 @@
         const cf = c.confirmed;
         const total = cf ? cf.totalCents : 0;
         const db = openDrawer(c.stdName || CAP_TYPE_LABEL[c.docType] || "Documento");
+        let billBlock = "";
+        if (cf && !c.billId)
+          billBlock = `<div class="card"><div class="ch"><h3>Factura de proveedor</h3><span class="tag">para poder conciliarla con el banco</span></div>
+    <div style="padding:10px 12px 12px"><button class="btn primary" id="cd_bill">Registrar como factura</button></div></div>`;
+        else if (c.billId)
+          billBlock = `<div class="card"><div class="ch"><h3>Factura de proveedor</h3><span class="pill g">Registrada</span></div></div>`;
         capAlloc = (
           c.allocations.length
             ? c.allocations
@@ -13292,7 +13298,8 @@
      <button class="btn sm" id="cd_add">＋ Repartir</button>
      <span style="flex:1"></span>
      <button class="btn primary" id="cd_alloc">Asignar</button>
-    </div></div>`;
+    </div></div>
+   ${billBlock}`;
 
         $("#cd_save").onclick = () =>
           mutate(() => {
@@ -13316,6 +13323,7 @@
           });
           capAllocRows(id, total);
         };
+        if ($("#cd_bill")) $("#cd_bill").onclick = () => billDrawer(id);
         $("#cd_alloc").onclick = () =>
           mutate(() => {
             erp.allocateCapture(
@@ -13339,11 +13347,18 @@
    a line that names both, and a screen that lets you tick two boxes and then
    says no is a screen that asked the question badly. */
       let capAlloc = [];
-      function capAllocRows(id, total) {
-        const host = $("#cd_rows");
+      function capAllocRows(id, total, opt) {
+        /* `opt` lets a second screen borrow this editor without copying it. A
+           supplier invoice is split exactly the way a photographed document is
+           — same destinations, same rule that a line goes to a project OR an
+           overhead and never both — and two editors for one gesture is how the
+           two drift apart. Defaults keep every existing call site unchanged. */
+        const o = opt || {};
+        const rows = o.rows || capAlloc;
+        const host = $(o.host || "#cd_rows");
         if (!host) return;
         const projects = erp.state.projects.filter((p) => !p.closed);
-        host.innerHTML = capAlloc
+        host.innerHTML = rows
           .map(
             (a, i) => `
    <div class="fgrid" style="border-top:${i ? "1px solid var(--hair)" : "0"};padding-top:${i ? "8px" : "0"}">
@@ -13368,7 +13383,7 @@
         : ""
     }
     <div class="field"><label>Importe (€)</label><input data-ai="${i}" data-k="amountCents" type="number" step="0.01" value="${(a.amountCents / 100).toFixed(2)}"></div>
-    ${capAlloc.length > 1 ? `<div class="field" style="display:flex;align-items:flex-end"><button class="btn sm danger" data-rm="${i}">Quitar</button></div>` : ""}
+    ${rows.length > 1 ? `<div class="field" style="display:flex;align-items:flex-end"><button class="btn sm danger" data-rm="${i}">Quitar</button></div>` : ""}
    </div>`,
           )
           .join("");
@@ -13376,8 +13391,8 @@
         // a number inside it is one text node no dictionary can hold, which is the
         // gap S5 found the hard way. Splitting them fixes all three languages with
         // no interpolation rule at all.
-        const assigned = capAlloc.reduce((s, a) => s + (a.amountCents || 0), 0);
-        const rest = $("#cd_rest");
+        const assigned = rows.reduce((s, a) => s + (a.amountCents || 0), 0);
+        const rest = $(o.rest || "#cd_rest");
         if (rest) {
           const diff = total - assigned;
           rest.innerHTML = total
@@ -13388,7 +13403,7 @@
         }
         host.querySelectorAll("[data-ai]").forEach((inp) => {
           inp.onchange = () => {
-            const a = capAlloc[+inp.dataset.ai],
+            const a = rows[+inp.dataset.ai],
               k = inp.dataset.k;
             if (k === "dest") {
               const val = inp.value;
@@ -13400,16 +13415,137 @@
             } else if (k === "amountCents")
               a.amountCents = Math.round(Number(String(inp.value).replace(",", ".")) * 100) || 0;
             else a[k] = inp.value;
-            capAllocRows(id, total);
+            capAllocRows(id, total, o);
           };
         });
         host.querySelectorAll("[data-rm]").forEach(
           (b) =>
             (b.onclick = () => {
-              capAlloc.splice(+b.dataset.rm, 1);
-              capAllocRows(id, total);
+              rows.splice(+b.dataset.rm, 1);
+              capAllocRows(id, total, o);
             }),
         );
+      }
+
+      /** One blank destination row, the shape both editors start from. */
+      function blankAlloc(amountCents) {
+        return {
+          projectId: "",
+          overheadCategory: "",
+          chapterNum: "",
+          kind: "material",
+          amountCents: amountCents || 0,
+        };
+      }
+
+      /* ---------- AP-01 · a supplier invoice you can actually record ----------
+   `registerBill` has been complete, guarded and tested since the engine was
+   written, and nothing in the product ever called it. The only bill action was
+   "Pay" on a row the seed had put there. That gap is quiet and it is large:
+   bank reconciliation matches a movement against a BILL, so on a workspace
+   where every document arrives by camera there is nothing to reconcile
+   against, and every screen downstream reads zero.
+
+   One drawer serves both doors — a blank invoice typed in, and a photographed
+   document being promoted — because they are the same form with different
+   starting values. Two drawers would be two places to forget the tax id. */
+      let billAlloc = [];
+      function billDrawer(capId) {
+        const cap = capId ? erp.state.captured.find((x) => x.id === capId) : null;
+        const cf = (cap && cap.confirmed) || null;
+        const suppliers = erp.state.parties.filter(
+          (p) => p.active !== false && (p.roles || []).some((r) => SUPPLIER_ROLES.includes(r)),
+        );
+        if (!suppliers.length) {
+          say("No hay ningún proveedor dado de alta todavía.");
+          return;
+        }
+        // Proposed, never decided: a tax id can be read off a page, but binding a
+        // cost to the wrong company is not a choice a screen should make alone.
+        const guess = cf && cf.issuerTaxId
+          ? suppliers.find((p) => (p.taxId || "").toUpperCase() === cf.issuerTaxId.toUpperCase())
+          : null;
+        const base = cf ? cf.baseCents || 0 : 0;
+        billAlloc = (cap && cap.allocations && cap.allocations.length
+          ? cap.allocations.map((a) => ({
+              projectId: a.projectId || "",
+              overheadCategory: a.overheadCategory || "",
+              chapterNum: a.chapterNum || "",
+              kind: a.kind || "material",
+              amountCents: a.amountCents,
+            }))
+          : [blankAlloc(base)]);
+
+        const db = openDrawer(cap ? "Registrar documento como factura" : "Nueva factura de proveedor");
+        db.innerHTML = `<div class="fgrid">
+   <div class="field full"><label>Proveedor *</label><select id="bd_sup">
+     ${suppliers.map((p) => `<option value="${p.id}"${guess && guess.id === p.id ? " selected" : ""}>${esc(p.name)}${p.taxId ? " · " + esc(p.taxId) : ""}</option>`).join("")}
+    </select></div>
+   ${cf && !guess && cf.issuerTaxId ? `<div class="field full"><span class="pill y">El NIF leído no coincide con ningún proveedor</span></div>` : ""}
+   <div class="field"><label>Nº factura *</label><input id="bd_num" value="${esc(cf ? cf.docNumber || "" : "")}"></div>
+   <div class="field"><label>Fecha</label><input id="bd_date" type="date" value="${esc(cf && cf.date ? cf.date : erp.state.today)}"></div>
+   <div class="field"><label>Vencimiento</label><input id="bd_due" type="date" value="${esc(cf && cf.dueDate ? cf.dueDate : "")}"></div>
+   <div class="field"><label>Base imponible (€) *</label><input id="bd_base" type="number" step="0.01" value="${(base / 100).toFixed(2)}"></div>
+   <div class="field"><label>IVA (€)</label><input id="bd_vat" type="number" step="0.01" value="${((cf ? cf.vatCents || 0 : 0) / 100).toFixed(2)}"></div>
+  </div>
+  <div class="card" style="margin-top:10px"><div class="ch"><h3>Asignación</h3><span class="tag" id="bd_rest"></span></div>
+   <div id="bd_rows" style="padding:6px 12px 12px"></div>
+   <div style="display:flex;gap:8px;padding:0 12px 12px;flex-wrap:wrap">
+    <button class="btn sm" id="bd_add">＋ Repartir</button>
+    <span style="flex:1"></span>
+    <button class="btn primary" id="bd_go">Registrar factura</button>
+   </div></div>`;
+
+        const readBase = () =>
+          Math.round(Number(String($("#bd_base").value).replace(",", ".")) * 100) || 0;
+        const draw = () =>
+          capAllocRows(capId || "new", readBase(), {
+            rows: billAlloc,
+            host: "#bd_rows",
+            rest: "#bd_rest",
+          });
+        $("#bd_base").oninput = draw;
+        $("#bd_add").onclick = () => {
+          billAlloc.push(blankAlloc(0));
+          draw();
+        };
+        $("#bd_go").onclick = () =>
+          mutate(() => {
+            const number = $("#bd_num").value.trim();
+            if (!number) throw new Error("La factura necesita un número");
+            const baseCents = readBase();
+            if (!(baseCents > 0)) throw new Error("La factura necesita una base imponible");
+            const vatCents =
+              Math.round(Number(String($("#bd_vat").value).replace(",", ".")) * 100) || 0;
+            // An unallocated bill is a legitimate state — the engine says so and
+            // the payables list flags it — so empty rows are dropped rather than
+            // refused, and a partial split is refused rather than filed wrong.
+            const rows = billAlloc
+              .filter((a) => (a.projectId || a.overheadCategory) && a.amountCents > 0)
+              .map((a) => ({
+                projectId: a.projectId || null,
+                overheadCategory: a.projectId ? null : a.overheadCategory || null,
+                chapterNum: a.chapterNum || null,
+                kind: a.kind || "material",
+                amountCents: a.amountCents,
+              }));
+            const total = rows.reduce((s, a) => s + a.amountCents, 0);
+            if (rows.length && Math.abs(total - baseCents) > 1)
+              throw new Error("El reparto debe sumar la base imponible");
+            const fields = {
+              supplierId: $("#bd_sup").value,
+              number,
+              date: $("#bd_date").value || erp.state.today,
+              dueDate: $("#bd_due").value || null,
+              baseCents,
+              vatCents,
+              allocations: rows,
+            };
+            if (capId) erp.billFromCapture(capId, fields, "backoffice");
+            else erp.registerBill(fields, "backoffice");
+            closeDrawer();
+          }, "Factura registrada");
+        draw();
       }
 
       /** Read a chosen file and open the validation screen on the result. */
@@ -16291,7 +16427,9 @@
           $("#sub").textContent =
             "Facturas de proveedor con base, IVA y retención IRPF según el perfil fiscal. Pagos parciales y un pago para varias facturas.";
           const rows = erp.payables();
-          v.innerHTML = `<div class="card"><div class="ch"><h3>Facturas de proveedor</h3><span class="tag">pendiente ${eur0(rows.reduce((s, r) => s + Math.max(0, r.outstandingCents), 0))}</span></div>
+          v.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+    <button class="btn primary sm" id="sb_new">＋ Nueva factura</button></div>
+   <div class="card"><div class="ch"><h3>Facturas de proveedor</h3><span class="tag">pendiente ${eur0(rows.reduce((s, r) => s + Math.max(0, r.outstandingCents), 0))}</span></div>
    <div class="scroll"><table><thead><tr><th>Proveedor</th><th>Nº factura</th><th class="num">Total</th><th class="num">Pendiente</th><th>Vence</th><th>Asignación</th><th>Estado</th><th></th></tr></thead><tbody>
    ${rows
      .map((r) => {
@@ -16310,6 +16448,7 @@
      })
      .join("")}
    </tbody></table></div></div>`;
+          $("#sb_new").onclick = () => billDrawer(null);
           v.querySelectorAll("[data-pay]").forEach(
             (b) =>
               (b.onclick = () => {

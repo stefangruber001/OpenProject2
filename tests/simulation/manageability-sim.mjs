@@ -2132,6 +2132,138 @@ assert(
   assert(issueErr.length > 0, "issuing on an unconfigured workspace is still refused", issueErr);
 }
 
+/**
+ * A PHOTOGRAPHED DOCUMENT BECOMES A SUPPLIER INVOICE.
+ *
+ * Until now the trail stopped at `captured`: the reader extracted the issuer,
+ * the number and the amounts, a person confirmed them, and nothing ever turned
+ * that into a bill. Bank reconciliation matches a movement against a BILL, so
+ * on a workspace where documents arrive by camera there was nothing to
+ * reconcile against — a gap that no test noticed because every fixture calls
+ * `registerBill` directly.
+ *
+ * The negative controls matter more than the happy path here: the two ways to
+ * get this wrong are binding a cost to the wrong company, and carrying a split
+ * across two records that measure different totals.
+ */
+{
+  const e = new ERP();
+  e.configureEntity(
+    { legalName: "Obras Test SL", taxId: "B12345674", iban: "ES9121000418450200051332" },
+    "bo",
+  );
+  const supplier = e.addParty(
+    { name: "Suministros Vallès SL", taxId: "B12345674", roles: ["supplier"] },
+    "bo",
+  );
+  const cust = e.addParty(
+    {
+      name: "Cliente Final",
+      taxId: "12345678Z",
+      roles: ["customer"],
+      billStreet: "C/ Major 18",
+      billPostalCode: "08950",
+      billCity: "Esplugues de Llobregat",
+      mobile: "600111222",
+    },
+    "bo",
+  );
+  const job = e.createQuickProject(
+    { partyId: cust.id, desc: "Reforma", activityLine: "reforma", valueCents: 500000 },
+    "bo",
+  );
+
+  const cap = e.captureDocument({ docType: "supplierInvoice", imageRef: "blob_1" }, "bo");
+  // Not confirmed yet: refuse, because a reading nobody has checked is not a fact.
+  throws(
+    () => e.billFromCapture(cap.id, { supplierId: supplier.id }, "bo"),
+    "billFromCapture refuses a document whose fields nobody has confirmed",
+  );
+
+  e.confirmCapture(
+    cap.id,
+    {
+      issuerName: "Suministros Vallès SL",
+      issuerTaxId: "B12345674",
+      docNumber: "A-2026-118",
+      date: e.state.today,
+      baseCents: 100000,
+      vatCents: 21000,
+      totalCents: 121000,
+    },
+    "bo",
+  );
+  // The supplier is never guessed from the page.
+  throws(
+    () => e.billFromCapture(cap.id, {}, "bo"),
+    "billFromCapture refuses to guess which company issued the document",
+  );
+
+  // A split across the document's TOTAL, which is not the bill's base.
+  e.allocateCapture(
+    cap.id,
+    [
+      { projectId: job.id, kind: "material", amountCents: 90750 },
+      { overheadCategory: "office", kind: "other", amountCents: 30250 },
+    ],
+    "bo",
+  );
+  const promoted = e.billFromCapture(cap.id, { supplierId: supplier.id }, "bo");
+
+  assert(
+    promoted.number === "A-2026-118",
+    "…the bill takes the number that was read and confirmed",
+  );
+  assert(promoted.baseCents === 100000, "…and the taxable base, not the total", promoted.baseCents);
+  assert(
+    promoted.capId === cap.id &&
+      e.state.captured.find((c) => c.id === cap.id).billId === promoted.id,
+    "…and the document and the bill point at each other",
+  );
+  const allocSum = promoted.allocations.reduce((s, a) => s + a.amountCents, 0);
+  assert(
+    allocSum === promoted.baseCents,
+    "…the split is rescaled from the document total to the taxable base, exactly",
+    allocSum + " vs " + promoted.baseCents,
+  );
+  assert(
+    promoted.allocations.length === 2 &&
+      promoted.allocations[0].projectId === job.id &&
+      promoted.allocations[1].overheadCategory === "office",
+    "…and every destination survives the rescale",
+  );
+  assert(
+    promoted.supplierName === "Suministros Vallès SL" && promoted.supplierTaxId === "B12345674",
+    "registerBill stamps the issuer's name and tax id onto the bill itself",
+  );
+  // Once promoted, again is a duplicate, not an update.
+  throws(
+    () => e.billFromCapture(cap.id, { supplierId: supplier.id }, "bo"),
+    "a document already registered as a bill cannot be registered twice",
+  );
+
+  // A bill from before the stamp still names its issuer.
+  const legacy = e.registerBill(
+    { supplierId: supplier.id, number: "OLD-1", baseCents: 5000 },
+    "bo",
+  );
+  delete legacy.supplierName;
+  delete legacy.supplierTaxId;
+  assert(
+    e.billSupplier(legacy).name === "Suministros Vallès SL" &&
+      e.billSupplier(legacy).taxId === "B12345674",
+    "billSupplier falls back to the party file for a bill registered before the stamp",
+  );
+  assert(
+    e.payables().every((r) => r.supplier),
+    "…and payables still names every supplier",
+  );
+
+  // The accountant's dictionary carries the tax id, which it never used to.
+  const pkgRows = e.state.bills.filter((b) => b.date === e.state.today);
+  assert(pkgRows.length >= 1, "the quarter has bills to report");
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

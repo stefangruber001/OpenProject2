@@ -4720,6 +4720,15 @@
           // with its allocations already on it is filed as completely as one
           // allocated afterwards through `allocateBill`.
           allocations: (b.allocations || []).map((a) => this.withAccountCode(a)),
+          // STAMPED, not looked up. The package that leaves for the accountant
+          // has to stand on its own, and a foreign key into the party file is
+          // not a name: the four fields named as the ones that matter are the
+          // document number, its date, the issuer and the issuer's tax id, and
+          // two of those lived only on another record. The party file stays the
+          // place they are EDITED; these are what the invoice said on the day it
+          // was filed, which is what a filing is for.
+          supplierName: supplier.name || "",
+          supplierTaxId: supplier.taxId || "",
           docRef: b.docRef || null,
           capId: b.capId || null,
           status: "registered",
@@ -4748,6 +4757,100 @@
       if (pu) pu.status.invoicedBillId = rec.id; // PUR-03/04
       this._log(user, "registerBill", supplier.name + " " + rec.number);
       return rec;
+    }
+    /**
+     * Who issued a bill, for a reader that must not depend on the party file.
+     *
+     * Bills registered before the stamp above have neither field, and a bill
+     * whose supplier was later deactivated still has to name its issuer — so
+     * this prefers what was stamped and falls back to the party record. Every
+     * report and export goes through here rather than reaching for
+     * `party(b.supplierId).name` itself.
+     */
+    billSupplier(bill) {
+      if (!bill) return { name: "", taxId: "" };
+      if (bill.supplierName || bill.supplierTaxId)
+        return { name: bill.supplierName || "", taxId: bill.supplierTaxId || "" };
+      const p = this.state.parties.find((x) => x.id === bill.supplierId);
+      return { name: p ? p.name || "" : "", taxId: p ? p.taxId || "" : "" };
+    }
+    /**
+     * A validated document becomes the supplier invoice it always was.
+     *
+     * The reader has captured the issuer, the number, the date and the amounts
+     * and a person has confirmed them; until now that was where the trail
+     * stopped, because nothing promoted a `captured` record into a `bill`. The
+     * consequence was quiet and large: bank reconciliation matches a movement
+     * against a BILL, so on a workspace where every document arrived by camera
+     * there was nothing to reconcile against.
+     *
+     * The supplier is not guessed. A tax id can be read off a page, but binding
+     * a cost to the wrong company is not a mistake a screen should make on its
+     * own, so the caller passes `supplierId` and the UI merely proposes one.
+     *
+     * ALLOCATIONS ARE RESCALED, because the two records measure different
+     * things: a document is split across its TOTAL (`allocateCapture` asserts
+     * exactly that), a bill across its TAXABLE BASE. Carrying the numbers
+     * across untouched would fail `registerBill`'s own sum check, and carrying
+     * them across silently wrong would be worse. Destinations are preserved,
+     * amounts are scaled, and the last row absorbs the rounding so the total is
+     * exact rather than approximately right.
+     */
+    billFromCapture(capId, opts, user) {
+      const c = this.state.captured.find((x) => x.id === capId);
+      if (!c) throw new Error("Captured document not found: " + capId);
+      if (c.billId) throw new Error("This document has already been registered as a bill");
+      const cf = c.confirmed;
+      if (!cf) throw new Error("Confirm what the document says before registering it");
+      const o = opts || {};
+      if (!o.supplierId) throw new Error("Choose the supplier this document belongs to");
+      const baseCents = o.baseCents != null ? cents(o.baseCents) : cents(cf.baseCents);
+      const rows = o.allocations || c.allocations || [];
+      const scaled = this._rescaleAllocations(rows, baseCents);
+      return this.registerBill(
+        {
+          supplierId: o.supplierId,
+          number: o.number != null ? o.number : cf.docNumber || "",
+          date: o.date || cf.date || this.state.today,
+          dueDate: o.dueDate || cf.dueDate || null,
+          baseCents,
+          vatCents: o.vatCents != null ? cents(o.vatCents) : cents(cf.vatCents),
+          irpfBp: o.irpfBp,
+          capId: c.id,
+          allocations: scaled,
+          docRef: o.docRef || c.stdName || null,
+        },
+        user,
+      );
+    }
+    /**
+     * The same destinations, summing to a different total, exactly.
+     *
+     * Proportional by amount, with the remainder given to the last row rather
+     * than spread — a cent has to land somewhere, and a rule that says where is
+     * worth more than one that is fair on average. An empty list stays empty:
+     * an unallocated bill is a legitimate state and the screens say so.
+     */
+    _rescaleAllocations(rows, targetCents) {
+      const list = (rows || []).filter((a) => a && Math.round(a.amountCents) > 0);
+      if (!list.length) return [];
+      const from = sum(list, (a) => Math.round(a.amountCents));
+      if (!from) return [];
+      let left = Math.round(targetCents);
+      return list.map((a, i) => {
+        const amountCents =
+          i === list.length - 1
+            ? left
+            : Math.round((Math.round(a.amountCents) * targetCents) / from);
+        left -= amountCents;
+        return {
+          projectId: a.projectId || null,
+          overheadCategory: a.projectId ? null : a.overheadCategory || null,
+          chapterNum: a.chapterNum || null,
+          kind: a.kind || "material",
+          amountCents,
+        };
+      });
     }
     billOutstandingCents(billId) {
       const b = this.state.bills.find((x) => x.id === billId);
@@ -4795,7 +4898,7 @@
         .filter((b) => !b.creditNoteFor)
         .map((b) => ({
           id: b.id,
-          supplier: this.party(b.supplierId).name,
+          supplier: this.billSupplier(b).name,
           number: b.number,
           dueDate: b.dueDate,
           totalCents: b.totalCents,
@@ -6374,7 +6477,7 @@
             billId: b.id,
             number: b.number,
             date: b.date,
-            supplier: this.party(b.supplierId).name,
+            supplier: this.billSupplier(b).name,
             category: a.overheadCategory,
             baseCents: a.amountCents,
           });
@@ -6548,7 +6651,12 @@
       const txFromBill = (b) => ({
         partyCode: this.party(b.supplierId).code,
         accountingCode: this.party(b.supplierId).accountingCode,
-        partyName: this.party(b.supplierId).name,
+        // From the bill, not the party file — see `billSupplier`. The four
+        // fields the accountant works from are the number, the date, the issuer
+        // and its tax id, and the tax id was the one of the four that this
+        // dictionary did not carry at all.
+        partyName: this.billSupplier(b).name,
+        partyTaxId: this.billSupplier(b).taxId,
         direction: "purchase",
         category: b.allocations[0]
           ? b.allocations[0].overheadCategory || "projectCost"
