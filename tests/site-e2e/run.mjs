@@ -949,6 +949,183 @@ async function testMobile(browser, base) {
       );
     else bad("mobile: dropdown narrows to the chapter", JSON.stringify(narrow));
 
+    /* ===== THE CATALOGUE PICKER OPENS WHERE THE OPERATOR IS LOOKING =====
+       This is the regression that shipped and was reported. `catalogueSearchModal`
+       builds its own `.mscrim` instead of going through erp-modal.js, and the
+       modal stylesheet is only published by `scrimEl()` — which that path never
+       calls. So `.mscrim` had NO rules: `position: fixed` fell back to `static`
+       and the whole picker rendered as a plain block in normal flow, at the
+       bottom of a very tall page. Pressing "+ partida del catálogo" looked like
+       it had done nothing.
+
+       Every existing check drove the picker with `.click()` and `.value =`,
+       which do not care where an element is, so all of them passed on a picker
+       nobody could see. GEOMETRY IS THE ASSERTION HERE: fixed, on top, and
+       inside the viewport. */
+    await pg.evaluate(() => {
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      go("quotes", b.id);
+    });
+    await pg.waitForTimeout(900);
+    await pg.evaluate(() => document.querySelector('#pbMTabs [data-mtab="lines"]').click());
+    await pg.waitForTimeout(400);
+    await pg.evaluate(() => document.querySelector("#bRows [data-addline]").click());
+    await pg.waitForTimeout(800);
+    const picker = await pg.evaluate(() => {
+      const m = document.querySelector("#catpick");
+      if (!m) return { err: "the catalogue did not open" };
+      const cs = getComputedStyle(m);
+      const box = m.querySelector(".modal");
+      const r = box.getBoundingClientRect();
+      // What is actually painted at the middle of the sheet: if the page has
+      // rendered on top of it, or it is somewhere else entirely, this is not
+      // the picker.
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + 40);
+      return {
+        position: cs.position,
+        z: cs.zIndex,
+        onScreen: r.top >= 0 && r.bottom <= window.innerHeight + 1 && r.width > 200,
+        rect: { t: Math.round(r.top), b: Math.round(r.bottom), w: Math.round(r.width) },
+        vh: window.innerHeight,
+        insidePicker: !!(hit && hit.closest("#catpick")),
+        rows: m.querySelectorAll(".cpi").length,
+        addBtn: !!m.querySelector("#cp_add"),
+      };
+    });
+    if (picker.err) bad("mobile: the catalogue picker opens", picker.err);
+    else if (
+      picker.position === "fixed" &&
+      picker.onScreen &&
+      picker.insidePicker &&
+      picker.rows > 0 &&
+      picker.addBtn
+    )
+      ok(
+        `mobile: the catalogue opens over the screen with ${picker.rows} tickable partidas, not below the page`,
+      );
+    else bad("mobile: catalogue picker position", JSON.stringify(picker));
+
+    /* IT NARROWS TO THE CHAPTER IT WAS PRESSED ON.
+       A budget chapter's name is free text and the price book's chapters are a
+       list, so "Pavimentos" never matched "Solados" and the picker opened on
+       all 208 every time — which is how "+ partida del catálogo" came to look
+       as though it ignored the chapter it belonged to. */
+    const narrowed = await pg.evaluate(() => {
+      const n = document.querySelectorAll("#catpick .cpi").length;
+      const sel = document.querySelector("#cp_chap");
+      return {
+        n,
+        total: erp.state.catalogue.filter((i) => i.active !== false).length,
+        chapterSelector: !!sel,
+      };
+    });
+    if (narrowed.n > 0 && narrowed.n < narrowed.total && narrowed.chapterSelector)
+      ok(
+        `mobile: it opens on this chapter's ${narrowed.n} partidas, not all ${narrowed.total}, with the whole book one control away`,
+      );
+    else bad("mobile: picker narrows to the chapter", JSON.stringify(narrowed));
+
+    /* TICK SEVERAL, ADD ONCE — the flow the operator asked to have back.
+       Asserted on the LINE COUNT, because "the modal closed" is not the
+       feature: a picker that adds one of the three ticked would close just as
+       cleanly. */
+    const multi = await pg.evaluate(async () => {
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      const v = b.versions[b.versions.length - 1];
+      const before = v.chapters[0].lines.length;
+      const rows = [...document.querySelectorAll("#catpick .cpi")].slice(0, 3);
+      if (rows.length < 3) return { err: `only ${rows.length} partidas offered` };
+      rows.forEach((r) => r.click());
+      const counted = document.querySelector("#cp_count")?.textContent || "";
+      document.querySelector("#cp_add").click();
+      await new Promise((r) => setTimeout(r, 900));
+      const v2 = (
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0]
+      ).versions.slice(-1)[0];
+      return {
+        before,
+        after: v2.chapters[0].lines.length,
+        counted,
+        stillOpen: !!document.querySelector("#catpick"),
+        priced: v2.chapters[0].lines.slice(-3).every((l) => l.priceCents > 0 && l.unit),
+      };
+    });
+    if (multi.err) bad("mobile: tick several and add at once", multi.err);
+    else if (multi.after === multi.before + 3 && !multi.stillOpen && multi.priced)
+      ok(
+        `mobile: three ticked, three added in one press (${multi.before}→${multi.after}), each arriving priced`,
+      );
+    else bad("mobile: tick several and add at once", JSON.stringify(multi));
+
+    /* AND THINGS CAN BE TAKEN OUT AGAIN — a partida, and a whole chapter.
+       `removeChapter` existed in the engine with no caller and no audit entry,
+       so a chapter added by mistake could only be emptied line by line and left
+       standing at zero. */
+    const delLine = await pg.evaluate(async () => {
+      const btn = document.querySelector("#bRows [data-delline]");
+      if (!btn) return { err: "no delete on a line" };
+      const r = btn.getBoundingClientRect();
+      // Labelled on a phone: an unlabelled ✕ on a row of its own is the one
+      // control an operator will not press, because nothing says what it kills.
+      const labelled = /elimina/i.test(btn.textContent || "");
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      const v = b.versions[b.versions.length - 1];
+      const before = v.chapters.reduce((s, c) => s + c.lines.length, 0);
+      btn.click();
+      await new Promise((x) => setTimeout(x, 700));
+      const v2 = (
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0]
+      ).versions.slice(-1)[0];
+      return {
+        labelled,
+        tall: Math.round(r.height),
+        before,
+        after: v2.chapters.reduce((s, c) => s + c.lines.length, 0),
+      };
+    });
+    if (delLine.err) bad("mobile: a partida can be removed", delLine.err);
+    else if (delLine.after === delLine.before - 1 && delLine.labelled && delLine.tall >= 44)
+      ok(
+        `mobile: a partida can be removed, from a labelled ${delLine.tall}px target — not a 26px ✕`,
+      );
+    else bad("mobile: remove a partida", JSON.stringify(delLine));
+
+    const delChap = await pg.evaluate(async () => {
+      const btn = document.querySelector("#bRows [data-delchap]");
+      if (!btn) return { err: "no delete on a chapter" };
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      const v = b.versions[b.versions.length - 1];
+      const before = v.chapters.length;
+      btn.click();
+      await new Promise((x) => setTimeout(x, 500));
+      // It must ASK first — this takes every partida under it.
+      const asked = !!document.querySelector(".mscrim.on");
+      const okBtn = [...document.querySelectorAll(".mscrim.on button")].find((x) =>
+        /elimina/i.test(x.textContent || ""),
+      );
+      if (okBtn) okBtn.click();
+      await new Promise((x) => setTimeout(x, 800));
+      const v2 = (
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0]
+      ).versions.slice(-1)[0];
+      return {
+        asked,
+        before,
+        after: v2.chapters.length,
+        renumbered: v2.chapters.every((c, i) => String(c.num) === String(i + 1)),
+      };
+    });
+    if (delChap.err) bad("mobile: a chapter can be removed", delChap.err);
+    else if (delChap.asked && delChap.after === delChap.before - 1 && delChap.renumbered)
+      ok(
+        `mobile: a chapter can be removed after confirming, and the rest renumber (${delChap.before}→${delChap.after})`,
+      );
+    else bad("mobile: remove a chapter", JSON.stringify(delChap));
+
     // The logo is the way home, and on a phone it is the only one visible.
     await pg.evaluate(() => (location.hash = "invoicing"));
     await pg.waitForTimeout(500);
@@ -1828,18 +2005,31 @@ async function testBudgetBuilder(browser, base) {
         erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
       const v = b.versions[b.versions.length - 1];
       const chap = v.chapters[0];
-      // A partida whose own words name a job, so the drawing cannot come from
-      // the chapter fallback and still look right.
-      const item = erp.state.catalogue.find((i) => /alicatado/i.test(i.desc));
-      if (!item) return { err: "no recognisable partida in the price book" };
-      const want = ErpPictograms.label(ErpPictograms.pick(item));
       go("quotes", b.id);
       await new Promise((r) => setTimeout(r, 900));
       const sel = document.querySelector(`#bRows tr[data-chap="${chap.id}"] select.bcat`);
       let lineId = null;
+      let item = null;
+      let want = "";
       if (sel) {
-        const opt = [...sel.options].find((o) => o.value === item.id);
-        if (!opt) return { err: "the added partida is not offered on this chapter" };
+        /* TAKEN FROM WHAT THIS CHAPTER ACTUALLY OFFERS, not from a partida
+           chosen by name. The first version picked an "alicatado" out of the
+           whole price book and then demanded the chapter offer it — which was
+           true only while the chapter matcher was broken and the picker showed
+           all 208. Fixing the matcher broke the test, on a change that made the
+           feature more right. Ask the control what it has.
+
+           Whichever partida that is, its drawing must be one the words earn:
+           `generic` would pass a "same drawing throughout" check while proving
+           nothing, since every unrecognised line draws it. */
+        const opt = [...sel.options].find((o) => {
+          if (!o.value || o.value === "__all__") return false;
+          const it = erp.state.catalogue.find((x) => x.id === o.value);
+          return it && ErpPictograms.pick(it) !== "generic";
+        });
+        if (!opt) return { err: "this chapter offers no partida with a drawing of its own" };
+        item = erp.state.catalogue.find((x) => x.id === opt.value);
+        want = ErpPictograms.label(ErpPictograms.pick(item));
         lineId = sel.dataset.cat;
         sel.value = item.id;
         sel.dispatchEvent(new Event("change", { bubbles: true }));
@@ -1858,8 +2048,10 @@ async function testBudgetBuilder(browser, base) {
          partidas. The class now says which is which in the markup rather than
          leaving the test to guess. */
       const lines = [...document.querySelectorAll("#dbody .chapline.item")];
+      // The row this partida became, found by the description it carries
+      // rather than by a word written into the test.
       const onDoc = lines
-        .filter((l) => /alicatado/i.test(l.textContent))
+        .filter((l) => (l.textContent || "").includes(item.desc.slice(0, 24)))
         .map((l) => l.querySelector("svg.pict")?.getAttribute("aria-label"));
       return {
         want,
@@ -5934,27 +6126,32 @@ async function testPresupuestadorRework(browser, base) {
     if (multi.ticks > 0 && multi.addDisabled === true)
       ok(`presupuestador: «+ partida del catálogo» opens ticked-list mode (${multi.ticks} shown)`);
     else bad("presupuestador: multi-select picker opens", JSON.stringify(multi));
-    // Scoped when the budget chapter is one of the catalogue's own, and on the
-    // whole catalogue when it is a free-text chapter that belongs to none —
-    // asserting a non-empty code would only be asserting which fixture ran.
-    const expectScope = await pg.evaluate(() => {
-      const name = document
-        .querySelector("tr.chaprow td")
-        .childNodes[0].textContent.replace(/^\s*[\d.]+\.\s*/, "")
-        .split("·")[0]
-        .trim();
-      const hit = erp.listAll("itemChapters").find((x) => x.es === name);
-      return hit ? hit.code : "";
+    /* THE CONTRACT, NOT A SECOND COPY OF THE RULE.
+       This used to recompute the expected scope by reimplementing the app's own
+       chapter matcher — `x.es === name`, scraped out of a DOM node — so it
+       asserted only that the test had copied the rule correctly. It then broke
+       the moment the rule was improved and the markup moved, on a change that
+       made the feature MORE right. What matters is the behaviour under either
+       rule: whatever the picker scopes to, everything it offers must belong
+       there, and the whole book stays one control away. */
+    const scope = await pg.evaluate(() => {
+      const code = document.querySelector("#cp_chap")?.value || "";
+      const shown = [...document.querySelectorAll(".cpi.pick")]
+        .map((b) => b.querySelector(".cpc")?.textContent.trim())
+        .map((c) => erp.state.catalogue.find((i) => i.code === c))
+        .filter(Boolean);
+      return {
+        code,
+        shown: shown.length,
+        strays: code ? shown.filter((i) => i.chapter !== code).length : 0,
+        choices: document.querySelectorAll("#cp_chap option").length,
+      };
     });
-    if (multi.chapter === expectScope && multi.chapterChoices > 1)
+    if (scope.shown > 0 && scope.strays === 0 && scope.choices > 1)
       ok(
-        `presupuestador: it opens on ${expectScope || "the whole catalogue"}, with every chapter one click away`,
+        `presupuestador: it opens on ${scope.code || "the whole catalogue"} — ${scope.shown} partidas, none from elsewhere, every chapter one click away`,
       );
-    else
-      bad(
-        "presupuestador: picker scoped to the chapter",
-        JSON.stringify(multi) + " expected " + JSON.stringify(expectScope),
-      );
+    else bad("presupuestador: picker scoped to the chapter", JSON.stringify(scope));
 
     // Tick two and take them in one go — the round trip this mode removes.
     const wanted = await pg.evaluate(() => {

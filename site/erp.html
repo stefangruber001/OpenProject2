@@ -2446,6 +2446,38 @@
       .pbfind input {
         min-width: 0;
       }
+      /* The chapter row's controls. A flex row that WRAPS, because at 390px
+         "+ partida del catálogo" alone is most of the width and the buttons
+         were running off the right-hand edge of the card — the delete would
+         have been unreachable the moment it was added. */
+      .chaprowin {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+      }
+      .chaprowin .chapttl {
+        flex: 1 1 100%;
+      }
+      @media (min-width: 1181px) {
+        .chaprowin .chapttl {
+          flex: 0 1 auto;
+          margin-right: 2px;
+        }
+      }
+      /* Destructive, so it does not sit next to the two "+" buttons as if it
+         were a third way to add something. */
+      .chaprowin .chapdel {
+        margin-left: auto;
+      }
+      /* Deleting a partida: a bare ✕ in a 24px column on the laptop, a button
+         that says what it does on the phone. The card layout gives every cell
+         a full row and its own label, and an unlabelled ✕ on a row of its own
+         is the one control an operator will not press because they cannot tell
+         what it deletes. */
+      .pbdel .dellbl {
+        display: none;
+      }
       /* ---------- the price book's line drawings ----------
          Sized in `em` so a mark tracks the text it sits beside, and given the
          muted ink rather than the green: it is a signpost to the description,
@@ -2677,6 +2709,35 @@
         .pbfind > div {
           flex-wrap: wrap;
           justify-content: flex-end;
+        }
+        /* The description gets the whole width under its label, not the sliver
+           left beside it. Stacked, "Nivelación y pavimento continuo de mortero"
+           was showing as "Nivelación y pavimento c…" — the one field on the row
+           whose whole job is to be read. */
+        .descell {
+          flex: 1 1 100%;
+        }
+        .descell input {
+          flex: 1 1 auto;
+        }
+        /* …and here it says so. */
+        .pbdel .dellbl {
+          display: inline;
+        }
+        .pbdel .delx {
+          display: none;
+        }
+        .pbdel {
+          justify-content: flex-end !important;
+        }
+        /* A real touch target. `.btn.sm` is 26px, which is fine under a mouse
+           and under the 44px minimum every phone platform asks for — and this
+           is the one button on the row that destroys something, so a mis-tap
+           costs a priced partida. Same rule the site-action rows already
+           follow. */
+        .pbdel .btn {
+          width: 100%;
+          min-height: 44px;
         }
       }
       /* ---------- ADM-03: document validation, full screen (S6) ----------
@@ -8353,6 +8414,13 @@
         const chosen = new Set();
         // Its own overlay rather than `ask()`: this is a searchable list that
         // re-renders as you type, which the field-based modal does not model.
+        //
+        // …but the STYLE still has to come from there. Building the scrim by
+        // hand skipped the one call that publishes the modal stylesheet, so
+        // `.mscrim` had no rules, `position: fixed` fell back to `static`, and
+        // this whole panel rendered in normal flow at the bottom of the page.
+        // Reported as the catalogue not opening at all.
+        if (typeof ErpModal !== "undefined" && ErpModal.ensureStyle) ErpModal.ensureStyle();
         const node = el("div", "mscrim on");
         node.id = "catpick";
         const box = el("div", "modal wide");
@@ -11748,11 +11816,95 @@
     belongs to no chapter), so the code is recovered rather than stored. Returns
     "" for a free-text chapter, which opens the picker on the whole catalogue —
     the honest answer when there is no chapter to narrow to. */
+      /**
+       * Which price-book chapter a budget chapter corresponds to.
+       *
+       * A budget chapter's name is FREE TEXT the operator typed; the price
+       * book's chapters are a list. This used to demand `x.es === c.name`,
+       * character for character, so "Pavimentos" found nothing against
+       * "Solados", "demoliciones" found nothing against "Demoliciones", and the
+       * catalogue picker opened on all 208 partidas every time — which is how
+       * "+ partida del catálogo" came to look like it ignored the chapter it
+       * was pressed on.
+       *
+       * Now: accents and case folded, then exact, then either name containing
+       * the other ("Pintura" ↔ "Pintura y acabados"). Still returns "" when it
+       * genuinely cannot tell, and the caller opens on the whole book with the
+       * chapter selector in reach — an empty picker would be worse than a full
+       * one, and guessing a chapter would file a partida under the wrong trade.
+       */
       function chapterCatalogueCode(budgetId, vsel, chapterId) {
         const c = erp.version(budgetId, vsel).chapters.find((x) => x.id === chapterId);
         if (!c) return "";
-        const hit = erp.listAll("itemChapters").find((x) => x.es === c.name);
-        return hit ? hit.code : "";
+        const fold = (s) =>
+          String(s || "")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[̀-ͯ]/g, "")
+            .trim();
+        const want = fold(c.name);
+        if (!want) return "";
+        const all = erp.listAll("itemChapters");
+        const exact = all.find((x) => fold(x.es) === want || fold(x.ca) === want);
+        if (exact) return exact.code;
+        // Longest containment wins, so "Pintura y acabados" prefers "Pintura"
+        // over a shorter accidental substring.
+        let best = null;
+        for (const x of all) {
+          const es = fold(x.es);
+          if (!es) continue;
+          if (want.includes(es) || es.includes(want)) {
+            if (!best || fold(best.es).length < es.length) best = x;
+          }
+        }
+        if (best) return best.code;
+        /* ASK THE PRICE BOOK, NOT A TABLE OF SYNONYMS.
+           "Pavimentos" is what half the trade calls the chapter the price book
+           files under "Solados", and no amount of string comparison between two
+           chapter LABELS will ever connect them. But the partidas themselves
+           say it: the word "pavimento" appears in the descriptions of the SOL
+           entries and nowhere else.
+
+           So the last resort counts which chapter's partidas actually use the
+           word, and takes it only on a clear majority. A synonym table would
+           have to be maintained by hand and would be wrong the first time a
+           company renames a chapter; this follows the operator's own price book
+           and needs nothing kept in step. Below the threshold it still returns
+           "" and the picker opens on everything, which is the honest answer to
+           a name nothing recognises. */
+        /* The words to look for, longest first. A chapter is written plural and
+           a partida is written singular — "Pavimentos" against "pavimento
+           porcelánico" — so each word is tried as itself and stripped of a
+           Spanish plural. Words under five letters are skipped: "y", "de" and
+           "obra" appear in half the price book and would match everything. */
+        const terms = [];
+        const addTerm = (w) => {
+          if (w.length >= 5 && !terms.includes(w)) terms.push(w);
+        };
+        addTerm(want);
+        for (const w of want.split(/[^a-z0-9]+/)) {
+          addTerm(w);
+          if (w.endsWith("es")) addTerm(w.slice(0, -2));
+          else if (w.endsWith("s")) addTerm(w.slice(0, -1));
+        }
+        for (const t of terms) {
+          const hits = new Map();
+          let total = 0;
+          for (const it of erp.state.catalogue) {
+            if (it.active === false || !it.chapter) continue;
+            if (fold(it.desc).includes(t)) {
+              hits.set(it.chapter, (hits.get(it.chapter) || 0) + 1);
+              total++;
+            }
+          }
+          if (total < 3) continue;
+          const [code, n] = [...hits.entries()].sort((a, b) => b[1] - a[1])[0];
+          // A clear majority or nothing. "Carpintería" is spread across four
+          // chapters at 33%, and filing its partidas under the largest of them
+          // would be a confident wrong answer — worse than the full catalogue.
+          if (n / total >= 0.6) return code;
+        }
+        return "";
       }
       /**
        * The chapter's subpartidas, as a native dropdown on the line itself.
@@ -11886,13 +12038,14 @@
           chapters
             .map(
               (c) => `
-    <tr class="chaprow" data-chaprow="${c.id}"><td colspan="${cols}">${esc(c.num)}. ${esc(c.name)} · ${SECL[c.section] || c.section}
+    <tr class="chaprow" data-chaprow="${c.id}"><td colspan="${cols}"><div class="chaprowin"><span class="chapttl">${esc(c.num)}. ${esc(c.name)} · ${SECL[c.section] || c.section}</span>
       ${
         locked
           ? ""
-          : `<button class="btn sm primary" data-addline="${c.id}" style="margin-left:8px">+ partida del catálogo</button>
-      <button class="btn sm" data-blankline="${c.id}" style="margin-left:6px" title="Una partida que todavía no está en el catálogo">+ partida en blanco</button>`
-      }</td></tr>
+          : `<button class="btn sm primary" data-addline="${c.id}">+ partida del catálogo</button>
+      <button class="btn sm" data-blankline="${c.id}" title="Una partida que todavía no está en el catálogo">+ partida en blanco</button>
+      <button class="btn sm danger chapdel" data-delchap="${c.id}" title="Eliminar el capítulo y todas sus partidas">✕ capítulo</button>`
+      }</div></td></tr>
     ${c.lines
       .map((l) => {
         const a = bLineAmt(l);
@@ -11914,7 +12067,7 @@
         <option value="pending"${bStatus(l) === "pending" ? " selected" : ""}>Pendiente</option>
         <option value="optional"${bStatus(l) === "optional" ? " selected" : ""}>Opcional</option></select></td>
       <td><button class="bimg${l.imageRefs.length ? " has" : ""}" data-gal="${l.id}">🖼 ${l.imageRefs.length}</button></td>
-      ${locked ? "" : `<td><button class="btn sm danger" data-delline="${l.id}">✕</button></td>`}
+      ${locked ? "" : `<td class="pbdel" data-th=""><button class="btn sm danger" data-delline="${l.id}" title="Eliminar esta partida"><span class="delx">✕</span><span class="dellbl">Eliminar partida</span></button></td>`}
     </tr>`;
       })
       .join("")}`,
@@ -12025,6 +12178,37 @@
                   },
                   { chapter: chapterCatalogueCode(id, vsel, chapId), multi: true },
                 );
+              }),
+          );
+        /* Deleting a capítulo takes every partida under it with it, so it asks
+           first and says HOW MANY — "are you sure?" with no number is a
+           question nobody can answer. The count is the whole content of the
+           warning; the name alone would not tell the estimator whether this is
+           the empty chapter they just made by mistake or the twelve priced
+           lines they spent the morning on. */
+        $("#bRows")
+          .querySelectorAll("[data-delchap]")
+          .forEach(
+            (btn) =>
+              (btn.onclick = async () => {
+                const chapId = btn.dataset.delchap;
+                const V2 = erp.version(id, vsel);
+                const ch = V2.chapters.find((x) => x.id === chapId);
+                if (!ch) return;
+                const n = (ch.lines || []).length;
+                const okDel = await askConfirm(`¿Eliminar el capítulo «${ch.num}. ${ch.name}»?`, {
+                  body: n
+                    ? `Se eliminan también sus ${n} partida${n === 1 ? "" : "s"}. No se puede deshacer.`
+                    : "El capítulo está vacío. No se puede deshacer.",
+                  okLabel: "Eliminar",
+                  danger: true,
+                });
+                if (!okDel) return;
+                mutate(() => {
+                  erp.removeChapter(id, chapId, "backoffice");
+                  // The tree's selection cannot survive the thing it selected.
+                  if (bChapter === chapId) bChapter = null;
+                }, `Capítulo eliminado${n ? ` · ${n} partida${n === 1 ? "" : "s"}` : ""}`);
               }),
           );
         $("#bRows")

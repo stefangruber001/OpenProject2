@@ -210,6 +210,15 @@
     max-height: 92vh;
     border-radius: 16px 16px 0 0;
   }
+}
+/* THE LANGUAGE PILL STANDS DOWN WHILE A DIALOG IS OPEN.
+   It is fixed to the bottom-left corner, and on a phone the modal is a bottom
+   sheet — so the pill sat on top of the sheet's own footer, covering the count
+   of what had been selected and half of "Cancelar". The pill is a preference
+   that can wait; the buttons in front of the operator cannot. */
+body:has(.mscrim.on) #canei-lang-pill {
+  opacity: 0;
+  pointer-events: none;
 }`;
 
   function injectStyle() {
@@ -545,5 +554,21 @@
     close: function () {
       closeModal(null);
     },
+    /**
+     * Publish the modal stylesheet without opening anything.
+     *
+     * IT USED TO BE INJECTED ONLY BY `scrimEl()`, which only runs when this
+     * module opens a dialog — so a caller that builds its OWN `.mscrim`, as the
+     * catalogue picker does, got no CSS at all. `position: fixed` fell back to
+     * `static` and the picker rendered as a plain block in normal flow, at the
+     * bottom of the page: on a phone, pressing "+ partida del catálogo" looked
+     * like it had done nothing, and the catalogue was sitting a screen and a
+     * half further down. Intermittent, too — it worked for the rest of a
+     * session as soon as any other dialog had been opened first.
+     *
+     * Exposed rather than fixed only inside the picker: the next hand-rolled
+     * overlay would have hit exactly the same thing.
+     */
+    ensureStyle: injectStyle,
   };
 })();

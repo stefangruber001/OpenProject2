@@ -1791,11 +1791,31 @@
       return found.chapter;
     }
 
-    removeChapter(budgetId, chapterId) {
+    /**
+     * Delete a chapter and everything filed under it.
+     *
+     * It existed with no caller and no audit entry: the estimator could add a
+     * capítulo and never take one away, so a chapter added by mistake stayed in
+     * the presupuesto and had to be emptied line by line and left standing at
+     * zero. Now it is reachable, and it LOGS — deleting five priced partidas in
+     * one press is exactly the kind of act that has to leave a trace.
+     *
+     * Guarded by `_editableVersion`, so a sent presupuesto cannot lose a
+     * chapter under the customer's copy, and by `_renumber`, so the ones that
+     * remain close the gap rather than leaving 1, 3, 4.
+     */
+    removeChapter(budgetId, chapterId, user) {
       const v = this._editableVersion(budgetId);
+      const gone = v.chapters.find((c) => c.id === chapterId);
+      if (!gone) throw new Error("Chapter not found");
       v.chapters = v.chapters.filter((c) => c.id !== chapterId);
       this._renumber(v);
-      return v;
+      this._log(
+        user,
+        "removeChapter",
+        `${this.budget(budgetId).number} ${gone.num}. ${gone.name} (${(gone.lines || []).length} partidas)`,
+      );
+      return gone;
     }
 
     /* ---- COM-03: reordering. The builder's tree and grid are dragged, and a
