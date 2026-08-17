@@ -2233,6 +2233,82 @@ async function testBudgetBuilder(browser, base) {
     else
       bad("builder: line follows the language", JSON.stringify({ lineEs, lineEn, lineAfterEdit }));
 
+    /* ===== THE DESKTOP GRID IS A GRID, NOT A RAGGED LIST =====
+       "Structure looks very unorganized and text not good readable. Buttons not
+       aligned." Three separate faults, and each is measurable:
+
+         · the chapter buttons started at a different x on every chapter,
+           because the title beside them sized to its own text — so four
+           chapters read as four unrelated rows;
+         · "× capítulo" carried `margin-left: auto` on a full-width chapter row,
+           which put it a thousand pixels from the chapter it deletes;
+         · the table had a min-width and no width, so it sized to its CONTENT.
+           The eleven fixed columns took 816px and Descripción — the one column
+           meant to take what is left — got whatever was over, and truncated.
+
+       Asserted geometrically, because "looks unorganized" is a measurement
+       once you say what it is: same x, adjacent, and not the narrowest column
+       on the row. */
+    await pg.evaluate(() => {
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      const v = b.versions[b.versions.length - 1];
+      // Two more chapters, so alignment across DIFFERENT title lengths is what
+      // is being measured rather than one row agreeing with itself.
+      erp.addChapter(b.id, { name: "Climatización y ventilación", section: v.chapters[0].section });
+      erp.addChapter(b.id, { name: "Obra", section: v.chapters[0].section });
+      go("quotes", b.id);
+    });
+    await pg.waitForTimeout(1100);
+    const desk = await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("#bRows tr.chaprow .chaprowin")];
+      if (rows.length < 3) return { err: `only ${rows.length} chapters` };
+      const firstBtn = rows.map((r) =>
+        Math.round(r.querySelector("[data-addline]").getBoundingClientRect().left),
+      );
+      const gaps = rows.map((r) => {
+        const blank = r.querySelector("[data-blankline]").getBoundingClientRect();
+        const del = r.querySelector("[data-delchap]").getBoundingClientRect();
+        return Math.round(del.left - blank.right);
+      });
+      const line = document.querySelector("#bRows tr.pbrow");
+      const w = (sel) => {
+        const el = line.querySelector(sel);
+        return el ? Math.round(el.getBoundingClientRect().width) : 0;
+      };
+      const desc = w("td.c-desc");
+      const others = ["td.c-unit", "td.c-cost", "td.c-qty", "td.c-price", "td.c-stat"].map(w);
+      return {
+        chapters: rows.length,
+        alignedTo: new Set(firstBtn).size,
+        worstGap: Math.max(...gaps),
+        desc,
+        widestOther: Math.max(...others),
+        /* The plate's code is hidden HERE and only here: the Código column is
+           the next cell but one, and printing the code twice six pixels apart
+           only makes the row taller. Row height itself is not asserted — a
+           line with marca · modelo carries a spec sub-line and is legitimately
+           taller, so the number would be measuring the fixture. */
+        plateCodeShown: (() => {
+          const c = line.querySelector(".plate .platec");
+          return !!(c && getComputedStyle(c).display !== "none");
+        })(),
+        codeColumn: (line.querySelector('td.c-code input[data-f="code"]') || {}).value,
+      };
+    });
+    if (desk.err) bad("desktop: the builder grid lines up", desk.err);
+    else if (
+      desk.alignedTo === 1 &&
+      desk.worstGap <= 40 &&
+      desk.desc > desk.widestOther * 2 &&
+      !desk.plateCodeShown &&
+      desk.codeColumn
+    )
+      ok(
+        `desktop: ${desk.chapters} chapters share one button column, delete beside them, description ${desk.desc}px and the code shown once`,
+      );
+    else bad("desktop: builder grid alignment", JSON.stringify(desk));
+
     if (errs.length === 0) ok("builder: no console errors");
     else bad("builder: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

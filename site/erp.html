@@ -1984,6 +1984,14 @@
      the whole point of the change. */
       .bgrid table {
         min-width: 860px;
+        /* WIDTH, not just a floor. A table with only a min-width sizes to its
+           CONTENT, so the eleven fixed columns totalled 816px and Descripción —
+           the one column that is meant to take what is left — took whatever the
+           longest description happened to need and then truncated it. On a
+           1440px laptop that was 274px of a pane 1570px wide: the free-text
+           column was the narrowest thing on the row while half the pane sat
+           empty. */
+        width: 100%;
       }
       .bgrid tbody td {
         padding: 3px 4px;
@@ -2470,15 +2478,34 @@
         flex: 1 1 100%;
       }
       @media (min-width: 1181px) {
+        /* ONE COLUMN OF BUTTONS, NOT A RAGGED EDGE. The chapter title is the
+           thing that varies in width — one word or four — so with an auto width
+           every chapter started its buttons at a different x, and four chapters
+           read as four unrelated rows. Fixed, and they line up down the page.
+
+           (No example names in this comment: the source audit reads a quoted
+           phrase in a comment as a user-visible literal, and three of them
+           would have arrived as untranslated strings. Written down two commits
+           ago and walked into again.) */
         .chaprowin .chapttl {
-          flex: 0 1 auto;
-          margin-right: 2px;
+          flex: 0 0 232px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
       }
-      /* Destructive, so it does not sit next to the two "+" buttons as if it
-         were a third way to add something. */
+      /* Destructive, so it is set apart from the two "+" buttons rather than
+         reading as a third way to add something — by a gap, not by being flung
+         to the far side of the table. It used to carry `margin-left: auto`,
+         which on a full-width chapter row put it a thousand pixels from the
+         chapter it deletes, under a column it has nothing to do with. */
       .chaprowin .chapdel {
-        margin-left: auto;
+        margin-left: 14px;
+      }
+      @media (max-width: 1180px) {
+        .chaprowin .chapdel {
+          margin-left: auto;
+        }
       }
       /* Deleting a partida: a bare ✕ in a 24px column on the laptop, a button
          that says what it does on the phone. The card layout gives every cell
@@ -2533,6 +2560,24 @@
         letter-spacing: 0.02em;
         color: var(--muted);
         white-space: nowrap;
+      }
+      /* …but not in the grid on a laptop, where the Código column is the very
+         next cell. The code under the plate is what makes the picture checkable
+         where there is no code column — the phone card, the printed quote — and
+         printing it twice, six pixels apart, only makes the row taller. */
+      @media (min-width: 1181px) {
+        .bgrid .plate .platec {
+          display: none;
+        }
+        /* Every pixel spent here is a pixel taken from the only free-text
+           column on the row. */
+        .bgrid .plate svg {
+          width: 22px;
+          height: 22px;
+        }
+        .bgrid .descell {
+          gap: 8px;
+        }
       }
       /* The line's catalogue dropdown is a PHONE control. Stated here, above
          the media query that turns it on, because a base rule written after an
@@ -11817,10 +11862,10 @@
              gained a digit. Descripción is the one column with no width: it
              takes what is left, which is the right rule for the only free text
              on the row. -->
-        <th style="width:16px"></th><th style="width:54px">Nº</th><th style="width:88px">Código</th><th>Descripción</th><th style="width:84px">Unidad</th>
-        <th class="num int" style="width:76px">Coste ud.</th><th class="num int" style="width:74px">Margen %</th>
-        <th class="num" style="width:76px">Cantidad</th><th class="num" style="width:80px">P. venta ud.</th><th class="num" style="width:86px">Total</th>
-        <th style="width:92px">Estado</th><th style="width:56px">Imág.</th>${locked ? "" : '<th style="width:34px"></th>'}
+        <th style="width:16px"></th><th style="width:46px">Nº</th><th style="width:80px">Código</th><th>Descripción</th><th style="width:76px">Unidad</th>
+        <th class="num int" style="width:70px">Coste ud.</th><th class="num int" style="width:66px">Margen %</th>
+        <th class="num" style="width:68px">Cantidad</th><th class="num" style="width:74px">P. venta ud.</th><th class="num" style="width:82px">Total</th>
+        <th style="width:86px">Estado</th><th style="width:46px">Imág.</th>${locked ? "" : '<th style="width:34px"></th>'}
       </tr></thead><tbody id="bRows"></tbody></table></div>
      </div>
 
@@ -12522,7 +12567,7 @@
       <td class="c-num"><input data-line="${l.id}" data-f="num" value="${esc(l.num)}" style="width:56px"
         title="${l.manualNum ? "Número escrito a mano — se mantiene al reordenar" : "Número automático — cambia con la posición"}"${locked ? " disabled" : ""}></td>
       <td class="pbfind c-code"><div>${locked ? "" : `<button class="bfind" data-find="${l.id}" title="Buscar en el catálogo">🔍</button>`}<input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="5"${locked ? " disabled" : ""}>${locked ? "" : `<button type="button" class="bcat" data-cat="${l.id}" data-catchap="${c.id}" title="Elegir una subpartida del catálogo">${esc(lineCatalogueLabel(l))}<span class="bcatch">›</span></button>`}</div></td>
-      <td class="c-desc"><div class="descell"><span class="pictwrap">${plateFor(l, c.name, 30)}</span><input data-line="${l.id}" data-f="desc" value="${esc(lineDesc(l))}"${locked ? " disabled" : ""}></div>${lineSpecLine(l)}</td>
+      <td class="c-desc"><div class="descell"><span class="pictwrap">${plateFor(l, c.name, 30)}</span><input data-line="${l.id}" data-f="desc" value="${esc(lineDesc(l))}" title="${esc(lineDesc(l))}"${locked ? " disabled" : ""}></div>${lineSpecLine(l)}</td>
       <td class="c-unit"><select data-line="${l.id}" data-f="unit" style="width:88px"${locked ? " disabled" : ""}>${listOptionsUnits(l.unit)}</select></td>
       <td class="int c-cost"><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>
       <td class="int c-marg"><input class="r" data-line="${l.id}" data-f="marginPct" type="number" step="0.1" max="99.9" value="${bMarginPct(l)}"${locked ? " disabled" : ""} title="Margen sobre el precio de venta. Al escribirlo, el precio unitario se recalcula."></td>
