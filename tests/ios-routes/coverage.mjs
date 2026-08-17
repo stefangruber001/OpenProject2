@@ -46,10 +46,25 @@ const assert = (cond, name, detail) =>
   checks.push({ name, pass: !!cond, detail: cond ? "" : String(detail ?? "") });
 
 /* ------------------------------------------------------------ the tab list */
+/* READ FROM `nav.json`, WHICH IS WHERE THE TABS NOW LIVE.
+   This used to grep `path: "…"` out of Config.swift. Then the tab bar was
+   moved onto the generated manifest so the app, Android and the web could stop
+   carrying three different sets of labels — and the regex kept matching
+   nothing. Zero paths meant zero tabs to check, so checks 1 and 2 iterated an
+   empty list and passed, and only the count assertion noticed. A gate pointed
+   at a file the feature has left is worse than no gate: it reports on
+   something that is not there. Both ends are pinned below. */
 const config = read("ios/CaneiSubirats/Support/Config.swift");
-const paths = [...config.matchAll(/path:\s*"([^"]+)"/g)].map((m) => m[1]);
+assert(
+  /static let tabs:\s*\[WebTab\]\s*=\s*NavManifest\.load\(\)/.test(config),
+  "Config.tabs is still loaded from the generated manifest",
+  "if the tabs move back into Swift, this gate is reading the wrong file again",
+);
 
-assert(paths.length >= 5, `Config.tabs declares its paths (${paths.length} found)`, paths.length);
+const manifest = JSON.parse(read("ios/CaneiSubirats/Resources/nav.json"));
+const paths = (manifest.tabs || []).map((t) => t.path).filter(Boolean);
+
+assert(paths.length >= 5, `nav.json declares its tab paths (${paths.length} found)`, paths.length);
 
 /* ------------------------------------------- the shell's own section keys */
 // The ERP shell declares its sections and subsections as `k: "<key>"`. A

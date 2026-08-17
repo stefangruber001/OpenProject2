@@ -42,12 +42,8 @@ if (rendered.status !== 0) process.exit(rendered.status ?? 1);
 const margins = node([resolve(__dirname, "margins.mjs"), OUT, "9.5"]);
 if (margins.status !== 0) process.exit(margins.status ?? 1);
 
-// The ceiling is the CI runner's count, not this machine's — its Chromium
-// places glyphs differently and is the stricter of the two. Overridable so the
-// number lives in one place when CI calls it directly.
-// Was 8 while Chromium was splitting headings a glyph at a time. All 21
-// documents are searchable as of 2026-08-16, so the ceiling comes down to
-// where it belongs; a regression now fails instead of fitting in a budget.
-const MAX = process.env.SEARCHABLE_MAX || "0";
-const searchable = node([resolve(__dirname, "searchable.mjs"), OUT, "--max", MAX]);
+// No ceiling to pass down any more: the tolerated documents are NAMED inside
+// searchable.mjs, measured on the CI runner. A count could be satisfied by the
+// wrong eight; a list cannot, and it cannot be re-derived from a local run.
+const searchable = node([resolve(__dirname, "searchable.mjs"), OUT]);
 process.exit(searchable.status ?? 1);

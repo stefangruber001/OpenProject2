@@ -28,7 +28,19 @@
  * margin and pagination rules absolutely, and to searchability by a ceiling
  * that may only come down.
  *
- * Run:  node tests/doc-print/searchable.mjs <pdf-dir> [--max N]
+ * WHY IT IS A NAMED LIST AND NO LONGER A COUNT. The ceiling was taken down
+ * from 8 to 0 on 2026-08-16 because THIS machine reported zero — which is
+ * precisely what the paragraph above says not to do, written in this file, and
+ * read past anyway. CI went red on the next push and stayed red, while the
+ * Deploy workflow went on succeeding, so nothing looked broken from the outside.
+ *
+ * A count could be satisfied by the wrong eight documents. The eight below are
+ * NAMED, measured on the CI runner (run 31999566404). Any other document that
+ * breaks fails this gate no matter what the total is, and a name may only be
+ * removed. That is a stricter gate than the number ever was, and it cannot be
+ * re-derived from a local run.
+ *
+ * Run:  node tests/doc-print/searchable.mjs <pdf-dir>
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -68,11 +80,32 @@ const TITLE_WORDS = [
   "CAMBIO",
 ];
 
+/**
+ * The documents whose headings the CI runner's Chromium shatters.
+ *
+ * Not a wish-list and not a budget: these are the ones measured broken there,
+ * by name. Every other document must extract cleanly on every machine. A file
+ * may leave this list; adding one means a document regressed and needs the
+ * writer path, not a longer list.
+ */
+const KNOWN_BROKEN = new Set([
+  "01-cliente__01-presupuesto.pdf",
+  "01-cliente__03-contrato-obra.pdf",
+  "01-cliente__04-orden-de-cambio.pdf",
+  "01-cliente__05-certificacion-obra.pdf",
+  "01-cliente__06-factura.pdf",
+  "01-cliente__07-factura-rectificativa.pdf",
+  "01-cliente__13-acta-entrega.pdf",
+  "02-proveedor__11-contrato-subcontratacion.pdf",
+]);
+
 requirePoppler();
 
 let bad = 0,
   checked = 0,
   wordsSeen = 0;
+const unexpected = [];
+const healed = [];
 for (const f of fs
   .readdirSync(dir)
   .filter((x) => x.endsWith(".pdf"))
@@ -94,8 +127,11 @@ for (const f of fs
   }
   if (hits.length) {
     bad++;
-    console.log(`  ✗ ${f}`);
+    if (!KNOWN_BROKEN.has(f)) unexpected.push(f);
+    console.log(`  ${KNOWN_BROKEN.has(f) ? "·" : "✗"} ${f}`);
     for (const h of hits.slice(0, 3)) console.log(`      "${h.slice(0, 60)}"`);
+  } else if (KNOWN_BROKEN.has(f)) {
+    healed.push(f);
   }
 }
 if (!wordsSeen) {
@@ -106,25 +142,40 @@ if (!wordsSeen) {
   process.exit(1);
 }
 
-const maxIdx = process.argv.indexOf("--max");
-const MAX = maxIdx > 0 ? Number(process.argv[maxIdx + 1]) : 0;
-
 console.log(
   bad
-    ? `\n${bad} of ${checked} documents contain unsearchable headings (ceiling ${MAX})`
-    : `\nall ${checked} documents are searchable — no shattered words`,
+    ? `\n${bad} of ${checked} documents contain unsearchable headings ` +
+        `(${KNOWN_BROKEN.size} named as broken on the CI runner)`
+    : `\nall ${checked} documents are searchable on this machine — no shattered words`,
 );
-if (bad > MAX) {
+
+if (unexpected.length) {
   console.error(
-    `\nFAIL: ${bad} broken, ceiling ${MAX}. Headings are broken by the BROWSER's ` +
-      `per-glyph placement, not by anything in the CSS — see the note at the top of ` +
-      `this file before reaching for letter-spacing again.`,
+    `\nFAIL: ${unexpected.length} document(s) break that are not on the named list:\n` +
+      unexpected.map((f) => `  ${f}`).join("\n") +
+      `\n\nHeadings are broken by the BROWSER's per-glyph placement, not by anything in ` +
+      `the CSS — see the note at the top of this file before reaching for letter-spacing ` +
+      `again. Searchability is guaranteed in site/erp-pdf.js, which emits real text runs; ` +
+      `a document a customer receives belongs on that path, not on a longer list here.`,
   );
   process.exit(1);
 }
-// Under the ceiling is not a pass to bank: say so, so the number gets lowered
-// rather than quietly becoming the new normal.
-if (bad < MAX) {
-  console.log(`↓ Down to ${bad}. Lower the --max in .github/workflows/ci.yml to ${bad}.`);
+
+/* A NAME MAY LEAVE THE LIST, BUT NOT FROM THIS MACHINE'S SAY-SO.
+   The local Chromium joins glyphs the runner's does not, so a clean local run
+   is the normal case here and means nothing. It is reported without an
+   instruction to act on it — the last time this gate told the reader to lower a
+   number, the number came from the wrong machine and main went red. Only a
+   green CI run may retire a name. */
+if (healed.length && healed.length < KNOWN_BROKEN.size) {
+  console.log(
+    `\n${healed.length} of the ${KNOWN_BROKEN.size} named documents extracted cleanly here. ` +
+      `That is expected on a non-CI Chromium and is not grounds to retire them.`,
+  );
+} else if (healed.length === KNOWN_BROKEN.size) {
+  console.log(
+    `\nAll ${KNOWN_BROKEN.size} named documents extracted cleanly HERE. If a CI run agrees, ` +
+      `empty KNOWN_BROKEN in this file — that is the only evidence that counts.`,
+  );
 }
 process.exit(0);
