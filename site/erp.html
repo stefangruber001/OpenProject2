@@ -2338,6 +2338,29 @@
         flex: 1 1 220px;
         min-width: 130px;
       }
+      /* Above the breakpoint the three panes are all on screen at once and a
+         chooser between them would be a control with nothing to choose. */
+      .pbmtabs {
+        display: none;
+        border-bottom: 1px solid var(--line);
+        background: var(--paper);
+      }
+      .pbmtabs button {
+        flex: 1;
+        appearance: none;
+        border: 0;
+        background: none;
+        padding: 11px 8px;
+        cursor: pointer;
+        font: 600 12.5px var(--sans);
+        color: var(--muted);
+        border-bottom: 2px solid transparent;
+      }
+      .pbmtabs button.on {
+        color: var(--greenDeep);
+        border-bottom-color: var(--green);
+        background: var(--greenSoft);
+      }
       @media (max-width: 1180px) {
         .pbpanes {
           grid-template-columns: minmax(0, 1fr);
@@ -2357,6 +2380,31 @@
            distrusted everywhere else. */
         .pbfold {
           display: none;
+        }
+        /* ONE PANE AT A TIME.
+           Stacked, the three panes are correct and unusable: you scroll past
+           the whole chapter tree to reach the lines, then past every line to
+           reach the totals, on the screen with the least room to spare. The
+           laptop answer to the same problem was folding; the phone answer is
+           tabs, because there is no width to give back.
+           `.pbtabs` is reused rather than a new component invented — the right
+           pane already tabs between Totales and Visita, so this arrives looking
+           like the app instead of like a patch. */
+        .pbmtabs {
+          display: flex;
+        }
+        .pbpanes[data-mtab="chapters"] .pbpane.mid,
+        .pbpanes[data-mtab="chapters"] #pbRight,
+        .pbpanes[data-mtab="lines"] #pbLeft,
+        .pbpanes[data-mtab="lines"] #pbRight,
+        .pbpanes[data-mtab="totals"] #pbLeft,
+        .pbpanes[data-mtab="totals"] .pbpane.mid {
+          display: none;
+        }
+        /* The visible pane owns the screen: no bottom rule under the last one,
+           because there is nothing below it to be separated from. */
+        .pbpane {
+          border-bottom: 0;
         }
       }
       /* ---------- ADM-03: document validation, full screen (S6) ----------
@@ -10822,6 +10870,13 @@
    the grid beside it. An explicit choice wins over the measurement and is
    remembered; the width only decides for somebody who has never chosen. */
       let bFold = null;
+      /* Which pane a PHONE is showing. Only consulted below the stacking
+   breakpoint, where the three panes cannot share a screen; above it the
+   chooser is hidden and this value is inert. "lines" by default because that
+   is the work — the tree and the totals are consulted, not written in. Held
+   here rather than in the DOM so it survives the builder's own re-renders,
+   which replace the whole pane markup on every keystroke-committed edit. */
+      let bMTab = "lines";
       /* Measured, not chosen: the row needs about 1 150 px, the two side panes
    560 px, and there are two borders between them — so all three coexist from
    roughly 1 720 px and not before. A 1 440 or 1 600 px laptop folds the tree;
@@ -10931,7 +10986,14 @@
      </div>
     </div>
 
-    <div class="pbpanes" id="pbPanes">
+    <!-- Phone only (see .pbmtabs). Partidas is the default because it is the
+         work; the tree and the totals are what you consult, not what you do. -->
+    <div class="pbmtabs" id="pbMTabs">
+     <button data-mtab="chapters"${bMTab === "chapters" ? ' class="on"' : ""}>Capítulos</button>
+     <button data-mtab="lines"${bMTab === "lines" ? ' class="on"' : ""}>Partidas</button>
+     <button data-mtab="totals"${bMTab === "totals" ? ' class="on"' : ""}>Totales</button>
+    </div>
+    <div class="pbpanes" id="pbPanes" data-mtab="${bMTab}">
      <div class="pbpane" id="pbLeft">
       <div class="pbh">Capítulos</div>
       <div class="btree" id="bTree" style="max-height:none"></div>
@@ -11018,6 +11080,20 @@
         pbApplyFold();
         $("#pbFoldL").onclick = () => pbToggleFold("l");
         $("#pbFoldR").onclick = () => pbToggleFold("r");
+        /* The phone's pane chooser. Set on the container rather than by adding
+           and removing panes, so switching tab costs a CSS match and never a
+           re-render — the grid keeps its scroll position and any half-typed
+           cell keeps its caret. */
+        document.querySelectorAll("#pbMTabs [data-mtab]").forEach((b) => {
+          b.onclick = () => {
+            bMTab = b.dataset.mtab;
+            const panes = $("#pbPanes");
+            if (panes) panes.dataset.mtab = bMTab;
+            document
+              .querySelectorAll("#pbMTabs [data-mtab]")
+              .forEach((x) => x.classList.toggle("on", x.dataset.mtab === bMTab));
+          };
+        });
         const addChap = $("#bAddChap");
         if (addChap)
           /* Package 1, slide 8: "los Capítulos deberían ser un dropdown list de

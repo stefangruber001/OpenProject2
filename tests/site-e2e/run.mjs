@@ -766,6 +766,33 @@ async function testMobile(browser, base) {
       ok(`mobile: the quote builder stacks into one column (${pb.mid}px of ${pb.viewport})`);
     else bad("mobile: quote builder stacks", JSON.stringify(pb));
 
+    /* And shows ONE pane at a time, chosen from a tab bar.
+       Stacked is correct but unusable — the tree, then every line, then the
+       totals, on the screen with the least room. Asserted per tab because the
+       failure that matters is two panes visible at once (the chooser doing
+       nothing) or none (the rule losing to a later one at equal specificity,
+       which is exactly how the bar shipped invisible the first time). */
+    const paneFor = async (tab) => {
+      await pg.evaluate((t) => document.querySelector(`#pbMTabs [data-mtab="${t}"]`).click(), tab);
+      await pg.waitForTimeout(250);
+      return pg.evaluate(() => {
+        const on = (s) => {
+          const el = document.querySelector(s);
+          return el && getComputedStyle(el).display !== "none";
+        };
+        return [on("#pbLeft"), on(".pbpane.mid"), on("#pbRight")].filter(Boolean).length;
+      });
+    };
+    const barShown = await pg.evaluate(() => {
+      const el = document.querySelector("#pbMTabs");
+      return !!el && getComputedStyle(el).display !== "none";
+    });
+    const counts = [];
+    for (const t of ["chapters", "totals", "lines"]) counts.push(await paneFor(t));
+    if (barShown && counts.every((n) => n === 1))
+      ok("mobile: the builder shows one pane at a time, chosen from a tab bar");
+    else bad("mobile: builder pane tabs", JSON.stringify({ barShown, counts }));
+
     // The logo is the way home, and on a phone it is the only one visible.
     await pg.evaluate(() => (location.hash = "invoicing"));
     await pg.waitForTimeout(500);
