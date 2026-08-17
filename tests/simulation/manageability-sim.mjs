@@ -2028,6 +2028,110 @@ assert(
   );
 }
 
+/* A WORKSPACE NOBODY HAS CONFIGURED YET STILL OPENS.
+   `state.config` is null until somebody runs `configureEntity`, and `alerts()`
+   read `config.marginThresholdBp` straight through. The Torre is the FIRST
+   screen a workspace shows, so a company that had not yet typed its own legal
+   details met `Cannot read properties of null` on the landing page and lost the
+   whole screen — four indicators, the project list and every alert — to the
+   error card. Reported from production.
+
+   The rule this pins: NOT knowing the company's tax details is a reason to
+   refuse to ISSUE a document; it is never a reason to refuse to SHOW one.
+   Reads degrade to the default `configureEntity` would have written; writes
+   still refuse, and now they refuse by naming the thing to go and do rather
+   than by naming a property that was null. */
+{
+  const bare = new ERP("2026-03-02");
+  assert(bare.state.config === null, "a new workspace genuinely starts unconfigured");
+  /* AN OPEN JOB IS REQUIRED, or this check cannot fail.
+     The crashing line sits inside `for (const p of projects.filter(open))`, so
+     on an empty workspace it never runs and the whole block passes while the
+     bug is present — which is exactly what the first version of this check did
+     when the fault was reintroduced to test it. A gate that cannot reach the
+     line it guards is decoration. */
+  const cli = bare.addParty(
+    {
+      roles: ["customer"],
+      name: "Cliente sin configurar",
+      taxId: "12345678Z",
+      billStreet: "c",
+      billPostalCode: "08001",
+      billCity: "BCN",
+      billProvince: "B",
+      mobile: "600111333",
+      email: "a@b.c",
+      leadSource: "referral",
+    },
+    "bo",
+  );
+  bare.createQuickProject(
+    { partyId: cli.id, desc: "Obra", activityLine: "repairs", valueCents: 100000 },
+    "bo",
+  );
+  assert(
+    bare.state.projects.filter((p) => !p.closed).length === 1,
+    "…with an open job, so the alert loop actually runs",
+  );
+  for (const m of [
+    "alerts",
+    "managedAlerts",
+    "controlTower",
+    "cashPosition",
+    "receivables",
+    "quarterlyPackage",
+  ]) {
+    let threw = "";
+    try {
+      bare[m]();
+    } catch (e) {
+      threw = e.message;
+    }
+    assert(
+      !threw,
+      `unconfigured workspace: ${m}() renders instead of throwing`,
+      threw.slice(0, 90),
+    );
+  }
+  assert(
+    bare.marginThresholdBp() === 1500,
+    "the margin threshold falls back to the value configureEntity would have set",
+    String(bare.marginThresholdBp()),
+  );
+  /* PREVIEW IS A READ, and the first fix for this crash forgot that — it put
+     the issue-time refusal into `previewInvoice` too, so the generator died on
+     the very workspace this block exists to protect. The loop above could not
+     catch it because previewInvoice needs a draft and so sits outside it.
+     Nothing pinned it but the browser suite, twelve minutes away. */
+  {
+    const job = bare.state.projects[0];
+    let threw = "";
+    let pv = null;
+    try {
+      pv = bare.previewInvoice({ projectId: job.id, baseCents: 50000 });
+    } catch (e) {
+      threw = e.message;
+    }
+    assert(!threw, "unconfigured workspace: previewInvoice() renders instead of throwing", threw);
+    assert(
+      pv && pv.doc && pv.baseCents === 50000,
+      "…and the preview is a real document, not an empty shell",
+    );
+    assert(
+      pv && (pv.blocks || []).length > 0,
+      "…while still showing the operator why it cannot be issued",
+    );
+  }
+  // …and the write path still refuses, in words that name the fix.
+  let issueErr = "";
+  try {
+    bare.issueInvoice({ projectId: "nope", baseCents: 1000 }, "bo");
+  } catch (e) {
+    issueErr = e.message;
+  }
+  assert(issueErr.length > 0, "issuing on an unconfigured workspace is still refused", issueErr);
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

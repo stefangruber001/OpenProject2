@@ -4158,6 +4158,20 @@ window.CANEI_DICT = {
     ["Periodo reabierto", "Period reopened"],
     ["Presupuesto enviado", "Quote sent"],
     ["Factura vencida", "Invoice overdue"],
+    // Invoice blocks — the reasons a draft cannot yet be issued. These are read
+    // in the preview, so they are chrome, not company data, and translate.
+    ["Ese cliente no paga esta obra", "That customer is not a payer on this job"],
+    [
+      "Añádalo como pagador del proyecto antes de emitirle una factura.",
+      "Add them as a payer on the project before invoicing them.",
+    ],
+    ["Datos fiscales del cliente incompletos", "Customer tax details incomplete"],
+    ["Faltan los datos de la empresa", "Your company details are missing"],
+    [
+      "Complete el nombre fiscal, el NIF, la dirección y el IBAN en Configuración › Empresa. La factura lleva la identidad del emisor y no puede emitirse sin ella.",
+      "Fill in the legal name, tax ID, address and IBAN under Settings › Company. " +
+        "An invoice carries the issuer's identity and cannot be issued without it.",
+    ],
     ["Obra finalizada", "Site completed"],
     ["Documentación de subcontrata caducada", "Subcontract documentation expired"],
     ["Cola y historial", "Queue and history"],

@@ -585,6 +585,34 @@
     ];
   }
 
+  /**
+   * The company's own record before anybody has filled it in.
+   *
+   * One shape, two callers: `configureEntity` merges onto it, and
+   * `_configForRead` hands it to the document builders when `state.config` is
+   * still null. Keeping them the same object literal is the point — a preview
+   * on an unconfigured workspace shows precisely the fields the setup screen
+   * will ask for, in the same order, with nothing invented.
+   */
+  function blankConfig() {
+    return {
+      legalName: "",
+      taxId: "",
+      street: "",
+      postalCode: "",
+      city: "",
+      province: "Barcelona",
+      country: "España",
+      registry: "",
+      phone: "",
+      email: "",
+      web: "",
+      iban: "",
+      logoRef: "canei-logo",
+      marginThresholdBp: 1500,
+    };
+  }
+
   /* =============================================================================
      ERP — the aggregate. `state` is plain JSON (persist/restore friendly).
      ========================================================================== */
@@ -829,29 +857,61 @@
     configureEntity(cfg) {
       // ORG-01: applied to every document. Partial re-calls update only the
       // provided fields — existing values are preserved, never reset.
-      this.state.config = Object.assign(
-        {
-          legalName: "",
-          taxId: "",
-          street: "",
-          postalCode: "",
-          city: "",
-          province: "Barcelona",
-          country: "España",
-          registry: "",
-          phone: "",
-          email: "",
-          web: "",
-          iban: "",
-          logoRef: "canei-logo",
-          marginThresholdBp: 1500,
-        },
-        this.state.config || {},
-        cfg,
-      );
+      this.state.config = Object.assign(blankConfig(), this.state.config || {}, cfg);
       for (const t of Object.keys(SERIES_PREFIX)) this.ensureSeries(t);
       this._log("backoffice", "configureEntity", this.state.config.legalName);
       return this.state.config;
+    }
+    /**
+     * The margin below which a job raises an alert, in basis points.
+     *
+     * READ THROUGH A METHOD, because `state.config` is NULL until somebody
+     * runs `configureEntity` — and `alerts()` is reached from the Torre, which
+     * is the FIRST screen a workspace opens. A company that had not yet
+     * entered its own legal details therefore crashed on the landing screen
+     * with `Cannot read properties of null`, and the whole Torre went to the
+     * error card: four indicators, the project list and every alert, gone,
+     * because of one unconfigured field.
+     *
+     * That is the wrong failure. Not knowing the company's VAT number is a
+     * reason to refuse to ISSUE a document; it is not a reason to refuse to
+     * SHOW one. Reads degrade to the same default `configureEntity` would have
+     * written; writes still refuse, loudly, where the law needs the answer.
+     */
+    marginThresholdBp() {
+      const c = this.state.config;
+      return c && typeof c.marginThresholdBp === "number" ? c.marginThresholdBp : 1500;
+    }
+    /**
+     * The company's own record, or a refusal naming what is missing.
+     *
+     * The issuing paths read `config.iban` directly and would throw a
+     * TypeError on a workspace that has never been configured — true, but
+     * unreadable, and it names a property rather than the thing to go and do.
+     */
+    _requireConfig(what) {
+      if (!this.state.config)
+        throw new Error(
+          `Cannot issue ${what}: the company's own details are not set up yet ` +
+            `(Configuración › Empresa). A document carries the seller's identity, so it ` +
+            `cannot be issued before that identity exists.`,
+        );
+      return this.state.config;
+    }
+    /**
+     * The company's own record for a READ, blank-filled rather than absent.
+     *
+     * The document builders below all open with `const cfg = this.state.config`
+     * and then reach straight into it, so every one of them threw on an
+     * unconfigured workspace — the invoice preview, the budget, the delivery
+     * note and the archive package alike. Guarding them one property at a time
+     * is how the first pass at this missed three of the four.
+     *
+     * Blank strings are also the honest answer: they are exactly what an
+     * operator sees after opening the setup screen and saving nothing.
+     */
+    _configForRead() {
+      return this.state.config || blankConfig();
     }
     /**
      * The document series this ERP issues, and their prefixes.
@@ -2086,7 +2146,7 @@
       // QUO-05/07 + QUO-10 + DOC-01: customer doc from data; no internal cost
       const b = this.budget(budgetId);
       const v = this.version(budgetId, versionId);
-      const cfg = this.state.config;
+      const cfg = this._configForRead();
       const t = this.budgetTotals(budgetId, versionId);
       return {
         docType: "PRESUPUESTO",
@@ -2689,7 +2749,7 @@
     renderContractDoc(contractId) {
       const c = this.state.contracts.find((x) => x.id === contractId);
       if (!c) throw new Error("Contract not found");
-      const cfg = this.state.config;
+      const cfg = this._configForRead();
       const project = this.state.projects.find((p) => p.contractId === c.id) || null;
       const v = this.contractValue(c.id);
       return {
@@ -3857,6 +3917,19 @@
     _invoiceBlocks(draft) {
       const out = [];
       const p = this.project(draft.projectId);
+      /* ORG-01 — the seller's own identity, which a document cannot go out
+         without. Stated HERE, as a block, so the operator reads it in the
+         preview beside every other reason the invoice is not ready. It was
+         previously only enforced at issue, where it surfaced as a thrown
+         error from a button — the same fact, delivered as a crash. */
+      if (!this.state.config)
+        out.push({
+          code: "ORG-01",
+          label: "Faltan los datos de la empresa",
+          detail:
+            "Complete el nombre fiscal, el NIF, la dirección y el IBAN en Configuración › Empresa. " +
+            "La factura lleva la identidad del emisor y no puede emitirse sin ella.",
+        });
       /* WHO IS BEING BILLED — the payer named on the draft, not the project's
          own customer. A job with one payer answers the same as it always did. */
       const billTo = draft.billToPartyId || p.partyId;
@@ -4247,7 +4320,10 @@
         // renegotiated term is not stale in a second copy.
         dueDate: addDays(this.state.today, payer.paymentTermsDays || party.paymentTermsDays || 30),
         paymentMethod: party.paymentMethod,
-        iban: this.state.config.iban,
+        // Soft read, unlike the issuing path below. A preview draws what the
+        // document would say; an unconfigured workspace makes that "no account
+        // number yet", not an error page. The refusal belongs at issue.
+        iban: (this.state.config && this.state.config.iban) || "",
         rectifies: draft.rectifies || null,
         rectifyReason: draft.rectifyReason || null,
       };
@@ -4287,7 +4363,7 @@
      * printed reads one object rather than reaching into engine state.
      */
     _invoiceDoc(rec) {
-      const cfg = this.state.config;
+      const cfg = this._configForRead();
       const project = this.state.projects.find((x) => x.id === rec.projectId) || null;
       const rectified = rec.rectifies
         ? this.state.invoices.find((i) => i.id === rec.rectifies || i.number === rec.rectifies)
@@ -4392,7 +4468,7 @@
         // renegotiated term is not stale in a second copy.
         dueDate: addDays(this.state.today, payer.paymentTermsDays || party.paymentTermsDays || 30),
         paymentMethod: party.paymentMethod,
-        iban: this.state.config.iban, // AR-02
+        iban: this._requireConfig(inv.kind === "creditNote" ? "a credit note" : "an invoice").iban, // AR-02
         rectifies: inv.rectifies || null,
         rectifyReason: inv.rectifyReason || null, // VFU-02
         installmentIdx: inv.installmentIdx != null ? inv.installmentIdx : null,
@@ -6796,7 +6872,7 @@
         const ec = this.projectEconomics(p.id);
         if (ec.marginForecastCents < 0)
           push("PROJ-MARGIN-NEG", "critical", `Margen negativo — ${p.code}`, { project: p.code });
-        else if (ec.marginForecastPct * 100 < this.state.config.marginThresholdBp / 100)
+        else if (ec.marginForecastPct * 100 < this.marginThresholdBp() / 100)
           push(
             "PROJ-MARGIN-LOW",
             "critical",
@@ -8229,7 +8305,7 @@
       if (!c) throw new Error("Change not found");
       const p = this.project(c.projectId);
       const con = p.contractId ? this.state.contracts.find((x) => x.id === p.contractId) : null;
-      const cfg = this.state.config;
+      const cfg = this._configForRead();
       return {
         docType: "MODIFICACION",
         number: c.annexNumber || null,

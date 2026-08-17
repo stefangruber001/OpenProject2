@@ -2188,6 +2188,14 @@ window.CANEI_DICT.ca = {
   "Periodo reabierto": "Període reobert",
   "Presupuesto enviado": "Pressupost enviat",
   "Factura vencida": "Factura vençuda",
+  "Ese cliente no paga esta obra": "Aquest client no paga aquesta obra",
+  "Añádalo como pagador del proyecto antes de emitirle una factura.":
+    "Afegiu-lo com a pagador del projecte abans d'emetre-li una factura.",
+  "Datos fiscales del cliente incompletos": "Dades fiscals del client incompletes",
+  "Faltan los datos de la empresa": "Falten les dades de l'empresa",
+  "Complete el nombre fiscal, el NIF, la dirección y el IBAN en Configuración › Empresa. La factura lleva la identidad del emisor y no puede emitirse sin ella.":
+    "Ompliu el nom fiscal, el NIF, l'adreça i l'IBAN a Configuració › Empresa. " +
+    "La factura porta la identitat de l'emissor i no es pot emetre sense ella.",
   "Obra finalizada": "Obra finalitzada",
   "Documentación de subcontrata caducada": "Documentació de subcontracta caducada",
   "Cola y historial": "Cua i historial",
