@@ -728,6 +728,44 @@ async function testMobile(browser, base) {
     if (!offscreen.length) ok("mobile: the top-bar menus open inside the screen, not off its edge");
     else bad("mobile: menus stay on screen", offscreen.join(" · "));
 
+    /* THE QUOTE BUILDER STACKS ON A PHONE, it does not shrink.
+       There has always been a rule that collapses its three panes into one
+       column below 1180px. The fold work added `grid-column: 1|2|3` pins so a
+       `display:none` pane could not let the others slide left — correct, and
+       written without a breakpoint. Against a ONE-column template a
+       `grid-column: 3` does not clamp, it creates implicit columns: the phone
+       got three columns again, the line grid squeezed to about ninety pixels,
+       "LINE ITEMS" rendering one letter per line. That shipped, and was
+       photographed on an iPhone before anything here caught it.
+
+       Asserted on the computed template rather than on any pixel, because the
+       fault was the template — and the check reads as the rule it protects. */
+    await pg.evaluate(() => {
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      if (b) go("quotes", b.id);
+    });
+    await pg.waitForTimeout(1200);
+    const pb = await pg.evaluate(() => {
+      const panes = document.querySelector("#pbPanes");
+      if (!panes) return null;
+      const w = (s) => {
+        const el = document.querySelector(s);
+        return el ? Math.round(el.getBoundingClientRect().width) : null;
+      };
+      const fold = document.querySelector("#pbFoldL");
+      return {
+        tracks: getComputedStyle(panes).gridTemplateColumns.trim().split(/\s+/).length,
+        mid: w(".pbpane.mid"),
+        viewport: window.innerWidth,
+        foldShown: fold ? getComputedStyle(fold).display !== "none" : false,
+      };
+    });
+    if (!pb) bad("mobile: the quote builder opens", "no #pbPanes");
+    else if (pb.tracks === 1 && pb.mid >= pb.viewport - 4 && !pb.foldShown)
+      ok(`mobile: the quote builder stacks into one column (${pb.mid}px of ${pb.viewport})`);
+    else bad("mobile: quote builder stacks", JSON.stringify(pb));
+
     // The logo is the way home, and on a phone it is the only one visible.
     await pg.evaluate(() => (location.hash = "invoicing"));
     await pg.waitForTimeout(500);

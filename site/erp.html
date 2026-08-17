@@ -2034,28 +2034,39 @@
      the whole row, on top of it. Everything still rendered and the 🔍 was
      still "visible" — it was simply underneath something, which is the kind of
      break that looks like nothing at all until a click goes nowhere. Pinned to
-     a column, a pane cannot take another pane's place. */
-      #pbLeft {
-        grid-column: 1;
-      }
-      .pbpane.mid {
-        grid-column: 2;
-      }
-      #pbRight {
-        grid-column: 3;
-      }
-      .pbpanes.foldL {
-        grid-template-columns: 0 minmax(0, 1fr) 300px;
-      }
-      .pbpanes.foldR {
-        grid-template-columns: 260px minmax(0, 1fr) 0;
-      }
-      .pbpanes.foldL.foldR {
-        grid-template-columns: 0 minmax(0, 1fr) 0;
-      }
-      .pbpanes.foldL #pbLeft,
-      .pbpanes.foldR #pbRight {
-        display: none;
+     a column, a pane cannot take another pane's place.
+
+     ALL OF IT INSIDE THE THREE-COLUMN BREAKPOINT, which the first version of
+     this was not — and that shipped. Below 1180px the panes stack into a single
+     column (see the media query further down), and a `grid-column: 3` against a
+     one-column template does not clamp: it creates IMPLICIT columns. So a phone
+     got three columns again, auto-sized, with the line grid squeezed to about
+     ninety pixels — "LINE ITEMS" rendering one letter per line and the empty
+     state running vertically down the screen. A rule written for a wide layout
+     has to say that it is for the wide layout. */
+      @media (min-width: 1181px) {
+        #pbLeft {
+          grid-column: 1;
+        }
+        .pbpane.mid {
+          grid-column: 2;
+        }
+        #pbRight {
+          grid-column: 3;
+        }
+        .pbpanes.foldL {
+          grid-template-columns: 0 minmax(0, 1fr) 300px;
+        }
+        .pbpanes.foldR {
+          grid-template-columns: 260px minmax(0, 1fr) 0;
+        }
+        .pbpanes.foldL.foldR {
+          grid-template-columns: 0 minmax(0, 1fr) 0;
+        }
+        .pbpanes.foldL #pbLeft,
+        .pbpanes.foldR #pbRight {
+          display: none;
+        }
       }
       .pbfold {
         appearance: none;
@@ -2339,6 +2350,13 @@
         }
         .pb {
           height: auto;
+        }
+        /* The fold chevrons belong to the three-column layout. Here the panes
+           are stacked and there is nothing to fold into — a control that does
+           nothing is worse than no control, because it is tried once and then
+           distrusted everywhere else. */
+        .pbfold {
+          display: none;
         }
       }
       /* ---------- ADM-03: document validation, full screen (S6) ----------
