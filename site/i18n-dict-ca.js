@@ -458,6 +458,15 @@ window.CANEI_DICT.ca = {
   Emitida: "Emesa",
   "Base imponible": "Base imposable",
   "↩ Deshacer importación": "↩ Desfer importació",
+  "En un periodo cerrado": "Dins d'un període tancat",
+  "Conciliado con un documento": "Conciliat amb un document",
+  "Asignado a una obra": "Assignat a una obra",
+  "Marcado sin factura, con motivo": "Marcat sense factura, amb motiu",
+  "Con justificante adjunto": "Amb justificant adjunt",
+  "Un periodo cerrado se reabre en la pestaña Conciliación, en «Periodos cerrados».":
+    "Un període tancat es reobre a la pestanya Conciliació, a «Períodes tancats».",
+  "Hay movimientos dentro de un periodo cerrado. Reábrelo en la pestaña Conciliación, en «Periodos cerrados», y vuelve a importar.":
+    "Hi ha moviments dins d'un període tancat. Reobre'l a la pestanya Conciliació, a «Períodes tancats», i torna a importar.",
   "Deshacer importación ·": "Desfer importació ·",
   "Deshacer importación": "Desfer importació",
   Importaciones: "Importacions",

@@ -295,6 +295,57 @@ assert(
   JSON.stringify(cleared),
 );
 
+// ---- the seal, in both directions (S20c) ------------------------------------
+// The operator closed 2026 while the account was empty — the screen offered
+// it, "0 unreconciled movements in the period" — and then imported into it.
+// The importer wrote 477 movements into a sealed period without a word, and
+// the same seal then refused to let them out again: the undo said "kept 477"
+// and gave no reason. A seal that only holds in one direction is a trap.
+const e5 = new ERP("2026-08-18");
+const acc5 = e5.addBankAccount({ name: "BBVA", kind: "bank" }, "bo");
+e5.closeBankPeriod("2026-01-01", "2026-12-31", "bo");
+const sealedPv = e5.previewImport(acc5.id, batchRows);
+assert(
+  sealedPv.closedRows === batchRows.length,
+  "seal: the preview counts every row that falls inside a closed period",
+  sealedPv.closedRows,
+);
+let refused = "";
+try {
+  e5.importMovements(acc5.id, batchRows, "bo");
+} catch (err) {
+  refused = err.message;
+}
+assert(/periodo cerrado/.test(refused), "seal: …and the import is refused, not written", refused);
+assert(
+  e5.state.movements.length === 0,
+  "seal: nothing reached the register",
+  e5.state.movements.length,
+);
+
+// Reopened, it all works — and the undo can now undo it.
+e5.reopenBankPeriod("2026-01-01", "corrigiendo una importación", "bo");
+e5.importMovements(acc5.id, batchRows, "bo");
+assert(e5.state.movements.length === 8, "seal: reopened, the same file imports");
+const pv5 = e5.discardPreview(acc5.id);
+assert(
+  pv5.deletable === 8 && pv5.kept === 0,
+  "seal: …and every row can be taken back out",
+  JSON.stringify(pv5),
+);
+
+// The breakdown names the blocker rather than leaving a bare count.
+const e6 = new ERP("2026-08-18");
+const acc6 = e6.addBankAccount({ name: "BBVA", kind: "bank" }, "bo");
+e6.importMovements(acc6.id, batchRows, "bo");
+e6.markMovementUnbacked(e6.state.movements[0].id, "comision", "bo");
+const why6 = e6.discardPreview(acc6.id);
+assert(
+  why6.deletable === 7 && why6.byReason.unbacked === 1,
+  "seal: the preview says WHICH state is holding a movement back",
+  JSON.stringify(why6),
+);
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} bank-import checks passed`);

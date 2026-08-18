@@ -4662,3 +4662,26 @@ as a statement import.
 **The rule taken from it:** any action that writes hundreds of records from a
 file has to be reversible before it ships. The parser being right is not the
 same as the operator being safe.
+
+## S20c · A seal that only holds one way is a trap
+
+The undo shipped, the operator pressed it, and it said "can be deleted: 0,
+kept: 477" — with no reason. The cause, reproduced exactly: at 08:00 the
+Reconciliation tab offered «0 unreconciled movements in the period · Close
+period» on an empty account, they closed 2026, and then imported into it.
+
+So the importer had written 477 movements INTO a closed period without a
+word, and the same seal then refused to let them out. The seal held against
+the correction and not against the mistake, which is the wrong way round.
+
+Both directions fixed. `previewImport` counts rows falling inside a closed
+period and the drawer refuses the import with the reason and the screen where
+the period is reopened; `importMovements` throws rather than writing through a
+seal. And the undo drawer now names what is holding each movement back —
+matched, allocated, unbacked, receipted, closed period — instead of stating a
+bare count, because "kept: 477" is a wall, not an explanation. The reason
+codes are identifiers, translated by the host, so no Spanish leaves the
+engine.
+
+**The rule taken from it:** a guard that refuses an undo must refuse the
+original write too, or it converts a mistake into a permanent one.

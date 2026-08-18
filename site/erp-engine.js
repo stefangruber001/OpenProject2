@@ -5131,6 +5131,11 @@
           duplicates.push({ row: r, existingId: idOf.get(k) || null });
         } else fresh.push(r);
       }
+      /* A closed period is a statement somebody has signed off. Until now the
+         importer wrote into one without a word — which is how 477 movements
+         landed inside a sealed 2026 and could then not be taken out again,
+         the seal refusing the undo it had never refused the import. */
+      const closedRows = rows.filter((r) => this.bankPeriodClosed(r.accountingDate)).length;
       const dates = rows
         .map((r) => r.accountingDate)
         .filter(Boolean)
@@ -5144,6 +5149,7 @@
       return {
         fresh,
         duplicates,
+        closedRows,
         overlapsExistingPeriod: overlaps,
         from: dates[0] || null,
         to: dates[dates.length - 1] || null,
@@ -5158,6 +5164,12 @@
          file. Until this existed there was no way back: 477 movements landed
          in a real register with amounts a parser bug had multiplied into the
          quadrillions, and nothing in the product could remove them. */
+      const sealed = rows.filter((r) => this.bankPeriodClosed(r.accountingDate));
+      if (sealed.length)
+        throw new Error(
+          sealed.length +
+            " movimientos caen en un periodo cerrado — reábrelo en Conciliación antes de importar",
+        );
       const importId = this._id("imp");
       const out = rows.map((r) => {
         const rec = {
@@ -5217,12 +5229,30 @@
      * importer's to discard. A closed period is closed.
      */
     _discardableMovement(m) {
-      if (m.status !== "unallocated" || m.matched) return "conciliado";
-      if ((m.allocations || []).length) return "asignado";
-      if (m.unbacked) return "marcado sin factura";
-      if (m.needsDoc === false && m.docRef) return "con justificante";
-      if (this.bankPeriodClosed(m.accountingDate)) return "periodo cerrado";
+      if (m.status !== "unallocated" || m.matched) return "matched";
+      if ((m.allocations || []).length) return "allocated";
+      if (m.unbacked) return "unbacked";
+      if (m.needsDoc === false && m.docRef) return "receipted";
+      if (this.bankPeriodClosed(m.accountingDate)) return "closedPeriod";
       return null;
+    }
+    /**
+     * What an undo would do, and — when it would do nothing — why.
+     *
+     * "Kept: 477" with no reason is not an explanation, it is a wall. The
+     * count that matters to somebody staring at a bad import is the one
+     * blocking it, and the reason names the screen where it can be lifted.
+     */
+    discardPreview(accountId) {
+      const here = this.state.movements.filter((m) => m.accountId === accountId);
+      const byReason = {};
+      let deletable = 0;
+      for (const m of here) {
+        const why = this._discardableMovement(m);
+        if (!why) deletable++;
+        else byReason[why] = (byReason[why] || 0) + 1;
+      }
+      return { total: here.length, deletable, kept: here.length - deletable, byReason };
     }
     /**
      * Undo an import: remove the movements it created that are still untouched.

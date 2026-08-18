@@ -15040,11 +15040,13 @@
      <div class="it"><span>Movimientos nuevos</span><span style="flex:1"></span><b>${pv.fresh.length}</b></div>
      <div class="it"><span>Ya importados</span><span style="flex:1"></span><b>${pv.duplicates.length}</b></div>
      <div class="it"><span>Filas no legibles</span><span style="flex:1"></span><b>${parsed.skipped}</b></div>
+     ${pv.closedRows ? `<div class="it"><span>En un periodo cerrado</span><span style="flex:1"></span><b>${pv.closedRows}</b></div>` : ""}
     </div>
     ${pv.overlapsExistingPeriod ? '<div style="padding:0 12px 10px"><span class="pill y">El periodo se solapa con movimientos ya importados; los repetidos no se volverán a crear.</span></div>' : ""}
+    ${pv.closedRows ? '<div style="padding:0 12px 10px"><span class="pill r">Hay movimientos dentro de un periodo cerrado. Reábrelo en la pestaña Conciliación, en «Periodos cerrados», y vuelve a importar.</span></div>' : ""}
     <div style="display:flex;gap:8px;padding:0 12px 12px">
      <span style="flex:1"></span>
-     <button class="btn primary" id="stGo"${pv.fresh.length ? "" : " disabled"}>Importar</button>
+     <button class="btn primary" id="stGo"${pv.fresh.length && !pv.closedRows ? "" : " disabled"}>Importar</button>
     </div></div>`;
           $("#stGo").onclick = () =>
             mutate(() => {
@@ -15087,6 +15089,36 @@
         return esc(lead) + (rest ? ` <span class="sub">${esc(rest)}</span>` : "");
       }
 
+      /* Keyed on codes, not on Spanish: the engine says WHY in a word the
+         host translates, the way every other refusal in this layer works. */
+      const DISCARD_REASONS = {
+        matched: "Conciliado con un documento",
+        allocated: "Asignado a una obra",
+        unbacked: "Marcado sin factura, con motivo",
+        receipted: "Con justificante adjunto",
+        closedPeriod: "En un periodo cerrado",
+      };
+      /* Why nothing can be deleted, when nothing can. The first version of
+         this drawer said «se conservan: 477» and stopped there, which tells
+         the operator that the button does not work and nothing else. Every
+         reason here names a state somebody put the movement in, and the one
+         that is not a decision — a closed period — says where to lift it. */
+      function discardReasons(pv) {
+        const rows = Object.entries(pv.byReason || {});
+        if (!rows.length) return "";
+        const body = rows
+          .map(
+            ([why, n]) =>
+              `<div class="it"><span>${esc(DISCARD_REASONS[why] || why)}</span>` +
+              `<span style="flex:1"></span><b>${n}</b></div>`,
+          )
+          .join("");
+        const closed = pv.byReason.closedPeriod
+          ? '<div style="padding:0 12px 10px"><span class="pill y">Un periodo cerrado se reabre en la pestaña Conciliación, en «Periodos cerrados».</span></div>'
+          : "";
+        return `<div class="daylist" style="border-top:1px solid var(--line)">${body}</div>${closed}`;
+      }
+
       /**
        * The way back out of an import.
        *
@@ -15109,8 +15141,9 @@
           .filter((b) => b.accountId === accountId)
           .slice()
           .reverse();
-        const here = erp.state.movements.filter((m) => m.accountId === accountId);
-        const free = here.filter((m) => !erp._discardableMovement(m)).length;
+        const pv = erp.discardPreview(accountId);
+        const here = { length: pv.total };
+        const free = pv.deletable;
         const db = openDrawer("Deshacer importación · " + (acc ? acc.name : ""));
         const rows = batches
           .map(
@@ -15132,6 +15165,7 @@
      <div class="it"><span>Se pueden borrar</span><span style="flex:1"></span><b>${free}</b></div>
      <div class="it"><span>Se conservan</span><span style="flex:1"></span><b>${here.length - free}</b></div>
     </div>
+    ${discardReasons(pv)}
     <div style="padding:0 12px 10px"><span class="pill y">Sólo se borra lo que nadie ha tocado: un movimiento casado, asignado o marcado sin factura se conserva.</span></div>
     <div style="display:flex;gap:8px;padding:0 12px 12px"><span style="flex:1"></span>
      <button class="btn" id="uiAll"${free ? "" : " disabled"}>Borrar los ${free} sin conciliar</button>
