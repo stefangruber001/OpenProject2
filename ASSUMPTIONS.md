@@ -4639,3 +4639,26 @@ movement is unallocated and unexplained (477 of them, on a fresh import of a
 year's statement). That is the designed gate, not a defect — but it means the
 quarter cannot be exported until the queue is worked through. Only `.xlsx` is
 imported; the PDF exports are for reading, per the decision recorded above.
+
+## S20b · An import you cannot undo is a trap
+
+Within the hour of the parser being fixed, the operator imported the real
+statement on the build that still had the bug. 477 movements landed with
+amounts multiplied into the quadrillions, the account read
+−1.498.540.839.999.877.400 €, and **nothing in the product could remove
+them**: there was no delete, no undo, no way back at all. The fix to the
+parser was worthless to the register that had already eaten the bad data.
+
+So an import is now a batch (`state.importBatches`, `importId` on every
+movement it writes) and there are two doors back: undo a named import, or
+clear what is still untouched on an account — the second because the mess
+that prompted this predates the batches. Neither can take back a decision:
+a movement that is matched, allocated, marked deliberately unbacked, or in a
+closed period is kept and counted, and the drawer states how many will go and
+how many will stay before anything happens. A cash entry passes through
+`importMovements` internally and is exempted, or every coffee would be filed
+as a statement import.
+
+**The rule taken from it:** any action that writes hundreds of records from a
+file has to be reversible before it ships. The parser being right is not the
+same as the operator being safe.

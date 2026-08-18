@@ -660,6 +660,7 @@
         payments: [],
         bankAccounts: [],
         movements: [],
+        importBatches: [], // BNK-06: one record per statement import, so it can be undone
         merchantRules: [],
         bankPeriods: [], // §5.3: closed/reopened reconciliation periods
         commsTemplates: [], // §5.7
@@ -5148,12 +5149,21 @@
         to: dates[dates.length - 1] || null,
       };
     }
-    importMovements(accountId, rows, user) {
+    importMovements(accountId, rows, user, { batch = true } = {}) {
       // BNK-01: retain all export fields
+      /* Every import is a batch, and the batch is remembered. An import is the
+         one act in this product that writes hundreds of records at once from a
+         file nobody has read line by line, so it is also the one act most
+         likely to be wrong — a mis-parsed column, the wrong account, the wrong
+         file. Until this existed there was no way back: 477 movements landed
+         in a real register with amounts a parser bug had multiplied into the
+         quadrillions, and nothing in the product could remove them. */
+      const importId = this._id("imp");
       const out = rows.map((r) => {
         const rec = {
           id: this._id("mov"),
           accountId,
+          importId,
           accountingDate: r.accountingDate,
           valueDate: r.valueDate || r.accountingDate,
           opCode: r.opCode || "",
@@ -5185,8 +5195,80 @@
         this.state.movements.push(rec);
         return rec;
       });
+      if (batch && out.length)
+        this.state.importBatches.push({
+          id: importId,
+          accountId,
+          at: this.today,
+          count: out.length,
+          from: out.reduce((a, m) => (a && a < m.accountingDate ? a : m.accountingDate), null),
+          to: out.reduce((a, m) => (a && a > m.accountingDate ? a : m.accountingDate), null),
+          by: user || "system",
+        });
       this._log(user, "importMovements", rows.length + " movs");
       return out;
+    }
+    /**
+     * Can this movement be taken back out again?
+     *
+     * Only while it is still nothing but a line off a statement. Once it has
+     * been matched, allocated, or deliberately marked as needing no invoice,
+     * it carries a decision somebody made, and a decision is not the
+     * importer's to discard. A closed period is closed.
+     */
+    _discardableMovement(m) {
+      if (m.status !== "unallocated" || m.matched) return "conciliado";
+      if ((m.allocations || []).length) return "asignado";
+      if (m.unbacked) return "marcado sin factura";
+      if (m.needsDoc === false && m.docRef) return "con justificante";
+      if (this.bankPeriodClosed(m.accountingDate)) return "periodo cerrado";
+      return null;
+    }
+    /**
+     * Undo an import: remove the movements it created that are still untouched.
+     *
+     * Never silently partial — the caller is told exactly how many were kept
+     * and why, because "undone" with three matched movements left behind is a
+     * different fact from "undone".
+     */
+    undoImport(importId, user) {
+      const batch = this.state.importBatches.find((b) => b.id === importId);
+      if (!batch) throw new Error("Import not found");
+      return this._discard(
+        this.state.movements.filter((m) => m.importId === importId),
+        user,
+        () => {
+          this.state.importBatches = this.state.importBatches.filter((b) => b.id !== importId);
+        },
+      );
+    }
+    /**
+     * Remove untouched movements from an account — the way back for a bad
+     * import that happened before imports were batched, and for a statement
+     * loaded onto the wrong account.
+     */
+    discardMovements(accountId, { from, to } = {}, user) {
+      const target = this.state.movements.filter(
+        (m) =>
+          m.accountId === accountId &&
+          (!from || m.accountingDate >= from) &&
+          (!to || m.accountingDate <= to),
+      );
+      return this._discard(target, user);
+    }
+    _discard(candidates, user, after) {
+      const kept = [];
+      const doomed = new Set();
+      for (const m of candidates) {
+        const why = this._discardableMovement(m);
+        if (why) kept.push({ id: m.id, why });
+        else doomed.add(m.id);
+      }
+      this.state.movements = this.state.movements.filter((m) => !doomed.has(m.id));
+      // A batch is only forgotten when nothing of it is left to point at.
+      if (after && !kept.length) after();
+      this._log(user, "discardMovements", doomed.size + " movs");
+      return { deleted: doomed.size, kept: kept.length, keptDetail: kept.slice(0, 20) };
     }
     allocateMovementToProject(movId, ref, kind, user) {
       // BNK-02: enter a budget/project number → cost lands on the project
@@ -5639,7 +5721,9 @@
     }
     recordCashMovement(tillId, mv, user) {
       // BNK-07: same discipline; flags when undocumented
-      const rec = this.importMovements(tillId, [{ ...mv, opCode: "CASH" }], user)[0];
+      const rec = this.importMovements(tillId, [{ ...mv, opCode: "CASH" }], user, {
+        batch: false,
+      })[0];
       if (!mv.supportingDocRef) {
         rec.needsDoc = true;
       } // flagged, never hidden

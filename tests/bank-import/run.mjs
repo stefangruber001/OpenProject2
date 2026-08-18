@@ -240,6 +240,61 @@ assert(
   "card: the card statement imports onto the card account",
 );
 
+// ---- the way back out (S20) -------------------------------------------------
+// An import writes hundreds of records from a file nobody read line by line.
+// When one of them is wrong — a mis-parsed column, the wrong account — there
+// has to be a way back, and it must never take back a decision somebody made.
+const e3 = new ERP("2026-08-18");
+const acc3 = e3.addBankAccount({ name: "BBVA", kind: "bank" }, "bo");
+const batchRows = (
+  await parseBbva(readFileSync(new URL("../fixtures/bbva-cuenta.xlsx", import.meta.url)))
+).rows;
+e3.importMovements(acc3.id, e3.previewImport(acc3.id, batchRows).fresh, "bo");
+assert(
+  e3.state.importBatches.length === 1 && e3.state.importBatches[0].count === 8,
+  "undo: the import is remembered as a batch of eight",
+  JSON.stringify(e3.state.importBatches),
+);
+// A till entry is not a statement import and must not appear as one.
+const till3 = e3.addBankAccount({ name: "Caja", kind: "till" }, "bo");
+e3.recordCashMovement(
+  till3.id,
+  { concept: "Café", amountCents: -500, accountingDate: "2026-05-02" },
+  "bo",
+);
+assert(e3.state.importBatches.length === 1, "undo: a cash entry does not create a batch of one");
+
+// One movement is given a decision: it must survive the undo.
+const keeper = e3.state.movements.find((m) => m.accountId === acc3.id);
+e3.markMovementUnbacked(keeper.id, "comision", "bo");
+const undone = e3.undoImport(e3.state.importBatches[0].id, "bo");
+assert(
+  undone.deleted === 7 && undone.kept === 1,
+  "undo: seven untouched movements go, the decided one stays",
+  JSON.stringify(undone),
+);
+assert(
+  e3.state.movements.filter((m) => m.accountId === acc3.id).length === 1,
+  "undo: …and the register agrees",
+  e3.state.movements.filter((m) => m.accountId === acc3.id).length,
+);
+assert(
+  e3.state.importBatches.length === 1,
+  "undo: the batch is kept while any of it survives, so the rest can still be found",
+);
+// The older mess predates batches: clearing by account must work regardless.
+const e4 = new ERP("2026-08-18");
+const acc4 = e4.addBankAccount({ name: "BBVA", kind: "bank" }, "bo");
+e4.importMovements(acc4.id, batchRows, "bo");
+const paid = e4.state.movements[0];
+paid.status = "matched"; // as matchMovement leaves it
+const cleared = e4.discardMovements(acc4.id, {}, "bo");
+assert(
+  cleared.deleted === 7 && cleared.kept === 1 && e4.state.movements.length === 1,
+  "undo: clearing an account removes only what nobody has touched",
+  JSON.stringify(cleared),
+);
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} bank-import checks passed`);

@@ -15087,6 +15087,74 @@
         return esc(lead) + (rest ? ` <span class="sub">${esc(rest)}</span>` : "");
       }
 
+      /**
+       * The way back out of an import.
+       *
+       * An import is the one act that writes hundreds of records at once from
+       * a file nobody read line by line, and it is therefore the one most
+       * likely to be wrong: a mis-parsed column, the wrong account, the wrong
+       * file. This product had no undo, and a real register spent a morning
+       * holding 477 movements whose amounts a parser bug had multiplied into
+       * the quadrillions, with no way to remove them.
+       *
+       * Two doors, because the older mess predates the batches: undo a named
+       * import, or clear what is still untouched on this account. Neither can
+       * take back a decision — a matched, allocated or deliberately unbacked
+       * movement is kept and counted, and the drawer says so before anything
+       * is removed.
+       */
+      function undoImportDrawer(accountId) {
+        const acc = erp.state.bankAccounts.find((a) => a.id === accountId);
+        const batches = (erp.state.importBatches || [])
+          .filter((b) => b.accountId === accountId)
+          .slice()
+          .reverse();
+        const here = erp.state.movements.filter((m) => m.accountId === accountId);
+        const free = here.filter((m) => !erp._discardableMovement(m)).length;
+        const db = openDrawer("Deshacer importación · " + (acc ? acc.name : ""));
+        const rows = batches
+          .map(
+            (b) =>
+              `<div class="it"><span class="k">${fmtD(b.at)}</span>` +
+              `<span class="sub">${b.from ? fmtD(b.from) + " — " + fmtD(b.to) : ""}</span>` +
+              `<span style="flex:1"></span><span class="pill">${b.count}</span>` +
+              `<button class="btn sm" data-undoimp="${b.id}">Deshacer</button></div>`,
+          )
+          .join("");
+        const list = rows
+          ? `<div class="card"><div class="ch"><h3>Importaciones</h3><span class="tag">${batches.length}</span></div>` +
+            `<div class="daylist">${rows}</div></div>`
+          : "";
+        db.innerHTML =
+          list +
+          `<div class="card"><div class="daylist">
+     <div class="it"><span>Movimientos en la cuenta</span><span style="flex:1"></span><b>${here.length}</b></div>
+     <div class="it"><span>Se pueden borrar</span><span style="flex:1"></span><b>${free}</b></div>
+     <div class="it"><span>Se conservan</span><span style="flex:1"></span><b>${here.length - free}</b></div>
+    </div>
+    <div style="padding:0 12px 10px"><span class="pill y">Sólo se borra lo que nadie ha tocado: un movimiento casado, asignado o marcado sin factura se conserva.</span></div>
+    <div style="display:flex;gap:8px;padding:0 12px 12px"><span style="flex:1"></span>
+     <button class="btn" id="uiAll"${free ? "" : " disabled"}>Borrar los ${free} sin conciliar</button>
+    </div></div>`;
+        db.querySelectorAll("[data-undoimp]").forEach(
+          (b) =>
+            (b.onclick = () =>
+              mutate(() => {
+                const r = erp.undoImport(b.dataset.undoimp, "backoffice");
+                closeDrawer();
+                say(`Importación deshecha: ${r.deleted} borrados, ${r.kept} conservados`);
+              }, "Importación deshecha")),
+        );
+        const all = $("#uiAll");
+        if (all)
+          all.onclick = () =>
+            mutate(() => {
+              const r = erp.discardMovements(accountId, {}, "backoffice");
+              closeDrawer();
+              say(`${r.deleted} movimientos borrados, ${r.kept} conservados`);
+            }, "Movimientos borrados");
+      }
+
       const ACCOUNT_KINDS = { bank: "Banco", card: "Tarjeta", till: "Caja" };
       /**
        * One line per account, then the sum — not the sum alone.
@@ -17143,6 +17211,7 @@
      <button class="btn sm" id="bkNew">＋ Cuenta</button>
      <span style="flex:1"></span>
      <button class="btn sm" id="bkImport">⬆ Importar extracto (.xlsx)</button>
+     <button class="btn sm" id="bkUndo">↩ Deshacer importación</button>
      <input type="file" id="bkFile" accept=".xlsx" style="display:none">
      <button class="btn sm" id="bToRec">Ir a Conciliación →</button>
    </div>
@@ -17211,6 +17280,13 @@
           /* The statement lands on ONE account — importing into "all accounts"
              would have to guess, and a guess about which bank a movement
              belongs to is a reconciliation that starts wrong. */
+          $("#bkUndo").onclick = () => {
+            if (!bankAcc) {
+              say("Elige primero la cuenta.");
+              return;
+            }
+            undoImportDrawer(bankAcc);
+          };
           $("#bkImport").onclick = () => {
             if (!bankAcc) {
               say("Elige primero la cuenta a la que pertenece el extracto.");

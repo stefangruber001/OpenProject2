@@ -4470,6 +4470,16 @@ async function testBankAndCash(browser, base) {
         named: mine.filter((m) => m.counterparty).length,
       };
     });
+    // …and it can be taken back out again, through the screen.
+    const undoShape = await pg.evaluate(() => {
+      const b = document.getElementById("bkUndo");
+      const r = b && b.getBoundingClientRect();
+      return b ? { w: Math.round(r.width), h: Math.round(r.height) } : null;
+    });
+    if (undoShape && undoShape.w > 60 && undoShape.h > 14)
+      ok(`1B: the bank screen offers an undo for an import (${undoShape.w}×${undoShape.h})`);
+    else bad("1B: undo button", JSON.stringify(undoShape));
+
     if (
       realOut.added === beforeReal + 8 &&
       realOut.payroll === 2 &&
@@ -4582,6 +4592,42 @@ async function testBankAndCash(browser, base) {
         `1D: marking removes exactly one from the queue (${marked.before} → ${marked.after}, motivo ${marked.reason})`,
       );
     else bad("1D: mark shrinks the queue", JSON.stringify(marked));
+
+    /* The undo drawer, driven: it must say what will go and what will stay,
+       and leave the decided movement behind. */
+    const undoRun = await pg.evaluate(async () => {
+      const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
+      bankAcc = acc.id;
+      render();
+      await new Promise((r) => setTimeout(r, 300));
+      // Give one movement a decision, so the drawer has something to protect.
+      const mine = erp.state.movements.filter((m) => m.accountId === acc.id && !m.matched);
+      if (mine.length) erp.markMovementUnbacked(mine[0].id, "comision", "bo");
+      const before = erp.state.movements.filter((m) => m.accountId === acc.id).length;
+      undoImportDrawer(acc.id);
+      await new Promise((r) => setTimeout(r, 300));
+      const btn = document.getElementById("uiAll");
+      const text = btn ? btn.closest(".card").textContent.replace(/\s+/g, " ") : "";
+      btn && btn.click();
+      await new Promise((r) => setTimeout(r, 500));
+      const after = erp.state.movements.filter((m) => m.accountId === acc.id);
+      return {
+        before,
+        after: after.length,
+        protectedKept: after.some((m) => m.unbacked),
+        saidKept: /Se conservan/.test(text),
+      };
+    });
+    if (
+      undoRun.before > undoRun.after &&
+      undoRun.after >= 1 &&
+      undoRun.protectedKept &&
+      undoRun.saidKept
+    )
+      ok(
+        `1B: the undo clears the untouched movements (${undoRun.before} → ${undoRun.after}) and keeps the decided one`,
+      );
+    else bad("1B: undo drawer", JSON.stringify(undoRun));
 
     if (errs.length === 0) ok("ADM-05/06: no console errors");
     else bad("ADM-05/06: no console errors", errs.slice(0, 3).join(" | "));
