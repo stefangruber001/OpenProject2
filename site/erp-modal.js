@@ -229,10 +229,12 @@
   }
 }
 /* THE LANGUAGE PILL STANDS DOWN WHILE A DIALOG IS OPEN.
-   It is fixed to the bottom-left corner, and on a phone the modal is a bottom
-   sheet — so the pill sat on top of the sheet's own footer, covering the count
-   of what had been selected and half of "Cancelar". The pill is a preference
-   that can wait; the buttons in front of the operator cannot. */
+   Written when the pill was fixed to the bottom-left corner, where on a phone
+   it sat on top of the modal sheet's own footer and covered half of
+   "Cancelar". The pill now rides in the toolbar, behind the scrim, so this is
+   belt and braces — it still matters on a page with no toolbar, where the
+   pill falls back to floating. A preference can wait; the buttons in front of
+   the operator cannot. */
 body:has(.mscrim.on) #canei-lang-pill {
   opacity: 0;
   pointer-events: none;

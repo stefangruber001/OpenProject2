@@ -4685,3 +4685,29 @@ engine.
 
 **The rule taken from it:** a guard that refuses an undo must refuse the
 original write too, or it converts a mistake into a permanent one.
+
+## S21 · The language switcher moves to the top right
+
+Operator's instruction, with both overlaps circled on a phone: "move the
+Button EN/SP/CAT from bottom left to top right … This will ensure no text
+overlapp and always available in all screens." At the bottom left the pill sat
+on the tab bar and on the foot of every long screen.
+
+It is now fixed at the top right. Two details make the instruction true rather
+than merely followed: where a page has a toolbar, an invisible spacer of the
+pill's own width is reserved at the end of it, so the profile button stops
+before the pill instead of underneath it; and the pill stands down while a
+drawer or modal is open, because a drawer puts its own Close in that same
+corner — the browser suite caught that by timing out on a click behind it.
+
+**Found and NOT fixed, deliberately.** The toolbar is written
+`position: sticky`, but `body { overflow-x: hidden }` makes the body a scroll
+container, which silently defeats it: search, Create and the bell scroll away
+on long screens. Removing that rule works and the toolbar sticks — but the
+rule was also hiding two real overflows, an unwrapped 520px table on the
+accountant screen and the closed drawer parked off the right edge, so
+`mobile: no sideways scroll` went red on `#accountant`. Turning a
+one-line request into a layout audit of 29 screens is not the trade the
+operator asked for; the pill is fixed, so it needs nothing from the sticky
+bar. Recorded here as its own piece of work: fix the two overflows, then
+replace the body rule with clipping at the root.

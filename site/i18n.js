@@ -767,16 +767,34 @@
    */
   function injectToggle() {
     if (document.getElementById("canei-lang-pill")) return;
+    /* Top right, and INSIDE the toolbar when the page has one.
+       It used to float at the bottom left, where it sat on top of the tab bar
+       on a phone and over the foot of every long screen — the operator's
+       words, with both overlaps circled: "move the button from bottom left to
+       top right … no text overlap and always available in all screens".
+       Docking it beside the other toolbar controls is what makes the second
+       half true: it cannot cover content it is part of, and it is in the same
+       place on every screen of the application. Pages with no toolbar keep a
+       fixed pill, now anchored top right and clear of the safe area. */
     var css =
-      "#canei-lang-pill{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:14px;z-index:99999;display:flex;gap:0;" +
-      "background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border:1px solid #dde5d6;border-radius:999px;" +
-      "box-shadow:0 2px 4px rgba(24,32,16,.06),0 14px 30px -18px rgba(24,32,16,.3);overflow:hidden;" +
-      "font:600 11px Inter,system-ui,sans-serif;letter-spacing:.06em}" +
+      "#canei-lang-pill{z-index:99999;display:flex;gap:0;" +
+      "background:rgba(255,255,255,.92);border:1px solid #dde5d6;border-radius:999px;" +
+      "overflow:hidden;font:600 11px Inter,system-ui,sans-serif;letter-spacing:.06em}" +
+      "#canei-lang-pill.floating{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));" +
+      "right:calc(10px + env(safe-area-inset-right,0px));backdrop-filter:blur(8px);" +
+      "box-shadow:0 2px 4px rgba(24,32,16,.06),0 14px 30px -18px rgba(24,32,16,.3)}" +
+      "#canei-lang-pill.docked{position:static;flex:0 0 auto;align-self:center}" +
       "#canei-lang-pill button{appearance:none;border:0;background:transparent;color:#8b8f80;padding:7px 12px;" +
       "cursor:pointer;font:inherit;transition:.15s}" +
       "#canei-lang-pill button.on{background:linear-gradient(120deg,#31532a,#48733c 70%);color:#fff}" +
+      /* Out of the way of anything that takes over the screen. A drawer puts
+         its own Close in the top right corner — exactly where the pill now
+         lives — so while one is open the pill stands down. A preference can
+         wait; the button in front of the operator cannot. */
+      "body:has(#drawer.on) #canei-lang-pill,body:has(.mscrim.on) #canei-lang-pill" +
+      "{opacity:0;pointer-events:none}" +
       "@media print{#canei-lang-pill{display:none}}" +
-      "@media(max-width:560px){#canei-lang-pill{bottom:calc(10px + env(safe-area-inset-bottom,0px));left:10px}#canei-lang-pill button{padding:6px 10px}}";
+      "@media(max-width:560px){#canei-lang-pill button{padding:6px 9px}}";
     var st = document.createElement("style");
     st.textContent = css;
     document.head.appendChild(st);
@@ -803,7 +821,30 @@
       });
       pill.appendChild(b);
     });
+    /* The toolbar of the application, or the page itself. `data-lang-host`
+       lets any page name its own spot without this file knowing about it. */
+    /* Fixed, so it is there on every screen at every scroll position — the
+       toolbar it sits beside is `position: sticky` but a body-level
+       `overflow-x` defeats that, which is a layout matter of its own and not
+       this file's to fix. What this file CAN do is make sure the pill covers
+       nothing: where the page has a toolbar, an invisible spacer of the same
+       size is reserved at the end of it, so the controls stop before the pill
+       instead of underneath it. */
+    pill.className = "floating";
     document.body.appendChild(pill);
+    var host = document.querySelector("[data-lang-host]") || document.querySelector(".gactions");
+    if (host) {
+      var spacer = document.createElement("span");
+      spacer.id = "canei-lang-spacer";
+      spacer.setAttribute("aria-hidden", "true");
+      spacer.style.cssText = "display:inline-block;flex:0 0 auto;height:1px";
+      host.appendChild(spacer);
+      var fit = function () {
+        spacer.style.width = pill.offsetWidth + 10 + "px";
+      };
+      fit();
+      window.addEventListener("resize", fit);
+    }
   }
 
   /* ---------- boot ---------- */

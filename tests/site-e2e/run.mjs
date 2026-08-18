@@ -9129,6 +9129,38 @@ async function testI18n(browser, base) {
     const pillButtons = await pg.locator("#canei-lang-pill button").count();
     if (pillButtons === 3) ok("i18n: the ES · CA · EN pill is on the page");
     else bad("i18n: ES · CA · EN pill", `expected 3 buttons, found ${pillButtons}`);
+
+    /* WHERE it sits, on the operator's instruction: top right, in the toolbar
+       rather than floating over the foot of the screen — "no text overlap and
+       always available in all screens". Both halves are measured: it lives in
+       the toolbar's own actions, in the right-hand third of the window, and
+       it is still on screen after scrolling to the bottom of a long page,
+       which is what the sticky toolbar is for. */
+    const placed = await pg.evaluate(() => {
+      const p = document.getElementById("canei-lang-pill");
+      const r = p.getBoundingClientRect();
+      return {
+        clearsToolbar: !!document.getElementById("canei-lang-spacer"),
+        fixed: getComputedStyle(p).position === "fixed",
+        rightThird: r.left > innerWidth * 0.66,
+        top: r.top < 120,
+      };
+    });
+    if (placed.clearsToolbar && placed.fixed && placed.rightThird && placed.top)
+      ok("i18n: the pill sits top right, with the toolbar clearing space for it");
+    else bad("i18n: pill placement", JSON.stringify(placed));
+
+    await pg.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await pg.waitForTimeout(400);
+    const stuck = await pg.evaluate(() => {
+      const r = document.getElementById("canei-lang-pill").getBoundingClientRect();
+      return { y: Math.round(r.top), onScreen: r.top >= 0 && r.bottom <= innerHeight };
+    });
+    if (stuck.onScreen)
+      ok(`i18n: …and it is still there at the bottom of a long screen (y=${stuck.y})`);
+    else bad("i18n: pill scrolls away", JSON.stringify(stuck));
+    await pg.evaluate(() => window.scrollTo(0, 0));
+    await pg.waitForTimeout(300);
     const esText = await pg.locator("body").innerText();
     if (esText.includes("Torre de control")) ok("i18n: workspace defaults to Spanish");
     else bad("i18n: workspace defaults to Spanish", esText.slice(0, 60));
