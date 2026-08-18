@@ -5932,6 +5932,80 @@ async function testAdmin(browser, base) {
     if (onRec === 1) ok("banco: the screen hands over to Conciliación explicitly");
     else bad("banco: link to reconciliation", `active tab not _reconcile (${pg.url()})`);
 
+    // ── 1G: the accountant package is a FILE, opened and READ BACK ────────
+    //    The ZIP is produced by buildAccountantZip and re-opened in the same
+    //    page by ErpImport's own ZIP reader — the export is verified by the
+    //    code that reads bank statements, not by trusting that producing it
+    //    worked. The xlsx inside is parsed back to rows; every supporting
+    //    file the sheet names must exist in the archive with bytes in it.
+    const zipCheck = await pg.evaluate(async () => {
+      // The quarter the DATA lives in, not today's: a gestor exports the
+      // closed quarter, and the seed's movements sit where the seed put them.
+      const qOf = (d) => {
+        const [y, m] = d.split("-").map(Number);
+        return y + "-Q" + Math.ceil(m / 3);
+      };
+      const byQ = {};
+      for (const m of erp.state.movements)
+        byQ[qOf(m.accountingDate)] = (byQ[qOf(m.accountingDate)] || 0) + 1;
+      const q = Object.keys(byQ).sort((a, b) => byQ[b] - byQ[a])[0];
+      const inQ = erp.state.movements.filter((m) => qOf(m.accountingDate) === q);
+      if (!q || inQ.length === 0) return { fail: "no movements in any quarter" };
+      await ErpStore.putBlob("mov_e2e_1g", new Blob([new Uint8Array(120)], { type: "image/png" }));
+      erp.attachMovementDoc(
+        inQ[0].id,
+        { storageKey: "mov_e2e_1g", name: "ticket.png", type: "image/png", size: 120 },
+        "bo",
+      );
+      // The gate stays a gate: justify what is outstanding BY NAME, then build.
+      for (const x of erp.exceptionsWithStatus(q).filter((r) => !r.accepted))
+        erp.acceptException(q, x.key, "e2e", "bo");
+      const pkg = erp.quarterlyPackage(q, { recipient: "E2E" }, "bo");
+      const z = await buildAccountantZip(q, pkg);
+      const bytes = new Uint8Array(await z.blob.arrayBuffer());
+      const dir = ErpImport.zip.centralDirectory(bytes);
+      const names = Object.keys(dir);
+      if (!names.includes("conciliacion.xlsx")) return { fail: "no conciliacion.xlsx", names };
+      const sheet = await ErpImport.zip.readEntry(bytes, dir["conciliacion.xlsx"]);
+      const rows = await ErpImport.parseXlsxRows(sheet.buffer ? sheet : new Uint8Array(sheet));
+      const header = rows[0] || [];
+      const docCol = header.indexOf("Justificante");
+      const named = rows
+        .slice(1)
+        .map((r) => r[docCol])
+        .filter(Boolean);
+      const missingInArchive = named.filter((n) => !names.includes(n));
+      const emptyEntries = names.filter((n) => n.startsWith("docs/") && dir[n].csize === 0);
+      return {
+        q,
+        entries: names.length,
+        rows: rows.length - 1,
+        movements: pkg.bankMovements.length,
+        header: header.slice(0, 4).join("|"),
+        named: named.length,
+        missingInArchive,
+        emptyEntries,
+        missingReported: z.missing.length,
+      };
+    });
+    if (zipCheck.fail) bad("1G: accountant ZIP", JSON.stringify(zipCheck));
+    else {
+      if (zipCheck.rows === zipCheck.movements && zipCheck.rows > 0)
+        ok(
+          `1G: conciliacion.xlsx parses back — one row per movement of the quarter (${zipCheck.rows})`,
+        );
+      else bad("1G: xlsx rows", JSON.stringify(zipCheck));
+      if (
+        zipCheck.named > 0 &&
+        zipCheck.missingInArchive.length === 0 &&
+        zipCheck.emptyEntries.length === 0
+      )
+        ok(
+          `1G: every supporting file the sheet names is IN the archive, with bytes (${zipCheck.named} named)`,
+        );
+      else bad("1G: docs in archive", JSON.stringify(zipCheck));
+    }
+
     if (errs.length === 0) ok("administración: no console errors");
     else bad("administración: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

@@ -528,6 +528,12 @@ window.CANEI_DICT = {
     ["Aceptada", "Accepted"],
     ["Emitida", "Issued"],
     ["Base imponible", "Taxable base"],
+    ["docs/", "docs/"],
+    ["Motivo sin factura", "No-invoice reason"],
+    [
+      "justificante(s) sin archivo detrás — el ZIP los nombra pero no puede incluirlos.",
+      "receipt(s) with no file behind them — the ZIP names them but cannot include them.",
+    ],
     ["📎 Justificante", "📎 Receipt"],
     ["Justificante ·", "Receipt ·"],
     ["Justificante adjuntado", "Receipt attached"],

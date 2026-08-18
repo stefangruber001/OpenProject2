@@ -330,5 +330,14 @@
     return { rows, headerRowIndex: rowIndex, skipped };
   }
 
-  return { parseXlsxRows, parseBbva, toCents, toIsoDate };
+  return {
+    parseXlsxRows,
+    parseBbva,
+    toCents,
+    toIsoDate,
+    // The raw ZIP reader, exported so the accountant export can be READ BACK
+    // by the same code that reads bank statements — the test opens the
+    // archive it produced instead of trusting that producing it worked.
+    zip: { centralDirectory, readEntry },
+  };
 });

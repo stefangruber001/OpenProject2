@@ -14976,6 +14976,125 @@
         });
       }
 
+      /* ---------- GES · the package the accountant actually receives ----------
+   quarterlyPackage builds the right data and, until now, the 📦 button showed
+   a toast and downloaded nothing — the deliverable of §5.6 is a FILE, and no
+   export format had ever been chosen. This is it: one ZIP —
+
+     conciliacion.xlsx   one row per bank/till movement of the quarter, with
+                         the document it was matched to, that document's
+                         number, the third party and its tax id, the reason
+                         when the movement is deliberately unbacked, and the
+                         archive name of its supporting file
+     docs/…              the actual supporting files: the captured image or
+                         attached paper of every bill of the quarter, and
+                         every movement's own receipt
+
+   Built from what is STORED, not re-derived: the matched pair comes off the
+   movement, the issuer comes off the bill (billSupplier — the stamp, with
+   the party file as fallback), and a file that the blob store cannot answer
+   for is COUNTED and reported, never silently omitted. The gestor reads the
+   xlsx; the xlsx names the files; the files are in the archive. */
+      async function buildAccountantZip(quarter, pkg) {
+        const ext = (t) =>
+          /pdf/i.test(t || "") ? ".pdf" : /png/i.test(t || "") ? ".png" : /jpe?g/i.test(t || "") ? ".jpg" : ".bin";
+        const safe = (x) =>
+          String(x || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^A-Za-z0-9._-]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 60) || "doc";
+        const files = [];
+        const missing = [];
+        const seen = new Set();
+        const addDoc = async (key, baseName) => {
+          if (!key) return "";
+          let blob = null;
+          try {
+            blob = await ErpStore.getBlob(key);
+          } catch {
+            blob = null;
+          }
+          if (!blob) {
+            missing.push(baseName);
+            return "";
+          }
+          const name = "docs/" + safe(baseName) + "_" + safe(key).slice(-6) + ext(blob.type);
+          if (!seen.has(name)) {
+            seen.add(name);
+            files.push({ path: name, bytes: new Uint8Array(await blob.arrayBuffer()) });
+          }
+          return name;
+        };
+
+        // Every bill of the quarter brings its paper.
+        const billDocName = {};
+        for (const b of erp.state.bills.filter((x) => pkg.receivedBills.some((t) => t.invoiceNumber === x.number))) {
+          const cap = b.capId ? erp.state.captured.find((c) => c.id === b.capId) : null;
+          const key = (b.supportingDoc && b.supportingDoc.storageKey) || (cap && cap.imageRef) || null;
+          billDocName[b.id] = await addDoc(key, "factura_" + (b.number || b.id));
+        }
+
+        const acc = (id) => (erp.state.bankAccounts.find((a) => a.id === id) || {}).name || "";
+        const eurTxt = (c) => (c / 100).toFixed(2).replace(".", ",");
+        const rows = [
+          ["Fecha", "Cuenta", "Concepto", "Importe (€)", "Documento", "Nº documento", "Tercero", "NIF", "Motivo sin factura", "Justificante"],
+        ];
+        for (const m of pkg.bankMovements) {
+          let docType = "";
+          let docNumber = "";
+          let party = "";
+          let taxId = "";
+          if (m.matched && m.matched.billId) {
+            const b = erp.state.bills.find((x) => x.id === m.matched.billId);
+            if (b) {
+              docType = "Factura recibida";
+              docNumber = b.number;
+              const sp = erp.billSupplier(b);
+              party = sp.name;
+              taxId = sp.taxId;
+            }
+          } else if (m.matched && m.matched.invoiceId) {
+            const i = erp.state.invoices.find((x) => x.id === m.matched.invoiceId);
+            if (i) {
+              docType = "Factura emitida";
+              docNumber = i.number;
+              const pt = erp.state.parties.find((x) => x.id === i.partyId);
+              party = pt ? pt.name : "";
+              taxId = pt ? pt.taxId || "" : "";
+            }
+          }
+          const reason = m.unbacked
+            ? (erp.listAll("unbackedReasons").find((r) => r.code === m.unbacked.reason) || {}).es ||
+              m.unbacked.reason
+            : "";
+          const ownDoc = m.supportingDoc
+            ? await addDoc(m.supportingDoc.storageKey, "mov_" + m.accountingDate + "_" + (m.concept || ""))
+            : "";
+          const matchedBillDoc =
+            m.matched && m.matched.billId ? billDocName[m.matched.billId] || "" : "";
+          rows.push([
+            m.accountingDate,
+            acc(m.accountId),
+            m.concept || m.merchantText || "",
+            eurTxt(m.amountCents),
+            docType,
+            docNumber,
+            party,
+            taxId,
+            reason,
+            ownDoc || matchedBillDoc,
+          ]);
+        }
+        const xlsx = xlsxBlob("Conciliacion " + quarter, rows);
+        files.unshift({
+          path: "conciliacion.xlsx",
+          bytes: new Uint8Array(await xlsx.arrayBuffer()),
+        });
+        return { blob: zipStore(files), entries: files.map((f) => f.path), missing, rows: rows.length - 1 };
+      }
+
       const VIEWS = {
         /* ---------- Torre de control · Mi día (DAS, spec §2.1/§2.2) ----------
     Defined once, above, as standalone functions — big enough (sparklines,
@@ -17256,10 +17375,19 @@
                 okLabel: "Enviar",
               });
               if (to === null) return;
+              let pkg = null;
               mutate(
-                () => erp.quarterlyPackage(q, { recipient: to }, "backoffice"),
+                () => (pkg = erp.quarterlyPackage(q, { recipient: to }, "backoffice")),
                 "Paquete " + q + " generado y registrado",
               );
+              if (!pkg) return;
+              const z = await buildAccountantZip(q, pkg);
+              downloadBlob(z.blob, "gestoria-" + q + ".zip");
+              if (z.missing.length)
+                say(
+                  z.missing.length +
+                    " justificante(s) sin archivo detrás — el ZIP los nombra pero no puede incluirlos.",
+                );
             };
         },
       };

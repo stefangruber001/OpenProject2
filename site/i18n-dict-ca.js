@@ -457,6 +457,10 @@ window.CANEI_DICT.ca = {
   Aceptada: "Acceptada",
   Emitida: "Emesa",
   "Base imponible": "Base imposable",
+  "docs/": "docs/",
+  "Motivo sin factura": "Motiu sense factura",
+  "justificante(s) sin archivo detrás — el ZIP los nombra pero no puede incluirlos.":
+    "justificant(s) sense arxiu al darrere — el ZIP els anomena però no els pot incloure.",
   "📎 Justificante": "📎 Justificant",
   "Justificante ·": "Justificant ·",
   "Justificante adjuntado": "Justificant adjuntat",
