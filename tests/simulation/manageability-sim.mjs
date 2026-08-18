@@ -2566,6 +2566,86 @@ assert(
   throws(() => e.markCardSettlement(purchases[1].id, card.id, "bo"), "a card cannot settle itself");
 }
 
+/**
+ * DELIBERATELY UNBACKED, WITH A REASON — and nothing is ever blocked.
+ *
+ * A bank fee has no invoice and none is coming; the operator says so once,
+ * with a reason from the owner-maintained list, and the queue stops asking.
+ * Only movements with NO invoice and NO reason keep being flagged. The mark
+ * is information for the accountant, never a gate: the exception list stops
+ * naming the movement, and the explained rows travel with their reasons.
+ */
+{
+  const e = new ERP("2026-03-10");
+  e.configureEntity(
+    { legalName: "Obras 1D SL", taxId: "B12345674", iban: "ES9121000418450200051332" },
+    "bo",
+  );
+  const acc = e.addBankAccount({ name: "BBVA", kind: "bank" }, "bo");
+  e.importMovements(
+    acc.id,
+    [
+      { accountingDate: "2026-03-05", concept: "COMISION MANTENIMIENTO", amountCents: -1200 },
+      { accountingDate: "2026-03-06", concept: "COMPRA SIN EXPLICAR", amountCents: -5000 },
+    ],
+    "bo",
+  );
+  const [fee, mystery] = e.state.movements;
+
+  assert(
+    e.unreconciledMovements().length === 2,
+    "before any mark, both movements are asked about",
+    e.unreconciledMovements().length,
+  );
+  throws(
+    () => e.markMovementUnbacked(fee.id, "inventado", "bo"),
+    "a reason the owner list does not carry is refused",
+  );
+  e.markMovementUnbacked(fee.id, "comision", "bo");
+  assert(
+    fee.unbacked && fee.unbacked.reason === "comision",
+    "the reason is stored by CODE on the movement",
+    JSON.stringify(fee.unbacked),
+  );
+  assert(
+    e.unreconciledMovements().length === 1 && e.unreconciledMovements()[0].id === mystery.id,
+    "the queue stops asking about the explained one — and ONLY that one",
+    e.unreconciledMovements().length,
+  );
+  const q = "2026-Q1";
+  const ex = e.exceptionList(q);
+  assert(
+    !ex.unallocatedMovements.includes(fee.id) && ex.unallocatedMovements.includes(mystery.id),
+    "the accountant exception names the unexplained movement, not the explained one",
+    JSON.stringify(ex.unallocatedMovements),
+  );
+  const info = e.unbackedMovements(q);
+  assert(
+    info.length === 1 &&
+      info[0].reason === "comision" &&
+      info[0].reasonLabel === "Comisión bancaria",
+    "the explained rows travel WITH their reasons, as information",
+    JSON.stringify(info),
+  );
+  e.clearMovementUnbacked(fee.id, "bo");
+  assert(
+    e.unreconciledMovements().length === 2,
+    "clearing the mark puts the movement back in the queue",
+    e.unreconciledMovements().length,
+  );
+  // A movement already matched needs no excuse and is refused one.
+  const sup = e.addParty({ roles: ["supplier"], name: "Prov 1D", taxId: "B12345674" }, "bo");
+  const bill = e.registerBill(
+    { supplierId: sup.id, number: "D-1", baseCents: 4132, vatBp: 2100 },
+    "bo",
+  );
+  e.matchMovement(mystery.id, { billId: bill.id }, "bo");
+  throws(
+    () => e.markMovementUnbacked(mystery.id, "comision", "bo"),
+    "a movement already backed by a document cannot be marked unbacked",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

@@ -9392,7 +9392,7 @@
           .map(
             (m) => `<div class="movrow${m.id === recSel ? " on" : ""}" data-mov="${m.id}">
         <span style="color:var(--muted)">${fmtD(m.accountingDate)}</span>
-        <span class="cpt">${esc(m.concept || m.merchantText || "—")}${m.needsDoc ? ' <span class="pill r">sin respaldo</span>' : ""}</span>
+        <span class="cpt">${esc(m.concept || m.merchantText || "—")}${m.needsDoc ? ' <span class="pill r">sin respaldo</span>' : ""}${m.unbacked ? ' <span class="pill g">sin factura · con motivo</span>' : ""}</span>
         <span class="amt ${m.amountCents < 0 ? "neg" : "pos"}">${eur(m.amountCents)}</span></div>`,
           )
           .join("") || '<div class="empty">Nada pendiente de conciliar en este periodo.</div>'
@@ -9431,6 +9431,9 @@
         <select class="inline" id="rcClass">${["overhead", "tax", "salary", "financial", "internalTransfer"].map((c) => `<option value="${c}">${{ overhead: "Gasto general", tax: "Impuestos", salary: "Nóminas", financial: "Financiero", internalTransfer: "Traspaso interno" }[c]}</option>`).join("")}</select>
         <button class="btn sm" id="rcClassify">Clasificar</button>
         <span style="flex:1"></span>
+        <select class="inline" id="rcWhy">${erp.listActive("unbackedReasons").map((r) => `<option value="${r.code}">${esc(r.es)}</option>`).join("")}</select>
+        <button class="btn sm" id="rcUnbacked">Sin factura, con motivo</button>
+        <span style="width:10px"></span>
         <button class="btn sm" id="rcNoDoc">Marcar sin respaldo</button>
       </div>`
       }</div>`
@@ -9510,6 +9513,13 @@
               erp.classifyMovement(sel.id, $("#rcClass").value, "backoffice");
               recSel = null;
             }, "Movimiento clasificado");
+        const unb = $("#rcUnbacked");
+        if (unb)
+          unb.onclick = () =>
+            mutate(
+              () => erp.markMovementUnbacked(sel.id, $("#rcWhy").value, "backoffice"),
+              "Movimiento explicado — sale de la cola sin factura",
+            );
         const nodoc = $("#rcNoDoc");
         if (nodoc)
           nodoc.onclick = () =>
@@ -14595,6 +14605,15 @@
           esPlaceholder: "40% a la firma · 60% a la entrega",
           caPlaceholder: "40% a la signatura · 60% a l'entrega",
         },
+        unbackedReasons: {
+          title: "Motivos sin factura (banco)",
+          code: "DMC-05",
+          singular: "motivo",
+          codeLabel: "Código",
+          codePlaceholder: "comision",
+          esPlaceholder: "Comisión bancaria",
+          caPlaceholder: "Comissió bancària",
+        },
         nextActions: {
           title: "Próximas acciones",
           code: "DMC-04",
@@ -16400,7 +16419,7 @@
         "payment-methods"(v) {
           listConfigScreen(
             v,
-            ["paymentMethods", "paymentConditions"],
+            ["paymentMethods", "paymentConditions", "unbackedReasons"],
             "Cómo se cobra (formas de pago) y en qué reparto (condiciones de pago). El vencimiento real lo calcula cada documento; aquí se mantienen las listas.",
             `<h4>Dónde se usa</h4>
     <p><b>Formas de pago</b> — en el contrato y en cada factura emitida, y es lo que se imprime

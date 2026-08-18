@@ -4040,6 +4040,38 @@ async function testBankAndCash(browser, base) {
       ok("1C: picking it marks the bank line as the card's settlement, an internal transfer");
     else bad("1C: settlement written", JSON.stringify(settled));
 
+    // ── 1D: a movement with no invoice can be EXPLAINED, and the queue
+    //    stops asking — only unexplained ones stay flagged.
+    await pg.evaluate(() => goTab("banking", "_reconcile"));
+    await pg.waitForTimeout(700);
+    const unb = await pg.evaluate(() => {
+      const b = document.getElementById("rcUnbacked");
+      const sel = document.getElementById("rcWhy");
+      if (!b || !sel) return null;
+      const r = b.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height), reasons: sel.options.length };
+    });
+    if (unb && unb.w > 60 && unb.reasons >= 4)
+      ok(`1D: the queue offers «Sin factura, con motivo» with ${unb.reasons} reasons`);
+    else bad("1D: unbacked control", JSON.stringify(unb));
+
+    const marked = await pg.evaluate(() => {
+      const before = erp.unreconciledMovements().length;
+      const id = document.querySelector(".movrow") && document.querySelector(".movrow").dataset.mov;
+      document.getElementById("rcUnbacked").click();
+      const m = erp.state.movements.find((x) => x.id === id);
+      return {
+        before,
+        after: erp.unreconciledMovements().length,
+        reason: m && m.unbacked && m.unbacked.reason,
+      };
+    });
+    if (marked.after === marked.before - 1 && marked.reason)
+      ok(
+        `1D: marking removes exactly one from the queue (${marked.before} → ${marked.after}, motivo ${marked.reason})`,
+      );
+    else bad("1D: mark shrinks the queue", JSON.stringify(marked));
+
     if (errs.length === 0) ok("ADM-05/06: no console errors");
     else bad("ADM-05/06: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

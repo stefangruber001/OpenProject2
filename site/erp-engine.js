@@ -339,6 +339,22 @@
       { code: "onAccount", es: "A cuenta", ca: "A compte" },
       { code: "oneOff", es: "Pago único", ca: "Pagament únic" },
     ],
+    /* §5.3, sharpened by the client review: every bank movement is backed by
+       an invoice — EXCEPT the ones that legitimately never will be, and those
+       are marked person-by-person with a reason from this list, never guessed
+       by a rule. Only movements with no invoice AND no reason are flagged.
+       Owner-maintained like every list here: the codes are stored on the
+       movements forever, the labels are what get edited. */
+    unbackedReasons: [
+      { code: "comision", es: "Comisión bancaria", ca: "Comissió bancària" },
+      {
+        code: "traspaso",
+        es: "Traspaso entre cuentas propias",
+        ca: "Traspàs entre comptes propis",
+      },
+      { code: "interes", es: "Intereses", ca: "Interessos" },
+      { code: "impuesto", es: "Cargo de impuestos", ca: "Càrrec d'impostos" },
+    ],
     /* Package 1, slide 9: the milestone split printed on a presupuesto — "40%
        a la firma…" — was a free-text box, so the same split got retyped
        slightly differently every time and never came back for a comparison.
@@ -5331,6 +5347,7 @@
       return this.state.movements.filter(
         (m) =>
           m.status === "unallocated" &&
+          !m.unbacked &&
           !m.excludedFromPL &&
           (!from || m.accountingDate >= from) &&
           (!to || m.accountingDate <= to),
@@ -5403,6 +5420,35 @@
      * responsible for; a task has an owner and a date, and turns up in the
      * day view until somebody deals with it.
      */
+    /**
+     * A movement that legitimately has no invoice, and says why.
+     *
+     * A bank fee, a transfer between the company's own accounts, interest — no
+     * invoice exists and none is coming, and a queue that keeps asking for one
+     * teaches the operator to ignore the queue. The reason comes from the
+     * owner-maintained list and is stored BY CODE on the movement, so renaming
+     * the label later does not rewrite history. Nothing is ever blocked by the
+     * absence of this mark — it only silences the asking. A movement already
+     * matched to a document does not need an excuse and is refused one.
+     */
+    markMovementUnbacked(movId, reasonCode, user) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      if (m.matched) throw new Error("This movement is already backed by a document");
+      const reason = this.listActive("unbackedReasons").find((r) => r.code === reasonCode);
+      if (!reason) throw new Error("Unknown reason: " + reasonCode);
+      m.unbacked = { reason: reason.code };
+      this._log(user, "markMovementUnbacked", movId + " · " + reason.code);
+      return m;
+    }
+    /** The mark was wrong — put the movement back in the queue. */
+    clearMovementUnbacked(movId, user) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      m.unbacked = null;
+      this._log(user, "clearMovementUnbacked", movId);
+      return m;
+    }
     flagMovementNoDoc(movId, user) {
       const m = this.state.movements.find((x) => x.id === movId);
       if (!m) throw new Error("Movement not found");
@@ -6426,6 +6472,30 @@
       );
       return { quarter, retainedCents: retained, sufferedCents: suffered };
     }
+    /**
+     * The quarter's deliberately-unbacked movements, WITH their reasons.
+     *
+     * Not an exception — an exception is something wrong, and these are the
+     * operator saying, name by name, that nothing is. They travel to the
+     * accountant as information (the export prints them with their reasons)
+     * rather than as a gate to be justified past: the justification already
+     * happened, one movement at a time.
+     */
+    unbackedMovements(quarter) {
+      const inQ = (d) => !quarter || quarterOf(d) === quarter;
+      return this.state.movements
+        .filter((m) => m.unbacked && inQ(m.accountingDate))
+        .map((m) => ({
+          id: m.id,
+          accountingDate: m.accountingDate,
+          concept: m.concept || m.merchantText || "",
+          amountCents: m.amountCents,
+          reason: m.unbacked.reason,
+          reasonLabel:
+            (this.listAll("unbackedReasons").find((r) => r.code === m.unbacked.reason) || {}).es ||
+            m.unbacked.reason,
+        }));
+    }
     exceptionList(quarter) {
       // GES-07
       const inQ = (d) => quarterOf(d) === quarter;
@@ -6442,7 +6512,7 @@
           .filter((id) => !validTaxId(this.party(id).taxId))
           .map((id) => this.party(id).code),
         unallocatedMovements: this.state.movements
-          .filter((m) => m.status === "unallocated" && inQ(m.accountingDate))
+          .filter((m) => m.status === "unallocated" && !m.unbacked && inQ(m.accountingDate))
           .map((m) => m.id),
         unmatchedReceipts: this.state.receipts
           .filter((r) => inQ(r.date) && !r.allocatedToInvoiceId)
