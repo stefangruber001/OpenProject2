@@ -15070,6 +15070,23 @@
         return `<optgroup label="Liquidación de tarjeta">${opts}</optgroup>`;
       }
 
+      /**
+       * Who the transaction was with — the question the operator is asking.
+       *
+       * A real statement names the counterparty in its own column and puts a
+       * scheme category in the concept: «TRANSFERENCIAS», «PAGO CON TARJETA EN
+       * HOGAR, MUEBLES, DECORACION Y ELECTR». Reading merchant text first hid
+       * the supplier name behind an order reference, and reading the concept
+       * first showed a category that is identical for every hardware shop in
+       * the country. The name comes first, and what is left goes quietly
+       * beside it.
+       */
+      function movWho(m) {
+        const lead = m.counterparty || m.merchantText || m.concept || "—";
+        const rest = m.counterparty && m.merchantText !== m.counterparty ? m.merchantText : "";
+        return esc(lead) + (rest ? ` <span class="sub">${esc(rest)}</span>` : "");
+      }
+
       const ACCOUNT_KINDS = { bank: "Banco", card: "Tarjeta", till: "Caja" };
       /**
        * One line per account, then the sum — not the sum alone.
@@ -17151,7 +17168,7 @@
            : null;
          return `<tr class="xrow${open ? " unapproved" : ""}">
       <td>${fmtD(m.accountingDate)}</td>
-      <td class="k">${esc(m.merchantText || m.counterparty || m.concept || "—")}${m.card ? ` <span class="pill b">${esc(m.card)}</span>` : ""}</td>
+      <td class="k">${movWho(m)}${m.card ? ` <span class="pill b">${esc(m.card)}</span>` : ""}</td>
       <td class="num" style="color:${m.amountCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur(m.amountCents)}</td>
       <td><select class="inline" data-bkclass="${m.id}">
         <option value="">—</option>

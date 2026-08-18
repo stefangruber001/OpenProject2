@@ -159,6 +159,17 @@
           if (m) {
             val = unescapeXml(m[1]);
             if (t === "s") val = strings[Number(val)] ?? "";
+            else if (!t || t === "n") {
+              /* A numeric cell keeps its NUMBER, because the type is the only
+                 thing that tells «1.234» the thousand from «1.234» the one
+                 point two three four: a sheet writes numbers in canonical
+                 form with a dot, a Spanish text cell writes them with a
+                 comma and groups thousands with the dot. Reading both as
+                 text made one of them wrong, and which one depended on the
+                 bank. */
+              const n = Number(val);
+              if (val !== "" && Number.isFinite(n)) val = n;
+            }
           }
         }
         const idx = ref != null ? colIndex(ref) : cells.length;
@@ -198,10 +209,31 @@
       .toLowerCase();
 
   /** "1.234,56", "-1234.56", "1 234,56 €" → integer cents. Null when not a number. */
+  /**
+   * Money as exact integer cents, from whatever the sheet holds.
+   *
+   * Two languages arrive here. A NUMBER is the sheet's own value: the decimal
+   * point is a decimal point, and it may carry the full binary expansion of a
+   * float — a real BBVA export writes sixty-nine euros ten as
+   * -69.099999999999994. Rounding is the only correct reading of that, and
+   * the text path below would have read its fifteen tail digits as euros:
+   * that one row alone became -6,909,999,999,999,999,000 cents, past the
+   * point where integers are even exact.
+   *
+   * TEXT is a human number in the export's own locale: «1.234,56», «-1.000»,
+   * «(12,00)». There the last separator is the decimal one when both appear;
+   * with only one separator a three-digit tail is the thousands grouping
+   * Spanish writes, and any other length is a fraction.
+   */
   function toCents(raw) {
+    if (typeof raw === "number") {
+      if (!Number.isFinite(raw)) return null;
+      const sign = raw < 0 ? -1 : 1;
+      return sign * Math.round(Math.abs(raw) * 100);
+    }
     let s = String(raw ?? "").trim();
     if (!s) return null;
-    s = s.replace(/[€\s ]/g, "");
+    s = s.replace(/[€\s ]/g, "");
     let sign = 1;
     if (/^\(.*\)$/.test(s)) {
       sign = -1;
@@ -211,7 +243,6 @@
       sign *= -1;
       s = s.slice(1);
     } else if (s.startsWith("+")) s = s.slice(1);
-    // Whichever separator comes LAST is the decimal one; the rest are noise.
     const lastComma = s.lastIndexOf(",");
     const lastDot = s.lastIndexOf(".");
     let intPart = s;
@@ -219,15 +250,22 @@
     const dec = Math.max(lastComma, lastDot);
     if (dec >= 0) {
       const tail = s.slice(dec + 1);
-      if (tail.length <= 2 && /^\d*$/.test(tail)) {
+      const both = lastComma >= 0 && lastDot >= 0;
+      if (/^\d*$/.test(tail) && (both || tail.length !== 3)) {
         intPart = s.slice(0, dec);
         decPart = tail;
       }
     }
     intPart = intPart.replace(/[.,]/g, "");
     if (!/^\d*$/.test(intPart) || (intPart === "" && decPart === "")) return null;
-    const centsStr = (decPart + "00").slice(0, 2);
-    return sign * (Number(intPart || "0") * 100 + Number(centsStr));
+    // Rounded, not truncated: «,995» is a cent up, not a cent lost.
+    let whole = Number(intPart || "0");
+    let cents = decPart ? Math.round(Number("0." + decPart) * 100) : 0;
+    if (cents >= 100) {
+      whole += Math.floor(cents / 100);
+      cents = cents % 100;
+    }
+    return sign * (whole * 100 + cents);
   }
 
   /** DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD or an Excel serial → ISO date. */
@@ -260,6 +298,12 @@
     currency: ["divisa"],
     balance: ["disponible", "saldo"],
     observations: ["observaciones"],
+    // Present in every real export and dropped by the first version of this
+    // parser: the counterparty is the single most useful field for deciding
+    // WHICH invoice a transaction pays.
+    counterparty: ["beneficiario", "ordenante", "benef"],
+    opCode: ["codigo", "cod."],
+    reference: ["remesa", "referencia"],
   };
 
   function findHeader(rows) {
@@ -316,17 +360,35 @@
       }
       const concept = String(get("concept") || "").trim();
       const detail = String(get("detail") || "").trim();
+      const observations = String(get("observations") || "").trim();
+      /* Where the merchant actually is. A card payment on a real statement
+         says «PAGO CON TARJETA EN HOGAR, MUEBLES, DECORACION Y ELECTR» as its
+         concept — the scheme's category, the same for every hardware shop in
+         the country — and names the shop in OBSERVACIONES. Leaving
+         merchantText empty meant the merchant rules (BNK-05), which key on
+         it, could never fire on a real import, and the screen showed a
+         category where the operator was looking for a supplier. */
+      const merchantText = detail && detail !== concept ? detail : observations;
       rows.push({
         accountingDate,
         valueDate: toIsoDate(get("valueDate")) || accountingDate,
         concept: concept || detail,
-        merchantText: detail && detail !== concept ? detail : "",
-        observations: String(get("observations") || "").trim(),
+        counterparty: String(get("counterparty") || "").trim(),
+        merchantText,
+        observations,
+        opCode: String(get("opCode") || "").trim(),
+        reference: String(get("reference") || "").trim(),
         amountCents,
         balanceCents: toCents(get("balance")),
         currency: String(get("currency") || "EUR").trim() || "EUR",
       });
     }
+    /* Chronological, whatever order the export used. BBVA writes newest
+       first; a ledger reads oldest first, and the running balance only tells
+       its story in that direction. The reversal preserves the bank's own
+       sequence within a day, which sorting by date would not. */
+    if (rows.length > 1 && rows[0].accountingDate > rows[rows.length - 1].accountingDate)
+      rows.reverse();
     return { rows, headerRowIndex: rowIndex, skipped };
   }
 

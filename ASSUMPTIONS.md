@@ -4589,3 +4589,53 @@ empty state says which one. Checked across all 29 routes on an empty register;
 the remaining empty screens are project-scoped ones that say "no projects yet"
 (a project arrives from an accepted budget, which is a different screen's job)
 and Usuarios, which correctly reports that accounts live on the server.
+
+## S20 · The real BBVA files, and what a fixture cannot tell you
+
+The tenant sent two genuine exports on 18/08 — one current account, one credit
+card. The importer had been built, tested and deployed against a fixture
+invented before anyone had seen either. It met the real files for the first
+time in a diagnostic run, and failed three ways, each one silent and each one
+money:
+
+1. **Amounts.** The account export stores IMPORTE as a NUMERIC cell carrying
+   the full binary expansion of a float: sixty-nine euros ten is written
+   `-69.099999999999994`. `toCents` read text only, and its
+   thousands-separator guard treated any tail longer than two digits as
+   euros — so that row became −6 909 999 999 999 999 000 cents, past the
+   point where integers are exact. **117 of 479 rows were wrong.**
+2. **De-duplication.** The statement pays two people 500 € of payroll on the
+   same day, twice over. `previewImport` keyed on date│amount│concept and
+   suppressed within the batch, so one of each pair was dropped as a
+   duplicate: 1 000 € removed from the register and reported as tidiness.
+3. **The counterparty.** BENEFICIARIO/ORDENANTE was not in the header map at
+   all, so the supplier name — the field that decides which invoice a
+   transaction pays — was discarded. `merchantText` was empty on every real
+   row, which also meant the merchant rules (BNK-05) could never fire.
+
+Fixed: cell types survive the read (a number is a number), cents are rounded
+rather than truncated, duplicates are counted rather than merely seen, and
+the counterparty, operation code and reference travel with the row. The
+ledger is turned chronological, since the bank writes newest first.
+
+**The real files are NOT in this repository and must not be.** They carry a
+live IBAN, full card numbers and the names of real people and suppliers, and
+this repository is public. `tests/fixtures/make-bbva-fixtures.py` reproduces
+the two layouts — the metadata block, the header on the sixteenth row
+starting in column C, the text dates, the numeric amounts with float noise,
+the newest-first order, the identical payroll pair, and the card file's ISO
+dates and comma decimals — with invented values. Regenerate with
+`python3 tests/fixtures/make-bbva-fixtures.py`.
+
+**Verified against the real files, not only the fixtures:** all 479 account
+rows and 53 card rows parse; the running balance chain closes on every one of
+the 478 steps, which is the bank's own arithmetic agreeing with ours to the
+cent; opening plus every movement lands exactly on the statement's closing
+balance; re-importing both files finds every row a duplicate and adds
+nothing.
+
+**Known and deliberate:** the accountant ZIP still refuses to build while any
+movement is unallocated and unexplained (477 of them, on a fresh import of a
+year's statement). That is the designed gate, not a defect — but it means the
+quarter cannot be exported until the queue is worked through. Only `.xlsx` is
+imported; the PDF exports are for reading, per the decision recorded above.

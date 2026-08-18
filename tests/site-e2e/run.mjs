@@ -4441,6 +4441,45 @@ async function testBankAndCash(browser, base) {
     if (movsFinal === movsAfter) ok("1B: and nothing was imported twice");
     else bad("1B: no duplicate import", `${movsAfter} → ${movsFinal}`);
 
+    /* The layout a real export actually has (S20): metadata above the header,
+       the table starting in column C, dates as text, amounts as numeric cells
+       with binary-float noise, newest row first, and two identical payroll
+       payments on one day. Driven through the same file input, because the
+       parser being right in a unit test says nothing about the screen. */
+    const beforeReal = await pg.evaluate(() => erp.state.movements.length);
+    await pg.setInputFiles("#bkFile", "tests/fixtures/bbva-cuenta.xlsx");
+    await pg.waitForTimeout(1100);
+    const realPv = await pg.evaluate(() => {
+      const go = document.getElementById("stGo");
+      if (!go) return null;
+      const t = go.closest(".card").textContent.replace(/\s+/g, " ");
+      return { disabled: go.disabled, text: t.slice(0, 200) };
+    });
+    if (realPv && !realPv.disabled && /Movimientos nuevos\s*8/.test(realPv.text))
+      ok("1B: a real-layout export previews all eight of its movements");
+    else bad("1B: real-layout preview", JSON.stringify(realPv));
+    await pg.click("#stGo");
+    await pg.waitForTimeout(700);
+    const realOut = await pg.evaluate(() => {
+      const mine = erp.state.movements.slice(-8);
+      return {
+        added: erp.state.movements.length,
+        payroll: mine.filter((m) => m.amountCents === -50000).length,
+        noisy: mine.filter((m) => m.amountCents === -6910).length,
+        big: mine.filter((m) => m.amountCents === -1876644).length,
+        named: mine.filter((m) => m.counterparty).length,
+      };
+    });
+    if (
+      realOut.added === beforeReal + 8 &&
+      realOut.payroll === 2 &&
+      realOut.noisy === 1 &&
+      realOut.big === 1 &&
+      realOut.named > 0
+    )
+      ok("1B: …and imports them as money: both payrolls kept, float noise exact to the cent");
+    else bad("1B: real-layout import", JSON.stringify(realOut));
+
     // ── 1C: a credit card is an ACCOUNT — created through the product, fed
     //    by the same importer, settled from the bank as an internal transfer.
     await pg.click("#bkNew");

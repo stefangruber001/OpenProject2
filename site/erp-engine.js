@@ -5104,19 +5104,31 @@
       const existing = this.state.movements.filter((m) => m.accountId === accountId);
       const key = (r) =>
         [r.accountingDate, cents(r.amountCents), (r.concept || "").trim().toUpperCase()].join("|");
-      const seen = new Map();
-      for (const m of existing) seen.set(key(m), m.id);
+      /* Counted, not merely seen. Two transactions can be identical in date,
+         amount and concept and still be two transactions: a real statement
+         from this tenant pays two people 500 € of payroll on the same day,
+         twice over. Treating the second as a duplicate of the first dropped
+         1.000 € from the register and reported it as tidiness.
+         So the question is not "has this key appeared?" but "how many of
+         this key does the register already hold?" — the excess is the
+         duplicate. Re-importing the same statement still finds every row a
+         duplicate, because the counts then match exactly. */
+      const held = new Map();
+      const idOf = new Map();
+      for (const m of existing) {
+        const k = key(m);
+        held.set(k, (held.get(k) || 0) + 1);
+        if (!idOf.has(k)) idOf.set(k, m.id);
+      }
       const fresh = [];
       const duplicates = [];
-      const withinBatch = new Set();
       for (const r of rows) {
         const k = key(r);
-        if (seen.has(k) || withinBatch.has(k))
-          duplicates.push({ row: r, existingId: seen.get(k) || null });
-        else {
-          withinBatch.add(k);
-          fresh.push(r);
-        }
+        const left = held.get(k) || 0;
+        if (left > 0) {
+          held.set(k, left - 1);
+          duplicates.push({ row: r, existingId: idOf.get(k) || null });
+        } else fresh.push(r);
       }
       const dates = rows
         .map((r) => r.accountingDate)
