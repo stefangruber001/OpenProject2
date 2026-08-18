@@ -2264,6 +2264,201 @@ assert(
   assert(pkgRows.length >= 1, "the quarter has bills to report");
 }
 
+/**
+ * A COST CAN NAME THE PARTIDA IT PAID FOR — and only a true one.
+ *
+ * Every allocation path stops at the chapter today; block 5's reporting wants
+ * one level deeper. The field is optional everywhere (every allocation written
+ * before it existed stays valid), but a lineId that IS given must name a line
+ * of the project's ACCEPTED version, in the chapter it claims — a cost filed
+ * against a partida from the wrong chapter is exactly the wrong that no report
+ * surfaces, because both numbers look plausible and the drill-down quietly
+ * disagrees with the totals above it.
+ */
+{
+  const e = new ERP("2026-03-02");
+  e.configureEntity(
+    {
+      legalName: "Obras 1F SL",
+      taxId: "B12345674",
+      street: "s",
+      postalCode: "08960",
+      city: "c",
+      iban: "ES9121000418450200051332",
+    },
+    "bo",
+  );
+  const cli = e.addParty(
+    {
+      roles: ["customer"],
+      name: "Cli 1F",
+      taxId: "12345678Z",
+      billStreet: "s",
+      billPostalCode: "08001",
+      billCity: "BCN",
+      mobile: "600111222",
+      email: "cli1f@example.com",
+    },
+    "bo",
+  );
+  const sup = e.addParty({ roles: ["supplier"], name: "Prov 1F", taxId: "B12345674" }, "bo");
+  const bg = e.createBudget({ partyId: cli.id }, "bo");
+  const c1 = e.addChapter(bg.id, { name: "Demoliciones" }, "bo");
+  const c2 = e.addChapter(bg.id, { name: "Pintura" }, "bo");
+  const l1 = e.addLine(
+    bg.id,
+    c1.id,
+    { desc: "Tabique", unit: "m2", qtyMilli: 10000, priceCents: 2000, costCents: 1000 },
+    "bo",
+  );
+  e.addLine(
+    bg.id,
+    c2.id,
+    { desc: "Pintar", unit: "m2", qtyMilli: 10000, priceCents: 1000, costCents: 500 },
+    "bo",
+  );
+  e.issueVersion(bg.id, {}, "bo");
+  e.acceptVersion(bg.id, e.currentVersion(bg.id).id, { evidenceRef: "ok" }, "bo");
+  const pj = e.createProjectFromAcceptance(bg.id, "bo");
+
+  // Happy path: the chapter is FILLED IN from the line, not asked for twice.
+  const b1 = e.registerBill(
+    {
+      supplierId: sup.id,
+      number: "1F-1",
+      baseCents: 5000,
+      allocations: [{ projectId: pj.id, lineId: l1.id, kind: "material", amountCents: 5000 }],
+    },
+    "bo",
+  );
+  assert(
+    b1.allocations[0].lineId === l1.id && b1.allocations[0].chapterNum === String(c1.num),
+    "an allocation that names a partida gets its chapter filled in from it",
+    JSON.stringify(b1.allocations[0]),
+  );
+
+  // The wrong chapter for that partida is refused, not corrected silently.
+  throws(
+    () =>
+      e.registerBill(
+        {
+          supplierId: sup.id,
+          number: "1F-2",
+          baseCents: 5000,
+          allocations: [
+            {
+              projectId: pj.id,
+              chapterNum: String(c2.num),
+              lineId: l1.id,
+              kind: "material",
+              amountCents: 5000,
+            },
+          ],
+        },
+        "bo",
+      ),
+    "a partida filed under the wrong chapter is refused",
+  );
+  throws(
+    () =>
+      e.registerBill(
+        {
+          supplierId: sup.id,
+          number: "1F-3",
+          baseCents: 5000,
+          allocations: [
+            { projectId: pj.id, lineId: "lin_nope", kind: "material", amountCents: 5000 },
+          ],
+        },
+        "bo",
+      ),
+    "a partida the accepted budget does not contain is refused",
+  );
+  throws(
+    () =>
+      e.registerBill(
+        {
+          supplierId: sup.id,
+          number: "1F-4",
+          baseCents: 5000,
+          allocations: [
+            { overheadCategory: "office", lineId: l1.id, kind: "other", amountCents: 5000 },
+          ],
+        },
+        "bo",
+      ),
+    "an overhead cost cannot name a partida",
+  );
+  {
+    const quick = e.createQuickProject(
+      { partyId: cli.id, desc: "Rápido", activityLine: "reforma", valueCents: 100000 },
+      "bo",
+    );
+    throws(
+      () =>
+        e.registerBill(
+          {
+            supplierId: sup.id,
+            number: "1F-5",
+            baseCents: 5000,
+            allocations: [
+              { projectId: quick.id, lineId: l1.id, kind: "material", amountCents: 5000 },
+            ],
+          },
+          "bo",
+        ),
+      "a project with no accepted budget cannot take a partida allocation",
+    );
+  }
+
+  // The bank path carries it too — a movement split names the same level.
+  const acc = e.addBankAccount({ name: "Banco 1F", kind: "bank" }, "bo");
+  e.importMovements(
+    acc.id,
+    [{ accountingDate: e.state.today, concept: "COMPRA 1F", amountCents: -5000 }],
+    "bo",
+  );
+  const mv = e.state.movements[e.state.movements.length - 1];
+  e.splitMovement(
+    mv.id,
+    [{ projectId: pj.id, lineId: l1.id, kind: "material", amountCents: 5000 }],
+    "bo",
+  );
+  assert(
+    mv.allocations[0].lineId === l1.id && mv.allocations[0].chapterNum === String(c1.num),
+    "a bank movement's split can name the partida, chapter filled in",
+    JSON.stringify(mv.allocations[0]),
+  );
+
+  // Promotion keeps the partida through the rescale.
+  const cap = e.captureDocument({ docType: "supplierInvoice", imageRef: "b1f" }, "bo");
+  e.confirmCapture(
+    cap.id,
+    {
+      issuerName: "Prov 1F",
+      issuerTaxId: "B12345674",
+      docNumber: "1F-CAP",
+      date: e.state.today,
+      baseCents: 10000,
+      vatCents: 2100,
+      totalCents: 12100,
+    },
+    "bo",
+  );
+  e.allocateCapture(
+    cap.id,
+    [{ projectId: pj.id, lineId: l1.id, kind: "material", amountCents: 12100 }],
+    "bo",
+  );
+  const promoted1f = e.billFromCapture(cap.id, { supplierId: sup.id }, "bo");
+  assert(
+    promoted1f.allocations[0].lineId === l1.id &&
+      promoted1f.allocations[0].amountCents === promoted1f.baseCents,
+    "capture → bill promotion keeps the partida through the rescale",
+    JSON.stringify(promoted1f.allocations[0]),
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

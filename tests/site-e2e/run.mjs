@@ -2453,6 +2453,77 @@ async function testSupplierBillEntry(browser, base) {
       ok("AP-01: the document and the invoice end up pointing at each other");
     else bad("AP-01: capture → bill link", JSON.stringify(linked));
 
+    // ── 1F: the allocation can name the PARTIDA, one level below the chapter ──
+    const pid = await pg.evaluate(() => {
+      const p = erp.state.projects.find(
+        (x) =>
+          x.budgetId &&
+          x.acceptedVersionId &&
+          !x.closed &&
+          erp.version(x.budgetId, x.acceptedVersionId).chapters.some((c) => c.lines.length),
+      );
+      return p ? p.id : null;
+    });
+    if (!pid) bad("1F: a project with an accepted budget to allocate against", "none in seed");
+    else {
+      await pg.click("#sb_new");
+      await pg.waitForTimeout(300);
+      await pg.evaluate((id) => {
+        document.getElementById("bd_num").value = "E2E-1F";
+        document.getElementById("bd_base").value = "250";
+        document.getElementById("bd_base").dispatchEvent(new Event("input", { bubbles: true }));
+        const dest = document.querySelector('#bd_rows [data-k="dest"]');
+        dest.value = "p:" + id;
+        dest.dispatchEvent(new Event("change", { bubbles: true }));
+      }, pid);
+      await pg.waitForTimeout(250);
+      const chap = await pg.evaluate(() => {
+        const sel = document.querySelector('#bd_rows [data-k="chapterNum"]');
+        const first = [...sel.options].find((o) => o.value);
+        sel.value = first.value;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        return first.value;
+      });
+      await pg.waitForTimeout(250);
+      // Geometry, not presence: a select nobody can see has shipped before.
+      const lineSel = await pg.evaluate(() => {
+        const sel = document.querySelector('#bd_rows [data-k="lineId"]');
+        if (!sel) return null;
+        const r = sel.getBoundingClientRect();
+        const opts = [...sel.options].filter((o) => o.value);
+        return { w: Math.round(r.width), h: Math.round(r.height), n: opts.length };
+      });
+      if (lineSel && lineSel.n >= 1 && lineSel.w > 80 && lineSel.h >= 20)
+        ok(
+          `1F: choosing a chapter offers its partidas (${lineSel.n} options, ${lineSel.w}×${lineSel.h})`,
+        );
+      else bad("1F: partida select visible", JSON.stringify(lineSel));
+
+      const lineId = await pg.evaluate(() => {
+        const sel = document.querySelector('#bd_rows [data-k="lineId"]');
+        const first = [...sel.options].find((o) => o.value);
+        sel.value = first.value;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        return first.value;
+      });
+      await pg.waitForTimeout(250);
+      await pg.evaluate(() => {
+        const amt = document.querySelector('#bd_rows [data-k="amountCents"]');
+        amt.value = "250";
+        amt.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await pg.waitForTimeout(200);
+      await pg.click("#bd_go");
+      await pg.waitForTimeout(600);
+      const stored = await pg.evaluate(() => {
+        const b = erp.state.bills.find((x) => x.number === "E2E-1F");
+        return b && b.allocations[0];
+      });
+      if (stored && stored.lineId === lineId && stored.chapterNum === chap)
+        ok("1F: the registered bill carries chapter AND partida on its allocation");
+      else bad("1F: lineId stored on the bill", JSON.stringify(stored));
+    }
+
     if (!errs.length) ok("AP-01: no console errors");
     else bad("AP-01: console", errs.slice(0, 2).join(" | "));
   } catch (e) {

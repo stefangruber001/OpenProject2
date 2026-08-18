@@ -3915,6 +3915,7 @@
           projectId: a.projectId || null,
           overheadCategory: a.overheadCategory || null,
           chapterNum: a.chapterNum || null,
+          lineId: a.lineId || null,
           kind: a.kind || "material",
           amountCents: Math.round(a.amountCents),
         }),
@@ -4847,6 +4848,7 @@
           projectId: a.projectId || null,
           overheadCategory: a.projectId ? null : a.overheadCategory || null,
           chapterNum: a.chapterNum || null,
+          lineId: a.lineId || null,
           kind: a.kind || "material",
           amountCents,
         };
@@ -5058,10 +5060,54 @@
       }
       return null;
     }
+    /**
+     * A cost that names a partida, checked against the budget it names it from.
+     *
+     * `lineId` is the one level below the chapter, and it is OPTIONAL
+     * everywhere: every allocation written before this field existed is valid
+     * without touching it, and a cost that only knows its chapter stays legal
+     * forever. But a lineId that IS given has to be true, because the whole
+     * point of the field is that block-5 reporting will trust it — so it must
+     * name a line of the project's accepted version, and if a chapter is also
+     * named, the line must belong to that chapter. A cost filed against a
+     * partida from the wrong chapter is precisely the kind of wrong that no
+     * report ever surfaces: both numbers exist, both look plausible, and the
+     * drill-down quietly disagrees with the chapter totals above it.
+     *
+     * When the chapter is NOT given, it is filled in from the line — a partida
+     * implies its chapter, and asking the operator to say the same thing twice
+     * is how the two answers end up different.
+     */
+    _lineAlloc(alloc) {
+      if (!alloc.lineId) {
+        // Normalised to null (not undefined, not "") so every stored
+        // allocation has the same shape whichever door it came through.
+        return { ...alloc, lineId: null };
+      }
+      if (!alloc.projectId)
+        throw new Error("A partida belongs to a project; an overhead cost cannot name one");
+      const p = this.project(alloc.projectId);
+      if (!p.budgetId || !p.acceptedVersionId)
+        throw new Error("This project has no accepted budget to name a partida from");
+      const hit = this.findLine(p.budgetId, alloc.lineId, p.acceptedVersionId);
+      if (!hit) throw new Error("Unknown partida for this project's accepted budget");
+      const chapterNum = String(hit.chapter.num);
+      if (alloc.chapterNum && String(alloc.chapterNum) !== chapterNum)
+        throw new Error(
+          "Partida " +
+            hit.line.num +
+            " belongs to chapter " +
+            chapterNum +
+            ", not " +
+            alloc.chapterNum,
+        );
+      return { ...alloc, lineId: alloc.lineId, chapterNum };
+    }
     /** The same allocation with its account resolved onto it. */
     withAccountCode(alloc) {
-      const code = this.resolveAccountCode(alloc);
-      return code ? { ...alloc, accountCode: code } : { ...alloc };
+      const a = this._lineAlloc(alloc);
+      const code = this.resolveAccountCode(a);
+      return code ? { ...a, accountCode: code } : a;
     }
     /**
      * Cost by account over a period — the roll-up that proves the wiring, and

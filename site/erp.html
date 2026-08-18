@@ -7258,6 +7258,30 @@
           )
           .join("");
       }
+      /* The partidas of one chapter of a project's ACCEPTED budget. The
+         accepted version, not the current one, because costs are controlled
+         against what was signed; a draft that renumbers its lines must not
+         re-aim money that was already filed. Empty when the project has no
+         accepted budget (quick projects) — the select simply does not render,
+         same rule as chapterOptions above. */
+      function lineOptionsFor(pid, chapterNum, sel) {
+        const p = erp.project(pid);
+        if (!p.budgetId || !p.acceptedVersionId || !chapterNum) return "";
+        let v;
+        try {
+          v = erp.version(p.budgetId, p.acceptedVersionId);
+        } catch {
+          return "";
+        }
+        const ch = (v.chapters || []).find((c) => String(c.num) === String(chapterNum));
+        if (!ch || !ch.lines.length) return "";
+        return ch.lines
+          .map(
+            (l) =>
+              `<option value="${l.id}"${l.id === sel ? " selected" : ""}>${esc(l.num)} · ${esc(lineDesc(l).slice(0, 48))}</option>`,
+          )
+          .join("");
+      }
       function noProjectsCard(v) {
         v.innerHTML = '<div class="card"><div class="empty">Todavía no hay proyectos.</div></div>';
       }
@@ -13271,6 +13295,7 @@
           projectId: a.projectId || "",
           overheadCategory: a.overheadCategory || "",
           chapterNum: a.chapterNum || "",
+          lineId: a.lineId || "",
           kind: a.kind || "material",
           amountCents: a.amountCents,
         }));
@@ -13332,6 +13357,7 @@
                 projectId: a.projectId || null,
                 overheadCategory: a.projectId ? null : a.overheadCategory || null,
                 chapterNum: a.chapterNum || null,
+                lineId: a.lineId || null,
                 kind: a.kind,
                 amountCents: a.amountCents,
               })),
@@ -13347,6 +13373,18 @@
    a line that names both, and a screen that lets you tick two boxes and then
    says no is a screen that asked the question badly. */
       let capAlloc = [];
+      /* The level below the chapter, offered only where it exists: a chapter
+         chosen, on a project whose accepted budget has lines under it. Optional
+         by design — the engine takes chapter-only allocations forever — so the
+         empty choice stays first. Built outside the row template: a template
+         nested inside a template is what the source audit misreads as prose,
+         three times now. */
+      function lineField(a, i) {
+        if (!a.projectId || !a.chapterNum) return "";
+        const opts = lineOptionsFor(a.projectId, a.chapterNum, a.lineId);
+        if (!opts) return "";
+        return `<div class="field"><label>Partida</label><select data-ai="${i}" data-k="lineId"><option value="">—</option>${opts}</select></div>`;
+      }
       function capAllocRows(id, total, opt) {
         /* `opt` lets a second screen borrow this editor without copying it. A
            supplier invoice is split exactly the way a photographed document is
@@ -13375,7 +13413,7 @@
     ${
       a.projectId
         ? `<div class="field"><label>Capítulo</label><select data-ai="${i}" data-k="chapterNum"><option value="">—</option>${chapterOptions(a.projectId, a.chapterNum)}</select></div>
-    <div class="field"><label>Naturaleza</label><select data-ai="${i}" data-k="kind">${Object.entries(
+    ${lineField(a, i)}<div class="field"><label>Naturaleza</label><select data-ai="${i}" data-k="kind">${Object.entries(
       COST_KIND_LABEL,
     )
       .map(([k, l]) => `<option value="${k}"${a.kind === k ? " selected" : ""}>${esc(l)}</option>`)
@@ -13409,9 +13447,15 @@
               const val = inp.value;
               a.projectId = val.startsWith("p:") ? val.slice(2) : "";
               a.overheadCategory = val.startsWith("o:") ? val.slice(2) : "";
+              a.lineId = "";
               if (!a.projectId) {
                 a.chapterNum = "";
               }
+            } else if (k === "chapterNum") {
+              // A partida belongs to one chapter; changing the chapter must not
+              // quietly keep the old chapter's line.
+              a.chapterNum = inp.value;
+              a.lineId = "";
             } else if (k === "amountCents")
               a.amountCents = Math.round(Number(String(inp.value).replace(",", ".")) * 100) || 0;
             else a[k] = inp.value;
@@ -13433,6 +13477,7 @@
           projectId: "",
           overheadCategory: "",
           chapterNum: "",
+          lineId: "",
           kind: "material",
           amountCents: amountCents || 0,
         };
@@ -13471,6 +13516,7 @@
               projectId: a.projectId || "",
               overheadCategory: a.overheadCategory || "",
               chapterNum: a.chapterNum || "",
+              lineId: a.lineId || "",
               kind: a.kind || "material",
               amountCents: a.amountCents,
             }))
@@ -13526,6 +13572,7 @@
                 projectId: a.projectId || null,
                 overheadCategory: a.projectId ? null : a.overheadCategory || null,
                 chapterNum: a.chapterNum || null,
+                lineId: a.lineId || null,
                 kind: a.kind || "material",
                 amountCents: a.amountCents,
               }));
