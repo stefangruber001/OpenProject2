@@ -2453,6 +2453,45 @@ async function testSupplierBillEntry(browser, base) {
       ok("AP-01: the document and the invoice end up pointing at each other");
     else bad("AP-01: capture → bill link", JSON.stringify(linked));
 
+    // ── Block 4: a split typed as PERCENTAGES lands as exact cents ─────────
+    const pctSplit = await pg.evaluate(async () => {
+      const projects = erp.state.projects.filter((p) => !p.closed).slice(0, 2);
+      if (projects.length < 2) return { skip: "needs two open projects" };
+      document.getElementById("sb_new").click();
+      await new Promise((r) => setTimeout(r, 300));
+      document.getElementById("bd_num").value = "E2E-PCT";
+      document.getElementById("bd_base").value = "1000";
+      document.getElementById("bd_base").dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 200));
+      document.getElementById("bd_add").click();
+      await new Promise((r) => setTimeout(r, 200));
+      const set = async (i, k, v) => {
+        const el = document.querySelector(`#bd_rows [data-ai="${i}"][data-k="${k}"]`);
+        el.value = v;
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 200));
+      };
+      await set(0, "dest", "p:" + projects[0].id);
+      await set(1, "dest", "p:" + projects[1].id);
+      // 33,3 / 66,7 — the case where naive rounding loses a cent.
+      await set(0, "pct", "33.3");
+      await set(1, "pct", "66.7");
+      document.getElementById("bd_go").click();
+      await new Promise((r) => setTimeout(r, 500));
+      const b = erp.state.bills.find((x) => x.number === "E2E-PCT");
+      return (
+        b && {
+          n: b.allocations.length,
+          sum: b.allocations.reduce((s2, a) => s2 + a.amountCents, 0),
+          base: b.baseCents,
+          both: b.allocations.every((a) => a.projectId),
+        }
+      );
+    });
+    if (pctSplit && pctSplit.n === 2 && pctSplit.sum === pctSplit.base && pctSplit.both)
+      ok("block 4: 33,3% / 66,7% across two projects lands as exact cents summing the base");
+    else bad("block 4: percentage split", JSON.stringify(pctSplit));
+
     // ── 1F: the allocation can name the PARTIDA, one level below the chapter ──
     const pid = await pg.evaluate(() => {
       const p = erp.state.projects.find(
