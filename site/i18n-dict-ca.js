@@ -457,6 +457,12 @@ window.CANEI_DICT.ca = {
   Aceptada: "Acceptada",
   Emitida: "Emesa",
   "Base imponible": "Base imposable",
+  Diferencia: "Diferència",
+  doc: "doc",
+  "⚠ Una obra cerrada no puede aceptar una variación":
+    "⚠ Una obra tancada no pot acceptar una variació",
+  "⚠ Una lista no puede quedarse sin entradas activas":
+    "⚠ Una llista no pot quedar-se sense entrades actives",
   "Presupuestos de variación": "Pressupostos de variació",
   "＋ Presupuesto de variación": "＋ Pressupost de variació",
   "Presupuesto de variación creado": "Pressupost de variació creat",
@@ -3912,6 +3918,16 @@ window.CANEI_DICT.ca = {
   "Mampara de vidrio templado · 480 €/ud": "Mampara de vidre trempat · 480 €/ud",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  [new RegExp("^(.+) · caja$"), "$1 · caixa"],
+  [new RegExp("^(.+) · tarjeta$"), "$1 · targeta"],
+  [new RegExp("^Documento · (.+)$"), "Document · $1"],
+  [new RegExp("^Justificante · (.+)$"), "Justificant · $1"],
+  [new RegExp("^Costes · (.+)$"), "Costos · $1"],
+  [new RegExp("^Importar extracto · (.+)$"), "Importar extracte · $1"],
+  [
+    new RegExp("^«¿Qué se pregunta sobre (.+)\\?» es obligatorio\\.$"),
+    "«Què es pregunta sobre $1?» és obligatori.",
+  ],
   [new RegExp("^([\\d.,]+)% margen$"), "$1% marge"],
   [new RegExp("^(\\d+) obra abierta$"), "$1 obra oberta"],
   [new RegExp("^(\\d+) obras abiertas$"), "$1 obres obertes"],

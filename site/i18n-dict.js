@@ -528,6 +528,16 @@ window.CANEI_DICT = {
     ["Aceptada", "Accepted"],
     ["Emitida", "Issued"],
     ["Base imponible", "Taxable base"],
+    ["Diferencia", "Difference"],
+    ["doc", "doc"],
+    [
+      "⚠ Una obra cerrada no puede aceptar una variación",
+      "⚠ A closed project cannot take a variation",
+    ],
+    [
+      "⚠ Una lista no puede quedarse sin entradas activas",
+      "⚠ A list cannot be left with no active entries",
+    ],
     ["Presupuestos de variación", "Variation budgets"],
     ["＋ Presupuesto de variación", "＋ Variation budget"],
     ["Presupuesto de variación creado", "Variation budget created"],
@@ -4733,6 +4743,19 @@ window.CANEI_DICT = {
     ["Limpieza y remates", "Cleaning and snagging"],
   ],
   rxEs2En: [
+    // An account option is its NAME plus a kind suffix; the name is company
+    // data and stays, the suffix is vocabulary and translates. Same shape for
+    // the drawer titles built as a prose prefix over a record.
+    [new RegExp("^(.+) · caja$"), "$1 · till"],
+    [new RegExp("^(.+) · tarjeta$"), "$1 · card"],
+    [new RegExp("^Documento · (.+)$"), "Document · $1"],
+    [new RegExp("^Justificante · (.+)$"), "Receipt · $1"],
+    [new RegExp("^Costes · (.+)$"), "Costs · $1"],
+    [new RegExp("^Importar extracto · (.+)$"), "Import statement · $1"],
+    [
+      new RegExp("^«¿Qué se pregunta sobre (.+)\\?» es obligatorio\\.$"),
+      "«What is being asked about $1?» is required.",
+    ],
     [new RegExp("^([\\d.,]+)% margen$"), "$1% margin"],
     [new RegExp("^(\\d+) obra abierta$"), "$1 job open"],
     [new RegExp("^(\\d+) obras abiertas$"), "$1 jobs open"],
