@@ -2646,6 +2646,77 @@ assert(
   );
 }
 
+/**
+ * A SUPPORTING DOCUMENT IS A FILE, NOT A SENTENCE.
+ *
+ * attachMovementDoc took a free-text string — "está en la carpeta" cleared
+ * the flag as effectively as a real receipt, and the accountant export can
+ * ship neither. The record form carries a storageKey the blob store can
+ * answer for; the string form stays legal because a reference is not wrong,
+ * just poorer.
+ */
+{
+  const e = new ERP("2026-03-10");
+  const acc = e.addBankAccount({ name: "Caja", kind: "till" }, "bo");
+  e.recordCashMovement(acc.id, { concept: "Ferretería", amountCents: -2000 }, "bo");
+  const m = e.state.movements[0];
+  assert(m.needsDoc === true, "a cash entry without its receipt is flagged", m.needsDoc);
+  throws(
+    () => e.attachMovementDoc(m.id, { name: "sin-clave.pdf" }, "bo"),
+    "an attachment with no stored file behind it is refused",
+  );
+  e.attachMovementDoc(
+    m.id,
+    { storageKey: "mov_abc", name: "ticket.jpg", type: "image/jpeg", size: 1234 },
+    "bo",
+  );
+  assert(
+    m.needsDoc === false && m.supportingDoc && m.supportingDoc.storageKey === "mov_abc",
+    "the record form stores the file and clears the flag",
+    JSON.stringify(m.supportingDoc),
+  );
+  e.recordCashMovement(acc.id, { concept: "Parking", amountCents: -300 }, "bo");
+  const m2 = e.state.movements[1];
+  e.attachMovementDoc(m2.id, "archivador azul, pestaña 3", "bo");
+  assert(
+    m2.needsDoc === false &&
+      m2.supportingDocRef === "archivador azul, pestaña 3" &&
+      !m2.supportingDoc,
+    "the string form still works, stored where it always was",
+  );
+
+  const sup = e.addParty({ roles: ["supplier"], name: "Prov 1E", taxId: "B12345674" }, "bo");
+  const bill = e.registerBill({ supplierId: sup.id, number: "E-1", baseCents: 1000 }, "bo");
+  e.attachBillDoc(
+    bill.id,
+    { storageKey: "bill_k1", name: "factura.pdf", type: "application/pdf" },
+    "bo",
+  );
+  assert(
+    bill.supportingDoc && bill.supportingDoc.storageKey === "bill_k1",
+    "a manually registered bill takes its paper as a file",
+  );
+  const cap = e.captureDocument({ docType: "supplierInvoice", imageRef: "cap_blob_1e" }, "bo");
+  e.confirmCapture(
+    cap.id,
+    {
+      issuerName: "Prov 1E",
+      issuerTaxId: "B12345674",
+      docNumber: "E-2",
+      date: e.state.today,
+      baseCents: 1000,
+      vatCents: 210,
+      totalCents: 1210,
+    },
+    "bo",
+  );
+  const promoted = e.billFromCapture(cap.id, { supplierId: sup.id }, "bo");
+  throws(
+    () => e.attachBillDoc(promoted.id, { storageKey: "x" }, "bo"),
+    "a bill promoted from a capture already has its file — a second is refused",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

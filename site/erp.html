@@ -9430,6 +9430,7 @@
         <span style="width:10px"></span>
         <select class="inline" id="rcClass">${["overhead", "tax", "salary", "financial", "internalTransfer"].map((c) => `<option value="${c}">${{ overhead: "Gasto general", tax: "Impuestos", salary: "Nóminas", financial: "Financiero", internalTransfer: "Traspaso interno" }[c]}</option>`).join("")}</select>
         <button class="btn sm" id="rcClassify">Clasificar</button>
+        <button class="btn sm" id="rcAttach">📎 Justificante</button>
         <span style="flex:1"></span>
         <select class="inline" id="rcWhy">${erp.listActive("unbackedReasons").map((r) => `<option value="${r.code}">${esc(r.es)}</option>`).join("")}</select>
         <button class="btn sm" id="rcUnbacked">Sin factura, con motivo</button>
@@ -9513,6 +9514,8 @@
               erp.classifyMovement(sel.id, $("#rcClass").value, "backoffice");
               recSel = null;
             }, "Movimiento clasificado");
+        const att = $("#rcAttach");
+        if (att) att.onclick = () => receiptDrawer(sel.id);
         const unb = $("#rcUnbacked");
         if (unb)
           unb.onclick = () =>
@@ -14918,6 +14921,61 @@
           }, "Cuenta creada");
       }
 
+      /* The receipt behind a movement, attached as a real file. It used to be
+         a button that flipped needsDoc to false — the word "justificado" with
+         no justificante behind it, which is exactly what the accountant
+         cannot work from. The file is optional in the sense that the drawer
+         can be closed; it is not optional in the sense that the flag cannot
+         be cleared without one any more. */
+      function receiptDrawer(movId) {
+        const m = erp.state.movements.find((x) => x.id === movId);
+        if (!m) return;
+        const db = openDrawer("Justificante · " + (m.concept || m.merchantText || ""));
+        db.innerHTML = `<div class="card"><div class="ch"><h3>Justificante</h3><span class="tag">${eur(m.amountCents)} · ${fmtD(m.accountingDate)}</span></div>
+   <div id="rd_file" style="padding:10px 12px 12px"></div></div>`;
+        evidenceField($("#rd_file"), {
+          value: m.supportingDoc || null,
+          prefix: "mov",
+          hint: "El ticket o la factura simplificada detrás de este movimiento.",
+          onChange: (rec) => {
+            if (!rec) return;
+            mutate(() => {
+              erp.attachMovementDoc(movId, rec, "backoffice");
+              closeDrawer();
+            }, "Justificante adjuntado");
+          },
+        });
+      }
+
+      /* What the payables row shows about the bill's document: the captured
+         file it came from, the attached paper, or the offer to attach one. */
+      function billDocCell(billId) {
+        const b = erp.state.bills.find((x) => x.id === billId);
+        if (!b) return "";
+        if (b.capId) return ' <span class="pill g">doc</span>';
+        if (b.supportingDoc) return ' <span class="pill g">doc</span>';
+        return ` <button class="btn sm" data-billdoc="${billId}">📎</button>`;
+      }
+      function billDocDrawer(billId) {
+        const b = erp.state.bills.find((x) => x.id === billId);
+        if (!b) return;
+        const db = openDrawer("Documento · " + (b.number || ""));
+        db.innerHTML = `<div class="card"><div class="ch"><h3>Factura del proveedor</h3><span class="tag">${esc(erp.billSupplier(b).name)}</span></div>
+   <div id="bd_file" style="padding:10px 12px 12px"></div></div>`;
+        evidenceField($("#bd_file"), {
+          value: b.supportingDoc || null,
+          prefix: "bill",
+          hint: "El PDF o la foto de la factura tal como llegó del proveedor.",
+          onChange: (rec) => {
+            if (!rec) return;
+            mutate(() => {
+              erp.attachBillDoc(billId, rec, "backoffice");
+              closeDrawer();
+            }, "Documento adjuntado");
+          },
+        });
+      }
+
       const VIEWS = {
         /* ---------- Torre de control · Mi día (DAS, spec §2.1/§2.2) ----------
     Defined once, above, as standalone functions — big enough (sparklines,
@@ -16590,11 +16648,15 @@
        return `<tr><td class="k">${esc(r.supplier)}</td><td>${esc(r.number)}</td><td class="num">${eur(r.totalCents)}</td>
      <td class="num k">${r.outstandingCents > 0 ? eur(r.outstandingCents) : "—"}</td><td>${fmtD(r.dueDate)}</td>
      <td>${r.unallocated ? '<span class="pill r">Sin asignar</span>' : '<span class="pill g">Asignada</span>'}</td><td>${st}</td>
-     <td>${r.outstandingCents > 0 ? `<button class="btn sm" data-pay="${r.id}">Pagar</button>` : ""}</td></tr>`;
+     <td>${r.outstandingCents > 0 ? `<button class="btn sm" data-pay="${r.id}">Pagar</button>` : ""}
+      ${billDocCell(r.id)}</td></tr>`;
      })
      .join("")}
    </tbody></table></div></div>`;
           $("#sb_new").onclick = () => billDrawer(null);
+          v.querySelectorAll("[data-billdoc]").forEach(
+            (b) => (b.onclick = () => billDocDrawer(b.dataset.billdoc)),
+          );
           v.querySelectorAll("[data-pay]").forEach(
             (b) =>
               (b.onclick = () => {
@@ -19284,12 +19346,7 @@
         $("#cashIn").onclick = () => cashDrawer(cashAcc, 1);
         $("#cashOut").onclick = () => cashDrawer(cashAcc, -1);
         v.querySelectorAll("[data-cashdoc]").forEach(
-          (b) =>
-            (b.onclick = () =>
-              mutate(() => {
-                const m = erp.state.movements.find((x) => x.id === b.dataset.cashdoc);
-                m.needsDoc = false;
-              }, "Justificante registrado")),
+          (b) => (b.onclick = () => receiptDrawer(b.dataset.cashdoc)),
         );
       }
       function cashDrawer(accountId, sign) {

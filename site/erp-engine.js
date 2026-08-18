@@ -8671,6 +8671,31 @@
       this._log(user, "correctBill", b.number);
       return b;
     }
+    /**
+     * The supplier's document behind a manually registered bill.
+     *
+     * A bill promoted from a capture already HAS its file — the photograph the
+     * whole record came from — so attaching a second here is refused and the
+     * message points at the capture. This is for the other door: a bill typed
+     * in from paper, whose paper the accountant will still want to see.
+     */
+    attachBillDoc(billId, doc, user) {
+      const b = this.state.bills.find((x) => x.id === billId);
+      if (!b) throw new Error("Bill not found");
+      if (b.capId)
+        throw new Error("This bill's document is the captured file it was registered from");
+      if (!doc || typeof doc !== "object" || !doc.storageKey)
+        throw new Error("The attachment has no stored file behind it");
+      b.supportingDoc = {
+        storageKey: doc.storageKey,
+        name: doc.name || "",
+        type: doc.type || "",
+        size: doc.size || 0,
+        uploadedAt: doc.uploadedAt || this.state.today,
+      };
+      this._log(user, "attachBillDoc", b.number);
+      return b;
+    }
     allocateBill(id, allocations, user) {
       const b = this.state.bills.find((x) => x.id === id);
       if (!b) throw new Error("Bill not found");
@@ -8759,10 +8784,32 @@
        and undoing a match would have left a phantom payment behind. Nothing in
        the UI called it, which is the only reason it never bit. Do not add a
        method to this class without grepping for its name first. */
-    attachMovementDoc(id, docRef, user) {
+    /**
+     * The receipt behind a movement, as a REAL FILE.
+     *
+     * `doc` is the standard evidence record — {storageKey, name, type, size,
+     * uploadedAt} — the same shape every other attachment in the product
+     * carries, which is what lets the accountant export ship the actual bytes
+     * instead of a filename somebody once typed. A plain string is still
+     * accepted and stored where it always was: the free-text reference was
+     * this method's whole contract until now, and a caller that only has a
+     * reference is not wrong, just poorer.
+     */
+    attachMovementDoc(id, doc, user) {
       const m = this.state.movements.find((x) => x.id === id);
       if (!m) throw new Error("Movement not found");
-      m.supportingDocRef = docRef;
+      if (doc && typeof doc === "object") {
+        if (!doc.storageKey) throw new Error("The attachment has no stored file behind it");
+        m.supportingDoc = {
+          storageKey: doc.storageKey,
+          name: doc.name || "",
+          type: doc.type || "",
+          size: doc.size || 0,
+          uploadedAt: doc.uploadedAt || this.state.today,
+        };
+      } else {
+        m.supportingDocRef = doc;
+      }
       m.needsDoc = false;
       this._log(user, "attachMovementDoc", id);
       return m;

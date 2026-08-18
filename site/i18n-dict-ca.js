@@ -457,6 +457,16 @@ window.CANEI_DICT.ca = {
   Aceptada: "Acceptada",
   Emitida: "Emesa",
   "Base imponible": "Base imposable",
+  "📎 Justificante": "📎 Justificant",
+  "Justificante ·": "Justificant ·",
+  "Justificante adjuntado": "Justificant adjuntat",
+  "Factura del proveedor": "Factura del proveïdor",
+  "El ticket o la factura simplificada detrás de este movimiento.":
+    "El tiquet o la factura simplificada darrere d'aquest moviment.",
+  "El PDF o la foto de la factura tal como llegó del proveedor.":
+    "El PDF o la foto de la factura tal com va arribar del proveïdor.",
+  "Documento ·": "Document ·",
+  "Documento adjuntado": "Document adjuntat",
   "Traspaso entre cuentas propias": "Traspàs entre comptes propis",
   "Cargo de impuestos": "Càrrec d'impostos",
   Intereses: "Interessos",

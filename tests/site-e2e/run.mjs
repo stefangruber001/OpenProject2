@@ -3852,6 +3852,36 @@ async function testBankAndCash(browser, base) {
       ok(`ADM-06: a cash payment with no receipt is counted (${before} → ${after.awaiting})`);
     else bad("ADM-06: undocumented cash", JSON.stringify({ before, ...after }));
 
+    // ── 1E: «Marcar justificado» now takes the FILE. The button used to flip
+    //    the flag with nothing behind it — the word without the receipt.
+    const docBtn = await pg.evaluate(() => {
+      const b = document.querySelector("[data-cashdoc]");
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height), id: b.dataset.cashdoc };
+    });
+    if (docBtn && docBtn.w > 60) ok("1E: the undocumented cash row offers its receipt");
+    else bad("1E: receipt button", JSON.stringify(docBtn));
+    await pg.click("[data-cashdoc]");
+    await pg.waitForTimeout(400);
+    await pg.setInputFiles('[data-ev="file"]', "tests/fixtures/receipt.png");
+    await pg.waitForTimeout(1200);
+    const attached = await pg.evaluate(async (id) => {
+      const m = erp.state.movements.find((x) => x.id === id);
+      if (!m || !m.supportingDoc) return { ok: false };
+      const blob = await ErpStore.getBlob(m.supportingDoc.storageKey);
+      return {
+        ok: m.needsDoc === false,
+        key: m.supportingDoc.storageKey,
+        bytes: blob ? blob.size : 0,
+      };
+    }, docBtn && docBtn.id);
+    if (attached.ok && attached.bytes > 0)
+      ok(
+        `1E: the receipt is a real stored file (${attached.bytes} bytes behind ${attached.key.slice(0, 8)}…)`,
+      );
+    else bad("1E: file stored and flag cleared", JSON.stringify(attached));
+
     // ---- ADM-05: classification edited in the row ----
     await pg.goto(`${base}/erp.html#banking`, { waitUntil: "networkidle" });
     await bootedShell(pg);
