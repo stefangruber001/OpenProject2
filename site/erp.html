@@ -3334,7 +3334,10 @@
         color: var(--faint);
         font-weight: 400;
       }
-      /* The four columns §3.2 fixes for the day sheet: 180 · 110 · 200 · 80. */
+      /* The day sheet columns: 180 · 200 · 80 · 120. The contract type of the
+         worker used to hold a column of its own; it now rides beside the name,
+         and the column it vacated names what the sheet could not say before —
+         whether the hours are normal, overtime or a public holiday. */
       .hsheet td,
       .hsheet th {
         height: 44px;
@@ -3343,7 +3346,14 @@
         width: 180px;
       }
       .hsheet .ck {
-        width: 110px;
+        width: 120px;
+      }
+      /* The second fact in a two-fact cell — contract type beside the name,
+         partida beside the chapter. Muted, so the cell keeps one lead. */
+      table td .sub {
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 12px;
       }
       .hsheet .cp {
         width: 200px;
@@ -8320,6 +8330,12 @@
         hTab = "sheet";
       const DOW = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
       const WORKER_KINDS = { employee: "Empleado", selfEmployed: "Autónomo" };
+      /* What KIND of hour, which is a different question from what kind of
+         worker — and the one that decides which rate band prices it. The sheet
+         showed the second and not the first, so an overtime hour and a normal
+         one were the same line with a different number in it. */
+      const HOUR_KINDS = { normal: "Normal", extra: "Extra", festivo: "Festivo" };
+      const HOUR_TONE = { normal: "", extra: " y", festivo: " b" };
       function horas(v) {
         $("#sub").textContent =
           "Parte diario por trabajador, con la semana al lado; y el resumen por proyecto y capítulo con la conciliación del mes.";
@@ -8342,6 +8358,54 @@
       }
 
       /** The seven day cells and the day's grid. */
+      /** The partida behind an entry, for the sheet to name rather than imply. */
+      function hourLineLabel(entry) {
+        if (!entry || !entry.lineId || !entry.projectId) return "";
+        try {
+          for (const { chapter } of erp.projectChapters(entry.projectId))
+            for (const l of chapter.lines || [])
+              if (l.id === entry.lineId) return l.name || l.num || "";
+        } catch (e) {}
+        return "";
+      }
+      /* Both cells are assembled here rather than inside the row template. A
+         conditional that emits markup where text would sit, between a closing
+         angle bracket and the next opening one, reads to the translation
+         source audit as a user-visible string — three sessions have now lost
+         time to that, and building the block outside the template costs
+         nothing. */
+      function hourKindCell(r) {
+        const kind = (r.entry && r.entry.kind) || "normal";
+        const label = HOUR_KINDS[kind] || kind;
+        if (r.entry && !r.locked) {
+          const opts = Object.keys(HOUR_KINDS)
+            .map(
+              (k) =>
+                `<option value="${k}"${k === kind ? " selected" : ""}>${HOUR_KINDS[k]}</option>`,
+            )
+            .join("");
+          return `<select class="inline" data-hkind="${r.entry.id}">${opts}</select>`;
+        }
+        if (r.entry) return `<span class="pill${HOUR_TONE[kind] || ""}">${label}</span>`;
+        // A row with no entry yet: the kind is chosen BEFORE the hours are
+        // typed, because typing them is what creates the entry.
+        const opts = Object.keys(HOUR_KINDS)
+          .map((k) => `<option value="${k}">${HOUR_KINDS[k]}</option>`)
+          .join("");
+        return `<select class="inline" data-newkind="${r.workerId}">${opts}</select>`;
+      }
+      function hourWhereCell(r, jobs, chaptersOf) {
+        if (!r.entry) {
+          const opts =
+            chaptersOf(jobs[0] && jobs[0].id)
+              .map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`)
+              .join("") || '<option value="">—</option>';
+          return `<select class="inline" data-newchap="${r.workerId}">${opts}</select>`;
+        }
+        const line = hourLineLabel(r.entry);
+        const chap = esc(r.entry.chapterNum || "—");
+        return line ? `${chap} <span class="sub">· ${esc(line)}</span>` : chap;
+      }
       function horasSheet() {
         const week = labourWeekAll(hDay);
         const dayRows = labourDayRows(hDay);
@@ -8378,14 +8442,14 @@
     <div class="card"><div class="ch"><h3>Parte del ${fmtD(hDay)}</h3>
       <span class="tag">${h(dayRows.reduce((s, r) => s + r.hoursMilli, 0))} h · ${dayRows.length} línea${dayRows.length === 1 ? "" : "s"}</span></div>
      <div class="scroll"><table class="hsheet"><thead><tr>
-       <th class="cw">Trabajador</th><th class="ck">Tipo</th><th class="cp">Proyecto</th>
-       <th class="ch2 num">Horas</th><th>Capítulo</th><th></th></tr></thead><tbody>
+       <th class="cw">Trabajador</th><th class="cp">Proyecto</th>
+       <th class="ch2 num">Horas</th><th class="ck">Tipo de hora</th>
+       <th>Capítulo</th><th></th></tr></thead><tbody>
      ${
        dayRows
          .map(
            (r) => `<tr${r.locked ? ' class="locked"' : ""}>
-       <td class="cw k">${esc(r.workerName)}</td>
-       <td class="ck">${esc(WORKER_KINDS[r.kind] || r.kind)}</td>
+       <td class="cw k">${esc(r.workerName)} <span class="sub">${esc(WORKER_KINDS[r.kind] || r.kind)}</span></td>
        <td class="cp">${
          r.entry
            ? esc(r.projectCode || "—")
@@ -8397,15 +8461,8 @@
            : `<input class="inline hin" type="number" step="0.25" min="0" style="width:70px"
               data-entry="${r.entry ? r.entry.id : ""}" data-worker="${r.workerId}" value="${r.hoursMilli ? h(r.hoursMilli) : ""}">`
        }</td>
-       <td>${
-         r.entry
-           ? esc(r.entry.chapterNum || "—")
-           : `<select class="inline" data-newchap="${r.workerId}">${
-               chaptersOf(jobs[0] && jobs[0].id)
-                 .map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`)
-                 .join("") || '<option value="">—</option>'
-             }</select>`
-       }</td>
+       <td class="ck">${hourKindCell(r)}</td>
+       <td>${hourWhereCell(r, jobs, chaptersOf)}</td>
        <td>${
          r.locked
            ? `<button class="btn sm" data-unapprove="${r.workerId}">🔓 Reabrir semana</button>`
@@ -8530,12 +8587,17 @@
                 const wid = inp.dataset.worker;
                 const proj = document.querySelector(`[data-newproj="${wid}"]`);
                 const chap = document.querySelector(`[data-newchap="${wid}"]`);
+                const knd = document.querySelector(`[data-newkind="${wid}"]`);
                 if (!proj || !proj.value) throw new Error("Selecciona el proyecto");
                 erp.recordHours(
                   {
                     workerId: wid,
                     projectId: proj.value,
                     chapterNum: (chap && chap.value) || null,
+                    // The kind chosen on the row prices the entry from its own
+                    // rate band; without it every inline entry was a normal
+                    // hour whatever the sheet said.
+                    kind: (knd && knd.value) || "normal",
                     hoursMilli: Math.round(val * 1000),
                     date: hDay,
                   },
@@ -8543,6 +8605,16 @@
                 );
               }, "Horas actualizadas");
             }),
+        );
+        // Correcting the kind re-prices the entry — correctHours reads the rate
+        // band for the new kind — so this is a real correction, not a relabel.
+        document.querySelectorAll("[data-hkind]").forEach(
+          (sel) =>
+            (sel.onchange = () =>
+              mutate(
+                () => erp.correctHours(sel.dataset.hkind, { kind: sel.value }, "operations"),
+                "Tipo de hora actualizado",
+              )),
         );
         document
           .querySelectorAll("[data-approve]")
@@ -14998,6 +15070,50 @@
         return `<optgroup label="Liquidación de tarjeta">${opts}</optgroup>`;
       }
 
+      const ACCOUNT_KINDS = { bank: "Banco", card: "Tarjeta", till: "Caja" };
+      /**
+       * One line per account, then the sum — not the sum alone.
+       *
+       * The strip this replaces showed a single figure "across all accounts",
+       * so a company holding a bank account, a card and a till could read its
+       * total and nothing else: which account the money was in, and which one
+       * had transactions still to match, took a filter change per account to
+       * find out. Money in three places is three balances; the total is the
+       * fourth fact, not the only one.
+       *
+       * Each line selects its account as well, because the two things you do
+       * after reading a balance — look at that account's transactions, import
+       * its statement — both need it selected first.
+       */
+      function accountLines(accs) {
+        const rows = accs
+          .map((a) => {
+            const open = erp.state.movements.filter(
+              (m) =>
+                m.accountId === a.id && m.status === "unallocated" && inPeriod(m.accountingDate),
+            ).length;
+            const pill = open
+              ? `<span class="pill y"><span>${open}</span> <span>sin casar</span></span>`
+              : '<span class="pill g">Todo casado</span>';
+            return (
+              `<div class="it" data-acct="${a.id}" style="cursor:pointer${a.id === bankAcc ? ";background:var(--greenSoft)" : ""}">` +
+              `<span class="k">${esc(a.name)}</span>` +
+              `<span class="pill b">${esc(ACCOUNT_KINDS[a.kind] || a.kind)}</span>` +
+              `<span style="flex:1"></span>${pill}` +
+              `<b>${eur0(erp.accountBalanceCents(a.id))}</b></div>`
+            );
+          })
+          .join("");
+        const total =
+          `<div class="it" style="border-top:1px solid var(--line)">` +
+          `<span>Total disponible</span><span style="flex:1"></span>` +
+          `<b>${eur0(erp.cashPosition().totalCents)}</b></div>`;
+        return (
+          `<div class="card"><div class="ch"><h3>Cuentas</h3><span class="tag">${accs.length}</span></div>` +
+          `<div class="daylist">${rows}${total}</div></div>`
+        );
+      }
+
       /* The product had NO way to add a bank account — they existed only in the
          seed, which is exactly the kind of gap a demo never shows and a real
          tenant hits on day one. Card statements need somewhere to land, so the
@@ -16988,8 +17104,9 @@
           if (bankAcc && !accs.some((a) => a.id === bankAcc)) bankAcc = "";
           const movAll = erp.state.movements.filter((m) => !bankAcc || m.accountId === bankAcc);
           const movs = movAll.filter((m) => inPeriod(m.accountingDate));
-          const unmatched = movs.filter((m) => m.status === "unallocated").length;
-          const selBal = bankAcc ? erp.accountBalanceCents(bankAcc) : erp.cashPosition().totalCents;
+          // Balances and the unmatched count are now stated per account, in
+          // accountLines() — one figure for all of them was the thing being
+          // fixed, so nothing here recomputes a total to display beside it.
           const CLASSES = [
             ["projectCost", "Coste de obra"],
             ["overhead", "Gasto general"],
@@ -17012,13 +17129,7 @@
      <input type="file" id="bkFile" accept=".xlsx" style="display:none">
      <button class="btn sm" id="bToRec">Ir a Conciliación →</button>
    </div>
-   <div class="card"><div class="queuebar">
-     <span class="n">${eur0(selBal)}</span><span>${bankAcc ? "en la cuenta seleccionada" : "en todas las cuentas"}</span>
-     <span style="flex:1"></span>
-     <span>${eur0(erp.cashPosition().totalCents)}</span><span>total disponible</span>
-     <span style="flex:1"></span>
-     ${unmatched ? `<span class="pill y"><span>${unmatched}</span> <span>sin casar</span></span>` : '<span class="pill g">Todo casado</span>'}
-   </div></div>
+   ${accountLines(accs)}
    ${periodNote(movs.length, movAll.length)}
    <div class="card"><div class="ch"><h3>Movimientos</h3><span class="tag">${movs.length}</span></div>
    <div class="scroll"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Clase</th><th>Destino</th><th>Antigüedad</th></tr></thead><tbody>
@@ -17069,6 +17180,15 @@
             bankAcc = e.target.value;
             render();
           };
+          // Clicking the account's own line is the same act as choosing it in
+          // the picker — a second way in, not a second piece of state.
+          v.querySelectorAll("[data-acct]").forEach(
+            (row) =>
+              (row.onclick = () => {
+                bankAcc = row.dataset.acct === bankAcc ? "" : row.dataset.acct;
+                render();
+              }),
+          );
           $("#bToRec").onclick = () => goTab("banking", "_reconcile");
           $("#bkNew").onclick = () => newAccountDrawer();
           /* The statement lands on ONE account — importing into "all accounts"

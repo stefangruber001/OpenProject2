@@ -457,6 +457,11 @@ window.CANEI_DICT.ca = {
   Aceptada: "Acceptada",
   Emitida: "Emesa",
   "Base imponible": "Base imposable",
+  Cuentas: "Comptes",
+  "Tipo de hora": "Tipus d'hora",
+  Extra: "Extra",
+  Festivo: "Festiu",
+  "Tipo de hora actualizado": "Tipus d'hora actualitzat",
   "＋ Crear caja": "＋ Crear caixa",
   "Crea la primera cuenta para empezar: banco, tarjeta o caja.":
     "Crea el primer compte per començar: banc, targeta o caixa.",

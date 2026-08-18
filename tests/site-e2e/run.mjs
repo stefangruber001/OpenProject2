@@ -4281,6 +4281,68 @@ async function testBankAndCash(browser, base) {
       ok(`ADM-05: every unmatched movement carries the amber bar (${inline.amberRows})`);
     else bad("ADM-05: amber on unmatched", JSON.stringify(inline));
 
+    /* One line per account, then the sum — the operator's words: "ensure that I
+       see each account separate and not only one line item with all accounts
+       sum up". Money in three places is three balances; the total is the
+       fourth fact, not the only one. Checked as GEOMETRY and arithmetic: a row
+       per account, each naming its own balance, and a total that is the sum of
+       them rather than a second figure that happens to sit nearby. */
+    await pg.evaluate(() => {
+      if (!erp.state.bankAccounts.some((a) => a.kind === "card"))
+        erp.addBankAccount({ name: "Visa E2E", kind: "card", openingCents: -12000 }, "bo");
+      render();
+    });
+    await pg.waitForTimeout(500);
+    const perAccount = await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("#view [data-acct]")];
+      const money = (t) => {
+        const m = (t.match(/-?[\d.]+(?:,\d+)?\s*€/g) || []).pop();
+        return m
+          ? Math.round(
+              parseFloat(m.replace(/[€\s]/g, "").replace(/\./g, "").replace(",", ".")) * 100,
+            )
+          : null;
+      };
+      const shown = rows.map((r) => ({
+        id: r.dataset.acct,
+        wide: r.getBoundingClientRect().width > 100,
+        cents: money(r.textContent),
+      }));
+      const totalRow = [...document.querySelectorAll("#view .daylist .it")].pop();
+      return {
+        accounts: erp.state.bankAccounts.length,
+        kinds: [...new Set(erp.state.bankAccounts.map((a) => a.kind))].length,
+        shown,
+        totalCents: totalRow ? money(totalRow.textContent) : null,
+        engineTotal: Math.round(erp.cashPosition().totalCents / 100) * 100,
+      };
+    });
+    const linesOk =
+      perAccount.shown.length === perAccount.accounts &&
+      perAccount.shown.every((s) => s.wide && s.cents !== null) &&
+      perAccount.kinds >= 3;
+    if (linesOk)
+      ok(
+        `ADM-05: one visible line per account, all ${perAccount.kinds} kinds (${perAccount.shown.length} accounts)`,
+      );
+    else bad("ADM-05: per-account lines", JSON.stringify(perAccount));
+    // The rounding is the screen's own (eur0), so compare at that resolution.
+    const sumShown = perAccount.shown.reduce((s, r) => s + (r.cents || 0), 0);
+    if (perAccount.totalCents !== null && Math.abs(perAccount.totalCents - sumShown) <= 100)
+      ok("ADM-05: …and the total underneath is those same balances added up");
+    else
+      bad("ADM-05: total equals the sum of the lines", `${perAccount.totalCents} vs ${sumShown}`);
+
+    // Selecting an account from its own line is the same act as the picker.
+    const firstAcct = perAccount.shown[0] && perAccount.shown[0].id;
+    if (firstAcct) {
+      await pg.locator(`[data-acct="${firstAcct}"]`).click();
+      await pg.waitForTimeout(500);
+      const picked = await pg.evaluate(() => (typeof bankAcc === "string" ? bankAcc : null));
+      if (picked === firstAcct) ok("ADM-05: clicking an account's line selects that account");
+      else bad("ADM-05: line selects account", `${picked} ≠ ${firstAcct}`);
+    }
+
     // Classifying one in the row really writes it.
     const target = await pg.evaluate(() => {
       const el = document.querySelector("[data-bkclass]");
@@ -6119,6 +6181,53 @@ async function testProcurement(browser, base) {
       if (b3.rate === 2600 && b3.chapterFilled && b3.lineId)
         ok("block 3: an extra hour prices from its own band, and hours land on the partida");
       else bad("block 3: overtime + partida", JSON.stringify(b3));
+
+      /* The sheet must SAY which kind of hour each line is. It priced overtime
+         correctly all along and showed the worker's contract type instead, so
+         a normal hour and an overtime hour were the same row with a different
+         number in it — the operator's words: "ensure you see in the tile what
+         hours are it, normal or overtime". */
+      await pg.evaluate(() => {
+        hDay = erp.state.today;
+        location.hash = "labour";
+        render();
+      });
+      await pg.waitForTimeout(700);
+      const kindShown = await pg.evaluate(() => {
+        const heads = [...document.querySelectorAll(".hsheet thead th")].map((t) =>
+          t.textContent.trim(),
+        );
+        const sels = [...document.querySelectorAll(".hsheet [data-hkind]")];
+        return {
+          hasColumn: heads.includes("Tipo de hora"),
+          controls: sels.length,
+          values: sels.map((s) => s.value),
+          // A control nobody can see is not a thing the tile shows.
+          visible: sels.filter((s) => s.getBoundingClientRect().width > 20).length,
+        };
+      });
+      if (kindShown.hasColumn && kindShown.visible > 0 && kindShown.values.includes("extra"))
+        ok("block 3: the day sheet names each line's hour kind, extra included");
+      else bad("block 3: hour kind on the sheet", JSON.stringify(kindShown));
+
+      // …and changing it there is a correction, not a relabel: correctHours
+      // re-reads the rate band, so the entry's cost has to move with it.
+      const repriced = await pg.evaluate(async () => {
+        const sel = [...document.querySelectorAll(".hsheet [data-hkind]")].find(
+          (s) => s.value === "extra",
+        );
+        if (!sel) return { skipped: true };
+        const id = sel.dataset.hkind;
+        const before = erp.state.labour.find((l) => l.id === id).rateCents;
+        sel.value = "normal";
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 400));
+        const after = erp.state.labour.find((l) => l.id === id);
+        return { before, after: after.rateCents, kind: after.kind };
+      });
+      if (repriced.before === 2600 && repriced.after === 2000 && repriced.kind === "normal")
+        ok("block 3: correcting the kind on the sheet re-prices the entry from the other band");
+      else bad("block 3: kind correction re-prices", JSON.stringify(repriced));
 
       await pg.evaluate(() => {
         document.querySelector("#view .tabstrip [data-tab]") && null;

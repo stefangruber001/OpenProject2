@@ -528,6 +528,11 @@ window.CANEI_DICT = {
     ["Aceptada", "Accepted"],
     ["Emitida", "Issued"],
     ["Base imponible", "Taxable base"],
+    ["Cuentas", "Accounts"],
+    ["Tipo de hora", "Hour type"],
+    ["Extra", "Overtime"],
+    ["Festivo", "Public holiday"],
+    ["Tipo de hora actualizado", "Hour type updated"],
     ["＋ Crear caja", "＋ Create till"],
     [
       "Crea la primera cuenta para empezar: banco, tarjeta o caja.",
