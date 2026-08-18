@@ -2855,6 +2855,159 @@ assert(
   );
 }
 
+/**
+ * A VARIATION IS A REAL BUDGET — blocks 5 and 6 of the client review.
+ *
+ * Created only after the project exists, built with the same builder, frozen
+ * by the same acceptance — and on acceptance its chapters JOIN the project:
+ * renumbered to carry on from the project's highest so every chapter-addressed
+ * mechanism (allocations, progress, reports) works on them unchanged, the
+ * economics grow by its sale and cost, certification sees its execution, and
+ * the completion date extends by the days it adds.
+ */
+{
+  const e = new ERP("2026-03-02");
+  e.configureEntity(
+    {
+      legalName: "Obras V SL",
+      taxId: "B12345674",
+      street: "s",
+      postalCode: "08960",
+      city: "c",
+      iban: "ES9121000418450200051332",
+    },
+    "bo",
+  );
+  const cli = e.addParty(
+    {
+      roles: ["customer"],
+      name: "Cli V",
+      taxId: "12345678Z",
+      billStreet: "s",
+      billPostalCode: "08001",
+      billCity: "BCN",
+      mobile: "600111222",
+      email: "v@example.com",
+    },
+    "bo",
+  );
+  const bg = e.createBudget({ partyId: cli.id }, "bo");
+  const c1 = e.addChapter(bg.id, { name: "Reforma base" }, "bo");
+  e.addLine(
+    bg.id,
+    c1.id,
+    { desc: "Obra", unit: "ud", qtyMilli: 1000, priceCents: 400000, costCents: 200000 },
+    "bo",
+  );
+  e.issueVersion(bg.id, {}, "bo");
+  e.acceptVersion(bg.id, e.currentVersion(bg.id).id, { evidenceRef: "ok" }, "bo");
+  const pj = e.createProjectFromAcceptance(bg.id, "bo");
+  e.updateProject(pj.id, { targetEnd: "2026-06-30" }, "bo");
+
+  const vb = e.createVariationBudget(pj.id, { reason: "Baño extra", scheduleImpactDays: 10 }, "bo");
+  assert(vb.variationOf === pj.id, "the variation knows its project", vb.variationOf);
+  const vc = e.addChapter(vb.id, { name: "Baño adicional" }, "bo");
+  const vl = e.addLine(
+    vb.id,
+    vc.id,
+    { desc: "Baño completo", unit: "ud", qtyMilli: 1000, priceCents: 80000, costCents: 50000 },
+    "bo",
+  );
+  e.issueVersion(vb.id, {}, "bo");
+
+  // Before acceptance it counts for NOTHING — a draft variation is a proposal.
+  assert(
+    e.projectEconomics(pj.id).variationRevenueCents === 0,
+    "an unaccepted variation adds nothing to the figures",
+  );
+  throws(
+    () => e.createProjectFromAcceptance(vb.id, "bo"),
+    "a variation cannot open a project of its own (pre-acceptance)",
+  );
+
+  e.acceptVersion(vb.id, e.currentVersion(vb.id).id, { evidenceRef: "firmado" }, "bo");
+  throws(
+    () => e.createProjectFromAcceptance(vb.id, "bo"),
+    "a variation cannot open a project of its own (post-acceptance)",
+  );
+
+  // Chapters renumbered to continue the project's own sequence.
+  const vAccepted = e.version(vb.id, vb.acceptedVersionId);
+  assert(
+    vAccepted.chapters[0].num === "2" && vAccepted.chapters[0].lines[0].num === "2.1",
+    "the variation's chapters carry on from the project's numbering",
+    JSON.stringify({ num: vAccepted.chapters[0].num, line: vAccepted.chapters[0].lines[0].num }),
+  );
+
+  // The economics grow by its sale and cost; the chapter table shows it.
+  const ec = e.projectEconomics(pj.id);
+  assert(
+    ec.variationRevenueCents === 80000 &&
+      ec.variationCostCents === 50000 &&
+      ec.currentRevenueCents === 480000,
+    "accepted, it joins the economics",
+    JSON.stringify({
+      vr: ec.variationRevenueCents,
+      vc: ec.variationCostCents,
+      cur: ec.currentRevenueCents,
+    }),
+  );
+  const chRows = e.chapterEconomics(pj.id);
+  const vRow = chRows.find((r) => r.variation);
+  assert(
+    vRow && vRow.num === "2" && vRow.saleCents === 80000 && vRow.budgetCostCents === 50000,
+    "…and the chapter table carries its row, marked as a variation",
+    JSON.stringify(vRow),
+  );
+
+  // Costs land on its chapter and its partida through the ordinary doors.
+  const sup = e.addParty({ roles: ["supplier"], name: "Prov V", taxId: "B12345674" }, "bo");
+  const bill = e.registerBill(
+    {
+      supplierId: sup.id,
+      number: "V-1",
+      baseCents: 30000,
+      allocations: [{ projectId: pj.id, lineId: vl.id, kind: "material", amountCents: 30000 }],
+    },
+    "bo",
+  );
+  assert(
+    bill.allocations[0].chapterNum === "2" && bill.allocations[0].lineId === vl.id,
+    "a cost allocation reaches the variation's partida, chapter filled from it",
+    JSON.stringify(bill.allocations[0]),
+  );
+  const drill = e.chapterCosts(pj.id, "2");
+  assert(
+    drill.length === 1 && drill[0].amountCents === 30000 && drill[0].lineId === vl.id,
+    "the chapter drill-down lists exactly that cost, with its partida",
+    JSON.stringify(drill),
+  );
+
+  // Progress: marking the variation's line moves the project's own percent.
+  const before = e.projectProgressPct(pj.id);
+  e.markLineProgress(pj.id, vl.id, { pct: 100 }, "op");
+  const after = e.projectProgressPct(pj.id);
+  assert(
+    after > before,
+    "progress on a variation line moves the project's percent",
+    before + " -> " + after,
+  );
+  // …and certification sees the executed variation work.
+  const cert = e.invoiceBases(pj.id).certification;
+  assert(
+    cert.chapters.some((c) => String(c.num) === "2" && c.doneCents === 80000),
+    "certification proposes the variation's executed work",
+    JSON.stringify(cert.chapters),
+  );
+
+  // Block 6: the deadline moved by the variation's days, automatically.
+  assert(
+    e.project(pj.id).dates.targetEnd === "2026-07-10",
+    "acceptance extends the completion date by the variation's days",
+    e.project(pj.id).dates.targetEnd,
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

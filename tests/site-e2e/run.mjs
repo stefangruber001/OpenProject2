@@ -81,6 +81,7 @@ async function main() {
     testPresupuestador,
     testCapture,
     testSupplierBillEntry,
+    testVariationBudget,
     testProjectTracking,
     testInvoicing,
     testInvoiceGenerator,
@@ -2567,6 +2568,197 @@ async function testSupplierBillEntry(browser, base) {
     else bad("AP-01: console", errs.slice(0, 2).join(" | "));
   } catch (e) {
     bad("supplier bill entry", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+// ── Blocks 5–6: a variation is a REAL budget, and its acceptance JOINS the
+//    project — list and creator on the variations screen, chapters renumbered
+//    into the project's sequence, the economics row with its pill, the cost
+//    drill-down, certification, and the settable completion date.
+async function testVariationBudget(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#variations`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(800);
+    const pid = await pg.evaluate(() => {
+      const p = erp.state.projects.find(
+        (x) =>
+          x.budgetId &&
+          x.acceptedVersionId &&
+          !x.closed &&
+          erp.version(x.budgetId, x.acceptedVersionId).chapters.some((c) => c.lines.length),
+      );
+      if (!p) return null;
+      gProject = p.id;
+      render();
+      return p.id;
+    });
+    await pg.waitForTimeout(600);
+    if (!pid) {
+      bad("5-6: a project to vary", "none with an accepted budget");
+      return;
+    }
+    const btn = await pg.evaluate(() => {
+      const b = document.getElementById("vbNew");
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height) };
+    });
+    if (btn && btn.w > 100) ok("5-6: the variations screen offers «＋ Presupuesto de variación»");
+    else bad("5-6: creator button", JSON.stringify(btn));
+
+    await pg.click("#vbNew");
+    await pg.waitForTimeout(800);
+    const inBuilder = await pg.evaluate((projectId) => {
+      const b = erp.state.budgets.find((x) => x.variationOf === projectId);
+      const who = document.querySelector(".pbbar .who span");
+      return {
+        hash: location.hash,
+        created: !!b,
+        id: b && b.id,
+        badge: who ? /variación de/.test(who.textContent) : false,
+      };
+    }, pid);
+    if (inBuilder.created && /quotes/.test(inBuilder.hash) && inBuilder.badge)
+      ok("5-6: creating one lands in the SAME builder, labelled as a variation of its job");
+    else bad("5-6: builder handoff", JSON.stringify(inBuilder));
+
+    // Build and accept through the engine — the builder's own UI is already
+    // covered by two suites; what is NEW is the join on acceptance.
+    const joined = await pg.evaluate((projectId) => {
+      const b = erp.state.budgets.find((x) => x.variationOf === projectId);
+      const ch = erp.addChapter(b.id, { name: "Cocina ampliada" }, "bo");
+      const ln = erp.addLine(
+        b.id,
+        ch.id,
+        {
+          desc: "Mueble alto extra",
+          unit: "ud",
+          qtyMilli: 1000,
+          priceCents: 60000,
+          costCents: 35000,
+        },
+        "bo",
+      );
+      erp.issueVersion(b.id, {}, "bo");
+      erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "firmado" }, "bo");
+      const v = erp.version(b.id, b.acceptedVersionId);
+      const ec = erp.projectEconomics(projectId);
+      // a cost onto the variation's partida, for the drill-down below
+      const sup = erp.state.parties.find((x) =>
+        (x.roles || []).some((r) => ["supplier", "subcontractor", "selfEmployed"].includes(r)),
+      );
+      erp.registerBill(
+        {
+          supplierId: sup.id,
+          number: "E2E-VB",
+          baseCents: 12000,
+          allocations: [
+            { projectId, lineId: v.chapters[0].lines[0].id, kind: "material", amountCents: 12000 },
+          ],
+        },
+        "bo",
+      );
+      return {
+        num: v.chapters[0].num,
+        vr: ec.variationRevenueCents,
+        lineId: ln.id,
+      };
+    }, pid);
+    if (Number(joined.num) > 1 && joined.vr === 60000)
+      ok(
+        `5-6: acceptance renumbers into the project (chapter ${joined.num}) and joins the economics (+600,00 €)`,
+      );
+    else bad("5-6: acceptance join", JSON.stringify(joined));
+
+    // The economics screen: the variation row, its pill, and the drill-down.
+    await pg.evaluate((projectId) => {
+      gProject = projectId;
+      ecoFull = true;
+      location.hash = "economics";
+    }, pid);
+    await pg.waitForTimeout(900);
+    const ecoRow = await pg.evaluate((num) => {
+      const row = document.querySelector(`[data-chcosts="${num}"]`);
+      if (!row) return null;
+      const r = row.getBoundingClientRect();
+      return { w: Math.round(r.width), pill: !!row.querySelector(".pill.b") };
+    }, joined.num);
+    if (ecoRow && ecoRow.w > 400 && ecoRow.pill)
+      ok("5-6: the chapter table carries the variation row, marked with its pill");
+    else bad("5-6: economics row", JSON.stringify(ecoRow));
+
+    await pg.click(`[data-chcosts="${joined.num}"]`);
+    await pg.waitForTimeout(500);
+    const drill = await pg.evaluate(() => {
+      const t = document.querySelector(".drawer table tbody");
+      if (!t) return null;
+      const rows = [...t.querySelectorAll("tr")];
+      return {
+        rows: rows.length,
+        named: rows.some((r) => /E2E-VB/.test(r.textContent)),
+        partida: rows.some((r) => /Mueble alto extra|\d+\.\d+/.test(r.textContent)),
+      };
+    });
+    if (drill && drill.rows >= 1 && drill.named && drill.partida)
+      ok("5-6: clicking the row opens every cost behind it, grouped by partida");
+    else bad("5-6: cost drill-down", JSON.stringify(drill));
+    await pg.evaluate(() => closeDrawer());
+
+    // Revenue click-through: lands on the invoice register filtered to the job.
+    const jump = await pg.evaluate((projectId) => {
+      document.getElementById("ecoInvoices").click();
+      return erp.project(projectId).code;
+    }, pid);
+    await pg.waitForTimeout(700);
+    const invFilter = await pg.evaluate(() => {
+      const q = document.getElementById("invQ");
+      return { hash: location.hash, q: q ? q.value : null };
+    });
+    if (/invoicing/.test(invFilter.hash) && invFilter.q === jump)
+      ok(`5-6: the revenue tile walks to the invoice register filtered on ${jump}`);
+    else bad("5-6: revenue click-through", JSON.stringify(invFilter));
+
+    // The completion date: settable at last, on the tracking screen.
+    await pg.evaluate((projectId) => {
+      gProject = projectId;
+      location.hash = "progress";
+    }, pid);
+    await pg.waitForTimeout(700);
+    await pg.evaluate(() => {
+      ganttFull = true;
+      render();
+    });
+    await pg.waitForTimeout(700);
+    const endField = await pg.evaluate(() => {
+      const el = document.getElementById("gEnd");
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height) };
+    });
+    if (endField && endField.w > 80) {
+      ok("5-6: the tracking screen carries a settable «Fin previsto»");
+      const saved = await pg.evaluate(() => {
+        const el = document.getElementById("gEnd");
+        el.value = "2026-12-24";
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+        return new Promise((res) =>
+          setTimeout(() => res(erp.project(gProject).dates.targetEnd), 400),
+        );
+      });
+      if (saved === "2026-12-24") ok("5-6: setting it writes the project's completion date");
+      else bad("5-6: targetEnd written", String(saved));
+    } else bad("5-6: Fin previsto field", JSON.stringify(endField));
+
+    if (!errs.length) ok("5-6: no console errors");
+    else bad("5-6: console", errs.slice(0, 2).join(" | "));
+  } catch (e) {
+    bad("variation budget", String(e).slice(0, 220));
   } finally {
     await pg.close();
   }

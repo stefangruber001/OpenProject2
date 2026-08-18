@@ -4533,3 +4533,36 @@ fresh rows, so a statement re-exported with three weeks of overlap imports only
 its new lines. A row the parser cannot read is COUNTED and shown ("Filas no
 legibles"), never silently dropped — a skipped row nobody is told about is a
 missing movement found at reconciliation time.
+
+## A variation is a REAL budget, and acceptance is what joins it (2026-08-18)
+
+**Decision.** Client blocks 5–6 ("there must be a Variation Budget which,
+together with the originally approved budget, forms the basis for financial
+control"; "new Line Items and Sub-line Items should be reflected automatically…
+and the deadline extended") are modelled as: a new `state.budgets` row flagged
+`variationOf: <projectId>`, built in the SAME builder and frozen by the SAME
+acceptance as any budget. Nothing about the accepted original moves — its three
+immutability guards stand untouched.
+
+**What acceptance does, in one place.** The variation's chapters are renumbered
+to carry on from the project's highest (so every chapter-addressed mechanism —
+allocations, progress, drill-downs — works on them unchanged); the economics
+grow by its sale and cost; certification sees its execution; the attribution
+ceiling grows for the project's own payer; and the completion date extends by
+`scheduleImpactDays` — when the project HAS one, because extending a date that
+was never set would be inventing one. A draft or issued variation counts for
+NOTHING: a proposal is not a contract.
+
+**Why this model.** The alternative — growing chapters/lines on the `changes`
+record — rebuilds the budget builder, versioning, freezing, PDF and signature
+machinery in a second place, and second places drift. Reusing the budget means
+a variation is priced from the same catalogue, printed by the same writer and
+signed by the same ceremony the client already knows. `changes` stays what it
+is: a priced note that becomes a contract annex.
+
+**Deliberately out.** A variation for a DIFFERENT payer than the project's own
+(it would need chapter attribution UI — the dormant split-billing surface);
+negative variations (a reduction is a credit-note conversation, not a budget);
+and variation-aware Gantt task generation (the plan derives from the base
+version; variation chapters appear on the progress list but not as auto tasks).
+Each reversible, none silently decided — this note is the flag.

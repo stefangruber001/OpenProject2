@@ -2313,6 +2313,69 @@
      *                     or by role. Free text, because the customer's staff
      *                     are not users of this system.
      */
+    /**
+     * A VARIATION IS A REAL BUDGET — blocks 5 and 6 of the client review.
+     *
+     * "It should be possible to create budgets for Variations once a budget
+     * has already been accepted for a project." Modelled as exactly that: a
+     * new budget flagged `variationOf: projectId`, going through the SAME
+     * draft → issue → accept cycle as any other — same builder, same catalogue
+     * picker, same freezing, same PDF, same signature machinery. Nothing about
+     * the accepted original moves: its three immutability guards stand, and
+     * the project's reporting reads base PLUS accepted variations.
+     *
+     * `scheduleImpactDays` is what block 6 asks to happen automatically: on
+     * acceptance, the project's completion date extends by the days the
+     * variation adds — when the project HAS a completion date; extending a
+     * date that was never set would be inventing one.
+     */
+    createVariationBudget(projectId, { reason, scheduleImpactDays } = {}, user) {
+      const p = this.project(projectId);
+      if (p.closed) throw new Error("A closed project cannot take a variation");
+      const base = p.budgetId ? this.budget(p.budgetId) : null;
+      const rec = this.createBudget(
+        {
+          partyId: p.partyId,
+          propertyId: base ? base.propertyId : null,
+          activityLine: p.activityLine || (base ? base.activityLine : "renovation"),
+          vatBp: base ? base.vatBp : 1000,
+          irpfBp: base ? base.irpfBp : 0,
+          internalRef: reason || "",
+        },
+        user,
+      );
+      rec.variationOf = projectId;
+      rec.scheduleImpactDays = Math.max(0, Math.round(scheduleImpactDays || 0));
+      this._log(user, "createVariationBudget", p.code + " ← " + rec.number);
+      return rec;
+    }
+    /** The project's ACCEPTED variations, oldest first. */
+    projectVariations(projectId) {
+      return this.state.budgets.filter((b) => b.variationOf === projectId && b.acceptedVersionId);
+    }
+    /**
+     * Every accepted (budget, version) pair a project's figures come from:
+     * the base budget first, then each accepted variation. The single walk
+     * every chapter-addressed mechanism goes through, so a variation's
+     * chapters are found by exactly the code that finds the base ones.
+     */
+    _projectVersions(p) {
+      const out = [];
+      if (p.budgetId && p.acceptedVersionId)
+        out.push({ budgetId: p.budgetId, version: this.version(p.budgetId, p.acceptedVersionId) });
+      for (const b of this.projectVariations(p.id))
+        out.push({ budgetId: b.id, version: this.version(b.id, b.acceptedVersionId) });
+      return out;
+    }
+    /** Accepted base-section chapters across base + variations, flattened. */
+    projectChapters(projectId) {
+      const p = this.project(projectId);
+      const out = [];
+      for (const { budgetId, version } of this._projectVersions(p))
+        for (const c of version.chapters.filter((x) => x.section === "base"))
+          out.push({ budgetId, versionId: version.id, chapter: c });
+      return out;
+    }
     acceptVersion(
       budgetId,
       versionId,
@@ -2324,6 +2387,22 @@
       const v = this.version(budgetId, versionId);
       if (!v.issued) throw new Error("Only an issued version can be accepted");
       if (b.acceptedVersionId) throw new Error("A version is already accepted");
+      /* A variation joining its project must not collide with the chapter
+         numbers already in use there — every cost allocation, every progress
+         mark and every report addresses a chapter by (projectId, num). So its
+         chapters are RENUMBERED to carry on from the project's highest, at the
+         last moment before the freeze; after it, the numbers are history like
+         everything else in the version. */
+      if (b.variationOf) {
+        const taken = this.projectChapters(b.variationOf).map((x) => Number(x.chapter.num) || 0);
+        let next = (taken.length ? Math.max(...taken) : 0) + 1;
+        for (const c of v.chapters) {
+          c.num = String(next++);
+          c.lines.forEach((l, i) => {
+            if (!l.manualNum) l.num = c.num + "." + (i + 1);
+          });
+        }
+      }
       // Symmetric with rejectVersion: one version, one answer. Without this a
       // refused version could be accepted afterwards, overwriting the refusal
       // and flipping the opportunity from lost back to won with no trace of
@@ -2353,6 +2432,17 @@
         // DAS-01's "contratadas/perdidas últimos 12 meses" counts it twice
         // over — once where it belongs and never where it is.
         o.decidedAt = when; // DAS-01: "contratadas/perdidas últimos 12 meses"
+      }
+      if (b.variationOf && b.scheduleImpactDays > 0) {
+        const pj = this.state.projects.find((x) => x.id === b.variationOf);
+        if (pj && pj.dates && pj.dates.targetEnd) {
+          pj.dates.targetEnd = addDays(pj.dates.targetEnd, b.scheduleImpactDays);
+          this._log(
+            user,
+            "variationExtendsDeadline",
+            pj.code + " +" + b.scheduleImpactDays + "d → " + pj.dates.targetEnd,
+          );
+        }
       }
       this._log(user, "acceptVersion", b.number + " v" + v.vNumber);
       return v;
@@ -2852,6 +2942,11 @@
 
     /* =========================== PRJ — projects =========================== */
     createProjectFromAcceptance(budgetId, user) {
+      {
+        const b0 = this.budget(budgetId);
+        if (b0.variationOf)
+          throw new Error("A variation joins its project — it does not open a new one");
+      }
       // PRJ-01..04: no re-entry, frozen baseline
       const b = this.budget(budgetId);
       if (!b.acceptedVersionId) throw new Error("Acceptance required before project creation");
@@ -3001,8 +3096,8 @@
     markLineProgress(projectId, lineId, { pct, qtyMilliDone }, user) {
       const p = this.project(projectId);
       if (!p.budgetId) throw new Error("Project has no budget to mark progress against");
-      const v = this.version(p.budgetId, p.acceptedVersionId);
-      for (const c of v.chapters) {
+      const chapterLists = this._projectVersions(p).flatMap((x) => x.version.chapters);
+      for (const c of chapterLists) {
         const l = c.lines.find((x) => x.id === lineId);
         if (!l) continue;
         let value = pct;
@@ -3031,8 +3126,8 @@
         const pct = p.progressSimple ? p.progressSimple.pct : 0;
         return p.baseline.chapters.map((c) => ({ num: c.num, progressPct: pct }));
       }
-      const v = this.version(p.budgetId, p.acceptedVersionId);
-      return v.chapters
+      return this._projectVersions(p)
+        .flatMap((x) => x.version.chapters)
         .filter((c) => c.section === "base")
         .map((c) => {
           let value = 0,
@@ -3167,10 +3262,10 @@
       // value-weighted, feeds progress invoicing (PLN-03)
       const p = this.project(projectId);
       if (!p.budgetId) return p.progressSimple ? p.progressSimple.pct : 0;
-      const v = this.version(p.budgetId, p.acceptedVersionId);
       let done = 0,
         total = 0;
-      for (const c of v.chapters.filter((x) => x.section === "base"))
+      const chs = this._projectVersions(p).flatMap((x) => x.version.chapters);
+      for (const c of chs.filter((x) => x.section === "base"))
         for (const l of c.lines.filter((l) => !l.pending)) {
           const amt = l.lumpSum
             ? l.priceCents
@@ -4137,7 +4232,10 @@
           ["approved", "executed", "invoiced"].includes(c.status) &&
           (c.chapterNum ? nums.has(String(c.chapterNum)) : partyId === p.partyId),
       );
-      return base + sum(extras, (c) => c.priceCents || 0);
+      let variation = 0;
+      if (partyId === p.partyId)
+        for (const r of this.chapterEconomics(p.id)) if (r.variation) variation += r.saleCents;
+      return base + sum(extras, (c) => c.priceCents || 0) + variation;
     }
 
     /**
@@ -4260,6 +4358,22 @@
             doneCents: Math.round((c.saleCents * progressPct) / 100),
           };
         });
+      /* Accepted variations certify like any other chapter. They are owed by
+         the project's own payer (the default the attribution ceiling uses too),
+         so a payer-scoped ask for anyone else does not see them. */
+      if (!forParty || forParty === p.partyId)
+        for (const r of this.chapterEconomics(p.id))
+          if (r.variation) {
+            const hit = prog.find((x) => String(x.num) === String(r.num));
+            const progressPct = hit ? hit.progressPct : 0;
+            chapters.push({
+              num: r.num,
+              name: r.name,
+              valueCents: r.saleCents,
+              progressPct,
+              doneCents: Math.round((r.saleCents * progressPct) / 100),
+            });
+          }
       const executedCents = sum(chapters, (c) => c.doneCents);
       return {
         billedBaseCents: billedBase,
@@ -5139,7 +5253,11 @@
       const p = this.project(alloc.projectId);
       if (!p.budgetId || !p.acceptedVersionId)
         throw new Error("This project has no accepted budget to name a partida from");
-      const hit = this.findLine(p.budgetId, alloc.lineId, p.acceptedVersionId);
+      let hit = null;
+      for (const { budgetId, version } of this._projectVersions(p)) {
+        hit = this.findLine(budgetId, alloc.lineId, version.id);
+        if (hit) break;
+      }
       if (!hit) throw new Error("Unknown partida for this project's accepted budget");
       const chapterNum = String(hit.chapter.num);
       if (alloc.chapterNum && String(alloc.chapterNum) !== chapterNum)
@@ -6286,13 +6404,26 @@
       );
       const changesPrice = sum(approved, (c) => c.priceCents),
         changesCost = sum(approved, (c) => c.costCents);
-      const currentRevenueCents = p.baseline.revenueCents + changesPrice;
+      let variationRevenue = 0,
+        variationCost = 0;
+      for (const r of this.chapterEconomics(projectId))
+        if (r.variation) {
+          variationRevenue += r.saleCents;
+          variationCost += r.budgetCostCents;
+        }
+      const currentRevenueCents = p.baseline.revenueCents + changesPrice + variationRevenue;
       const committed = this.committedCostCents(projectId);
       const actual = this.actualCostCents(projectId);
-      const forecastCost = Math.max(p.baseline.costCents + changesCost, committed, actual);
+      const forecastCost = Math.max(
+        p.baseline.costCents + changesCost + variationCost,
+        committed,
+        actual,
+      );
       return {
         baselineRevenueCents: p.baseline.revenueCents,
         approvedChangesCents: changesPrice,
+        variationRevenueCents: variationRevenue,
+        variationCostCents: variationCost,
         currentRevenueCents,
         baselineCostCents: p.baseline.costCents,
         changesCostCents: changesCost,
@@ -6309,6 +6440,64 @@
         progressPct: this.projectProgressPct(projectId),
       };
     }
+    /**
+     * Every cost behind ONE chapter of a project — the drill-down block 5 asks
+     * to click into. Mirrors actualCostCents' rules row for row (bills minus
+     * credit notes, labour, direct movements that are not behind a bill,
+     * allocated tickets), so the drawer's sum can never disagree with the
+     * chapter total above it. Each row carries its partida when it names one.
+     */
+    chapterCosts(projectId, chapterNum) {
+      const num = String(chapterNum);
+      const out = [];
+      for (const b of this.state.bills)
+        for (const a of b.allocations || [])
+          if (a.projectId === projectId && String(a.chapterNum) === num)
+            out.push({
+              source: "bill",
+              ref: b.number,
+              date: b.date,
+              desc: this.billSupplier(b).name,
+              lineId: a.lineId || null,
+              amountCents: b.creditNoteFor ? -a.amountCents : a.amountCents,
+            });
+      for (const l of this.state.labour)
+        if (l.projectId === projectId && String(l.chapterNum) === num)
+          out.push({
+            source: "labour",
+            ref: (this.state.workers.find((w) => w.id === l.workerId) || {}).name || "",
+            date: l.date,
+            desc: (l.hoursMilli / 1000).toString() + " h",
+            lineId: l.lineId || null,
+            amountCents: l.costCents,
+          });
+      const billMovIds = new Set(this.state.payments.map((x) => x.movementId).filter(Boolean));
+      for (const m of this.state.movements)
+        if (m.class === "projectCost" && !billMovIds.has(m.id) && !m.matched)
+          for (const a of m.allocations || [])
+            if (a.projectId === projectId && String(a.chapterNum) === num)
+              out.push({
+                source: "movement",
+                ref: m.concept || m.merchantText || "",
+                date: m.accountingDate,
+                desc: "",
+                lineId: a.lineId || null,
+                amountCents: a.amountCents,
+              });
+      for (const c of this.state.captured)
+        if (c.status === "allocated" && !c.billId && ["ticket"].includes(c.docType))
+          for (const a of c.allocations || [])
+            if (a.projectId === projectId && String(a.chapterNum) === num)
+              out.push({
+                source: "capture",
+                ref: c.stdName || c.id,
+                date: (c.confirmed && c.confirmed.date) || "",
+                desc: (c.confirmed && c.confirmed.issuerName) || "",
+                lineId: a.lineId || null,
+                amountCents: a.amountCents,
+              });
+      return out.sort((a, b2) => String(a.date).localeCompare(String(b2.date)));
+    }
     chapterEconomics(projectId) {
       // FIN-03 at chapter level
       const p = this.project(projectId);
@@ -6321,14 +6510,44 @@
       for (const l of this.state.labour)
         if (l.projectId === projectId && l.chapterNum)
           actualByCh[l.chapterNum] = (actualByCh[l.chapterNum] || 0) + l.costCents;
-      return p.baseline.chapters.map((c) => ({
+      const rows = p.baseline.chapters.map((c) => ({
         num: c.num,
         name: c.name,
         saleCents: c.saleCents,
         budgetCostCents: c.costCents,
         actualCents: actualByCh[c.num] || 0,
         overrun: (actualByCh[c.num] || 0) > c.costCents,
+        variation: false,
       }));
+      /* Accepted variations join the SAME table — that is block 5's ask in one
+         line: "any new Line Items and Sub-line Items should be reflected here
+         automatically so they can be tracked". Their figures come from their
+         frozen version's lines, the way the baseline's came from the base
+         version at project creation. */
+      const baseNums = new Set(rows.map((r) => String(r.num)));
+      for (const { chapter: c } of this.projectChapters(projectId)) {
+        if (baseNums.has(String(c.num))) continue;
+        const sale = sum(c.lines, (l) =>
+          l.lumpSum
+            ? l.priceCents
+            : mul(l.subLines.length ? this._aggSubLines(l.subLines) : l.qtyMilli, l.priceCents),
+        );
+        const cost = sum(c.lines, (l) =>
+          l.lumpSum
+            ? l.costCents
+            : mul(l.subLines.length ? this._aggSubLines(l.subLines) : l.qtyMilli, l.costCents),
+        );
+        rows.push({
+          num: c.num,
+          name: c.name,
+          saleCents: sale,
+          budgetCostCents: cost,
+          actualCents: actualByCh[c.num] || 0,
+          overrun: (actualByCh[c.num] || 0) > cost,
+          variation: true,
+        });
+      }
+      return rows;
     }
     /**
      * Money that reached this project and stopped there — allocated to the job
@@ -6406,6 +6625,7 @@
       const parts = Array.isArray(splits) ? splits : [];
       if (!parts.length) throw new Error("A cost must be split into at least one chapter");
       const known = new Set((p.baseline.chapters || []).map((c) => String(c.num)));
+      for (const x of this.projectChapters(projectId)) known.add(String(x.chapter.num));
       parts.forEach((s) => {
         if (!known.has(String(s.chapterNum)))
           throw new Error("Unknown chapter for this project: " + s.chapterNum);

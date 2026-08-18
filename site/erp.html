@@ -7055,11 +7055,11 @@
         let chapters = [];
         try {
           const p = erp.project(pid);
-          chapters = p.budgetId
-            ? erp
-                .version(p.budgetId, p.acceptedVersionId)
-                .chapters.filter((c) => c.section === "base")
-            : [];
+          // Base + accepted variations, in one walk — block 6's ask is that a
+          // variation's new chapters appear HERE automatically, and they do,
+          // because the engine's projectChapters is the same walk every other
+          // chapter-addressed mechanism now uses.
+          chapters = p.budgetId ? erp.projectChapters(pid).map((x) => x.chapter) : [];
         } catch (e) {}
         const taskFor = {};
         plan.tasks.forEach((t) => {
@@ -7955,7 +7955,29 @@
           ? reg.items.filter((c) => erp.changeStage(c) === chgStage)
           : reg.items;
 
+        const vbs = erp.state.budgets.filter((b) => b.variationOf === pid);
         v.innerHTML = `
+   <div class="card"><div class="ch"><h3>Presupuestos de variación</h3>
+     <span style="flex:1"></span>
+     <button class="btn primary sm" id="vbNew">＋ Presupuesto de variación</button></div>
+    <div class="daylist">
+    ${
+      vbs
+        .map((b) => {
+          const t = erp.budgetTotals(b.id, b.acceptedVersionId || b.currentVersionId);
+          const st = b.acceptedVersionId
+            ? '<span class="pill g">Aceptado</span>'
+            : (erp.currentVersion(b.id) || {}).issued
+              ? '<span class="pill b">Emitido</span>'
+              : '<span class="pill y">Borrador</span>';
+          return `<div class="it click" data-vb="${b.id}"><span class="k">${esc(b.number)}</span>
+        <span>${esc(b.internalRef || "")}</span><span style="flex:1"></span>
+        <b>${eur(t.taxableCents)}</b> ${st}</div>`;
+        })
+        .join("") ||
+      '<div class="it" style="color:var(--muted)">Sin presupuestos de variación. El botón crea uno sobre esta obra; se construye y se acepta como cualquier presupuesto, y al aceptarse sus capítulos entran en la economía, el avance y la certificación.</div>'
+    }
+    </div></div>
    <div class="counters" style="--cw:216px">
     ${STAGES.map(
       ([k, l]) => `<button class="counter${chgStage === k ? " on" : ""}" data-cstage="${k}">
@@ -7998,6 +8020,15 @@
             }),
         );
         $("#mNew").onclick = () => changeFormDrawer(pid);
+        if ($("#vbNew"))
+          $("#vbNew").onclick = () =>
+            mutate(() => {
+              const b = erp.createVariationBudget(pid, {}, "backoffice");
+              go("quotes", b.id);
+            }, "Presupuesto de variación creado");
+        v.querySelectorAll("[data-vb]").forEach(
+          (b) => (b.onclick = () => go("quotes", b.dataset.vb)),
+        );
         changeThumbs(v);
         wireChangeActions(pid);
       }
@@ -12006,7 +12037,17 @@
    <div class="pb">
     <div class="pbbar">
      <button class="btn sm" id="bBack" title="Todos los presupuestos">←</button>
-     <div class="who"><b>${b.number} · v${V.vNumber}</b><span>${esc(erp.party(b.partyId).name)}</span></div>
+     <div class="who"><b>${b.number} · v${V.vNumber}</b><span>${esc(erp.party(b.partyId).name)}${
+       b.variationOf
+         ? (() => {
+             try {
+               return " · variación de " + erp.project(b.variationOf).code;
+             } catch (e2) {
+               return "";
+             }
+           })()
+         : ""
+     }</span></div>
      ${
        b.versions.length > 1
          ? // Package 2 slide 2: the header named the version being edited but
@@ -15163,6 +15204,45 @@
           bytes: new Uint8Array(await xlsx.arrayBuffer()),
         });
         return { blob: zipStore(files), entries: files.map((f) => f.path), missing, rows: rows.length - 1 };
+      }
+
+      /* Every cost behind one chapter of one job, grouped by partida when the
+         rows name one. Sums to the same figure as the chapter table above it
+         BY CONSTRUCTION — chapterCosts mirrors actualCostCents' rules — so a
+         disagreement between drawer and table is impossible rather than rare. */
+      function chapterCostsDrawer(projectId, chapterNum, chapterName) {
+        const rows = erp.chapterCosts(projectId, chapterNum);
+        const SRC = { bill: "Factura", labour: "Horas", movement: "Banco", capture: "Documento" };
+        const p = erp.project(projectId);
+        const lineName = {};
+        for (const { chapter } of erp.projectChapters(projectId))
+          for (const l of chapter.lines) lineName[l.id] = l.num + " · " + (l.desc || "");
+        const byLine = new Map();
+        for (const r of rows) {
+          const k = r.lineId || "";
+          if (!byLine.has(k)) byLine.set(k, []);
+          byLine.get(k).push(r);
+        }
+        const total = rows.reduce((s2, r) => s2 + r.amountCents, 0);
+        const db = openDrawer("Costes · " + chapterNum + ". " + (chapterName || ""));
+        db.innerHTML = `<div class="card"><div class="ch"><h3>Coste acumulado</h3><span class="tag">${eur(total)}</span></div>
+   <div class="scroll"><table><thead><tr><th>Partida</th><th>Origen</th><th>Documento</th><th>Fecha</th><th class="num">Importe</th></tr></thead><tbody>
+   ${
+     [...byLine.entries()]
+       .map(([lid, list]) =>
+         list
+           .map(
+             (r, i) => `<tr>
+      <td>${i === 0 ? (lid ? esc(lineName[lid] || lid) : '<span class="pill y">sin partida</span>') : ""}</td>
+      <td>${SRC[r.source] || r.source}</td><td class="k">${esc(r.ref)}${r.desc ? " · " + esc(r.desc) : ""}</td>
+      <td>${r.date ? fmtD(r.date) : "—"}</td><td class="num">${eur(r.amountCents)}</td></tr>`,
+           )
+           .join(""),
+       )
+       .join("") ||
+     '<tr><td colspan="5"><div class="empty">Ningún coste imputado a este capítulo todavía.</div></td></tr>'
+   }
+   </tbody></table></div></div>`;
       }
 
       const VIEWS = {
@@ -19255,9 +19335,14 @@
             ? ErpBridge.projects.forecast(erp, id)
             : null;
         const names = {};
+        const variationNums = new Set();
         try {
           (p.baseline.chapters || []).forEach((c) => {
             names[c.num] = c.name;
+          });
+          erp.chapterEconomics(id).forEach((c) => {
+            if (!names[c.num]) names[c.num] = c.name;
+            if (c.variation) variationNums.add(String(c.num));
           });
         } catch (err) {}
         const pend = erp.unassignedChapterCosts(id);
@@ -19269,8 +19354,8 @@
 
         body.innerHTML = `
     <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
-      <div class="kpi"><div class="lab">Venta</div><div class="val">${eur0(e.currentRevenueCents)}</div>
-        <div class="sub"><span>contratada más extras aprobados</span></div></div>
+      <div class="kpi click" id="ecoInvoices" title="Ver las facturas de esta obra"><div class="lab">Venta</div><div class="val">${eur0(e.currentRevenueCents)}</div>
+        <div class="sub"><span>contratada más extras aprobados</span> <span>· ver facturas →</span></div></div>
       <div class="kpi"><div class="lab">Coste</div><div class="val">${eur0(e.actualCents)}</div>
         <div class="sub"><span>comprometido</span> <span>${eur0(e.committedCents)}</span></div></div>
       <div class="kpi ${marginCents < 0 ? "warn" : "hi"}"><div class="lab">Margen</div><div class="val">${eur0(marginCents)}</div>
@@ -19282,21 +19367,37 @@
        <th>Capítulo</th><th class="num">Presupuestado</th><th class="num">Acumulado</th>
        <th class="num">Desviación</th><th class="num">%</th><th class="num">Margen</th><th></th></tr></thead><tbody>
      ${
-       (f
-         ? f.byChapter
-         : erp.chapterEconomics(id).map((c) => ({
-             chapter: c.num,
-             budgetCents: c.budgetCostCents,
-             actualCents: c.actualCents,
-             varianceCents: c.actualCents - c.budgetCostCents,
-             varianceBp: 0,
-           }))
-       )
+       (() => {
+         const rows = f
+           ? f.byChapter.slice()
+           : erp.chapterEconomics(id).map((c) => ({
+               chapter: c.num,
+               budgetCents: c.budgetCostCents,
+               actualCents: c.actualCents,
+               varianceCents: c.actualCents - c.budgetCostCents,
+               varianceBp: 0,
+             }));
+         /* The factory forecast reads baseline + change orders and knows
+            nothing of variation budgets — so their chapters are merged in
+            from chapterEconomics, which does. Without this the forecast
+            bridge being loaded HID every variation from the table. */
+         if (f)
+           for (const c of erp.chapterEconomics(id))
+             if (c.variation && !rows.some((r) => String(r.chapter) === String(c.num)))
+               rows.push({
+                 chapter: c.num,
+                 budgetCents: c.budgetCostCents,
+                 actualCents: c.actualCents,
+                 varianceCents: c.actualCents - c.budgetCostCents,
+                 varianceBp: 0,
+               });
+         return rows;
+       })()
          .map((c) => {
            const base =
              (p.baseline.chapters || []).find((x) => String(x.num) === String(c.chapter)) || {};
            const mg = (base.saleCents || 0) - (c.actualCents || 0);
-           return `<tr><td class="k">${c.chapter}. ${esc(names[c.chapter] || "—")}</td>
+           return `<tr class="click" data-chcosts="${c.chapter}"><td class="k">${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>
         <td class="num">${eur0(c.budgetCents)}</td>
         <td class="num">${eur0(c.actualCents)}</td>
         <td class="num ${c.varianceCents > 0 ? "warn" : ""}">${c.varianceCents > 0 ? "+" : ""}${eur0(c.varianceCents)}</td>
@@ -19338,6 +19439,24 @@
                 id,
                 pend.find((r) => r.id === b.dataset.assign),
               )),
+        );
+        /* Block 5's two click-throughs. Revenue walks to the invoice register
+           filtered on this job's code; a chapter row opens every cost behind
+           its figure — the drill-down whose absence meant the total could only
+           be believed, never checked. Grouped by partida when the costs name
+           one, because that is the level the client asked to see. */
+        const eco = body.querySelector("#ecoInvoices");
+        if (eco)
+          eco.onclick = () => {
+            Object.assign(getListState("invoices"), { q: p.code, page: 1 });
+            go("invoicing");
+          };
+        body.querySelectorAll("[data-chcosts]").forEach(
+          (row) =>
+            (row.onclick = (ev) => {
+              if (ev.target.closest("button")) return;
+              chapterCostsDrawer(id, row.dataset.chcosts, names[row.dataset.chcosts] || "");
+            }),
         );
         // The manual forecast override kept its button. The doc's table does not
         // mention one, but `setForecastOverride` is a real engine rule with a real
@@ -20744,6 +20863,11 @@
       <button class="btn sm" id="gBack" title="Volver a la lista de obras">← Obras</button>
       <div class="who"><b>${esc(p.code)}</b><span>${esc(erp.party(p.partyId).name)}</span></div>
       <span style="flex:1"></span>
+      <!-- Block 6: the completion date, finally SETTABLE. updateProject has
+           carried targetEnd since it was written and no screen ever called it,
+           so a project could not have a deadline for a variation to extend. -->
+      <label class="tag" style="display:flex;gap:6px;align-items:center">Fin previsto
+        <input type="date" id="gEnd" value="${esc((p.dates && p.dates.targetEnd) || "")}" style="font:inherit;border:1px solid var(--line);border-radius:7px;padding:2px 6px;background:var(--paper);color:var(--ink)"></label>
       <div class="acts"><span class="tag">Avance físico</span></div>
     </div>
     <div id="gBody" style="flex:1;min-height:0;overflow:auto;padding:12px 14px"></div>
@@ -20752,6 +20876,11 @@
           ganttFull = false;
           render();
         };
+        $("#gEnd").onchange = () =>
+          mutate(
+            () => erp.updateProject(gProject, { targetEnd: $("#gEnd").value || null }, "backoffice"),
+            "Fin previsto actualizado",
+          );
         VIEWS._ganttBody($("#gBody"));
       }
 
