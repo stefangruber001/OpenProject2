@@ -3969,6 +3969,77 @@ async function testBankAndCash(browser, base) {
     if (movsFinal === movsAfter) ok("1B: and nothing was imported twice");
     else bad("1B: no duplicate import", `${movsAfter} → ${movsFinal}`);
 
+    // ── 1C: a credit card is an ACCOUNT — created through the product, fed
+    //    by the same importer, settled from the bank as an internal transfer.
+    await pg.click("#bkNew");
+    await pg.waitForTimeout(300);
+    await pg.evaluate(() => {
+      document.getElementById("na_name").value = "Visa E2E";
+      document.getElementById("na_kind").value = "card";
+    });
+    await pg.click("#na_go");
+    await pg.waitForTimeout(500);
+    const cardAcc = await pg.evaluate(() => {
+      const c = erp.state.bankAccounts.find((a) => a.kind === "card" && a.name === "Visa E2E");
+      return c ? c.id : null;
+    });
+    if (cardAcc) ok("1C: a card account can be created through the product");
+    else bad("1C: card account created", "not found after drawer");
+
+    // The card statement, into the card account, through the same file input.
+    await pg.evaluate((id) => {
+      const sel = document.getElementById("bkSel");
+      sel.value = id;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    }, cardAcc);
+    await pg.waitForTimeout(500);
+    await pg.setInputFiles("#bkFile", "tests/fixtures/bbva-movimientos.xlsx");
+    await pg.waitForTimeout(900);
+    await pg.click("#stGo");
+    await pg.waitForTimeout(600);
+    const onCard = await pg.evaluate(
+      (id) => erp.state.movements.filter((m) => m.accountId === id).length,
+      cardAcc,
+    );
+    if (onCard === 3) ok("1C: the card statement lands on the card account (3 movements)");
+    else bad("1C: card statement import", String(onCard));
+
+    // A negative movement on the BANK offers the settlement destination.
+    const settleOffer = await pg.evaluate(() => {
+      const bank = erp.state.bankAccounts.find((a) => a.kind === "bank");
+      const sel = document.getElementById("bkSel");
+      sel.value = bank.id;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      return bank.id;
+    });
+    await pg.waitForTimeout(500);
+    const group = await pg.evaluate(() => {
+      const sels = [...document.querySelectorAll("[data-bkdest]")];
+      const withGroup = sels.filter((sel) =>
+        [...sel.querySelectorAll("optgroup")].some((g) => /Liquidación de tarjeta/.test(g.label)),
+      );
+      return { total: sels.length, offered: withGroup.length };
+    });
+    if (group.offered > 0)
+      ok(
+        `1C: outgoing bank rows offer «Liquidación de tarjeta» (${group.offered} of ${group.total})`,
+      );
+    else bad("1C: settlement optgroup", JSON.stringify(group));
+
+    const settled = await pg.evaluate((cardId) => {
+      const sel = [...document.querySelectorAll("[data-bkdest]")].find((x) =>
+        [...x.querySelectorAll("optgroup")].some((g) => /Liquidación de tarjeta/.test(g.label)),
+      );
+      if (!sel) return null;
+      sel.value = "c:" + cardId;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      const m = erp.state.movements.find((x) => x.id === sel.dataset.bkdest);
+      return { class: m.class, link: m.cardSettlement && m.cardSettlement.accountId };
+    }, cardAcc);
+    if (settled && settled.class === "internalTransfer" && settled.link === cardAcc)
+      ok("1C: picking it marks the bank line as the card's settlement, an internal transfer");
+    else bad("1C: settlement written", JSON.stringify(settled));
+
     if (errs.length === 0) ok("ADM-05/06: no console errors");
     else bad("ADM-05/06: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

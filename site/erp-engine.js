@@ -4918,14 +4918,47 @@
 
     /* =========================== BNK — bank, cash, reconciliation =========================== */
     addBankAccount(a, user) {
-      // BNK-06
+      // BNK-06. Three kinds, and a CARD is deliberately one of them: its
+      // statement imports as ordinary movements on its own account, so the
+      // importer, the duplicate detection, the suggestion scoring and the
+      // matching screen all apply to card purchases with no second
+      // implementation to keep in step. The bank line that pays the card off
+      // is an internal transfer that names the card it settles — see
+      // markCardSettlement.
       const rec = Object.assign(
         { id: this._id("bank"), name: "", kind: "bank", iban: "", openingCents: 0 },
         a,
       );
+      if (!["bank", "till", "card"].includes(rec.kind))
+        throw new Error("Unknown account kind: " + rec.kind);
       this.state.bankAccounts.push(rec);
       this._log(user, "addBankAccount", rec.name);
       return rec;
+    }
+    /**
+     * The bank line that pays a card off, tied to the card it settles.
+     *
+     * The money truth of a card is: the PURCHASES are the costs (they live on
+     * the card account and are matched to invoices there), and the bank's
+     * monthly charge is NOT a cost — counting it too would count every card
+     * purchase twice. So the settlement line is classified an internal
+     * transfer, which the P&L already excludes, and it records WHICH card it
+     * pays so the reader can walk from the bank line to the purchases it
+     * covers. Refuses a target that is not a card, and refuses a movement
+     * that itself sits on a card — a card cannot settle itself.
+     */
+    markCardSettlement(movId, cardAccountId, user) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      const card = this.state.bankAccounts.find((x) => x.id === cardAccountId);
+      if (!card || card.kind !== "card") throw new Error("The settlement must name a card account");
+      if (m.accountId === cardAccountId)
+        throw new Error("A card cannot settle itself — pick the bank line that pays it");
+      m.class = "internalTransfer";
+      m.cardSettlement = { accountId: cardAccountId };
+      m.status = m.status === "unallocated" ? "allocated" : m.status;
+      this._log(user, "markCardSettlement", movId + " → " + card.name);
+      return m;
     }
     /**
      * Rows a statement import would ADD, and rows it would duplicate (§5.3
@@ -5226,7 +5259,11 @@
           this.payBills(
             {
               amountCents: Math.abs(m.amountCents),
-              method: m.card ? "card" : "transfer",
+              method:
+                m.card ||
+                (this.state.bankAccounts.find((a) => a.id === m.accountId) || {}).kind === "card"
+                  ? "card"
+                  : "transfer",
               billAllocations: [{ billId: target.billId, amountCents: Math.abs(m.amountCents) }],
               movementId: movId,
             },

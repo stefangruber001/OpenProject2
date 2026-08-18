@@ -2496,6 +2496,76 @@ assert(
   );
 }
 
+/**
+ * A CREDIT CARD IS AN ACCOUNT, NOT A SPECIAL MOVEMENT.
+ *
+ * Its statement imports as ordinary movements on its own account — so the
+ * importer, the dedupe, the scoring and the matching screen all apply with no
+ * second implementation — and the bank line that pays the card off is an
+ * internal transfer naming the card it settles, because the PURCHASES are the
+ * costs and counting the monthly charge too counts each of them twice.
+ */
+{
+  const e = new ERP("2026-03-10");
+  e.configureEntity(
+    { legalName: "Obras 1C SL", taxId: "B12345674", iban: "ES9121000418450200051332" },
+    "bo",
+  );
+  const sup = e.addParty({ roles: ["supplier"], name: "Ferretería 1C", taxId: "B12345674" }, "bo");
+  throws(
+    () => e.addBankAccount({ name: "??", kind: "wallet" }, "bo"),
+    "an unknown account kind is refused, not stored",
+  );
+  const bank = e.addBankAccount({ name: "BBVA CC", kind: "bank" }, "bo");
+  const card = e.addBankAccount({ name: "Visa empresa", kind: "card" }, "bo");
+
+  // The card's statement, imported like any other statement.
+  e.importMovements(
+    card.id,
+    [
+      { accountingDate: "2026-03-03", concept: "FERRETERIA VALLES", amountCents: -12100 },
+      { accountingDate: "2026-03-04", concept: "GASOLINERA REPSOL", amountCents: -6050 },
+    ],
+    "bo",
+  );
+  const purchases = e.state.movements.filter((m) => m.accountId === card.id);
+  assert(purchases.length === 2, "the card statement lands on the card account", purchases.length);
+
+  // Matching a card purchase to its invoice records a CARD payment.
+  const bill = e.registerBill(
+    { supplierId: sup.id, number: "T-88", baseCents: 10000, vatBp: 2100 },
+    "bo",
+  );
+  e.matchMovement(purchases[0].id, { billId: bill.id }, "bo");
+  const pay = e.state.payments.find((p) => p.movementId === purchases[0].id);
+  assert(
+    pay && pay.method === "card" && e.billOutstandingCents(bill.id) === 0,
+    "matching a card purchase pays its bill BY CARD",
+    JSON.stringify({ method: pay && pay.method, out: e.billOutstandingCents(bill.id) }),
+  );
+
+  // The bank line that pays the card off: internal transfer, naming the card.
+  e.importMovements(
+    bank.id,
+    [{ accountingDate: "2026-03-31", concept: "LIQUIDACION VISA", amountCents: -18150 }],
+    "bo",
+  );
+  const settle = e.state.movements.find((m) => m.accountId === bank.id);
+  e.markCardSettlement(settle.id, card.id, "bo");
+  assert(
+    settle.class === "internalTransfer" &&
+      settle.cardSettlement &&
+      settle.cardSettlement.accountId === card.id,
+    "the settlement is an internal transfer that names the card it pays",
+    JSON.stringify({ class: settle.class, link: settle.cardSettlement }),
+  );
+  throws(
+    () => e.markCardSettlement(settle.id, bank.id, "bo"),
+    "a settlement must name a CARD — a bank account is refused",
+  );
+  throws(() => e.markCardSettlement(purchases[1].id, card.id, "bo"), "a card cannot settle itself");
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

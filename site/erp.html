@@ -14848,6 +14848,57 @@
             }, "Extracto importado");
         }
 
+      /* Paying the card off is not a cost — the purchases on the card are, and
+         counting the monthly charge too counts every one of them twice. So a
+         negative bank line can be marked as the settlement of a card, which
+         classifies it an internal transfer and records which card it pays.
+         Offered only where it can be true: money going OUT, on an account that
+         is not itself a card, in a workspace that has one. */
+      function cardSettleGroup(m) {
+        const acc = erp.state.bankAccounts.find((a) => a.id === m.accountId);
+        if (!acc || acc.kind === "card" || m.amountCents >= 0) return "";
+        const cards = erp.state.bankAccounts.filter((a) => a.kind === "card");
+        if (!cards.length) return "";
+        const opts = cards
+          .map((c) => `<option value="c:${c.id}">${esc(c.name)}</option>`)
+          .join("");
+        return `<optgroup label="Liquidación de tarjeta">${opts}</optgroup>`;
+      }
+
+      /* The product had NO way to add a bank account — they existed only in the
+         seed, which is exactly the kind of gap a demo never shows and a real
+         tenant hits on day one. Card statements need somewhere to land, so the
+         drawer arrives with the card work. */
+      function newAccountDrawer() {
+        const db = openDrawer("Nueva cuenta");
+        db.innerHTML = `<div class="fgrid">
+   <div class="field full"><label>Nombre *</label><input id="na_name" placeholder="BBVA · cuenta corriente"></div>
+   <div class="field"><label>Tipo</label><select id="na_kind">
+     <option value="bank">Cuenta bancaria</option>
+     <option value="card">Tarjeta de crédito</option>
+     <option value="till">Caja de efectivo</option></select></div>
+   <div class="field"><label>Saldo inicial (€)</label><input id="na_open" type="number" step="0.01" value="0"></div>
+   <div class="field full"><label>IBAN</label><input id="na_iban" placeholder="ES00 0000 0000 0000 0000 0000"></div>
+   <div class="field full" style="margin-top:6px"><button class="btn primary" id="na_go">Crear cuenta</button></div>
+  </div>`;
+        $("#na_go").onclick = () =>
+          mutate(() => {
+            const name = $("#na_name").value.trim();
+            if (!name) throw new Error("La cuenta necesita un nombre");
+            erp.addBankAccount(
+              {
+                name,
+                kind: $("#na_kind").value,
+                iban: $("#na_iban").value.trim(),
+                openingCents:
+                  Math.round(Number(String($("#na_open").value).replace(",", ".")) * 100) || 0,
+              },
+              "backoffice",
+            );
+            closeDrawer();
+          }, "Cuenta creada");
+      }
+
       const VIEWS = {
         /* ---------- Torre de control · Mi día (DAS, spec §2.1/§2.2) ----------
     Defined once, above, as standalone functions — big enough (sparklines,
@@ -16595,8 +16646,9 @@
    <div class="stepbar">
      <select class="inline" id="bkSel">
        <option value="">Todas las cuentas</option>
-       ${accs.map((a) => `<option value="${a.id}"${a.id === bankAcc ? " selected" : ""}>${esc(a.name)}</option>`).join("")}
+       ${accs.map((a) => `<option value="${a.id}"${a.id === bankAcc ? " selected" : ""}>${esc(a.name)}${a.kind === "card" ? " · tarjeta" : a.kind === "till" ? " · caja" : ""}</option>`).join("")}
      </select>
+     <button class="btn sm" id="bkNew">＋ Cuenta</button>
      <span style="flex:1"></span>
      <button class="btn sm" id="bkImport">⬆ Importar extracto (.xlsx)</button>
      <input type="file" id="bkFile" accept=".xlsx" style="display:none">
@@ -16645,6 +16697,7 @@
         <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL)
           .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
           .join("")}</optgroup>
+        ${cardSettleGroup(m)}
       </select></td>
       <td>${open ? `<span title="Días sin casar"><span>${age}</span> <span>d</span></span>` : '<span class="pill g">Casado</span>'}</td>
      </tr>`;
@@ -16659,6 +16712,7 @@
             render();
           };
           $("#bToRec").onclick = () => goTab("banking", "_reconcile");
+          $("#bkNew").onclick = () => newAccountDrawer();
           /* The statement lands on ONE account — importing into "all accounts"
              would have to guess, and a guess about which bank a movement
              belongs to is a reconciliation that starts wrong. */
@@ -16699,6 +16753,10 @@
                 if (!val) return;
                 mutate(() => {
                   const m = erp.state.movements.find((x) => x.id === sel.dataset.bkdest);
+                  if (val.startsWith("c:")) {
+                    erp.markCardSettlement(m.id, val.slice(2), "backoffice");
+                    return;
+                  }
                   const amount = Math.abs(m.amountCents);
                   erp.splitMovement(
                     m.id,
