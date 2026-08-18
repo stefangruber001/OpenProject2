@@ -4566,3 +4566,26 @@ negative variations (a reduction is a credit-note conversation, not a budget);
 and variation-aware Gantt task generation (the plan derives from the base
 version; variation chapters appear on the progress list but not as auto tasks).
 Each reversible, none silently decided — this note is the flag.
+
+## S19 · An empty state is a screen, and it needs a door
+
+**Found by the client, on production, on day one.** The petty-cash screen said
+"no cash till configured" and offered nothing to press; the bank screen said
+"no accounts configured" and did the same. Everything Part 1 built — creating
+the account, importing the statement — was rendered ten lines below that early
+return, so on a register with no accounts the whole of the bank work was
+unreachable. Not a stale deploy, which is what it looked like: the code was
+current, the door was just behind the wall.
+
+**Why no test saw it.** Every browser suite runs against the demo seed, which
+ships two accounts and a till. A server-mode tenant never runs that seed, so
+the empty branch was the one state nothing had ever opened. `testFirstRun`
+now empties the register in the page and asserts the way OUT of each empty
+state; it was confirmed red against the unfixed screens before being kept.
+
+**The rule taken from it:** an empty state names what is missing AND carries
+the control that creates it. Where the creation lives on another screen, the
+empty state says which one. Checked across all 29 routes on an empty register;
+the remaining empty screens are project-scoped ones that say "no projects yet"
+(a project arrives from an accepted budget, which is a different screen's job)
+and Usuarios, which correctly reports that accounts live on the server.

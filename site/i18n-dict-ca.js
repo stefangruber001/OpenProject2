@@ -457,6 +457,9 @@ window.CANEI_DICT.ca = {
   Aceptada: "Acceptada",
   Emitida: "Emesa",
   "Base imponible": "Base imposable",
+  "＋ Crear caja": "＋ Crear caixa",
+  "Crea la primera cuenta para empezar: banco, tarjeta o caja.":
+    "Crea el primer compte per començar: banc, targeta o caixa.",
   Diferencia: "Diferència",
   doc: "doc",
   "⚠ Una obra cerrada no puede aceptar una variación":

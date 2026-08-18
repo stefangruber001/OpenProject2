@@ -87,6 +87,7 @@ async function main() {
     testInvoiceGenerator,
     testCashFlow,
     testFinancials,
+    testFirstRun,
     testBankAndCash,
     testContract,
     testChangeApprovalEvidence,
@@ -4026,6 +4027,99 @@ async function testProjectTracking(browser, base) {
     else bad("tracking: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("project tracking", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/**
+ * Day one on a REAL register — the state no other suite is ever in.
+ *
+ * Every suite here runs against the demo seed, which ships two bank accounts
+ * and a till. A server-mode tenant gets neither: the seed does not run there.
+ * So the branch that renders "no accounts configured" had never been looked
+ * at, and the buttons that create the account and import the statement were
+ * built BELOW it — the whole of the bank work was unreachable on precisely
+ * the first day it was needed, and the client found it before this test did.
+ *
+ * The register is emptied in the page rather than mocked: same code, same
+ * screens, no accounts. What is asserted is the way OUT of each empty state,
+ * because a screen that only states the absence is a screen you cannot use.
+ */
+async function testFirstRun(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  const emptyRegister = () =>
+    pg.evaluate(() => {
+      erp.state.bankAccounts = [];
+      erp.state.movements = [];
+      erp.state.bankPeriods = [];
+      render();
+    });
+  try {
+    // ---- the bank screen: a create button, and a drawer behind it ----------
+    await pg.goto(`${base}/erp.html#banking`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await emptyRegister();
+    await pg.waitForTimeout(400);
+
+    if (await pg.locator("#bkNew").isVisible())
+      ok("first run: with no accounts, the bank screen still offers ＋ Cuenta");
+    else bad("first run: bank screen", "no #bkNew — the empty state is a dead end");
+
+    await pg.locator("#bkNew").click();
+    await pg.waitForTimeout(400);
+    await pg.fill("#na_name", "BBVA primera cuenta");
+    await pg.selectOption("#na_kind", "bank");
+    await pg.locator("#na_go").click();
+    await pg.waitForTimeout(600);
+    const madeBank = await pg.evaluate(() => erp.state.bankAccounts.length);
+    if (madeBank === 1) ok("first run: the first bank account is created from that button");
+    else bad("first run: create account", `accounts=${madeBank}`);
+
+    // …and once one exists, the statement importer is on the same screen.
+    const importable = await pg.evaluate(() => !!document.querySelector("#bkImport"));
+    if (importable) ok("first run: the statement importer appears with the first account");
+    else bad("first run: importer", "no #bkImport after creating an account");
+
+    // ---- petty cash: the till is created from the screen named after it ----
+    await pg.goto(`${base}/erp.html#petty-cash`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await emptyRegister();
+    await pg.waitForTimeout(400);
+
+    if (await pg.locator("#cashNew").isVisible())
+      ok("first run: with no till, Caja chica offers to create one");
+    else bad("first run: petty cash", "no #cashNew — the empty state is a dead end");
+
+    await pg.locator("#cashNew").click();
+    await pg.waitForTimeout(400);
+    // The kind is PRESELECTED: this button says "create a till", so landing on
+    // "bank account" would be a different promise than the one it made.
+    const preset = await pg.inputValue("#na_kind");
+    if (preset === "till") ok("first run: that button preselects «Caja de efectivo»");
+    else bad("first run: till preset", `kind=${preset}`);
+
+    await pg.fill("#na_name", "Caja obra");
+    await pg.locator("#na_go").click();
+    await pg.waitForTimeout(700);
+    // Geometry, not a count: the screen must now BE the petty-cash screen —
+    // entrada, salida and the arqueo — not merely hold one more record.
+    const usable = await pg.evaluate(() => ({
+      tills: erp.state.bankAccounts.filter((a) => a.kind === "till").length,
+      inBtn: !!document.querySelector("#cashIn"),
+      outBtn: !!document.querySelector("#cashOut"),
+      close: !!document.querySelector("#cashClose"),
+    }));
+    if (usable.tills === 1 && usable.inBtn && usable.outBtn && usable.close)
+      ok("first run: creating the till turns Caja chica into a working screen");
+    else bad("first run: petty cash after creation", JSON.stringify(usable));
+
+    if (errs.length === 0) ok("first run: no console errors");
+    else bad("first run: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("first run", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }

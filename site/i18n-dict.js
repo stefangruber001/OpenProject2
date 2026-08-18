@@ -528,6 +528,11 @@ window.CANEI_DICT = {
     ["Aceptada", "Accepted"],
     ["Emitida", "Issued"],
     ["Base imponible", "Taxable base"],
+    ["＋ Crear caja", "＋ Create till"],
+    [
+      "Crea la primera cuenta para empezar: banco, tarjeta o caja.",
+      "Create the first account to begin: bank, card or till.",
+    ],
     ["Diferencia", "Difference"],
     ["doc", "doc"],
     [

@@ -15002,14 +15002,15 @@
          seed, which is exactly the kind of gap a demo never shows and a real
          tenant hits on day one. Card statements need somewhere to land, so the
          drawer arrives with the card work. */
-      function newAccountDrawer() {
+      function newAccountDrawer(kind) {
         const db = openDrawer("Nueva cuenta");
+        const k = kind || "bank";
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Nombre *</label><input id="na_name" placeholder="BBVA · cuenta corriente"></div>
    <div class="field"><label>Tipo</label><select id="na_kind">
-     <option value="bank">Cuenta bancaria</option>
-     <option value="card">Tarjeta de crédito</option>
-     <option value="till">Caja de efectivo</option></select></div>
+     <option value="bank"${k === "bank" ? " selected" : ""}>Cuenta bancaria</option>
+     <option value="card"${k === "card" ? " selected" : ""}>Tarjeta de crédito</option>
+     <option value="till"${k === "till" ? " selected" : ""}>Caja de efectivo</option></select></div>
    <div class="field"><label>Saldo inicial (€)</label><input id="na_open" type="number" step="0.01" value="0"></div>
    <div class="field full"><label>IBAN</label><input id="na_iban" placeholder="ES00 0000 0000 0000 0000 0000"></div>
    <div class="field full" style="margin-top:6px"><button class="btn primary" id="na_go">Crear cuenta</button></div>
@@ -16972,9 +16973,16 @@
           $("#sub").textContent =
             "Saldos, movimientos y clasificación. La clase y el destino se editan en la propia fila; lo que sigue sin casar lleva una barra ámbar y dice cuántos días lleva ahí.";
           const accs = erp.state.bankAccounts;
+          /* A register with no account yet is where a real tenant starts — the
+             demo seed ships two, so this branch only ever runs on the one day
+             it matters. The buttons that create an account and import a
+             statement were built ten lines BELOW it, which made the whole of
+             the bank work unreachable precisely on first use: a sentence, and
+             nothing to press. The door belongs above the emptiness. */
           if (!accs.length) {
-            v.innerHTML =
-              '<div class="card"><div class="empty">No hay cuentas configuradas.</div></div>';
+            v.innerHTML = `<div class="stepbar"><button class="btn primary sm" id="bkNew">＋ Cuenta</button></div>
+   <div class="card"><div class="empty">No hay cuentas configuradas.<br>Crea la primera cuenta para empezar: banco, tarjeta o caja.</div></div>`;
+            $("#bkNew").onclick = () => newAccountDrawer();
             return;
           }
           if (bankAcc && !accs.some((a) => a.id === bankAcc)) bankAcc = "";
@@ -19608,9 +19616,13 @@
         $("#sub").textContent =
           "Entradas y salidas de la caja en efectivo, y el arqueo que las prueba. Una salida sin justificante se cuenta aparte: es el agujero clásico en las cuentas de una empresa pequeña.";
         const tills = erp.state.bankAccounts.filter((a) => a.kind === "till");
+        /* Same first-day trap as the bank screen: the till is created in the
+           account drawer, and this screen — the one named after it — used to
+           state the absence and offer no way out of it. */
         if (!tills.length) {
-          v.innerHTML =
-            '<div class="card"><div class="empty">No hay ninguna caja en efectivo configurada.</div></div>';
+          v.innerHTML = `<div class="stepbar"><button class="btn primary sm" id="cashNew">＋ Crear caja</button></div>
+   <div class="card"><div class="empty">No hay ninguna caja en efectivo configurada.</div></div>`;
+          $("#cashNew").onclick = () => newAccountDrawer("till");
           return;
         }
         if (!cashAcc || !tills.some((t) => t.id === cashAcc)) cashAcc = tills[0].id;
