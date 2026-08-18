@@ -8550,18 +8550,27 @@
    <div class="field full"><label>Trabajador *</label><select id="nh_w">${erp.state.workers.map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join("")}</select></div>
    <div class="field"><label>Proyecto *</label><select id="nh_p">${jobs.map((p) => `<option value="${p.id}">${esc(p.code)} · ${esc(p.name)}</option>`).join("")}</select></div>
    <div class="field"><label>Capítulo</label><select id="nh_c"></select></div>
+   <div class="field" id="nh_lwrap" style="display:none"><label>Partida</label><select id="nh_l"></select></div>
+   <div class="field"><label>Tipo</label><select id="nh_k"><option value="normal">Normal</option><option value="extra">Extra</option><option value="festivo">Festivo</option></select></div>
    <div class="field"><label>Horas *</label><input id="nh_h" type="number" step="0.25" min="0"></div>
    <div class="field"><label>Fecha</label><input id="nh_d" type="date" value="${day}"></div>
    <div class="field full" style="margin-top:6px"><button class="btn primary" id="nh_go">Registrar</button></div>
   </div>`;
+        const fillLines = () => {
+          const opts = lineOptionsFor($("#nh_p").value, $("#nh_c").value, "");
+          $("#nh_lwrap").style.display = opts ? "" : "none";
+          if (opts) $("#nh_l").innerHTML = '<option value="">—</option>' + opts;
+        };
         const fillChaps = () => {
           $("#nh_c").innerHTML =
             chapsFor($("#nh_p").value)
               .map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`)
               .join("") || '<option value="">—</option>';
+          fillLines();
         };
         fillChaps();
         $("#nh_p").onchange = fillChaps;
+        $("#nh_c").onchange = fillLines;
         $("#nh_go").onclick = () =>
           mutate(() => {
             const hrs = Number(String($("#nh_h").value).replace(",", "."));
@@ -8571,6 +8580,9 @@
                 workerId: $("#nh_w").value,
                 projectId: $("#nh_p").value,
                 chapterNum: $("#nh_c").value || null,
+                lineId:
+                  $("#nh_lwrap").style.display !== "none" ? $("#nh_l").value || null : null,
+                kind: $("#nh_k").value,
                 hoursMilli: Math.round(hrs * 1000),
                 date: $("#nh_d").value || day,
               },
@@ -8616,6 +8628,37 @@
         )
         .join("") ||
       '<tr><td colspan="4"><div class="empty">Sin horas registradas en el periodo.</div></td></tr>'
+    }
+    </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Por trabajador</h3><span class="tag">${fmtD(r.from)} – ${fmtD(r.to)}</span></div>
+    <div class="scroll"><table id="hByW"><thead><tr><th>Trabajador</th><th>Obras</th>
+      <th class="num">Horas</th><th class="num">De ellas, extra</th><th class="num">Coste</th></tr></thead><tbody>
+    ${
+      erp
+        .hoursByWorker(r.from, r.to)
+        .map(
+          (w) => `<tr><td class="k">${esc(w.name)}</td>
+        <td>${w.projects.map((pj) => esc(pj.code || "—")).join(" · ")}</td>
+        <td class="num">${h(w.hoursMilli)}</td><td class="num">${w.extraHoursMilli ? h(w.extraHoursMilli) : "—"}</td>
+        <td class="num k">${eur(w.costCents)}</td></tr>`,
+        )
+        .join("") ||
+      '<tr><td colspan="5"><div class="empty">Sin horas registradas en el periodo.</div></td></tr>'
+    }
+    </tbody></table></div></div>
+   <div class="card"><div class="ch"><h3>Pagos en efectivo por trabajador</h3><span class="tag" id="hWRecTag"></span></div>
+    <div class="scroll"><table id="hWRec"><thead><tr><th>Trabajador</th>
+      <th class="num">Horas del mes (coste)</th><th class="num">Pagado a su nombre</th><th class="num">Diferencia</th></tr></thead><tbody>
+    ${
+      erp
+        .workerMonthlyReconciliation(rec.month)
+        .map(
+          (w) => `<tr><td class="k">${esc(w.name)}</td>
+        <td class="num">${eur(w.bookedCents)}</td><td class="num">${eur(w.paidCents)}</td>
+        <td class="num" style="color:${w.diffCents < 0 ? "var(--danger)" : "var(--ink)"}">${eur(w.diffCents)}</td></tr>`,
+        )
+        .join("") ||
+      '<tr><td colspan="4"><div class="empty">Sin horas ni pagos nominales este mes.</div></td></tr>'
     }
     </tbody></table></div></div>
    <div class="card"><div class="ch"><h3>Conciliación del mes</h3><span class="tag">${rec.month}</span></div>
@@ -9225,6 +9268,7 @@
    <div class="field"><label>Teléfono</label><input id="w_phone"></div>
    <div class="field"><label>Email</label><input id="w_mail"></div>
    <div class="field"><label>Tarifa inicial (€/hora) *</label><input id="w_rate" type="number" min="0" step="0.5"></div>
+   <div class="field"><label>Tarifa hora extra (€/hora)</label><input id="w_xrate" type="number" min="0" step="0.5" placeholder="como la normal si se deja vacío"></div>
    <div class="field full" style="margin-top:8px"><button class="btn primary" id="w_save">Guardar trabajador</button></div></div>`;
         $("#w_save").onclick = () =>
           mutate(() => {
@@ -9242,7 +9286,12 @@
               },
               "backoffice",
             );
-            erp.addWorkerRate(rec.id, { from: erp.today, rateCentsPerHour: rate }, "backoffice");
+            const xr = Math.round((+$("#w_xrate").value || 0) * 100);
+            erp.addWorkerRate(
+              rec.id,
+              { from: erp.today, rateCentsPerHour: rate, extraRateCentsPerHour: xr > 0 ? xr : null },
+              "backoffice",
+            );
             closeDrawer();
           }, "Trabajador creado");
       }
@@ -9271,13 +9320,14 @@
          .sort((a, b) => b.from.localeCompare(a.from))
          .map(
            (r) =>
-             `<div class="it">desde ${fmtD(r.from)} · ${esc(eur(r.rateCentsPerHour))}/hora</div>`,
+             `<div class="it">desde ${fmtD(r.from)} · ${esc(eur(r.rateCentsPerHour))}/hora${r.extraRateCentsPerHour ? ` · extra ${esc(eur(r.extraRateCentsPerHour))}/hora` : ""}</div>`,
          )
          .join("") || '<div class="it">Sin tarifas registradas.</div>'
      }
     </div>
     <div class="fgrid" style="padding:0 16px 14px">
      <div class="field"><label>Nueva tarifa (€/hora)</label><input id="w_newrate" type="number" min="0" step="0.5"></div>
+     <div class="field"><label>Tarifa hora extra (€/hora)</label><input id="w_newxrate" type="number" min="0" step="0.5"></div>
      <div class="field"><label>Vigente desde</label><input id="w_newfrom" type="date" value="${erp.today}"></div>
      <div class="field full"><button class="btn sm" id="w_addrate">＋ Añadir tarifa</button></div>
     </div></div>
@@ -9316,9 +9366,14 @@
           mutate(() => {
             const rc = Math.round((+$("#w_newrate").value || 0) * 100);
             if (rc <= 0) throw new Error("Indica la tarifa");
+            const xrc = Math.round((+$("#w_newxrate").value || 0) * 100);
             erp.addWorkerRate(
               id,
-              { from: $("#w_newfrom").value || erp.today, rateCentsPerHour: rc },
+              {
+                from: $("#w_newfrom").value || erp.today,
+                rateCentsPerHour: rc,
+                extraRateCentsPerHour: xrc > 0 ? xrc : null,
+              },
               "backoffice",
             );
             workerDrawer(id);
@@ -19533,6 +19588,14 @@
        : ""
    }
    ${destBlock}
+   ${
+     sign < 0
+       ? `<div class="field full"><label>Trabajador (si es un pago a su nombre)</label><select id="ca_w">
+      <option value="">—</option>
+      ${erp.state.workers.filter((w) => w.active !== false).map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join("")}
+     </select></div>`
+       : ""
+   }
    <div class="field full" style="margin-top:6px"><button class="btn primary" id="ca_go">Registrar</button></div>
   </div>`;
         wireCashDest();
@@ -19555,6 +19618,7 @@
                   amountCents: sign * amt,
                   supportingDocRef:
                     sign < 0 && doc && doc.checked ? null : "registrado-en-pantalla",
+                  workerId: $("#ca_w") && $("#ca_w").value ? $("#ca_w").value : null,
                 },
                 "operations",
               );

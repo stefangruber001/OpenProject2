@@ -5741,6 +5741,96 @@ async function testProcurement(browser, base) {
       if (lockedRows > 0) ok("ADM-04: approving the week turns its row into a locked figure");
       else bad("ADM-04: approve locks the row", `locked=${lockedRows}`);
 
+      // ── Block 3: the labour asks from the client review, on the real screen.
+      //    An overtime hour priced from its own band; hours naming a partida;
+      //    the by-worker table and the per-worker cash reconciliation, both
+      //    RENDERED with geometry, not merely computed.
+      const b3 = await pg.evaluate(() => {
+        const w = erp.state.workers.find((x) => x.active !== false);
+        erp.addWorkerRate(
+          w.id,
+          { from: erp.state.today, rateCentsPerHour: 2000, extraRateCentsPerHour: 2600 },
+          "bo",
+        );
+        const p = erp.state.projects.find(
+          (x) =>
+            x.budgetId &&
+            x.acceptedVersionId &&
+            !x.closed &&
+            erp.version(x.budgetId, x.acceptedVersionId).chapters.some((c) => c.lines.length),
+        );
+        const v = p && erp.version(p.budgetId, p.acceptedVersionId);
+        const chp = v && v.chapters.find((c) => c.lines.length);
+        const rec = erp.recordHours(
+          {
+            workerId: w.id,
+            projectId: p.id,
+            lineId: chp.lines[0].id,
+            kind: "extra",
+            hoursMilli: 2000,
+            date: erp.state.today,
+          },
+          "op",
+        );
+        const till =
+          erp.state.bankAccounts.find((a) => a.kind === "till") ||
+          erp.addBankAccount({ name: "Caja E2E", kind: "till" }, "bo");
+        erp.recordCashMovement(
+          till.id,
+          {
+            concept: "Pago semana",
+            amountCents: -5000,
+            workerId: w.id,
+            supportingDocRef: "recibo",
+          },
+          "bo",
+        );
+        return {
+          rate: rec.rateCents,
+          chapterFilled: rec.chapterNum === String(chp.num),
+          lineId: !!rec.lineId,
+        };
+      });
+      if (b3.rate === 2600 && b3.chapterFilled && b3.lineId)
+        ok("block 3: an extra hour prices from its own band, and hours land on the partida");
+      else bad("block 3: overtime + partida", JSON.stringify(b3));
+
+      await pg.evaluate(() => {
+        document.querySelector("#view .tabstrip [data-tab]") && null;
+        location.hash = "labour";
+      });
+      // Resumen tab renders the two new tables.
+      await pg.evaluate(() => {
+        const t = [...document.querySelectorAll(".tabstrip .tab")].find((x) =>
+          /Resumen/.test(x.textContent),
+        );
+        if (t) t.click();
+      });
+      await pg.waitForTimeout(700);
+      const tables = await pg.evaluate(() => {
+        const g = (id) => {
+          const t = document.getElementById(id);
+          if (!t) return null;
+          const r = t.getBoundingClientRect();
+          return { rows: t.querySelectorAll("tbody tr").length, w: Math.round(r.width) };
+        };
+        return { byW: g("hByW"), wRec: g("hWRec") };
+      });
+      if (tables.byW && tables.byW.rows > 0 && tables.byW.w > 400)
+        ok(`block 3: the by-worker table renders with rows (${tables.byW.rows})`);
+      else bad("block 3: by-worker table", JSON.stringify(tables));
+      if (tables.wRec && tables.wRec.rows > 0)
+        ok(`block 3: the per-worker cash reconciliation renders (${tables.wRec.rows} rows)`);
+      else bad("block 3: worker cash reconciliation", JSON.stringify(tables));
+      // Back to the day sheet — the checks below this block belong to it.
+      await pg.evaluate(() => {
+        const t = [...document.querySelectorAll(".tabstrip .tab")].find((x) =>
+          /Parte diario/.test(x.textContent),
+        );
+        if (t) t.click();
+      });
+      await pg.waitForTimeout(600);
+
       /* Repeat copies the PREVIOUS day, so move on one day first — otherwise
          the button is being asked to copy a day that has nothing on it.
          Advanced by DATE rather than by clicking the next calendar cell: the

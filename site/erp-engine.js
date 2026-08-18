@@ -5040,6 +5040,7 @@
           balanceCents: r.balanceCents ?? null,
           currency: "EUR",
           card: r.card || null,
+          workerId: r.workerId || null,
           class: null,
           allocations: [],
           matched: null,
@@ -5823,14 +5824,23 @@
       this._log(user, "deactivateWorker", w.name);
       return w;
     }
-    workerRateCents(workerId, date) {
-      // LAB-05 with history
+    workerRateCents(workerId, date, kind) {
+      // LAB-05 with history. `kind` appended and defaulted so every existing
+      // caller keeps meaning what it meant: no third argument is the standard
+      // rate. An "extra"/"festivo" hour takes the band's overtime rate WHEN
+      // THE BAND NAMES ONE — a band without it falls back to the standard
+      // rate, because an unset overtime rate means "same as always", never
+      // zero: an overtime hour that costs nothing is a lie a margin report
+      // would repeat.
       const w = this.state.workers.find((x) => x.id === workerId);
       const applicable = w.rateHistory
         .filter((r) => r.from <= date)
         .sort((a, b) => b.from.localeCompare(a.from));
       if (!applicable.length) throw new Error("No rate effective for " + date);
-      return applicable[0].rateCentsPerHour;
+      const band = applicable[0];
+      if ((kind === "extra" || kind === "festivo") && band.extraRateCentsPerHour > 0)
+        return band.extraRateCentsPerHour;
+      return band.rateCentsPerHour;
     }
     /** A worker's own mandatory documentation (§4.6's "trabajador sin
         documentación válida" — the alert, not a hard block: only subcontracted
@@ -5858,6 +5868,7 @@
           workerId: null,
           projectId: null,
           chapterNum: null,
+          lineId: null,
           date: this.state.today,
           hoursMilli: 0,
           kind: "normal",
@@ -5868,7 +5879,18 @@
         },
         h,
       );
-      rec.rateCents = this.workerRateCents(rec.workerId, rec.date);
+      if (rec.lineId) {
+        // Same truth test every cost allocation passes since 1F: the partida
+        // must exist on the accepted version, in the chapter it claims, and
+        // the chapter is filled in from it when absent.
+        const a = this._lineAlloc({
+          projectId: rec.projectId,
+          chapterNum: rec.chapterNum,
+          lineId: rec.lineId,
+        });
+        rec.chapterNum = a.chapterNum;
+      } else rec.lineId = null;
+      rec.rateCents = this.workerRateCents(rec.workerId, rec.date, rec.kind);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);
       this.state.labour.push(rec);
       return rec;
@@ -5907,6 +5929,88 @@
      * under a null chapter rather than dropped — an hour nobody assigned is
      * the thing the summary exists to surface.
      */
+    /**
+     * LAB by WORKER — the grouping the client named and no report had.
+     *
+     * hoursSummary answers "what did this project cost in labour"; this one
+     * answers "what did this person work, where, at what cost" — totals, by
+     * site, split normal/overtime. Same rows, other axis; the two can never
+     * disagree because neither stores anything.
+     */
+    hoursByWorker(from, to) {
+      const rows = this.state.labour.filter(
+        (l) => (!from || l.date >= from) && (!to || l.date <= to),
+      );
+      const byW = new Map();
+      for (const l of rows) {
+        if (!byW.has(l.workerId)) {
+          const w = this.state.workers.find((x) => x.id === l.workerId);
+          byW.set(l.workerId, {
+            workerId: l.workerId,
+            name: w ? w.name : l.workerId,
+            hoursMilli: 0,
+            extraHoursMilli: 0,
+            costCents: 0,
+            projects: new Map(),
+          });
+        }
+        const acc = byW.get(l.workerId);
+        acc.hoursMilli += l.hoursMilli;
+        if (l.kind !== "normal") acc.extraHoursMilli += l.hoursMilli;
+        acc.costCents += l.costCents;
+        const pid = l.projectId || "";
+        if (!acc.projects.has(pid)) {
+          const p = this.state.projects.find((x) => x.id === pid);
+          acc.projects.set(pid, {
+            projectId: pid || null,
+            code: p ? p.code : "",
+            hoursMilli: 0,
+            costCents: 0,
+          });
+        }
+        const pj = acc.projects.get(pid);
+        pj.hoursMilli += l.hoursMilli;
+        pj.costCents += l.costCents;
+      }
+      return [...byW.values()]
+        .map((w) => ({ ...w, projects: [...w.projects.values()] }))
+        .sort((a, b) => b.costCents - a.costCents);
+    }
+    /**
+     * §4 sharpened by the client review: "each month, the petty cash payment
+     * to a worker should reconcile with the hours worked by that same
+     * worker." Per worker, per month: the labour cost booked on the sheets
+     * against the money that left with their name on it — cash or bank. A
+     * payment can only carry a name since this same change (workerId on the
+     * movement), so months before it simply show zero paid, which is true of
+     * what was RECORDED and the only honest reading.
+     */
+    workerMonthlyReconciliation(monthIso) {
+      const from = monthIso + "-01";
+      const to = monthIso + "-31";
+      const out = new Map();
+      const row = (workerId) => {
+        if (!out.has(workerId)) {
+          const w = this.state.workers.find((x) => x.id === workerId);
+          out.set(workerId, {
+            workerId,
+            name: w ? w.name : workerId,
+            bookedCents: 0,
+            paidCents: 0,
+          });
+        }
+        return out.get(workerId);
+      };
+      for (const l of this.state.labour.filter((x) => x.date >= from && x.date <= to))
+        row(l.workerId).bookedCents += l.costCents;
+      for (const m of this.state.movements.filter(
+        (x) => x.workerId && x.accountingDate >= from && x.accountingDate <= to,
+      ))
+        row(m.workerId).paidCents += Math.abs(m.amountCents);
+      return [...out.values()]
+        .map((r) => ({ ...r, diffCents: r.paidCents - r.bookedCents }))
+        .sort((a, b) => Math.abs(b.diffCents) - Math.abs(a.diffCents));
+    }
     hoursSummary(from, to, projectId) {
       const rows = this.state.labour.filter(
         (l) =>
@@ -8814,12 +8918,18 @@
       this._log(user, "attachMovementDoc", id);
       return m;
     }
-    addWorkerRate(workerId, { from, rateCentsPerHour }, user) {
+    addWorkerRate(workerId, { from, rateCentsPerHour, extraRateCentsPerHour }, user) {
       // append-only: past effective rows stay; recorded hours keep their historic cost
       const w = this.state.workers.find((x) => x.id === workerId);
       if (!w) throw new Error("Worker not found");
       if (!(rateCentsPerHour > 0)) throw new Error("Rate must be positive");
-      w.rateHistory.push({ from: from || this.state.today, rateCentsPerHour });
+      if (extraRateCentsPerHour != null && !(extraRateCentsPerHour > 0))
+        throw new Error("The overtime rate, when given, must be positive");
+      w.rateHistory.push({
+        from: from || this.state.today,
+        rateCentsPerHour,
+        extraRateCentsPerHour: extraRateCentsPerHour > 0 ? extraRateCentsPerHour : null,
+      });
       w.rateHistory.sort((a, b) => a.from.localeCompare(b.from));
       this._log(user, "addWorkerRate", w.name);
       return w;
@@ -8830,14 +8940,30 @@
       const rec = this.state.labour.find((x) => x.id === id);
       if (!rec) throw new Error("Hours entry not found");
       if (rec.locked) throw new Error("Hours entry is in an approved week — reopen the week first");
-      const allowed = ["projectId", "chapterNum", "hoursMilli", "date", "kind", "extraPayCents"];
+      const allowed = [
+        "projectId",
+        "chapterNum",
+        "hoursMilli",
+        "date",
+        "kind",
+        "extraPayCents",
+        "lineId",
+      ];
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
       if (patch.projectId) {
         const p = this.state.projects.find((x) => x.id === patch.projectId);
         if (p && p.closed) throw new Error("Cannot reallocate hours onto a closed project");
       }
       Object.assign(rec, patch);
-      rec.rateCents = this.workerRateCents(rec.workerId, rec.date);
+      if (rec.lineId) {
+        const a = this._lineAlloc({
+          projectId: rec.projectId,
+          chapterNum: rec.chapterNum,
+          lineId: rec.lineId,
+        });
+        rec.chapterNum = a.chapterNum;
+      } else rec.lineId = null;
+      rec.rateCents = this.workerRateCents(rec.workerId, rec.date, rec.kind);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);
       this._log(user, "correctHours", id);
       return rec;

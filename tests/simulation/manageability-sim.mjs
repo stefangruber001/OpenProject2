@@ -2717,6 +2717,144 @@ assert(
   );
 }
 
+/**
+ * LABOUR, PER THE CLIENT REVIEW: a worker has a standard rate AND an overtime
+ * rate; hours can name the partida; reports exist BY WORKER; and the month's
+ * cash payments to a worker reconcile against that same worker's hours.
+ */
+{
+  const e = new ERP("2026-03-02");
+  e.configureEntity(
+    { legalName: "Obras L SL", taxId: "B12345674", iban: "ES9121000418450200051332" },
+    "bo",
+  );
+  const cli = e.addParty(
+    {
+      roles: ["customer"],
+      name: "Cli L",
+      taxId: "12345678Z",
+      billStreet: "s",
+      billPostalCode: "08001",
+      billCity: "BCN",
+      mobile: "600111222",
+      email: "l@example.com",
+    },
+    "bo",
+  );
+  const bg = e.createBudget({ partyId: cli.id }, "bo");
+  const ch = e.addChapter(bg.id, { name: "Albañilería" }, "bo");
+  const ln = e.addLine(
+    bg.id,
+    ch.id,
+    { desc: "Tabiques", unit: "m2", qtyMilli: 10000, priceCents: 2000, costCents: 1000 },
+    "bo",
+  );
+  e.issueVersion(bg.id, {}, "bo");
+  e.acceptVersion(bg.id, e.currentVersion(bg.id).id, { evidenceRef: "ok" }, "bo");
+  const pj = e.createProjectFromAcceptance(bg.id, "bo");
+
+  const w = e.addWorker({ name: "Andreu", kind: "employee" }, "bo");
+  throws(
+    () =>
+      e.addWorkerRate(
+        w.id,
+        { from: "2026-03-01", rateCentsPerHour: 2000, extraRateCentsPerHour: -5 },
+        "bo",
+      ),
+    "a negative overtime rate is refused",
+  );
+  e.addWorkerRate(
+    w.id,
+    { from: "2026-03-01", rateCentsPerHour: 2000, extraRateCentsPerHour: 2600 },
+    "bo",
+  );
+
+  const hN = e.recordHours(
+    { workerId: w.id, projectId: pj.id, lineId: ln.id, hoursMilli: 8000, date: "2026-03-03" },
+    "op",
+  );
+  assert(
+    hN.rateCents === 2000 && hN.costCents === 16000,
+    "a normal hour costs the standard rate",
+    JSON.stringify({ rate: hN.rateCents, cost: hN.costCents }),
+  );
+  assert(
+    hN.lineId === ln.id && hN.chapterNum === String(ch.num),
+    "hours can name the partida, and the chapter fills in from it",
+    JSON.stringify({ lineId: hN.lineId, chapterNum: hN.chapterNum }),
+  );
+  const hX = e.recordHours(
+    { workerId: w.id, projectId: pj.id, kind: "extra", hoursMilli: 2000, date: "2026-03-03" },
+    "op",
+  );
+  assert(
+    hX.rateCents === 2600 && hX.costCents === 5200,
+    "an overtime hour costs the overtime rate",
+    JSON.stringify({ rate: hX.rateCents, cost: hX.costCents }),
+  );
+  // A band that names no overtime rate falls back to the standard one —
+  // an overtime hour that costs nothing is a lie a margin report repeats.
+  const w2 = e.addWorker({ name: "Pau", kind: "employee" }, "bo");
+  e.addWorkerRate(w2.id, { from: "2026-03-01", rateCentsPerHour: 1800 }, "bo");
+  const hX2 = e.recordHours(
+    { workerId: w2.id, projectId: pj.id, kind: "extra", hoursMilli: 1000, date: "2026-03-04" },
+    "op",
+  );
+  assert(
+    hX2.rateCents === 1800,
+    "…and without one, extra falls back to standard, never zero",
+    hX2.rateCents,
+  );
+  throws(
+    () =>
+      e.recordHours(
+        {
+          workerId: w.id,
+          projectId: pj.id,
+          chapterNum: "9",
+          lineId: ln.id,
+          hoursMilli: 1000,
+          date: "2026-03-05",
+        },
+        "op",
+      ),
+    "hours on a partida under the wrong chapter are refused",
+  );
+
+  const byW = e.hoursByWorker("2026-03-01", "2026-03-31");
+  const andreu = byW.find((x) => x.workerId === w.id);
+  assert(
+    andreu &&
+      andreu.hoursMilli === 10000 &&
+      andreu.extraHoursMilli === 2000 &&
+      andreu.costCents === 21200 &&
+      andreu.projects.length === 1,
+    "the by-worker report: totals, overtime split, by site, at cost",
+    JSON.stringify(andreu),
+  );
+
+  // The month's cash to the worker vs the month's hours by the worker.
+  const till = e.addBankAccount({ name: "Caja", kind: "till" }, "bo");
+  e.recordCashMovement(
+    till.id,
+    {
+      concept: "Semana Andreu",
+      amountCents: -20000,
+      workerId: w.id,
+      accountingDate: "2026-03-07",
+      supportingDocRef: "recibo",
+    },
+    "bo",
+  );
+  const rec = e.workerMonthlyReconciliation("2026-03");
+  const rA = rec.find((x) => x.workerId === w.id);
+  assert(
+    rA && rA.bookedCents === 21200 && rA.paidCents === 20000 && rA.diffCents === -1200,
+    "per worker, the month's payments reconcile against the month's hours",
+    JSON.stringify(rA),
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);
