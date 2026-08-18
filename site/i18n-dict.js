@@ -528,6 +528,7 @@ window.CANEI_DICT = {
     ["Aceptada", "Accepted"],
     ["Emitida", "Issued"],
     ["Base imponible", "Taxable base"],
+    ["— sin asignar todavía —", "— not assigned yet —"],
     ["docs/", "docs/"],
     ["Motivo sin factura", "No-invoice reason"],
     [

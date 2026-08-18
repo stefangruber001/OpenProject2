@@ -3852,6 +3852,61 @@ async function testBankAndCash(browser, base) {
       ok(`ADM-06: a cash payment with no receipt is counted (${before} → ${after.awaiting})`);
     else bad("ADM-06: undocumented cash", JSON.stringify({ before, ...after }));
 
+    // ── Block 2: a cash payment says WHERE it landed — project, chapter,
+    //    partida — through the same validation every other cost uses.
+    const cashDest = await pg.evaluate(() => {
+      document.getElementById("cashOut").click();
+      return new Promise((res) =>
+        setTimeout(() => {
+          const dest = document.getElementById("ca_dest");
+          if (!dest) return res(null);
+          const p = erp.state.projects.find(
+            (x) =>
+              x.budgetId &&
+              x.acceptedVersionId &&
+              !x.closed &&
+              erp.version(x.budgetId, x.acceptedVersionId).chapters.some((c) => c.lines.length),
+          );
+          if (!p) return res({ noProject: true });
+          document.getElementById("ca_c").value = "Tornillería obra";
+          document.getElementById("ca_a").value = "23.50";
+          dest.value = "p:" + p.id;
+          dest.dispatchEvent(new Event("change", { bubbles: true }));
+          setTimeout(() => {
+            const chap = document.getElementById("ca_chap");
+            const first = [...chap.options].find((o) => o.value);
+            chap.value = first.value;
+            chap.dispatchEvent(new Event("change", { bubbles: true }));
+            setTimeout(() => {
+              const line = document.getElementById("ca_line");
+              const lopt = [...line.options].find((o) => o.value);
+              if (lopt) line.value = lopt.value;
+              document.getElementById("ca_go").click();
+              setTimeout(() => {
+                const m = erp.state.movements.find((x) => x.concept === "Tornillería obra");
+                res(
+                  m && {
+                    alloc: m.allocations[0] || null,
+                    amount: m.amountCents,
+                  },
+                );
+              }, 500);
+            }, 250);
+          }, 250);
+        }, 400),
+      );
+    });
+    if (
+      cashDest &&
+      cashDest.alloc &&
+      cashDest.alloc.projectId &&
+      cashDest.alloc.chapterNum &&
+      cashDest.alloc.lineId &&
+      cashDest.amount === -2350
+    )
+      ok("block 2: a cash payment lands on project · chapter · partida from the drawer");
+    else bad("block 2: cash destination", JSON.stringify(cashDest));
+
     // ── 1E: «Marcar justificado» now takes the FILE. The button used to flip
     //    the flag with nothing behind it — the word without the receipt.
     const docBtn = await pg.evaluate(() => {

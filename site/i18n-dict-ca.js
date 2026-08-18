@@ -457,6 +457,7 @@ window.CANEI_DICT.ca = {
   Aceptada: "Acceptada",
   Emitida: "Emesa",
   "Base imponible": "Base imposable",
+  "— sin asignar todavía —": "— encara sense assignar —",
   "docs/": "docs/",
   "Motivo sin factura": "Motiu sense factura",
   "justificante(s) sin archivo detrás — el ZIP los nombra pero no puede incluirlos.":
