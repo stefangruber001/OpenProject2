@@ -5055,6 +5055,7 @@
     <script src="erp-pictograms.js"></script>
     <script src="erp-migrations.js"></script>
     <script src="erp-store.js"></script>
+    <script src="erp-import.js"></script>
     <!-- Typed capability layer: erp-factory.js is GENERATED from packages/erp-browser
      (do not edit by hand); erp-bridge.js is the seam erp.html calls through.
      Both degrade silently if unavailable, so the ERP still runs without them. -->
@@ -14819,6 +14820,34 @@
         wireListConfig(v);
       }
 
+        /* The dry run, shown before anything is written. `previewImport` is
+           the engine's own dedupe — date│amount│CONCEPT — so a statement
+           re-exported next month with three weeks of overlap imports only its
+           new rows, and the operator sees the counts before agreeing. Rows the
+           parser could not read are named here too: a skipped row that nobody
+           is told about is a missing movement found at reconciliation time. */
+      function statementPreviewDrawer(accountId, parsed) {
+          const pv = erp.previewImport(accountId, parsed.rows);
+          const acc = erp.state.bankAccounts.find((a) => a.id === accountId);
+          const db = openDrawer("Importar extracto · " + (acc ? acc.name : ""));
+          db.innerHTML = `<div class="card"><div class="daylist">
+     <div class="it"><span>Periodo del extracto</span><span style="flex:1"></span><b>${pv.from ? fmtD(pv.from) + " — " + fmtD(pv.to) : "—"}</b></div>
+     <div class="it"><span>Movimientos nuevos</span><span style="flex:1"></span><b>${pv.fresh.length}</b></div>
+     <div class="it"><span>Ya importados</span><span style="flex:1"></span><b>${pv.duplicates.length}</b></div>
+     <div class="it"><span>Filas no legibles</span><span style="flex:1"></span><b>${parsed.skipped}</b></div>
+    </div>
+    ${pv.overlapsExistingPeriod ? '<div style="padding:0 12px 10px"><span class="pill y">El periodo se solapa con movimientos ya importados; los repetidos no se volverán a crear.</span></div>' : ""}
+    <div style="display:flex;gap:8px;padding:0 12px 12px">
+     <span style="flex:1"></span>
+     <button class="btn primary" id="stGo"${pv.fresh.length ? "" : " disabled"}>Importar</button>
+    </div></div>`;
+          $("#stGo").onclick = () =>
+            mutate(() => {
+              erp.importMovements(accountId, pv.fresh, "backoffice");
+              closeDrawer();
+            }, "Extracto importado");
+        }
+
       const VIEWS = {
         /* ---------- Torre de control · Mi día (DAS, spec §2.1/§2.2) ----------
     Defined once, above, as standalone functions — big enough (sparklines,
@@ -16569,6 +16598,8 @@
        ${accs.map((a) => `<option value="${a.id}"${a.id === bankAcc ? " selected" : ""}>${esc(a.name)}</option>`).join("")}
      </select>
      <span style="flex:1"></span>
+     <button class="btn sm" id="bkImport">⬆ Importar extracto (.xlsx)</button>
+     <input type="file" id="bkFile" accept=".xlsx" style="display:none">
      <button class="btn sm" id="bToRec">Ir a Conciliación →</button>
    </div>
    <div class="card"><div class="queuebar">
@@ -16628,6 +16659,29 @@
             render();
           };
           $("#bToRec").onclick = () => goTab("banking", "_reconcile");
+          /* The statement lands on ONE account — importing into "all accounts"
+             would have to guess, and a guess about which bank a movement
+             belongs to is a reconciliation that starts wrong. */
+          $("#bkImport").onclick = () => {
+            if (!bankAcc) {
+              say("Elige primero la cuenta a la que pertenece el extracto.");
+              return;
+            }
+            $("#bkFile").click();
+          };
+          $("#bkFile").onchange = async (ev) => {
+            const file = ev.target.files && ev.target.files[0];
+            ev.target.value = "";
+            if (!file) return;
+            let parsed;
+            try {
+              parsed = await ErpImport.parseBbva(await file.arrayBuffer());
+            } catch (err) {
+              say(String(err.message || err));
+              return;
+            }
+            statementPreviewDrawer(bankAcc, parsed);
+          };
           v.querySelectorAll("[data-bkclass]").forEach(
             (sel) =>
               (sel.onchange = () => {

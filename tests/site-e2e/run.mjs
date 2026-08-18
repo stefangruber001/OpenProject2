@@ -3912,6 +3912,63 @@ async function testBankAndCash(browser, base) {
       ok(`gap 13: every allocated cost names its account, and rolls up (${gap13.rows} accounts)`);
     else bad("gap 13: accountCode", JSON.stringify(gap13));
 
+    // ── 1B: a real BBVA .xlsx, through the REAL file input ────────────────
+    //    setInputFiles drives the same hidden <input> the button clicks, so
+    //    the whole path runs: parse → previewImport → drawer → import. The
+    //    fixture is the same file the Node gate reads.
+    await pg.evaluate(() => (location.hash = "banking"));
+    await pg.waitForTimeout(600);
+    await pg.evaluate(() => {
+      const sel = document.getElementById("bkSel");
+      const first = [...sel.options].find((o) => o.value);
+      sel.value = first.value;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(500);
+    const impBtn = await pg.evaluate(() => {
+      const b = document.getElementById("bkImport");
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height) };
+    });
+    if (impBtn && impBtn.w > 80 && impBtn.h >= 20)
+      ok(`1B: the banking screen offers the statement import (${impBtn.w}×${impBtn.h})`);
+    else bad("1B: import button", JSON.stringify(impBtn));
+
+    const movsBefore = await pg.evaluate(() => erp.state.movements.length);
+    await pg.setInputFiles("#bkFile", "tests/fixtures/bbva-movimientos.xlsx");
+    await pg.waitForTimeout(900);
+    const preview = await pg.evaluate(() => {
+      const go = document.getElementById("stGo");
+      if (!go) return null;
+      const txt = go.closest(".card").textContent;
+      return { disabled: go.disabled, hasCounts: /Movimientos nuevos/.test(txt) };
+    });
+    if (preview && !preview.disabled && preview.hasCounts)
+      ok("1B: the dry run shows its counts before anything is written");
+    else bad("1B: preview drawer", JSON.stringify(preview));
+    await pg.click("#stGo");
+    await pg.waitForTimeout(600);
+    const movsAfter = await pg.evaluate(() => erp.state.movements.length);
+    if (movsAfter === movsBefore + 3)
+      ok(`1B: three movements imported from the file (${movsBefore} → ${movsAfter})`);
+    else bad("1B: movements imported", `${movsBefore} → ${movsAfter}`);
+
+    // The same statement again: duplicates reported, nothing re-created.
+    await pg.setInputFiles("#bkFile", "tests/fixtures/bbva-movimientos.xlsx");
+    await pg.waitForTimeout(900);
+    const again = await pg.evaluate(() => {
+      const go = document.getElementById("stGo");
+      return go ? { disabled: go.disabled } : null;
+    });
+    if (again && again.disabled)
+      ok("1B: re-importing the same statement finds nothing new — the button says so");
+    else bad("1B: duplicate statement blocked", JSON.stringify(again));
+    await pg.evaluate(() => closeDrawer());
+    const movsFinal = await pg.evaluate(() => erp.state.movements.length);
+    if (movsFinal === movsAfter) ok("1B: and nothing was imported twice");
+    else bad("1B: no duplicate import", `${movsAfter} → ${movsFinal}`);
+
     if (errs.length === 0) ok("ADM-05/06: no console errors");
     else bad("ADM-05/06: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

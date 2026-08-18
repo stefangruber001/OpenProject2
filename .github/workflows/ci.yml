@@ -381,6 +381,9 @@ jobs:
       - name: Site scripts parse (a syntax error takes a whole module with it)
         run: node tests/site-syntax/run.mjs
 
+      - name: Bank statement import (a real .xlsx fixture, through the same module)
+        run: node tests/bank-import/run.mjs
+
       # The starter price book in three languages. Two hundred partidas ship
       # with this system, so an operator reading English met two hundred lines
       # of Spanish inside a translated interface. Checks that every partida has

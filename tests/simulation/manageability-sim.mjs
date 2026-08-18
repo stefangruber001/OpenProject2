@@ -2430,6 +2430,43 @@ assert(
     JSON.stringify(mv.allocations[0]),
   );
 
+  /* UNDOING A MATCH UNDOES THE MONEY IT CREATED. For a while this class held
+     TWO methods named unmatchMovement, and the later, thinner one won: it
+     cleared `matched` and left the payment the match had created standing — a
+     bill marked paid by a reconciliation that no longer exists. The stub is
+     deleted; this is the control that keeps it deleted. */
+  {
+    const b2 = e.registerBill(
+      { supplierId: sup.id, number: "1F-M", baseCents: 4132, vatBp: 2100 },
+      "bo",
+    );
+    e.importMovements(
+      acc.id,
+      [{ accountingDate: e.state.today, concept: "PAGO 1F-M", amountCents: -b2.totalCents }],
+      "bo",
+    );
+    const mv2 = e.state.movements[e.state.movements.length - 1];
+    e.matchMovement(mv2.id, { billId: b2.id }, "bo");
+    assert(
+      e.billOutstandingCents(b2.id) === 0 && mv2.status === "matched",
+      "matching a movement to a bill pays the bill",
+      e.billOutstandingCents(b2.id) + " / " + mv2.status,
+    );
+    e.unmatchMovement(mv2.id, "bo");
+    assert(
+      e.billOutstandingCents(b2.id) === b2.totalCents &&
+        !e.state.payments.some((p) => p.movementId === mv2.id) &&
+        mv2.status === "unallocated" &&
+        mv2.matched === null,
+      "unmatching voids the payment it created — no phantom payment survives",
+      JSON.stringify({
+        outstanding: e.billOutstandingCents(b2.id),
+        payments: e.state.payments.filter((p) => p.movementId === mv2.id).length,
+        status: mv2.status,
+      }),
+    );
+  }
+
   // Promotion keeps the partida through the rescale.
   const cap = e.captureDocument({ docType: "supplierInvoice", imageRef: "b1f" }, "bo");
   e.confirmCapture(

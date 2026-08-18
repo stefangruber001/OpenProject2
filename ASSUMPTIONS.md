@@ -4508,3 +4508,28 @@ inside the budget and moves the count by a string or two — measured at one
 across two runs. The alternative, a ceiling pinned to the exact figure, goes red
 on the next layout commit for a reason it is not about. Reversible: lower it
 whenever the crawl is made deterministic.
+
+## The bank statement importer reads ONE fixed layout (2026-08-18)
+
+**Decision.** `site/erp-import.js` parses the `.xlsx` movements export BBVA
+produces today: a preamble, then a header row found **by its column names**
+(Fecha / F. Valor / Concepto / Movimiento / Importe / Divisa / Disponible /
+Observaciones), then one row per movement. No column-mapping step, no second
+bank. Operator-chosen for speed over generality.
+
+**The known cost, stated rather than discovered later.** The day BBVA renames a
+column, the import fails loudly at the header search — it says which names it
+was looking for — and a second bank means a second profile in the same module.
+The reversible upgrade is a per-account column-mapping step remembered on the
+account; the parser is deliberately its own file so that upgrade is a swap, not
+surgery on the reconciliation screen.
+
+**What is NOT fixed.** The preamble length (the header is found by name, not by
+row number), the number formats ("1.234,56" text and numeric cells both parse,
+by string arithmetic — never by multiplying a float), and dates (DD/MM/YYYY
+text or Excel serials). Re-imports are safe by the engine's own dedupe:
+`previewImport` keys on date│amount│CONCEPT and the screen imports only the
+fresh rows, so a statement re-exported with three weeks of overlap imports only
+its new lines. A row the parser cannot read is COUNTED and shown ("Filas no
+legibles"), never silently dropped — a skipped row nobody is told about is a
+missing movement found at reconciliation time.

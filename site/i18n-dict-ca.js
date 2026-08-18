@@ -457,6 +457,20 @@ window.CANEI_DICT.ca = {
   Aceptada: "Acceptada",
   Emitida: "Emesa",
   "Base imponible": "Base imposable",
+  "⬆ Importar extracto (.xlsx)": "⬆ Importar extracte (.xlsx)",
+  "Importar extracto ·": "Importar extracte ·",
+  "Importar extracto": "Importar extracte",
+  "Extracto importado": "Extracte importat",
+  "Elige primero la cuenta a la que pertenece el extracto.":
+    "Tria primer el compte al qual pertany l'extracte.",
+  "Periodo del extracto": "Període de l'extracte",
+  "Movimientos nuevos": "Moviments nous",
+  "Ya importados": "Ja importats",
+  "Filas no legibles": "Files no llegibles",
+  "El periodo se solapa con movimientos ya importados; los repetidos no se volverán a crear.":
+    "El període se solapa amb moviments ja importats; els repetits no es tornaran a crear.",
+  "No he encontrado la cabecera del extracto (Fecha / Concepto / Importe). ¿Es el export de movimientos de BBVA?":
+    "No he trobat la capçalera de l'extracte (Fecha / Concepto / Importe). És l'export de moviments de BBVA?",
   "Nueva factura de proveedor": "Nova factura de proveïdor",
   "Registrar documento como factura": "Registrar el document com a factura",
   "Registrar como factura": "Registrar com a factura",

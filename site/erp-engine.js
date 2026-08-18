@@ -8645,13 +8645,13 @@
       this._log(user, "voidMovement", id);
       return m;
     }
-    unmatchMovement(id, user) {
-      const m = this.state.movements.find((x) => x.id === id);
-      if (!m) throw new Error("Movement not found");
-      m.matched = null;
-      this._log(user, "unmatchMovement", id);
-      return m;
-    }
+    /* unmatchMovement lives further up, beside matchMovement. A second, thinner
+       definition used to sit HERE — same name, same class — and in a class body
+       the later definition wins, so the careful one (void the payment the match
+       created, check the closed period, clear allocations) was silently dead
+       and undoing a match would have left a phantom payment behind. Nothing in
+       the UI called it, which is the only reason it never bit. Do not add a
+       method to this class without grepping for its name first. */
     attachMovementDoc(id, docRef, user) {
       const m = this.state.movements.find((x) => x.id === id);
       if (!m) throw new Error("Movement not found");
