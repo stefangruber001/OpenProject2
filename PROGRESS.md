@@ -1629,3 +1629,52 @@ the end of the report. Diagnosing one broken suite by re-running all thirty-five
 is how a fix takes an afternoon; reading a 450-line report through `| tail`
 keeps the count and discards the lines that say what broke. Both earned
 themselves back the same session.
+
+## S18 — the client review's Part 1, all six blocks (2026-08-18)
+
+Eleven commits on `main`, `aecd50d` → `8f18700` plus the close-out, each stage
+green before the next: full browser suite 486 → **525/525**, manageability 268
+→ **329/329**, plus a new Node gate (bank-import, 24/24) and a new chained
+browser gate (`tests/real-life/run.mjs`, 8/8) that plays the whole of Part 1 as
+one story and reads its own export back.
+
+**Block 1 · Bank reconciliation.** The engine had matching, dedupe, scoring and
+period locks since §5.3 and no file had ever reached them. Landed: supplier
+invoices registrable through the product and captures promotable to bills
+(registerBill had NO UI caller — the largest gap behind the whole block), with
+issuer name + tax id stamped on the bill; `site/erp-import.js` reading the BBVA
+`.xlsx` (fixed layout, recorded in ASSUMPTIONS with its reversible upgrade)
+into the existing previewImport/importMovements; a credit card as an account
+(`kind:"card"`) so its statement, matching and settlement reuse everything —
+plus the ＋ Cuenta drawer, because NO account of any kind was creatable;
+deliberately-unbacked movements with owner-maintained reasons, information
+never a gate; supporting documents as real files through the standard evidence
+record; costs one level deeper (`lineId`, validated against the accepted
+version, chapter auto-filled); and the quarterly package leaving as
+`gestoria-<Q>.zip` — conciliacion.xlsx naming the accountant's four fields plus
+docs/ with the actual bytes, verified by re-opening the ZIP with the importer's
+own reader. Folded in: the duplicate `unmatchMovement` whose thin later copy
+shadowed the careful one — undoing a match would have left a phantom payment.
+
+**Blocks 2–4.** The cash drawer says where a payment landed (project → chapter
+→ partida, or overhead; entries stay destination-free — a float top-up is not a
+cost). Labour: a second effective-dated overtime band selected by the entry's
+kind (fallback to standard, never zero), hours naming partidas, the by-worker
+report, and the month's cash reconciled PER WORKER via `workerId` on movements.
+Expenses: splits typed as percentages, landing as exact cents, last row
+absorbing rounding noise; real leftover stays visible as unfinished.
+
+**Blocks 5–6 · the Variation Budget.** A real budget flagged `variationOf`,
+built and accepted by the machinery that already exists; acceptance renumbers
+its chapters into the project's sequence and joins economics, certification,
+attribution and progress in one place (`_projectVersions` — the walk every
+chapter-addressed mechanism now shares). The revenue tile walks to the filtered
+invoice register; a chapter row opens every cost behind it grouped by partida
+(mirroring actualCostCents so drawer and table cannot disagree); the completion
+date is settable at last (updateProject's targetEnd had no caller) and extends
+automatically by an accepted variation's days. The factory forecast bridge was
+quietly HIDING variation chapters from the economics table — merged in.
+
+**Recurring lesson, twice more.** The forecast bridge hiding variations and the
+miss-crawl flagging translated catalogue strings were both counts agreeing
+while the page disagreed. Geometry and read-back beat tallies.

@@ -384,6 +384,18 @@ jobs:
       - name: Bank statement import (a real .xlsx fixture, through the same module)
         run: node tests/bank-import/run.mjs
 
+      # The client-review Part 1 as one story in one browser: statement in,
+      # capture to bill, match, card, cash on a partida, overtime hours,
+      # variation joining the economics, and the quarter leaving as a ZIP that
+      # is read back. Each suite proves its stage; this proves they CHAIN.
+      # This job had no browser until here — the scenario is the one gate in
+      # it that drives a page instead of the engine.
+      - name: Install Playwright browser (the scenario drives a real page)
+        run: pnpm --filter web exec playwright install --with-deps chromium
+
+      - name: Part 1 real-life scenario (chained, one browser)
+        run: node tests/real-life/run.mjs
+
       # The starter price book in three languages. Two hundred partidas ship
       # with this system, so an operator reading English met two hundred lines
       # of Spanish inside a translated interface. Checks that every partida has
