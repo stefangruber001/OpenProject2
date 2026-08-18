@@ -8453,7 +8453,7 @@
        <td class="cp">${
          r.entry
            ? esc(r.projectCode || "—")
-           : `<select class="inline" data-newproj="${r.workerId}">${jobs.map((p) => `<option value="${p.id}">${esc(p.code)}</option>`).join("")}</select>`
+           : `<select class="inline" data-newproj="${r.workerId}">${jobs.map((p) => `<option value="${p.id}">${esc(projectPickLabel(p))}</option>`).join("")}</select>`
        }</td>
        <td class="ch2 num">${
          r.locked
@@ -13584,7 +13584,7 @@
    <div class="fgrid" style="border-top:${i ? "1px solid var(--hair)" : "0"};padding-top:${i ? "8px" : "0"}">
     <div class="field full"><label>Destino</label><select data-ai="${i}" data-k="dest">
       <option value="">—</option>
-      <optgroup label="Obras">${projects.map((p) => `<option value="p:${p.id}"${a.projectId === p.id ? " selected" : ""}>${esc(p.code)} — ${esc(erp.party(p.partyId).name)}</option>`).join("")}</optgroup>
+      <optgroup label="Obras">${projects.map((p) => `<option value="p:${p.id}"${a.projectId === p.id ? " selected" : ""}>${esc(projectPickLabel(p))}</option>`).join("")}</optgroup>
       <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL)
         .map(
           ([k, l]) =>
@@ -15187,6 +15187,37 @@
               closeDrawer();
               say(`${r.deleted} movimientos borrados, ${r.kept} conservados`);
             }, "Movimientos borrados");
+      }
+
+      /**
+       * A project in a picker: the code first, then enough to recognise it.
+       *
+       * «P-R001» is unambiguous to the database and useless to the person
+       * choosing — the operator's words, looking at a destination list:
+       * "with the code P-R001 is difficult to know what project it is …
+       * at some point 100 of projects will be there". The code keeps its
+       * place at the front, because that is what these lists are ordered by
+       * and what appears on every document; the customer and the street are
+       * what turn a serial number into somewhere somebody has been.
+       *
+       * Clipped rather than complete: a native picker on a phone truncates
+       * whatever it is given, and it truncates the END — so the parts that
+       * identify the job have to arrive before the cut.
+       */
+      const clipTo = (s, n) => {
+        const t = String(s || "").trim();
+        return t.length > n ? t.slice(0, n - 1).trimEnd() + "…" : t;
+      };
+      function projectPickLabel(p) {
+        const bits = [p.code];
+        try {
+          const who = erp.party(p.partyId);
+          if (who && who.name) bits.push(clipTo(who.name, 22));
+        } catch (e) {}
+        const site =
+          p.propertyId && (erp.state.properties || []).find((x) => x.id === p.propertyId);
+        if (site && site.street) bits.push(clipTo(site.street, 24));
+        return bits.join(" · ");
       }
 
       const ACCOUNT_KINDS = { bank: "Banco", card: "Tarjeta", till: "Caja" };
@@ -17281,7 +17312,7 @@
         <option value="">${alloc ? esc(alloc) : "—"}</option>
         <optgroup label="Obras">${erp.state.projects
           .filter((p) => !p.closed)
-          .map((p) => `<option value="p:${p.id}">${esc(p.code)}</option>`)
+          .map((p) => `<option value="p:${p.id}">${esc(projectPickLabel(p))}</option>`)
           .join("")}</optgroup>
         <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL)
           .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
@@ -19940,7 +19971,7 @@
       <option value="">— sin asignar todavía —</option>
       <optgroup label="Obras">${erp.state.projects
         .filter((p) => !p.closed)
-        .map((p) => `<option value="p:${p.id}">${esc(p.code)} — ${esc(erp.party(p.partyId).name)}</option>`)
+        .map((p) => `<option value="p:${p.id}">${esc(projectPickLabel(p))}</option>`)
         .join("")}</optgroup>
       <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL)
         .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
@@ -20235,7 +20266,7 @@
         const db = openDrawer("Nueva factura");
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Obra *</label><select id="nf_p">
-    ${projects.map((p) => `<option value="${p.id}"${p.id === preselect ? " selected" : ""}>${esc(p.code)} — ${esc(erp.party(p.partyId).name)}${p.closed ? " (cerrada)" : ""}</option>`).join("")}
+    ${projects.map((p) => `<option value="${p.id}"${p.id === preselect ? " selected" : ""}>${esc(projectPickLabel(p))}${p.closed ? " (cerrada)" : ""}</option>`).join("")}
    </select></div>
    <div class="field full"><p style="font-size:12.5px;color:var(--body);margin:0">Se abre el generador con lo que ya se puede facturar de esa obra: los hitos del contrato pendientes, el avance certificable y los adicionales aprobados.</p></div>
    <div class="field full" style="margin-top:6px"><button class="btn primary" id="nf_go">Continuar</button></div>

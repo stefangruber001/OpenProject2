@@ -4281,6 +4281,34 @@ async function testBankAndCash(browser, base) {
       ok(`ADM-05: every unmatched movement carries the amber bar (${inline.amberRows})`);
     else bad("ADM-05: amber on unmatched", JSON.stringify(inline));
 
+    /* A destination list has to be readable by the person choosing. The
+       operator, looking at a picker of bare codes: "with the code P-R001 is
+       difficult to know what project it is … at some point 100 of projects
+       will be there". The code still leads — it is what the lists are ordered
+       by — and the customer follows it. */
+    const destLabels = await pg.evaluate(() => {
+      const sel = document.querySelector("[data-bkdest]");
+      if (!sel) return null;
+      const opts = [...sel.querySelectorAll('optgroup[label="Obras"] option')].map((o) =>
+        o.textContent.trim(),
+      );
+      const projects = erp.state.projects.filter((p) => !p.closed);
+      return {
+        count: opts.length,
+        codeFirst: opts.every((t, i) => t.startsWith(projects[i].code)),
+        carryContext: opts.filter((t) => t.includes(" · ")).length,
+        sample: opts[0] || "",
+      };
+    });
+    if (
+      destLabels &&
+      destLabels.count > 0 &&
+      destLabels.codeFirst &&
+      destLabels.carryContext === destLabels.count
+    )
+      ok(`ADM-05: every project option names its customer after the code («${destLabels.sample}»)`);
+    else bad("ADM-05: project option labels", JSON.stringify(destLabels));
+
     /* One line per account, then the sum — the operator's words: "ensure that I
        see each account separate and not only one line item with all accounts
        sum up". Money in three places is three balances; the total is the
