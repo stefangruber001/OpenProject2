@@ -3993,10 +3993,31 @@
       .printsheet {
         display: none;
       }
+      /* The page the customer's document is set on. Without this the browser
+         used whatever default it liked, so the same quote came out with
+         different margins on different machines and the sheet's own 20px
+         padding was the only thing standing between the text and the paper
+         edge. A4 with 12mm all round matches the printed templates.
+
+         NOTE, and it is worth knowing: the browser's own header and footer —
+         the page URL and «1/1» — are a SETTING in the print dialog, not
+         something a stylesheet can switch off. Until the download writes a
+         real file rather than driving print(), the operator unticks
+         «Headers and footers» once and the browser remembers it. */
+      @page {
+        size: A4;
+        margin: 12mm;
+      }
       @media print {
         .printsheet {
           display: block;
-          padding: 20px;
+          padding: 0;
+          /* Tints, rules and the coloured section headings are the document's
+             design, not decoration a printer may drop: without this Chrome
+             strips every background the moment «Background graphics» is off,
+             which is its default. */
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         /* On screen .doc reads as a PREVIEW of a document — dashed border,
            tinted paper. On paper it IS the document, so it prints as one:
@@ -19619,8 +19640,26 @@
         await Promise.all(
           imgs.map(async (im) => {
             const u = await imageUrl(im.dataset.blob);
-            if (u) im.src = u;
-            else im.alt = "(imagen no disponible)";
+            if (!u) {
+              im.alt = "(imagen no disponible)";
+              return;
+            }
+            im.src = u;
+            /* Waiting for the URL is NOT waiting for the picture. print() used
+       to fire the instant the src was assigned, before the browser had
+       decoded a single byte, so the graphic annex went out to the customer
+       as blank plates with only their captions — measured on the seeded
+       quote: 0 of 3 images decoded at print time, 3 of 3 a second later.
+       The store was never the problem; the blobs were there all along.
+
+       decode() resolves when the image is actually paintable and rejects on
+       a file the browser cannot read, which is the alt text's job anyway.
+       The race caps the wait: one slow or corrupt picture must not hold the
+       print dialog shut on a document that is otherwise ready. */
+            await Promise.race([
+              im.decode().catch(() => {}),
+              new Promise((r) => setTimeout(r, 5000)),
+            ]);
           }),
         );
         window.print();

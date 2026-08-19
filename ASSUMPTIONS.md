@@ -4905,3 +4905,43 @@ total, so the right number was still "in here somewhere". It now reads each
 chapter's own row and compares that cell. The rewritten check fails the same
 negative control (23/24) and passes clean (24/24) — the first version would
 have certified wrong money.
+
+## S27 · The budget PDF: what was actually wrong (2026-08-19)
+
+**Item 9, reproduced before it was touched** (rule S20: verify the produced
+file, not the code that produces it). A headless run built the sheet exactly
+as `⤓ Descargar` does, stubbed `print()`, and rendered the result through
+Chrome's print pipeline. Two faults, and NEITHER was the one the plan guessed.
+
+**«Missing images» is a race, not a missing file.** The plan expected 404s from
+a server-backed blob store. The store was innocent: every blob was present and
+the right size (8.8 kB, 7.7 kB, 8.2 kB on the seeded quote).
+`downloadBudgetPdf` awaited the image URL and then printed — and awaiting a URL
+is not awaiting a picture. Measured: **0 of 3 images paintable at print time, 3
+of 3 a second later**. The customer received the graphic annex as blank plates
+with captions underneath. Fixed by awaiting `decode()` per image, raced against
+a 5 s cap so one corrupt file cannot hold the print dialog shut.
+
+**«No formatting» is the browser's own header.** The first line of text in the
+produced PDF is `http://127.0.0.1:PORT/erp.html#quotes` — in production, the
+server address — with «1/1» at the foot. That is the print dialog's
+headers-and-footers setting, which **no stylesheet can switch off**. What CSS
+could fix is now fixed: `@page { size: A4; margin: 12mm }` (there was no
+`@page` at all, so margins were whatever each machine defaulted to) and
+`print-color-adjust: exact` (Chrome strips every tint by default, taking the
+document's coloured headings with it). The header itself needs either the
+operator to untick «Headers and footers» once — the browser remembers — or a
+download that writes a real file.
+
+**Why not write a real file.** `site/erp-pdf.js` is a genuine PDF writer with a
+31-check gate, and it is not loaded by the app. It draws vector pictograms and
+has **no raster-image support** — no XObject, no DCTDecode — so wiring the
+budget to it today would produce a clean PDF and lose the photographic annex
+entirely. Trading one half of the complaint for the other is not a fix.
+Recorded as the next step for that file, not done here.
+
+**A negative control that had to be moved to see anything.** The first version
+of the regression check ran on the page that had already downloaded once, so
+the blob URLs were cached and the browser painted from cache: it passed on the
+broken build. It now runs in its own cold context — the customer's FIRST
+download is the case that fails — and reports 0/3 without the fix, 3/3 with it.

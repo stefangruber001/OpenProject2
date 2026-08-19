@@ -8515,6 +8515,56 @@ async function testSendAndVersions(browser, base) {
       ok("send: «⤓ Descargar» prints exactly the customer document, then cleans up");
     else bad("send: download PDF print sheet", JSON.stringify(printResult));
 
+    /* Part 2 · item 9 — the graphic annex reached the customer as blank
+       plates. Not a missing blob and not a 404: downloadBudgetPdf awaited the
+       image URL and then printed, so the browser had decoded nothing yet.
+       Measured before the fix on the seeded quote: 0 of 3 images paintable AT
+       PRINT TIME, 3 of 3 a second later — the pictures always existed, the
+       document just left before they arrived.
+
+       So this asserts the property that actually failed: at the instant
+       print() is called, every annex image is decoded. Waiting first and then
+       counting would pass on the broken build, which is exactly how this
+       survived a suite that already checked the sheet's contents. */
+    /* A COLD page: the first download in this suite already cached the blob
+       URLs and let the browser decode them, so a second print paints straight
+       from cache and passes even on the broken build — a negative control ran
+       green until this was moved to its own context. The customer's very
+       first download is the case that matters. */
+    const cold = await browser.newContext({ viewport: { width: 1400, height: 950 } });
+    const cpg = await cold.newPage();
+    await cpg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+    await cpg.waitForSelector("#p1 .secitem", { timeout: 15000 });
+    await cpg.waitForTimeout(600);
+    const annexAtPrint = await cpg.evaluate(async () => {
+      const withImgs = erp.state.budgets.find((x) =>
+        x.versions.some((v) =>
+          v.chapters.some((c) => c.lines.some((l) => (l.imageRefs || []).length)),
+        ),
+      );
+      if (!withImgs) return { skipped: true };
+      let shot = null;
+      const origPrint = window.print;
+      window.print = () => {
+        const imgs = [...document.querySelectorAll(".printsheet img[data-blob]")];
+        shot = { total: imgs.length, painted: imgs.filter((i) => i.naturalWidth > 0).length };
+      };
+      await downloadBudgetPdf(withImgs.id, withImgs.acceptedVersionId || withImgs.currentVersionId);
+      window.print = origPrint;
+      return shot || { total: 0, painted: 0 };
+    });
+    await cold.close();
+    if (
+      annexAtPrint.skipped ||
+      (annexAtPrint.total > 0 && annexAtPrint.painted === annexAtPrint.total)
+    )
+      ok(
+        annexAtPrint.skipped
+          ? "send: no quote carries annex images in this register"
+          : `send: every annex image is painted before printing (${annexAtPrint.painted}/${annexAtPrint.total})`,
+      );
+    else bad("send: annex images blank at print time", JSON.stringify(annexAtPrint));
+
     if (errs.length) bad("send/versions: no console errors", errs.slice(0, 2).join(" | "));
     else ok("send/versions: no console errors");
   } catch (e) {
