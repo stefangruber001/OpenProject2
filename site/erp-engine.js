@@ -507,7 +507,7 @@
       defaultThreshold: 14,
     },
     "PRICE-EXPIRED": { type: "documental", label: "Precio de proveedor caducado" },
-    "PROJ-CHAPTER-OVERCOST": { type: "economica", label: "Capítulo por encima de coste previsto" },
+    "PROJ-CHAPTER-OVERCOST": { type: "economica", label: "Partida por encima de coste previsto" },
     "CHG-UNAPPROVED-COST": { type: "economica", label: "Extra sin aprobar con coste incurrido" },
     "PUR-ARRIVAL-DELAYED": { type: "tecnica", label: "Llegada de material retrasada" },
     "PUR-RECONCILE-DIFF": {
@@ -1812,9 +1812,9 @@
      * Delete a chapter and everything filed under it.
      *
      * It existed with no caller and no audit entry: the estimator could add a
-     * capítulo and never take one away, so a chapter added by mistake stayed in
+     * partida and never take one away, so a chapter added by mistake stayed in
      * the presupuesto and had to be emptied line by line and left standing at
-     * zero. Now it is reachable, and it LOGS — deleting five priced partidas in
+     * zero. Now it is reachable, and it LOGS — deleting five priced subpartidas in
      * one press is exactly the kind of act that has to leave a trace.
      *
      * Guarded by `_editableVersion`, so a sent presupuesto cannot lose a
@@ -1830,7 +1830,7 @@
       this._log(
         user,
         "removeChapter",
-        `${this.budget(budgetId).number} ${gone.num}. ${gone.name} (${(gone.lines || []).length} partidas)`,
+        `${this.budget(budgetId).number} ${gone.num}. ${gone.name} (${(gone.lines || []).length} subpartidas)`,
       );
       return gone;
     }
@@ -1856,7 +1856,7 @@
     /**
      * Move a line within its chapter, or into another one.
      *
-     * Moving BETWEEN chapters is the point: a line put under the wrong capítulo
+     * Moving BETWEEN chapters is the point: a line put under the wrong partida
      * lands in the wrong subtotal and, if that chapter is `optional` or
      * `outOfScope`, in the wrong section of the customer's document — so the
      * estimator must be able to correct it by dragging rather than by retyping
@@ -2126,7 +2126,7 @@
       const t = this.budgetTotals(budgetId);
       for (const c of t.chapters)
         if (c.section === "base" && c.marginCents < 0)
-          issues.push({ level: "block", line: c.num, msg: "Capítulo con margen negativo" });
+          issues.push({ level: "block", line: c.num, msg: "Partida con margen negativo" });
       return issues;
     }
     /**
@@ -2227,7 +2227,7 @@
               /* The price-book code and the link behind it. Not money and not
                  a cost — the code is already printed on any quote an estimator
                  would recognise, and it is what lets the document draw the
-                 partida's own mark and let a reader check the two against each
+                 subpartida's own mark and let a reader check the two against each
                  other. `itemId` carries the trade, which is what colours it. */
               code: l.code || "",
               itemId: l.itemId || null,
@@ -5356,7 +5356,7 @@
       return null;
     }
     /**
-     * A cost that names a partida, checked against the budget it names it from.
+     * A cost that names a subpartida, checked against the budget it names it from.
      *
      * `lineId` is the one level below the chapter, and it is OPTIONAL
      * everywhere: every allocation written before this field existed is valid
@@ -5365,11 +5365,11 @@
      * point of the field is that block-5 reporting will trust it — so it must
      * name a line of the project's accepted version, and if a chapter is also
      * named, the line must belong to that chapter. A cost filed against a
-     * partida from the wrong chapter is precisely the kind of wrong that no
+     * subpartida from the wrong chapter is precisely the kind of wrong that no
      * report ever surfaces: both numbers exist, both look plausible, and the
      * drill-down quietly disagrees with the chapter totals above it.
      *
-     * When the chapter is NOT given, it is filled in from the line — a partida
+     * When the chapter is NOT given, it is filled in from the line — a subpartida
      * implies its chapter, and asking the operator to say the same thing twice
      * is how the two answers end up different.
      */
@@ -5380,20 +5380,20 @@
         return { ...alloc, lineId: null };
       }
       if (!alloc.projectId)
-        throw new Error("A partida belongs to a project; an overhead cost cannot name one");
+        throw new Error("A subpartida belongs to a project; an overhead cost cannot name one");
       const p = this.project(alloc.projectId);
       if (!p.budgetId || !p.acceptedVersionId)
-        throw new Error("This project has no accepted budget to name a partida from");
+        throw new Error("This project has no accepted budget to name a subpartida from");
       let hit = null;
       for (const { budgetId, version } of this._projectVersions(p)) {
         hit = this.findLine(budgetId, alloc.lineId, version.id);
         if (hit) break;
       }
-      if (!hit) throw new Error("Unknown partida for this project's accepted budget");
+      if (!hit) throw new Error("Unknown subpartida for this project's accepted budget");
       const chapterNum = String(hit.chapter.num);
       if (alloc.chapterNum && String(alloc.chapterNum) !== chapterNum)
         throw new Error(
-          "Partida " +
+          "Subpartida " +
             hit.line.num +
             " belongs to chapter " +
             chapterNum +
@@ -6131,7 +6131,7 @@
         h,
       );
       if (rec.lineId) {
-        // Same truth test every cost allocation passes since 1F: the partida
+        // Same truth test every cost allocation passes since 1F: the subpartida
         // must exist on the accepted version, in the chapter it claims, and
         // the chapter is filled in from it when absent.
         const a = this._lineAlloc({
@@ -6578,7 +6578,7 @@
      * to click into. Mirrors actualCostCents' rules row for row (bills minus
      * credit notes, labour, direct movements that are not behind a bill,
      * allocated tickets), so the drawer's sum can never disagree with the
-     * chapter total above it. Each row carries its partida when it names one.
+     * chapter total above it. Each row carries its subpartida when it names one.
      */
     chapterCosts(projectId, chapterNum) {
       const num = String(chapterNum);
@@ -6684,11 +6684,11 @@
     }
     /**
      * Money that reached this project and stopped there — allocated to the job
-     * but to no capítulo (PRY-02's pending-assignment block).
+     * but to no partida (PRY-02's pending-assignment block).
      *
      * `chapterEconomics` above silently skips exactly these rows: a bill line
      * with a `projectId` and no `chapterNum` contributes to the project's
-     * actual cost and to none of its chapters, so the per-capítulo table adds
+     * actual cost and to none of its chapters, so the per-partida table adds
      * up to less than the project does and nothing on screen says why. This
      * method is that difference, itemised.
      *
@@ -6743,12 +6743,12 @@
       return rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
     }
     /**
-     * Split one of those rows across capítulos — the only place in the product
+     * Split one of those rows across partidas — the only place in the product
      * where a cost acquires a chapter (§3.2, PRY-02).
      *
      * A split writes SIBLING allocations rather than editing one in place, so
      * the amount that reached the project is conserved by construction: the
-     * row is replaced by rows that add up to it. Every capítulo has to exist
+     * row is replaced by rows that add up to it. Every partida has to exist
      * in the project's frozen baseline, because a chapter number nothing
      * recognises is a cost that has left the project's own accounting without
      * leaving the project.
@@ -7695,7 +7695,7 @@
             push(
               "PROJ-CHAPTER-OVERCOST",
               "high",
-              `Capítulo ${ch.num} por encima de coste previsto — ${p.code}`,
+              `Partida ${ch.num} por encima de coste previsto — ${p.code}`,
               { project: p.code, chapter: ch.num },
             );
       }

@@ -215,6 +215,28 @@ if (missingCa.length > CA_BACKLOG) {
   );
 }
 
+/* Part 2 · item 7 — the vocabulary ratchet. The client renamed the budget
+   hierarchy in all three languages (capítulo→partida→Partida/Line item,
+   partida→subpartida→Subpartida/Sub-line item). A future merge that
+   reintroduces the OLD words would re-split the vocabulary silently; this
+   fails it instead. Data-model identifiers (chapterNum, itemChapters) are
+   not strings in the dictionaries, so they cannot trip it. */
+const oldVocab = [];
+for (const [es, en] of D.pairs) {
+  if (/\bChapters?\b/.test(en)) oldVocab.push(`EN value says Chapter: ${JSON.stringify(en)}`);
+  if (/cap[íi]tulos?/i.test(es)) oldVocab.push(`ES key says capítulo: ${JSON.stringify(es)}`);
+}
+for (const [es, ca] of Object.entries(D.ca)) {
+  if (/cap[íi]tols?/i.test(String(ca)))
+    oldVocab.push(`CA value says capítol: ${JSON.stringify(ca)}`);
+  if (/cap[íi]tulos?/i.test(es)) oldVocab.push(`ES key (ca) says capítulo: ${JSON.stringify(es)}`);
+}
+if (oldVocab.length) {
+  failed = true;
+  console.log(`\n✗ old vocabulary crept back (${oldVocab.length}):`);
+  for (const l of oldVocab.slice(0, 10)) console.log("   " + l);
+}
+
 if (!failed) {
   console.log(
     missingCa.length === 0

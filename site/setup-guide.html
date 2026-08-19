@@ -340,15 +340,15 @@
       <tr><td><b>1 Lead</b></td><td>Type the customer &amp; the enquiry.</td><td>Opens a lead with a next action; starts the project folder.</td></tr>
       <tr><td><b>2 Site visit</b></td><td>Take photos on the phone, jot notes/measurements.</td><td>Files photos &amp; notes into the “02 Site visit” folder.</td></tr>
       <tr><td><b>3 Estimate</b></td><td>Confirm rough scope.</td><td>Produces an order-of-magnitude figure.</td></tr>
-      <tr><td><b>4 Quotation</b></td><td>Pick chapters &amp; quantities (catalogue-first).</td><td>Totals it, keeps optionals separate, makes the <b>quote PDF</b>.</td></tr>
+      <tr><td><b>4 Quotation</b></td><td>Pick line items &amp; quantities (catalogue-first).</td><td>Totals it, keeps optionals separate, makes the <b>quote PDF</b>.</td></tr>
       <tr><td><b>5 Acceptance</b></td><td>Mark accepted (tick any optionals taken).</td><td>Freezes the version; drafts the <b>acceptance email</b> + PDF.</td></tr>
       <tr><td><b>6 Project</b></td><td>—</td><td>Turns the quote into a project with a frozen baseline.</td></tr>
-      <tr><td><b>7 Purchasing</b></td><td>Raise purchase orders to chosen suppliers.</td><td>Commits cost against each chapter; flags over-budget.</td></tr>
-      <tr><td><b>8 Execution</b></td><td>Book supplier bills as they arrive.</td><td>Tracks actual vs budget per chapter (margin warning).</td></tr>
+      <tr><td><b>7 Purchasing</b></td><td>Raise purchase orders to chosen suppliers.</td><td>Commits cost against each line item; flags over-budget.</td></tr>
+      <tr><td><b>8 Execution</b></td><td>Book supplier bills as they arrive.</td><td>Tracks actual vs budget per line item (margin warning).</td></tr>
       <tr><td><b>9 Invoicing</b></td><td>Confirm the invoice.</td><td>Applies the VAT rule, seals &amp; numbers it, makes PDF + <b>email</b>.</td></tr>
       <tr><td><b>10 Collections</b></td><td>Record the receipt when paid.</td><td>Allocates it; drafts a <b>reminder</b> if overdue.</td></tr>
       <tr><td><b>11 Supplier payments</b></td><td>Pay bills on due dates.</td><td>Shows cash out vs cash in.</td></tr>
-      <tr><td><b>12 Close</b></td><td>—</td><td>Final margin &amp; profit summary per chapter.</td></tr>
+      <tr><td><b>12 Close</b></td><td>—</td><td>Final margin &amp; profit summary per line item.</td></tr>
       <tr><td><b>13 Review request</b></td><td>Send the request.</td><td>Drafts a branded <b>review email</b> with your Google link.</td></tr>
     </tbody>
   </table>
@@ -433,7 +433,7 @@
     replace the placeholder CIF (B-00000000) and IBAN with the real values once your gestor confirms them,
     <b>before issuing any invoice</b>.</div></div></div>
   <div class="step"><div class="no">9</div><div class="bd"><b>Load your catalogue &amp; suppliers</b>
-    <div class="why">Enter your usual chapters/items and prices, and your suppliers with their prices. This is
+    <div class="why">Enter your usual line items/sub-line items and prices, and your suppliers with their prices. This is
     what makes quoting “pick, don't type”. Start with your 20 most common items; add more over time.</div></div></div>
   <div class="step"><div class="no">10</div><div class="bd"><b>Create the user accounts &amp; roles</b>
     <div class="why">Add each team member and give them a role: <b>Owner</b>, <b>Administration</b> or
@@ -471,7 +471,7 @@
     </ul></div>
     <div class="box"><h4>Every month</h4><ul style="margin:0;padding-left:18px;font-size:12px">
       <li>Export the ledger for your gestor (CSV).</li>
-      <li>Check margin-by-chapter for lessons on pricing.</li>
+      <li>Check margin-by-line-item for lessons on pricing.</li>
       <li>Confirm the backup ran (section 8).</li>
     </ul></div>
     <div class="box"><h4>If something looks wrong</h4><ul style="margin:0;padding-left:18px;font-size:12px">
@@ -550,7 +550,7 @@
   <table class="avoid">
     <thead><tr><th style="width:20%">Step</th><th style="width:40%">Extra input to capture</th><th>Output it unlocks</th></tr></thead>
     <tbody>
-      <tr><td>Quotation</td><td>Quantity × unit price per line (not only a chapter lump sum); measurement (medición)</td><td>Itemised quote &amp; certifiable progress billing</td></tr>
+      <tr><td>Quotation</td><td>Quantity × unit price per line (not only a line-item lump sum); measurement (medición)</td><td>Itemised quote &amp; certifiable progress billing</td></tr>
       <tr><td>Acceptance</td><td>Acceptance date &amp; method (signature / email); deposit % agreed</td><td>Deposit invoice + audit trail</td></tr>
       <tr><td>Invoicing</td><td>Deposit / milestone (<i>certificación</i>) invoices; IRPF retention line for B2B; series per year</td><td>Partial invoices &amp; correct withholding</td></tr>
       <tr><td>Project</td><td>Planned start / end dates; assigned team</td><td>Scheduling &amp; overdue alerts</td></tr>

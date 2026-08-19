@@ -175,8 +175,8 @@ jobs:
       - name: Translation coverage (source literals)
         if: always()
         run: |
-          node tests/i18n/source-audit.mjs --lang en --max 234
-          node tests/i18n/source-audit.mjs --lang ca --max 234
+          node tests/i18n/source-audit.mjs --lang en --max 233
+          node tests/i18n/source-audit.mjs --lang ca --max 233
 
       # THE CEILINGS ARE THE MEASUREMENT, NOT A BUDGET. They were 256 and 335
       # against an actual 239 and 234 — a hundred strings of headroom in

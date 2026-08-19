@@ -2022,7 +2022,7 @@ async function testBudgetBuilder(browser, base) {
 
     // Grouped and ordered by chapter and line, each captioned with both.
     const firstCap = await pg.locator("#dbody .plate figcaption").first().innerText();
-    if (/partida 1\.1/.test(firstCap) && /1\. Pavimentos/.test(firstCap))
+    if (/subpartida 1\.1/.test(firstCap) && /1\. Pavimentos/.test(firstCap))
       ok("annex: each picture names its chapter and its line");
     else bad("annex: caption reference", firstCap.replace(/\n/g, " ").slice(0, 90));
 
@@ -3139,7 +3139,7 @@ async function testPresupuestador(browser, base) {
   const errs = [];
   attachConsole(pg, errs);
   await autoAnswerModals(pg, {
-    "Nuevo capítulo": "Capítulo E2E",
+    "Nueva partida": "Partida E2E",
     "Nueva versión": "Revisión E2E",
   });
   try {
@@ -9411,8 +9411,8 @@ async function testI18n(browser, base) {
     const ecoCaText = await pg.locator("#view").innerText();
     if (
       /Marge/i.test(ecoCaText) &&
-      /Per capítol/i.test(ecoCaText) &&
-      !/Pendiente de repartir/.test(ecoCaText)
+      /Per partida/i.test(ecoCaText) &&
+      !/Per capítol|Pendiente de repartir/.test(ecoCaText)
     )
       ok("i18n: CA translates the PRY-02 panel");
     else bad("i18n: CA PRY-02", ecoCaText.replace(/\n/g, " ").slice(0, 160));
@@ -9592,7 +9592,7 @@ async function testI18n(browser, base) {
     const ecoEnText = await pg.locator("#view").innerText();
     if (
       /Accrued/i.test(ecoEnText) &&
-      /By chapter/i.test(ecoEnText) &&
+      /By line item/i.test(ecoEnText) &&
       !/Pendiente de repartir/.test(ecoEnText)
     )
       ok("i18n: EN translates the PRY-02 panel");
@@ -9654,10 +9654,10 @@ async function testI18n(browser, base) {
       await pg.waitForTimeout(600);
       const builderEn = await pg.locator(".pb").innerText();
       if (
-        /Chapters/i.test(builderEn) &&
-        /Line items/i.test(builderEn) &&
+        /\bLine items\b/i.test(builderEn) &&
+        /Sub-line item/i.test(builderEn) &&
         /Document language/i.test(builderEn) &&
-        !/Capítulos|Idioma del documento/.test(builderEn)
+        !/\bChapters?\b|Capítulos|Partidas y subpartidas y|Idioma del documento/.test(builderEn)
       )
         ok("i18n: EN translates the presupuestador — panes, bar and conditions");
       else bad("i18n: EN presupuestador", builderEn.replace(/\n/g, " ").slice(0, 200));

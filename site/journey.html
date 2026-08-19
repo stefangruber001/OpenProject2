@@ -2804,7 +2804,7 @@
           ],
           facts: [
             ["Base (IVA no incl.)", eurTxt(base)],
-            ["Capitulos", String(S.chapters.length)],
+            ["Partidas", String(S.chapters.length)],
             ["Opcional", hasOpt ? eurTxt(S.optional.amount) : "-"],
             ["Validez", validity + " dias"],
           ],
@@ -2816,7 +2816,7 @@
               lines: [S.buyerNif ? "NIF/CIF: " + S.buyerNif : "", S.address],
             },
           ],
-          tableLabel: "Detalle por capitulos",
+          tableLabel: "Detalle por partidas",
           tableNote: "precios unitarios sin IVA",
           signatures: ["Por " + BRAND.legal, "Conforme — el cliente (firma y fecha)"],
           buyer: {

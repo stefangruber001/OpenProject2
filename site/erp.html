@@ -839,7 +839,7 @@
       }
       /* The line's drawing on the quote itself. The description takes the room
          it is given, so the mark is fixed and the text flexes — otherwise a
-         long partida squeezes the picture away on exactly the lines that most
+         long subpartida squeezes the picture away on exactly the lines that most
          need explaining. */
       .chapline .chapmark {
         flex: 0 0 auto;
@@ -853,7 +853,7 @@
         color: #8a8f80;
       }
       /* On the printed quote the plate is small and its code smaller: it is
-         there so a reader can check the picture against the partida, not to
+         there so a reader can check the picture against the subpartida, not to
          compete with the description beside it. */
       .chapline .platec {
         font-size: 6.5px;
@@ -2004,7 +2004,7 @@
            column with no width gets everything left. Measured at 1440px in
            English, the description went from 238px to 358px and stopped
            truncating; the codes stopped reading DEM-1 for four different
-           partidas. */
+           subpartidas. */
         table-layout: fixed;
       }
       .bgrid tbody td {
@@ -2077,7 +2077,7 @@
       }
       /* Marca · modelo · calidad · tipo, under the description. Small and grey
      because it is context, not a field: it is what the catalogue said, and the
-     way to change it is to change the catalogue or pick a different partida. */
+     way to change it is to change the catalogue or pick a different subpartida. */
       /* One span per fact, so each is a text node the translator can match on
          its own; the middot between them belongs to the layout, not to either
          fact, and lives here. */
@@ -2549,7 +2549,7 @@
         min-width: 0;
       }
       /* The chapter row's controls. A flex row that WRAPS, because at 390px
-         "+ partida del catálogo" alone is most of the width and the buttons
+         "+ subpartida del catálogo" alone is most of the width and the buttons
          were running off the right-hand edge of the card — the delete would
          have been unreachable the moment it was added. */
       .chaprowin {
@@ -2591,7 +2591,7 @@
           margin-left: auto;
         }
       }
-      /* Deleting a partida: a bare ✕ in a 24px column on the laptop, a button
+      /* Deleting a subpartida: a bare ✕ in a 24px column on the laptop, a button
          that says what it does on the phone. The card layout gives every cell
          a full row and its own label, and an unlabelled ✕ on a row of its own
          is the one control an operator will not press because they cannot tell
@@ -2673,7 +2673,7 @@
       }
       /* The line's catalogue chooser. Styled as a field rather than as a button
          because that is what it stands in for — the code you would otherwise
-         type — and it opens the same sheet "+ partida del catálogo" opens
+         type — and it opens the same sheet "+ subpartida del catálogo" opens
          rather than a list of its own. */
       .bcat {
         appearance: none;
@@ -2918,7 +2918,7 @@
         /* A real touch target. `.btn.sm` is 26px, which is fine under a mouse
            and under the 44px minimum every phone platform asks for — and this
            is the one button on the row that destroys something, so a mis-tap
-           costs a priced partida. Same rule the site-action rows already
+           costs a priced subpartida. Same rule the site-action rows already
            follow. */
         .pbdel .btn {
           width: 100%;
@@ -3349,7 +3349,7 @@
         width: 120px;
       }
       /* The second fact in a two-fact cell — contract type beside the name,
-         partida beside the chapter. Muted, so the cell keeps one lead. */
+         subpartida beside the chapter. Muted, so the cell keeps one lead. */
       table td .sub {
         color: var(--muted);
         font-weight: 400;
@@ -3579,7 +3579,7 @@
         white-space: nowrap;
         font-size: 13px;
       }
-      /* Package 3 slide 3: the same row, one level down. A partida is indented
+      /* Package 3 slide 3: the same row, one level down. A subpartida is indented
      under the chapter it belongs to and set slightly quieter, so the two read
      as a tree without needing a <table> to draw one — which is the whole
      point, since a table forces a phone into horizontal scrolling and a flex
@@ -4113,7 +4113,7 @@
         transform: translate(-50%, 0);
       }
 
-      /* DMC-01 — the partidas tree (S3). Two zones per the doc: a narrow tree on
+      /* DMC-01 — the subpartidas tree (S3). Two zones per the doc: a narrow tree on
      the left with its own search and a count per branch, and the table on the
      right. Chapters drag to reorder; the drop target is drawn as a line
      rather than by moving rows around, so the list never appears to have
@@ -4229,7 +4229,7 @@
       }
 
       /* DMC-02 — the supplier comparison strip (S3). It appears only when the
-     screen is filtered to ONE partida, because comparing suppliers across
+     screen is filtered to ONE subpartida, because comparing suppliers across
      different items is not a comparison. A supplier with no price is drawn
      grey and says «sin precio»: the doc is explicit that a missing price is
      never to be rendered as a zero, which would make the cheapest supplier
@@ -4433,7 +4433,7 @@
 
         /* ================= THE QUOTE'S LINES, ON A PHONE =================
            The generic card gives every cell a labelled row of its own. On the
-           budget grid that is thirteen rows and about 700px per partida, so a
+           budget grid that is thirteen rows and about 700px per subpartida, so a
            chapter of six is four screens of scrolling and the operator cannot
            see what belongs to what: "I want to see immediately the chapters and
            what falls below each chapter."
@@ -4510,7 +4510,7 @@
         /* LABELS ONLY WHERE THE VALUE CANNOT SPEAK.
            A caption over "1.1", over the description, over a chooser that
            already reads "SOL-101 · Pavimento cerámico…" says nothing and costs
-           a line each — and four wasted lines per partida is what made a
+           a line each — and four wasted lines per subpartida is what made a
            chapter of six into four screens. The figures keep theirs, because
            28 · 42,00 · 26,00 · 38,1 are indistinguishable without them. */
         .bgrid table.cards tr.pbrow > td.c-num:before,
@@ -4537,7 +4537,7 @@
           grid-area: hd;
         }
         /* The number stays: it is editable, a manual one survives reordering,
-           and it is how a partida is referred to on the telephone. Kept small
+           and it is how a subpartida is referred to on the telephone. Kept small
            and next to the money rather than given a labelled row of its own. */
         .bgrid table.cards tr.pbrow > td.c-num {
           grid-area: num;
@@ -4586,14 +4586,14 @@
           white-space: nowrap;
         }
         /* The typed code and the chooser on ONE line. Both earn their place —
-           the chooser is how a partida comes out of the price book, the box is
+           the chooser is how a subpartida comes out of the price book, the box is
            how a code that is not in it gets written — but stacked they cost two
            rows to say one thing. */
         .bgrid table.cards tr.pbrow > td.c-code {
           grid-area: code;
         }
         /* Block, not a flex column: as a flex ITEM the inner row was sized from
-           its own content — 82px of code box plus a whole partida description —
+           its own content — 82px of code box plus a whole subpartida description —
            and hung 60px off the right of the card no matter how many
            `min-width: 0`s were added below it. A block child is simply the
            width of its parent, which is the thing that needed saying. */
@@ -4615,7 +4615,7 @@
         }
         .bgrid table.cards tr.pbrow > td.c-code .bcat {
           /* basis 0, not auto: with `auto` the chooser's starting size is its
-             own text, which is a whole partida description. */
+             own text, which is a whole subpartida description. */
           flex: 1 1 0;
           margin-top: 0;
           min-width: 0;
@@ -4689,7 +4689,7 @@
         }
         /* The chapter, and everything under it.
            A filled band rather than another bordered card: at a glance the eye
-           needs to find the HEADINGS first and read the partidas as their
+           needs to find the HEADINGS first and read the subpartidas as their
            consequence, and a heading that looks like its own children is a list
            with no shape. */
         .bgrid table.cards tr.chaprow {
@@ -5056,12 +5056,12 @@
     <!-- The starter price book, read by migration 16. MUST precede erp-migrations.js. -->
     <script src="erp-catalogue-pack.js"></script>
     <!-- The same price book in English and Catalan. Read by catalogueDesc();
-     absent, every partida simply shows its Spanish and nothing breaks. -->
+     absent, every subpartida simply shows its Spanish and nothing breaks. -->
     <script src="erp-catalogue-i18n.js"></script>
     <!-- Line drawings for the price book. No blobs, no requests: the same
      definition renders as inline SVG here and as PDF path operators in
      erp-pdf.js, so the catalogue, the quote builder and the printed quote
-     cannot show three different pictures of one partida. -->
+     cannot show three different pictures of one subpartida. -->
     <script src="erp-pictograms.js"></script>
     <script src="erp-migrations.js"></script>
     <script src="erp-store.js"></script>
@@ -5163,9 +5163,9 @@
        * `ErpSeed.build()` alone is NOT a complete starting state, and the gap
        * was invisible because it only ever showed on a first run. Migrations
        * replay over a STORED blob; a fresh seed is used directly and never
-       * touches the ladder — so every existing workspace received the 200-partida
+       * touches the ladder — so every existing workspace received the 200-subpartida
        * price book through migration 16 while a first tenant got the eight demo
-       * partidas and nothing else. The quote builder this price book exists to
+       * subpartidas and nothing else. The quote builder this price book exists to
        * make usable opened empty on precisely the day it mattered most.
        *
        * `applyCataloguePack` is migration 16's own body, exported rather than
@@ -7043,15 +7043,15 @@
 
       /* ================= The one progress control (Package 3 slide 3) =============
    Two controls used to record the same fact. This screen had a grid of
-   chapters and their partidas that wrote through to the plan's own bars;
+   chapters and their subpartidas that wrote through to the plan's own bars;
    PRY-01's «Avance» tab had a three-state control that wrote only through
    `markProgress`, so a percentage typed there never reached the chart, and a
    job could read 40 % on one screen and 0 % on the other. The operator asked
    for one control, usable on a desk and on a phone.
 
-   What each side contributed. From the grid: the chapter+partida structure
+   What each side contributed. From the grid: the chapter+subpartida structure
    and — the part that matters — the write path, `recordProgress` for a
-   chapter with a bar and `syncProgress` after a partida, so the engine and
+   chapter with a bar and `syncProgress` after a subpartida, so the engine and
    the plan always move together. From the tab: the three contiguous state
    buttons and the percentage box that is live only in the middle state
    (§3.2), including the mobile rule that collapses the strip to the single
@@ -7101,7 +7101,7 @@
         } catch (e) {}
         if (!chapters.length && !plan.tasks.length) return "";
         return `<div class="card" id="progCtl"><div class="ch"><h3>Avance</h3>
-    <span class="tag">estado y porcentaje, por capítulo y por partida</span></div>
+    <span class="tag">estado y porcentaje, por partida y por subpartida</span></div>
    <div style="padding:4px 14px 12px">
    ${
      chapters
@@ -7127,7 +7127,7 @@
         .join("")}`;
        })
        .join("") ||
-     '<div class="empty">Sin capítulos aceptados: el avance se registra sobre las tareas del gráfico.</div>'
+     '<div class="empty">Sin partidas aceptadas: el avance se registra sobre las tareas del gráfico.</div>'
    }
    </div></div>`;
       }
@@ -7180,7 +7180,7 @@
           mutate(() => {
             erp.markLineProgress(pid, lineId, { pct }, "operations");
             B.save(erp.state, pid, B.syncProgress(erp, pid, plan));
-          }, "Avance de la partida registrado");
+          }, "Avance de la subpartida registrado");
 
         host.querySelectorAll(".pstate").forEach((strip) => {
           const isLine = "line" in strip.dataset;
@@ -7275,7 +7275,7 @@
         const p = erp.project(pid);
         // A project reached from ADM-03's allocation panel need not have a frozen
         // baseline — a cost can land on a job before its presupuesto was accepted.
-        // The screen offers no capítulo in that case rather than throwing.
+        // The screen offers no partida in that case rather than throwing.
         return ((p.baseline && p.baseline.chapters) || [])
           .map(
             (c) =>
@@ -7283,7 +7283,7 @@
           )
           .join("");
       }
-      /* The partidas of one chapter of a project's ACCEPTED budget. The
+      /* The subpartidas of one chapter of a project's ACCEPTED budget. The
          accepted version, not the current one, because costs are controlled
          against what was signed; a draft that renumbers its lines must not
          re-aim money that was already filed. Empty when the project has no
@@ -7321,7 +7321,7 @@
    describe them and could be read as removing them; they are kept because
    they are the only place the budget's committed-versus-pending figure is
    visible, and an order created from an open need is an order that already
-   knows which capítulo it belongs to. Retiring them would move real work back
+   knows which partida it belongs to. Retiring them would move real work back
    into somebody's head. Logged in ASSUMPTIONS.md.
 
    Goods receipt is no longer a stage of this screen, which is what the doc
@@ -7358,8 +7358,8 @@
       .join("")}
    </div>
    <div id="puList"></div>
-   <div class="card"><div class="ch"><h3>Necesidades</h3><span class="tag">lo comprometido frente a lo pendiente, por capítulo</span></div>
-    <div class="scroll"><table><thead><tr><th>Capítulo</th><th class="num">Presupuestado</th><th class="num">Comprometido</th><th class="num">Pendiente</th><th></th></tr></thead><tbody>
+   <div class="card"><div class="ch"><h3>Necesidades</h3><span class="tag">lo comprometido frente a lo pendiente, por partida</span></div>
+    <div class="scroll"><table><thead><tr><th>Partida</th><th class="num">Presupuestado</th><th class="num">Comprometido</th><th class="num">Pendiente</th><th></th></tr></thead><tbody>
     ${
       needs
         .map(
@@ -7369,7 +7369,7 @@
       <td class="num warn">${eur0(c.pendingCents)}</td><td><button class="btn sm" data-need="${c.num}">＋ OC</button></td></tr>`,
         )
         .join("") ||
-      '<tr><td colspan="5"><div class="empty">Todos los capítulos están comprometidos.</div></td></tr>'
+      '<tr><td colspan="5"><div class="empty">Todas las partidas están comprometidos.</div></td></tr>'
     }
     </tbody></table></div></div>
    <div class="card"><div class="ch"><h3>Calendario de llegadas</h3></div><div class="daylist">
@@ -7411,7 +7411,7 @@
           columns: [
             { label: "Número", primary: true, get: (p) => p.number },
             { label: "Proveedor", get: (p) => erp.party(p.supplierId).name },
-            { label: "Capítulo", get: (p) => p.chapterNum || "—" },
+            { label: "Partida", get: (p) => p.chapterNum || "—" },
             { label: "Importe", html: (p) => eur(p.totalCents - (p.status.returnedCents || 0)) },
             {
               label: "Llegada prevista",
@@ -7592,7 +7592,7 @@
    <div class="pbbody"><div class="daylist">
      <div class="it"><span>Proveedor</span><span style="flex:1"></span><b>${esc(erp.party(pu.supplierId).name)}</b></div>
      <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${fmtD(pu.date)}</b></div>
-     <div class="it"><span>Capítulo</span><span style="flex:1"></span><b>${pu.chapterNum || "—"}</b></div>
+     <div class="it"><span>Partida</span><span style="flex:1"></span><b>${pu.chapterNum || "—"}</b></div>
      <div class="it"><span>Llegada prevista</span><span style="flex:1"></span><b>${pu.expectedArrival ? fmtD(pu.expectedArrival) : "—"}</b></div>
      ${pu.orderRef ? `<div class="it"><span>Referencia</span><span style="flex:1"></span><b>${esc(pu.orderRef)}</b></div>` : ""}
      ${pu.cancelledAt ? `<div class="it"><span class="pill r">Anulada</span><span>${fmtD(pu.cancelledAt)}${pu.cancelReason ? " — " + esc(pu.cancelReason) : ""}</span></div>` : ""}
@@ -7715,7 +7715,7 @@
         const db = openDrawer("Nueva orden de compra");
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Proveedor *</label><select id="p_sup"><option value="">—</option>${supplierOptions()}</select></div>
-   <div class="field"><label>Capítulo</label><select id="p_ch"><option value="">—</option>${chapterOptions(pid, chapterNum)}</select></div>
+   <div class="field"><label>Partida</label><select id="p_ch"><option value="">—</option>${chapterOptions(pid, chapterNum)}</select></div>
    <div class="field"><label>Llegada prevista</label><input id="p_arr" type="date"></div>
    <div class="field full"><label>Descripción</label><input id="p_desc" placeholder="Material"></div>
    <div class="field"><label>Cantidad</label><input id="p_qty" type="number" step="0.001" value="1"></div>
@@ -7779,7 +7779,7 @@
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Industrial / proveedor *</label><select id="s_sup"><option value="">—</option>${supplierOptions()}</select></div>
    <div class="field"><label>Oficio *</label><input id="s_trade" placeholder="Fontanería"></div>
-   <div class="field"><label>Capítulo</label><select id="s_ch"><option value="">—</option>${chapterOptions(pid)}</select></div>
+   <div class="field"><label>Partida</label><select id="s_ch"><option value="">—</option>${chapterOptions(pid)}</select></div>
    <div class="field"><label>Formato</label><select id="s_fmt"><option value="workOrder">Orden de trabajo</option><option value="contract">Contrato de subcontrata</option></select></div>
    <div class="field"><label>Importe adjudicado (€)</label><input id="s_amt" type="number" step="0.01" value="0"></div>
    <div class="field"><label>Retención (%)</label><input id="s_ret" type="number" step="0.1" value="0"></div>
@@ -7816,7 +7816,7 @@
    <div class="card"><div class="ch"><h3>${esc(erp.party(s.supplierId).name)}</h3><span class="pill ${lab[1]}">${lab[0]}</span></div>
     <div class="daylist">
      <div class="it">Adjudicado <b>${eur(s.awardedCents)}</b> · Certificado <b>${eur(certifiedCents)}</b> · Retención ${s.retentionPct}%${s.retentionReleasedAt ? ` · liberada ${fmtD(s.retentionReleasedAt)}` : ""}</div>
-     <div class="it">Capítulo ${s.chapterNum || "—"} · ${s.format === "contract" ? "Contrato de subcontrata" : "Orden de trabajo"}</div>
+     <div class="it">Partida ${s.chapterNum || "—"} · ${s.format === "contract" ? "Contrato de subcontrata" : "Orden de trabajo"}</div>
      <div class="it">Previsto ${s.dates.plannedStart ? fmtD(s.dates.plannedStart) : "—"} → ${s.dates.plannedEnd ? fmtD(s.dates.plannedEnd) : "—"}${s.dates.actualStart ? ` · real desde ${fmtD(s.dates.actualStart)}` : ""}${s.dates.actualEnd ? ` hasta ${fmtD(s.dates.actualEnd)}` : ""}</div>
      ${(s.rejectedWork || []).length ? `<div class="it">⚠ ${s.rejectedWork.length} trabajo(s) rechazado(s)</div>` : ""}
     </div></div>
@@ -7999,7 +7999,7 @@
         <b>${eur(t.taxableCents)}</b> ${st}</div>`;
         })
         .join("") ||
-      '<div class="it" style="color:var(--muted)">Sin presupuestos de variación. El botón crea uno sobre esta obra; se construye y se acepta como cualquier presupuesto, y al aceptarse sus capítulos entran en la economía, el avance y la certificación.</div>'
+      '<div class="it" style="color:var(--muted)">Sin presupuestos de variación. El botón crea uno sobre esta obra; se construye y se acepta como cualquier presupuesto, y al aceptarse sus partidas entran en la economía, el avance y la certificación.</div>'
     }
     </div></div>
    <div class="counters" style="--cw:216px">
@@ -8015,7 +8015,7 @@
      <span style="flex:1"></span>
      <span class="tag"><span>Sin aprobar</span> <b>${eur0(reg.unapprovedValueCents)}</b></span></div>
    <div class="card"><div class="ch"><h3>Modificaciones</h3><span class="tag">no facturable sin aprobación</span></div>
-    <div class="scroll"><table><thead><tr><th></th><th>Descripción</th><th>Capítulo</th><th class="num">Venta</th><th class="num">Coste</th><th>Plazo</th><th>Fecha</th><th>Estado</th><th></th></tr></thead><tbody>
+    <div class="scroll"><table><thead><tr><th></th><th>Descripción</th><th>Partida</th><th class="num">Venta</th><th class="num">Coste</th><th>Plazo</th><th>Fecha</th><th>Estado</th><th></th></tr></thead><tbody>
     ${
       shown
         .slice()
@@ -8175,7 +8175,7 @@
                   const applied = B.applyChapterDelay(plan, c.chapterNum, c.scheduleImpactDays);
                   if (applied === plan)
                     throw new Error(
-                      "El capítulo " +
+                      "La partida " +
                         c.chapterNum +
                         " no tiene todavía una tarea derivada — deriva la planificación primero",
                     );
@@ -8194,7 +8194,7 @@
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Descripción *</label><input id="c_desc" placeholder="Suelo radiante en baño"></div>
    <div class="field full"><label>Motivo</label><input id="c_reason" placeholder="Petición del cliente"></div>
-   <div class="field"><label>Capítulo</label><select id="c_ch"><option value="">—</option>${chapterOptions(pid)}</select></div>
+   <div class="field"><label>Partida</label><select id="c_ch"><option value="">—</option>${chapterOptions(pid)}</select></div>
    <div class="field full"><label>Foto</label>
      <div style="display:flex;gap:8px;align-items:center">
        <span class="xthumb" id="c_thumb">📷</span>
@@ -8325,7 +8325,7 @@
    Two tabs, per §3.2. «Parte diario» is a day sheet with the week beside it:
    the 372 calendar on the left carries each day's total, so choosing a day
    and spotting the day nobody filled in are the same glance. «Resumen» rolls
-   the period up per proyecto y capítulo and closes with the monthly
+   the period up per proyecto y partida and closes with the monthly
    reconciliation.
 
    The day sheet spans EVERY project, not the one in the project bar. An hour
@@ -8352,7 +8352,7 @@
       const HOUR_TONE = { normal: "", extra: " y", festivo: " b" };
       function horas(v) {
         $("#sub").textContent =
-          "Parte diario por trabajador, con la semana al lado; y el resumen por proyecto y capítulo con la conciliación del mes.";
+          "Parte diario por trabajador, con la semana al lado; y el resumen por proyecto y partida con la conciliación del mes.";
         if (!erp.state.projects.length) return noProjectsCard(v);
         if (!hDay) hDay = erp.today;
         hWeekRef = hDay;
@@ -8372,7 +8372,7 @@
       }
 
       /** The seven day cells and the day's grid. */
-      /** The partida behind an entry, for the sheet to name rather than imply. */
+      /** The subpartida behind an entry, for the sheet to name rather than imply. */
       function hourLineLabel(entry) {
         if (!entry || !entry.lineId || !entry.projectId) return "";
         try {
@@ -8458,7 +8458,7 @@
      <div class="scroll"><table class="hsheet"><thead><tr>
        <th class="cw">Trabajador</th><th class="cp">Proyecto</th>
        <th class="ch2 num">Horas</th><th class="ck">Tipo de hora</th>
-       <th>Capítulo</th><th></th></tr></thead><tbody>
+       <th>Partida</th><th></th></tr></thead><tbody>
      ${
        dayRows
          .map(
@@ -8666,8 +8666,8 @@
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Trabajador *</label><select id="nh_w">${erp.state.workers.map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join("")}</select></div>
    <div class="field"><label>Proyecto *</label><select id="nh_p">${jobs.map((p) => `<option value="${p.id}">${esc(p.code)} · ${esc(p.name)}</option>`).join("")}</select></div>
-   <div class="field"><label>Capítulo</label><select id="nh_c"></select></div>
-   <div class="field" id="nh_lwrap" style="display:none"><label>Partida</label><select id="nh_l"></select></div>
+   <div class="field"><label>Partida</label><select id="nh_c"></select></div>
+   <div class="field" id="nh_lwrap" style="display:none"><label>Subpartida</label><select id="nh_l"></select></div>
    <div class="field"><label>Tipo</label><select id="nh_k"><option value="normal">Normal</option><option value="extra">Extra</option><option value="festivo">Festivo</option></select></div>
    <div class="field"><label>Horas *</label><input id="nh_h" type="number" step="0.25" min="0"></div>
    <div class="field"><label>Fecha</label><input id="nh_d" type="date" value="${day}"></div>
@@ -8725,8 +8725,8 @@
     <div class="counter"><div class="lab">Sin aprobar</div><div class="val">${h(rec.openHoursMilli)}</div>
       <div class="sub">del mes ${rec.month}</div></div>
    </div>
-   <div class="card"><div class="ch"><h3>Por proyecto y capítulo</h3><span class="tag">${fmtD(r.from)} – ${fmtD(r.to)}</span></div>
-    <div class="scroll"><table id="hSum"><thead><tr><th>Proyecto</th><th>Capítulo</th>
+   <div class="card"><div class="ch"><h3>Por proyecto y partida</h3><span class="tag">${fmtD(r.from)} – ${fmtD(r.to)}</span></div>
+    <div class="scroll"><table id="hSum"><thead><tr><th>Proyecto</th><th>Partida</th>
       <th class="num">Horas</th><th class="num">Coste</th></tr></thead><tbody>
     ${
       s.projects
@@ -8738,7 +8738,7 @@
         .map(
           (
             c,
-          ) => `<tr><td></td><td>${c.chapterNum ? esc(c.chapterNum + ". " + (c.name || "")) : '<span class="pill y">Sin capítulo</span>'}</td>
+          ) => `<tr><td></td><td>${c.chapterNum ? esc(c.chapterNum + ". " + (c.name || "")) : '<span class="pill y">Sin partida</span>'}</td>
         <td class="num">${h(c.hoursMilli)}</td><td class="num">${eur(c.costCents)}</td></tr>`,
         )
         .join("")}`,
@@ -8798,7 +8798,7 @@
       function labourRegisterAll() {
         const lab = erp.state.labour.filter((l) => inPeriod(l.date));
         return `<div class="card"><div class="ch"><h3>Registro</h3><span class="tag">reasigna o corrige una entrada</span></div>
-   <div class="scroll"><table><thead><tr><th>Fecha</th><th>Trabajador</th><th>Proyecto</th><th>Capítulo</th><th class="num">Horas</th><th class="num">Coste</th><th>Estado</th><th></th></tr></thead><tbody>
+   <div class="scroll"><table><thead><tr><th>Fecha</th><th>Trabajador</th><th>Proyecto</th><th>Partida</th><th class="num">Horas</th><th class="num">Coste</th><th>Estado</th><th></th></tr></thead><tbody>
    ${
      lab
        .slice()
@@ -8840,10 +8840,10 @@
                   },
                   {
                     key: "chap",
-                    label: "Capítulo",
+                    label: "Partida",
                     value: l.chapterNum || "",
-                    placeholder: "Sin capítulo",
-                    hint: "Déjalo en blanco para dejar el parte sin capítulo asignado.",
+                    placeholder: "Sin partida",
+                    hint: "Déjalo en blanco para dejar el parte sin partida asignada.",
                   },
                 ],
                 { okLabel: "Reasignar" },
@@ -8918,14 +8918,14 @@
    overhead here rather than structure. Tarifas is append-only history
    (addWorkerRate), shown inline; Documentos reuses the existing
    workerDocDrawer rather than duplicating its add/renew form. */
-      /* ---------- DMC-01 · a partida (S3) ----------
-   One drawer for create and edit, because a partida is a short record and
+      /* ---------- DMC-01 · a subpartida (S3) ----------
+   One drawer for create and edit, because a subpartida is a short record and
    splitting it would mean two forms to keep in step. The code is editable
-   only while creating: budget lines store it, so on an existing partida it
+   only while creating: budget lines store it, so on an existing subpartida it
    is shown and not offered. */
       function catalogueItemDrawer(id) {
         const it = id ? erp.state.catalogue.find((x) => x.id === id) : null;
-        const db = openDrawer(it ? `${it.code} · ${it.desc}` : "Nueva partida");
+        const db = openDrawer(it ? `${it.code} · ${it.desc}` : "Nueva subpartida");
         const chapters = erp.listActive("itemChapters");
         const TYPE = [
           ["material", "Material"],
@@ -8943,8 +8943,8 @@
        ? `<div class="field"><label>Código</label><input value="${esc(it.code)}" disabled title="Las líneas de presupuesto guardan el código; no se cambia."></div>`
        : `<div class="field"><label>Código *</label><input id="ci_code" placeholder="ALB-011"></div>`
    }
-   <div class="field"><label>Capítulo</label><select id="ci_chap">
-     <option value="">— sin capítulo —</option>
+   <div class="field"><label>Partida</label><select id="ci_chap">
+     <option value="">— sin partida —</option>
      ${chapters.map((c) => `<option value="${esc(c.code)}"${it && it.chapter === c.code ? " selected" : ""}>${esc(c.es)}</option>`).join("")}</select></div>
    <div class="field full"><label>Descripción *</label><input id="ci_desc" value="${val("desc", "")}"></div>
    <div class="field full"><label>Cómo se le dice al cliente <span style="font-weight:400;color:var(--muted)">(si difiere)</span></label><input id="ci_cw" value="${val("customerWording", "")}"></div>
@@ -8956,10 +8956,10 @@
    <div class="field"><label>Coste de referencia (€)</label><input id="ci_cost" type="number" min="0" step="0.01" value="${it ? it.defaultCostCents / 100 : ""}"></div>
    <div class="field"><label>Precio de referencia (€)</label><input id="ci_price" type="number" min="0" step="0.01" value="${it && it.defaultPriceCents ? it.defaultPriceCents / 100 : ""}"></div>
    <div class="field full" style="font-size:11.5px;color:var(--muted);margin-top:-2px">
-     Un precio de referencia en blanco se muestra como «sin precio», nunca como cero — la partida
+     Un precio de referencia en blanco se muestra como «sin precio», nunca como cero — la subpartida
      entra en el presupuesto marcada como pendiente de valorar.</div>
    <div class="field full" style="margin-top:8px;display:flex;gap:8px;align-items:center">
-     <button class="btn primary" id="ci_save">${it ? "Guardar cambios" : "Crear partida"}</button>
+     <button class="btn primary" id="ci_save">${it ? "Guardar cambios" : "Crear subpartida"}</button>
      ${it ? '<span style="flex:1"></span><button class="btn" id="ci_off">Retirar del catálogo</button>' : ""}</div></div>
    ${
      it
@@ -8971,7 +8971,7 @@
             (r) => `<img class="catthumb" data-blob="${esc(r)}" alt="" style="margin-right:6px">`,
           )
           .join("") ||
-        "Esta partida no tiene imágenes. Las que se añadan salen en el anexo gráfico del presupuesto, nunca dentro de la fila."
+        "Esta subpartida no tiene imágenes. Las que se añadan salen en el anexo gráfico del presupuesto, nunca dentro de la fila."
       }
      </div></div></div>`
        : ""
@@ -9005,35 +9005,35 @@
                 const code = $("#ci_code").value.trim();
                 if (!code) throw new Error("El código es obligatorio");
                 if (erp.state.catalogue.some((x) => x.code === code))
-                  throw new Error("Ya existe una partida con el código " + code);
+                  throw new Error("Ya existe una subpartida con el código " + code);
                 erp.addCatalogueItem(Object.assign({ code }, patch), "backoffice");
               }
               closeDrawer();
             },
-            it ? "Partida actualizada" : "Partida creada",
+            it ? "Subpartida actualizada" : "Subpartida creada",
           );
         const off = $("#ci_off");
         if (off)
           off.onclick = () =>
             mutate(() => {
               // Deactivate, never delete: a budget written last year references this
-              // partida by id, and the line has to keep resolving.
+              // subpartida by id, and the line has to keep resolving.
               erp.updateCatalogueItem(it.id, { active: false }, "backoffice");
               closeDrawer();
-            }, "Partida retirada del catálogo");
+            }, "Subpartida retirada del catálogo");
       }
       /* ---------- Catalogue picker (Package 1, slide 9) ----------
    "Debería en ambos, Partidas o Subpartidas, una opción de buscar que cuando
-   se apriete, se abra un pop up con la lista de partidas y una casilla de
+   se apriete, se abra un pop up con la lista de subpartidas y una casilla de
    búsqueda. En caso de no estar creada, dar la opción de crearla."
 
    The search runs over código, descripción and the customer wording, because
-   people look a partida up by whichever of the three they remember. Picking
+   people look a subpartida up by whichever of the three they remember. Picking
    one fills the line's código, descripción, unidad AND both figures, which is
    the point of a catalogue: the second time you quote alicatado it should
    already know what alicatado costs.
 
-   Not finding one opens `catalogueItemDrawer` — the SAME "＋ Nueva partida"
+   Not finding one opens `catalogueItemDrawer` — the SAME "＋ Nueva subpartida"
    form the Configuración screen uses (operator's own suggestion), rather than
    a second form written for this popup that would drift out of step with it.
 
@@ -9041,7 +9041,7 @@
      query    text the search box starts with
      chapter  a chapter CODE to open filtered on, with a way to widen to the
               whole catalogue. Adding lines to «Fontanería» should start among
-              the plumbing, not among two hundred partidas of everything.
+              the plumbing, not among two hundred subpartidas of everything.
      multi    tick several and take them in one go — `onPick` then receives an
               ARRAY. A chapter is ten sub-partidas and quoting one usually means
               quoting six of them; making that six round trips through a modal
@@ -9052,7 +9052,7 @@
       function catalogueSearchModal(onPick, opts) {
         const o = typeof opts === "string" ? { query: opts } : opts || {};
         const rows = erp.state.catalogue.filter((i) => i.active !== false);
-        const chapLabel = (code) => (code ? chapterLabel(code) : "sin capítulo");
+        const chapLabel = (code) => (code ? chapterLabel(code) : "sin partida");
         // A chapter with nothing in it would open on an empty list that looks
         // broken, so the filter only applies when it has something to show.
         let chapter = o.chapter && rows.some((i) => i.chapter === o.chapter) ? o.chapter : "";
@@ -9071,7 +9071,7 @@
         node.id = "catpick";
         const box = el("div", "modal wide");
         box.innerHTML = `<div class="mh"><h3>Buscar en el catálogo</h3>
-    <p>${multi ? "Marca las subpartidas que entran en el capítulo. Cada una llega con su unidad, su coste y su precio." : "Por código, descripción o cómo se le dice al cliente."}</p></div>
+    <p>${multi ? "Marca las subpartidas que entran en la partida. Cada una llega con su unidad, su coste y su precio." : "Por código, descripción o cómo se le dice al cliente."}</p></div>
    <div class="mb">
     <div class="mf"><input id="cp_q" placeholder="alicatado, ALB-010, tabique…" value="${esc(o.query || "")}"></div>
     <div class="mf"><select id="cp_chap">${cpChapterOptions(rows, chapter)}</select></div>
@@ -9079,7 +9079,7 @@
    </div>
    <div class="ma">${multi ? '<span class="tag" id="cp_count"></span>' : ""}<span class="sp"></span>
     <button class="btn sm" id="cp_cancel">Cancelar</button>
-    <button class="btn sm" id="cp_new">＋ Nueva partida</button>
+    <button class="btn sm" id="cp_new">＋ Nueva subpartida</button>
     ${multi ? '<button class="btn sm primary" id="cp_add" disabled>Añadir</button>' : ""}</div>`;
         node.appendChild(box);
         document.body.appendChild(node);
@@ -9112,7 +9112,7 @@
           $("#cp_list").innerHTML =
             hits
               .map((i) => {
-                // What the catalogue knows about this partida beyond its name.
+                // What the catalogue knows about this subpartida beyond its name.
                 // Shown HERE as well as on the line, because "which of the two
                 // mixers is this" is a question you answer while choosing, not
                 // after choosing.
@@ -9126,10 +9126,10 @@
               })
               .join("") ||
             (rows.length === 0
-              ? `<div class="empty" style="padding:18px">El catálogo está vacío todavía. Crea la primera partida con el botón de abajo, o añádelas en Configuración › Partidas y subpartidas.</div>`
+              ? `<div class="empty" style="padding:18px">El catálogo está vacío todavía. Crea la primera subpartida con el botón de abajo, o añádelas en Configuración › Partidas y subpartidas.</div>`
               : q
-                ? `<div class="empty" style="padding:18px">Ninguna partida coincide con «${esc(q)}»${chapter ? " en este capítulo" : ""}. ${chapter ? "Prueba en «Todos los capítulos», o créala" : "Créala"} con el botón de abajo y queda en el catálogo para la próxima vez.</div>`
-                : `<div class="empty" style="padding:18px">Este capítulo no tiene partidas todavía. Elige «Todos los capítulos» o crea la primera.</div>`);
+                ? `<div class="empty" style="padding:18px">Ninguna subpartida coincide con «${esc(q)}»${chapter ? " en esta partida" : ""}. ${chapter ? "Prueba en «Todas las partidas», o créala" : "Créala"} con el botón de abajo y queda en el catálogo para la próxima vez.</div>`
+                : `<div class="empty" style="padding:18px">Esta partida no tiene subpartidas todavía. Elige «Todas las partidas» o crea la primera.</div>`);
           if (multi) {
             $("#cp_count").textContent = chosen.size
               ? `${chosen.size} seleccionada${chosen.size === 1 ? "" : "s"}`
@@ -9182,7 +9182,7 @@
         const count = new Map();
         for (const i of rows) count.set(i.chapter || "", (count.get(i.chapter || "") || 0) + 1);
         return (
-          `<option value=""${selected ? "" : " selected"}>Todos los capítulos (${rows.length})</option>` +
+          `<option value=""${selected ? "" : " selected"}>Todas las partidas (${rows.length})</option>` +
           erp
             .listActive("itemChapters")
             .filter((c) => count.get(c.code))
@@ -9261,7 +9261,7 @@
             p.active &&
             p.roles.some((r) => ["supplier", "subcontractor", "selfEmployed"].includes(r)),
         );
-        if (!items.length) return toast("⚠ Primero hay que dar de alta alguna partida");
+        if (!items.length) return toast("⚠ Primero hay que dar de alta alguna subpartida");
         if (!sups.length) return toast("⚠ Primero hay que dar de alta algún proveedor");
         const db = openDrawer("Nuevo precio");
         const SRC = [
@@ -9273,7 +9273,7 @@
           ["manualConfirmation", "Confirmación manual"],
         ];
         db.innerHTML = `<div class="fgrid">
-   <div class="field full"><label>Partida *</label><select id="pr_item">${items.map((i) => `<option value="${i.id}"${i.id === itemId ? " selected" : ""}>${esc(i.code)} · ${esc(i.desc)}</option>`).join("")}</select></div>
+   <div class="field full"><label>Subpartida *</label><select id="pr_item">${items.map((i) => `<option value="${i.id}"${i.id === itemId ? " selected" : ""}>${esc(i.code)} · ${esc(i.desc)}</option>`).join("")}</select></div>
    <div class="field full"><label>Proveedor *</label><select id="pr_sup">${sups.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select></div>
    <div class="field"><label>Fecha *</label><input id="pr_date" type="date" value="${erp.today}"></div>
    <div class="field"><label>Código del artículo en el proveedor</label><input id="pr_ref" placeholder="el suyo, no el nuestro"></div>
@@ -9357,7 +9357,7 @@
         const expired = p.validUntil && p.validUntil < erp.today;
         db.innerHTML = `<div class="card"><div class="ch"><h3>El precio</h3>
      <span class="tag">${expired ? "caducado" : "vigente"}</span></div><div class="daylist">
-    <div class="it">Partida: <b>${esc(it ? it.code + " · " + it.desc : "—")}</b>${it ? ` · por ${esc(it.unit)}` : ""}</div>
+    <div class="it">Subpartida: <b>${esc(it ? it.code + " · " + it.desc : "—")}</b>${it ? ` · por ${esc(it.unit)}` : ""}</div>
     <div class="it">Proveedor: <b>${esc(erp.party(p.supplierId).name)}</b>${p.supplierRef ? ` · su código <b>${esc(p.supplierRef)}</b>` : ""}</div>
     <div class="it">Lista ${eur(p.listCents)} · descuento ${p.discountPct}% → <b>neto ${eur(p.netCents)}</b></div>
     <div class="it">IVA: ${p.taxRateBp == null ? '<span class="pill y">sin dato</span>' : `<b>${p.taxRateBp / 100}%</b>`}</div>
@@ -9371,7 +9371,7 @@
     <div class="it">Un precio es lo que un proveedor dijo un día concreto, y los presupuestos escritos
       con él tienen que poder seguir explicándose. Una cotización nueva se registra como una fila
       más — el histórico completo queda en la pantalla anterior.</div>
-    <div class="it"><button class="btn primary" id="pr_again">＋ Registrar un precio nuevo de esta partida</button></div>
+    <div class="it"><button class="btn primary" id="pr_again">＋ Registrar un precio nuevo de esta subpartida</button></div>
    </div></div>`;
         $("#pr_again").onclick = () => newPriceDrawer(p.itemId);
       }
@@ -11948,7 +11948,7 @@
           annex: "Anexo gráfico",
           page: "página",
           of: "de",
-          item: "partida",
+          item: "subpartida",
           validity: "Validez",
           exclusions: "Exclusiones",
           assumptions: "Supuestos",
@@ -11966,11 +11966,11 @@
           vat: "IVA",
           total: "TOTAL",
           perM2: "Total per m²",
-          pending: "⚠ Partides pendents de preu (no incloses)",
+          pending: "⚠ Subpartides pendents de preu (no incloses)",
           annex: "Annex gràfic",
           page: "pàgina",
           of: "de",
-          item: "partida",
+          item: "subpartida",
           validity: "Validesa",
           exclusions: "Exclusions",
           assumptions: "Supòsits",
@@ -12009,7 +12009,7 @@
           annex: "Graphic annex",
           page: "page",
           of: "of",
-          item: "line item",
+          item: "sub-line item",
           validity: "Validity",
           exclusions: "Exclusions",
           assumptions: "Assumptions",
@@ -12170,16 +12170,16 @@
      </div>
     </div>
 
-    <!-- Phone only (see .pbmtabs). Partidas is the default because it is the
+    <!-- Phone only (see .pbmtabs). Subpartidas is the default because it is the
          work; the tree and the totals are what you consult, not what you do. -->
     <div class="pbmtabs" id="pbMTabs">
-     <button data-mtab="chapters"${bMTab === "chapters" ? ' class="on"' : ""}>Capítulos</button>
-     <button data-mtab="lines"${bMTab === "lines" ? ' class="on"' : ""}>Partidas</button>
+     <button data-mtab="chapters"${bMTab === "chapters" ? ' class="on"' : ""}>Partidas</button>
+     <button data-mtab="lines"${bMTab === "lines" ? ' class="on"' : ""}>Subpartidas</button>
      <button data-mtab="totals"${bMTab === "totals" ? ' class="on"' : ""}>Totales</button>
     </div>
     <div class="pbpanes" id="pbPanes" data-mtab="${bMTab}">
      <div class="pbpane" id="pbLeft">
-      <div class="pbh">Capítulos</div>
+      <div class="pbh">Partidas</div>
       <div class="btree" id="bTree" style="max-height:none"></div>
      </div>
 
@@ -12189,12 +12189,12 @@
            back. Thirteen columns do not fit beside a 260 px tree and a 300 px
            totals pane on a laptop, and the answer to that is not a horizontal
            scrollbar over the sale price. -->
-      <!-- «+ capítulo» lives HERE and not over the tree, because the tree folds
+      <!-- «+ partida» lives HERE and not over the tree, because the tree folds
            and the button went with it: with the pane closed there was no way
            left to add a chapter at all. Every add now sits in the one pane that
            is always on screen. -->
-      <div class="pbh"><button class="pbfold" id="pbFoldL" title="Mostrar u ocultar los capítulos">⟨</button>
-       Partidas${locked ? "" : '<button class="btn sm" id="bAddChap" style="margin-left:8px">+ capítulo</button>'}<span style="flex:1"></span><span class="tag" id="bGridTag"></span>
+      <div class="pbh"><button class="pbfold" id="pbFoldL" title="Mostrar u ocultar las partidas">⟨</button>
+       Subpartidas${locked ? "" : '<button class="btn sm" id="bAddChap" style="margin-left:8px">+ partida</button>'}<span style="flex:1"></span><span class="tag" id="bGridTag"></span>
        <button class="pbfold" id="pbFoldR" title="Mostrar u ocultar los totales">⟩</button></div>
       <!-- Column order and names come from Package 1 slide 9, and they are the
            order the work is actually done in: say what it is, in what unit, what
@@ -12287,8 +12287,8 @@
         });
         const addChap = $("#bAddChap");
         if (addChap)
-          /* Package 1, slide 8: "los Capítulos deberían ser un dropdown list de
-       las Partidas" — a chapter is not a free-text heading, it is one of the
+          /* Package 1, slide 8: "los Partidas deberían ser un dropdown list de
+       las Subpartidas" — a chapter is not a free-text heading, it is one of the
        catalogue's own chapters, and typing it fresh each time is how the same
        chapter ends up spelled three ways across three presupuestos. The
        already-used ones are hidden, since a second "Albañilería" in the same
@@ -12307,29 +12307,29 @@
                   value: c.es,
                   label: c.es,
                   group: "Del catálogo",
-                  hint: n ? n + (n === 1 ? " partida" : " partidas") : "sin partidas todavía",
+                  hint: n ? n + (n === 1 ? " subpartida" : " subpartidas") : "sin subpartidas todavía",
                 };
               });
             options.push({ value: "__free__", label: "Otro nombre…", group: "Fuera del catálogo" });
-            const pick = await askChoice("Nuevo capítulo", options, {
-              body: "Los capítulos salen del catálogo para que se llamen igual en todos los presupuestos.",
+            const pick = await askChoice("Nueva partida", options, {
+              body: "Las partidas salen del catálogo para que se llamen igual en todos los presupuestos.",
               okLabel: "Añadir",
               wide: true,
             });
             if (pick === null) return;
             let name = pick;
             if (pick === "__free__") {
-              name = await askText("Nuevo capítulo", {
-                label: "Nombre del capítulo",
+              name = await askText("Nueva partida", {
+                label: "Nombre dla partida",
                 required: true,
                 okLabel: "Añadir",
-                hint: "Sólo para un capítulo que no se va a repetir. Si se va a usar más veces, añádelo al catálogo en Configuración → Partidas.",
+                hint: "Sólo para una subpartida que no se va a repetir. Si se va a usar más veces, añádela al catálogo en Configuración → Partidas y subpartidas.",
               });
               if (name === null) return;
             }
             mutate(() => {
               bChapter = erp.addChapter(id, { name }).id;
-            }, "Capítulo añadido");
+            }, "Partida añadida");
           };
         $("#bPreview").onclick = () => budgetDrawer(id, vsel);
         // "Guardar" is in the bar because the specification's own layout puts it
@@ -12466,7 +12466,7 @@
       /* ---------- Dragging (COM-03) ----------
    Chapters reorder among themselves; lines reorder within a chapter and move
    BETWEEN chapters, which is the case that earns the feature: a line under the
-   wrong capítulo is in the wrong subtotal and, if that chapter is optional or
+   wrong partida is in the wrong subtotal and, if that chapter is optional or
    out of scope, in the wrong part of the customer's document.
 
    The drag id lives here rather than in dataTransfer because Safari will not
@@ -12520,8 +12520,8 @@
       /**
        * Everything a catalogue entry contributes to a budget line.
        *
-       * ONE function, used by both the row's 🔍 and «+ partida». They used to
-       * be one copy and one blank line, which is how «+ partida» came to
+       * ONE function, used by both the row's 🔍 and «+ subpartida». They used to
+       * be one copy and one blank line, which is how «+ subpartida» came to
        * produce a row at 0,00 € — and had they merely been two copies, they
        * would have drifted the first time either learned a new field.
        *
@@ -12555,21 +12555,21 @@
           quality: it.quality || "",
           costCents: it.defaultCostCents || 0,
           priceCents: it.defaultPriceCents || 0,
-          // A partida with no reference price arrives marked pending rather than
+          // A subpartida with no reference price arrives marked pending rather than
           // priced at zero — the catalogue screen says so and the line has to
           // agree.
           pending: !it.defaultPriceCents,
         };
       }
-      /** The catalogue's photographs seed the line's graphic annex, so a partida
+      /** The catalogue's photographs seed the line's graphic annex, so a subpartida
     always quoted with a picture arrives with it. Through the guarded method,
     marked `catalogue` so the annex can say where each picture came from. */
       /**
        * The catalogue, opened from a LINE — the 🔍 on the laptop, the chooser
        * on the phone. One function, so the two cannot drift into two different
-       * ideas of what taking a partida from the price book means.
+       * ideas of what taking a subpartida from the price book means.
        *
-       * MULTI-SELECT, LIKE "+ partida del catálogo". It used to take exactly
+       * MULTI-SELECT, LIKE "+ subpartida del catálogo". It used to take exactly
        * one and close, so filling a chapter meant opening the catalogue, typing
        * the search, choosing, waiting for the sheet to close, and starting
        * again — six times for six subpartidas. The operator asked for the
@@ -12577,10 +12577,10 @@
        * lot, then edit quantities.
        *
        * The FIRST pick replaces the line it was opened from — which is almost
-       * always a blank "Nueva partida" or a partida being corrected — and the
+       * always a blank "Nueva subpartida" or a subpartida being corrected — and the
        * rest are appended to the same chapter. Anything else would either throw
        * away the row the operator pressed on or leave it empty above the
-       * partidas they just chose.
+       * subpartidas they just chose.
        *
        * `chapterId` narrows the sheet; null opens on the whole book.
        */
@@ -12599,7 +12599,7 @@
               });
               attachCatalogueImages(budgetId, lineId, first);
               for (const it of rest) {
-                // Quantity 1 rather than 0: a partida at zero contributes
+                // Quantity 1 rather than 0: a subpartida at zero contributes
                 // nothing to the total, so a chapter of them reads as free.
                 const line = erp.addLine(
                   budgetId,
@@ -12608,7 +12608,7 @@
                 );
                 attachCatalogueImages(budgetId, line.id, it);
               }
-            }, `${list.length} partida${list.length === 1 ? "" : "s"} del catálogo`);
+            }, `${list.length} subpartida${list.length === 1 ? "" : "s"} del catálogo`);
           },
           { chapter: chapterId ? chapterCatalogueCode(budgetId, vsel, chapterId) : "", multi: true },
         );
@@ -12634,15 +12634,15 @@
        * book's chapters are a list. This used to demand `x.es === c.name`,
        * character for character, so "Pavimentos" found nothing against
        * "Solados", "demoliciones" found nothing against "Demoliciones", and the
-       * catalogue picker opened on all 208 partidas every time — which is how
-       * "+ partida del catálogo" came to look like it ignored the chapter it
+       * catalogue picker opened on all 208 subpartidas every time — which is how
+       * "+ subpartida del catálogo" came to look like it ignored the chapter it
        * was pressed on.
        *
        * Now: accents and case folded, then exact, then either name containing
        * the other ("Pintura" ↔ "Pintura y acabados"). Still returns "" when it
        * genuinely cannot tell, and the caller opens on the whole book with the
        * chapter selector in reach — an empty picker would be worse than a full
-       * one, and guessing a chapter would file a partida under the wrong trade.
+       * one, and guessing a chapter would file a subpartida under the wrong trade.
        */
       function chapterCatalogueCode(budgetId, vsel, chapterId) {
         const c = erp.version(budgetId, vsel).chapters.find((x) => x.id === chapterId);
@@ -12672,11 +12672,11 @@
         /* ASK THE PRICE BOOK, NOT A TABLE OF SYNONYMS.
            "Pavimentos" is what half the trade calls the chapter the price book
            files under "Solados", and no amount of string comparison between two
-           chapter LABELS will ever connect them. But the partidas themselves
+           chapter LABELS will ever connect them. But the subpartidas themselves
            say it: the word "pavimento" appears in the descriptions of the SOL
            entries and nowhere else.
 
-           So the last resort counts which chapter's partidas actually use the
+           So the last resort counts which chapter's subpartidas actually use the
            word, and takes it only on a clear majority. A synonym table would
            have to be maintained by hand and would be wrong the first time a
            company renames a chapter; this follows the operator's own price book
@@ -12684,7 +12684,7 @@
            "" and the picker opens on everything, which is the honest answer to
            a name nothing recognises. */
         /* The words to look for, longest first. A chapter is written plural and
-           a partida is written singular — "Pavimentos" against "pavimento
+           a subpartida is written singular — "Pavimentos" against "pavimento
            porcelánico" — so each word is tried as itself and stripped of a
            Spanish plural. Words under five letters are skipped: "y", "de" and
            "obra" appear in half the price book and would match everything. */
@@ -12711,7 +12711,7 @@
           if (total < 3) continue;
           const [code, n] = [...hits.entries()].sort((a, b) => b[1] - a[1])[0];
           // A clear majority or nothing. "Carpintería" is spread across four
-          // chapters at 33%, and filing its partidas under the largest of them
+          // chapters at 33%, and filing its subpartidas under the largest of them
           // would be a confident wrong answer — worse than the full catalogue.
           if (n / total >= 0.6) return code;
         }
@@ -12728,31 +12728,31 @@
        * picker looks like when it can only show a list of names.
        *
        * So the button opens the catalogue itself: the same searchable, ticked
-       * sheet that "+ partida del catálogo" opens, showing each partida's
+       * sheet that "+ subpartida del catálogo" opens, showing each subpartida's
        * chapter, unit and price, and letting several be marked before it
        * closes. One picker, reached from two places, instead of a second
        * cheaper one that had to be learned separately.
        */
       /* ================= THE PRICE BOOK, IN THE READER'S LANGUAGE =========
-         The interface translates; two hundred partidas inside it did not, so an
+         The interface translates; two hundred subpartidas inside it did not, so an
          operator reading English met the whole price book in Spanish — in every
          list, every picker and every line of the builder.
 
          THE LINE THIS DRAWS, and it is the important part. Everywhere else the
          company OWNS its data and this system leaves it alone: a customer name,
-         a site address, a partida the estimator typed — because inventing a
+         a site address, a subpartida the estimator typed — because inventing a
          translation of somebody else's words is worse than leaving them in the
          language they were written in. That rule stands. The STARTER price book
          is different: it is data this system ships, like the word
          "Presupuesto", and it has an authored English and Catalan.
 
-         So the test is provenance, not appearance: a partida that came from the
-         pack is shown translated; a partida somebody typed is shown exactly as
+         So the test is provenance, not appearance: a subpartida that came from the
+         pack is shown translated; a subpartida somebody typed is shown exactly as
          typed, in every language. */
       function uiLang() {
         /* `lang()`, not `active`. `active` is a BOOLEAN — "does this page need
            translating at all" — and calling it as a function threw, was caught
-           by the guard below, and returned Spanish forever: every partida
+           by the guard below, and returned Spanish forever: every subpartida
            rendered untranslated while the dictionary was complete and every
            other check passed. The guard was hiding the bug it was written to
            survive, so it now falls back only when the module is genuinely
@@ -12910,12 +12910,12 @@
         const V = erp.version(id, vsel);
         const chapters = bChapter ? V.chapters.filter((c) => c.id === bChapter) : V.chapters;
         $("#bGridTag").textContent = bChapter
-          ? "capítulo seleccionado"
-          : `${V.chapters.length} capítulos`;
+          ? "partida seleccionada"
+          : `${V.chapters.length} partidas`;
         const cols = locked ? 12 : 13;
         /* Resolved ONCE per render, not once per line. `chapterCatalogueCode`
            walks the chapter list and then the itemChapters list; on a quote with
-           a hundred partidas that is a hundred redundant walks, on the screen
+           a hundred subpartidas that is a hundred redundant walks, on the screen
            where typing already re-renders. */
         const chapCat = {};
         for (const c of V.chapters) chapCat[c.id] = chapterCatalogueCode(id, vsel, c.id);
@@ -12927,9 +12927,9 @@
       ${
         locked
           ? ""
-          : `<button class="btn sm primary" data-addline="${c.id}">+ partida del catálogo</button>
-      <button class="btn sm" data-blankline="${c.id}" title="Una partida que todavía no está en el catálogo">+ partida en blanco</button>
-      <button class="btn sm danger chapdel" data-delchap="${c.id}" title="Eliminar el capítulo y todas sus partidas">✕ capítulo</button>`
+          : `<button class="btn sm primary" data-addline="${c.id}">+ subpartida del catálogo</button>
+      <button class="btn sm" data-blankline="${c.id}" title="Una subpartida que todavía no está en el catálogo">+ subpartida en blanco</button>
+      <button class="btn sm danger chapdel" data-delchap="${c.id}" title="Eliminar la partida y todas sus subpartidas">✕ partida</button>`
       }</div></td></tr>
     ${c.lines
       .map((l) => {
@@ -12952,13 +12952,13 @@
         <option value="pending"${bStatus(l) === "pending" ? " selected" : ""}>Pendiente</option>
         <option value="optional"${bStatus(l) === "optional" ? " selected" : ""}>Opcional</option></select></td>
       <td class="c-img"><button class="bimg${l.imageRefs.length ? " has" : ""}" data-gal="${l.id}">🖼 ${l.imageRefs.length}</button></td>
-      ${locked ? "" : `<td class="pbdel c-del" data-th=""><button class="btn sm danger" data-delline="${l.id}" title="Eliminar esta partida"><span class="delx">✕</span><span class="dellbl">Eliminar partida</span></button></td>`}
+      ${locked ? "" : `<td class="pbdel c-del" data-th=""><button class="btn sm danger" data-delline="${l.id}" title="Eliminar esta subpartida"><span class="delx">✕</span><span class="dellbl">Eliminar subpartida</span></button></td>`}
     </tr>`;
       })
       .join("")}`,
             )
             .join("") ||
-          `<tr><td colspan="${cols}"><div class="empty">Sin capítulos todavía.</div></td></tr>`;
+          `<tr><td colspan="${cols}"><div class="empty">Sin partidas todavía.</div></td></tr>`;
 
         $("#bRows")
           .querySelectorAll("[data-gal]")
@@ -12968,7 +12968,7 @@
           .forEach((btn) => {
             /* The WHOLE catalogue, deliberately — searching is global, adding
                is local. This 🔍 is reached from a line that already exists,
-               often one whose chapter does not match where its partida is
+               often one whose chapter does not match where its subpartida is
                filed, and a magnifier that quietly hides most of the catalogue
                is the failure it is supposed to fix. Passing no chapter opens on
                everything; the chapter selector is in the sheet either way. */
@@ -12984,15 +12984,15 @@
           .forEach(
             (btn) =>
               (btn.onclick = () => {
-                /* «+ partida» used to create a BLANK line, and that one decision
-           is what made a two-hundred-partida price book invisible: the
-           operator pressed it, got «Nueva partida» at 0,00 €, looked for a
+                /* «+ subpartida» used to create a BLANK line, and that one decision
+           is what made a two-hundred-subpartida price book invisible: the
+           operator pressed it, got «Nueva subpartida» at 0,00 €, looked for a
            dropdown to choose from and found only a 🔍 tucked inside the
            código cell. So the button now opens the catalogue itself,
            already narrowed to this chapter, with ticks — a chapter is ten
            subpartidas and quoting one of them usually means quoting six.
 
-           The blank line survives as the SECOND button, because a partida
+           The blank line survives as the SECOND button, because a subpartida
            that is not in the price book yet is a normal thing to quote and
            must not require a detour through Configuración first. */
                 const chapId = btn.dataset.addline;
@@ -13009,14 +13009,14 @@
                           attachCatalogueImages(id, line.id, it);
                         }
                       },
-                      `${items.length} partida${items.length === 1 ? "" : "s"} del catálogo`,
+                      `${items.length} subpartida${items.length === 1 ? "" : "s"} del catálogo`,
                     );
                   },
                   { chapter: chapterCatalogueCode(id, vsel, chapId), multi: true },
                 );
               }),
           );
-        /* Deleting a capítulo takes every partida under it with it, so it asks
+        /* Deleting a partida takes every subpartida under it with it, so it asks
            first and says HOW MANY — "are you sure?" with no number is a
            question nobody can answer. The count is the whole content of the
            warning; the name alone would not tell the estimator whether this is
@@ -13032,10 +13032,10 @@
                 const ch = V2.chapters.find((x) => x.id === chapId);
                 if (!ch) return;
                 const n = (ch.lines || []).length;
-                const okDel = await askConfirm(`¿Eliminar el capítulo «${ch.num}. ${ch.name}»?`, {
+                const okDel = await askConfirm(`¿Eliminar la partida «${ch.num}. ${ch.name}»?`, {
                   body: n
-                    ? `Se eliminan también sus ${n} partida${n === 1 ? "" : "s"}. No se puede deshacer.`
-                    : "El capítulo está vacío. No se puede deshacer.",
+                    ? `Se eliminan también sus ${n} subpartida${n === 1 ? "" : "s"}. No se puede deshacer.`
+                    : "La partida está vacío. No se puede deshacer.",
                   okLabel: "Eliminar",
                   danger: true,
                 });
@@ -13044,7 +13044,7 @@
                   erp.removeChapter(id, chapId, "backoffice");
                   // The tree's selection cannot survive the thing it selected.
                   if (bChapter === chapId) bChapter = null;
-                }, `Capítulo eliminado${n ? ` · ${n} partida${n === 1 ? "" : "s"}` : ""}`);
+                }, `Partida eliminada${n ? ` · ${n} subpartida${n === 1 ? "" : "s"}` : ""}`);
               }),
           );
         $("#bRows")
@@ -13054,11 +13054,11 @@
               (btn.onclick = () =>
                 mutate(() => {
                   erp.addLine(id, btn.dataset.blankline, {
-                    desc: "Nueva partida",
+                    desc: "Nueva subpartida",
                     unit: "ud",
                     qtyMilli: 1000,
                   });
-                }, "Partida en blanco añadida")),
+                }, "Subpartida en blanco añadida")),
           );
         $("#bRows")
           .querySelectorAll("[data-delline]")
@@ -13067,7 +13067,7 @@
               (btn.onclick = () =>
                 mutate(() => {
                   erp.deleteLine(id, btn.dataset.delline, "backoffice");
-                }, "Partida eliminada")),
+                }, "Subpartida eliminada")),
           );
         if (locked) return;
 
@@ -13088,7 +13088,7 @@
                 .version(id, vsel)
                 .chapters.find((c) => c.id === dest)
                 .lines.findIndex((l) => l.id === row.dataset.row);
-              mutate(() => erp.moveLine(id, d.id, dest, idx, "backoffice"), "Partida movida");
+              mutate(() => erp.moveLine(id, d.id, dest, idx, "backoffice"), "Subpartida movida");
             });
           });
         // Dropping on a chapter heading appends to that chapter — the only way to
@@ -13099,7 +13099,7 @@
             bDropTarget(tr, accept, (d) =>
               mutate(
                 () => erp.moveLine(id, d.id, tr.dataset.chaprow, null, "backoffice"),
-                "Partida movida de capítulo",
+                "Subpartida movida de partida",
               ),
             );
           });
@@ -13135,7 +13135,7 @@
          : ""
      }`;
             })
-            .join("") || '<div class="empty" style="padding:16px">Sin capítulos.</div>';
+            .join("") || '<div class="empty" style="padding:16px">Sin partidas.</div>';
         $("#bTree")
           .querySelectorAll("[data-chap]")
           .forEach((d) => {
@@ -13152,7 +13152,7 @@
                 if (x.id === d.dataset.chap) return;
                 mutate(
                   () => erp.moveChapter(id, x.id, Number(d.dataset.idx), "backoffice"),
-                  "Capítulo movido",
+                  "Partida movida",
                 );
               },
             );
@@ -13254,7 +13254,7 @@
      <div class="row mut" id="bAnnexCount">${
        imgs
          ? `${imgs} ${imgs === 1 ? "imagen" : "imágenes"} en ${b.annex && b.annex.enabled ? Math.ceil(imgs / ((b.annex && b.annex.imagesPerPage) || 2)) + " página(s)" : "—"}`
-         : "Ninguna partida tiene imágenes todavía."
+         : "Ninguna subpartida tiene imágenes todavía."
      }</div>
     </div>
    </div>
@@ -13588,7 +13588,7 @@
         if (!a.projectId || !a.chapterNum) return "";
         const opts = lineOptionsFor(a.projectId, a.chapterNum, a.lineId);
         if (!opts) return "";
-        return `<div class="field"><label>Partida</label><select data-ai="${i}" data-k="lineId"><option value="">—</option>${opts}</select></div>`;
+        return `<div class="field"><label>Subpartida</label><select data-ai="${i}" data-k="lineId"><option value="">—</option>${opts}</select></div>`;
       }
       function capAllocRows(id, total, opt) {
         /* `opt` lets a second screen borrow this editor without copying it. A
@@ -13617,7 +13617,7 @@
      </select></div>
     ${
       a.projectId
-        ? `<div class="field"><label>Capítulo</label><select data-ai="${i}" data-k="chapterNum"><option value="">—</option>${chapterOptions(a.projectId, a.chapterNum)}</select></div>
+        ? `<div class="field"><label>Partida</label><select data-ai="${i}" data-k="chapterNum"><option value="">—</option>${chapterOptions(a.projectId, a.chapterNum)}</select></div>
     ${lineField(a, i)}<div class="field"><label>Naturaleza</label><select data-ai="${i}" data-k="kind">${Object.entries(
       COST_KIND_LABEL,
     )
@@ -13658,7 +13658,7 @@
                 a.chapterNum = "";
               }
             } else if (k === "chapterNum") {
-              // A partida belongs to one chapter; changing the chapter must not
+              // A subpartida belongs to one chapter; changing the chapter must not
               // quietly keep the old chapter's line.
               a.chapterNum = inp.value;
               a.lineId = "";
@@ -14187,7 +14187,7 @@
      t.pendingCount
        ? `<div class="card"><div class="ch"><h3>Pendientes de precio</h3><span class="tag">no van en el total</span></div>
     <div class="daylist">
-     <div class="it"><span>Partidas sin precio todavía</span><span style="flex:1"></span>
+     <div class="it"><span>Subpartidas sin precio todavía</span><span style="flex:1"></span>
        <span class="pill y">${t.pendingCount}</span></div>
      <div class="it"><span>Valoradas provisionalmente en</span><span style="flex:1"></span><b>${eur(t.pendingEstCents)}</b></div>
      <div class="it"><span>No están incluidas en el total y no se imprimen en el documento.</span></div>
@@ -14402,7 +14402,7 @@
      ${locked ? "" : `<div class="it"><input id="bc_${key}" placeholder="Añadir y pulsar Enter" style="flex:1"></div>`}
     </div></div>`;
         db.innerHTML = `
-   <div class="card"><div class="ch"><h3>Resumen</h3><span class="tag">${cur.chapters.length} capítulos</span></div>
+   <div class="card"><div class="ch"><h3>Resumen</h3><span class="tag">${cur.chapters.length} partidas</span></div>
     <div class="daylist">
      <div class="it">Base <b>${eur(t.baseCents)}</b> · IVA ${t.vatBp / 100}% <b>${eur(t.vatCents)}</b></div>
      <div class="it">Total <b>${eur(t.grandCents)}</b></div>
@@ -14432,17 +14432,17 @@
          .map(
            (i) =>
              `<div class="it"><span class="pill ${i.level === "block" ? "r" : "y"}">${i.level === "block" ? "bloquea" : "aviso"}</span>
-        <span style="flex:1">Partida ${esc(i.line)} — ${esc(i.msg)}</span></div>`,
+        <span style="flex:1">Subpartida ${esc(i.line)} — ${esc(i.msg)}</span></div>`,
          )
          .join("") ||
-       '<div class="it">Nada que corregir: todas las partidas tienen cantidad, precio y coste coherentes.</div>'
+       '<div class="it">Nada que corregir: todas las subpartidas tienen cantidad, precio y coste coherentes.</div>'
      }
     </div></div>
    ${
      locked
        ? '<div class="card"><div class="daylist"><div class="it">Esta versión ya está congelada: se conserva tal como se envió.</div></div></div>'
        : `<div style="margin-top:10px">
-     <button class="btn primary" id="ns_send"${blocks.length ? ' disabled title="Hay partidas que bloquean el envío"' : ""}>Enviar al cliente →</button>
+     <button class="btn primary" id="ns_send"${blocks.length ? ' disabled title="Hay subpartidas que bloquean el envío"' : ""}>Enviar al cliente →</button>
      ${blocks.length ? '<div class="mhint" style="margin-top:6px">Corrige los bloqueos de arriba y vuelve a abrir este paso.</div>' : ""}
     </div>`
    }`;
@@ -14578,7 +14578,7 @@
         db.innerHTML = `
    <div class="card"><div class="ch"><h3>${l.imageRefs.length} imágenes</h3>
      <span class="tag">${b.annex && b.annex.enabled ? "el anexo está activo" : "el anexo está desactivado"}</span></div>
-    <div class="daylist"><div class="it">Las imágenes no se imprimen en la fila de la partida: se reúnen en el anexo gráfico al final del documento, con su capítulo, su número de partida y su descripción.</div></div>
+    <div class="daylist"><div class="it">Las imágenes no se imprimen en la fila de la subpartida: se reúnen en el anexo gráfico al final del documento, con su partida, su número de subpartida y su descripción.</div></div>
     <div class="gal" style="padding:0 16px 14px">
      ${
        l.imageRefs
@@ -14602,7 +14602,7 @@
         </div>
        </div></div>`,
          )
-         .join("") || '<div class="empty">Esta partida no tiene imágenes.</div>'
+         .join("") || '<div class="empty">Esta subpartida no tiene imágenes.</div>'
      }
     </div>
    </div>
@@ -14834,7 +14834,7 @@
       };
       /** New-row drafts, keyed by list kind, so a half-typed entry survives re-render. */
       const listDraft = {};
-      /** DMC-02's partida filter. A view concern, so it lives here, not in state. */
+      /** DMC-02's subpartida filter. A view concern, so it lives here, not in state. */
       let priceItem = "";
       /* ADM-07's wizard step, and where each kind of exception is actually fixed.
    An exception that cannot be acted on is a complaint; the route turns it into
@@ -15496,7 +15496,7 @@
         return { blob: zipStore(files), entries: files.map((f) => f.path), missing, rows: rows.length - 1 };
       }
 
-      /* Every cost behind one chapter of one job, grouped by partida when the
+      /* Every cost behind one chapter of one job, grouped by subpartida when the
          rows name one. Sums to the same figure as the chapter table above it
          BY CONSTRUCTION — chapterCosts mirrors actualCostCents' rules — so a
          disagreement between drawer and table is impossible rather than rare. */
@@ -15516,21 +15516,21 @@
         const total = rows.reduce((s2, r) => s2 + r.amountCents, 0);
         const db = openDrawer("Costes · " + chapterNum + ". " + (chapterName || ""));
         db.innerHTML = `<div class="card"><div class="ch"><h3>Coste acumulado</h3><span class="tag">${eur(total)}</span></div>
-   <div class="scroll"><table><thead><tr><th>Partida</th><th>Origen</th><th>Documento</th><th>Fecha</th><th class="num">Importe</th></tr></thead><tbody>
+   <div class="scroll"><table><thead><tr><th>Subpartida</th><th>Origen</th><th>Documento</th><th>Fecha</th><th class="num">Importe</th></tr></thead><tbody>
    ${
      [...byLine.entries()]
        .map(([lid, list]) =>
          list
            .map(
              (r, i) => `<tr>
-      <td>${i === 0 ? (lid ? esc(lineName[lid] || lid) : '<span class="pill y">sin partida</span>') : ""}</td>
+      <td>${i === 0 ? (lid ? esc(lineName[lid] || lid) : '<span class="pill y">sin subpartida</span>') : ""}</td>
       <td>${SRC[r.source] || r.source}</td><td class="k">${esc(r.ref)}${r.desc ? " · " + esc(r.desc) : ""}</td>
       <td>${r.date ? fmtD(r.date) : "—"}</td><td class="num">${eur(r.amountCents)}</td></tr>`,
            )
            .join(""),
        )
        .join("") ||
-     '<tr><td colspan="5"><div class="empty">Ningún coste imputado a este capítulo todavía.</div></td></tr>'
+     '<tr><td colspan="5"><div class="empty">Ningún coste imputado a esta partida todavía.</div></td></tr>'
    }
    </tbody></table></div></div>`;
       }
@@ -16122,7 +16122,7 @@
 
         /* ---------- Seguimiento económico de obra (spec §4.4) ----------
     Presupuestado · comprometido · real · proyectado · desviación · margen, por
-    capítulo. The column that matters is "proyectado": "spent 40 of 100" reads
+    partida. The column that matters is "proyectado": "spent 40 of 100" reads
     as comfortable and says nothing, while "spent 40 to get a quarter of the way,
     so heading for 160" is the sentence somebody can act on. It is computed by
     @repo/capability-projects, never here. */
@@ -16134,13 +16134,13 @@
     repeating the KPI cards the panel already carries.
 
     Three things the panel says that no screen said before: the margin as its
-    own card rather than a column somebody has to find; the per-capítulo table
+    own card rather than a column somebody has to find; the per-partida table
     in the doc's own terms (presupuestado, acumulado, desviación en € y en %,
     margen); and — the point of the whole screen — the money that reached this
-    job and stopped, because nobody said which capítulo pays for it. */
+    job and stopped, because nobody said which partida pays for it. */
         economics(v) {
           $("#sub").textContent =
-            "Elige una obra: venta, coste y margen capítulo a capítulo, y el coste que ha llegado sin capítulo asignado.";
+            "Elige una obra: venta, coste y margen partida a partida, y el coste que ha llegado sin partida asignada.";
           if (!erp.state.projects.length) return noProjectsCard(v);
           if (ecoFull) return economicsScreen(v);
           renderMasterList(v, {
@@ -16409,7 +16409,7 @@
     the shell, and unchanged in every other respect. */
         _ganttBody(v) {
           $("#sub").textContent =
-            "Carta Gantt derivada del presupuesto aceptado, avance por partida o por cantidad ejecutada, y desviación frente a la línea base. Arrastra una barra para moverla, tira del borde para alargarla y une dos barras para crear una dependencia.";
+            "Carta Gantt derivada del presupuesto aceptado, avance por subpartida o por cantidad ejecutada, y desviación frente a la línea base. Arrastra una barra para moverla, tira del borde para alargarla y une dos barras para crear una dependencia.";
           const P = erp.state.projects;
           if (!P.length) {
             v.innerHTML =
@@ -16430,7 +16430,7 @@
        lands here too — and the first row of the list is exactly that. The
        empty state therefore has to distinguish "no plan yet" from "nothing
        to plan from": a job with no accepted presupuesto has no chapters for
-       `fromBudget` to derive and no partidas to record progress against, so
+       `fromBudget` to derive and no subpartidas to record progress against, so
        offering «Derivar del presupuesto» there is offering a button that can
        only fail. */
           let derivable = false,
@@ -16458,7 +16458,7 @@
    <div class="card"><div class="gtools">
      <button class="btn sm" id="gAdd">＋ Tarea</button>
      <button class="btn sm" id="gAddMs">◆ Hito</button>
-     <button class="btn sm${plan.tasks.length || !derivable ? "" : " primary"}" id="gDerive"${derivable ? "" : " disabled"} title="${derivable ? "Vuelve a derivar la planificación de los capítulos y partidas del presupuesto aceptado, conservando el avance registrado" : "Esta obra no tiene un presupuesto aceptado del que derivar la planificación"}">↻ Derivar del presupuesto</button>
+     <button class="btn sm${plan.tasks.length || !derivable ? "" : " primary"}" id="gDerive"${derivable ? "" : " disabled"} title="${derivable ? "Vuelve a derivar la planificación de las partidas y subpartidas del presupuesto aceptado, conservando el avance registrado" : "Esta obra no tiene un presupuesto aceptado del que derivar la planificación"}">↻ Derivar del presupuesto</button>
      <!-- Package 3 slide 3: moved out of PRY-01's Programación tab. Moving a
           milestone is a thing done TO the plan, and the plan is here. -->
      <button class="btn sm" id="gResched" title="Recalcula las fechas previstas de los hitos de cobro del contrato a partir de la planificación actual">Recalcular los cobros previstos</button>
@@ -16484,8 +16484,8 @@
      plan.tasks.length
        ? ganttChart(plan, sch, cmp, pays)
        : derivable
-         ? `<div class="empty">Sin planificación. «Derivar del presupuesto» la construye a partir de los capítulos y partidas aceptados: la duración de cada capítulo sale de sus cantidades y del rendimiento diario del oficio.</div>`
-         : `<div class="empty">Esta obra todavía no tiene un presupuesto aceptado, así que no hay capítulos ni partidas que planificar ni sobre los que registrar avance.
+         ? `<div class="empty">Sin planificación. «Derivar del presupuesto» la construye a partir de las partidas y subpartidas aceptadas: la duración de cada partida sale de sus cantidades y del rendimiento diario del oficio.</div>`
+         : `<div class="empty">Esta obra todavía no tiene un presupuesto aceptado, así que no hay partidas ni subpartidas que planificar ni sobre los que registrar avance.
        <div style="margin-top:10px"><button class="btn sm primary" id="gGoBudget">${budgetId ? "Abrir el presupuesto" : "Ir a Presupuestos"}</button></div></div>`
    }
    <div class="glegend">
@@ -16756,11 +16756,11 @@
         /* ---------- Partidas y subpartidas (DMC-01, spec §DMC-01) ----------
     The catalogue finally gets a screen inside the shell. It lived in
     master-data.html, which was a separate page holding a separate dataset
-    that was never wired to the engine — so what looked like the partidas
+    that was never wired to the engine — so what looked like the subpartidas
     file was a mock, and the real catalogue had no interface at all.
 
     Two zones, per the doc: the chapter tree on the left with a count per
-    branch and its own search, the partidas table on the right. Chapters are
+    branch and its own search, the subpartidas table on the right. Chapters are
     an owner-maintained list (state.lists.itemChapters), which is what makes
     the tree draggable — the array order IS the display order, so there is no
     second sort field that can disagree with what is on screen.
@@ -16770,7 +16770,7 @@
     a gallery you cannot read prices off. */
         items(v) {
           $("#sub").textContent =
-            "El catálogo de partidas: capítulo, unidad, marca, modelo y calidad, con su coste y su precio de referencia. Arrastra un capítulo para cambiar el orden en que sale en los presupuestos.";
+            "El catálogo de subpartidas: partida, unidad, marca, modelo y calidad, con su coste y su precio de referencia. Arrastra una partida para cambiar el orden en que sale en los presupuestos.";
           const chapters = erp.listAll("itemChapters");
           const tq = catTreeQ.trim().toLowerCase();
           const shown = tq
@@ -16817,9 +16817,9 @@
 
           v.innerHTML = `<div class="catwrap">
    <div class="cattree">
-     <div class="tsearch"><input id="catTreeQ" placeholder="Buscar capítulo…" value="${esc(catTreeQ)}"></div>
+     <div class="tsearch"><input id="catTreeQ" placeholder="Buscar partida…" value="${esc(catTreeQ)}"></div>
      <div class="catbr${catChapter === "" ? " on" : ""}" data-chap=""><span class="grip" style="visibility:hidden">⠿</span>
-       <span class="nm">Todas las partidas</span><span class="ct">${erp.state.catalogue.filter((i) => i.active !== false).length}</span></div>
+       <span class="nm">Todas las subpartidas</span><span class="ct">${erp.state.catalogue.filter((i) => i.active !== false).length}</span></div>
      ${shown
        .map(
          (
@@ -16834,18 +16834,18 @@
      ${
        orphans.length
          ? `<div class="catbr${catChapter === "~" ? " on" : ""}" data-chap="~"><span class="grip" style="visibility:hidden">⠿</span>
-       <span class="nm" style="color:var(--muted)">Sin capítulo</span><span class="ct">${orphans.length}</span></div>`
+       <span class="nm" style="color:var(--muted)">Sin partida</span><span class="ct">${orphans.length}</span></div>`
          : ""
      }
    </div>
    <div>
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-      <button class="btn primary sm" id="catNew">＋ Nueva partida</button>
+      <button class="btn primary sm" id="catNew">＋ Nueva subpartida</button>
       <input id="catQ" placeholder="Buscar por código, descripción o marca" value="${esc(catQ)}"
         style="flex:0 1 300px;min-width:190px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)">
-      <span class="tag">${rows.length} partida${rows.length === 1 ? "" : "s"}</span></div>
+      <span class="tag">${rows.length} subpartida${rows.length === 1 ? "" : "s"}</span></div>
     <div class="card"><div class="scroll"><table class="mlist"><thead><tr>
-      <th></th><th>Código</th><th>Descripción</th><th>Capítulo</th><th>Ud</th><th>Tipo</th>
+      <th></th><th>Código</th><th>Descripción</th><th>Partida</th><th>Ud</th><th>Tipo</th>
       <th>Marca</th><th>Modelo</th><th>Calidad</th>
       <th class="num">Coste</th><th class="num">Precio</th><th class="num">Margen</th><th class="num">Fotos</th></tr></thead><tbody>
     ${
@@ -16860,7 +16860,7 @@
       <td class="pictcell" data-th="">${pict(i)}</td>
       <td class="k" data-th="Código">${esc(i.code)}</td>
       <td class="k" data-th="Descripción">${esc(catalogueDesc(i))}</td>
-      <td data-th="Capítulo">${i.chapter ? esc(chapterLabel(i.chapter)) : '<span class="pill y">sin capítulo</span>'}</td>
+      <td data-th="Partida">${i.chapter ? esc(chapterLabel(i.chapter)) : '<span class="pill y">sin partida</span>'}</td>
       <td data-th="Ud">${esc(i.unit)}</td>
       <td data-th="Tipo">${esc(TYPE[i.type] || i.type)}</td>
       <td data-th="Marca">${esc(i.brand || "—")}</td>
@@ -16872,7 +16872,7 @@
       <td class="num" data-th="Fotos">${(i.imageRefs || []).length || "—"}</td></tr>`;
         })
         .join("") ||
-      '<tr><td colspan="13"><div class="empty">Ninguna partida coincide.</div></td></tr>'
+      '<tr><td colspan="13"><div class="empty">Ninguna subpartida coincide.</div></td></tr>'
     }
     </tbody></table></div></div>
     <div class="card"><div class="ch"><h3>Paquetes de trabajo</h3><span class="tag">rendimiento · merma · compra mínima · envase</span></div>
@@ -16970,7 +16970,7 @@
               catDrag = null;
               mutate(
                 () => erp.moveListEntry("itemChapters", moved, to, "backoffice"),
-                "Orden de capítulos actualizado",
+                "Orden de partidas actualizado",
               );
             };
           });
@@ -16985,9 +16985,9 @@
           listConfigScreen(
             v,
             ["units"],
-            "Las unidades que usan las partidas, los presupuestos y los documentos impresos. El símbolo es lo que aparece en la tabla; el nombre, en el desplegable y en el documento.",
+            "Las unidades que usan las subpartidas, los presupuestos y los documentos impresos. El símbolo es lo que aparece en la tabla; el nombre, en el desplegable y en el documento.",
             `<h4>Dónde se usa</h4>
-    <p>Cada partida del catálogo y cada línea de presupuesto llevan una unidad. Es lo que se
+    <p>Cada subpartida del catálogo y cada línea de presupuesto llevan una unidad. Es lo que se
        imprime junto a la cantidad en el presupuesto y en la factura.</p>
     <p><b>El símbolo no se puede cambiar.</b> Es lo que queda guardado en cada línea ya escrita:
        renombrarlo rompería documentos ya emitidos. Lo que sí se edita es el nombre, y por eso
@@ -17432,10 +17432,10 @@
         },
 
         /* ---------- Lista de precios (DMC-02, spec §DMC-02) ----------
-    The doc puts a partida filter at the top and makes it permanent, because
+    The doc puts a subpartida filter at the top and makes it permanent, because
     the comparison the screen exists for is "who is cheapest for THIS item" —
-    a grid of every partida against every supplier is a spreadsheet, not an
-    answer. Choosing one partida is what makes the strip appear.
+    a grid of every subpartida against every supplier is a spreadsheet, not an
+    answer. Choosing one subpartida is what makes the strip appear.
 
     The rule that outranks the layout: a supplier with no price is drawn as
     having no price. Rendering a blank as 0,00 € would make the supplier who
@@ -17444,7 +17444,7 @@
     rather than a zero; this screen keeps that distinction visible. */
         "price-list"(v) {
           $("#sub").textContent =
-            "Precios por proveedor con su fecha, su documento de origen y su vigencia. Filtra por partida para comparar proveedores; un precio ausente se ve ausente y nunca cuenta como cero.";
+            "Precios por proveedor con su fecha, su documento de origen y su vigencia. Filtra por subpartida para comparar proveedores; un precio ausente se ve ausente y nunca cuenta como cero.";
           const sups = erp.state.parties.filter(
             (p) =>
               p.active &&
@@ -17469,7 +17469,7 @@
             .slice()
             .sort((a, b) => b.date.localeCompare(a.date));
 
-          // The strip, only when the screen is filtered to a single partida.
+          // The strip, only when the screen is filtered to a single subpartida.
           let strip = "";
           if (one) {
             const cmp = erp.comparePrices(
@@ -17485,7 +17485,7 @@
            const s = erp.party(ps.supplierId);
            if (ps.missing)
              return `<div class="pcard none"><div class="sup">${esc(s.name)}</div>
-         <div class="net">Sin precio</div><div class="meta">nunca ha cotizado esta partida</div></div>`;
+         <div class="net">Sin precio</div><div class="meta">nunca ha cotizado esta subpartida</div></div>`;
            const best = cmp.bestCents != null && ps.netCents === cmp.bestCents;
            const last = rows.find((p) => p.supplierId === ps.supplierId && p.itemId === one.id);
            const over = cmp.bestCents
@@ -17504,17 +17504,17 @@
 
           v.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
     <button class="btn primary sm" id="prcNew">＋ Nuevo precio</button>
-    <label style="font-size:12px;color:var(--dim)">Partida
+    <label style="font-size:12px;color:var(--dim)">Subpartida
       <select id="prcItem" style="font:inherit;font-size:12.5px;margin-left:6px;padding:6px 8px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink);max-width:340px">
-        <option value="">Todas las partidas</option>
+        <option value="">Todas las subpartidas</option>
         ${items.map((i) => `<option value="${i.id}"${i.id === priceItem ? " selected" : ""}>${esc(i.code)} · ${esc(i.desc)}</option>`).join("")}
       </select></label>
-    <span class="tag">${rows.length} precio${rows.length === 1 ? "" : "s"}${one ? " de esta partida" : ""}</span>
+    <span class="tag">${rows.length} precio${rows.length === 1 ? "" : "s"}${one ? " de esta subpartida" : ""}</span>
     ${one ? '<button class="btn sm" id="prcAll">Ver todas</button>' : ""}</div>
    ${strip}
    <div class="card"><div class="ch"><h3>Histórico de precios</h3><span class="tag">se añade, nunca se sobrescribe</span></div>
    <div class="scroll"><table><thead><tr>
-     <th>Partida</th><th>Proveedor</th><th>Cód. art.</th><th>Fecha</th>
+     <th>Subpartida</th><th>Proveedor</th><th>Cód. art.</th><th>Fecha</th>
      <th class="num">Lista</th><th class="num">Dto.</th><th class="num">Neto</th><th class="num">IVA</th>
      <th class="num">Transporte</th><th class="num">Residuos</th><th class="num">Mín.</th>
      <th>Origen</th><th>Proyecto</th><th>Vigencia</th><th>Notas</th></tr></thead><tbody>
@@ -18004,7 +18004,7 @@
 
    <div class="card"><div class="ch"><h3>Qué NO cambia</h3></div><div class="daylist">
     <div class="it">El <b>presupuesto</b> y el <b>contrato</b> se emiten en el idioma del cliente, que se elige en el propio documento. Cambiar el idioma de aquí no reescribe un documento ya emitido ni el que está por emitir.</div>
-    <div class="it">Los <b>datos</b> — nombres de partidas, descripciones, notas — se guardan tal y como se escribieron. Esto traduce la interfaz, no el contenido.</div>
+    <div class="it">Los <b>datos</b> — nombres de subpartidas, descripciones, notas — se guardan tal y como se escribieron. Esto traduce la interfaz, no el contenido.</div>
    </div></div>`;
         v.querySelectorAll("[data-uilang]").forEach(
           (b) =>
@@ -19635,7 +19635,7 @@
       let ganttFull = false,
         ecoFull = false;
 
-      /** PRY-02's panel: three cards, the per-capítulo table, what is unassigned. */
+      /** PRY-02's panel: three cards, the per-partida table, what is unassigned. */
       function economicsPanel(body, id) {
         const p = erp.project(id);
         const e = erp.projectEconomics(id);
@@ -19671,9 +19671,9 @@
         <div class="sub"><span>${marginPct}%</span> <span>sobre la venta</span></div></div>
     </div>
 
-    <div class="card" style="margin-top:12px"><div class="ch"><h3>Por capítulo</h3></div>
+    <div class="card" style="margin-top:12px"><div class="ch"><h3>Por partida</h3></div>
      <div class="scroll"><table><thead><tr>
-       <th>Capítulo</th><th class="num">Presupuestado</th><th class="num">Acumulado</th>
+       <th>Partida</th><th class="num">Presupuestado</th><th class="num">Acumulado</th>
        <th class="num">Desviación</th><th class="num">%</th><th class="num">Margen</th><th></th></tr></thead><tbody>
      ${
        (() => {
@@ -19715,10 +19715,10 @@
         <td>${f ? `<button class="btn sm" data-adj="${c.chapter}">Ajustar</button>` : ""}</td></tr>`;
          })
          .join("") ||
-       '<tr><td colspan="7"><div class="empty">Esta obra no tiene capítulos en su línea base.</div></td></tr>'
+       '<tr><td colspan="7"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>'
      }
      </tbody></table></div>
-     ${f ? `<div class="daylist"><div class="it" style="color:var(--muted)">La proyección de cada capítulo parte del coste real y del avance registrado. «Ajustar» la sustituye a mano, y la cifra calculada se sigue mostrando junto a la ajustada.</div></div>` : ""}
+     ${f ? `<div class="daylist"><div class="it" style="color:var(--muted)">La proyección de cada partida parte del coste real y del avance registrado. «Ajustar» la sustituye a mano, y la cifra calculada se sigue mostrando junto a la ajustada.</div></div>` : ""}
     </div>
 
     <div class="card" style="margin-top:12px"><div class="ch"><h3>Pendiente de repartir</h3>
@@ -19737,7 +19737,7 @@
         )
         .join("")}
      </tbody></table></div>`
-         : '<div class="daylist"><div class="it">Todo el coste de esta obra tiene capítulo. La tabla de arriba cuadra con el proyecto.</div></div>'
+         : '<div class="daylist"><div class="it">Todo el coste de esta obra tiene partida. La tabla de arriba cuadra con el proyecto.</div></div>'
      }
     </div>`;
 
@@ -19752,7 +19752,7 @@
         /* Block 5's two click-throughs. Revenue walks to the invoice register
            filtered on this job's code; a chapter row opens every cost behind
            its figure — the drill-down whose absence meant the total could only
-           be believed, never checked. Grouped by partida when the costs name
+           be believed, never checked. Grouped by subpartida when the costs name
            one, because that is the level the client asked to see. */
         const eco = body.querySelector("#ecoInvoices");
         if (eco)
@@ -19807,7 +19807,7 @@
         economicsPanel($("#ecoBody"), gProject);
       }
 
-      /* The 480 panel §3.2 calls "the only place cost is split by capítulo", and it
+      /* The 480 panel §3.2 calls "the only place cost is split by partida", and it
    is exactly that: no other screen in the product writes `chapterNum` onto a
    cost. Splitting is offered because one supplier invoice routinely covers
    three chapters — refusing to split it is how a chapter ends up carrying a
@@ -19831,14 +19831,14 @@
      <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${row.date ? fmtD(row.date) : "—"}</b></div>
      <div class="it"><span>Importe</span><span style="flex:1"></span><b>${eur(row.amountCents)}</b></div>
    </div></div>
-   <div class="card"><div class="ch"><h3>Capítulos</h3><span class="tag" id="as_rest"></span></div>
+   <div class="card"><div class="ch"><h3>Partidas</h3><span class="tag" id="as_rest"></span></div>
     <div id="as_rows" style="padding:6px 12px 12px"></div>
     <div style="display:flex;gap:8px;padding:0 12px 12px">
-      ${single ? "" : '<button class="btn sm" id="as_add">＋ Otro capítulo</button>'}
+      ${single ? "" : '<button class="btn sm" id="as_add">＋ Otra partida</button>'}
       <span style="flex:1"></span>
       <button class="btn primary" id="as_go">Repartir</button>
     </div>
-    ${single ? '<div class="daylist"><div class="it" style="color:var(--muted)">Un parte de horas va a un solo capítulo: son las horas de una persona en un día, y partirlas aquí sería inventar un segundo parte.</div></div>' : ""}
+    ${single ? '<div class="daylist"><div class="it" style="color:var(--muted)">Un parte de horas va a una sola partida: son las horas de una persona en un día, y partirlas aquí sería inventar un segundo parte.</div></div>' : ""}
    </div>`;
         const add = $("#as_add");
         if (add)
@@ -19858,7 +19858,7 @@
               "backoffice",
             );
             closeDrawer();
-          }, "Coste repartido por capítulo");
+          }, "Coste repartido por partida");
         chapSplitRows(pid, row, chapters);
       }
       function chapSplitRows(pid, row, chapters) {
@@ -19868,7 +19868,7 @@
           .map(
             (s, i) => `
    <div class="fgrid" style="border-top:${i ? "1px solid var(--hair)" : "0"};padding-top:${i ? "8px" : "0"}">
-    <div class="field"><label>Capítulo</label><select data-si="${i}" data-k="chapterNum">
+    <div class="field"><label>Partida</label><select data-si="${i}" data-k="chapterNum">
       ${chapters.map((c) => `<option value="${c.num}"${String(c.num) === String(s.chapterNum) ? " selected" : ""}>${c.num}. ${esc(c.name)}</option>`).join("")}
     </select></div>
     <div class="field"><label>Importe (€)</label><input data-si="${i}" data-k="amountCents" type="number" step="0.01" value="${(s.amountCents / 100).toFixed(2)}"></div>
@@ -19982,7 +19982,7 @@
       function cashDrawer(accountId, sign) {
         const db = openDrawer(sign > 0 ? "Entrada de caja" : "Salida de caja");
         /* Block 2 of the client review: a cash payment lands somewhere — a
-           project (down to its chapter and partida, on the same accepted-budget
+           project (down to its chapter and subpartida, on the same accepted-budget
            validation every other cost uses) or an overhead — and until now this
            drawer had nowhere to say so, even though the engine takes it. A cash
            ENTRY (money in) is a float top-up, not a cost, so it gets no
@@ -20000,8 +20000,8 @@
         .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
         .join("")}</optgroup>
      </select></div>
-    <div class="field" id="ca_chapwrap" style="display:none"><label>Capítulo</label><select id="ca_chap"></select></div>
-    <div class="field" id="ca_linewrap" style="display:none"><label>Partida</label><select id="ca_line"></select></div>`
+    <div class="field" id="ca_chapwrap" style="display:none"><label>Partida</label><select id="ca_chap"></select></div>
+    <div class="field" id="ca_linewrap" style="display:none"><label>Subpartida</label><select id="ca_line"></select></div>`
             : "";
         const wireCashDest = () => {
           const dest = $("#ca_dest");
@@ -20581,8 +20581,8 @@
         if (w.basis === "certification") {
           const c = bases.certification;
           if (!c.chapters.length)
-            return '<div class="empty">Esta obra no tiene capítulos sobre los que certificar.</div>';
-          return `<div class="scroll"><table><thead><tr><th>Capítulo</th><th class="num">Avance</th><th class="num">Ejecutado</th></tr></thead><tbody>
+            return '<div class="empty">Esta obra no tiene partidas sobre los que certificar.</div>';
+          return `<div class="scroll"><table><thead><tr><th>Partida</th><th class="num">Avance</th><th class="num">Ejecutado</th></tr></thead><tbody>
       ${c.chapters.map((ch) => `<tr><td>${esc(ch.num)}. ${esc(ch.name)}</td><td class="num">${ch.progressPct}%</td><td class="num">${eur0(ch.doneCents)}</td></tr>`).join("")}
       <tr class="tot"><td>Ejecutado a origen</td><td></td><td class="num">${eur0(c.executedCents)}</td></tr>
       <tr><td>Ya facturado</td><td></td><td class="num">${eur0(bases.billedBaseCents)}</td></tr>

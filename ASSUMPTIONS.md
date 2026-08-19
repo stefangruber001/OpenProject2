@@ -4743,3 +4743,46 @@ the crawls, and CI's ledger step was the only thing that noticed. Fixed here
 with two interpolation rules (project label + Email line); the rules also
 cleared a batch of older misses, so the EN ceiling ratchets 69→53 (measured
 49+4 slack) and CA stays 113 (measured 110).
+
+## S23 · The vocabulary flip (Part 2 · item 7), all three languages
+
+Client-mandated, operator-confirmed 18/08: what was capítulo / Capítol /
+Chapter is now **Partida / Partida / Line item**; what was partida / partida /
+line item is now **Subpartida / Subpartida / Sub-line item** — on screens,
+toasts and printed documents alike.
+
+**Words only.** Data-model and API identifiers keep their `chapter*` names
+(`chapterNum`, `chapter.lines`, `addChapter`, `itemChapters`, catalogue keys
+like `DEM`): renaming them would be a migration across every stored workspace
+for zero user-visible gain. The glossary row in CLAUDE.md ("line item |
+partida") became MORE correct.
+
+**How it was done safely.** A placeholder-based transform (never committed):
+protected senses frozen first («partida alzada», «las partidas abiertas»,
+«punto de partida», «€/partida», the already-new «Partidas y subpartidas»),
+old partida forms to placeholders, capítulo→partida with a gender-agreement
+rule table (la partida, nueva partida, partida asignada… and the Catalan
+equivalents down to «se'n van amb ella»), EN values flipped through inert
+placeholders (the first attempt emitted "Sub-line item" unprotected and the
+lowercase pass matched the "line item" inside it — "Sub-sub-line item"; caught
+by the bijectivity spot-checks, script fixed, re-run from a clean tree), then
+a bijectivity check over both dictionaries because the rename map collides by
+construction ("Capítulo movido"→"Partida movida" lands where old "Partida
+movida" sat).
+
+**Hand-resolved:** the "Chapters (partidas)" gloss family (now "Line items
+(partidas)" with clean ES keys), a dozen irregular EN values ("New item",
+"Line moved", "Items and sub-items"→"Line items and sub-line items"), the
+builder hint that was one level off even before the flip, DOCL (the words a
+customer reads on the printed budget) in all three branches, and the
+EN-authored master-data and setup-guide pages.
+
+**Ratchet:** coverage.mjs now fails if any EN value says Chapter or any ES
+key / CA value says capítulo/capítol — proven on a planted entry.
+
+**Known consequences, accepted:** reprinting an old accepted budget shows the
+new words (wording renders live; the frozen numbers do not change).
+`tenants/*/tenant.yaml` `line: Partida` and boundary-lint's `/\bpartida/i`
+(which cannot see "subpartida" — `\b` fails after "b") are packages-side and
+flagged for the factory, not changed here. Source-audit dropped 234→233 (a
+comment literal stopped being flagged); the CI ceilings ratchet to 233.

@@ -18,8 +18,8 @@
  */
 window.CANEI_DICT = window.CANEI_DICT || {};
 window.CANEI_DICT.ca = {
-  "Elige una obra: venta, coste y margen capítulo a capítulo, y el coste que ha llegado sin capítulo asignado.":
-    "Tria una obra: venda, cost i marge capítol a capítol, i el cost que ha arribat sense capítol assignat.",
+  "Elige una obra: venta, coste y margen partida a partida, y el coste que ha llegado sin partida asignada.":
+    "Tria una obra: venda, cost i marge partida a partida, i el cost que ha arribat sense partida assignata.",
   "Busca por número o cliente, o crea uno nuevo desde una visita realizada o un lead abierto.":
     "Cerca per número o client, o crea'n un de nou des d'una visita realitzada o un lead obert.",
   "Buscar por número o cliente…": "Cerca per número o client…",
@@ -77,11 +77,11 @@ window.CANEI_DICT.ca = {
   "Registro único de terceros con datos fiscales validados.":
     "Registre únic de tercers amb dades fiscals validades.",
   Proyectos: "Projectes",
-  "Línea base congelada, avance por capítulo, coste real y extras.":
-    "Línia base congelada, avanç per capítol, cost real i extres.",
+  "Línea base congelada, avance por partida, coste real y extras.":
+    "Línia base congelada, avanç per partida, cost real i extres.",
   Presupuestos: "Pressupostos",
-  "Capítulos, partidas y sub-mediciones con control de versiones.":
-    "Capítols, partides i subamidaments amb control de versions.",
+  "Partidas, subpartidas y sub-mediciones con control de versiones.":
+    "Partides, subpartides i subamidaments amb control de versions.",
   Proveedores: "Proveïdors",
   "Industriales y autónomos con IRPF correcto y vencimientos.":
     "Industrials i autònoms amb IRPF correcte i venciments.",
@@ -267,8 +267,8 @@ window.CANEI_DICT.ca = {
   Notas: "Notes",
   "✓ adjunto": "✓ adjunt",
   Cerradas: "Tancades",
-  "Presupuestos con capítulos, partidas y sub-mediciones, opciones y pendientes separados, y control de versiones con una única versión aceptada.":
-    "Pressupostos amb capítols, partides i subamidaments, opcions i pendents separats, i control de versions amb una única versió acceptada.",
+  "Presupuestos con partidas, subpartidas y sub-mediciones, opciones y pendientes separados, y control de versiones con una única versión aceptada.":
+    "Pressupostos amb partides, subpartides i subamidaments, opcions i pendents separats, i control de versions amb una única versió acceptada.",
   Número: "Número",
   Versión: "Versió",
   Margen: "Marge",
@@ -292,8 +292,8 @@ window.CANEI_DICT.ca = {
   "En vigor": "En vigor",
   Finalizado: "Finalitzat",
   Anulado: "Anul·lat",
-  "Cada proyecto conserva su línea base aceptada y muestra venta, coste comprometido, coste real y margen por capítulo. Marca partidas hechas para certificar.":
-    "Cada projecte conserva la seva línia base acceptada i mostra venda, cost compromès, cost real i marge per capítol. Marca partides fetes per certificar.",
+  "Cada proyecto conserva su línea base aceptada y muestra venta, coste comprometido, coste real y margen por partida. Marca subpartidas hechas para certificar.":
+    "Cada projecte conserva la seva línia base acceptada i mostra venda, cost compromès, cost real i marge per partida. Marca subpartides fetes per certificar.",
   "Venta actual": "Venda actual",
   Comprometido: "Compromès",
   Real: "Real",
@@ -330,7 +330,7 @@ window.CANEI_DICT.ca = {
   "Horas diarias por trabajador y proyecto, con tarifa histórica. El coste de mano de obra entra en el coste real de cada obra.":
     "Hores diàries per treballador i projecte, amb tarifa històrica. El cost de mà d'obra entra en el cost real de cada obra.",
   Trabajador: "Treballador",
-  Capítulo: "Capítol",
+  Partida: "Partida",
   Horas: "Hores",
   Coste: "Cost",
   "Sin asignar": "Sense assignar",
@@ -382,11 +382,11 @@ window.CANEI_DICT.ca = {
   "Cobros previstos": "Cobraments previstos",
   "Pagos previstos": "Pagaments previstos",
   Neto: "Net",
-  "Catálogo de partidas y precios por proveedor con fecha y documento de origen. Un precio ausente se ve ausente — nunca cuenta como cero.":
-    "Catàleg de partides i preus per proveïdor amb data i document d'origen. Un preu absent es veu absent — mai no compta com a zero.",
-  "Comparativa de precios por partida": "Comparativa de preus per partida",
+  "Catálogo de subpartidas y precios por proveedor con fecha y documento de origen. Un precio ausente se ve ausente — nunca cuenta como cero.":
+    "Catàleg de subpartides i preus per proveïdor amb data i document d'origen. Un preu absent es veu absent — mai no compta com a zero.",
+  "Comparativa de precios por subpartida": "Comparativa de preus per subpartida",
   "neto por proveedor": "net per proveïdor",
-  Partida: "Partida",
+  Subpartida: "Subpartida",
   Mejor: "Millor",
   "Sin precio": "Sense preu",
   "Histórico de precios": "Històric de preus",
@@ -496,16 +496,16 @@ window.CANEI_DICT.ca = {
   "Presupuestos de variación": "Pressupostos de variació",
   "＋ Presupuesto de variación": "＋ Pressupost de variació",
   "Presupuesto de variación creado": "Pressupost de variació creat",
-  "Sin presupuestos de variación. El botón crea uno sobre esta obra; se construye y se acepta como cualquier presupuesto, y al aceptarse sus capítulos entran en la economía, el avance y la certificación.":
-    "Sense pressupostos de variació. El botó en crea un sobre aquesta obra; es construeix i s'accepta com qualsevol pressupost, i en acceptar-se els seus capítols entren a l'economia, l'avanç i la certificació.",
+  "Sin presupuestos de variación. El botón crea uno sobre esta obra; se construye y se acepta como cualquier presupuesto, y al aceptarse sus partidas entran en la economía, el avance y la certificación.":
+    "Sense pressupostos de variació. El botó en crea un sobre aquesta obra; es construeix i s'accepta com qualsevol pressupost, i en acceptar-se els seus partides entren a l'economia, l'avanç i la certificació.",
   "· variación de": "· variació de",
   variación: "variació",
   "Coste acumulado": "Cost acumulat",
   "Costes ·": "Costos ·",
   "Ver las facturas de esta obra": "Veure les factures d'aquesta obra",
   "· ver facturas →": "· veure factures →",
-  "sin partida": "sense partida",
-  "Ningún coste imputado a este capítulo todavía.": "Cap cost imputat a aquest capítol encara.",
+  "sin subpartida": "sense subpartida",
+  "Ningún coste imputado a esta partida todavía.": "Cap cost imputat a aquesta partida encara.",
   "Fin previsto actualizado": "Fi previst actualitzat",
   "Tarifa hora extra (€/hora)": "Tarifa hora extra (€/hora)",
   "como la normal si se deja vacío": "com la normal si es deixa buit",
@@ -587,10 +587,10 @@ window.CANEI_DICT.ca = {
   "Coste interno base:": "Cost intern base:",
   "· Margen:": "· Marge:",
   "Margen previsto": "Marge previst",
-  "Avance por capítulo": "Avanç per capítol",
+  "Avance por partida": "Avanç per partida",
   "marca lo hecho — alimenta la certificación": "marca el que s'ha fet — alimenta la certificació",
   "✓ Hecho": "✓ Fet",
-  "Coste por capítulo": "Cost per capítol",
+  "Coste por partida": "Cost per partida",
   "previsto vs. real": "previst vs. real",
   "Coste prev.": "Cost prev.",
   Desvío: "Desviació",
@@ -644,8 +644,8 @@ window.CANEI_DICT.ca = {
   Gastos: "Despeses",
   "Validez · 30 días": "Validesa · 30 dies",
   "Desde la fecha de emisión": "Des de la data d'emissió",
-  "Comparativa de proveedores — capítulo de baño (precio ausente ≠ cero)":
-    "Comparativa de proveïdors — capítol de bany (preu absent ≠ zero)",
+  "Comparativa de proveedores — partida de baño (precio ausente ≠ cero)":
+    "Comparativa de proveïdors — partida de bany (preu absent ≠ zero)",
   "Correos — redactados automáticamente, un clic para enviar":
     "Correus — redactats automàticament, un clic per enviar",
   "Cada evento del ciclo de vida redacta el correo por usted. Revíselo, ajústelo si hace falta y pulse":
@@ -711,8 +711,8 @@ window.CANEI_DICT.ca = {
   "Motivo de la nueva versión": "Motiu de la nova versió",
   "Vista previa": "Vista prèvia",
   "Respuesta del cliente": "Resposta del client",
-  Capítulos: "Capítols",
   Partidas: "Partides",
+  Subpartidas: "Subpartides",
   Totales: "Totals",
   "Arrastrar para reordenar": "Arrossega per reordenar",
   "Número escrito a mano — se mantiene al reordenar": "Número escrit a mà — es manté en reordenar",
@@ -737,9 +737,9 @@ window.CANEI_DICT.ca = {
   "Visita de este presupuesto": "Visita d'aquest pressupost",
   "Última visita del cliente — no vinculada a este presupuesto":
     "Última visita del client — no vinculada a aquest pressupost",
-  "Capítulo movido": "Capítol mogut",
-  "Partida movida": "Partida moguda",
-  "Partida movida de capítulo": "Partida moguda de capítol",
+  "Partida movida": "Partida moguta",
+  "Subpartida movida": "Subpartida moguda",
+  "Subpartida movida de partida": "Subpartida moguda de partida",
   "⚠ Ese número ya está en uso": "⚠ Aquest número ja s'utilitza",
   "⚠ No se ha podido guardar": "⚠ No s'ha pogut desar",
   "Presupuesto enviado — versión congelada": "Pressupost enviat — versió congelada",
@@ -747,7 +747,7 @@ window.CANEI_DICT.ca = {
   "Presupuesto rechazado": "Pressupost rebutjat",
   "Lo que va a recibir el cliente": "El que rebrà el client",
   "sin correo": "sense correu",
-  "Partidas sin precio todavía": "Partides sense preu encara",
+  "Subpartidas sin precio todavía": "Subpartides sense preu encara",
   "Valoradas provisionalmente en": "Valorades provisionalment en",
   "No están incluidas en el total y no se imprimen en el documento.":
     "No estan incloses en el total i no s'imprimeixen al document.",
@@ -783,8 +783,8 @@ window.CANEI_DICT.ca = {
   "Añadir y pulsar Enter": "Afegeix i prem Enter",
   "La versión está congelada: sus condiciones se conservan tal como se enviaron.":
     "La versió està congelada: les seves condicions es conserven tal com es van enviar.",
-  "Sin capítulos todavía.": "Sense capítols encara.",
-  "Ninguna partida tiene imágenes todavía.": "Cap partida té imatges encara.",
+  "Sin partidas todavía.": "Sense partides encara.",
+  "Ninguna subpartida tiene imágenes todavía.": "Cap subpartida té imatges encara.",
   "Anexo gráfico activado": "Annex gràfic activat",
   "Anexo gráfico desactivado": "Annex gràfic desactivat",
   "Anexo actualizado": "Annex actualitzat",
@@ -935,8 +935,8 @@ window.CANEI_DICT.ca = {
   "Registrar como detectada": "Registra com a detectada",
   "Extra registrado": "Extra registrat",
   // ── PRY-01 Avance físico and PRY-02 Avance económico (S8).
-  "Cada obra conserva su línea base aceptada. Marca el estado de cada capítulo — sin empezar, en ejecución o terminado — y el porcentaje sólo cuando esté en ejecución.":
-    "Cada obra conserva la seva línia base acceptada. Marqueu l'estat de cada capítol — sense començar, en execució o acabat — i el percentatge només quan estigui en execució.",
+  "Cada obra conserva su línea base aceptada. Marca el estado de cada partida — sin empezar, en ejecución o terminado — y el porcentaje sólo cuando esté en ejecución.":
+    "Cada obra conserva la seva línia base acceptada. Marqueu l'estat de cada partida — sense començar, en execució o acabat — i el percentatge només quan estigui en execució.",
   "Buscar por código o cliente…": "Cerca per codi o client…",
   "Ninguna obra coincide con la búsqueda.": "Cap obra coincideix amb la cerca.",
   obras: "obres",
@@ -944,8 +944,8 @@ window.CANEI_DICT.ca = {
   "Fin real": "Fi real",
   Ficha: "Fitxa",
   "En ejecución": "En execució",
-  "Esta obra no tiene capítulos aceptados: el avance se registra sobre las tareas del gráfico.":
-    "Aquesta obra no té capítols acceptats: l'avanç es registra sobre les tasques del gràfic.",
+  "Esta obra no tiene partidas aceptadas: el avance se registra sobre las tareas del gráfico.":
+    "Aquesta obra no té partides acceptates: l'avanç es registra sobre les tasques del gràfic.",
   "Avance registrado": "Avanç registrat",
   "Fin de obra previsto": "Fi d'obra previst",
   "Desvío sobre línea base": "Desviació sobre la línia base",
@@ -958,29 +958,29 @@ window.CANEI_DICT.ca = {
   Cobrado: "Cobrat",
   "Por facturar": "Per facturar",
   "Extras aprobados": "Extres aprovats",
-  "Venta, coste y margen de la obra, capítulo a capítulo, y el coste que ha llegado a la obra sin capítulo asignado. Repartirlo aquí es lo que hace que la tabla cuadre con el proyecto.":
-    "Venda, cost i marge de l'obra, capítol a capítol, i el cost que ha arribat a l'obra sense capítol assignat. Repartir-lo aquí és el que fa que la taula quadri amb el projecte.",
+  "Venta, coste y margen de la obra, partida a partida, y el coste que ha llegado a la obra sin partida asignada. Repartirlo aquí es lo que hace que la tabla cuadre con el proyecto.":
+    "Venda, cost i marge de l'obra, partida a partida, i el cost que ha arribat a l'obra sense partida assignata. Repartir-lo aquí és el que fa que la taula quadri amb el projecte.",
   "contratada más extras aprobados": "contractada més extres aprovats",
   comprometido: "compromès",
   "sobre la venta": "sobre la venda",
-  "Por capítulo": "Per capítol",
+  "Por partida": "Per partida",
   Acumulado: "Acumulat",
-  "Esta obra no tiene capítulos en su línea base.":
-    "Aquesta obra no té capítols a la seva línia base.",
+  "Esta obra no tiene partidas en su línea base.":
+    "Aquesta obra no té partides a la seva línia base.",
   "Pendiente de repartir": "Pendent de repartir",
   nada: "res",
   Repartir: "Reparteix",
-  "Todo el coste de esta obra tiene capítulo. La tabla de arriba cuadra con el proyecto.":
-    "Tot el cost d'aquesta obra té capítol. La taula de dalt quadra amb el projecte.",
+  "Todo el coste de esta obra tiene partida. La tabla de arriba cuadra con el proyecto.":
+    "Tot el cost d'aquesta obra té partida. La taula de dalt quadra amb el projecte.",
   Ajustar: "Ajusta",
-  "La proyección de cada capítulo parte del coste real y del avance registrado. «Ajustar» la sustituye a mano, y la cifra calculada se sigue mostrando junto a la ajustada.":
-    "La projecció de cada capítol parteix del cost real i de l'avanç registrat. «Ajusta» la substitueix a mà, i la xifra calculada es continua mostrant al costat de l'ajustada.",
-  "＋ Otro capítulo": "＋ Un altre capítol",
+  "La proyección de cada partida parte del coste real y del avance registrado. «Ajustar» la sustituye a mano, y la cifra calculada se sigue mostrando junto a la ajustada.":
+    "La projecció de cada partida parteix del cost real i de l'avanç registrat. «Ajusta» la substitueix a mà, i la xifra calculada es continua mostrant al costat de l'ajustada.",
+  "＋ Otra partida": "＋ Una altra partida",
   "Cuadra con el coste": "Quadra amb el cost",
-  "Un parte de horas va a un solo capítulo: son las horas de una persona en un día, y partirlas aquí sería inventar un segundo parte.":
-    "Un part d'hores va a un sol capítol: són les hores d'una persona en un dia, i partir-les aquí seria inventar un segon part.",
-  "Coste repartido por capítulo": "Cost repartit per capítol",
-  "Sin capítulo": "Sense capítol",
+  "Un parte de horas va a una sola partida: son las horas de una persona en un día, y partirlas aquí sería inventar un segundo parte.":
+    "Un part d'hores va a una sola partida: són les hores d'una persona en un dia, i partir-les aquí seria inventar un segon part.",
+  "Coste repartido por partida": "Cost repartit per partida",
+  "Sin partida": "Sense partida",
   "Esta obra no tiene contrato, así que no hay hitos de cobro que recalcular.":
     "Aquesta obra no té contracte, així que no hi ha fites de cobrament per recalcular.",
   "Lo que dice la planificación": "El que diu la planificació",
@@ -1022,11 +1022,11 @@ window.CANEI_DICT.ca = {
   "Siguiente ›": "Següent ›",
   "＋ Nuevo": "＋ Nou",
   Necesidades: "Necessitats",
-  "lo comprometido frente a lo pendiente, por capítulo":
-    "el compromès davant del pendent, per capítol",
+  "lo comprometido frente a lo pendiente, por partida":
+    "el compromès davant del pendent, per partida",
   "Calendario de llegadas": "Calendari d'arribades",
   "Sin llegadas previstas.": "Sense arribades previstes.",
-  "Todos los capítulos están comprometidos.": "Tots els capítols estan compromesos.",
+  "Todas las partidas están comprometidos.": "Totes les partides estan compromeses.",
   "＋ Nueva orden de compra": "＋ Nova comanda de compra",
   "＋ OC": "＋ CC",
   Presupuestado: "Pressupostat",
@@ -1123,7 +1123,7 @@ window.CANEI_DICT.ca = {
   "Parte diario": "Part diari",
   "Trimestre y contenido": "Trimestre i contingut",
   "IVA, IRPF y envío": "IVA, IRPF i enviament",
-  "Por proyecto y capítulo": "Per projecte i capítol",
+  "Por proyecto y partida": "Per projecte i partida",
   "Conciliación del mes": "Conciliació del mes",
   "Horas imputadas a obra": "Hores imputades a obra",
   "Nóminas pagadas por banco": "Nòmines pagades pel banc",
@@ -1164,8 +1164,8 @@ window.CANEI_DICT.ca = {
   //    rather than raising the ceiling — the backlog only ever falls.
   "Ruta crítica — un día perdido aquí es un día perdido en la obra":
     "Ruta crítica — un dia perdut aquí és un dia perdut a l'obra",
-  "Sin tareas planificadas. Añade una tarea o genera la planificación desde los capítulos del proyecto.":
-    "Sense tasques planificades. Afegeix una tasca o genera la planificació des dels capítols del projecte.",
+  "Sin tareas planificadas. Añade una tarea o genera la planificación desde las partidas del proyecto.":
+    "Sense tasques planificades. Afegeix una tasca o genera la planificació des dles partides del projecte.",
   "Ninguna. Arrastra el punto de otra barra hasta ésta para crear una.":
     "Cap. Arrossega el punt d'una altra barra fins a aquesta per crear-ne una.",
   "Planificación de obra con dependencias, ruta crítica y línea base. Arrastra una barra para moverla, tira del borde derecho para alargarla y arrastra el punto de una barra a otra para crear una dependencia.":
@@ -1235,7 +1235,7 @@ window.CANEI_DICT.ca = {
   "proyecto y dirección": "projecte i direcció",
   levantamiento: "aixecament",
   "contador y suministro": "comptador i subministrament",
-  partida: "partida",
+  subpartida: "subpartida",
   "— elegir del catálogo —": "— triar del catàleg —",
   "Elegir una subpartida del catálogo": "Triar una subpartida del catàleg",
   "Completar los datos ahora": "Completa les dades ara",
@@ -1252,8 +1252,8 @@ window.CANEI_DICT.ca = {
     "D'on arriben els clients, què toca fer amb cada oportunitat i per què es perden. Les tres llistes alimenten els informes d'origen i de conversió.",
   "Del catálogo": "Del catàleg",
   Destinatario: "Destinatari",
-  "Déjalo en blanco para dejar el parte sin capítulo asignado.":
-    "Deixa-ho en blanc per deixar el part sense capítol assignat.",
+  "Déjalo en blanco para dejar el parte sin partida asignada.":
+    "Deixa-ho en blanc per deixar el part sense partida assignata.",
   "Encuadra y dispara": "Enquadra i dispara",
   Entendido: "Entesos",
   "Enviar consulta": "Envia la consulta",
@@ -1268,7 +1268,7 @@ window.CANEI_DICT.ca = {
   "Fecha límite": "Data límit",
   "Fuera del catálogo": "Fora del catàleg",
   "Hacer la foto": "Fes la foto",
-  "Hay partidas que bloquean el envío": "Hi ha partides que bloquegen l'enviament",
+  "Hay subpartidas que bloquean el envío": "Hi ha subpartides que bloquegen l'enviament",
   Justificar: "Justifica",
   "Justificar la excepción": "Justifica l'excepció",
   "La versión enviada se conserva intacta; los cambios van en la nueva.":
@@ -1276,8 +1276,8 @@ window.CANEI_DICT.ca = {
   "La visita se captura igual — pero sin estos datos no se puede emitir ni contrato ni factura.":
     "La visita es captura igual — però sense aquestes dades no es pot emetre ni contracte ni factura.",
   "Llamar la semana que viene": "Truca la setmana que ve",
-  "Los capítulos salen del catálogo para que se llamen igual en todos los presupuestos.":
-    "Els capítols surten del catàleg perquè es diguin igual a tots els pressupostos.",
+  "Las partidas salen del catálogo para que se llamen igual en todos los presupuestos.":
+    "Les partides surten del catàleg perquè es diguin igual a tots els pressupostos.",
   "Los que aún no se han visitado van primero, y dentro de cada grupo los que llevan más tiempo esperando.":
     "Els que encara no s'han visitat van primer, i dins de cada grup els que porten més temps esperant.",
   "Marcar como perdida": "Marca com a perduda",
@@ -1288,8 +1288,8 @@ window.CANEI_DICT.ca = {
   "Motivo de la reapertura": "Motiu de la reobertura",
   "Motivo de la rescisión": "Motiu de la rescissió",
   "Motivo del rechazo": "Motiu del rebuig",
-  "Nada que corregir: todas las partidas tienen cantidad, precio y coste coherentes.":
-    "Res a corregir: totes les partides tenen quantitat, preu i cost coherents.",
+  "Nada que corregir: todas las subpartidas tienen cantidad, precio y coste coherentes.":
+    "Res a corregir: totes les subpartides tenen quantitat, preu i cost coherents.",
   "No se ha dado permiso de cámara. Puedes autorizarlo en el candado de la barra de direcciones.":
     "No s'ha donat permís de càmera. Ho pots autoritzar des del cadenat de la barra d'adreces.",
   "No se puede eliminar": "No es pot eliminar",
@@ -1297,18 +1297,18 @@ window.CANEI_DICT.ca = {
     "No es pot programar una visita en una data passada",
   "Nom (CA)": "Nom (CA)",
   "Nombre (ES)": "Nom (ES)",
-  "Nombre del capítulo": "Nom del capítol",
+  "Nombre dla partida": "Nom dla partida",
   "Nombre o puesto": "Nom o càrrec",
   "Nota de resolución": "Nota de resolució",
   "Nueva entrada": "Nova entrada",
+  "Nueva subpartida": "Nova subpartida",
   "Nueva partida": "Nova partida",
-  "Nuevo capítulo": "Nou capítol",
   "Nº de factura, documento, referencia… (opcional)":
     "Núm. de factura, document, referència… (opcional)",
   "Opcional, pero es lo que explica la espera…": "Opcional, però és el que explica l'espera…",
   "Otro nombre…": "Un altre nom…",
   "P. unitario venta": "P. unitari venda",
-  "Partida tomada del catálogo": "Partida agafada del catàleg",
+  "Subpartida tomada del catálogo": "Subpartida agafada del catàleg",
   "Rendimiento de la cartera": "Rendiment de la cartera",
   "Coste incurrido": "Cost incorregut",
   "Pendiente hasta terminar": "Pendent fins a acabar",
@@ -1321,21 +1321,21 @@ window.CANEI_DICT.ca = {
   "Sin NIF no se puede facturar ni contratar — la ficha existe igual y se completa después":
     "Sense NIF no es pot facturar ni contractar — la fitxa existeix igualment i es completa després",
   "Ir a la Torre de control": "Anar a la Torre de control",
-  "+ capítulo": "+ capítol",
+  "+ partida": "+ partida",
   "Coste ud.": "Cost ut.",
   "P. venta ud.": "P. venda ut.",
   "Imág.": "Imat.",
-  "Mostrar u ocultar los capítulos": "Mostrar o amagar els capítols",
+  "Mostrar u ocultar las partidas": "Mostrar o amagar les partides",
   "Mostrar u ocultar los totales": "Mostrar o amagar els totals",
-  "+ partida del catálogo": "+ partida del catàleg",
-  "+ partida en blanco": "+ partida en blanc",
-  "Una partida que todavía no está en el catálogo": "Una partida que encara no és al catàleg",
-  "Marca las subpartidas que entran en el capítulo. Cada una llega con su unidad, su coste y su precio.":
-    "Marca les subpartides que entren al capítol. Cadascuna arriba amb la seva unitat, el seu cost i el seu preu.",
+  "+ subpartida del catálogo": "+ subpartida del catàleg",
+  "+ subpartida en blanco": "+ subpartida en blanc",
+  "Una subpartida que todavía no está en el catálogo": "Una subpartida que encara no és al catàleg",
+  "Marca las subpartidas que entran en la partida. Cada una llega con su unidad, su coste y su precio.":
+    "Marca les subpartides que entren a la partida. Cadascuna arriba amb la seva unitat, el seu cost i el seu preu.",
   "ninguna seleccionada": "cap de seleccionada",
-  "Este capítulo no tiene partidas todavía. Elige «Todos los capítulos» o crea la primera.":
-    "Aquest capítol encara no té partides. Tria «Tots els capítols» o crea la primera.",
-  "Partida en blanco añadida": "Partida en blanc afegida",
+  "Esta partida no tiene subpartidas todavía. Elige «Todas las partidas» o crea la primera.":
+    "Aquesta partida encara no té subpartides. Tria «Totes les partides» o crea la primera.",
+  "Subpartida en blanco añadida": "Subpartida en blanc afegida",
   "mano de obra propia": "mà d'obra pròpia",
   maquinaria: "maquinària",
   honorarios: "honoraris",
@@ -1377,22 +1377,22 @@ window.CANEI_DICT.ca = {
   "Sin visita todavía": "Sense visita encara",
   "Sólo es posible si no tiene documentos económicos asociados. Esta acción no se puede deshacer.":
     "Només és possible si no té documents econòmics associats. Aquesta acció no es pot desfer.",
-  "Sólo para un capítulo que no se va a repetir. Si se va a usar más veces, añádelo al catálogo en Configuración → Partidas.":
-    "Només per a un capítol que no es tornarà a fer servir. Si s'ha d'utilitzar més vegades, afegeix-lo al catàleg a Configuració → Partides.",
+  "Sólo para una subpartida que no se va a repetir. Si se va a usar más veces, añádela al catálogo en Configuración → Partidas y subpartidas.":
+    "Només per a una partida que no es tornarà a fer servir. Si s'ha d'utilitzar més vegades, afegeix-la al catàleg a Configuració → Subpartides.",
   "Una alerta no se cierra sin decir cómo se resolvió.":
     "Una alerta no es tanca sense dir com s'ha resolt.",
   "Vence el": "Venç el",
   "Ya visitados — sería un seguimiento": "Ja visitats — seria un seguiment",
   seguimiento: "seguiment",
-  "sin capítulo": "sense capítol",
-  "sin partidas todavía": "sense partides encara",
+  "sin partida": "sense partida",
+  "sin subpartidas todavía": "sense subpartides encara",
   "¿A quién se asigna?": "A qui s'assigna?",
   "¿Para qué lead?": "Per a quin lead?",
   "¿Por qué puede enviarse el paquete así?": "Per què es pot enviar el paquet així?",
   "¿Por qué se ha perdido?": "Per què s'ha perdut?",
   "¿Recargar los datos de demostración?": "Recarregar les dades de demostració?",
   "⤓ Descargar": "⤓ Descarrega",
-  "＋ Nueva partida": "＋ Nova partida",
+  "＋ Nueva subpartida": "＋ Nova subpartida",
   "＋ Nueva…": "＋ Nova…",
   "＋ Nuevo cliente…": "＋ Nou client…",
   "＋ Programar visita de seguimiento": "＋ Programar visita de seguiment",
@@ -1531,7 +1531,7 @@ window.CANEI_DICT.ca = {
   "Proveedores y subcontratistas": "Proveïdors i subcontractistes",
   "Catálogo y precios": "Catàleg i preus",
   "Artículos — materiales y trabajos": "Articles — materials i treballs",
-  "Capítulos (partidas)": "Capítols (partides)",
+  "Partidas del catálogo": "Partides del catàleg",
   "Listas de precios / Tarifas": "Llistes de preus / Tarifes",
   "Códigos de IVA / impuestos": "Codis d'IVA / impostos",
   "Unidades de medida": "Unitats de mesura",
@@ -1564,7 +1564,7 @@ window.CANEI_DICT.ca = {
   "Suministro — Condiciones de pago": "Subministrament — Condicions de pagament",
   "Catálogo y precios — Artículos — materiales y trabajos":
     "Catàleg i preus — Articles — materials i treballs",
-  "Catálogo y precios — Capítulos (partidas)": "Catàleg i preus — Capítols (partides)",
+  "Catálogo y precios — Partidas": "Catàleg i preus — Partides",
   "Catálogo y precios — Listas de precios / Tarifas":
     "Catàleg i preus — Llistes de preus / Tarifes",
   "Catálogo y precios — Códigos de IVA / impuestos": "Catàleg i preus — Codis d'IVA / impostos",
@@ -1585,12 +1585,13 @@ window.CANEI_DICT.ca = {
   Prospecto: "Prospecte",
   Editar: "Editar",
   Eliminar: "Eliminar",
-  "✕ capítulo": "✕ capítol",
-  "Eliminar partida": "Eliminar partida",
-  "Eliminar esta partida": "Eliminar aquesta partida",
-  "Eliminar el capítulo y todas sus partidas": "Eliminar el capítol i totes les seves partides",
-  "Capítulo eliminado": "Capítol eliminat",
-  "El capítulo está vacío. No se puede deshacer.": "El capítol és buit. No es pot desfer.",
+  "✕ partida": "✕ partida",
+  "Eliminar subpartida": "Eliminar subpartida",
+  "Eliminar esta subpartida": "Eliminar aquesta subpartida",
+  "Eliminar la partida y todas sus subpartidas":
+    "Eliminar la partida i totes les seves subpartides",
+  "Partida eliminada": "Partida eliminata",
+  "La partida está vacío. No se puede deshacer.": "La partida és buit. No es pot desfer.",
   Cancelar: "Cancel·lar",
   "Guardar registro": "Desar registre",
   "Buscar registros…": "Cercar registres…",
@@ -1743,7 +1744,7 @@ window.CANEI_DICT.ca = {
   Calidad: "Qualitat",
   "Coste de referencia (€)": "Cost de referència (€)",
   "Precio de referencia (€)": "Preu de referència (€)",
-  "Partida *": "Partida *",
+  "Subpartida *": "Subpartida *",
   "Fecha *": "Data *",
   "Código del artículo en el proveedor": "Codi de l'article al proveïdor",
   "Precio de lista (€) *": "Preu de llista (€) *",
@@ -1775,11 +1776,11 @@ window.CANEI_DICT.ca = {
   "Concepto *": "Concepte *",
   "Orden de trabajo": "Ordre de treball",
   "Contrato de subcontrata": "Contracte de subcontracta",
-  "— sin capítulo —": "— sense capítol —",
+  "— sin partida —": "— sense partida —",
   "Borrador para aprobar": "Esborrany per aprovar",
   Automático: "Automàtic",
   Opcional: "Opcional",
-  "Todas las partidas": "Totes les partides",
+  "Todas las subpartidas": "Totes les subpartides",
   Desactivado: "Desactivat",
   "— sin inmueble asociado —": "— sense immoble associat —",
   "— sin clientes todavía —": "— encara no hi ha clients —",
@@ -1819,7 +1820,8 @@ window.CANEI_DICT.ca = {
   "Guardar precio": "Desar preu",
   "El precio": "El preu",
   "Por qué no se puede editar": "Per què no es pot editar",
-  "＋ Registrar un precio nuevo de esta partida": "＋ Registrar un preu nou d'aquesta partida",
+  "＋ Registrar un precio nuevo de esta subpartida":
+    "＋ Registrar un preu nou d'aquesta subpartida",
   "Guardar trabajador": "Desar treballador",
   Tarifas: "Tarifes",
   "＋ Añadir tarifa": "＋ Afegir tarifa",
@@ -1847,7 +1849,7 @@ window.CANEI_DICT.ca = {
   "Crear regla": "Crear regla",
   Cola: "Cua",
   "Registrar envío": "Registrar enviament",
-  "+ partida": "+ partida",
+  "+ subpartida": "+ subpartida",
   "En uso": "En ús",
   "＋ Añadir": "＋ Afegir",
   "↻ Derivar del presupuesto": "↻ Derivar del pressupost",
@@ -1895,8 +1897,8 @@ window.CANEI_DICT.ca = {
   "Guardar ajuste": "Desar ajust",
   "Volver a la calculada": "Tornar a la calculada",
   "La versión está congelada": "La versió està congelada",
-  "Las imágenes no se imprimen en la fila de la partida":
-    "Les imatges no s'imprimeixen a la fila de la partida",
+  "Las imágenes no se imprimen en la fila de la subpartida":
+    "Les imatges no s'imprimeixen a la fila de la subpartida",
   "Coste interno base": "Cost intern base",
   "Sólo entra lo que tiene fecha comprometida": "Només hi entra el que té data compromesa",
   "Petición del cliente": "Petició del client",
@@ -1911,7 +1913,7 @@ window.CANEI_DICT.ca = {
   "Seguimiento de presupuesto": "Seguiment de pressupost",
   "Aviso de factura vencida a 3 días": "Avís de factura vençuda a 3 dies",
   "Pie de imagen (opcional)": "Peu d'imatge (opcional)",
-  "Buscar capítulo…": "Cercar capítol…",
+  "Buscar partida…": "Cercar partida…",
   "Buscar por código, descripción o marca": "Cercar per codi, descripció o marca",
   "Cómo aparecerá en el registro de actividad": "Com apareixerà al registre d'activitat",
   "p. ej. Reformas": "p. ex. Reformes",
@@ -1924,8 +1926,8 @@ window.CANEI_DICT.ca = {
   "Bloquea el periodo; exige cero movimientos sin conciliar":
     "Bloqueja el període; exigeix zero moviments sense conciliar",
   días: "dies",
-  "Vuelve a derivar la planificación de los capítulos y partidas del presupuesto aceptado, conservando el avance registrado":
-    "Torna a derivar la planificació dels capítols i partides del pressupost acceptat, conservant l'avanç registrat",
+  "Vuelve a derivar la planificación de las partidas y subpartidas del presupuesto aceptado, conservando el avance registrado":
+    "Torna a derivar la planificació dles partides i subpartides del pressupost acceptat, conservant l'avanç registrat",
   "Desvío frente a la línea base, en días laborables":
     "Desviació respecte a la línia base, en dies laborables",
   "Congelar la planificación actual como referencia":
@@ -1957,7 +1959,7 @@ window.CANEI_DICT.ca = {
   "La clave es obligatoria": "La clau és obligatòria",
   "Crea una plantilla antes de la regla": "Crea una plantilla abans de la regla",
   "⚠ Módulo de planificación no disponible": "⚠ Mòdul de planificació no disponible",
-  "⚠ Primero hay que dar de alta alguna partida": "⚠ Primer cal donar d'alta alguna partida",
+  "⚠ Primero hay que dar de alta alguna subpartida": "⚠ Primer cal donar d'alta alguna subpartida",
   "⚠ Primero hay que dar de alta algún proveedor": "⚠ Primer cal donar d'alta algun proveïdor",
   "Exportado a Excel": "Exportat a Excel",
   "Exportado a CSV": "Exportat a CSV",
@@ -2058,7 +2060,7 @@ window.CANEI_DICT.ca = {
   "Periodo aplicado:": "Període aplicat:",
   "Planificación derivada del presupuesto": "Planificació derivada del pressupost",
   "duraciones derivadas de las cantidades": "durades derivades de les quantitats",
-  "Avance de la partida registrado": "Avanç de la partida registrat",
+  "Avance de la subpartida registrado": "Avanç de la subpartida registrat",
   "Cantidad ejecutada registrada": "Quantitat executada registrada",
   "Alta S.S.": "Alta S.S.",
   "Recibida parcial": "Rebuda parcial",
@@ -2086,7 +2088,7 @@ window.CANEI_DICT.ca = {
   "Modificación enviada": "Modificació enviada",
   "Modificación rechazada": "Modificació rebutjada",
   "Modificación anulada": "Modificació anul·lada",
-  "El capítulo": "El capítol",
+  "La partida": "La partida",
   "no tiene todavía una tarea derivada — deriva la planificación primero":
     "encara no té una tasca derivada — deriva la planificació primer",
   "Planificación actualizada": "Planificació actualitzada",
@@ -2134,12 +2136,12 @@ window.CANEI_DICT.ca = {
   "(fuera de presupuesto)": "(fora de pressupost)",
   "(extras)": "(extres)",
   "Base imposable": "Base imposable",
-  "Capítulo añadido": "Capítol afegit",
+  "Partida añadida": "Partida afegita",
   Revisión: "Revisió",
   "Sin incidencias": "Sense incidències",
-  "capítulo seleccionado": "capítol seleccionat",
-  "Partida añadida": "Partida afegida",
-  "Partida eliminada": "Partida eliminada",
+  "partida seleccionada": "partida seleccionata",
+  "Subpartida añadida": "Subpartida afegida",
+  "Subpartida eliminada": "Subpartida eliminada",
   "página(s)": "pàgina(es)",
   "% de confianza": "% de confiança",
   "Ruta completa": "Ruta completa",
@@ -2175,7 +2177,7 @@ window.CANEI_DICT.ca = {
   "Ninguna subcontrata coincide con la búsqueda.": "Cap subcontracta coincideix amb la cerca.",
   "Buscar por nombre": "Cercar per nom",
   "Ningún trabajador coincide con la búsqueda.": "Cap treballador coincideix amb la cerca.",
-  "Orden de capítulos actualizado": "Ordre de capítols actualitzat",
+  "Orden de partidas actualizado": "Ordre de partides actualitzat",
   "Pago registrado:": "Pagament registrat:",
   "todavía sin ningún precio": "encara sense cap preu",
   "Tres pasos: qué contiene el trimestre, qué excepciones lo bloquean, y las cifras de IVA e IRPF antes de enviar.":
@@ -2230,8 +2232,8 @@ window.CANEI_DICT.ca = {
     "aquesta versió inclou dos anys d'històric (2024-2025) i més informació per client.",
   "por porcentaje o por cantidad ejecutada — lo que sepa la obra":
     "per percentatge o per quantitat executada — el que sàpiga l'obra",
-  "Sin capítulos aceptados: el avance se registra sobre las tareas del gráfico.":
-    "Sense capítols acceptats: l'avanç es registra sobre les tasques del gràfic.",
+  "Sin partidas aceptadas: el avance se registra sobre las tareas del gráfico.":
+    "Sense partides acceptates: l'avanç es registra sobre les tasques del gràfic.",
   "Todavía no hay proyectos.": "Encara no hi ha projectes.",
   "Sin subcontratas en este proyecto.": "Sense subcontractes en aquest projecte.",
   "· Certificado": "· Certificat",
@@ -2277,13 +2279,13 @@ window.CANEI_DICT.ca = {
     "res no surt sense aprovació — l'enviament real no està connectat",
   "La cola está vacía.": "La cua és buida.",
   "Sin proyectos activos.": "Sense projectes actius.",
-  "Sin capítulos.": "Sense capítols.",
+  "Sin partidas.": "Sense partides.",
   "Incluir anexo en el documento": "Incloure l'annex al document",
   "Imágenes por página": "Imatges per pàgina",
   "Nada que corregir. El presupuesto puede emitirse.":
     "Res a corregir. El pressupost es pot emetre.",
   "Sólo uso interno": "Només ús intern",
-  "Esta partida no tiene imágenes.": "Aquesta partida no té imatges.",
+  "Esta subpartida no tiene imágenes.": "Aquesta subpartida no té imatges.",
   "La versión está congelada: su anexo se conserva tal como se emitió.":
     "La versió està congelada: el seu annex es conserva tal com es va emetre.",
   "Desde el ordenador": "Des de l'ordinador",
@@ -2298,14 +2300,14 @@ window.CANEI_DICT.ca = {
   "Sin planificación.": "Sense planificació.",
   crítica: "crítica",
   "Nada fuera de plazo.": "Res fora de termini.",
-  "Ninguna partida coincide.": "Cap partida coincideix.",
+  "Ninguna subpartida coincide.": "Cap subpartida coincideix.",
   "rendimiento · merma · compra mínima · envase": "rendiment · minva · compra mínima · envàs",
   "Sin paquetes definidos.": "Sense paquets definits.",
   "En el contrato y en cada factura emitida, y es lo que se imprime como condición de pago.":
     "Al contracte i a cada factura emesa, i és el que s'imprimeix com a condició de pagament.",
   "El código es lo que queda guardado en los documentos ya emitidos, así que no se edita. El nombre sí —":
     "El codi és el que queda desat als documents ja emesos, així que no s'edita. El nom sí —",
-  "nunca ha cotizado esta partida": "mai no ha cotitzat aquesta partida",
+  "nunca ha cotizado esta subpartida": "mai no ha cotitzat aquesta subpartida",
   "No hay proveedores dados de alta todavía.": "No hi ha proveïdors donats d'alta encara.",
   "se añade, nunca se sobrescribe": "s'afegeix, mai no se sobreescriu",
   "Sin precios registrados para este filtro.": "Sense preus registrats per a aquest filtre.",
@@ -2344,20 +2346,20 @@ window.CANEI_DICT.ca = {
   "Proyección calculada": "Projecció calculada",
   "provisional — muy poco avance para extrapolar": "provisional — massa poc avanç per extrapolar",
   "Ajuste vigente": "Ajust vigent",
-  "Sin capítulos aceptados": "Sense capítols acceptats",
+  "Sin partidas aceptadas": "Sense partides acceptates",
   "Entrada eliminada": "Entrada eliminada",
   "Asignar trabajador": "Assignar treballador",
   "Trabajador asignado": "Treballador assignat",
   "Documentación ·": "Documentació ·",
   "Mano de obra propia": "Mà d'obra pròpia",
   "Gestión de residuos": "Gestió de residus",
-  "Crear partida": "Crear partida",
-  "Esta partida no tiene imágenes. Las que se añadan salen en el anexo gráfico del presupuesto, nunca dentro de la fila.":
-    "Aquesta partida no té imatges. Les que s'afegeixin surten a l'annex gràfic del pressupost, mai dins la fila.",
-  "Ya existe una partida con el código": "Ja existeix una partida amb el codi",
-  "Partida actualizada": "Partida actualitzada",
-  "Partida creada": "Partida creada",
-  "Partida retirada del catálogo": "Partida retirada del catàleg",
+  "Crear subpartida": "Crear subpartida",
+  "Esta subpartida no tiene imágenes. Las que se añadan salen en el anexo gráfico del presupuesto, nunca dentro de la fila.":
+    "Aquesta subpartida no té imatges. Les que s'afegeixin surten a l'annex gràfic del pressupost, mai dins la fila.",
+  "Ya existe una subpartida con el código": "Ja existeix una subpartida amb el codi",
+  "Subpartida actualizada": "Subpartida actualitzada",
+  "Subpartida creada": "Subpartida creada",
+  "Subpartida retirada del catálogo": "Subpartida retirada del catàleg",
   "Portal del proveedor": "Portal del proveïdor",
   "Factura de compra": "Factura de compra",
   "Confirmación manual": "Confirmació manual",
@@ -2457,7 +2459,7 @@ window.CANEI_DICT.ca = {
     "Per a una obra amb pressupost formal, crea-la des del pressupost acceptat: així conserva la seva línia base.",
   App: "App",
   "Caja no cubre los pagos previstos": "La caixa no cobreix els pagaments previstos",
-  "Capítulo por encima de coste previsto": "Capítol per sobre del cost previst",
+  "Partida por encima de coste previsto": "Partida per sobre del cost previst",
   "Certificado por encima de lo adjudicado": "Certificat per sobre de l'adjudicat",
   "Diferencias en la conciliación de una orden": "Diferències en la conciliació d'una comanda",
   "Documentación caducada": "Documentació caducada",
@@ -2505,12 +2507,12 @@ window.CANEI_DICT.ca = {
   "{{number}}": "{{number}}",
   "Asignar, poner fecha, posponer con motivo, resolver con nota y evidencia, o convertir en tarea. Las reglas viven detrás de ⚙ Reglas.":
     "Assignar, posar data, ajornar amb motiu, resoldre amb nota i evidència, o convertir en tasca. Les regles viuen darrere de ⚙ Regles.",
-  "Cada partida del catálogo y cada línea de presupuesto llevan una unidad. Es lo que se imprime junto a la cantidad en el presupuesto y en la factura.":
-    "Cada partida del catàleg i cada línia de pressupost porten una unitat. És el que s'imprimeix al costat de la quantitat al pressupost i a la factura.",
+  "Cada subpartida del catálogo y cada línea de presupuesto llevan una unidad. Es lo que se imprime junto a la cantidad en el presupuesto y en la factura.":
+    "Cada subpartida del catàleg i cada línia de pressupost porten una unitat. És el que s'imprimeix al costat de la quantitat al pressupost i a la factura.",
   "De dónde llegan los clientes y por qué se pierden las oportunidades. Las dos listas alimentan los informes de origen y de conversión.":
     "D'on arriben els clients i per què es perden les oportunitats. Les dues llistes alimenten els informes d'origen i de conversió.",
-  "El catálogo de partidas: capítulo, unidad, marca, modelo y calidad, con su coste y su precio de referencia. Arrastra un capítulo para cambiar el orden en que sale en los presupuestos.":
-    "El catàleg de partides: capítol, unitat, marca, model i qualitat, amb el seu cost i el seu preu de referència. Arrossega un capítol per canviar l'ordre en què surt als pressupostos.",
+  "El catálogo de subpartidas: partida, unidad, marca, modelo y calidad, con su coste y su precio de referencia. Arrastra una partida para cambiar el orden en que sale en los presupuestos.":
+    "El catàleg de subpartides: partida, unitat, marca, model i qualitat, amb el seu cost i el seu preu de referència. Arrossega una partida per canviar l'ordre en què surt als pressupostos.",
   "Es lo que queda guardado en cada línea ya escrita: renombrarlo rompería documentos ya emitidos. Lo que sí se edita es el nombre, y por eso hay dos —":
     "És el que queda desat a cada línia ja escrita: reanomenar-lo trencaria documents ja emesos. El que sí que s'edita és el nom, i per això n'hi ha dos —",
   ". El documento sale en el idioma del cliente, así que una unidad sin nombre en catalán saldría en castellano dentro de un presupuesto en catalán.":
@@ -2521,12 +2523,12 @@ window.CANEI_DICT.ca = {
     "Aquestes llistes estaven escrites dins del programa: afegir una font era un lliurament nou. Ara són dades de l'empresa i es mantenen des d'aquí.",
   "Las condiciones de pago que se ofrecen en contratos y facturas. El vencimiento real lo calcula cada documento; aquí se mantiene la lista.":
     "Les condicions de pagament que s'ofereixen en contractes i factures. El venciment real el calcula cada document; aquí es manté la llista.",
-  "Las unidades que usan las partidas, los presupuestos y los documentos impresos. El símbolo es lo que aparece en la tabla; el nombre, en el desplegable y en el documento.":
-    "Les unitats que fan servir les partides, els pressupostos i els documents impresos. El símbol és el que apareix a la taula; el nom, al desplegable i al document.",
+  "Las unidades que usan las subpartidas, los presupuestos y los documentos impresos. El símbolo es lo que aparece en la tabla; el nombre, en el desplegable y en el documento.":
+    "Les unitats que fan servir les subpartides, els pressupostos i els documents impresos. El símbol és el que apareix a la taula; el nom, al desplegable i al document.",
   "Plantillas por familia, reglas evento → plantilla → destinatario → momento, y la cola resultante. Por defecto nada sale sin que una persona lo apruebe.":
     "Plantilles per família, regles esdeveniment → plantilla → destinatari → moment, i la cua resultant. Per defecte res no surt sense que una persona ho aprovi.",
-  "Precios por proveedor con su fecha, su documento de origen y su vigencia. Filtra por partida para comparar proveedores; un precio ausente se ve ausente y nunca cuenta como cero.":
-    "Preus per proveïdor amb la seva data, el seu document d'origen i la seva vigència. Filtra per partida per comparar proveïdors; un preu absent es veu absent i mai no compta com a zero.",
+  "Precios por proveedor con su fecha, su documento de origen y su vigencia. Filtra por subpartida para comparar proveedores; un precio ausente se ve ausente y nunca cuenta como cero.":
+    "Preus per proveïdor amb la seva data, el seu document d'origen i la seva vigència. Filtra per subpartida per comparar proveïdors; un preu absent es veu absent i mai no compta com a zero.",
   "Retirar una unidad la quita de los desplegables. Las líneas que ya la llevan la conservan y se siguen viendo con su nombre — por eso la columna «en uso» informa, pero no bloquea.":
     "Retirar una unitat la treu dels desplegables. Les línies que ja la porten la conserven i se segueixen veient amb el seu nom — per això la columna «en ús» informa, però no bloqueja.",
   "Una cuenta se desactiva, nunca se borra: el registro de actividad tiene que seguir diciendo quién hizo qué. Al desactivar, sus sesiones abiertas terminan de inmediato.":
@@ -2573,8 +2575,8 @@ window.CANEI_DICT.ca = {
     "Obre el generador amb el que ja es pot facturar d'aquella obra: les fites del contracte pendents, l'avanç certificable i les línies soltes.",
   Planificado: "Planificat",
   "Volver a la lista de obras": "Tornar a la llista d'obres",
-  "estado y porcentaje, por capítulo y por partida":
-    "estat i percentatge, per capítol i per partida",
+  "estado y porcentaje, por partida y por subpartida":
+    "estat i percentatge, per partida i per subpartida",
   "Recalcula las fechas previstas de los hitos de cobro del contrato a partir de la planificación actual":
     "Recalcula les dates previstes de les fites de cobrament del contracte a partir de la planificació actual",
   caducado: "caducat",
@@ -2595,12 +2597,12 @@ window.CANEI_DICT.ca = {
     "L'elecció es desa en aquest navegador i s'aplica en recarregar. És personal: un company pot tenir el programa en un altre idioma sense que canviï el seu.",
   "se emiten en el idioma del cliente, que se elige en el propio documento. Cambiar el idioma de aquí no reescribe un documento ya emitido ni el que está por emitir.":
     "s'emeten en l'idioma del client, que es tria en el propi document. Canviar l'idioma d'aquí no reescriu un document ja emès ni el que està per emetre.",
-  "— nombres de partidas, descripciones, notas — se guardan tal y como se escribieron. Esto traduce la interfaz, no el contenido.":
-    "— noms de partides, descripcions, notes — es desen tal com es van escriure. Això tradueix la interfície, no el contingut.",
+  "— nombres de subpartidas, descripciones, notas — se guardan tal y como se escribieron. Esto traduce la interfaz, no el contenido.":
+    "— noms de subpartides, descripcions, notes — es desen tal com es van escriure. Això tradueix la interfície, no el contingut.",
   Maquinaria: "Maquinària",
   Profesional: "Professional",
-  "Un precio de referencia en blanco se muestra como «sin precio», nunca como cero — la partida entra en el presupuesto marcada como pendiente de valorar.":
-    "Un preu de referència en blanc es mostra com «sense preu», mai com a zero — la partida entra al pressupost marcada com a pendent de valorar.",
+  "Un precio de referencia en blanco se muestra como «sin precio», nunca como cero — la subpartida entra en el presupuesto marcada como pendiente de valorar.":
+    "Un preu de referència en blanc es mostra com «sense preu», mai com a zero — la subpartida entra al pressupost marcada com a pendent de valorar.",
   "La retención de IRPF depende del perfil del tercero (profesional, empresarial o módulos) y no está confirmada. Se conserva tal cual hasta que la gestoría la revise — ver":
     "La retenció d'IRPF depèn del perfil del tercer (professional, empresarial o mòduls) i no està confirmada. Es conserva tal qual fins que la gestoria la revisi — veure",
   Comprobación: "Comprovació",
@@ -2659,8 +2661,8 @@ window.CANEI_DICT.ca = {
     "Arrossega aquí el contracte signat (PDF o imatge), o cerca'l al dispositiu.",
   "Esta obra no tiene un presupuesto aceptado del que derivar la planificación":
     "Aquesta obra no té un pressupost acceptat del qual derivar la planificació",
-  "Esta obra todavía no tiene un presupuesto aceptado, así que no hay capítulos ni partidas que planificar ni sobre los que registrar avance.":
-    "Aquesta obra encara no té un pressupost acceptat, així que no hi ha capítols ni partides per planificar ni sobre els quals registrar avanç.",
+  "Esta obra todavía no tiene un presupuesto aceptado, así que no hay partidas ni subpartidas que planificar ni sobre los que registrar avance.":
+    "Aquesta obra encara no té un pressupost acceptat, així que no hi ha partides ni subpartides per planificar ni sobre els quals registrar avanç.",
   "Extracto a la izquierda, documentos candidatos a la derecha y la propuesta de emparejamiento en medio, con el porqué. La cola de movimientos sin conciliar es el indicador de salud del periodo.":
     "Extracte a l'esquerra, documents candidats a la dreta i la proposta d'aparellament al mig, amb el perquè. La cua de moviments sense conciliar és l'indicador de salut del període.",
   "El idioma de la interfaz, para quien está usando el programa. No cambia el idioma de los presupuestos ni de los contratos: eso se elige por cliente, en cada documento.":
@@ -2669,8 +2671,8 @@ window.CANEI_DICT.ca = {
   "¿De dónde sale este presupuesto?": "D'on surt aquest pressupost?",
   "No hace falta esperar a la visita para preparar el presupuesto.":
     "No cal esperar la visita per preparar el pressupost.",
-  "Parte diario por trabajador, con la semana al lado; y el resumen por proyecto y capítulo con la conciliación de horas.":
-    "Part diari per treballador, amb la setmana al costat; i el resum per projecte i capítol amb la conciliació d'hores.",
+  "Parte diario por trabajador, con la semana al lado; y el resumen por proyecto y partida con la conciliación de horas.":
+    "Part diari per treballador, amb la setmana al costat; i el resum per projecte i partida amb la conciliació d'hores.",
   TQ1: "TQ1",
   TQ2: "TQ2",
   TQ3: "TQ3",
@@ -2876,8 +2878,8 @@ window.CANEI_DICT.ca = {
     "Definicions reutilitzables de condicions de pagament referenciades per clients, proveïdors i documents.",
   "El libro de precios. Cada material, tarifa de mano de obra, equipo y línea de subcontrata de los que se nutren presupuestos y compras.":
     "El llibre de preus. Cada material, tarifa de mà d'obra, equip i línia de subcontracta dels quals s'alimenten pressupostos i compres.",
-  "La estructura de costes de una reforma — los capítulos en los que se consolidan presupuestos, ofertas y el margen por capítulo.":
-    "L'estructura de costos d'una reforma — els capítols en què es consoliden pressupostos, ofertes i el marge per capítol.",
+  "La estructura de costes de una reforma — las partidas en los que se consolidan presupuestos, ofertas y el margen por partida.":
+    "L'estructura de costos d'una reforma — les partides en què es consoliden pressupostos, ofertes i el marge per partida.",
   "Conjuntos de precios con nombre y fecha de vigencia asignados a grupos de clientes; el sistema elige el adecuado para cada presupuesto.":
     "Conjunts de preus amb nom i data de vigència assignats a grups de clients; el sistema tria l'adequat per a cada pressupost.",
   "Códigos de IVA y retención con fecha de vigencia; la regla de jurisdicción decide cuál se aplica en cada línea.":
@@ -3098,7 +3100,7 @@ window.CANEI_DICT.ca = {
   "p. ej. 31/12": "p. ex. 31/12",
   "p. ej. FRA-2026-": "p. ex. FRA-2026-",
   "código de Listas de precios": "codi de Llistes de preus",
-  "código de Capítulos": "codi de Capítols",
+  "código de Partidas": "codi de Partides",
   "código de proveedor": "codi de proveïdor",
   "código de cliente": "codi de client",
   "código de entidad": "codi d'entitat",
@@ -3140,8 +3142,8 @@ window.CANEI_DICT.ca = {
   "Nueva condición de pago": "Nova condició de pagament",
   "Editar artículo — materiales y trabajos": "Editar article — materials i treballs",
   "Nuevo artículo — materiales y trabajos": "Nou article — materials i treballs",
-  "Editar capítulo (partida)": "Editar capítol (partida)",
-  "Nuevo capítulo (partida)": "Nou capítol (partida)",
+  "Editar partida del catálogo": "Editar partida del catàleg",
+  "Nueva partida del catálogo": "Nova partida del catàleg",
   "Editar lista de precios / tarifa": "Editar llista de preus / tarifa",
   "Nueva lista de precios / tarifa": "Nova llista de preus / tarifa",
   "Editar código de IVA / impuesto": "Editar codi d'IVA / impost",
@@ -3519,14 +3521,14 @@ window.CANEI_DICT.ca = {
   proyecto: "projecte",
   "con una": "amb una",
   "línea base inmutable": "línia base immutable",
-  "— sin volver a introducir datos. Los presupuestos por capítulo se copian una vez y se congelan; todo lo que sigue se mide contra ellos.":
-    "— sense tornar a introduir dades. Els pressupostos per capítol es copien una vegada i es congelen; tot el que segueix es mesura contra ells.",
+  "— sin volver a introducir datos. Los presupuestos por partida se copian una vez y se congelan; todo lo que sigue se mide contra ellos.":
+    "— sense tornar a introduir dades. Els pressupostos per partida es copien una vegada i es congelen; tot el que segueix es mesura contra ells.",
   "Proyecto abierto:": "Projecte obert:",
   "Órdenes de compra": "Comandes de compra",
   "se emiten a los proveedores seleccionados — esto": "s'emeten als proveïdors seleccionats — això",
   compromete: "compromet",
-  "coste contra el presupuesto de cada capítulo, visible de inmediato.":
-    "cost contra el pressupost de cada capítol, visible de seguida.",
+  "coste contra el presupuesto de cada partida, visible de inmediato.":
+    "cost contra el pressupost de cada partida, visible de seguida.",
   "vs presupuesto": "vs pressupost",
   "✓ dentro": "✓ dins",
   "⚠ excedido": "⚠ excedit",
@@ -3534,16 +3536,16 @@ window.CANEI_DICT.ca = {
   "facturas de proveedor": "factures de proveïdor",
   "se contabilizan como": "es comptabilitzen com a",
   "coste real": "cost real",
-  "(los duplicados se rechazan). El presupuestado-vs-real por capítulo se actualiza en directo — la alerta temprana de fugas de margen.":
-    "(els duplicats es rebutgen). El pressupostat-vs-real per capítol s'actualitza en directe — l'alerta primerenca de fuites de marge.",
+  "(los duplicados se rechazan). El presupuestado-vs-real por partida se actualiza en directo — la alerta temprana de fugas de margen.":
+    "(els duplicats es rebutgen). El pressupostat-vs-real per partida s'actualitza en directe — l'alerta primerenca de fuites de marge.",
   La: "La",
   "se emite a partir del presupuesto aceptado. El tipo de IVA reducido se aplica cuando se cumplen las condiciones de la reforma de vivienda (art. 91.Uno.2.10º), y el motivo queda registrado en el documento. La numeración no tiene huecos y cada factura queda sellada contra manipulaciones.":
     "s'emet a partir del pressupost acceptat. El tipus d'IVA reduït s'aplica quan es compleixen les condicions de la reforma d'habitatge (art. 91.U.2.10è), i el motiu queda registrat al document. La numeració no té buits i cada factura queda segellada contra manipulacions.",
   "Facturar a": "Facturar a",
   "PDF de factura completa archivado en “09 Facturación”":
     "PDF de factura completa arxivat a “09 Facturació”",
-  "— partes (NIF/CIF), fechas, partidas, desglose de IVA, IBAN y condiciones de pago, y las notas legales.":
-    "— parts (NIF/CIF), dates, partides, desglossament d'IVA, IBAN i condicions de pagament, i les notes legals.",
+  "— partes (NIF/CIF), fechas, subpartidas, desglose de IVA, IBAN y condiciones de pago, y las notas legales.":
+    "— parts (NIF/CIF), dates, subpartides, desglossament d'IVA, IBAN i condicions de pagament, i les notes legals.",
   "Emitida en español (es-ES).": "Emesa en espanyol (es-ES).",
   "Total a pagar": "Total a pagar",
   "Cobros:": "Cobraments:",
@@ -3559,8 +3561,8 @@ window.CANEI_DICT.ca = {
   "con la verdad que pide el BRD: no facturación —":
     "amb la veritat que demana el BRD: no facturació —",
   rentabilidad: "rendibilitat",
-  ". Ingresos, coste real, margen y presupuestado-vs-real por capítulo.":
-    ". Ingressos, cost real, marge i pressupostat-vs-real per capítol.",
+  ". Ingresos, coste real, margen y presupuestado-vs-real por partida.":
+    ". Ingressos, cost real, marge i pressupostat-vs-real per partida.",
   "Cerrado con beneficio.": "Tancat amb benefici.",
   "El paso final, a menudo olvidado:": "El pas final, sovint oblidat:",
   "pedir una reseña con la buena impresión aún fresca":
@@ -3660,11 +3662,11 @@ window.CANEI_DICT.ca = {
     "Afegiu almenys una línia amb descripció i preu.",
   "Constructor de presupuestos — catálogo primero (concepto · cantidad · precio · importe)":
     "Constructor de pressupostos — catàleg primer (concepte · quantitat · preu · import)",
-  "＋ Añadir partida del catálogo…": "＋ Afegir partida del catàleg…",
+  "＋ Añadir subpartida del catálogo…": "＋ Afegir subpartida del catàleg…",
   "＋ Línea personalizada": "＋ Línia personalitzada",
   "✓ Actualizar presupuesto": "✓ Actualitzar el pressupost",
   "Base del presupuesto:": "Base del pressupost:",
-  "agrupadas por capítulo en el PDF": "agrupades per capítol al PDF",
+  "agrupadas por partida en el PDF": "agrupades per partida al PDF",
   "Añada al menos una línea con concepto, cantidad y precio.":
     "Afegiu almenys una línia amb concepte, quantitat i preu.",
   "Otros trabajos": "Altres treballs",
@@ -3707,20 +3709,20 @@ window.CANEI_DICT.ca = {
   Limpiar: "Netejar",
   "Sus datos se guardan solo en este navegador. “Descargar carpeta (.zip)” lo exporta todo.":
     "Les vostres dades es desen només en aquest navegador. “Descarregar carpeta (.zip)” ho exporta tot.",
-  "Presupuesto — capítulos": "Pressupost — capítols",
-  "Capítulos rápidos — los detallará desde el catálogo en el":
-    "Capítols ràpids — els detallareu des del catàleg al",
+  "Presupuesto — partidas": "Pressupost — partides",
+  "Partidas rápidas — los detallará desde el catálogo en el":
+    "Partides ràpides — les detallareu des del catàleg al",
   "Cargado del catálogo. Refine cada línea en el": "Carregat del catàleg. Refineu cada línia al",
   "paso 4 · Presupuesto": "pas 4 · Pressupost",
-  "Capítulo / trabajo (p. ej. Fontanería)": "Capítol / treball (p. ex. Lampisteria)",
+  "Partida / trabajo (p. ej. Fontanería)": "Partida / treball (p. ex. Lampisteria)",
   "€ presupuesto": "€ pressupost",
-  "＋ Añadir capítulo": "＋ Afegir capítol",
+  "＋ Añadir partida": "＋ Afegir partida",
   "Trabajo opcional (se muestra aparte)": "Treball opcional (es mostra a part)",
   "p. ej. Mampara": "p. ex. Mampara",
   "Importe opcional (€)": "Import opcional (€)",
   "Introduzca el nombre del cliente.": "Introduïu el nom del client.",
-  "Añada al menos un capítulo con presupuesto (o cargue el ejemplo).":
-    "Afegiu almenys un capítol amb pressupost (o carregueu l'exemple).",
+  "Añada al menos una partida con presupuesto (o cargue el ejemplo).":
+    "Afegiu almenys una partida amb pressupost (o carregueu l'exemple).",
   "Introduzca un NIF / CIF válido del cliente — es obligatorio para una factura legal.":
     "Introduïu un NIF / CIF vàlid del client — és obligatori per a una factura legal.",
   "Introduzca un correo electrónico válido del cliente — los documentos se envían a esta dirección.":
@@ -3863,22 +3865,22 @@ window.CANEI_DICT.ca = {
   "Abrir Proyectos": "Obrir Projectes",
   "Abrir Precios y costes": "Obrir Preus i costos",
   "Abrir Banco y caja": "Obrir Banc i caixa",
-  "Órdenes de compra, recepciones y compromiso por capítulo.":
-    "Comandes de compra, recepcions i compromís per capítol.",
-  "El registro de compras y el compromiso de coste por capítulo ya existen y se consultan hoy dentro de cada proyecto.":
-    "El registre de compres i el compromís de cost per capítol ja existeixen i es consulten avui dins de cada projecte.",
+  "Órdenes de compra, recepciones y compromiso por partida.":
+    "Comandes de compra, recepcions i compromís per partida.",
+  "El registro de compras y el compromiso de coste por partida ya existen y se consultan hoy dentro de cada proyecto.":
+    "El registre de compres i el compromís de cost per partida ja existeixen i es consulten avui dins de cada projecte.",
   "Contratación de industriales, ofertas comparadas y documentación obligatoria.":
     "Contractació d'industrials, ofertes comparades i documentació obligatòria.",
   "Las ofertas por proveedor y su comparativa se gestionan hoy en Precios y costes; la contratación se registra en el proyecto.":
     "Les ofertes per proveïdor i la seva comparativa es gestionen avui a Preus i costos; la contractació es registra al projecte.",
-  "Avance de obra por capítulo, partes de trabajo y replanificación.":
-    "Avanç d'obra per capítol, parts de treball i replanificació.",
-  "El avance por capítulo se marca hoy en la ficha del proyecto y alimenta la certificación.":
-    "L'avanç per capítol es marca avui a la fitxa del projecte i alimenta la certificació.",
-  "Venta, coste comprometido, coste real y desviación por capítulo.":
-    "Venda, cost compromès, cost real i desviació per capítol.",
-  "La economía de cada obra se ve hoy en la ficha del proyecto, con coste previsto frente a real por capítulo.":
-    "L'economia de cada obra es veu avui a la fitxa del projecte, amb cost previst enfront de real per capítol.",
+  "Avance de obra por partida, partes de trabajo y replanificación.":
+    "Avanç d'obra per partida, parts de treball i replanificació.",
+  "El avance por partida se marca hoy en la ficha del proyecto y alimenta la certificación.":
+    "L'avanç per partida es marca avui a la fitxa del projecte i alimenta la certificació.",
+  "Venta, coste comprometido, coste real y desviación por partida.":
+    "Venda, cost compromès, cost real i desviació per partida.",
+  "La economía de cada obra se ve hoy en la ficha del proyecto, con coste previsto frente a real por partida.":
+    "L'economia de cada obra es veu avui a la fitxa del projecte, amb cost previst enfront de real per partida.",
   "Extras y modificaciones contractuales con su aprobación.":
     "Extres i modificacions contractuals amb la seva aprovació.",
   "Los extras se registran, valoran y aprueban hoy en la ficha del proyecto; sin aprobación no son facturables.":
@@ -3895,11 +3897,11 @@ window.CANEI_DICT.ca = {
   Fechas: "Dates",
   Holgura: "Marge",
   "＋ Hito/recordatorio": "＋ Fita/recordatori",
-  "Generar desde los capítulos": "Generar des dels capítols",
+  "Generar desde las partidas": "Generar des dles partides",
   ninguno: "cap",
   "en la ruta crítica": "a la ruta crítica",
   "días de margen": "dies de marge",
-  "Planificación generada desde los capítulos": "Planificació generada des dels capítols",
+  "Planificación generada desde las partidas": "Planificació generada des dles partides",
   "Picado de alicatado / solado antiguo · 18 €/m²": "Picat d'enrajolat / paviment antic · 18 €/m²",
   "Desmontaje de sanitarios · 35 €/ud": "Desmuntatge de sanitaris · 35 €/ud",
   "Demolición de tabique · 22 €/m²": "Enderroc d'envà · 22 €/m²",
@@ -3972,32 +3974,32 @@ window.CANEI_DICT.rxEs2Ca = [
   ],
   [new RegExp("^(\\d+) seleccionada$"), "$1 seleccionada"],
   [new RegExp("^(\\d+) seleccionadas$"), "$1 seleccionades"],
-  [new RegExp("^Todos los capítulos \\((\\d+)\\)$"), "Tots els capítols ($1)"],
-  [new RegExp("^(\\d+) partida del catálogo$"), "$1 partida del catàleg"],
-  [new RegExp("^(\\d+) partidas del catálogo$"), "$1 partides del catàleg"],
-  [new RegExp("^¿Eliminar el capítulo «(.+)»\\?$"), "Voleu eliminar el capítol «$1»?"],
+  [new RegExp("^Todas las partidas \\((\\d+)\\)$"), "Totes les partides ($1)"],
+  [new RegExp("^(\\d+) subpartida del catálogo$"), "$1 subpartida del catàleg"],
+  [new RegExp("^(\\d+) subpartidas del catálogo$"), "$1 subpartides del catàleg"],
+  [new RegExp("^¿Eliminar la partida «(.+)»\\?$"), "Voleu eliminar la partida «$1»?"],
   [
-    new RegExp("^Se eliminan también sus (\\d+) partidas\\. No se puede deshacer\\.$"),
-    "Les seves $1 partides se'n van amb ell. No es pot desfer.",
+    new RegExp("^Se eliminan también sus (\\d+) subpartidas\\. No se puede deshacer\\.$"),
+    "Les seves $1 subpartides se'n van amb ella. No es pot desfer.",
   ],
   [
-    new RegExp("^Se eliminan también su (\\d+) partida\\. No se puede deshacer\\.$"),
-    "La seva $1 partida se'n va amb ell. No es pot desfer.",
+    new RegExp("^Se eliminan también su (\\d+) subpartida\\. No se puede deshacer\\.$"),
+    "La seva $1 subpartida se'n va amb ell. No es pot desfer.",
   ],
-  [new RegExp("^Capítulo eliminado · (\\d+) partidas$"), "Capítol eliminat · $1 partides"],
-  [new RegExp("^Capítulo eliminado · (\\d+) partida$"), "Capítol eliminat · $1 partida"],
-  [new RegExp("^(\\d+) partida del catálogo$"), "$1 partida del catàleg"],
+  [new RegExp("^Partida eliminada · (\\d+) subpartidas$"), "Partida eliminata · $1 subpartides"],
+  [new RegExp("^Partida eliminada · (\\d+) subpartida$"), "Partida eliminata · $1 subpartida"],
+  [new RegExp("^(\\d+) subpartida del catálogo$"), "$1 subpartida del catàleg"],
   [
     new RegExp(
-      "^Ninguna partida coincide con «(.+)» en este capítulo\\. Prueba en «Todos los capítulos», o créala con el botón de abajo y queda en el catálogo para la próxima vez\\.$",
+      "^Ninguna subpartida coincide con «(.+)» en esta partida\\. Prueba en «Todas las partidas», o créala con el botón de abajo y queda en el catálogo para la próxima vez\\.$",
     ),
-    "Cap partida coincideix amb «$1» en aquest capítol. Prova a «Tots els capítols», o crea-la amb el botó de sota i queda al catàleg per a la propera vegada.",
+    "Cap subpartida coincideix amb «$1» en aquesta partida. Prova a «Totes les partides», o crea-la amb el botó de sota i queda al catàleg per a la propera vegada.",
   ],
   [
     new RegExp(
-      "^Ninguna partida coincide con «(.+)»\\. Créala con el botón de abajo y queda en el catálogo para la próxima vez\\.$",
+      "^Ninguna subpartida coincide con «(.+)»\\. Créala con el botón de abajo y queda en el catálogo para la próxima vez\\.$",
     ),
-    "Cap partida coincideix amb «$1». Crea-la amb el botó de sota i queda al catàleg per a la propera vegada.",
+    "Cap subpartida coincideix amb «$1». Crea-la amb el botó de sota i queda al catàleg per a la propera vegada.",
   ],
   [new RegExp("^(\\S+) — (.+) \\(cerrada\\)$"), "$1 — $2 (tancada)"],
   [new RegExp("^(\\S+) — (.+) \\(activa\\)$"), "$1 — $2 (activa)"],
@@ -4325,8 +4327,8 @@ window.CANEI_DICT.rxEs2Ca = [
     "$1 (IVA no incl.). Versió congelada.",
   ],
   [
-    new RegExp("^línea base (.+) en (\\d+) capítulos\\. Estado: activo\\.$"),
-    "línia base $1 en $2 capítols. Estat: actiu.",
+    new RegExp("^línea base (.+) en (\\d+) partidas\\. Estado: activo\\.$"),
+    "línia base $1 en $2 partides. Estat: actiu.",
   ],
   [
     new RegExp("^(.+) recibido y asignado a (\\S+)\\. Pendiente: (.+)\\.$"),
@@ -4394,14 +4396,12 @@ window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^1 archivo$"), "1 fitxer"],
   [new RegExp("^(\\d+) archivos$"), "$1 fitxers"],
   [
-    new RegExp("^Estimación aplicada al presupuesto — (.+) en (\\d+) capítulo\\(s\\)\\.$"),
-    "Estimació aplicada al pressupost — $1 en $2 capítol(s).",
+    new RegExp("^Estimación aplicada al presupuesto — (.+) en (\\d+) partida\\(s\\)\\.$"),
+    "Estimació aplicada al pressupost — $1 en $2 partida(s).",
   ],
   [
-    new RegExp(
-      "^Presupuesto actualizado — (\\d+) capítulo\\(s\\), (\\d+) línea\\(s\\), base (.+)$",
-    ),
-    "Pressupost actualitzat — $1 capítol(s), $2 línia(es), base $3",
+    new RegExp("^Presupuesto actualizado — (\\d+) partida\\(s\\), (\\d+) línea\\(s\\), base (.+)$"),
+    "Pressupost actualitzat — $1 partida(s), $2 línia(es), base $3",
   ],
   [new RegExp("^Proveedor (\\d+)$"), "Proveïdor $1"],
   [new RegExp("^Estimado\\/a (.+):$"), "Benvolgut/da $1:"],
@@ -4516,9 +4516,9 @@ window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^(\\d+) documento$"), "$1 document"],
   [new RegExp("^Caducado (\\S+)$"), "Caducat $1"],
   [new RegExp("^Albarán valorado · Albarán (\\S+)$"), "Albarà valorat · Albarà $1"],
-  [new RegExp("^(\\d+) capítulos$"), "$1 capítols"],
-  [new RegExp("^(\\d+) capítulo$"), "$1 capítol"],
   [new RegExp("^(\\d+) partidas$"), "$1 partides"],
+  [new RegExp("^(\\d+) partida$"), "$1 partida"],
+  [new RegExp("^(\\d+) subpartidas$"), "$1 subpartides"],
   [new RegExp("^(\\d+) precios$"), "$1 preus"],
   [new RegExp("^(\\d+) activas de (\\d+)$"), "$1 actives de $2"],
   [new RegExp("^(\\d+) por encolar$"), "$1 per encuar"],
@@ -4541,8 +4541,8 @@ window.CANEI_DICT.rxEs2Ca = [
     "$1 jornada(es) sense registrar — $2",
   ],
   [
-    new RegExp("^Capítulo (\\d+) por encima de coste previsto — (.+)$"),
-    "Capítol $1 per sobre del cost previst — $2",
+    new RegExp("^Partida (\\d+) por encima de coste previsto — (.+)$"),
+    "Partida $1 per sobre del cost previst — $2",
   ],
   [new RegExp("^Documentación caducada — (.+)$"), "Documentació caducada — $1"],
   [new RegExp("^Exclusiones y supuestos \\((\\d+)\\)$"), "Exclusions i supòsits ($1)"],
@@ -4607,8 +4607,8 @@ window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^¿Qué se pregunta sobre (.+)\\?$"), "Què es pregunta sobre $1?"],
   [new RegExp("^Ya hay (\\d+) visitas$"), "Ja hi ha $1 visites"],
   [new RegExp("^Ya hay (\\d+) visita$"), "Ja hi ha $1 visita"],
-  [new RegExp("^(\\d+) partidas$"), "$1 partides"],
-  [new RegExp("^(\\d+) partida$"), "$1 partida"],
+  [new RegExp("^(\\d+) subpartidas$"), "$1 subpartides"],
+  [new RegExp("^(\\d+) subpartida$"), "$1 subpartida"],
   // PK2-B: the version-picker <option> text.
   [new RegExp("^(v[\\d.]+) · aceptada$"), "$1 · acceptada"],
   [new RegExp("^(v[\\d.]+) · emitida$"), "$1 · emesa"],
