@@ -732,7 +732,7 @@
 
     /* ---- the honest fallback ---- */
     generic: [
-      "partida",
+      "subpartida",
       [
         ["R", 0.14, 0.14, 0.72, 0.72],
         ["M", 0.14, 0.38],
