@@ -1165,7 +1165,7 @@ window.CANEI_DICT.ca = {
   "Ruta crítica — un día perdido aquí es un día perdido en la obra":
     "Ruta crítica — un dia perdut aquí és un dia perdut a l'obra",
   "Sin tareas planificadas. Añade una tarea o genera la planificación desde las partidas del proyecto.":
-    "Sense tasques planificades. Afegeix una tasca o genera la planificació des dles partides del projecte.",
+    "Sense tasques planificades. Afegeix una tasca o genera la planificació des de les partides del projecte.",
   "Ninguna. Arrastra el punto de otra barra hasta ésta para crear una.":
     "Cap. Arrossega el punt d'una altra barra fins a aquesta per crear-ne una.",
   "Planificación de obra con dependencias, ruta crítica y línea base. Arrastra una barra para moverla, tira del borde derecho para alargarla y arrastra el punto de una barra a otra para crear una dependencia.":
@@ -1297,7 +1297,7 @@ window.CANEI_DICT.ca = {
     "No es pot programar una visita en una data passada",
   "Nom (CA)": "Nom (CA)",
   "Nombre (ES)": "Nom (ES)",
-  "Nombre dla partida": "Nom dla partida",
+  "Nombre de la partida": "Nom de la partida",
   "Nombre o puesto": "Nom o càrrec",
   "Nota de resolución": "Nota de resolució",
   "Nueva entrada": "Nova entrada",
@@ -1927,7 +1927,7 @@ window.CANEI_DICT.ca = {
     "Bloqueja el període; exigeix zero moviments sense conciliar",
   días: "dies",
   "Vuelve a derivar la planificación de las partidas y subpartidas del presupuesto aceptado, conservando el avance registrado":
-    "Torna a derivar la planificació dles partides i subpartides del pressupost acceptat, conservant l'avanç registrat",
+    "Torna a derivar la planificació de les partides i subpartides del pressupost acceptat, conservant l'avanç registrat",
   "Desvío frente a la línea base, en días laborables":
     "Desviació respecte a la línia base, en dies laborables",
   "Congelar la planificación actual como referencia":
@@ -3897,11 +3897,11 @@ window.CANEI_DICT.ca = {
   Fechas: "Dates",
   Holgura: "Marge",
   "＋ Hito/recordatorio": "＋ Fita/recordatori",
-  "Generar desde las partidas": "Generar des dles partides",
+  "Generar desde las partidas": "Generar des de les partides",
   ninguno: "cap",
   "en la ruta crítica": "a la ruta crítica",
   "días de margen": "dies de marge",
-  "Planificación generada desde las partidas": "Planificació generada des dles partides",
+  "Planificación generada desde las partidas": "Planificació generada des de les partides",
   "Picado de alicatado / solado antiguo · 18 €/m²": "Picat d'enrajolat / paviment antic · 18 €/m²",
   "Desmontaje de sanitarios · 35 €/ud": "Desmuntatge de sanitaris · 35 €/ud",
   "Demolición de tabique · 22 €/m²": "Enderroc d'envà · 22 €/m²",

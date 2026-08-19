@@ -3363,7 +3363,7 @@ window.CANEI_DICT = {
     ],
     ["Nom (CA)", "Name (CA)"],
     ["Nombre (ES)", "Name (ES)"],
-    ["Nombre dla partida", "Line item name"],
+    ["Nombre de la partida", "Line item name"],
     ["Nombre o puesto", "Name or role"],
     ["Nota de resolución", "Resolution note"],
     ["Nueva entrada", "New entry"],
