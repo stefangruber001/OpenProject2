@@ -4851,3 +4851,24 @@ would be a fourth thing to keep in step.
 
 Negative control run before the fix: with the proposal returning nothing and
 the margin listener disabled, the two new checks fail (43/45); restored, 45/45.
+
+## S25 · The rectificativa starts on the invoice it corrects (2026-08-19)
+
+**Item 16.** The credit-note flow was complete, legally gated and tested — and
+unreachable in practice. `invOpen(projectId, opts)` already accepted
+`opts.rectifies` and forced the credit basis, but no caller ever passed it: the
+only route was ＋ Nueva factura → choose the obra → notice «Abono» among the
+origin chips, which is a path you can walk only if you already know it is
+there. The parameter had been dead code since it was written.
+
+One button on `invoiceDrawer`, beside ⤓ Descargar PDF, lights it up: the
+correction now starts where the mistake is visible. Shown only on an invoice
+that can be corrected — a credit note is replaced, not rectified — and it fills
+in WHAT is being corrected, never WHY: AR-10 still demands the operator's own
+sentence before the credit note can be issued, which is exactly the gate
+LEGAL_REVIEW §4 asks for. No engine change; the label ships in all three
+languages.
+
+Negative control: with the button suppressed the new check fails (8/9) while
+the "not offered on a credit note" check keeps passing — proving the two halves
+are independent and neither is vacuous.

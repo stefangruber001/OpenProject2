@@ -5038,6 +5038,52 @@ async function testInvoicing(browser, base) {
       );
     }
 
+    /* Part 2 · item 16 — the rectificativa can be found. Both halves: the
+       button is offered on an invoice that can be corrected, and it lands in
+       the generator with the credit basis and THAT invoice already named; and
+       it is NOT offered on a credit note, which is replaced rather than
+       rectified. */
+    await pg.evaluate(() => (location.hash = "invoicing"));
+    await pg.waitForTimeout(600);
+    const rectify = await pg.evaluate(async () => {
+      const normal = erp.state.invoices.find((i) => i.kind !== "creditNote");
+      if (!normal) return { skipped: true };
+      invoiceDrawer(normal.number);
+      await new Promise((r) => setTimeout(r, 250));
+      const offered = !!document.querySelector("#iv_rect");
+      if (!offered) return { offered };
+      document.querySelector("#iv_rect").click();
+      await new Promise((r) => setTimeout(r, 500));
+      return {
+        offered,
+        basis: invWork && invWork.basis,
+        names: invWork && invWork.rectifies === normal.id,
+        // The reason stays the operator's to write — AR-10 must still bite.
+        reasonBlank: !(invWork && invWork.rectifyReason),
+      };
+    });
+    if (
+      rectify.skipped ||
+      (rectify.offered && rectify.basis === "credit" && rectify.names && rectify.reasonBlank)
+    )
+      ok("ADM-01: an issued invoice offers «Rectificar…», which opens the credit note naming it");
+    else bad("ADM-01: rectificar", JSON.stringify(rectify));
+
+    const notOnCredit = await pg.evaluate(async () => {
+      const credit = erp.state.invoices.find((i) => i.kind === "creditNote");
+      if (!credit) return { skipped: true };
+      location.hash = "invoicing";
+      await new Promise((r) => setTimeout(r, 400));
+      invoiceDrawer(credit.number);
+      await new Promise((r) => setTimeout(r, 250));
+      const offered = !!document.querySelector("#iv_rect");
+      closeDrawer();
+      return { offered };
+    });
+    if (notOnCredit.skipped || notOnCredit.offered === false)
+      ok("ADM-01: a credit note is not itself offered «Rectificar…»");
+    else bad("ADM-01: rectificar on a credit note", JSON.stringify(notOnCredit));
+
     if (errs.length === 0) ok("ADM-01: no console errors");
     else bad("ADM-01: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

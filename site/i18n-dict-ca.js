@@ -743,6 +743,7 @@ window.CANEI_DICT.ca = {
   "⚠ Ese número ya está en uso": "⚠ Aquest número ja s'utilitza",
   "⚠ No se ha podido guardar": "⚠ No s'ha pogut desar",
   "Presupuesto enviado — versión congelada": "Pressupost enviat — versió congelada",
+  "Rectificar…": "Rectificar…",
   "Presupuesto aceptado": "Pressupost acceptat",
   "Presupuesto aceptado — obra creada": "Pressupost acceptat — obra creada",
   "Presupuesto rechazado": "Pressupost rebutjat",

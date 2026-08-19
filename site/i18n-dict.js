@@ -2747,6 +2747,7 @@ window.CANEI_DICT = {
     ["⚠ Ese número ya está en uso", "⚠ That number is already in use"],
     ["⚠ No se ha podido guardar", "⚠ Could not save"],
     ["Presupuesto enviado — versión congelada", "Quote sent — version frozen"],
+    ["Rectificar…", "Correct with a credit note…"],
     ["Presupuesto aceptado", "Quote accepted"],
     ["Presupuesto aceptado — obra creada", "Quote accepted — job created"],
     ["Presupuesto rechazado", "Quote refused"],

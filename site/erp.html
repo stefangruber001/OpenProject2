@@ -20875,8 +20875,28 @@
    }
    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn sm" id="iv_pdf">⤓ Descargar PDF</button>
+    ${inv.kind !== "creditNote" ? '<button class="btn sm" id="iv_rect">Rectificar…</button>' : ""}
    </div>`;
         $("#iv_pdf").onclick = () => downloadInvoicePdf(inv.number);
+
+        /* Part 2 · item 16 — the rectificativa was unfindable. The whole flow
+     existed and `invOpen` even took a `rectifies` option, but NOTHING passed
+     it: the only way in was ＋ Nueva factura → pick the obra → spot «Abono»
+     among the origin chips, which is a path you can only walk if you already
+     know it is there. The correction now starts where the mistake is visible,
+     on the invoice being corrected, and hands the generator the id it was
+     always ready to receive.
+
+     Only on an invoice that can be corrected: a credit note does not get
+     rectified, it gets replaced. AR-10 (a credit note must name and explain
+     what it corrects) is untouched — this fills in the «what», never the
+     «why», which stays the operator's sentence to write. */
+        const rect = $("#iv_rect");
+        if (rect)
+          rect.onclick = () => {
+            closeDrawer();
+            invOpen(inv.projectId, { rectifies: inv.id });
+          };
         const go = $("#iv_go");
         if (go)
           go.onclick = () =>
