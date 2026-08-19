@@ -751,6 +751,11 @@ window.CANEI_DICT.ca = {
     "No s'ha pogut llegir la versió acceptada del pressupost.",
   "El alcance sale de la versión aceptada del presupuesto: son las mismas partidas y subpartidas que leyó el cliente. Los adicionales aceptados van aparte porque el importe vigente del contrato ya los incluye.":
     "L'abast surt de la versió acceptada del pressupost: són les mateixes partides i subpartides que va llegir el client. Els addicionals acceptats van a part perquè l'import vigent del contracte ja els inclou.",
+  "Motivo de la rectificación *": "Motiu de la rectificació *",
+  "Por qué se rectifica": "Per què es rectifica",
+  "— elige la factura a rectificar —": "— tria la factura a rectificar —",
+  "Quitar la línea": "Treure la línia",
+  "⤓ Descargar PDF": "⤓ Descarregar PDF",
   "Rectificar…": "Rectificar…",
   "Presupuesto aceptado": "Pressupost acceptat",
   "Presupuesto aceptado — obra creada": "Pressupost acceptat — obra creada",

@@ -14,6 +14,9 @@ product. Tenant #1 is a Spanish _reformas_ SME.
    then implement the mandate anyway.
 3. End every unit: tests green → commit (conventional message) → update
    `PROGRESS.md` → continue. Never leave the repo red or half-migrated.
+4. **Reports and summaries for the client are written in ENGLISH**, always,
+   unless the operator asks for another language. The product speaks Spanish,
+   Catalan and English; the reporting does not. (Operator, 19 Aug.)
 
 ## Architecture (enforced, not aspirational)
 
