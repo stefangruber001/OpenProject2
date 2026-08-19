@@ -18,7 +18,7 @@ misma estructura de carpetas (nombres sin paréntesis: `01-cliente`,
 - **Cifras protagonistas**: franja de datos clave bajo el título — total,
   vencimiento, IBAN — en Roboto Serif tabular. El símbolo pequeño en amarillo
   actúa de signo de puntuación junto a la cifra principal (dispositivo de marca).
-- **Gráficos lean e imprimibles**: barra de distribución por capítulos
+- **Gráficos lean e imprimibles**: barra de distribución por partidas
   (presupuesto), barras de avance (certificación), línea de hitos de pago
   (contrato), barras de margen (ficha de proyecto). Tinta mínima, sin librerías.
 - **Formato es-ES corregido**: 1.109,30 € (antes 1109,30 €) en todo el conjunto.
@@ -38,7 +38,7 @@ Para producción sin red: autohospedar los woff2 del design system
 
 Cada archivo mantiene `@page { size: A4 }` y su hoja de estilos de impresión
 (cortes de página controlados: las filas, cajas y firmas no se parten).
-El presupuesto sigue ocupando 2–3 páginas según capítulos; el resto, una.
+El presupuesto sigue ocupando 2–3 páginas según partidas; el resto, una.
 
 ## Producción
 

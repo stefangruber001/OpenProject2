@@ -635,7 +635,7 @@
       varX = X1 - 80,
       pctX = X1;
     const head = () => {
-      this.text(X0, this.y - 8, 6.5, FONT.sansB, C.muted, "CAPITULO", { tracking: 0.04 });
+      this.text(X0, this.y - 8, 6.5, FONT.sansB, C.muted, "PARTIDA", { tracking: 0.04 });
       this.textRight(budgetX, this.y - 8, 6.5, FONT.sansB, C.muted, "PREVISTO", { tracking: 0.04 });
       this.textRight(actualX, this.y - 8, 6.5, FONT.sansB, C.muted, "REAL", { tracking: 0.04 });
       this.textRight(varX, this.y - 8, 6.5, FONT.sansB, C.muted, "DESVIACION", { tracking: 0.04 });
@@ -814,7 +814,7 @@
         fn(d, s);
       }
     } else if (doc.groups && doc.groups.length) {
-      d.band(doc.tableLabel || "Detalle por capitulos", doc.tableNote || "");
+      d.band(doc.tableLabel || "Detalle por partidas", doc.tableNote || "");
       d.groups();
       d.totals();
     } else {

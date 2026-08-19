@@ -514,7 +514,7 @@ doc(
     ) +
       `<div class="parties">${partyBlock("Contratista", SELLER)}${partyBlock("Cliente", BUYER)}</div>
    <table style="margin-top:6mm">
-     <thead><tr><th style="width:40%">Capítulo</th><th class="num">Contratado</th><th class="num">% anterior</th><th class="num">% actual</th><th class="num">A origen</th><th class="num">En este periodo</th></tr></thead>
+     <thead><tr><th style="width:40%">Partida</th><th class="num">Contratado</th><th class="num">% anterior</th><th class="num">% actual</th><th class="num">A origen</th><th class="num">En este periodo</th></tr></thead>
      <tbody>
        ${CHAPTERS.map((ch, i) => {
          const t = chapterTotal(ch);
@@ -619,13 +619,13 @@ doc(
     ]) +
       `<div style="margin:6mm 0"><span class="badge warn">Rectificativa</span></div>
    <div class="parties">${partyBlock("Expedidor", SELLER)}${partyBlock("Destinatario", BUYER)}</div>
-   <div class="note" style="margin-bottom:5mm"><b>Causa de la rectificación:</b> la medición del capítulo 06 se certificó
+   <div class="note" style="margin-bottom:5mm"><b>Causa de la rectificación:</b> la medición de la partida 06 se certificó
    al 65 % cuando el avance real a 15/06/2026 era del 58 %. Se rectifica a la baja la diferencia.
    Art. 15 del RD 1619/2012.</div>
    <table>
      <thead><tr><th style="width:58%">Concepto</th><th class="num">Base</th><th class="num">% IVA</th><th class="num">Cuota IVA</th></tr></thead>
      <tbody>
-       <tr><td>Rectificación de medición — capítulo 06 Revestimientos y acabados<br>
+       <tr><td>Rectificación de medición — partida 06 Revestimientos y acabados<br>
          <span class="small muted">Diferencia 65 % → 58 % sobre ${eur(chapterTotal(CHAPTERS[5]))}</span></td>
          <td class="num">−${eur(21860)}</td><td class="num">10 %</td><td class="num">−${eur(2186)}</td></tr>
      </tbody>
@@ -927,9 +927,9 @@ doc(
      </tbody>
      <tfoot><tr><td colspan="7" class="r"><b>Total semana</b></td><td class="num"><b>110 h</b></td><td class="num"><b>${eur(188700)}</b></td></tr></tfoot>
    </table>
-   <h2 style="margin-top:6mm">Imputación por capítulo</h2>
+   <h2 style="margin-top:6mm">Imputación por partida</h2>
    <table>
-     <thead><tr><th style="width:52%">Capítulo</th><th class="num">Horas</th><th class="num">Coste imputado</th></tr></thead>
+     <thead><tr><th style="width:52%">Partida</th><th class="num">Horas</th><th class="num">Coste imputado</th></tr></thead>
      <tbody>
        <tr><td>03 · Fontanería</td><td class="num">46</td><td class="num">${eur(78900)}</td></tr>
        <tr><td>04 · Calefacción y climatización</td><td class="num">28</td><td class="num">${eur(48100)}</td></tr>
@@ -941,7 +941,7 @@ doc(
    suministro (1 cubo de impermeabilizante pendiente del albarán ALB-2026-0155). Viernes, jornada reducida por
    corte de agua programado por la comunidad.</div>
    <div class="box small" style="margin-top:5mm">Las horas registradas alimentan el coste real del proyecto y la
-   desviación por capítulo en la torre de control. Un parte sin firmar del encargado genera una alerta técnica.</div>
+   desviación por partida en la torre de control. Un parte sin firmar del encargado genera una alerta técnica.</div>
    <div class="sig">
      <div><div class="line"></div><div class="small muted">Encargado de obra</div></div>
      <div><div class="line"></div><div class="small muted">Administración — conformidad</div></div>
@@ -969,9 +969,9 @@ doc(
        <dt>Inicio / entrega</dt><dd>01/06/2026 → 27/06/2026 (2 días de desviación)</dd>
      </dl>
    </div>
-   <h2>Margen por capítulo</h2>
+   <h2>Margen por partida</h2>
    <table>
-     <thead><tr><th style="width:34%">Capítulo</th><th class="num">Venta</th><th class="num">Coste previsto</th><th class="num">Coste real</th><th class="num">Margen</th><th class="num">Desviación</th></tr></thead>
+     <thead><tr><th style="width:34%">Partida</th><th class="num">Venta</th><th class="num">Coste previsto</th><th class="num">Coste real</th><th class="num">Margen</th><th class="num">Desviación</th></tr></thead>
      <tbody>
        ${CHAPTERS.map((ch, i) => {
          const sale = chapterTotal(ch);
@@ -997,7 +997,7 @@ doc(
      <tr><td class="muted">Comprometido en pedidos abiertos</td><td class="num">${eur(31200)}</td></tr>
      <tr class="grand"><td>Margen del proyecto</td><td class="num">${eur(Math.round((BASE + 43040 - 21860) * 0.345))}</td></tr>
    </table>
-   <div class="note" style="margin-top:6mm"><b>Lecciones para el próximo presupuesto:</b> el capítulo 03 · Fontanería
+   <div class="note" style="margin-top:6mm"><b>Lecciones para el próximo presupuesto:</b> la partida 03 · Fontanería
    se desvió un 18 % por el desplazamiento de la bajante. Revisar el precio unitario del catálogo y añadir una
    partida específica de "verificación de patologías ocultas" en obras de comunidad anteriores a 1980.</div>
    ${foot()}`,

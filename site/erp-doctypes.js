@@ -139,7 +139,7 @@
           ],
           facts: [
             ["Base (sin impuesto)", eur(t.base)],
-            ["Capitulos", String(f.chapters.length)],
+            ["Partidas", String(f.chapters.length)],
             ["Validez", f.project.validityDays + " dias"],
             ["Proyecto", f.project.code],
           ],
@@ -148,7 +148,7 @@
           sections: [
             {
               type: "table",
-              label: "Detalle por capitulos",
+              label: "Detalle por partidas",
               note: "precios unitarios sin impuesto",
             },
             { type: "totals" },
@@ -335,12 +335,12 @@
           sections: [
             {
               type: "band",
-              label: "Avance por capitulo",
+              label: "Avance por partida",
               note: "porcentaje ejecutado sobre lo contratado",
             },
             {
               type: "progressBars",
-              label: "CAPITULO",
+              label: "PARTIDA",
               rows: f.valuation.rows.map((r) => ({
                 label: r.chapter,
                 pct: r.currentPct,
@@ -865,10 +865,10 @@
           sections: [
             { type: "band", label: "Horas por dia y operario", tone: "interno" },
             { type: "lines" },
-            { type: "band", label: "Reparto por capitulo", tone: "interno" },
+            { type: "band", label: "Reparto por partida", tone: "interno" },
             {
               type: "progressBars",
-              label: "CAPITULO",
+              label: "PARTIDA",
               rows: ts.byChapter.map((c) => ({
                 label: c.chapter,
                 pct: c.pctOfWeek,
@@ -931,7 +931,7 @@
                 ["Entrega real", m.actualEnd],
               ],
             },
-            { type: "band", label: "Margen por capitulo", tone: "interno" },
+            { type: "band", label: "Margen por partida", tone: "interno" },
             {
               type: "marginTable",
               rows: m.rows
@@ -958,7 +958,7 @@
             { type: "band", label: "Avance fisico", tone: "interno" },
             {
               type: "progressBars",
-              label: "CAPITULO",
+              label: "PARTIDA",
               rows: m.rows.map((r) => ({
                 label: r.chapter,
                 pct: r.progressPct,
@@ -1044,7 +1044,7 @@
         rows.push({
           chapter: chapCodes[i % chapCodes.length],
           code: chapCodes[i % chapCodes.length] + "-1" + String(j + 1).padStart(2, "0"),
-          item: names[i % names.length] + " — partida " + (j + 1),
+          item: names[i % names.length] + " — subpartida " + (j + 1),
           note:
             j === 0
               ? "Incluye medios auxiliares, retirada de escombros y limpieza de la zona de trabajo."
@@ -1204,8 +1204,8 @@
         reasonCode: "R4 · descuento posterior",
         reason: "Descuento acordado por retraso en la entrega de material",
         rows: [
-          { item: "Descuento sobre capitulo 03 · Fontaneria", amount: 30000 },
-          { item: "Descuento sobre capitulo 05 · Electricidad", amount: 17500 },
+          { item: "Descuento sobre partida 03 · Fontaneria", amount: 30000 },
+          { item: "Descuento sobre partida 05 · Electricidad", amount: 17500 },
         ],
       },
 
