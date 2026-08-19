@@ -14351,8 +14351,23 @@
               },
               "backoffice",
             );
+            /* The card above promises «Aceptar crea el proyecto», and until now
+       nothing kept that promise from the interface. `createProjectFromAcceptance`
+       existed and was reachable only from the demo seeders, so a real tenant
+       accepted a budget and got no obra — and with no obra there is no frozen
+       baseline, which is precisely what avance físico, avance económico, the
+       certificación and every cost split by partida read. The chain stopped at
+       its own first link and only the demo data hid it.
+
+       Two guards, both structural: a variation JOINS its project rather than
+       opening a new one (the engine refuses it outright), and a budget that
+       already carries its obra must never open a second — accepting is not
+       re-entrant, and PRJ-01 says so on the engine side too. */
+            const b = erp.budget(id);
+            if (!b.variationOf && !erp.state.projects.some((p) => p.budgetId === id))
+              erp.createProjectFromAcceptance(id, "backoffice");
             closeDrawer();
-          }, "Presupuesto aceptado");
+          }, "Presupuesto aceptado — obra creada");
         const no = $("#brNo");
         if (no && reasons.length)
           no.onclick = () =>

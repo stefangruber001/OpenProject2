@@ -4786,3 +4786,36 @@ new words (wording renders live; the frozen numbers do not change).
 (which cannot see "subpartida" — `\b` fails after "b") are packages-side and
 flagged for the factory, not changed here. Source-audit dropped 234→233 (a
 comment literal stopped being flagged); the CI ceilings ratchet to 233.
+
+## S23 · Accepting a budget creates its obra (2026-08-19)
+
+Writing the end-to-end acceptance test surfaced a hole in the chain's first
+link. `budgetResponseDrawer`'s accept card has always told the operator
+«Aceptar crea el proyecto y da la oportunidad por ganada», and the second half
+was true while the first was not: `createProjectFromAcceptance` existed on the
+engine and was reachable only from `erp-seed.js` and `erp-history.js`. Every
+project in the demo data was therefore born correctly and no screen could show
+the gap, but a real tenant accepting their first budget got a won opportunity
+and no obra at all.
+
+That is not a cosmetic gap. The obra carries the FROZEN BASELINE, and the
+baseline is what avance físico reads to list partidas, what avance económico
+reads for «Por partida», what the certificación origin reads to compute what
+may be billed, and what every cost split by partida writes against. Without
+it the whole downstream half of the product has nothing to stand on, and
+`＋ Crear › 🏗️ Nuevo proyecto` is no substitute: `createQuickProject` makes a
+project with no baseline, and its own hint tells the operator to create the
+job from the accepted budget instead — pointing at a door that did not exist.
+
+**Decision:** wire it at the UI layer, in the accept handler, not in
+`acceptVersion`. The seeders call `acceptVersion` and then
+`createProjectFromAcceptance` themselves; moving the creation into the engine
+would have made every seeded budget open two obras. Two guards, both
+structural rather than defensive: a variation budget joins its project instead
+of opening one (the engine refuses outright), and a budget that already
+carries an obra never opens a second, so accepting stays non-re-entrant on the
+UI side exactly as PRJ-01 keeps it on the engine side.
+
+The toast now reads «Presupuesto aceptado — obra creada», with its English and
+Catalan forms in the same commit. Reversible: delete the four added lines and
+acceptance goes back to marking the version and nothing else.

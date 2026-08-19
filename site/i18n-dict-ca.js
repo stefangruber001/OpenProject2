@@ -744,6 +744,7 @@ window.CANEI_DICT.ca = {
   "⚠ No se ha podido guardar": "⚠ No s'ha pogut desar",
   "Presupuesto enviado — versión congelada": "Pressupost enviat — versió congelada",
   "Presupuesto aceptado": "Pressupost acceptat",
+  "Presupuesto aceptado — obra creada": "Pressupost acceptat — obra creada",
   "Presupuesto rechazado": "Pressupost rebutjat",
   "Lo que va a recibir el cliente": "El que rebrà el client",
   "sin correo": "sense correu",

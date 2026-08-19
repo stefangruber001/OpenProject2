@@ -2748,6 +2748,7 @@ window.CANEI_DICT = {
     ["⚠ No se ha podido guardar", "⚠ Could not save"],
     ["Presupuesto enviado — versión congelada", "Quote sent — version frozen"],
     ["Presupuesto aceptado", "Quote accepted"],
+    ["Presupuesto aceptado — obra creada", "Quote accepted — job created"],
     ["Presupuesto rechazado", "Quote refused"],
     ["Lo que va a recibir el cliente", "What the customer is about to receive"],
     ["sin correo", "no email address"],
