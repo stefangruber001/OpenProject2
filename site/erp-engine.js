@@ -2171,6 +2171,13 @@
       v.annex = clone(b.annex || { enabled: true, imagesPerPage: 2 });
       v.sent = { date: when, time: sentTime || null, channel: ch }; // QUO-09 + MDM-04
       v.docRef = this._docName("presupuesto", b, v); // DOC-04
+      /* Part 2 · item 14: validity is thirty days FROM ISSUE, as policy. The
+         create-time default counted from the day drafting started, so a
+         quote that took two weeks to write went out with sixteen days left
+         on it. Stamped here, the printed date is always send + 30. The
+         header-edit API keeps accepting validityDate, so the old behaviour
+         is one hidden control away (HIDDEN_CONTROLS in the shell). */
+      b.validityDate = addDays(when, 30);
       b.status = "issued";
       const o = this.state.opportunities.find(
         (x) => x.partyId === b.partyId && !["won", "lost"].includes(x.status),

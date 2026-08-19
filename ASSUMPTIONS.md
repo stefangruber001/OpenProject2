@@ -4711,3 +4711,35 @@ one-line request into a layout audit of 29 screens is not the trade the
 operator asked for; the pill is fixed, so it needs nothing from the sticky
 bar. Recorded here as its own piece of work: fix the two overflows, then
 replace the body rule with clipping at the root.
+
+## S22 · Part 2 begins: removal means hidden, and validity becomes policy
+
+**The removal rule, made executable.** The client's Part 2 asks for screens to
+be "removed". The operator's standing instruction: keep everything in the
+background, remove only from the UI, easy to switch on again. So `erp.html`
+now carries `HIDDEN_SUBS` (menu entries) and `HIDDEN_CONTROLS` (individual
+inputs) — read only by the nav/screen builders. Routes, aliases, data, alert
+deep-links and the suites all keep working against hidden screens; deleting a
+key from the set restores the entry unchanged. First occupants: purchasing
+(ADM-02), financials (ADM-09), alerts (DMC-07), and the `bcValid` input.
+
+**Validity (item 14).** Thirty days is now policy, stamped at ISSUE
+(`issueVersion` sets `validityDate = sent + 30`). The create-time default
+counted from the day drafting started, so a slow draft went out with a bite
+already taken from its window. The header-edit API still accepts
+`validityDate`, and the date input is one `HIDDEN_CONTROLS` key away — the
+old behaviour is fully recoverable. The builder bar states the policy
+(«Validez · 30 días») because an invisible rule reads as a bug.
+
+**Income, not Revenue.** Item 4 renames the nav to Ingresos/Gastos; the
+client's English for `Ingresos` is _Income_, so the global dictionary entry
+changed from "Revenue" — every screen that says Ingresos now says Income in
+English. Bare `Gastos` had no entry in either dictionary and gained both.
+
+**A miss the ledger caught from the PREVIOUS commit.** The picker labels
+shipped in d271a94 ("P-… · customer · street (cerrada)") pushed the
+translator miss ledger to 77/121 — that commit went out without re-running
+the crawls, and CI's ledger step was the only thing that noticed. Fixed here
+with two interpolation rules (project label + Email line); the rules also
+cleared a batch of older misses, so the EN ceiling ratchets 69→53 (measured
+49+4 slack) and CA stays 113 (measured 110).

@@ -754,7 +754,12 @@ window.CANEI_DICT = {
     ["Entradas (cobros)", "Inflow (collections)"],
     ["Salidas (proveedores y nóminas)", "Outflow (supplier & payroll)"],
     ["Rendimiento de la empresa — ingresos y margen", "Company performance — revenue & margin"],
-    ["Ingresos", "Revenue"],
+    /* Part 2 · item 4: the client's word for this side of the house is
+       Income; one entry serves every screen that says «Ingresos». */
+    ["Ingresos", "Income"],
+    ["Gastos", "Expenses"],
+    ["Validez · 30 días", "Validity · 30 days"],
+    ["Desde la fecha de emisión", "From the issue date"],
     [
       "Comparativa de proveedores — capítulo de baño (precio ausente ≠ cero)",
       "Supplier comparison — bathroom chapter (missing price ≠ zero)",
@@ -4781,6 +4786,12 @@ window.CANEI_DICT = {
     ["Limpieza y remates", "Cleaning and snagging"],
   ],
   rxEs2En: [
+    /* The project picker composes CODE · customer · street, all data, and
+       appends the one translatable word when the job is closed. Data passes
+       through; the suffix translates. Same shape for the Email line a party
+       card composes around an address. */
+    [new RegExp("^(P-[\\w-]+ · .+) \\(cerrada\\)$"), "$1 (closed)"],
+    [new RegExp("^Email: (\\S+@\\S+)$"), "Email: $1"],
     // An account option is its NAME plus a kind suffix; the name is company
     // data and stays, the suffix is vocabulary and translates. Same shape for
     // the drawer titles built as a prose prefix over a record.

@@ -52,6 +52,9 @@ const OUTPUTS = [
   resolve(SITE, "nav.json"),
   resolve(ROOT, "ios/CaneiSubirats/Resources/nav.json"),
   resolve(ROOT, "android/app/src/main/assets/nav.json"),
+  // The workspace mirror was byte-identical but written by nobody — the one
+  // copy that could drift because it was outside this list. Now it cannot.
+  resolve(ROOT, "apps/web/public/workspace/nav.json"),
 ];
 
 /**

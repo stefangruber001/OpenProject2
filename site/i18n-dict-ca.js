@@ -641,6 +641,9 @@ window.CANEI_DICT.ca = {
   "Salidas (proveedores y nóminas)": "Sortides (proveïdors i nòmines)",
   "Rendimiento de la empresa — ingresos y margen": "Rendiment de l'empresa — ingressos i marge",
   Ingresos: "Ingressos",
+  Gastos: "Despeses",
+  "Validez · 30 días": "Validesa · 30 dies",
+  "Desde la fecha de emisión": "Des de la data d'emissió",
   "Comparativa de proveedores — capítulo de baño (precio ausente ≠ cero)":
     "Comparativa de proveïdors — capítol de bany (preu absent ≠ zero)",
   "Correos — redactados automáticamente, un clic para enviar":
@@ -3948,6 +3951,8 @@ window.CANEI_DICT.ca = {
   "Mampara de vidrio templado · 480 €/ud": "Mampara de vidre trempat · 480 €/ud",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  [new RegExp("^(P-[\\w-]+ · .+) \\(cerrada\\)$"), "$1 (tancada)"],
+  [new RegExp("^Email: (\\S+@\\S+)$"), "Email: $1"],
   [new RegExp("^(.+) · caja$"), "$1 · caixa"],
   [new RegExp("^(.+) · tarjeta$"), "$1 · targeta"],
   [new RegExp("^Documento · (.+)$"), "Document · $1"],

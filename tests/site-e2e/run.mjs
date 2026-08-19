@@ -1565,19 +1565,62 @@ async function testShell(browser, base) {
     if (sections === 6 && subsOpen === 0) ok("shell: 6 sections, subsection panel collapsed");
     else bad("shell: sections + collapsed panel", `sections=${sections} open=${subsOpen}`);
 
-    // The specification's own count, asserted rather than assumed: six
-    // secciones and thirty subsecciones. It is thirty and not the doc's
-    // twenty-six because Comunicaciones, Alertas and Usuarios were moved into
-    // Configuración instead of being deleted (decisions 18, 19, 22), and
-    // because PK5-A added Idioma there when the floating language pill was
-    // removed. Each deviation is recorded in ASSUMPTIONS.md; the number is
-    // pinned here so a thirty-first arrives deliberately rather than by drift.
+    // The count, asserted rather than assumed: six secciones, thirty
+    // subsecciones declared, three of them hidden (Part 2 · item 3 — hidden,
+    // never deleted, so SECTIONS still declares them and their routes live).
+    // Pinned so both a thirty-first sub and a fourth hidden entry arrive
+    // deliberately rather than by drift.
     const shape = await pg.evaluate(() => ({
       sections: SECTIONS.length,
       subs: SECTIONS.reduce((n, s) => n + s.subs.length, 0),
+      hidden: [...HIDDEN_SUBS].sort().join(","),
     }));
-    if (shape.sections === 6 && shape.subs === 30) ok("shell: 6 secciones × 30 subsecciones");
-    else bad("shell: 6×30", JSON.stringify(shape));
+    if (
+      shape.sections === 6 &&
+      shape.subs === 30 &&
+      shape.hidden === "alerts,financials,purchasing"
+    )
+      ok("shell: 6 secciones × 30 declared subs, 3 hidden by name");
+    else bad("shell: 6×30 (3 hidden)", JSON.stringify(shape));
+
+    /* The hidden three, both halves of the promise: the MENU no longer lists
+       them, and the ROUTE still renders the screen — hiding that killed the
+       route would be deletion wearing a costume. Checked per entry, because
+       "no dead links" (below) cannot see a link that is not offered. */
+    const hiddenBehaviour = await pg.evaluate(async () => {
+      const out = [];
+      for (const k of ["purchasing", "alerts"]) {
+        const sec = SECTIONS.find((s) => s.subs.some((x) => x.k === k)).k;
+        buildSubs(sec);
+        const listed = !!document.querySelector(`#p2list .navitem[data-k="${k}"]`);
+        location.hash = k;
+        await new Promise((r) => setTimeout(r, 250));
+        const dead = /Ruta desconocida/.test(document.querySelector("#view").innerText);
+        out.push({ k, listed, dead });
+      }
+      closeSection();
+      return out;
+    });
+    if (hiddenBehaviour.every((h) => !h.listed && !h.dead))
+      ok("shell: hidden entries are out of the menu AND their routes still render");
+    else bad("shell: hidden entries", JSON.stringify(hiddenBehaviour));
+
+    // Administración in the operator's money-flow order (Part 2 · item 5),
+    // with the item-4 renames — asserted as the exact visible sequence.
+    const adminOrder = await pg.evaluate(() => {
+      buildSubs("admin");
+      const rows = [...document.querySelectorAll("#p2list .navitem")].map((b) =>
+        b.querySelector("span").textContent.trim(),
+      );
+      closeSection();
+      return rows.join(" · ");
+    });
+    if (
+      adminOrder ===
+      "Ingresos · Gastos · Consolidación bancaria · Caja chica · Horas · Reporte a gestoría · Flujo de caja"
+    )
+      ok("shell: Administración runs in money-flow order with the new names");
+    else bad("shell: admin order", adminOrder);
 
     // Press a section → panel 2 opens with that section's subsections.
     await pg.locator('#p1 .secitem[data-sec="sales"]').click();
@@ -7764,6 +7807,18 @@ async function testPresupuestadorRework(browser, base) {
     if (bar.next && !bar.validate)
       ok("presupuestador: the bar ends in one «Siguiente paso» instead of three endings");
     else bad("presupuestador: siguiente paso replaces the scattered buttons", JSON.stringify(bar));
+
+    // Part 2 · item 14: validity is policy, not a choice. The date input is
+    // hidden (HIDDEN_CONTROLS — removable in one line, per the removal rule)
+    // and the bar SAYS the policy instead, because an invisible rule reads
+    // as a bug.
+    const validity = await pg.evaluate(() => ({
+      input: !!document.querySelector("#bcValid"),
+      pill: /Validez · 30 días/.test(document.querySelector(".pbcond")?.textContent || ""),
+    }));
+    if (!validity.input && validity.pill)
+      ok("presupuestador: the validity selector is gone and the 30-day policy is stated");
+    else bad("presupuestador: validity policy", JSON.stringify(validity));
 
     await pg.click("#bcNext");
     await pg.waitForTimeout(600);

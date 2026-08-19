@@ -182,6 +182,19 @@ assert(erp.currentVersion(b.id).chapters[0].lines.length === 1, "removeLine renu
 erp.updateBudget(b.id, { vatBp: 1000 }, "bo");
 assert(erp.budget(b.id).vatBp === 1000, "updateBudget vat");
 erp.issueVersion(b.id, {}, "bo");
+// Part 2 · item 14: validity is policy — thirty days FROM ISSUE. The
+// create-time default counted from the day drafting began, so a slow draft
+// went out with a bite already taken from its window.
+{
+  const d = new Date(erp.state.today + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 30);
+  const expect = d.toISOString().slice(0, 10);
+  assert(
+    erp.budget(b.id).validityDate === expect,
+    "issuing stamps validity at issue + 30 days",
+    `${erp.budget(b.id).validityDate} ≠ ${expect}`,
+  );
+}
 throws(
   () => erp.updateLine(b.id, 1, "1.1", { priceCents: 1 }, "bo"),
   "issued version line is frozen",

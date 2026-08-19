@@ -5431,15 +5431,19 @@
    an old link still lands where it did — it just arrives at the new name.
    Renaming without that map is how you break a bookmark silently.
 
-   Six secciones, twenty-nine subsecciones. The specification names twenty-six;
-   the extra three are Comunicaciones, Alertas and Usuarios, moved into
-   Configuración by operator decision rather than deleted (see ASSUMPTIONS).
-
-   Subsections carry either a `view` (rendered in panel 3) or an `href` (a page
-   this shell does not own yet). As of S12 every one of them resolves to a real
-   screen; a route that resolves to neither is a dead link, not a promise, and
-   says so. `code` is the specification's own identifier, so a screen can be
-   traced to the paragraph that asked for it. */
+   Six secciones. Subsections carry either a `view` (rendered in panel 3) or
+   an `href` (a page this shell does not own yet). As of S12 every one of them
+   resolves to a real screen; a route that resolves to neither is a dead link,
+   not a promise, and says so. `code` is the specification's own identifier,
+   so a screen can be traced to the paragraph that asked for it. */
+      /* What the client asked us to REMOVE (Part 2, 18/08/2026), by the
+   operator's standing rule: hide at the surface, keep it working underneath.
+   Nothing is deleted — the screens, their routes, aliases, data and tests
+   all stay live, because SUBMAP is still built from the full SECTIONS list;
+   only the menu builders consult these sets. Delete a key and the entry is
+   back, unchanged. HIDDEN_CONTROLS is the same rule for individual inputs. */
+      const HIDDEN_SUBS = new Set(["purchasing", "financials", "alerts"]);
+      const HIDDEN_CONTROLS = new Set(["bcValid"]);
       const SECTIONS = [
         {
           k: "tower",
@@ -5471,20 +5475,27 @@
             { k: "variations", lab: "Adicionales", code: "PRY-03" },
           ],
         },
+        // Administración in money-flow order, the operator's choice for
+        // Part 2 · item 5: in, out, where it sits, who it pays, then the
+        // reporting. The hidden entries ride at the end — position is
+        // irrelevant to a row nobody sees, and keeping them inside SECTIONS
+        // keeps their routes alive. (Comment sits OUTSIDE the object:
+        // gen-nav-manifest parses this block by a strict regex from k: to
+        // the first sub, and a comment inside the run breaks the parse.)
         {
           k: "admin",
           ic: "🧾",
           lab: "Administración",
           short: "Admin.",
           subs: [
-            { k: "invoicing", lab: "Facturación", code: "ADM-01" },
-            { k: "purchasing", lab: "Compras y pedidos", code: "ADM-02" },
-            { k: "supplier-invoices", lab: "Facturas de proveedores", code: "ADM-03" },
-            { k: "labour", lab: "Horas", code: "ADM-04" },
+            { k: "invoicing", lab: "Ingresos", code: "ADM-01" },
+            { k: "supplier-invoices", lab: "Gastos", code: "ADM-03" },
             { k: "banking", lab: "Consolidación bancaria", code: "ADM-05" },
             { k: "petty-cash", lab: "Caja chica", code: "ADM-06" },
+            { k: "labour", lab: "Horas", code: "ADM-04" },
             { k: "accountant", lab: "Reporte a gestoría", code: "ADM-07" },
             { k: "cash-flow", lab: "Flujo de caja", code: "ADM-08" },
+            { k: "purchasing", lab: "Compras y pedidos", code: "ADM-02" },
             {
               k: "financials",
               lab: "Datos financieros",
@@ -5617,6 +5628,9 @@
         const list = $("#p2list");
         list.innerHTML = "";
         s.subs.forEach((x) => {
+          // The one place menu hiding happens. Route, SUBMAP entry, aliases
+          // and the screen itself all stay live; only the row is withheld.
+          if (HIDDEN_SUBS.has(x.k)) return;
           const b = el("button", "navitem" + (x.k === cur ? " on" : ""));
           const c = counts(x.k);
           b.innerHTML = `<span>${x.lab}</span>${x.href ? '<span class="ext">↗</span>' : c !== "" ? `<span class="ct${x.k === "torre" && c ? " alert" : ""}">${c}</span>` : ""}`;
@@ -12220,7 +12234,13 @@
          belongs to FINISHING moves behind one button. Superficie is gone
          entirely, input and figure both, at the operator's request. -->
     <div class="pbcond">
-     <label>Validez <input type="date" id="bcValid" value="${esc(b.validityDate || "")}" min="${esc(erp.today)}"${dis}></label>
+     <!-- Part 2 · item 14: validity is POLICY now, not a choice — thirty
+          days from the day the quote is issued, stamped by issueVersion.
+          The input is hidden, not deleted (the removal rule): delete
+          "bcValid" from HIDDEN_CONTROLS and it is back, wiring and all.
+          The read-only pill keeps the policy visible, because a rule
+          nobody can see reads as a bug. -->
+     ${HIDDEN_CONTROLS.has("bcValid") ? `<span class="pill" title="Desde la fecha de emisión">Validez · 30 días</span>` : `<label>Validez <input type="date" id="bcValid" value="${esc(b.validityDate || "")}" min="${esc(erp.today)}"${dis}></label>`}
      <label>Idioma del documento
       <select id="bcLang"${dis}>
        <option value="es"${b.language === "es" ? " selected" : ""}>Español</option>
@@ -12355,6 +12375,9 @@
 
         if (!locked) {
           const hdr = (el, patch, msg) => {
+            // Null-tolerant: a control in HIDDEN_CONTROLS is not rendered,
+            // and its wiring must wait for it rather than crash the screen.
+            if (!el) return;
             el.onchange = () => mutate(() => erp.updateBudget(id, patch(el), "backoffice"), msg);
           };
           hdr($("#bcValid"), (el) => ({ validityDate: el.value }), "Validez actualizada");
