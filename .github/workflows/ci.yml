@@ -66,8 +66,16 @@ jobs:
       # The template and translation gates render real pages in a real browser,
       # which is the whole point of them — so they need one. The runner has no
       # browser until this step, and `pnpm install` does not fetch it.
+      # Bounded on purpose. This same command finishes in about two and a half
+      # minutes on a healthy runner; on 19/08 one job sat in it for FORTY,
+      # twice, while two sibling jobs in the same run installed normally. An
+      # unbounded step turns a runner hiccup into a run that neither passes nor
+      # fails and holds the machine while it does nothing. Eight minutes is
+      # three times the healthy duration: slow still passes, hung fails fast
+      # and says so.
       - name: Install Playwright browser (document + translation gates render pages)
         if: always()
+        timeout-minutes: 8
         run: pnpm --filter web exec playwright install --with-deps chromium
 
       # The writer behind every quote and invoice: paginates instead of
@@ -393,6 +401,7 @@ jobs:
       # This job had no browser until here — the scenario is the one gate in
       # it that drives a page instead of the engine.
       - name: Install Playwright browser (the scenario drives a real page)
+        timeout-minutes: 8 # see the note on the first install step
         run: pnpm --filter web exec playwright install --with-deps chromium
 
       - name: Part 1 real-life scenario (chained, one browser)
@@ -483,6 +492,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browser
+        timeout-minutes: 8 # see the note on the first install step
         run: pnpm --filter web exec playwright install --with-deps chromium
 
       - name: Run end-to-end tests
