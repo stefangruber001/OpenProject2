@@ -1578,10 +1578,10 @@ async function testShell(browser, base) {
     if (
       shape.sections === 6 &&
       shape.subs === 30 &&
-      shape.hidden === "alerts,financials,purchasing"
+      shape.hidden === "alerts,financials,price-list,purchasing"
     )
-      ok("shell: 6 secciones × 30 declared subs, 3 hidden by name");
-    else bad("shell: 6×30 (3 hidden)", JSON.stringify(shape));
+      ok("shell: 6 secciones × 30 declared subs, 4 hidden by name");
+    else bad("shell: 6×30 (4 hidden)", JSON.stringify(shape));
 
     /* The hidden three, both halves of the promise: the MENU no longer lists
        them, and the ROUTE still renders the screen — hiding that killed the
@@ -1589,7 +1589,7 @@ async function testShell(browser, base) {
        "no dead links" (below) cannot see a link that is not offered. */
     const hiddenBehaviour = await pg.evaluate(async () => {
       const out = [];
-      for (const k of ["purchasing", "alerts"]) {
+      for (const k of ["purchasing", "alerts", "price-list"]) {
         const sec = SECTIONS.find((s) => s.subs.some((x) => x.k === k)).k;
         buildSubs(sec);
         const listed = !!document.querySelector(`#p2list .navitem[data-k="${k}"]`);
@@ -7274,6 +7274,81 @@ async function testControlTowerAndDay(browser, base) {
     )
       ok("DMC-01: brand, model and quality capture and persist");
     else bad("DMC-01 brand/model/quality", JSON.stringify(made));
+
+    /* Part 2 · item 6 — the drawer proposes the next free code for the chosen
+       partida, and the margin is shown where the two figures that make it are
+       typed. Three properties, because each can break on its own: the proposal
+       follows the PREFIX-NNN convention past the codes already taken, a code
+       the operator typed is never overwritten, and the margin matches the
+       register's own arithmetic. */
+    await pg.evaluate(() => (location.hash = "items"));
+    await pg.waitForTimeout(400);
+    await pg.locator("#catNew").click();
+    await pg.waitForTimeout(250);
+    const proposal = await pg.evaluate(async () => {
+      const chap = document.querySelector("#ci_chap"),
+        code = document.querySelector("#ci_code");
+      // Pick the first real partida and let the change handler run.
+      const opt = [...chap.options].find((o) => o.value);
+      chap.value = opt.value;
+      chap.dispatchEvent(new Event("change"));
+      await new Promise((r) => setTimeout(r, 60));
+      const taken = erp.state.catalogue
+        .map((x) => String(x.code || "").toUpperCase())
+        .filter((c) => c.startsWith(opt.value.toUpperCase() + "-"));
+      // What the convention says it should be: 101 upward, skipping taken.
+      let want = 101;
+      while (taken.includes(`${opt.value.toUpperCase()}-${want}`)) want++;
+      return { chapter: opt.value, got: code.value, want: `${opt.value.toUpperCase()}-${want}` };
+    });
+    if (proposal.got === proposal.want)
+      ok(`DMC-01: a new subpartida is proposed the next free code (${proposal.got})`);
+    else bad("DMC-01 code proposal", JSON.stringify(proposal));
+
+    // The operator's own code wins, and keeps winning after a partida change.
+    const typedWins = await pg.evaluate(async () => {
+      const chap = document.querySelector("#ci_chap"),
+        code = document.querySelector("#ci_code");
+      code.value = "MIO-777";
+      code.dispatchEvent(new Event("input"));
+      const others = [...chap.options].filter((o) => o.value && o.value !== chap.value);
+      if (!others.length) return { skipped: true };
+      chap.value = others[0].value;
+      chap.dispatchEvent(new Event("change"));
+      await new Promise((r) => setTimeout(r, 60));
+      return { code: code.value };
+    });
+    if (typedWins.skipped || typedWins.code === "MIO-777")
+      ok("DMC-01: a hand-typed code survives a change of partida");
+    else bad("DMC-01 typed code overwritten", JSON.stringify(typedWins));
+
+    // Margin: computed, live, and blank while there is no price.
+    const marginLine = await pg.evaluate(async () => {
+      const el = document.querySelector("#ci_margin"),
+        cost = document.querySelector("#ci_cost"),
+        price = document.querySelector("#ci_price");
+      const read = () => (el ? el.textContent.trim() : null);
+      const empty = read();
+      cost.value = "60";
+      cost.dispatchEvent(new Event("input"));
+      price.value = "100";
+      price.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 40));
+      const priced = read();
+      price.value = "50"; // below cost
+      price.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 40));
+      return { empty, priced, negative: read() };
+    });
+    if (
+      marginLine.empty === "—" &&
+      /^40%/.test(marginLine.priced) &&
+      /^-20%/.test(marginLine.negative)
+    )
+      ok("DMC-01: the drawer shows the margin, live, and blank with no price");
+    else bad("DMC-01 drawer margin", JSON.stringify(marginLine));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(200);
 
     // A blank reference price stays blank. Zero would mean "we quote this for
     // nothing", which is a different and untrue statement.

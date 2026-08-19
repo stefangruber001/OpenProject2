@@ -5441,8 +5441,16 @@
    Nothing is deleted — the screens, their routes, aliases, data and tests
    all stay live, because SUBMAP is still built from the full SECTIONS list;
    only the menu builders consult these sets. Delete a key and the entry is
-   back, unchanged. HIDDEN_CONTROLS is the same rule for individual inputs. */
-      const HIDDEN_SUBS = new Set(["purchasing", "financials", "alerts"]);
+   back, unchanged. HIDDEN_CONTROLS is the same rule for individual inputs.
+
+   `price-list` is here for a different reason than the other three. The client
+   asked for ONE catalogue screen, and from the operator's chair the price list
+   looks like a second one — but it is not redundant: it is the only place the
+   supplier price HISTORY lives, the only cheapest-supplier comparison, and
+   where the PRICE-EXPIRED alert lands. So the menu loses it and everything
+   else keeps it: the alert still opens the screen, `#price-list` still works,
+   and the register keeps recording. */
+      const HIDDEN_SUBS = new Set(["purchasing", "financials", "alerts", "price-list"]);
       const HIDDEN_CONTROLS = new Set(["bcValid"]);
       const SECTIONS = [
         {
@@ -8923,6 +8931,30 @@
    splitting it would mean two forms to keep in step. The code is editable
    only while creating: budget lines store it, so on an existing subpartida it
    is shown and not offered. */
+      /**
+       * The next free code for a partida, following the catalogue's own
+       * convention: PREFIX-NNN counting from 101 (see erp-catalogue-pack.js —
+       * the shipped price book numbers DEM-101…DEM-110, ALB-101…, and so on).
+       *
+       * Taken codes are SKIPPED rather than counted, so a catalogue with a gap
+       * fills the gap instead of colliding, and one with 10 items proposes the
+       * eleventh. The proposal is only ever a proposal: the field stays free
+       * text and the uniqueness guard on save is unchanged, because a company
+       * that already numbers its own way must be able to keep doing so.
+       */
+      function nextCatalogueCode(chapterCode) {
+        if (!chapterCode) return "";
+        const taken = new Set(
+          erp.state.catalogue.map((x) => String(x.code || "").toUpperCase()),
+        );
+        const prefix = String(chapterCode).toUpperCase();
+        for (let n = 101; n < 1000; n++) {
+          const candidate = `${prefix}-${n}`;
+          if (!taken.has(candidate)) return candidate;
+        }
+        return "";
+      }
+
       function catalogueItemDrawer(id) {
         const it = id ? erp.state.catalogue.find((x) => x.id === id) : null;
         const db = openDrawer(it ? `${it.code} · ${it.desc}` : "Nueva subpartida");
@@ -8955,6 +8987,8 @@
    <div class="field"><label>Calidad</label><input id="ci_qual" value="${val("quality", "")}" placeholder="estándar / alta"></div>
    <div class="field"><label>Coste de referencia (€)</label><input id="ci_cost" type="number" min="0" step="0.01" value="${it ? it.defaultCostCents / 100 : ""}"></div>
    <div class="field"><label>Precio de referencia (€)</label><input id="ci_price" type="number" min="0" step="0.01" value="${it && it.defaultPriceCents ? it.defaultPriceCents / 100 : ""}"></div>
+   <div class="field full" style="display:flex;align-items:center;gap:8px;margin-top:-2px">
+     <label style="margin:0">Margen</label><b id="ci_margin" translate="no">—</b></div>
    <div class="field full" style="font-size:11.5px;color:var(--muted);margin-top:-2px">
      Un precio de referencia en blanco se muestra como «sin precio», nunca como cero — la subpartida
      entra en el presupuesto marcada como pendiente de valorar.</div>
@@ -8977,6 +9011,62 @@
        : ""
    }`;
         if (it) paintImages(db);
+
+        /* The margin, shown where the two figures that make it are typed. It is
+     COMPUTED and never stored: the catalogue keeps a cost and a price, and a
+     third stored number would be a fourth thing to keep in step. Same formula
+     as the register's own column — (price − cost) / price — so the drawer and
+     the table can never tell the operator two different things. */
+        const paintMargin = () => {
+          const num = (el) => {
+            const raw = String(($(el) || {}).value || "").trim();
+            if (!raw) return 0;
+            const n = Number(raw.replace(",", "."));
+            return Number.isFinite(n) ? n : 0;
+          };
+          const costC = Math.round(num("#ci_cost") * 100),
+            priceC = Math.round(num("#ci_price") * 100);
+          const el = $("#ci_margin");
+          if (!el) return;
+          // No price means "pendiente de valorar", not a 100% margin.
+          if (!priceC) {
+            el.textContent = "—";
+            el.style.color = "var(--muted)";
+            return;
+          }
+          // The register's own arithmetic, to the same tenth of a point.
+          const pct = Math.round(((priceC - costC) / priceC) * 1000) / 10;
+          el.textContent = `${pct}% · ${eur(priceC - costC)}`;
+          // Selling below cost is the one thing this line exists to catch.
+          el.style.color = pct < 0 ? "var(--danger)" : "var(--green)";
+        };
+        ["#ci_cost", "#ci_price"].forEach((s) => {
+          const el = $(s);
+          if (el) el.addEventListener("input", paintMargin);
+        });
+        paintMargin();
+
+        /* Proposing the code (Package 2 · item 6). Only when CREATING — an
+     existing subpartida's code is disabled, because budget lines store it.
+     The proposal follows the chosen partida and stops the moment the operator
+     types anything of their own: `mine` latches on their first keystroke and
+     never unlatches, so their code is never overwritten by a later change of
+     partida. Clearing the field hands control back. */
+        if (!it) {
+          const codeEl = $("#ci_code"),
+            chapEl = $("#ci_chap");
+          let mine = false;
+          if (codeEl && chapEl) {
+            codeEl.addEventListener("input", () => {
+              mine = codeEl.value.trim() !== "";
+            });
+            chapEl.addEventListener("change", () => {
+              if (mine) return;
+              codeEl.value = nextCatalogueCode(chapEl.value);
+            });
+          }
+        }
+
         $("#ci_save").onclick = () =>
           mutate(
             () => {

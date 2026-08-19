@@ -4819,3 +4819,35 @@ UI side exactly as PRJ-01 keeps it on the engine side.
 The toast now reads «Presupuesto aceptado — obra creada», with its English and
 Catalan forms in the same commit. Reversible: delete the four added lines and
 acceptance goes back to marking the version and nothing else.
+
+## S24 · One catalogue screen, and the codes propose themselves (2026-08-19)
+
+**Item 6, three decisions.**
+
+**The price list leaves the menu, not the product.** The client asked for one
+catalogue screen. From the operator's chair `Lista de precios` looks like a
+second one, but it is not a duplicate of `Partidas y subpartidas`: it is the
+only UI for the supplier price HISTORY (`state.prices`), the only
+cheapest-supplier comparison, and where the `PRICE-EXPIRED` alert lands. So it
+goes behind `HIDDEN_SUBS` like the other three: the menu loses it, `#price-list`
+still opens it, the alert still lands there, and prices keep recording. Deleting
+the key brings the entry back.
+
+**Codes are proposed, never imposed.** `nextCatalogueCode` follows the shipped
+price book's own convention — `PREFIX-NNN` from 101, where PREFIX is the
+partida's code — and SKIPS codes already taken rather than counting them, so a
+catalogue with a gap fills the gap. The proposal appears when a partida is
+chosen and stops the moment the operator types: a latch set on their first
+keystroke is never unset, so a hand-typed code survives a later change of
+partida. The field stays free text and the uniqueness guard on save is
+untouched, because a company that already numbers its own way must be able to
+keep doing so.
+
+**The margin is computed in the drawer, never stored.** Same formula as the
+register's column — (price − cost) / price to the tenth of a point — so the
+drawer and the table can never say two different things. A blank price shows
+«—», not 100%: no price means «pendiente de valorar», and a stored third number
+would be a fourth thing to keep in step.
+
+Negative control run before the fix: with the proposal returning nothing and
+the margin listener disabled, the two new checks fail (43/45); restored, 45/45.
