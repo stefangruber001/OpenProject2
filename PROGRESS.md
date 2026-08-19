@@ -1678,3 +1678,64 @@ quietly HIDING variation chapters from the economics table — merged in.
 **Recurring lesson, twice more.** The forecast bridge hiding variations and the
 miss-crawl flagging translated catalogue strings were both counts agreeing
 while the page disagreed. Geometry and read-back beat tallies.
+
+## Part 2 — the sixteen unordered changes (2026-08-19)
+
+Six stages, each shipped green to `main` and promoted to production before the
+next began: **A** navigation, **B** vocabulary, **C** catalogue, **D**
+rectificativa, **F** contracts and nav move, **E** the budget document.
+
+**A · Navigation (items 3, 4, 5, 14).** Three screens left the menu behind one
+named switch, `HIDDEN_SUBS` — the operator's standing rule from 18 Aug: hidden
+at the surface, alive underneath. Routes, aliases, data and tests all survive,
+and deleting a key restores the entry. Facturación→**Ingresos**, Facturas de
+proveedores→**Gastos**, Administración reordered to follow the money. Validity
+became a policy rather than a field: issue date + 30 days, stamped on issue,
+shown as a pill so an unchangeable rule is still visible.
+
+**B · The vocabulary flip (item 7).** capítulo→**partida**,
+partida→**subpartida** in all three languages, ~1 100 occurrences across
+screens, both dictionaries, the printed document and the unwired doc stack.
+Placeholder-based with a gender-agreement table (partida is feminine), frozen
+protected senses («partida alzada», «punto de partida»), and a bijectivity
+check because the rename collides with itself by construction. A permanent
+ratchet in `coverage.mjs` now fails any build where the old words return.
+
+**C · One catalogue screen (item 6).** `price-list` joins the hidden set — it
+is not redundant (supplier price history, cheapest-supplier comparison,
+PRICE-EXPIRED landing) so it keeps working. New subpartidas propose their own
+code, PREFIX-NNN from 101, skipping taken; a hand-typed code survives a change
+of partida. The margin is computed in the drawer with the register's own
+arithmetic.
+
+**D · The rectificativa can be found (item 16).** `invOpen`'s `rectifies`
+option had been dead code since it was written. One button on the invoice
+drawer lights it up; AR-10 still demands the operator's reason.
+
+**F · Contracts carry their scope (items 11, 15).** The Alcance tab renders the
+accepted budget version the contract has always stored, reading the same
+payload the customer's quote prints from. Adicionales moved to Comercial.
+
+**E · The budget document (item 9), reproduced before it was touched.** Neither
+fault was the one predicted. «Missing images» was a RACE — the blobs were all
+present; the code awaited the image URL and printed before the browser had
+decoded anything (0 of 3 paintable at print time, 3 of 3 a second later), so
+the annex reached customers as blank plates. «No formatting» is the browser's
+own header printing the server URL on the document, which no stylesheet can
+disable; `@page` and `print-color-adjust` fix what CSS owns, and the rest is
+one checkbox the operator unticks once.
+
+**Found while writing the acceptance test, and worth more than any item on the
+list.** Accepting a budget never created the obra: `createProjectFromAcceptance`
+was reachable only from the demo seeders, so every project in the demo was born
+correctly while a real tenant's first acceptance produced a won lead and no
+job — and with no job there is no baseline, which is what progress, economics,
+certification and every cost split by partida all read. Wired at the UI layer,
+guarded against variations and re-entry (ASSUMPTIONS S23).
+
+**Recurring lesson, sharper than ever: a passing test is not evidence until it
+has failed.** Three checks this part passed against a broken build before being
+rewritten — a scope table searched pane-wide (a one-line chapter's total equals
+its line's, so wrong money still "appeared"), and the annex check ran on a page
+whose images were already cached. Each was caught by running the negative
+control, not by reading the code.
