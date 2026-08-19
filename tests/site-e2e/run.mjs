@@ -1622,12 +1622,37 @@ async function testShell(browser, base) {
       ok("shell: Administración runs in money-flow order with the new names");
     else bad("shell: admin order", adminOrder);
 
-    // Press a section → panel 2 opens with that section's subsections.
+    /* Press a section → panel 2 opens with that section's subsections.
+       Five since Part 2 · item 15 moved Adicionales here from Proyectos —
+       asserted by NAME as well as by count, so the next move is a deliberate
+       edit rather than a number nudged until the test goes quiet. */
     await pg.locator('#p1 .secitem[data-sec="sales"]').click();
     await pg.waitForTimeout(250);
-    const subs = await pg.locator("#p2.on .navitem").count();
-    if (subs === 4) ok("shell: section opens its subsection panel");
-    else bad("shell: section opens panel", `subsections=${subs}`);
+    const salesSubs = await pg.evaluate(() =>
+      [...document.querySelectorAll("#p2.on .navitem")].map((b) =>
+        b.querySelector("span").textContent.trim(),
+      ),
+    );
+    if (salesSubs.join(" · ") === "Leads · Visitas · Presupuestos · Contratos · Adicionales")
+      ok("shell: Comercial opens its five subsections, Adicionales among them");
+    else bad("shell: section opens panel", salesSubs.join(" · "));
+
+    /* …and Proyectos keeps the two that are about building it. Built in page
+       rather than clicked: panel 2 is open over the rail at this point, so a
+       second rail click waits on an element the scrim is covering. */
+    const projSubs = await pg.evaluate(() => {
+      buildSubs("projects");
+      const rows = [...document.querySelectorAll("#p2list .navitem")].map((b) =>
+        b.querySelector("span").textContent.trim(),
+      );
+      // Put Comercial back: the next check clicks a subsection in this panel,
+      // and leaving Proyectos (or nothing) here would starve it of its target.
+      buildSubs("sales");
+      return rows;
+    });
+    if (projSubs.join(" · ") === "Avance físico · Avance económico")
+      ok("shell: Proyectos keeps physical and financial progress");
+    else bad("shell: projects subs", projSubs.join(" · "));
 
     // Choosing a subsection routes and collapses the panel again.
     await pg.locator('#p2 .navitem[data-k="contracts"]').click();
@@ -5446,12 +5471,75 @@ async function testContract(browser, base) {
       viewer.docCol <= 760 &&
       viewer.panelCol > 392 &&
       viewer.docTranslateOff &&
-      viewer.tabs.length === 3
+      viewer.tabs.length === 4
     )
       ok(
-        `COM-04: full screen, document ≤760 + panel fills the rest (${viewer.docCol}+${viewer.panelCol}), three tabs`,
+        `COM-04: full screen, document ≤760 + panel fills the rest (${viewer.docCol}+${viewer.panelCol}), four tabs`,
       );
     else bad("COM-04: full-screen viewer", JSON.stringify(viewer));
+
+    /* Part 2 · item 11 — the Alcance tab renders what was contracted, read
+       from the accepted budget version the contract has always stored. The
+       assertion is on the NUMBERS, not on the presence of a table: a scope
+       pane that lists the right partidas with the wrong money would be worse
+       than none, so every chapter total is checked against the engine's own
+       renderBudgetDoc. */
+    await pg.locator('[data-contab="alcance"]').click();
+    await pg.waitForTimeout(350);
+    const scope = await pg.evaluate(() => {
+      const c = erp.state.contracts.find((x) => x.id === conWork.id);
+      if (!c.budgetId)
+        return { external: true, text: document.querySelector("#conBody").innerText };
+      const doc = erp.renderBudgetDoc(c.budgetId, c.acceptedVersionId);
+      const base = doc.chapters.filter((ch) => ch.section === "base");
+      const txt = document.querySelector("#conBody").innerText;
+      // The app's own formatter, grouping and all — a four-digit total prints
+      // as 1.234,00 € there and would print as 1234,00 € under the default.
+      const eurTxt = (cents) =>
+        new Intl.NumberFormat("es-ES", {
+          style: "currency",
+          currency: "EUR",
+          useGrouping: "always",
+        }).format(cents / 100);
+      /* Read each chapter's OWN row rather than searching the whole pane:
+         with a one-line chapter the line total equals the chapter total, so a
+         whole-pane search says "the right number is in here somewhere" even
+         when the chapter row is wrong. Proven by a negative control that a
+         pane-wide search happily passed. */
+      const rows = [...document.querySelectorAll("#conBody table tr.k")].map((tr) => ({
+        name: tr.children[0].textContent.trim(),
+        amount: tr.children[2].textContent.trim(),
+      }));
+      return {
+        chapters: base.length,
+        rows: rows.length,
+        priced: base.map((ch) => {
+          const want = `${ch.num}. ${ch.name}`;
+          const row = rows.find((r) => r.name === want);
+          return {
+            want,
+            found: !!row,
+            ok: !!row && row.amount === eurTxt(ch.lines.reduce((n, l) => n + l.totalCents, 0)),
+            saw: row ? row.amount : null,
+          };
+        }),
+        // …and at least one sub-line item, or it is a chapter list, not a scope.
+        hasLines: base.some((ch) => ch.lines.some((l) => txt.includes(l.desc))),
+      };
+    });
+    if (
+      scope.external ||
+      (scope.chapters > 0 &&
+        scope.rows === scope.chapters &&
+        scope.priced.every((p) => p.found && p.ok) &&
+        scope.hasLines)
+    )
+      ok(
+        scope.external
+          ? "COM-04: an externally signed contract says so instead of inventing a scope"
+          : `COM-04: Alcance lists the accepted budget's ${scope.chapters} partidas with their own totals`,
+      );
+    else bad("COM-04: alcance", JSON.stringify(scope));
 
     // The document is built from data — it names the customer and totals its
     // own milestones, which no uploaded PDF in this system could do.

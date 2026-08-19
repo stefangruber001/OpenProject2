@@ -2747,6 +2747,20 @@ window.CANEI_DICT = {
     ["⚠ Ese número ya está en uso", "⚠ That number is already in use"],
     ["⚠ No se ha podido guardar", "⚠ Could not save"],
     ["Presupuesto enviado — versión congelada", "Quote sent — version frozen"],
+    ["Alcance contratado", "Contracted scope"],
+    ["adicional aceptado", "accepted variation"],
+    [
+      "Este contrato se firmó fuera del sistema, así que no tiene un presupuesto aceptado del que leer el alcance. Lo contratado es lo que diga el archivo firmado.",
+      "This contract was signed outside the system, so there is no accepted quote to read the scope from. What was contracted is whatever the signed file says.",
+    ],
+    [
+      "No se ha podido leer la versión aceptada del presupuesto.",
+      "The accepted version of the quote could not be read.",
+    ],
+    [
+      "El alcance sale de la versión aceptada del presupuesto: son las mismas partidas y subpartidas que leyó el cliente. Los adicionales aceptados van aparte porque el importe vigente del contrato ya los incluye.",
+      "The scope comes from the accepted version of the quote: the same line items and sub-line items the customer read. Accepted variations are listed separately because the contract's current amount already includes them.",
+    ],
     ["Rectificar…", "Correct with a credit note…"],
     ["Presupuesto aceptado", "Quote accepted"],
     ["Presupuesto aceptado — obra creada", "Quote accepted — job created"],

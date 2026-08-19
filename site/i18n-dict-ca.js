@@ -743,6 +743,14 @@ window.CANEI_DICT.ca = {
   "⚠ Ese número ya está en uso": "⚠ Aquest número ja s'utilitza",
   "⚠ No se ha podido guardar": "⚠ No s'ha pogut desar",
   "Presupuesto enviado — versión congelada": "Pressupost enviat — versió congelada",
+  "Alcance contratado": "Abast contractat",
+  "adicional aceptado": "addicional acceptat",
+  "Este contrato se firmó fuera del sistema, así que no tiene un presupuesto aceptado del que leer el alcance. Lo contratado es lo que diga el archivo firmado.":
+    "Aquest contracte es va signar fora del sistema, així que no té un pressupost acceptat del qual llegir l'abast. El que s'ha contractat és el que digui l'arxiu signat.",
+  "No se ha podido leer la versión aceptada del presupuesto.":
+    "No s'ha pogut llegir la versió acceptada del pressupost.",
+  "El alcance sale de la versión aceptada del presupuesto: son las mismas partidas y subpartidas que leyó el cliente. Los adicionales aceptados van aparte porque el importe vigente del contrato ya los incluye.":
+    "L'abast surt de la versió acceptada del pressupost: són les mateixes partides i subpartides que va llegir el client. Els addicionals acceptats van a part perquè l'import vigent del contracte ja els inclou.",
   "Rectificar…": "Rectificar…",
   "Presupuesto aceptado": "Pressupost acceptat",
   "Presupuesto aceptado — obra creada": "Pressupost acceptat — obra creada",

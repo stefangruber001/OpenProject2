@@ -5470,8 +5470,14 @@
             { k: "visits", lab: "Visitas", code: "COM-02" },
             { k: "quotes", lab: "Presupuestos", code: "COM-03" },
             { k: "contracts", lab: "Contratos", code: "COM-04" },
+            { k: "variations", lab: "Adicionales", code: "PRY-03" },
           ],
         },
+        // Adicionales sits under Comercial (Part 2 · item 15): an extra is a
+        // change to what was SOLD, negotiated and approved by the customer
+        // before anyone builds it, so it belongs beside the contract it
+        // amends. Its route key and code are unchanged, and PROJECT_SUBS
+        // still lists it so the project-context bar survives the move.
         {
           k: "projects",
           ic: "🏗️",
@@ -5480,7 +5486,6 @@
           subs: [
             { k: "progress", lab: "Avance físico", code: "PRY-01" },
             { k: "economics", lab: "Avance económico", code: "PRY-02" },
-            { k: "variations", lab: "Adicionales", code: "PRY-03" },
           ],
         },
         // Administración in money-flow order, the operator's choice for
@@ -20965,6 +20970,7 @@
         const val = erp.contractValue(conWork.id);
         const TABS = [
           ["datos", "Datos"],
+          ["alcance", "Alcance"],
           ["hitos", "Hitos de pago"],
           ["anexos", "Anexos"],
         ];
@@ -21216,6 +21222,85 @@
       <div class="it"><span>Firma</span><span style="flex:1"></span>
         ${d.signature.customerSignedAt ? `<b>${fmtD(d.signature.customerSignedAt)}</b>` : '<span class="pill r">Sin firmar</span>'}</div>
      </div>`;
+          return;
+        }
+        /* Part 2 · item 11 — what was actually contracted, not just how much.
+       The contract already stored `budgetId` + `acceptedVersionId` from the
+       day it was created; no screen ever rendered them, so the one document
+       that says what the customer bought could tell you the amount and not
+       the work. The unwired doctype had specified this table all along
+       (erp-doctypes.js «Alcance contratado»), which is the design intent
+       catching up with the data.
+
+       It reads `renderBudgetDoc` — the SAME payload the customer's quote is
+       printed from — so the contract's scope and the accepted quote cannot
+       drift apart. Accepted variation budgets follow underneath, because the
+       contract's «Importe vigente» already includes them: showing base and
+       variations separately is what makes that figure explainable. */
+        if (conWork.tab === "alcance") {
+          const c = erp.state.contracts.find((x) => x.id === conWork.id);
+          const project = erp.state.projects.find((p) => p.contractId === c.id) || null;
+          const scopeTable = (doc) => `<div class="scroll"><table><thead><tr>
+       <th>Partida</th><th class="num">Cantidad</th><th class="num">Importe</th></tr></thead><tbody>
+      ${doc.chapters
+        .filter((ch) => ch.section === "base")
+        .map(
+          (ch) => `<tr class="k"><td><b>${esc(ch.num + ". " + ch.name)}</b></td><td></td>
+         <td class="num"><b>${eur(ch.lines.reduce((n, l) => n + l.totalCents, 0))}</b></td></tr>
+        ${ch.lines
+          .map(
+            (l) => `<tr><td style="padding-left:18px">${esc(l.num + " " + l.desc)}</td>
+          <td class="num">${l.qty} ${esc(l.unit)}</td><td class="num">${eur(l.totalCents)}</td></tr>`,
+          )
+          .join("")}`,
+        )
+        .join("")}
+      </tbody></table></div>`;
+
+          if (!c.budgetId) {
+            // Signed elsewhere: there is no accepted version to read, and
+            // inventing a scope table from the amount would be a fiction.
+            host.innerHTML = `<div class="daylist"><div class="it" style="color:var(--muted)">
+        Este contrato se firmó fuera del sistema, así que no tiene un presupuesto aceptado del que
+        leer el alcance. Lo contratado es lo que diga el archivo firmado${
+          d.externalRef ? ` (${esc(d.externalRef)})` : ""
+        }.</div></div>`;
+            return;
+          }
+          let base = null;
+          try {
+            base = erp.renderBudgetDoc(c.budgetId, c.acceptedVersionId);
+          } catch (e) {
+            base = null;
+          }
+          const variations = project
+            ? erp.state.budgets
+                .filter((b) => b.variationOf === project.id && b.acceptedVersionId)
+                .map((b) => {
+                  try {
+                    return { b, doc: erp.renderBudgetDoc(b.id, b.acceptedVersionId) };
+                  } catch (e) {
+                    return null;
+                  }
+                })
+                .filter(Boolean)
+            : [];
+          host.innerHTML = `
+      <div class="card" style="margin:0"><div class="ch"><h3>Alcance contratado</h3>
+        <span class="tag">${esc(d.budgetNumber || "")}</span></div>
+       ${base ? scopeTable(base) : '<div class="daylist"><div class="it" style="color:var(--muted)">No se ha podido leer la versión aceptada del presupuesto.</div></div>'}
+      </div>
+      ${variations
+        .map(
+          (v) => `<div class="card" style="margin-top:10px"><div class="ch"><h3>${esc(v.b.number)}</h3>
+        <span class="pill g">adicional aceptado</span></div>
+       ${scopeTable(v.doc)}</div>`,
+        )
+        .join("")}
+      <div class="daylist"><div class="it" style="color:var(--muted)">
+        El alcance sale de la versión aceptada del presupuesto: son las mismas partidas y subpartidas
+        que leyó el cliente. Los adicionales aceptados van aparte porque el importe vigente del
+        contrato ya los incluye.</div></div>`;
           return;
         }
         if (conWork.tab === "anexos") {

@@ -4872,3 +4872,36 @@ languages.
 Negative control: with the button suppressed the new check fails (8/9) while
 the "not offered on a credit note" check keeps passing — proving the two halves
 are independent and neither is vacuous.
+
+## S26 · Contracts show what was contracted, and Adicionales moves to Comercial (2026-08-19)
+
+**Item 11 — the view was missing, not the data.** A contract created from an
+accepted budget has stored `budgetId` and `acceptedVersionId` since the day
+`createContract` was written, and no screen ever rendered them: the one
+document that says what the customer bought could tell you the AMOUNT and not
+the WORK. The unwired doctype had specified the table all along
+(`erp-doctypes.js`, «Alcance contratado»), so this is the design intent
+catching up with the data rather than a new idea.
+
+The new **Alcance** tab reads `renderBudgetDoc` — the same payload the
+customer's own quote is printed from — so the contract's scope and the accepted
+quote cannot drift apart. Accepted variation budgets are listed underneath and
+separately, because the contract's «Importe vigente» already includes them and
+splitting base from variations is what makes that figure explainable. A
+contract signed outside the system says so and names its file instead of
+inventing a scope table from an amount (empty-state rule S19).
+
+**Item 15 — Adicionales moves from Proyectos to Comercial**, after Contratos.
+An extra is a change to what was SOLD, agreed with the customer before anyone
+builds it, so it belongs beside the contract it amends. Route key, code
+(PRY-03) and every alias are unchanged, and `PROJECT_SUBS` still lists it so
+the project-context bar survives the move. The nav manifest is unaffected —
+it carries the six section tabs, and both sections keep their first sub.
+
+**A test that had to be sharpened.** The first Alcance check searched the whole
+pane for each chapter's total, and a negative control that shifted every total
+by 1,00 € PASSED it: in a one-line chapter the line total equals the chapter
+total, so the right number was still "in here somewhere". It now reads each
+chapter's own row and compares that cell. The rewritten check fails the same
+negative control (23/24) and passes clean (24/24) — the first version would
+have certified wrong money.
