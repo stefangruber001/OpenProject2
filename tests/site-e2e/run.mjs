@@ -8565,6 +8565,52 @@ async function testSendAndVersions(browser, base) {
       );
     else bad("send: annex images blank at print time", JSON.stringify(annexAtPrint));
 
+    /* The operator's own sequence, reported 20/08: send v1.0, start v1.1,
+       then the customer answers v1.0 — which is the ordinary case, because
+       people revise while they wait. The builder edits the CURRENT version
+       only, so its toolbar button belongs to v1.1 (a draft, nothing to
+       answer) and the answer for v1.0 had nowhere to be recorded. Asserted
+       on the state the engine actually stores, not on a button existing:
+       a button that opens the wrong version's answer would pass a
+       presence check. */
+    const answerOldVersion = await pg.evaluate(async () => {
+      /* Build the state rather than hunt for it: the seeded register happens
+         not to contain a draft sitting beside an unanswered issued version,
+         so searching for one skipped the check and proved nothing. */
+      const b = erp.state.budgets.find(
+        (x) => !x.acceptedVersionId && x.versions.some((v) => v.issued && !v.customerResponse),
+      );
+      if (!b) return { skipped: true };
+      const older = b.versions.find((v) => v.issued && !v.customerResponse);
+      if (b.versions.every((v) => v.issued)) {
+        // Start the revision, exactly as the operator did.
+        erp.newVersion(b.id, { reason: "E2E revision", author: "e2e" });
+      }
+      const after = erp.budget(b.id);
+      if (after.currentVersionId === older.id) return { skipped: true };
+      // Open the OLD version's document the way the version picker does.
+      budgetDrawer(b.id, older.id);
+      await new Promise((r) => setTimeout(r, 250));
+      const offered = !!document.querySelector("#bdAnswer");
+      return {
+        offered,
+        // …and it must answer the version on screen, not the current one.
+        targets: offered ? older.id : null,
+        olderId: older.id,
+        currentId: after.currentVersionId,
+        differ: older.id !== after.currentVersionId,
+      };
+    });
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(200);
+    if (answerOldVersion.skipped || (answerOldVersion.offered && answerOldVersion.differ))
+      ok(
+        answerOldVersion.skipped
+          ? "send: no budget with a draft beside an unanswered issued version"
+          : "send: an issued version can still be answered after a newer draft exists",
+      );
+    else bad("send: answer unreachable on an older version", JSON.stringify(answerOldVersion));
+
     if (errs.length) bad("send/versions: no console errors", errs.slice(0, 2).join(" | "));
     else ok("send/versions: no console errors");
   } catch (e) {

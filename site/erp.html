@@ -19708,6 +19708,28 @@
         : ""
     }
    </div></div>
+   ${
+     /* The customer answers a VERSION, not a budget — and they answer the one
+        they were sent, which is not always the one being drafted. The builder
+        edits the current version only, so the moment v1.1 was started the
+        button vanished from the toolbar (v1.1 is a draft, and a draft has
+        nothing to answer) and picking v1.0 from the version dropdown lands
+        here, on the document, where there was no way to record the answer
+        either. A quote sent on Monday and accepted on Thursday became
+        unrecordable because somebody had begun a revision in between — which
+        is the ordinary case, not an edge one.
+
+        So the action lives where the version does. Same three conditions as
+        the toolbar, read from the version ON SCREEN. */
+     V.issued && !V.customerResponse && !b.acceptedVersionId
+       ? `<div class="card"><div class="ch"><h3>Respuesta del cliente</h3>
+     <span class="tag">v${V.vNumber}</span></div><div class="daylist">
+    <div class="it"><span>Esta versión se envió y todavía no tiene respuesta.</span>
+     <span style="flex:1"></span>
+     <button class="btn primary sm" id="bdAnswer">Respuesta del cliente</button></div>
+   </div></div>`
+       : ""
+   }
    ${renderBudgetDocHtml(doc, annex, marked, perPage, b, t)}
    <div class="card" style="margin-top:12px"><div class="ch"><h3>Margen interno</h3><span class="tag">nunca aparece en el documento del cliente</span></div><div class="daylist">
     <div class="it">Coste interno base: <b>${eur(t.costBaseCents)}</b> · Margen: <b>${eur(t.marginBaseCents)} (${t.marginBasePct}%)</b></div>
@@ -19734,6 +19756,10 @@
         db.querySelectorAll("[data-goverid]").forEach((n) => {
           n.onclick = () => budgetDrawer(id, n.dataset.goverid);
         });
+        // Answers the version being viewed, not the current one — that is the
+        // whole point of putting it here.
+        const bdAns = $("#bdAnswer");
+        if (bdAns) bdAns.onclick = () => budgetResponseDrawer(id, vsel);
       }
       /** Adjust one chapter's projection. The reason is required, by the engine. */
       function forecastDrawer(pid, chapterNum, name, row) {

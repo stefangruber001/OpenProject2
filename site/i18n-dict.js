@@ -2707,6 +2707,10 @@ window.CANEI_DICT = {
     ["Nueva versión creada", "New version created"],
     ["Motivo de la nueva versión", "Reason for the new version"],
     ["Vista previa", "Preview"],
+    [
+      "Esta versión se envió y todavía no tiene respuesta.",
+      "This version was sent and has no answer yet.",
+    ],
     ["Respuesta del cliente", "The customer's answer"],
     ["Partidas", "Line items"],
     ["Subpartidas", "Sub-line items"],

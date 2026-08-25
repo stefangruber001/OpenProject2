@@ -710,6 +710,8 @@ window.CANEI_DICT.ca = {
   "Nueva versión creada": "Nova versió creada",
   "Motivo de la nueva versión": "Motiu de la nova versió",
   "Vista previa": "Vista prèvia",
+  "Esta versión se envió y todavía no tiene respuesta.":
+    "Aquesta versió es va enviar i encara no té resposta.",
   "Respuesta del cliente": "Resposta del client",
   Partidas: "Partides",
   Subpartidas: "Subpartides",
