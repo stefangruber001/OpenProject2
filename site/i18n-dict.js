@@ -3583,6 +3583,12 @@ window.CANEI_DICT = {
     ["Crear contrato", "Create contract"],
     ["Contrato creado", "Contract created"],
     ["Contrato registrado", "Contract recorded"],
+    ["Firmar contrato", "Sign contract"],
+    ["Firmar", "Sign"],
+    [
+      "Al firmar, el contrato entra en vigor y la obra puede facturarse.",
+      "Once signed, the contract takes effect and the job can be invoiced.",
+    ],
     ["Contrato firmado", "Signed contract"],
     ["Contrato firmado fuera de este sistema.", "A contract signed outside this system."],
     [

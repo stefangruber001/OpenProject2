@@ -4945,3 +4945,39 @@ of the regression check ran on the page that had already downloaded once, so
 the blob URLs were cached and the browser painted from cache: it passed on the
 broken build. It now runs in its own cold context — the customer's FIRST
 download is the case that fails — and reports 0/3 without the fix, 3/3 with it.
+
+## S28 · A contract can be signed from its own screen (2026-08-26)
+
+Operator report, 26/08, with a photograph of CTR-2026-0002: status **Borrador**,
+signature **Sin firmar**, and no way anywhere on the screen to change either.
+
+`signContract` has existed on the engine since CON-11 was written, and it was
+reachable from exactly one place: the **creation** drawer, where «Firmado el»
+is one field among twenty. Leave that field empty — which the acceptance
+protocol explicitly tells the tester to do, so the unsigned state can be seen —
+and the contract is sealed shut. Nothing on the contract screen, in any tab,
+called the method.
+
+That is worse than a missing convenience, because CON-11 refuses the job's
+**first invoice** while `customerSignedAt` is null. A contract drawn up without
+a signature date blocked the whole money chain behind it, and the only exits
+were to cancel the contract and draw it up again, or to edit the record by hand.
+
+**What was added:** a `Firmar contrato` button in the contract screen's action
+bar, offered only while the contract is unsigned and not cancelled. It asks for
+the date rather than assuming today — the signed copy usually comes back days
+after it was sent, and stamping «today» would date the guarantees and the
+execution period from the wrong day — capped at today, because the engine
+refuses a future signature (the same rule `acceptVersion` and `issueVersion`
+apply). Method is recorded as `physical`; a contract signed inside this system
+is not a digital signature and must not claim to be one.
+
+**The test had to be rewritten before it proved anything.** The first version
+searched the register for an unsigned contract, found none, and reported a pass
+that was a skip. It now **builds the state**: it takes the contract already on
+screen, blanks its signature, asserts the button is offered, clicks it, fills
+the real modal, reads the record back — signed today, status `signed`, button
+gone — and then restores the signature exactly as it was. Two negative controls,
+both red: remove the button (offered: false) and leave it unwired (offered but
+nothing happens). The unwired case is the shape of the reported defect, so it
+fails as a check rather than as a timeout that takes the suite down with it.

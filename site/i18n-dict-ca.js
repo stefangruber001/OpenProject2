@@ -1472,6 +1472,10 @@ window.CANEI_DICT.ca = {
   "Crear contrato": "Crea el contracte",
   "Contrato creado": "Contracte creat",
   "Contrato registrado": "Contracte registrat",
+  "Firmar contrato": "Signar contracte",
+  Firmar: "Signar",
+  "Al firmar, el contrato entra en vigor y la obra puede facturarse.":
+    "En signar, el contracte entra en vigor i l'obra es pot facturar.",
   "Contrato firmado": "Contracte signat",
   "Contrato firmado fuera de este sistema.": "Un contracte signat fora d'aquest sistema.",
   "No se ha adjuntado el contrato firmado. Los datos están en el panel de al lado.":

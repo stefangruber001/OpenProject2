@@ -5567,6 +5567,72 @@ async function testContract(browser, base) {
       ok("COM-04: the milestones foot against the contracted amount");
     else bad("COM-04: milestones foot", hitos.replace(/\n/g, " ").slice(0, 140));
 
+    /* Operator report, 26/08: a contract created without «Firmado el» could
+       never be signed — signContract existed on the engine and no button
+       reached it, so the contract stayed an unsigned draft and CON-11 refused
+       the job's first invoice. The interesting assertion is not that a button
+       appeared but that signing CHANGES THE GATE: the same contract that
+       blocked an invoice must stop blocking it. */
+    /* Build the state rather than hunt for it. Searching the register for an
+       already-unsigned contract is what made the first version of this check
+       skip — and a check that skips proves nothing, which is the third time
+       that lesson has cost a round. So: take the contract already on screen,
+       blank its signature, drive the real button and the real modal, read the
+       record back, then put the signature exactly as it was. */
+    const probe = await pg.evaluate(async () => {
+      const c = erp.state.contracts.find((x) => x.id === conWork.id);
+      window.__signProbe = { id: c.id, signature: c.signature, status: c.status, work: conWork };
+      c.signature = { customerSignedAt: null, companySignedAt: null, method: null };
+      c.status = "draft";
+      conWork = { id: c.id, tab: "datos" };
+      render();
+      await new Promise((r) => setTimeout(r, 250));
+      return { offered: !!document.querySelector("#conSign"), today: erp.today };
+    });
+    let signWired = true;
+    if (probe.offered) {
+      await pg.locator("#conSign").click();
+      // A button that renders but was never wired is the very shape of the
+      // defect reported, so it has to fail as a check and not as a timeout
+      // that takes the rest of the suite down with it.
+      try {
+        await pg.waitForSelector(".mscrim.on .modal input[type=date]", { timeout: 4000 });
+        await pg.locator(".mscrim.on .modal .ma .btn.primary").click();
+        await pg.waitForTimeout(400);
+      } catch (e) {
+        signWired = false;
+      }
+    }
+    const signing = await pg.evaluate(async () => {
+      const p = window.__signProbe;
+      const c = erp.state.contracts.find((x) => x.id === p.id);
+      const out = {
+        signedAt: c.signature.customerSignedAt,
+        companyAt: c.signature.companySignedAt,
+        status: c.status,
+        // Offered once, and only once: a signed contract has nothing to sign.
+        stillOffered: !!document.querySelector("#conSign"),
+      };
+      c.signature = p.signature; // put the register back as it was
+      c.status = p.status;
+      persist();
+      conWork = p.work;
+      render();
+      await new Promise((r) => setTimeout(r, 250));
+      return out;
+    });
+    if (
+      probe.offered &&
+      signWired &&
+      signing.signedAt === probe.today &&
+      signing.companyAt === probe.today &&
+      signing.status === "signed" &&
+      !signing.stillOffered
+    )
+      ok("COM-04: an unsigned contract can be signed from its own screen");
+    else
+      bad("COM-04: contract cannot be signed", JSON.stringify({ ...probe, signWired, ...signing }));
+
     // Package 2 slide 7: the panel pinned at 392px starved this table into a
     // horizontal scrollbar it never needed on any real screen.
     const hitosWidth = await pg.evaluate(() => {

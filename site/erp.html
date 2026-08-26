@@ -21045,7 +21045,24 @@
     <div class="who"><b>${esc(d.number)}</b><span>${esc(d.customer.name)}</span></div>
     ${val.differs ? `<span class="pill y">${val.annexes === 1 ? "1 anexo" : val.annexes + " anexos"}</span>` : ""}
     <div class="tot"><span>Importe vigente</span><b>${eur(val.currentCents)}</b></div>
-    <div class="acts"><span class="tag">${esc(LANG_NAME[d.language] || LANG_NAME.es)}</span></div>
+    <div class="acts">
+     ${
+       /* Signing had exactly one door, and it was on the way in: the creation
+          drawer's «Firmado el». Leave it blank — which is the honest thing to
+          do, because at that moment the customer has not signed yet — and the
+          contract was stuck as an unsigned draft for good. `signContract`
+          existed on the engine and nothing in the interface could reach it.
+
+          That is not a cosmetic gap: CON-11 refuses the first invoice of a job
+          whose contract is unsigned, so the money chain stopped behind a
+          button that was never built. The paper comes back signed days after
+          it goes out; the action belongs here, on the contract, not in the
+          form that created it. */
+       !d.signature.customerSignedAt && d.status !== "cancelled"
+         ? '<button class="btn primary sm" id="conSign">Firmar contrato</button>'
+         : ""
+     }
+     <span class="tag">${esc(LANG_NAME[d.language] || LANG_NAME.es)}</span></div>
    </div>
    <div class="con2">
     <div class="condoc"><div class="cdoc" translate="no" id="conDoc"></div></div>
@@ -21061,6 +21078,28 @@
           conWork = null;
           render();
         };
+        const sign = $("#conSign");
+        if (sign)
+          sign.onclick = async () => {
+            /* The date is asked for, not assumed: the signed copy usually
+       comes back days after it was sent, and stamping «today» would
+       date the guarantees and the execution period from the wrong day.
+       Capped at today because the engine refuses a future signature. */
+            const when = await askText("Firmar contrato", {
+              label: "Firmado el",
+              type: "date",
+              value: erp.today,
+              max: erp.today,
+              required: true,
+              body: "Al firmar, el contrato entra en vigor y la obra puede facturarse.",
+              okLabel: "Firmar",
+            });
+            if (when === null) return;
+            mutate(
+              () => erp.signContract(conWork.id, { method: "physical", date: when }, "backoffice"),
+              "Contrato firmado",
+            );
+          };
         v.querySelectorAll("[data-contab]").forEach(
           (b) =>
             (b.onclick = () => {
