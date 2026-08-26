@@ -3578,6 +3578,24 @@ window.CANEI_DICT = {
     ["Plazo de ejecución (días)", "Execution term (days)"],
     ["Firmado el", "Signed on"],
     ["Déjalo en blanco si todavía no está firmado.", "Leave it blank if it is not signed yet."],
+    [
+      "Déjalo en blanco si todavía no está firmado. Puedes firmarlo más tarde desde el propio contrato.",
+      "Leave it blank if it is not signed yet. You can sign it later from the contract itself.",
+    ],
+    [
+      "Sólo si ya está firmado: arrastra aquí el contrato firmado (PDF o imagen).",
+      "Only if it is already signed: drag the signed contract here (PDF or image).",
+    ],
+    [
+      "⚠ Adjunta el contrato firmado, o deja «Firmado el» en blanco",
+      "⚠ Attach the signed contract, or leave «Signed on» blank",
+    ],
+    ["Firma del cliente", "The customer's signature"],
+    ["⚠ Adjunta el contrato firmado", "⚠ Attach the signed contract"],
+    [
+      "Sin el documento firmado no se puede firmar: es el justificante de que el cliente aceptó estas condiciones.",
+      "Without the signed document it cannot be signed: that file is the evidence that the customer accepted these terms.",
+    ],
     ["＋ Añadir hito", "＋ Add milestone"],
     ["Sin hitos de pago.", "No payment milestones."],
     ["Crear contrato", "Create contract"],

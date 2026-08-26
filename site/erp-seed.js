@@ -608,7 +608,10 @@
       },
     });
     erp.setToday("2026-03-16");
-    erp.signContract(conR.id, { method: "digital" });
+    erp.signContract(conR.id, {
+      method: "digital",
+      evidence: { ref: "contrato-firmado-roca.pdf" },
+    });
     const prjR = erp.createProjectFromAcceptance(bRoca.id);
     prjR.dates.targetEnd = "2026-06-05";
     const depR = erp.issueInvoice({
@@ -821,7 +824,10 @@
       ],
     });
     erp.setToday("2026-04-25");
-    erp.signContract(conB.id, { method: "physical" });
+    erp.signContract(conB.id, {
+      method: "physical",
+      evidence: { ref: "contrato-firmado-balmes.pdf" },
+    });
     const prjB = erp.createProjectFromAcceptance(bBal.id);
     prjB.dates.targetEnd = "2026-07-25";
     const depB = erp.issueInvoice({
@@ -974,7 +980,10 @@
       guarantees: [{ category: "executionAndFinishes", months: 24 }],
     });
     erp.setToday("2026-03-12");
-    erp.signContract(conF.id, { method: "digital" });
+    erp.signContract(conF.id, {
+      method: "digital",
+      evidence: { ref: "contrato-firmado-ferran.pdf" },
+    });
     const prjF = erp.createProjectFromAcceptance(bFer.id);
     const tF = erp.budgetTotals(bFer.id, bFer.acceptedVersionId);
     const invF1 = erp.issueInvoice({

@@ -18738,10 +18738,12 @@
         let mode = s.mode || (linkable.length ? "budget" : "external");
         const db = openDrawer("Nuevo contrato");
         let evid = null;
+        let sevid = null;
         // A file already attached before the detour to fix the client must
         // survive it: the blob is in the store, so the RECORD is what has to
         // be carried back, not the upload.
         let heldDoc = s.doc || null;
+        let heldSigned = s.signedDoc || null;
         const paint = () => {
           db.innerHTML = `
    <div class="card"><div class="ch"><h3>¿De dónde sale este contrato?</h3></div><div class="daylist" style="gap:9px">
@@ -18795,7 +18797,16 @@
       <input id="cn_start" type="date" style="margin-left:auto"></label></div>
     <div class="it"><label class="opt">Firmado el
       <input id="cn_signed" type="date" max="${esc(erp.today)}" style="margin-left:auto"></label></div>
-    <div class="it" style="color:var(--muted)">Déjalo en blanco si todavía no está firmado.</div>
+    <div class="it" style="color:var(--muted)">Déjalo en blanco si todavía no está firmado. Puedes firmarlo más tarde desde el propio contrato.</div>
+    ${
+      /* CON-11 · a date without the signed copy is an assertion, not a fact.
+         The external form has always asked for the file under «Datos del
+         contrato»; this is the same demand for the contract we draw up. */
+      mode === "budget"
+        ? `<div class="it" style="display:block"><label class="opt" style="margin-bottom:6px">Contrato firmado</label>
+     <div id="cn_sdoc"></div></div>`
+        : ""
+    }
    </div></div>
    <div class="card"><div class="ch"><h3>Hitos de pago</h3><span class="tag" id="cn_hsum"></span></div>
     <div class="daylist" style="gap:9px" id="cn_hitos"></div>
@@ -18821,6 +18832,15 @@
               hint: "Arrastra aquí el contrato firmado (PDF o imagen), o búscalo en el dispositivo.",
               onChange: (r) => {
                 heldDoc = r;
+              },
+            });
+          } else {
+            sevid = evidenceField($("#cn_sdoc"), {
+              value: heldSigned,
+              prefix: "sig",
+              hint: "Sólo si ya está firmado: arrastra aquí el contrato firmado (PDF o imagen).",
+              onChange: (r) => {
+                heldSigned = r;
               },
             });
           }
@@ -18919,6 +18939,17 @@
             }));
           const signedOn = $("#cn_signed").value || null;
           const start = $("#cn_start").value || null;
+          /* CON-11 · the signed copy is checked HERE, before anything is
+             created. The engine refuses a signature without it, and letting
+             that refusal happen between createContract and signContract would
+             leave a numbered contract behind and report a failure — the worst
+             of both. In the external form the signed file IS the contract, so
+             that upload answers this on its own. */
+          const signedDoc = mode === "budget" ? (sevid && sevid.value()) || null : heldDoc;
+          if (signedOn && !signedDoc) {
+            toast("⚠ Adjunta el contrato firmado, o deja «Firmado el» en blanco");
+            return;
+          }
           if (mode === "budget") {
             mutate(() => {
               const c = erp.createContract(
@@ -18936,7 +18967,11 @@
                 "backoffice",
               );
               if (signedOn)
-                erp.signContract(c.id, { method: "physical", date: signedOn }, "backoffice");
+                erp.signContract(
+                  c.id,
+                  { method: "physical", date: signedOn, evidence: signedDoc },
+                  "backoffice",
+                );
               closeDrawer();
               conWork = { id: c.id, tab: "datos" };
             }, "Contrato creado");
@@ -18952,6 +18987,7 @@
               mode: "external",
               hitos,
               doc: heldDoc,
+              signedDoc: heldSigned,
               partyId,
               propertyId: $("#cn_prop").value || null,
               base: $("#cn_base").value,
@@ -18988,7 +19024,11 @@
               "backoffice",
             );
             if (signedOn)
-              erp.signContract(c.id, { method: "physical", date: signedOn }, "backoffice");
+              erp.signContract(
+                c.id,
+                { method: "physical", date: signedOn, evidence: signedDoc },
+                "backoffice",
+              );
             closeDrawer();
             conWork = { id: c.id, tab: "datos" };
           }, "Contrato registrado");
@@ -21079,27 +21119,7 @@
           render();
         };
         const sign = $("#conSign");
-        if (sign)
-          sign.onclick = async () => {
-            /* The date is asked for, not assumed: the signed copy usually
-       comes back days after it was sent, and stamping «today» would
-       date the guarantees and the execution period from the wrong day.
-       Capped at today because the engine refuses a future signature. */
-            const when = await askText("Firmar contrato", {
-              label: "Firmado el",
-              type: "date",
-              value: erp.today,
-              max: erp.today,
-              required: true,
-              body: "Al firmar, el contrato entra en vigor y la obra puede facturarse.",
-              okLabel: "Firmar",
-            });
-            if (when === null) return;
-            mutate(
-              () => erp.signContract(conWork.id, { method: "physical", date: when }, "backoffice"),
-              "Contrato firmado",
-            );
-          };
+        if (sign) sign.onclick = () => signContractDrawer(conWork.id);
         v.querySelectorAll("[data-contab]").forEach(
           (b) =>
             (b.onclick = () => {
@@ -21297,6 +21317,59 @@
    <div class="pair"><span>${d.signature.customerSignedAt ? esc(L.signed) + " " + fmtD(d.signature.customerSignedAt) : esc(L.unsigned)}</span><span>${esc(d.signature.method || "")}</span></div>`;
       }
 
+      /**
+       * Firmar un contrato · CON-11.
+       *
+       * A modal asking only for the date was not enough, and the operator was
+       * right to say so: a signature with no signed copy behind it is an
+       * assertion, not a fact — and it is the fact that opens the job's first
+       * invoice. The two things are asked for together, the way the external
+       * contract form has always asked for them, because a date typed without
+       * the document is exactly the record nobody can audit later.
+       *
+       * The date is asked for rather than assumed: the signed copy usually
+       * comes back days after it went out, and stamping «today» would date the
+       * guarantees and the execution period from the wrong day. It is capped
+       * at today because the engine refuses a future signature.
+       */
+      function signContractDrawer(id) {
+        const c = erp.state.contracts.find((x) => x.id === id);
+        if (!c) return;
+        const db = openDrawer(`Firmar contrato · ${c.number}`);
+        db.innerHTML = `
+   <div class="card"><div class="ch"><h3>Firma del cliente</h3></div><div class="daylist" style="gap:9px">
+    <div class="it">Al firmar, el contrato entra en vigor y la obra puede facturarse.</div>
+    <div class="it" style="display:block"><label class="opt" style="margin-bottom:6px">Contrato firmado</label>
+     <div id="sgEvid"></div></div>
+    <div class="it"><label class="opt">Firmado el
+      <input id="sgDate" type="date" value="${esc(erp.today)}" max="${esc(erp.today)}" style="margin-left:auto"></label></div>
+    <div class="it" style="color:var(--muted)">Sin el documento firmado no se puede firmar: es el justificante de que el cliente aceptó estas condiciones.</div>
+    <div class="it"><button class="btn primary" id="sgOk">Firmar</button></div>
+   </div></div>`;
+        /* An externally recorded contract already carries its signed file, so
+           it is offered here rather than asked for a second time. */
+        const evid = evidenceField($("#sgEvid"), {
+          value: c.signature.document || c.document || null,
+          prefix: "sig",
+          hint: "Arrastra aquí el contrato firmado (PDF o imagen), o búscalo en el dispositivo.",
+        });
+        $("#sgOk").onclick = () => {
+          const doc = evid.value();
+          if (!doc) {
+            toast("⚠ Adjunta el contrato firmado");
+            return;
+          }
+          mutate(() => {
+            erp.signContract(
+              id,
+              { method: "physical", date: $("#sgDate").value || erp.today, evidence: doc },
+              "backoffice",
+            );
+            closeDrawer();
+          }, "Contrato firmado");
+        };
+      }
+
       /** Datos · Hitos de pago · Anexos — the index beside the document. */
       function contractPanel(d, val) {
         const host = $("#conBody");
@@ -21325,7 +21398,21 @@
       <div class="it"><span>Plazo</span><span style="flex:1"></span><b>${d.duration.estimatedDays || "—"}</b></div>
       <div class="it"><span>Firma</span><span style="flex:1"></span>
         ${d.signature.customerSignedAt ? `<b>${fmtD(d.signature.customerSignedAt)}</b>` : '<span class="pill r">Sin firmar</span>'}</div>
+      ${
+        /* The signed copy is the evidence behind the date beside it, so it is
+           reachable from the same place rather than filed where nobody looks. */
+        d.signature.document
+          ? `<div class="it"><span>Contrato firmado</span><span style="flex:1"></span>
+        ${
+          d.signature.document.storageKey
+            ? '<button class="btn sm" id="conSeeSigned">Ver</button>'
+            : `<b>${esc(d.signature.document.ref || d.signature.document.name || "—")}</b>`
+        }</div>`
+          : ""
+      }
      </div>`;
+          const seeSigned = $("#conSeeSigned");
+          if (seeSigned) seeSigned.onclick = () => openPhotoViewer([d.signature.document], 0);
           return;
         }
         /* Part 2 · item 11 — what was actually contracted, not just how much.

@@ -2574,7 +2574,7 @@
           .filter((cb) => cb.effectiveFrom <= this.state.today)
           .map((cb) => cb.id), // CON-09
         language: language || "es", // CON-10
-        signature: { customerSignedAt: null, companySignedAt: null, method: null }, // CON-11
+        signature: { customerSignedAt: null, companySignedAt: null, method: null, document: null }, // CON-11
         status: "draft",
         annexes: [],
         scopeAnnexRef: null,
@@ -2718,7 +2718,12 @@
             .filter((cb) => cb.effectiveFrom <= this.state.today)
             .map((cb) => cb.id), // CON-09
           language: b.language, // CON-10
-          signature: { customerSignedAt: null, companySignedAt: null, method: null }, // CON-11
+          signature: {
+            customerSignedAt: null,
+            companySignedAt: null,
+            method: null,
+            document: null,
+          }, // CON-11
           status: "draft",
           annexes: [],
           scopeAnnexRef: this._docName(
@@ -2732,20 +2737,38 @@
       return this._finishContract(rec, user, "createContract");
     }
     /**
-     * @param date  when it was actually signed. Defaults to today and may be
-     *              EARLIER — a contract registered from paper was signed
-     *              before anybody typed it in. A future date is refused, the
-     *              same rule acceptVersion and issueVersion already apply.
+     * @param date      when it was actually signed. Defaults to today and may
+     *                  be EARLIER — a contract registered from paper was
+     *                  signed before anybody typed it in. A future date is
+     *                  refused, the same rule acceptVersion and issueVersion
+     *                  already apply.
+     * @param evidence  the signed copy itself — {storageKey,name,type,size}
+     *                  for a file held here, or {ref} for one that is named
+     *                  but kept elsewhere, the same distinction `evidenceRef`
+     *                  draws on an accepted budget version.
+     *
+     *                  Required either way, and it is the whole point of the
+     *                  signature: a contract that claims to be signed with no
+     *                  signed document behind it is an assertion, not a fact,
+     *                  and CON-11 opens the job's first invoice on the
+     *                  strength of it. A contract recorded from outside
+     *                  already carries that file as `document`, so it answers
+     *                  this on its own rather than being asked for the same
+     *                  PDF twice.
      */
-    signContract(id, { method, date } = {}, user) {
+    signContract(id, { method, date, evidence } = {}, user) {
       // CON-11
       const c = this.state.contracts.find((x) => x.id === id);
       const when = date || this.state.today;
       if (when > this.state.today) throw new Error("A signature cannot be dated in the future");
+      const signed = evidence || c.document || null;
+      if (!signed || !(signed.storageKey || signed.ref || signed.name))
+        throw new Error("A signature needs the signed document (CON-11)");
       c.signature = {
         customerSignedAt: when,
         companySignedAt: when,
         method: method || "physical",
+        document: signed,
       };
       c.status = "signed";
       c.guarantees.forEach((g) => {

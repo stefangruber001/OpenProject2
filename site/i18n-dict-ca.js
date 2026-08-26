@@ -1467,6 +1467,16 @@ window.CANEI_DICT.ca = {
   "Plazo de ejecución (días)": "Termini d'execució (dies)",
   "Firmado el": "Signat el",
   "Déjalo en blanco si todavía no está firmado.": "Deixa-ho en blanc si encara no està signat.",
+  "Déjalo en blanco si todavía no está firmado. Puedes firmarlo más tarde desde el propio contrato.":
+    "Deixa-ho en blanc si encara no està signat. El pots signar més tard des del mateix contracte.",
+  "Sólo si ya está firmado: arrastra aquí el contrato firmado (PDF o imagen).":
+    "Només si ja està signat: arrossega aquí el contracte signat (PDF o imatge).",
+  "⚠ Adjunta el contrato firmado, o deja «Firmado el» en blanco":
+    "⚠ Adjunta el contracte signat, o deixa «Signat el» en blanc",
+  "Firma del cliente": "La signatura del client",
+  "⚠ Adjunta el contrato firmado": "⚠ Adjunta el contracte signat",
+  "Sin el documento firmado no se puede firmar: es el justificante de que el cliente aceptó estas condiciones.":
+    "Sense el document signat no es pot signar: és el justificant que el client va acceptar aquestes condicions.",
   "＋ Añadir hito": "＋ Afegeix una fita",
   "Sin hitos de pago.": "Sense fites de pagament.",
   "Crear contrato": "Crea el contracte",

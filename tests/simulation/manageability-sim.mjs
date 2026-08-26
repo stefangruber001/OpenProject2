@@ -214,7 +214,7 @@ const con = erp.createContract(
 erp.markContractSent(con.id, "bo");
 assert(erp.state.contracts[0].status === "sent", "markContractSent");
 const con2status = erp.state.contracts[0];
-erp.signContract(con.id, { method: "paper" }, "bo");
+erp.signContract(con.id, { method: "paper", evidence: { ref: "firmado.pdf" } }, "bo");
 throws(() => erp.cancelContract(con.id, "x", "bo"), "signed contract cannot be cancelled");
 
 // project planning fields + reopen
@@ -1986,7 +1986,7 @@ assert(
       },
       "bo",
     );
-    v.signContract(ct.id, { method: "paper" }, "bo");
+    v.signContract(ct.id, { method: "paper", evidence: { ref: "firmado.pdf" } }, "bo");
     const pj = v.createProjectFromAcceptance(bg.id, "bo");
     const ms = v.invoiceBases(pj.id).milestones[0];
     assert(

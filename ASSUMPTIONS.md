@@ -4981,3 +4981,46 @@ gone — and then restores the signature exactly as it was. Two negative control
 both red: remove the button (offered: false) and leave it unwired (offered but
 nothing happens). The unwired case is the shape of the reported defect, so it
 fails as a check rather than as a timeout that takes the suite down with it.
+
+## S29 · A signature needs the signed copy (2026-08-26)
+
+Operator, immediately after S28: «now it is possible to sign a contract without
+uploading the evidence that the contract was accepted». Correct, and it matters
+more than it sounds. The button added in S28 asked only for a date, so the
+record could say **firmado 26/08** with nothing behind it — and CON-11 opens the
+job's **first invoice** on the strength of exactly that field. A signature with
+no signed document is an assertion, not a fact, and the whole money chain was
+being unlocked by an assertion.
+
+The external contract form has asked for the file since it was written
+(«Contrato firmado», under Datos del contrato). What was missing was the same
+demand for the contract this system draws up itself.
+
+**What changed.** Signing is now a drawer, not a one-field modal: the signed
+copy and the date are asked for together, and «Firmar» refuses while the file is
+missing. The engine refuses too — `signContract` takes `evidence` and throws
+`A signature needs the signed document (CON-11)` without it — so the rule holds
+whichever door is used. A contract recorded from outside already carries that
+file as `document`; it answers the rule on its own rather than being asked for
+the same PDF twice, and the drawer offers it already attached.
+
+**The creation form checks BEFORE it creates.** «Firmado el» is still there, and
+in the presupuesto path it now sits beside its own upload. The check runs before
+`createContract`, deliberately: letting the engine's refusal land between
+`createContract` and `signContract` would leave a numbered contract behind and
+report a failure — a burnt number and a half-done act, the worst of both.
+
+**Evidence that is named but not held.** `evidence` accepts either a stored file
+(`storageKey`) or a reference (`ref`), the same distinction `evidenceRef` draws
+on an accepted budget version. That is what the demonstration data and the
+simulations use — a seeded contract names its scan without shipping a blob —
+and the interface shows the name instead of a «Ver» button when there is no file
+behind it. The interface itself always produces a real file: the drawer has no
+way to record a bare reference.
+
+**Negative control.** Both guards removed at once — the drawer's and the
+engine's — and the check goes red on the two things that matter: `refusedEmpty:
+false` (it signed with nothing attached) and `signedDoc: false` (it recorded no
+document). With the guards back, both hold. The check drives the real drawer and
+attaches a real PDF through the file input, so it exercises the path a person
+uses rather than the method behind it.

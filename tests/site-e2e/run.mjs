@@ -5570,35 +5570,69 @@ async function testContract(browser, base) {
     /* Operator report, 26/08: a contract created without «Firmado el» could
        never be signed — signContract existed on the engine and no button
        reached it, so the contract stayed an unsigned draft and CON-11 refused
-       the job's first invoice. The interesting assertion is not that a button
-       appeared but that signing CHANGES THE GATE: the same contract that
-       blocked an invoice must stop blocking it. */
-    /* Build the state rather than hunt for it. Searching the register for an
+       the job's first invoice.
+
+       Operator report, 26/08 (second): the button that fixed that asked only
+       for a date, so a contract could claim to be signed with no signed copy
+       behind it. The signature and its evidence are one act, and this check
+       says so in both directions — refused without the file, recorded with it.
+
+       Build the state rather than hunt for it. Searching the register for an
        already-unsigned contract is what made the first version of this check
-       skip — and a check that skips proves nothing, which is the third time
-       that lesson has cost a round. So: take the contract already on screen,
-       blank its signature, drive the real button and the real modal, read the
-       record back, then put the signature exactly as it was. */
+       skip, and a check that skips proves nothing. So: take the contract
+       already on screen, blank its signature AND its file, drive the real
+       button and the real drawer, read the record back, then put both away
+       exactly as they were. */
     const probe = await pg.evaluate(async () => {
       const c = erp.state.contracts.find((x) => x.id === conWork.id);
-      window.__signProbe = { id: c.id, signature: c.signature, status: c.status, work: conWork };
-      c.signature = { customerSignedAt: null, companySignedAt: null, method: null };
+      window.__signProbe = {
+        id: c.id,
+        signature: c.signature,
+        status: c.status,
+        document: c.document,
+        work: conWork,
+      };
+      c.signature = { customerSignedAt: null, companySignedAt: null, method: null, document: null };
       c.status = "draft";
+      // An externally recorded contract already carries the signed file, and
+      // it would satisfy the rule on its own — which is correct behaviour and
+      // the wrong thing to measure here.
+      c.document = null;
       conWork = { id: c.id, tab: "datos" };
       render();
       await new Promise((r) => setTimeout(r, 250));
       return { offered: !!document.querySelector("#conSign"), today: erp.today };
     });
     let signWired = true;
+    let refusedEmpty = null;
     if (probe.offered) {
       await pg.locator("#conSign").click();
       // A button that renders but was never wired is the very shape of the
-      // defect reported, so it has to fail as a check and not as a timeout
-      // that takes the rest of the suite down with it.
+      // first defect, so it has to fail as a check and not as a timeout that
+      // takes the rest of the suite down with it.
       try {
-        await pg.waitForSelector(".mscrim.on .modal input[type=date]", { timeout: 4000 });
-        await pg.locator(".mscrim.on .modal .ma .btn.primary").click();
-        await pg.waitForTimeout(400);
+        await pg.waitForSelector("#sgOk", { timeout: 4000 });
+        // Press Firmar with nothing attached: this must NOT sign anything.
+        await pg.locator("#sgOk").click();
+        await pg.waitForTimeout(300);
+        refusedEmpty = await pg.evaluate(
+          () =>
+            !erp.state.contracts.find((c) => c.id === window.__signProbe.id).signature
+              .customerSignedAt && !!document.querySelector("#sgOk"),
+        );
+        // Then attach the signed copy the way a person does, and sign.
+        await pg.setInputFiles(
+          "#sgEvid input[type=file]",
+          {
+            name: "contrato-firmado.pdf",
+            mimeType: "application/pdf",
+            buffer: Buffer.from(minimalPdf(), "latin1"),
+          },
+          { force: true },
+        );
+        await pg.waitForSelector("#sgEvid .evfile", { timeout: 4000 });
+        await pg.locator("#sgOk").click();
+        await pg.waitForTimeout(500);
       } catch (e) {
         signWired = false;
       }
@@ -5610,11 +5644,13 @@ async function testContract(browser, base) {
         signedAt: c.signature.customerSignedAt,
         companyAt: c.signature.companySignedAt,
         status: c.status,
+        signedDoc: !!(c.signature.document && c.signature.document.storageKey),
         // Offered once, and only once: a signed contract has nothing to sign.
         stillOffered: !!document.querySelector("#conSign"),
       };
       c.signature = p.signature; // put the register back as it was
       c.status = p.status;
+      c.document = p.document;
       persist();
       conWork = p.work;
       render();
@@ -5624,14 +5660,19 @@ async function testContract(browser, base) {
     if (
       probe.offered &&
       signWired &&
+      refusedEmpty &&
       signing.signedAt === probe.today &&
       signing.companyAt === probe.today &&
       signing.status === "signed" &&
+      signing.signedDoc &&
       !signing.stillOffered
     )
-      ok("COM-04: an unsigned contract can be signed from its own screen");
+      ok("COM-04: signing asks for the signed copy, refuses without it, and records both");
     else
-      bad("COM-04: contract cannot be signed", JSON.stringify({ ...probe, signWired, ...signing }));
+      bad(
+        "COM-04: contract cannot be signed",
+        JSON.stringify({ ...probe, signWired, refusedEmpty, ...signing }),
+      );
 
     // Package 2 slide 7: the panel pinned at 392px starved this table into a
     // horizontal scrollbar it never needed on any real screen.

@@ -464,7 +464,11 @@
           { category: "installations", months: 24 },
         ],
       });
-      erp.signContract(con.id, { method: "physical" }, "backoffice");
+      erp.signContract(
+        con.id,
+        { method: "physical", evidence: { ref: "contrato-firmado-" + con.number + ".pdf" } },
+        "backoffice",
+      );
       erp.recordFirstPayment(con.id);
       const prj = erp.createProjectFromAcceptance(b.id, "backoffice");
 

@@ -375,7 +375,10 @@ function runLargeOrMedium(size, monthStartIso) {
       suspendingEvents: ["customer delay", "force majeure"],
     },
   });
-  erp.signContract(con.id, { method: rnd() < 0.5 ? "physical" : "digital" });
+  erp.signContract(con.id, {
+    method: rnd() < 0.5 ? "physical" : "digital",
+    evidence: { ref: "contrato-firmado-" + con.number + ".pdf" },
+  });
   const prj = erp.createProjectFromAcceptance(bud.id);
   prj.dates.targetEnd = addDays(erp.today, con.duration.estimatedDays + 15);
 
