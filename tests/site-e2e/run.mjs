@@ -1565,11 +1565,13 @@ async function testShell(browser, base) {
     if (sections === 6 && subsOpen === 0) ok("shell: 6 sections, subsection panel collapsed");
     else bad("shell: sections + collapsed panel", `sections=${sections} open=${subsOpen}`);
 
-    // The count, asserted rather than assumed: six secciones, thirty
-    // subsecciones declared, three of them hidden (Part 2 · item 3 — hidden,
+    // The count, asserted rather than assumed: six secciones, thirty-one
+    // subsecciones declared, four of them hidden (Part 2 · item 3 — hidden,
     // never deleted, so SECTIONS still declares them and their routes live).
-    // Pinned so both a thirty-first sub and a fourth hidden entry arrive
-    // deliberately rather than by drift.
+    // Pinned so both a thirty-second sub and a fifth hidden entry arrive
+    // deliberately rather than by drift. It went from 30 to 31 when
+    // Configuración › Empresa was built: ORG-01 had been pointing at a screen
+    // that did not exist, so no real workspace could issue an invoice.
     const shape = await pg.evaluate(() => ({
       sections: SECTIONS.length,
       subs: SECTIONS.reduce((n, s) => n + s.subs.length, 0),
@@ -1577,11 +1579,11 @@ async function testShell(browser, base) {
     }));
     if (
       shape.sections === 6 &&
-      shape.subs === 30 &&
+      shape.subs === 31 &&
       shape.hidden === "alerts,financials,price-list,purchasing"
     )
-      ok("shell: 6 secciones × 30 declared subs, 4 hidden by name");
-    else bad("shell: 6×30 (4 hidden)", JSON.stringify(shape));
+      ok("shell: 6 secciones × 31 declared subs, 4 hidden by name");
+    else bad("shell: 6×31 (4 hidden)", JSON.stringify(shape));
 
     /* The hidden three, both halves of the promise: the MENU no longer lists
        them, and the ROUTE still renders the screen — hiding that killed the
@@ -4183,6 +4185,101 @@ async function testFirstRun(browser, base) {
     if (usable.tills === 1 && usable.inBtn && usable.outBtn && usable.close)
       ok("first run: creating the till turns Caja chica into a working screen");
     else bad("first run: petty cash after creation", JSON.stringify(usable));
+
+    /* ---- ORG-01 · the company's own record --------------------------------
+       The operator asked where the company data is entered and the answer was
+       nowhere: `configureEntity` existed and only the demo seeder called it,
+       so a real workspace could never issue an invoice and its documents went
+       out with no issuer at all. The demo hides it, which is why this check
+       starts by CLEARING the record rather than trusting the seeded one. */
+    await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    const held = await pg.evaluate(async () => {
+      const before = erp.state.config;
+      erp.state.config = null;
+      render();
+      await new Promise((r) => setTimeout(r, 300));
+      return {
+        before,
+        // A workspace with no company cannot invoice, and must say so where
+        // somebody will see it rather than four screens later.
+        banner: !!document.querySelector("#cbGo"),
+        missing: erp.companyMissing(),
+      };
+    });
+    if (held.banner && held.missing.length === 4)
+      ok(
+        "first run: an unconfigured company is announced on the Torre, not discovered at the invoice",
+      );
+    else
+      bad(
+        "first run: company banner",
+        JSON.stringify({ banner: held.banner, missing: held.missing }),
+      );
+
+    // Through the banner when there is one — that is the path a person takes.
+    // Without it, straight to the screen: a missing banner is already one
+    // failed check above, and letting it become a timeout here would take the
+    // three checks below down with it and report nothing about any of them.
+    if (held.banner) await pg.locator("#cbGo").click();
+    else await pg.evaluate(() => go("company"));
+    await pg.waitForTimeout(500);
+    await pg.fill("#co_legalName", "Empresa E2E, S.L.");
+    await pg.fill("#co_taxId", "B00000000");
+    await pg.fill("#co_regStreet", "Carrer de Prova 1");
+    await pg.fill("#co_regPostalCode", "08960");
+    await pg.fill("#co_regCity", "Sant Just Desvern");
+    await pg.fill("#co_street", "Carrer de Treball 2");
+    await pg.fill("#co_postalCode", "08960");
+    await pg.fill("#co_city", "Sant Just Desvern");
+    await pg.fill("#co_registry", "R.M. Barcelona");
+    await pg.fill("#co_registryTomo", "12345");
+    await pg.fill("#co_iban", "ES9121000418450200051332");
+    await pg.fill("#co_quoteValidityDays", "15");
+    await pg.locator("#co_save").click();
+    await pg.waitForTimeout(700);
+    const saved = await pg.evaluate(() => {
+      const c = erp.companyProfile();
+      const iss = erp._issuerBlock();
+      return {
+        missing: erp.companyMissing(),
+        legalName: c.legalName,
+        // Two addresses, printed in two places: the letterhead one in the
+        // header, the registered office in the small print.
+        header: iss.address,
+        foot: iss.registeredAddress,
+        registry: iss.registry,
+        validity: c.quoteValidityDays,
+      };
+    });
+    if (
+      saved.missing.length === 0 &&
+      saved.legalName === "Empresa E2E, S.L." &&
+      /Treball 2/.test(saved.header) &&
+      /Prova 1/.test(saved.foot) &&
+      /R.M. Barcelona · Tomo 12345/.test(saved.registry)
+    )
+      ok("first run: the company record saves, and both addresses reach the documents");
+    else bad("first run: company saved", JSON.stringify(saved));
+
+    /* The point of the record: a default that used to be a literal in the
+       engine now comes from here. Fifteen days, not thirty. */
+    const stamped = await pg.evaluate(() => {
+      const party = erp.state.parties.find((p) => p.roles.includes("customer"));
+      const b = erp.createBudget({ partyId: party.id }, "e2e");
+      const days = Math.round((new Date(b.validityDate) - new Date(erp.today)) / 864e5);
+      erp.state.budgets = erp.state.budgets.filter((x) => x.id !== b.id);
+      return days;
+    });
+    if (stamped === 15)
+      ok("first run: quote validity is the company's own, not a number inside the program");
+    else bad("first run: validity from the company record", `days=${stamped}`);
+
+    await pg.evaluate((before) => {
+      erp.state.config = before; // put the register back as it was
+      persist();
+      render();
+    }, held.before);
 
     if (errs.length === 0) ok("first run: no console errors");
     else bad("first run: no console errors", errs.slice(0, 3).join(" | "));

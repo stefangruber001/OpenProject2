@@ -817,6 +817,17 @@
         padding: 18px 20px;
         font-size: 12.5px;
       }
+      /* The company's own small print, under every document. Muted and small
+         on purpose: it is the legally required line, not a selling point. */
+      .doc .dfoot,
+      .cdoc .dfoot {
+        margin-top: 14px;
+        padding-top: 8px;
+        border-top: 1px solid var(--hair);
+        font-size: 10.5px;
+        line-height: 1.45;
+        color: var(--muted);
+      }
       .doc .dh {
         display: flex;
         justify-content: space-between;
@@ -5042,6 +5053,7 @@
         <!-- Project context (spec §4): the selector and the fixed header strip.
            Rendered outside #view so it survives every subsection change — the
            context is the section's, not any one screen's. -->
+        <div id="companybar"></div>
         <div id="seedbar"></div>
         <div id="projbar"></div>
         <div id="view"></div>
@@ -5556,6 +5568,11 @@
           lab: "Configuración",
           short: "Config.",
           subs: [
+            /* First, and first for a reason: on a workspace that has never been
+               configured this is the only screen that matters. ORG-01 refuses
+               every invoice until it is filled in, and until this session the
+               blocker pointed at a screen that did not exist. */
+            { k: "company", lab: "Empresa", code: "ORG-01" },
             { k: "items", lab: "Partidas y subpartidas", code: "DMC-01" },
             { k: "price-list", lab: "Lista de precios", code: "DMC-02" },
             { k: "units", lab: "Unidades de medida", code: "DMC-03" },
@@ -5755,6 +5772,7 @@
         renderCreateMenu();
         renderProjectBar();
         renderSeedBar();
+        renderCompanyBar();
         const v = $("#view");
         // Full screen is opt-in per render, never sticky: a view that wants it turns
         // it on for itself (today only the presupuestador does). Clearing it here
@@ -6388,11 +6406,51 @@
         rechazado: "datos no válidos",
         sinNombre: "sin nombre",
       };
+      /* A workspace with no company record cannot issue a single invoice, and
+   until this session nothing said so until the operator had already built a
+   quote, a contract and a job and reached the one screen that refuses. The
+   demo dataset hides it — the seeder fills the record in — so this bar exists
+   for the case the demo cannot show: a real company, starting empty.
+
+   Not dismissable, unlike the seed bar. That one offers an upgrade; this one
+   reports that the system cannot do its job, and it goes away by being fixed. */
+      function renderCompanyBar() {
+        const host = $("#companybar");
+        if (!host) return;
+        let missing = [];
+        try {
+          missing = erp.companyMissing();
+        } catch (e) {
+          return;
+        }
+        if (!missing.length || cur === "company") {
+          host.innerHTML = "";
+          return;
+        }
+
+        const LAB = COMPANY_MISSING_LABELS;
+        host.innerHTML = `<div class="card" style="border-left:3px solid var(--danger);margin-bottom:12px">
+    <div class="queuebar"><b>Faltan los datos de la empresa</b>
+    <span style="color:var(--muted)">sin ellos no se puede emitir ninguna factura.</span>
+    <span style="flex:1"></span>
+    <button class="btn sm primary" id="cbGo">Completar</button></div></div>`;
+        $("#cbGo").onclick = () => go("company");
+      }
+
       /* Tells you when the shipped demo dataset is newer than the one on this
    device, and offers the reload. It does NOT reseed on its own: boot() must
    never overwrite records somebody may have entered, so the decision stays a
    click. Dismissable per device — the stored version is only compared, never
    written, so dismissing does not pretend you upgraded. */
+      /* What ORG-01 is missing, in words. Named once because two screens say
+         it — the Torre's banner and the company screen's own header — and a
+         gap described two ways reads as two different problems. */
+      const COMPANY_MISSING_LABELS = {
+        legalName: "la denominación social",
+        taxId: "el NIF",
+        street: "la dirección",
+        iban: "el IBAN",
+      };
       let seedBarHidden = false;
       function renderSeedBar() {
         const host = $("#seedbar");
@@ -8340,7 +8398,7 @@
         const doc = erp.renderChangeDoc(id);
         const db = openDrawer("Adenda" + (doc.number ? " " + doc.number : ""));
         db.innerHTML = `<div class="doc">
-   <div class="dh"><div><b>MODIFICACIÓN CONTRACTUAL${doc.number ? " " + doc.number : ""}</b><br>${esc(doc.issuer.legalName)} · ${esc(doc.issuer.taxId)}<br>${esc(doc.issuer.address)}</div>
+   <div class="dh"><div>${issuerLogoHtml(doc.issuer, 30)}<b>MODIFICACIÓN CONTRACTUAL${doc.number ? " " + doc.number : ""}</b><br>${esc(doc.issuer.tradeName || doc.issuer.legalName)}${doc.issuer.taxId ? " · " + esc(doc.issuer.taxId) : ""}<br>${esc(doc.issuer.address)}</div>
     <div style="text-align:right">${esc(doc.customer.name)}<br>${esc(doc.customer.taxId)}<br>${esc(doc.customer.address)}</div></div>
    <div class="chapline"><span>Proyecto</span><b>${esc(doc.project)}</b></div>
    ${doc.contractNumber ? `<div class="chapline"><span>Contrato</span><b>${esc(doc.contractNumber)}</b></div>` : ""}
@@ -12243,7 +12301,11 @@
        b.variationOf
          ? (() => {
              try {
-               return " · variación de " + erp.project(b.variationOf).code;
+               return (
+                 ` <span>· variación de</span> <span translate="no">` +
+                 esc(erp.project(b.variationOf).code) +
+                 `</span>`
+               );
              } catch (e2) {
                return "";
              }
@@ -18106,6 +18168,192 @@
    presupuesto or the contrato the customer receives — is a field on that
    document, set per customer where the document is written, and nothing here
    touches it. Same reason `renderBudgetDocHtml` carries `translate="no"`. */
+      /* ================= Configuración › Empresa (ORG-01) =====================
+   The company's own record, and the answer to a question that had none: the
+   operator asked where the company data is entered, and it was nowhere.
+   `configureEntity` has existed since ORG-01 was written and its only caller
+   was the demo seeder — which is exactly why nobody noticed. The demo
+   workspace arrives with an identity; a real one starts blank, and a blank
+   one cannot issue a single invoice (ORG-01), prints «EMPRESA —» on its
+   contracts and sends quotes with no issuer at all.
+
+   This screen is the master record for the whole system. Everything printed
+   reads `_issuerBlock()`, and every default that used to be a literal in the
+   engine — quote validity, the tax rates, the contract's grace period — now
+   reads from here. Change it once and every future document changes with it.
+
+   Two addresses, because a company has two: the registered office the
+   mercantile register holds, and the one on the letterhead. They print in
+   different places rather than fighting over one field. */
+      const COMPANY_FIELDS = [
+        ["legalName", "Denominación social *", "text", ""],
+        ["tradeName", "Nombre comercial", "text", ""],
+        ["taxId", "NIF / CIF *", "text", "B00000000"],
+        ["regStreet", "Domicilio social *", "text", ""],
+        ["regPostalCode", "Código postal", "text", "08960"],
+        ["regCity", "Población", "text", ""],
+        ["regProvince", "Provincia", "text", "Barcelona"],
+        ["regCountry", "País", "text", "España"],
+        ["street", "Dirección de trabajo", "text", ""],
+        ["postalCode", "Código postal", "text", "08960"],
+        ["city", "Población", "text", ""],
+        ["province", "Provincia", "text", "Barcelona"],
+        ["country", "País", "text", "España"],
+        ["registry", "Registro Mercantil", "text", ""],
+        ["registryTomo", "Tomo", "text", ""],
+        ["registryFolio", "Folio", "text", ""],
+        ["registryHoja", "Hoja", "text", ""],
+        ["phone", "Teléfono", "text", ""],
+        ["email", "Email", "text", "hola@empresa.com"],
+        ["web", "Web", "text", ""],
+        ["iban", "IBAN *", "text", "ES00 0000 0000 0000 0000 0000"],
+        ["bic", "BIC / SWIFT", "text", ""],
+        ["bankName", "Banco", "text", ""],
+        ["defaultVatBp", "IVA por defecto (%)", "number", ""],
+        ["defaultIrpfBp", "IRPF por defecto (%)", "number", ""],
+        ["paymentTermsDays", "Plazo de pago (días)", "number", ""],
+        ["quoteValidityDays", "Validez del presupuesto (días)", "number", ""],
+        ["latePaymentInterestPctYear", "Interés de demora (% anual)", "number", ""],
+        ["graceDays", "Días de cortesía", "number", ""],
+        ["scheduleWithinDays", "Planificar en (días)", "number", ""],
+        ["startWithinDays", "Empezar en (días)", "number", ""],
+        ["marginThresholdBp", "Margen mínimo, alerta (%)", "number", ""],
+      ];
+      /* Basis points on the record, percent on the screen. The engine counts
+         in basis points because 21 % of a cent has to land somewhere; nobody
+         types "2100" for a tax rate. */
+      const COMPANY_BP = new Set([
+        "defaultVatBp",
+        "defaultIrpfBp",
+        "marginThresholdBp",
+      ]);
+      const companyField = (c, key) => {
+        const f = COMPANY_FIELDS.find((x) => x[0] === key);
+        const raw = c[key];
+        const val = COMPANY_BP.has(key) ? (raw || 0) / 100 : raw;
+        return `<div class="field"><label>${f[1]}</label>
+     <input id="co_${key}" type="${f[2]}"${f[2] === "number" ? ' step="0.01"' : ""} value="${esc(val === null || val === undefined ? "" : String(val))}"${f[3] ? ` placeholder="${esc(f[3])}"` : ""}></div>`;
+      };
+      let companyLogo = null;
+      VIEWS.company = (v) => {
+        $("#sub").textContent =
+          "Quién emite los documentos de esta empresa, dónde está, cómo se le paga y con qué valores por defecto trabaja. Todo lo que sale impreso — presupuestos, contratos y facturas — se lee de aquí.";
+        const c = erp.companyProfile();
+        const missing = erp.companyMissing();
+        // The same four words the Torre's banner uses — one wording, so the
+        // two places that report the same gap cannot describe it differently.
+        const MISS_LAB = COMPANY_MISSING_LABELS;
+        const grid = (...keys) =>
+          `<div class="fgrid" style="padding:12px 16px">${keys.map((k) => companyField(c, k)).join("")}</div>`;
+        v.innerHTML = `
+   ${
+     missing.length
+       ? `<div class="card" style="border-left:3px solid var(--danger);margin-bottom:12px"><div class="daylist">
+      <div class="it"><span class="pill r">ORG-01</span>
+      <span style="flex:1;margin-left:8px">Sin estos datos no se puede emitir ninguna factura.
+       <b>${esc(missing.map((k) => MISS_LAB[k]).join(", "))}</b></span></div></div></div>`
+       : `<div class="card" style="border-left:3px solid var(--green);margin-bottom:12px"><div class="daylist">
+      <div class="it"><span class="pill g">Completo</span><span style="flex:1;margin-left:8px">La empresa puede emitir presupuestos, contratos y facturas.</span></div></div></div>`
+   }
+   <div class="card"><div class="ch"><h3>Identidad</h3><span class="tag">ORG-01</span></div>
+    ${grid("legalName", "tradeName", "taxId")}
+    <div class="fgrid" style="padding:0 16px 14px">
+     <div class="field full"><label>Logotipo</label><div id="co_logo"></div></div>
+    </div></div>
+
+   <div class="card"><div class="ch"><h3>Domicilio social</h3>
+     <span class="tag">el que consta en el Registro</span></div>
+    ${grid("regStreet", "regPostalCode", "regCity", "regProvince", "regCountry")}</div>
+
+   <div class="card"><div class="ch"><h3>Dirección de trabajo</h3>
+     <span class="tag">la que va en la cabecera</span></div>
+    <div class="daylist"><div class="it"><label class="opt">
+      <input type="checkbox" id="co_same"${c.sameAsRegistered ? " checked" : ""}>
+      <span>Igual que el domicilio social</span></label></div></div>
+    ${grid("street", "postalCode", "city", "province", "country")}</div>
+
+   <div class="card"><div class="ch"><h3>Registro Mercantil</h3>
+     <span class="tag">va al pie de los documentos</span></div>
+    ${grid("registry", "registryTomo", "registryFolio", "registryHoja")}</div>
+
+   <div class="card"><div class="ch"><h3>Contacto</h3></div>
+    ${grid("phone", "email", "web")}</div>
+
+   <div class="card"><div class="ch"><h3>Banco</h3><span class="tag">AR-02</span></div>
+    ${grid("iban", "bic", "bankName")}</div>
+
+   <div class="card"><div class="ch"><h3>Valores por defecto</h3>
+     <span class="tag">se aplican a lo nuevo, no a lo ya emitido</span></div>
+    ${grid(
+      "defaultVatBp",
+      "defaultIrpfBp",
+      "paymentTermsDays",
+      "quoteValidityDays",
+      "latePaymentInterestPctYear",
+      "graceDays",
+      "scheduleWithinDays",
+      "startWithinDays",
+      "marginThresholdBp",
+    )}
+    <div class="daylist"><div class="it" style="color:var(--muted)">Estos valores eran fijos dentro del programa y ahora se leen de aquí. Un presupuesto o un contrato que ya existe conserva los suyos.</div></div></div>
+
+   <div class="card"><div class="ch"><h3>Pie legal</h3></div>
+    <div class="fgrid" style="padding:12px 16px">
+     <div class="field full"><label>Texto que se imprime al pie de cada documento</label>
+      <input id="co_legalFooter" value="${esc(c.legalFooter || "")}" placeholder="Opcional — protección de datos, condiciones generales…"></div>
+    </div></div>
+
+   <div style="margin:12px 0 24px"><button class="btn primary" id="co_save">Guardar</button></div>`;
+
+        /* The logo is a file, not a name. `logoRef` — the field this replaces —
+           was never read by anything that draws. */
+        const logo = evidenceField($("#co_logo"), {
+          value: companyLogo || c.logo || null,
+          prefix: "logo",
+          hint: "Arrastra aquí el logotipo (PNG o JPG), o búscalo en el dispositivo.",
+          onChange: (r) => {
+            // The document draws this with <img>. A PDF would store fine and
+            // then print as a broken picture on the customer's quote.
+            if (r && !/^image\//.test(r.type || "")) {
+              toast("⚠ El logotipo tiene que ser una imagen (PNG o JPG)");
+              logo.clear();
+              return;
+            }
+            companyLogo = r;
+          },
+        });
+        const same = $("#co_same");
+        const mirrored = ["street", "postalCode", "city", "province", "country"];
+        const applySame = () => {
+          const on = same.checked;
+          mirrored.forEach((k, i) => {
+            const src = $("#co_" + ["regStreet", "regPostalCode", "regCity", "regProvince", "regCountry"][i]);
+            const dst = $("#co_" + k);
+            dst.disabled = on;
+            if (on) dst.value = src.value;
+          });
+        };
+        same.onchange = applySame;
+        applySame();
+        $("#co_save").onclick = () => {
+          const patch = { sameAsRegistered: same.checked, logo: logo.value() };
+          COMPANY_FIELDS.forEach(([k, , type]) => {
+            const el = $("#co_" + k);
+            if (!el) return;
+            if (type === "number") {
+              const n = Number(el.value);
+              if (el.value === "" || Number.isNaN(n)) return; // leave the default alone
+              patch[k] = COMPANY_BP.has(k) ? Math.round(n * 100) : n;
+            } else patch[k] = el.value.trim();
+          });
+          patch.legalFooter = $("#co_legalFooter").value.trim();
+          mutate(() => {
+            erp.configureEntity(patch);
+            companyLogo = null;
+          }, "Datos de la empresa guardados");
+        };
+      };
+
       const UI_LANGS = [
         ["es", "Castellano", "Español"],
         ["ca", "Català", "Catalán"],
@@ -18320,7 +18568,18 @@
       let drawerDismiss = null;
       function openDrawer(title, onDismiss) {
         drawerDismiss = typeof onDismiss === "function" ? onDismiss : null;
-        $("#dttl").textContent = title;
+        /* «Etiqueta · dato» is two things in one string: a label the dictionary
+           can translate and a record's own name it must never touch. Joined in
+           a single text node they were neither — no dictionary entry can
+           contain a customer's name, so the label went untranslated on every
+           drawer opened with one. Split here, once, rather than at each of the
+           forty call sites. textContent is unchanged, so anything reading the
+           title still reads the same string. */
+        const t = $("#dttl");
+        const at = String(title).indexOf(" · ");
+        if (at > 0)
+          t.innerHTML = `<span>${esc(String(title).slice(0, at))}</span> · <span translate="no">${esc(String(title).slice(at + 3))}</span>`;
+        else t.textContent = title;
         $("#scrim").classList.add("on");
         $("#drawer").classList.add("on");
         return $("#dbody");
@@ -19600,11 +19859,42 @@
    Pulled out of budgetDrawer so the download-PDF button (Package 2 slide 1)
    can print EXACTLY this markup on its own sheet, rather than a second copy
    that could drift from what Vista previa shows on screen. */
+      /* ---------------- the issuer, as it appears on paper ------------------
+   Both halves come from `_issuerBlock()`, which every document builder now
+   shares — so the logo, the trading address and the register entry cannot be
+   on the quote and missing from the invoice, which is exactly how they came
+   to be missing from all four.
+
+   The foot is DATA, not labels: a company's own identity reads the same in
+   any language, so printing it needs no dictionary and cannot fall out of
+   step with one. */
+      function issuerLogoHtml(iss, px) {
+        return iss && iss.logo && iss.logo.storageKey
+          ? `<img data-blob="${esc(iss.logo.storageKey)}" alt="" style="max-height:${px}px;max-width:190px;display:block;margin-bottom:6px">`
+          : "";
+      }
+      function issuerFootHtml(iss) {
+        if (!iss) return "";
+        const bits = [
+          iss.legalName,
+          iss.taxId,
+          iss.registeredAddress,
+          iss.registry,
+          iss.phone,
+          iss.email,
+          iss.web,
+        ].filter(Boolean);
+        const foot = bits.join(" · ");
+        return foot || iss.legalFooter
+          ? `<div class="dfoot">${esc(foot)}${iss.legalFooter ? `<br>${esc(iss.legalFooter)}` : ""}</div>`
+          : "";
+      }
+
       function renderBudgetDocHtml(doc, annex, marked, perPage, b, t) {
         const L = DOCL[doc.language] || DOCL.es;
         const SEC = L.sections;
         return `<div class="doc" translate="no" lang="${esc(doc.language)}">
-    <div class="dh"><div><b>${L.doc} ${doc.number} · v${doc.version}</b><br>${esc(doc.issuer.legalName)} · ${esc(doc.issuer.taxId)}<br>${esc(doc.issuer.address)}</div>
+    <div class="dh"><div>${issuerLogoHtml(doc.issuer, 34)}<b>${L.doc} ${doc.number} · v${doc.version}</b><br>${esc(doc.issuer.tradeName || doc.issuer.legalName)}${doc.issuer.taxId ? " · " + esc(doc.issuer.taxId) : ""}<br>${esc(doc.issuer.address)}</div>
     <div style="text-align:right">${esc(doc.customer.name)}<br>${esc(doc.customer.taxId)}<br>${esc(doc.customer.address)}</div></div>
     ${doc.chapters
       .map(
@@ -19648,7 +19938,14 @@
       ${doc.assumptions.map((x) => `<div class="chapline"><span>· ${esc(x)}</span></div>`).join("")}</div>`
         : ""
     }
-    <div style="margin-top:8px;color:var(--muted)">${L.validity}: ${fmtD(b.validityDate)} · ${esc(b.paymentConditions)} · IBAN ${esc(doc.issuer.iban)}</div>
+    <div style="margin-top:8px;color:var(--muted)">${[
+      `${L.validity}: ${fmtD(b.validityDate)}`,
+      esc(b.paymentConditions),
+      doc.issuer.iban ? `IBAN ${esc(doc.issuer.iban)}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ")}</div>
+    ${issuerFootHtml(doc.issuer)}
    </div>`;
       }
       /**
@@ -20834,7 +21131,10 @@
           return;
         }
         const doc = $("#invDoc");
-        if (doc) doc.innerHTML = invoiceDocHtml(pv.doc);
+        if (doc) {
+          doc.innerHTML = invoiceDocHtml(pv.doc);
+          paintImages(doc); // the company logo is a stored blob like any other
+        }
         const tot = $("#invTotal");
         if (tot) tot.textContent = eur(pv.totalCents);
         const gates = $("#invGates");
@@ -20902,7 +21202,7 @@
         whole sheet 600 wide inside a 390 phone — the contract's own document,
         which has no such floor, measures 388 in the same place. -->
    <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px">
-    <div style="flex:1 1 170px;min-width:0;overflow-wrap:anywhere"><b>${esc(doc.issuer.legalName)}</b><br>${esc(doc.issuer.taxId)}<br>${esc(doc.issuer.address)}${doc.issuer.phone ? `<br>${esc(doc.issuer.phone)}` : ""}</div>
+    <div style="flex:1 1 170px;min-width:0;overflow-wrap:anywhere">${issuerLogoHtml(doc.issuer, 30)}<b>${esc(doc.issuer.tradeName || doc.issuer.legalName)}</b><br>${esc(doc.issuer.taxId)}<br>${esc(doc.issuer.address)}${doc.issuer.phone ? `<br>${esc(doc.issuer.phone)}` : ""}</div>
     <div style="flex:1 1 170px;min-width:0;overflow-wrap:anywhere;text-align:right"><b>${esc(doc.customer.name)}</b><br>${esc(doc.customer.taxId)}<br>${esc(doc.customer.address)}</div>
    </div>
    <h2>Obra</h2>
@@ -20922,7 +21222,8 @@
    </tbody></table>
    <h2>Pago</h2>
    <div class="pair"><span>Vencimiento</span><span>${fmtD(doc.dueDate)}</span></div>
-   <div class="pair"><span>IBAN</span><span>${esc(doc.issuer.iban || "—")}</span></div>`;
+   <div class="pair"><span>IBAN</span><span>${esc(doc.issuer.iban || "—")}</span></div>
+   ${issuerFootHtml(doc.issuer)}`;
       }
 
       /**
@@ -21272,6 +21573,7 @@
    <div class="meta">${esc(L.no)} ${esc(d.number)} · ${esc(L.date)} ${fmtD(d.date)}</div>
 
    <h2>${esc(L.issuer)}</h2>
+   ${issuerLogoHtml(d.issuer, 30)}
    <div class="pair"><span>${esc(d.issuer.legalName || L.none)}</span><span>${esc(d.issuer.taxId || "")}</span></div>
    <div class="pair"><span>${esc(d.issuer.address || "")}</span><span>${esc(d.issuer.email || "")}</span></div>
 
@@ -21314,7 +21616,9 @@
    <div class="pair"><span>${d.penalties.latePaymentInterestPctYear || 0}% · ${d.penalties.graceDays || 0} ${esc(L.days)}</span><span></span></div>
 
    <h2>${esc(L.sign)}</h2>
-   <div class="pair"><span>${d.signature.customerSignedAt ? esc(L.signed) + " " + fmtD(d.signature.customerSignedAt) : esc(L.unsigned)}</span><span>${esc(d.signature.method || "")}</span></div>`;
+   <div class="pair"><span>${d.signature.customerSignedAt ? esc(L.signed) + " " + fmtD(d.signature.customerSignedAt) : esc(L.unsigned)}</span><span>${esc(d.signature.method || "")}</span></div>
+   ${issuerFootHtml(d.issuer)}`;
+        paintImages(host); // the company logo is a stored blob like any other
       }
 
       /**
