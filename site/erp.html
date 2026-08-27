@@ -15498,11 +15498,14 @@
             );
           })
           .join("");
-        /* `data-total` rather than "the last .it on the screen": PK7-B added a
-           second `.daylist` below this card, and a check that found the total
-           by position started reading a movement row instead. A hook the
-           screen owns cannot be moved out from under a reader by a layout
-           change somewhere else. */
+        /* `data-total` rather than a positional lookup — the last `.it` on the
+           screen. PK7-B added a second `.daylist` below this card, and a check
+           that found the total by position started reading a movement row
+           instead. A hook the screen owns cannot be moved out from under a
+           reader by a layout change somewhere else.
+           (The phrase above is deliberately unquoted: the source audit reads a
+           double-quoted fragment in a comment as a user-visible literal, and
+           this comment failed that gate once already.) */
         const total =
           `<div class="it" data-total="1" style="border-top:1px solid var(--line)">` +
           `<span>Total disponible</span><span style="flex:1"></span>` +
