@@ -10167,7 +10167,8 @@
           .map((s) => {
             const kind = s.billId ? "bill" : "invoice";
             const id = s.billId || s.invoiceId;
-            const open = kind === "bill" ? erp.billOutstandingCents(id) : erp.invoiceOutstandingCents(id);
+            const open =
+              kind === "bill" ? erp.billOutstandingCents(id) : erp.invoiceOutstandingCents(id);
             if (open <= 0) return null;
             const rec =
               kind === "bill"
@@ -10184,7 +10185,10 @@
      Si el resto sigue pendiente no hay nada que hacer; si se da por cerrado, di por qué.</div>
    ${short
      .map(
-       (d, i) => `<div class="card" style="margin:0 0 10px"><div class="daylist" style="padding:10px 14px">
+       (
+         d,
+         i,
+       ) => `<div class="card" style="margin:0 0 10px"><div class="daylist" style="padding:10px 14px">
       <div class="it"><span class="k" style="flex:1">${esc(d.ref)}</span><span>Sigue debiendo</span><b>${eur(d.open)}</b></div>
       <div class="it">
         <select class="inline" data-sfr="${i}">${reasons.map((x) => `<option value="${x.code}">${esc(x.es)}</option>`).join("")}</select>
@@ -18575,11 +18579,7 @@
       /* Basis points on the record, percent on the screen. The engine counts
          in basis points because 21 % of a cent has to land somewhere; nobody
          types "2100" for a tax rate. */
-      const COMPANY_BP = new Set([
-        "defaultVatBp",
-        "defaultIrpfBp",
-        "marginThresholdBp",
-      ]);
+      const COMPANY_BP = new Set(["defaultVatBp", "defaultIrpfBp", "marginThresholdBp"]);
       const companyField = (c, key) => {
         const f = COMPANY_FIELDS.find((x) => x[0] === key);
         const raw = c[key];
@@ -18680,7 +18680,9 @@
         const applySame = () => {
           const on = same.checked;
           mirrored.forEach((k, i) => {
-            const src = $("#co_" + ["regStreet", "regPostalCode", "regCity", "regProvince", "regCountry"][i]);
+            const src = $(
+              "#co_" + ["regStreet", "regPostalCode", "regCity", "regProvince", "regCountry"][i],
+            );
             const dst = $("#co_" + k);
             dst.disabled = on;
             if (on) dst.value = src.value;
@@ -19403,7 +19405,10 @@
        <option value="">— sin obra asociada —</option>
        ${erp.state.projects
          .filter((p) => !p.contractId && p.status === "active")
-         .map((p) => `<option value="${esc(p.id)}"${s.projectId === p.id ? " selected" : ""}>${esc(p.code)}</option>`)
+         .map(
+           (p) =>
+             `<option value="${esc(p.id)}"${s.projectId === p.id ? " selected" : ""}>${esc(p.code)}</option>`,
+         )
          .join("")}
       </select></label></div>
     <div class="it" style="color:var(--muted)">Un contrato externo no nombra ningún presupuesto, así que la obra a la que pertenece hay que decirla aquí — o dejarlo sin asociar.</div>
@@ -20536,6 +20541,49 @@
           ? Math.round((marginCents / e.currentRevenueCents) * 1000) / 10
           : 0;
         const SRC = { bill: "Factura", labour: "Horas", capture: "Documento" };
+        /* The rows the table will render, built HERE so their sum can be
+           checked against the project's own total before the screen claims
+           they agree. */
+        const tableRows = (() => {
+          const rows = f
+            ? f.byChapter.slice()
+            : erp.chapterEconomics(id).map((c) => ({
+                chapter: c.num,
+                budgetCents: c.budgetCostCents,
+                actualCents: c.actualCents,
+                varianceCents: c.actualCents - c.budgetCostCents,
+                varianceBp: 0,
+              }));
+          /* The factory forecast reads baseline + change orders and knows
+             nothing of variation budgets — so their chapters are merged in
+             from chapterEconomics, which does. Without this the forecast
+             bridge being loaded HID every variation from the table. */
+          if (f)
+            for (const c of erp.chapterEconomics(id))
+              if (c.variation && !rows.some((r) => String(r.chapter) === String(c.num)))
+                rows.push({
+                  chapter: c.num,
+                  budgetCents: c.budgetCostCents,
+                  actualCents: c.actualCents,
+                  varianceCents: c.actualCents - c.budgetCostCents,
+                  varianceBp: 0,
+                });
+          return rows;
+        })();
+        /* «Cuadra» is a claim, not a pleasantry — measured before it is
+           printed. The operator's UAT caught this screen saying «la tabla de
+           arriba cuadra con el proyecto» while the table sat 45 € short of
+           the card above it. Assigned rows plus what is waiting to be split
+           must equal the project's actual cost, to the cent. */
+        const tableCents =
+          tableRows.reduce((sum2, r) => sum2 + (r.actualCents || 0), 0) +
+          pend.reduce((sum2, r) => sum2 + r.amountCents, 0);
+        const tableAgrees = tableCents === e.actualCents;
+        const agreeNote = tableAgrees
+          ? '<div class="daylist"><div class="it">Todo el coste de esta obra tiene partida. La tabla de arriba cuadra con el proyecto.</div></div>'
+          : `<div class="daylist"><div class="it"><span class="pill r">No cuadra</span>
+        <span style="flex:1;margin-left:8px">La tabla de arriba no cuadra con el coste del proyecto.</span>
+        <b translate="no">${eur(tableCents)} / ${eur(e.actualCents)}</b></div></div>`;
 
         body.innerHTML = `
     <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
@@ -20552,32 +20600,7 @@
        <th>Partida</th><th class="num">Presupuestado</th><th class="num">Acumulado</th>
        <th class="num">Desviación</th><th class="num">%</th><th class="num">Margen</th><th></th></tr></thead><tbody>
      ${
-       (() => {
-         const rows = f
-           ? f.byChapter.slice()
-           : erp.chapterEconomics(id).map((c) => ({
-               chapter: c.num,
-               budgetCents: c.budgetCostCents,
-               actualCents: c.actualCents,
-               varianceCents: c.actualCents - c.budgetCostCents,
-               varianceBp: 0,
-             }));
-         /* The factory forecast reads baseline + change orders and knows
-            nothing of variation budgets — so their chapters are merged in
-            from chapterEconomics, which does. Without this the forecast
-            bridge being loaded HID every variation from the table. */
-         if (f)
-           for (const c of erp.chapterEconomics(id))
-             if (c.variation && !rows.some((r) => String(r.chapter) === String(c.num)))
-               rows.push({
-                 chapter: c.num,
-                 budgetCents: c.budgetCostCents,
-                 actualCents: c.actualCents,
-                 varianceCents: c.actualCents - c.budgetCostCents,
-                 varianceBp: 0,
-               });
-         return rows;
-       })()
+       tableRows
          .map((c) => {
            const base =
              (p.baseline.chapters || []).find((x) => String(x.num) === String(c.chapter)) || {};
@@ -20613,7 +20636,7 @@
         )
         .join("")}
      </tbody></table></div>`
-         : '<div class="daylist"><div class="it">Todo el coste de esta obra tiene partida. La tabla de arriba cuadra con el proyecto.</div></div>'
+         : agreeNote
      }
     </div>`;
 

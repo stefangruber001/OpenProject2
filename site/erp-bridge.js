@@ -270,23 +270,40 @@
       actualByChapter[c.num] = c.actualCents;
     });
     var costs = [];
-    p.baseline.chapters.forEach(function (c) {
-      if (committed[c.num])
+    /* Baseline chapters AND everything chapterEconomics knows beyond them.
+       This used to iterate `p.baseline.chapters` alone, so a variation
+       budget's chapter — real money, already spent — was silently dropped
+       from the capability's cost list, and only the VIEW compensated with a
+       hand-merge. The forecast then extrapolated a job that looked cheaper
+       than it was. One list of chapter numbers, baseline first (their order
+       is meaningful), the rest appended once. */
+    var chapterNums = p.baseline.chapters.map(function (c) {
+      // Object.keys below yields strings; a numeric baseline num must compare
+      // equal to its own key or every chapter would be counted twice.
+      return String(c.num);
+    });
+    Object.keys(actualByChapter)
+      .concat(Object.keys(committed))
+      .forEach(function (num) {
+        if (chapterNums.indexOf(num) < 0) chapterNums.push(num);
+      });
+    chapterNums.forEach(function (num) {
+      if (committed[num])
         costs.push({
-          id: "cm_" + c.num,
+          id: "cm_" + num,
           kind: "committed",
-          chapter: c.num,
+          chapter: num,
           description: "",
-          amountCents: committed[c.num],
+          amountCents: committed[num],
           date: erp.today,
         });
-      if (actualByChapter[c.num])
+      if (actualByChapter[num])
         costs.push({
-          id: "ac_" + c.num,
+          id: "ac_" + num,
           kind: "actual",
-          chapter: c.num,
+          chapter: num,
           description: "",
-          amountCents: actualByChapter[c.num],
+          amountCents: actualByChapter[num],
           date: erp.today,
         });
     });

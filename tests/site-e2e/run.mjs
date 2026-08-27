@@ -2764,6 +2764,28 @@ async function testVariationBudget(browser, base) {
       ok("5-6: the chapter table carries the variation row, marked with its pill");
     else bad("5-6: economics row", JSON.stringify(ecoRow));
 
+    /* The FORECAST must see the same money the table does. `projectValue`
+       used to iterate the baseline chapters alone, so a variation chapter's
+       cost — the 120,00 € bill filed above — was silently absent from the
+       capability's cost list and the projection ran on a job that looked
+       cheaper than it was. Only the view's hand-merge hid it. */
+    const fcast = await pg.evaluate(
+      ([projectId, num]) => {
+        const f = ErpBridge.projects.forecast(erp, projectId);
+        const row = f.byChapter.find((r) => String(r.chapter) === String(num));
+        return {
+          present: !!row,
+          actual: row ? row.actualCents : null,
+          // No double counting either: the chapter appears exactly once.
+          copies: f.byChapter.filter((r) => String(r.chapter) === String(num)).length,
+        };
+      },
+      [pid, joined.num],
+    );
+    if (fcast.present && fcast.actual === 12000 && fcast.copies === 1)
+      ok("5-6: the variation chapter's cost reaches the forecast, once");
+    else bad("5-6: forecast sees the variation", JSON.stringify(fcast));
+
     await pg.click(`[data-chcosts="${joined.num}"]`);
     await pg.waitForTimeout(500);
     const drill = await pg.evaluate(() => {
@@ -3828,6 +3850,28 @@ async function testProjectTracking(browser, base) {
     )
       ok(`PRY-02: splitting by capítulo makes the table agree with the project (${split.parts})`);
     else bad("PRY-02: chapter split", JSON.stringify(split));
+
+    /* Operator's UAT, CP 83 + CP 86 aftermath. The engine identity (chapters
+       + unassigned = project) is asserted in the simulations; what the
+       operator actually saw was the SCREEN — a card at 647, a table summing
+       602, and a sentence underneath claiming they agreed. So this check
+       reads the rendered screen: the Coste card must print the engine's own
+       total, and the «cuadra» sentence must be the measured green one, never
+       the red «No cuadra» pill, while everything is genuinely assigned. */
+    const honest = await pg.evaluate(() => {
+      const view = document.querySelector("#view");
+      const text = view ? view.innerText : "";
+      return {
+        cost: erp.actualCostCents(gProject),
+        cardShowsIt: text.includes(eur0(erp.actualCostCents(gProject))),
+        pend: erp.unassignedChapterCosts(gProject).length,
+        saysAgrees: /cuadra con el proyecto/.test(text),
+        saysDisagrees: /No cuadra/.test(text),
+      };
+    });
+    if (honest.cardShowsIt && honest.pend === 0 && honest.saysAgrees && !honest.saysDisagrees)
+      ok("PRY-02: the screen's «cuadra» claim is measured, and the card prints the engine's total");
+    else bad("PRY-02: measured cuadra claim", JSON.stringify(honest));
 
     // A projection is adjustable, and the reason is required by the engine.
     await pg.locator("#view [data-adj]").first().click();
