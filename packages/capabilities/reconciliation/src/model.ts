@@ -81,7 +81,28 @@ export interface InternalTransfer {
   inMovementId: string;
   amountCents: Cents;
   daysApart: number;
+  /** Every reason that put this pair together, so a person can see WHY. */
+  reasons: TransferReason[];
+  /**
+   * How many other incoming movements fitted the outgoing one equally well.
+   *
+   * Zero is the ordinary case and the only one safe to accept in bulk. Above
+   * zero the pair is a GUESS between look-alikes: a quarter of real card
+   * traffic repeats the same amounts, and "nearest by date" is not evidence
+   * when three candidates sit within the same tolerance window.
+   */
+  alternatives: number;
+  /** `alternatives > 0`. Named, because a caller reading a boolean is clearer. */
+  ambiguous: boolean;
 }
+
+/** Why two movements were paired. Same vocabulary shape as MatchReason. */
+export type TransferReason =
+  | "oppositeAmount"
+  | "amountWithinTolerance"
+  | "differentAccounts"
+  | "sameDate"
+  | "dateWithinTolerance";
 
 /**
  * The tunables, as plain data.

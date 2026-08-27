@@ -1767,8 +1767,13 @@ touching any bank or expense screen.
   whether the rest is still owed or closed, and «closed» takes a reason; and a
   proposal the bank line does not name is never one click, however exact the
   amount.
-- **PK7-D · E · F** — the matching drawer, Conciliados and internal
-  transfers as pairs, bulk actions over a 535-row quarter, PDF statements.
+- **PK7-D — done (2026-08-27).** Conciliados: a third tab listing what is
+  already explained and how, every row with its own Deshacer. Internal
+  transfers became real pairs — the link is stored on both legs, the
+  counterpart is shown with its reasons, a pair the matcher had to guess
+  between look-alikes is labelled and kept out of the bulk action, and every
+  action works on both legs.
+- **PK7-E · F** — bulk actions over a 535-row quarter, PDF statements.
 
 Two constraints fixed by evidence, not preference: a real quarter is ~535
 movements, most of them small card purchases, so `gasto general` cannot be

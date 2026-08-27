@@ -3366,6 +3366,212 @@ assert(
   );
 }
 
+/* ===================================================================== PK7-D
+   CONCILIADOS, DESHACER, AND TRANSFERS AS PAIRS.
+   ===================================================================== */
+{
+  const e = new ERP("2026-08-27");
+  const cli = e.addParty(
+    {
+      roles: ["customer"],
+      name: "Cli 7D",
+      taxId: "12345678Z",
+      billStreet: "s",
+      billPostalCode: "08001",
+      billCity: "BCN",
+      mobile: "600111222",
+      email: "cli7d@example.com",
+    },
+    "bo",
+  );
+  const sup = e.addParty({ roles: ["supplier"], name: "Prov 7D", taxId: "B12345674" }, "bo");
+  const bg = e.createBudget({ partyId: cli.id }, "bo");
+  const c1 = e.addChapter(bg.id, { name: "Demoliciones" }, "bo");
+  const l1 = e.addLine(
+    bg.id,
+    c1.id,
+    { desc: "Tabique", unit: "m2", qtyMilli: 10000, priceCents: 2000, costCents: 1000 },
+    "bo",
+  );
+  e.issueVersion(bg.id, {}, "bo");
+  e.acceptVersion(bg.id, e.currentVersion(bg.id).id, { evidenceRef: "ok" }, "bo");
+  const pj = e.createProjectFromAcceptance(bg.id, "bo");
+  const bank = e.addBankAccount({ name: "Banco 7D", kind: "bank" }, "bo");
+  const till = e.addBankAccount({ name: "Caja 7D", kind: "till" }, "bo");
+
+  /* THE SAFETY PROPERTY THIS WHOLE PACKAGE RESTS ON.
+     A matched movement contributes nothing to the project's cost — the BILL it
+     paid does — so matching it, and then undoing that match, must leave the
+     project exactly where it was. If undo could move cost, no reconciliation
+     would ever be safe to correct, and the answer to "did I get this right?"
+     would be "do not touch it". */
+  const bill = e.registerBill(
+    {
+      supplierId: sup.id,
+      number: "7D-1",
+      baseCents: 10000,
+      allocations: [{ projectId: pj.id, lineId: l1.id, kind: "material", amountCents: 10000 }],
+    },
+    "bo",
+  );
+  const costBefore = e.actualCostCents(pj.id);
+  const owed = e.billOutstandingCents(bill.id);
+  e.importMovements(
+    bank.id,
+    [{ accountingDate: "2026-08-20", concept: "PAGO PROV 7D", amountCents: -owed }],
+    "bo",
+  );
+  const pay = e.state.movements[e.state.movements.length - 1];
+  e.matchMovementSplit(pay.id, [{ billId: bill.id, amountCents: owed }], "bo");
+  const costDuring = e.actualCostCents(pj.id);
+  e.unexplainMovement(pay.id, "bo");
+  const costAfter = e.actualCostCents(pj.id);
+  assert(
+    costBefore === costDuring && costDuring === costAfter && costAfter === 10000,
+    "project cost is identical before a match, during it, and after Deshacer",
+    [costBefore, costDuring, costAfter].join(" / "),
+  );
+  assert(
+    e.billOutstandingCents(bill.id) === owed &&
+      !pay.matched &&
+      pay.status === "unallocated" &&
+      !e.state.payments.some((p) => p.movementId === pay.id && !p.voided),
+    "Deshacer unwinds the payment the match created and returns the movement to the queue",
+    JSON.stringify({ owed: e.billOutstandingCents(bill.id), matched: pay.matched }),
+  );
+
+  /* A TRANSFER IS A PAIR, AND THE PRODUCT NOW HOLDS IT AS ONE.
+     Before, the single-row path marked one leg and left the other in the
+     queue, and nothing recorded that the two belonged together — so nothing
+     could ever undo them together. */
+  e.importMovements(
+    bank.id,
+    [{ accountingDate: "2026-08-21", concept: "TRASPASO A CAJA", amountCents: -50000 }],
+    "bo",
+  );
+  const outLeg = e.state.movements[e.state.movements.length - 1];
+  e.importMovements(
+    till.id,
+    [{ accountingDate: "2026-08-21", concept: "TRASPASO RECIBIDO", amountCents: 50000 }],
+    "bo",
+  );
+  const inLeg = e.state.movements[e.state.movements.length - 1];
+
+  throws(
+    () => e.markInternalTransfer(outLeg.id, outLeg.id, "bo"),
+    "a movement cannot be its own transfer",
+  );
+  {
+    e.importMovements(
+      bank.id,
+      [{ accountingDate: "2026-08-21", concept: "DEVOLUCION", amountCents: 50000 }],
+      "bo",
+    );
+    const sameAcct = e.state.movements[e.state.movements.length - 1];
+    throws(
+      () => e.markInternalTransfer(outLeg.id, sameAcct.id, "bo"),
+      "two legs on the SAME account are a payment and its refund, not a transfer",
+    );
+  }
+
+  const before = e.unreconciledMovements(null, null, null).length;
+  e.markInternalTransfer(outLeg.id, inLeg.id, "bo");
+  assert(
+    outLeg.class === "internalTransfer" &&
+      inLeg.class === "internalTransfer" &&
+      outLeg.excludedFromPL &&
+      inLeg.excludedFromPL,
+    "marking a transfer marks BOTH legs and keeps both out of the profit figures",
+    JSON.stringify({ out: outLeg.class, in: inLeg.class }),
+  );
+  assert(
+    outLeg.transferPair.withMovementId === inLeg.id &&
+      inLeg.transferPair.withMovementId === outLeg.id,
+    "each leg records which movement it is paired with",
+    JSON.stringify(outLeg.transferPair),
+  );
+  assert(
+    e.unreconciledMovements(null, null, null).length === before - 2,
+    "both legs leave the queue at once",
+    String(e.unreconciledMovements(null, null, null).length),
+  );
+
+  /* Undoing from EITHER leg returns both. Pressing Deshacer on the incoming
+     line and getting the outgoing one back is the whole point of storing the
+     link. */
+  e.unexplainMovement(inLeg.id, "bo");
+  assert(
+    !outLeg.transferPair &&
+      !inLeg.transferPair &&
+      outLeg.status === "unallocated" &&
+      inLeg.status === "unallocated" &&
+      !outLeg.excludedFromPL &&
+      !inLeg.excludedFromPL,
+    "Deshacer on one leg returns BOTH to the queue",
+    JSON.stringify({ out: outLeg.status, in: inLeg.status }),
+  );
+  assert(
+    e.unreconciledMovements(null, null, null).length === before,
+    "…and the queue is exactly as it was",
+    String(e.unreconciledMovements(null, null, null).length),
+  );
+
+  /* CONCILIADOS SAYS HOW, not merely that. Every kind of explanation is
+     distinguished, because a screen that lumps them together cannot offer the
+     right way back. */
+  e.markInternalTransfer(outLeg.id, inLeg.id, "bo");
+  e.importMovements(
+    bank.id,
+    [{ accountingDate: "2026-08-22", concept: "COMISION MANTENIMIENTO", amountCents: -1450 }],
+    "bo",
+  );
+  const fee = e.state.movements[e.state.movements.length - 1];
+  e.markMovementUnbacked(fee.id, "comision", "bo");
+  e.importMovements(
+    bank.id,
+    [{ accountingDate: "2026-08-23", concept: "PAPELERIA", amountCents: -4500 }],
+    "bo",
+  );
+  const gen = e.state.movements[e.state.movements.length - 1];
+  e.splitMovement(gen.id, [{ overheadCategory: "office", amountCents: 4500 }], "bo");
+
+  const explained = e.explainedMovements(null, null, null);
+  const hows = {};
+  for (const row of explained) hows[row.how] = (hows[row.how] || 0) + 1;
+  assert(
+    hows.internalTransfer === 2 && hows.unbacked === 1 && hows.allocated === 1,
+    "Conciliados distinguishes transfer, sin-factura and allocated",
+    JSON.stringify(hows),
+  );
+  assert(
+    explained.find((x) => x.id === fee.id).detail === "Comisión bancaria",
+    "the sin-factura row names the reason, not its code",
+    explained.find((x) => x.id === fee.id).detail,
+  );
+  assert(
+    explained.every((x) => x.undoable),
+    "every explained row offers a way back while the period is open",
+    JSON.stringify(explained.filter((x) => !x.undoable)),
+  );
+
+  /* Except the one explained by nothing but the seal over it: there is no
+     decision to undo, and offering a button that would have to refuse is
+     worse than saying so. */
+  // The seal refuses while anything is unexplained — correctly. Clear the two
+  // left over from the checks above (the un-matched payment and the refund
+  // used as a negative control) so the seal has something to seal.
+  for (const m of e.unreconciledMovements(null, null, null))
+    e.markMovementUnbacked(m.id, "comision", "bo");
+  e.closeBankPeriod("2026-08-01", "2026-08-31", "bo");
+  const sealed = e.explainedMovements(null, null, null);
+  assert(
+    sealed.every((x) => !x.undoable),
+    "a closed period takes the way back off every row in it",
+    JSON.stringify(sealed.filter((x) => x.undoable).slice(0, 3)),
+  );
+  throws(() => e.unexplainMovement(fee.id, "bo"), "and Deshacer is refused inside a sealed period");
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

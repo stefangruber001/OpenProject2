@@ -5418,6 +5418,187 @@
       this._log(user, "markCardSettlement", movId + " → " + card.name);
       return m;
     }
+    /* ============ PK7-D — a transfer is a PAIR, and the product must hold it ==
+       `findInternalTransfers` has always proposed pairs and the bulk button
+       has always marked both legs. Everything else treated a transfer as two
+       unrelated facts: the single-row path marked one leg and left the other
+       in the queue, nothing recorded that the two belonged together, and so
+       undoing one could never undo the other. Two halves of one event, and the
+       product knew about neither half's twin.
+
+       The link is stored on both movements. That is what makes «Deshacer»
+       able to act on both legs afterwards — a screen cannot re-derive the pair
+       later, because by then both are out of the queue the matcher reads. */
+    markInternalTransfer(outMovId, inMovId, user) {
+      const a = this.state.movements.find((x) => x.id === outMovId);
+      const b = this.state.movements.find((x) => x.id === inMovId);
+      if (!a || !b) throw new Error("Movement not found");
+      if (a.id === b.id) throw new Error("Un movimiento no puede ser su propio traspaso");
+      if (a.accountId === b.accountId)
+        throw new Error(
+          "Los dos movimientos están en la misma cuenta: eso es un pago y su devolución, no un traspaso.",
+        );
+      if (a.amountCents > 0 === b.amountCents > 0)
+        throw new Error("Un traspaso tiene una salida y una entrada, no dos del mismo signo");
+      for (const m of [a, b]) {
+        if (m.transferPair && m.transferPair.withMovementId !== (m === a ? b.id : a.id))
+          throw new Error("Ese movimiento ya está emparejado con otro traspaso");
+      }
+      for (const [m, other] of [
+        [a, b],
+        [b, a],
+      ]) {
+        this.classifyMovement(m.id, "internalTransfer", user);
+        m.transferPair = {
+          withMovementId: other.id,
+          at: this.state.today,
+          by: user || "backoffice",
+        };
+      }
+      this._log(user, "markInternalTransfer", a.id + " ↔ " + b.id);
+      return { out: a, in: b };
+    }
+    /** Undo it — on BOTH legs, whichever one the person pressed. */
+    unmarkInternalTransfer(movId, user) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      const other = m.transferPair
+        ? this.state.movements.find((x) => x.id === m.transferPair.withMovementId)
+        : null;
+      const legs = other ? [m, other] : [m];
+      for (const leg of legs) {
+        if (this.bankPeriodClosed(leg.accountingDate))
+          throw new Error("El periodo está cerrado — reábrelo antes de deshacer");
+      }
+      for (const leg of legs) {
+        leg.transferPair = null;
+        leg.class = null;
+        leg.excludedFromPL = false;
+        leg.status = "unallocated";
+      }
+      this._log(user, "unmarkInternalTransfer", legs.map((x) => x.id).join(" ↔ "));
+      return legs;
+    }
+
+    /* ==================== PK7-D — Conciliados: what is explained, and HOW ====
+       The queue answers "what is left". Nothing answered "what did I already
+       decide, and on what grounds" — so a decision made in a hurry could only
+       be found by remembering it. Every row here carries its own way back.
+
+       The order of the tests below is the order of specificity, not the order
+       of `_discardableMovement`, which lumps everything non-deletable under
+       "matched" because for ITS purpose the distinction does not matter. Here
+       it is the whole point. */
+    movementExplanation(m) {
+      if (m.matched && (m.matched.documents || []).length)
+        return {
+          how: "matched",
+          detail: m.matched.documents
+            .map((d) => {
+              const rec = d.billId
+                ? this.state.bills.find((b) => b.id === d.billId)
+                : this.state.invoices.find((i) => i.id === d.invoiceId);
+              return (rec && rec.number) || d.billId || d.invoiceId;
+            })
+            .join(" + "),
+          undoable: true,
+        };
+      if (m.cardSettlement) {
+        const card = this.state.bankAccounts.find((a) => a.id === m.cardSettlement.accountId);
+        return { how: "cardSettlement", detail: (card && card.name) || "", undoable: true };
+      }
+      if (m.transferPair) {
+        const other = this.state.movements.find((x) => x.id === m.transferPair.withMovementId);
+        const acc = other && this.state.bankAccounts.find((a) => a.id === other.accountId);
+        return { how: "internalTransfer", detail: (acc && acc.name) || "", undoable: true };
+      }
+      if (m.class === "internalTransfer")
+        return { how: "internalTransfer", detail: "", undoable: true };
+      if ((m.allocations || []).length) {
+        const detail = m.allocations
+          .map((a) => (a.projectId ? this.project(a.projectId).code : a.overheadCategory || ""))
+          .filter(Boolean)
+          .join(", ");
+        return { how: "allocated", detail, undoable: true };
+      }
+      if (m.unbacked) {
+        const r = this.listAll("unbackedReasons").find((x) => x.code === m.unbacked.reason);
+        return { how: "unbacked", detail: (r && r.es) || m.unbacked.reason || "", undoable: true };
+      }
+      if (m.needsDoc === false && m.docRef)
+        return { how: "receipted", detail: m.docRef, undoable: true };
+      if (m.class) return { how: "classified", detail: m.class, undoable: true };
+      // Explained by nothing except the seal over it: there is no decision to
+      // undo, and saying so is more honest than offering a button that would
+      // have to refuse.
+      if (this.bankPeriodClosed(m.accountingDate))
+        return { how: "closedPeriod", detail: "", undoable: false };
+      return null;
+    }
+    /** Everything already explained, newest first, with how and its way back. */
+    explainedMovements(from, to, accountId) {
+      const out = [];
+      for (const m of this.state.movements) {
+        if (accountId && m.accountId !== accountId) continue;
+        if (from && m.accountingDate < from) continue;
+        if (to && m.accountingDate > to) continue;
+        const e = this.movementExplanation(m);
+        if (!e) continue;
+        out.push({
+          id: m.id,
+          accountId: m.accountId,
+          accountingDate: m.accountingDate,
+          concept: m.concept || m.merchantText || "",
+          counterparty: m.counterparty || "",
+          amountCents: m.amountCents,
+          how: e.how,
+          detail: e.detail,
+          undoable: e.undoable && !this.bankPeriodClosed(m.accountingDate),
+        });
+      }
+      return out.sort((a, b) => String(b.accountingDate).localeCompare(String(a.accountingDate)));
+    }
+    /**
+     * One «Deshacer», whatever the explanation was.
+     *
+     * A screen that lists six kinds of decision and offers six different ways
+     * back is a screen that will grow a seventh kind and forget the seventh
+     * way. The dispatch belongs where the kinds are decided.
+     *
+     * SAFETY PROPERTY, and the reason this package could be built at all:
+     * undoing an explanation must not move project cost. A matched movement
+     * contributed nothing to `actualCostCents` — the bill it paid did — so
+     * unwinding the payment must leave the project exactly where it was.
+     */
+    unexplainMovement(movId, user) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      if (this.bankPeriodClosed(m.accountingDate))
+        throw new Error("El periodo está cerrado — reábrelo antes de deshacer");
+      const e = this.movementExplanation(m);
+      if (!e) throw new Error("Ese movimiento no tiene nada que deshacer");
+      if (!e.undoable) throw new Error("Sólo lo cierra el periodo: reábrelo para poder tocarlo");
+      if (e.how === "internalTransfer" && m.transferPair)
+        return this.unmarkInternalTransfer(movId, user);
+      if (e.how === "matched") return this.unmatchMovement(movId, user);
+      // Everything else is a flag or a classification this layer set, and the
+      // way back is to clear exactly what was set — not to call unmatch, which
+      // would void payments that were never created.
+      if (e.how === "unbacked") m.unbacked = null;
+      if (e.how === "receipted") {
+        m.needsDoc = true;
+        m.docRef = null;
+        m.docKey = null;
+      }
+      if (e.how === "cardSettlement") m.cardSettlement = null;
+      m.allocations = [];
+      m.class = null;
+      m.excludedFromPL = false;
+      m.status = "unallocated";
+      this._log(user, "unexplainMovement", movId + " · " + e.how);
+      return m;
+    }
+
     /**
      * The statement's OWN arithmetic, read off the file it came in.
      *
@@ -6268,8 +6449,13 @@
      */
     closeBankPeriod(from, to, user) {
       const open = this.unreconciledMovements(from, to);
+      /* The count is NOT in the message. It is already on screen, in the bar
+         directly above the button that was just pressed, and putting it in the
+         refusal too makes one distinct string per number the queue can hold —
+         an unbounded set no dictionary can translate. The same fault
+         `candDistance` and `countTag` were built to remove. */
       if (open.length)
-        throw new Error(open.length + " movimientos sin conciliar — no se puede cerrar el periodo");
+        throw new Error("Quedan movimientos sin conciliar — no se puede cerrar el periodo");
       this.state.bankPeriods.push({
         from,
         to,

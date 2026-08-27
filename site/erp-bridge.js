@@ -836,8 +836,15 @@
         return recon.internalTransfers(
           erp.state.movements
             .filter(function (m) {
+              /* Only movements nothing has explained yet. Proposing a leg that
+                 is already matched to an invoice invites marking it as a
+                 transfer instead, which would void a real payment to explain a
+                 coincidence of amounts. */
               return (
                 !m.excludedFromPL &&
+                !m.matched &&
+                !m.unbacked &&
+                m.status === "unallocated" &&
                 (!from || m.accountingDate >= from) &&
                 (!to || m.accountingDate <= to)
               );

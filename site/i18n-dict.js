@@ -2941,6 +2941,56 @@ window.CANEI_DICT = {
       "The queue of unexplained transactions, ten at a time. Open one to see which document explains it; job cost is assigned in Expenses.",
     ],
     ["Conciliar movimiento", "Reconcile transaction"],
+    ["Conciliados", "Reconciled"],
+    [
+      "Quedan movimientos sin conciliar — no se puede cerrar el periodo",
+      "There are still unreconciled transactions — the period cannot be closed",
+    ],
+    // ── PK7-D: Conciliados, its ways back, and transfers as pairs.
+    [
+      "Lo que ya está explicado, y cómo. Cada línea puede deshacerse: deshacer una conciliación deshace también el pago que creó, y no toca el coste de obra.",
+      "What is already explained, and how. Every line can be undone: undoing a reconciliation also undoes the payment it created, and does not touch job cost.",
+    ],
+    [
+      "Buscar por concepto, importe o explicación…",
+      "Search by description, amount or explanation…",
+    ],
+    [
+      "Todavía no hay nada explicado en este periodo.",
+      "Nothing has been explained in this period yet.",
+    ],
+    ["movimientos explicados en el periodo", "transactions explained in the period"],
+    ["Explicación", "Explanation"],
+    ["↩ Deshacer", "↩ Undo"],
+    ["Deshacer la explicación", "Undo the explanation"],
+    ["Reabre el periodo", "Reopen the period"],
+    ["Conciliados →", "Reconciled →"],
+    ["← Volver a la cola", "← Back to the queue"],
+    [
+      "Un traspaso son dos movimientos. Deshacerlo devuelve LOS DOS a la cola.",
+      "A transfer is two movements. Undoing it returns BOTH to the queue.",
+    ],
+    [
+      "Traspaso deshecho — los dos movimientos vuelven a la cola",
+      "Transfer undone — both movements return to the queue",
+    ],
+    [
+      "Traspaso marcado — los dos movimientos salen de la cola",
+      "Transfer marked — both movements leave the queue",
+    ],
+    ["Traspasos entre cuentas propias", "Transfers between your own accounts"],
+    ["Marcar como traspaso", "Mark as a transfer"],
+    ["Marcar los", "Mark the"],
+    ["seguros", "certain ones"],
+    [
+      "movimientos encajaban igual de bien. Compruébalo antes de marcarlo.",
+      "movements fitted equally well. Check before marking it.",
+    ],
+    ["Con justificante", "With a receipt"],
+    ["Clasificado", "Classified"],
+    ["importe opuesto exacto", "exactly opposite amount"],
+    ["importe casi opuesto", "almost opposite amount"],
+    ["cuentas distintas", "different accounts"],
     ["＋ Añadir gasto", "＋ Add expense"],
     // The register nouns. `countTag` renders the figure and the noun as
     // separate elements, so each noun is a stable key instead of one

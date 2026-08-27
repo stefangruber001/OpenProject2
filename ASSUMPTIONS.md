@@ -5405,6 +5405,95 @@ address and the check catches it. The banner control also showed the check
 taking two others down with it as a timeout; the navigation now falls back to
 `go("company")` so one broken thing reports as one failed check.
 
+## PK7-D · Conciliados, Deshacer, and transfers as pairs (2026-08-27)
+
+**113e — the screen that says what was already decided.** The queue answers
+"what is left". Nothing answered "what did I decide, and on what grounds", so a
+decision made in a hurry could only be found by remembering it — and a wrong one
+could only be corrected by remembering it first. Conciliados is a third tab
+beside Cuentas y saldos and Conciliación: every explained movement, newest
+first, paginated and searchable like every other register, each row saying HOW
+it was explained and carrying its own way back.
+
+The kinds are distinguished on purpose: **conciliado con un documento ·
+asignado · sin factura con su motivo · con justificante · liquidación de
+tarjeta · traspaso interno · clasificado · en un periodo cerrado**.
+`_discardableMovement` already classified movements but lumps everything
+non-deletable under «matched», because for ITS purpose — may this be deleted? —
+the distinction does not matter. Here it is the whole point, so
+`movementExplanation` is a second, finer reading rather than a reuse of the
+first. Two questions, two answers; sharing the code would have made one of them
+wrong.
+
+**One Deshacer, not six.** A screen that lists six kinds of decision and offers
+six different ways back is a screen that will grow a seventh kind and forget the
+seventh way. `unexplainMovement` dispatches on the kind it just decided: a
+match unwinds through `unmatchMovement` (which voids the payment it created), a
+transfer through `unmarkInternalTransfer` (which acts on both legs), and
+everything else clears exactly the flag that was set — deliberately NOT by
+calling unmatch, which would try to void payments that were never created.
+
+**A row explained by nothing but the seal over it shows no button.** There is no
+decision to undo, and saying «reabre el periodo» is more honest than a button
+that would have to refuse. `undoable` is computed, not assumed.
+
+### A transfer is a pair, and the product now holds it as one
+
+`findInternalTransfers` has always proposed pairs, and the bulk button has
+always marked both legs. Everything else treated a transfer as two unrelated
+facts: the single-row path marked one leg and left the other in the queue,
+**nothing recorded that the two belonged together**, and so undoing one could
+never undo the other. Two halves of one event, and the product knew about
+neither half's twin.
+
+`markInternalTransfer(outId, inId)` writes the link on both movements, and it is
+that stored link — not a re-derivation — that lets Deshacer act on both legs
+afterwards. A screen cannot re-derive the pair later: by then both movements are
+out of the queue the matcher reads, so the evidence for the pairing has gone.
+The method also refuses the two shapes that are not transfers at all: the same
+movement twice, and two legs on the **same account**, which is a payment and its
+refund.
+
+**The counterpart is shown, with the reasons.** This was a number and a button —
+«3 traspaso(s) interno(s) detectado(s)» and «Marcar como internos» — which asked
+somebody to accept three guesses they could not see. Each pair now shows both
+legs with their accounts, dates and concepts, the amount, and why they were
+paired: importe opuesto exacto · cuentas distintas · misma fecha.
+
+**And the guess is labelled as a guess.** This is the gap that mattered at 535
+rows. A real quarter repeats amounts — the same weekly transfer, the same round
+top-up — and "nearest by date" then picks one of several equally good candidates
+and says nothing about the others. Marking the wrong pair moves two movements
+out of the queue AND out of the profit figures, and the mistake is **invisible
+afterwards because the amounts still net to zero**. So `alternatives` — how many
+rivals the matcher had to beat — travels with the proposal, `ambiguous` names
+it, the screen says so in red, and the bulk button marks only the unambiguous
+ones («Marcar los N seguros»). The rest are left for a person, one at a time.
+
+The counting had to happen inside the matcher: only it sees the candidates it
+rejected, and a caller given one answer cannot work out how many others fitted.
+
+**The bridge stopped proposing legs that are already explained.** It filtered
+only on `excludedFromPL`, so a movement already matched to an invoice could be
+offered as a transfer leg — and accepting that would void a real payment to
+explain a coincidence of amounts.
+
+### The safety property, stated and measured
+
+**Undoing an explanation must not move project cost.** A matched movement
+contributes nothing to `actualCostCents` — the bill it paid does — so matching
+it and then undoing the match must leave the project exactly where it was. If
+undo could move cost, no reconciliation would ever be safe to correct and the
+honest answer to «did I get this right?» would be «do not touch it».
+
+Asserted three times over — before the match, during it, and after Deshacer —
+in the engine simulation and again in the browser against the demonstration
+data. The negative control removes the `voidPayment` loop from `unmatchMovement`
+and two checks go red, which is what makes them evidence.
+
+**Also verified as a negative control:** narrowing `unmarkInternalTransfer` to
+the leg that was pressed turns «Deshacer on one leg returns BOTH» red, and the
+queue count with it.
 ## S31 · PK-A — a job is linked back to its contract (2026-08-28)
 
 UAT CP 60 + CP 92, one cause with three symptoms. On a live workspace the job

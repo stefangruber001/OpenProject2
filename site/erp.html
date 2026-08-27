@@ -9744,9 +9744,10 @@
    <div class="card"><div class="queuebar">
      <span class="n">${open.length}</span><span>movimientos sin conciliar en el periodo</span>
      <span style="flex:1"></span>
-     ${transfers.length ? `<span class="pill b">${transfers.length} traspaso(s) interno(s) detectado(s)</span><button class="btn sm" id="rcTransfers">Marcar como internos</button>` : ""}
+     <button class="btn sm" id="rcToDone">Conciliados →</button>
      <button class="btn sm" id="rcClose" title="Bloquea el periodo; exige cero movimientos sin conciliar">🔒 Cerrar periodo</button>
    </div></div>
+   ${transferCard(transfers)}
    ${!R ? '<div class="card"><div class="empty">El emparejamiento asistido necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>' : ""}
    <div id="rcList"></div>
    <div class="card" style="margin-top:12px"><div class="ch"><h3>Periodos cerrados</h3></div><div class="daylist" style="padding:10px 14px">
@@ -9818,15 +9819,30 @@
 
         $("#rcClose").onclick = () =>
           mutate(() => erp.closeBankPeriod(r.from, r.to, "backoffice"), "Periodo cerrado");
-        const tr = $("#rcTransfers");
-        if (tr)
-          tr.onclick = () =>
+        $("#rcToDone").onclick = () => goTab("banking", "_reconciled");
+        /* One pair at a time, through the method that writes the LINK. The old
+           bulk button called `classifyMovement` on each leg separately, which
+           left two movements that happened to be classified the same way and
+           nothing recording that they were one event — so nothing could ever
+           undo them together. */
+        const markPair = (t) =>
+          mutate(
+            () => erp.markInternalTransfer(t.outMovementId, t.inMovementId, "backoffice"),
+            "Traspaso marcado — los dos movimientos salen de la cola",
+          );
+        v.querySelectorAll("[data-tpair]").forEach(
+          (b) => (b.onclick = () => markPair(transfers[Number(b.dataset.tpair)])),
+        );
+        const trAll = $("#rcTransfersAll");
+        if (trAll)
+          trAll.onclick = () => {
+            const safe = transfers.filter((t) => !t.ambiguous);
             mutate(() => {
-              transfers.forEach((t) => {
-                erp.classifyMovement(t.outMovementId, "internalTransfer", "backoffice");
-                erp.classifyMovement(t.inMovementId, "internalTransfer", "backoffice");
-              });
-            }, transfers.length + " traspaso(s) marcados — no cuentan como ingreso ni gasto");
+              safe.forEach((t) =>
+                erp.markInternalTransfer(t.outMovementId, t.inMovementId, "backoffice"),
+              );
+            }, safe.length + " traspaso(s) marcados — no cuentan como ingreso ni gasto");
+          };
         v.querySelectorAll("[data-reopen]").forEach(
           (b) =>
             (b.onclick = async () => {
@@ -9899,6 +9915,198 @@
         if (m.needsDoc) return '<span class="pill r">sin respaldo</span>';
         const days = Math.max(0, ErpEngine.daysBetween(erp.today, m.accountingDate));
         return `<span title="Días sin casar"><span>${days}</span> <span>d</span></span>`;
+      }
+
+      /* Why two movements were paired, in the operator's words. Same shape as
+         REC_REASON: the capability says WHY in a code, the host translates. */
+      const TRANSFER_REASON = {
+        oppositeAmount: "importe opuesto exacto",
+        amountWithinTolerance: "importe casi opuesto",
+        differentAccounts: "cuentas distintas",
+        sameDate: "misma fecha",
+        dateWithinTolerance: "fecha próxima",
+      };
+      /**
+       * The transfers detected in the period — as PAIRS, with the counterpart.
+       *
+       * This was a number and a button: «3 traspaso(s) interno(s)
+       * detectado(s)» and «Marcar como internos», which asked somebody to
+       * accept three guesses they could not see. Marking the wrong pair moves
+       * two movements out of the queue AND out of the profit figures, and the
+       * error is invisible afterwards because the amounts still net to zero.
+       *
+       * Now each pair shows both legs, both accounts, and the reasons it was
+       * proposed. A pair the matcher had to CHOOSE — several incoming lines
+       * fitted the same outgoing one, which is what a quarter of repeated
+       * amounts produces — is marked as a guess, kept out of the bulk action,
+       * and left for a person to decide one at a time.
+       */
+      function transferCard(transfers) {
+        if (!transfers.length) return "";
+        const line = (id) => {
+          const m = erp.state.movements.find((x) => x.id === id);
+          if (!m) return "";
+          const acc = erp.state.bankAccounts.find((a) => a.id === m.accountId);
+          return `<span class="k">${esc((acc && acc.name) || "")}</span> <span class="sub">${fmtD(m.accountingDate)} · ${esc(m.concept || m.merchantText || "")}</span>`;
+        };
+        const sure = transfers.filter((t) => !t.ambiguous).length;
+        const rows = transfers
+          .map((t, i) => {
+            const why = (t.reasons || [])
+              .map((x) => `<b>${TRANSFER_REASON[x] || x}</b>`)
+              .join(" · ");
+            const doubt = t.ambiguous
+              ? `<div class="why" style="color:var(--danger)"><span>Otros</span> <span>${t.alternatives}</span> <span>movimientos encajaban igual de bien. Compruébalo antes de marcarlo.</span></div>`
+              : "";
+            return `<div class="sugg${t.ambiguous ? "" : " strong"}">
+      <div class="hd"><span style="flex:1">${line(t.outMovementId)} → ${line(t.inMovementId)}</span>
+       <b>${eur(t.amountCents)}</b>
+       <button class="btn sm${t.ambiguous ? "" : " primary"}" data-tpair="${i}">Marcar como traspaso</button></div>
+      <div class="why">${why}</div>${doubt}</div>`;
+          })
+          .join("");
+        return `<div class="card"><div class="ch"><h3>Traspasos entre cuentas propias</h3>
+     <span class="tag">${transfers.length}</span><span style="flex:1"></span>
+     ${sure ? `<button class="btn sm" id="rcTransfersAll"><span>Marcar los</span> <span>${sure}</span> <span>seguros</span></button>` : ""}</div>
+    <div style="padding:11px 14px">${rows}</div></div>`;
+      }
+
+      /* ===================== Conciliados (ADM-05 · PK7-D · 113e) ============
+   The queue answers "what is left". Nothing answered "what did I already
+   decide, and on what grounds" — so a decision made in a hurry could only be
+   found by remembering it, and a wrong one could only be corrected by
+   remembering it first.
+
+   Every row says HOW it was explained — matched to a document · asignado ·
+   sin factura con su motivo · con justificante · liquidación de tarjeta ·
+   traspaso interno — and carries its own way back. «Deshacer» goes through one
+   engine method whatever the kind, because a screen that lists six kinds of
+   decision and offers six ways back is a screen that will grow a seventh kind
+   and forget the seventh way.
+
+   A row explained by nothing except the seal over it shows no button: there is
+   no decision to undo, and saying so is more honest than a button that would
+   have to refuse. */
+      const EXPLAINED_HOW = {
+        matched: "Conciliado con un documento",
+        allocated: "Asignado",
+        unbacked: "Sin factura, con motivo",
+        receipted: "Con justificante",
+        cardSettlement: "Liquidación de tarjeta",
+        internalTransfer: "Traspaso interno",
+        classified: "Clasificado",
+        closedPeriod: "En un periodo cerrado",
+      };
+      function conciliados(v) {
+        $("#sub").textContent =
+          "Lo que ya está explicado, y cómo. Cada línea puede deshacerse: deshacer una conciliación deshace también el pago que creó, y no toca el coste de obra.";
+        const r = periodRange();
+        const rows = erp.explainedMovements(r.from, r.to, bankAcc);
+        const all = erp.explainedMovements(null, null, bankAcc);
+
+        v.innerHTML = `${periodNote(rows.length, all.length)}
+   <div class="card"><div class="queuebar">
+     <span class="n">${rows.length}</span><span>movimientos explicados en el periodo</span>
+     <span style="flex:1"></span>
+     <button class="btn sm" id="rdToQueue">← Volver a la cola</button>
+   </div></div>
+   <div id="rdList"></div>`;
+
+        $("#rdToQueue").onclick = () => goTab("banking", "_reconcile");
+
+        renderMasterList($("#rdList"), {
+          id: "reconciled-" + (bankAcc || "all"),
+          defSize: 10,
+          noNew: true,
+          ids: {
+            q: "rdQ",
+            size: "rdSize",
+            prev: "rdPrev",
+            next: "rdNext",
+            exp: "rdExp",
+            expMenu: "rdExpMenu",
+            expXlsx: "rdExpXlsx",
+            expCsv: "rdExpCsv",
+          },
+          searchPlaceholder: "Buscar por concepto, importe o explicación…",
+          nounSingular: "movimiento",
+          nounPlural: "movimientos",
+          emptyText: "Todavía no hay nada explicado en este periodo.",
+          baseRows: rows,
+          matches: (m, q) =>
+            [
+              m.concept,
+              m.counterparty,
+              m.detail,
+              EXPLAINED_HOW[m.how] || m.how,
+              fmtD(m.accountingDate),
+              (m.amountCents / 100).toFixed(2),
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase()
+              .includes(q),
+          columns: [
+            { label: "Fecha", get: (m) => fmtD(m.accountingDate) },
+            {
+              label: "Concepto",
+              primary: true,
+              get: (m) => m.counterparty || m.concept,
+              html: (m) => explainedWho(m),
+            },
+            {
+              label: "Importe",
+              get: (m) => eur(m.amountCents),
+              html: (m) =>
+                `<b style="color:${m.amountCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur(m.amountCents)}</b>`,
+            },
+            {
+              label: "Explicación",
+              get: (m) => EXPLAINED_HOW[m.how] || m.how,
+              html: (m) => explainedHow(m),
+            },
+            { label: "", get: () => "", html: (m) => undoCell(m) },
+          ],
+          onRowClick: () => {},
+        });
+
+        v.querySelectorAll("[data-undo]").forEach(
+          (b) =>
+            (b.onclick = async (ev) => {
+              ev.stopPropagation();
+              const row = rows.find((x) => x.id === b.dataset.undo);
+              const pair = row && row.how === "internalTransfer";
+              const yes = await askConfirm("Deshacer la explicación", {
+                body: pair
+                  ? "Un traspaso son dos movimientos. Deshacerlo devuelve LOS DOS a la cola."
+                  : "El movimiento vuelve a la cola. Si estaba conciliado con un documento, también se deshace el pago que la conciliación creó — el coste de obra no se toca.",
+                okLabel: "Deshacer",
+              });
+              if (!yes) return;
+              mutate(
+                () => erp.unexplainMovement(b.dataset.undo, "backoffice"),
+                pair ? "Traspaso deshecho — los dos movimientos vuelven a la cola" : "Deshecho",
+              );
+            }),
+        );
+      }
+      /** Who, with what the bank wrote under it — the same rule as the queue. */
+      function explainedWho(m) {
+        const lead = m.counterparty || m.concept || "—";
+        const rest = m.counterparty && m.concept && m.concept !== m.counterparty ? m.concept : "";
+        return esc(lead) + (rest ? ` <span class="sub">${esc(rest)}</span>` : "");
+      }
+      /** How it was explained, and against what. Built outside the template. */
+      function explainedHow(m) {
+        const label = EXPLAINED_HOW[m.how] || m.how;
+        const tone = m.how === "matched" ? "g" : m.how === "closedPeriod" ? "y" : "b";
+        const detail = m.detail ? ` <span class="sub">${esc(m.detail)}</span>` : "";
+        return `<span class="pill ${tone}">${esc(label)}</span>${detail}`;
+      }
+      /** The way back, or the reason there is not one. */
+      function undoCell(m) {
+        if (m.undoable) return `<button class="btn sm" data-undo="${m.id}">↩ Deshacer</button>`;
+        return '<span class="sub">Reabre el periodo</span>';
       }
 
       /* ---------- The matching panel (113a · 113c) ----------
@@ -17343,6 +17551,7 @@
     (matching, message planning) and are long enough that inlining them
     here would bury the rest of the map. */
         _reconcile: conciliacion,
+        _reconciled: conciliados,
         "petty-cash": cajaChica,
         "cash-flow": flujoCaja,
         messaging: comunicaciones,
@@ -18872,6 +19081,7 @@
         banking: [
           ["Cuentas y saldos", "_bankAccounts"],
           ["Conciliación", "_reconcile"],
+          ["Conciliados", "_reconciled"],
         ],
       };
       const tabState = {};

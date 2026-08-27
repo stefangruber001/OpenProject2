@@ -6,6 +6,7 @@ import type {
   MatchReason,
   MatchSuggestion,
   ReconciliationConfig,
+  TransferReason,
 } from "./model";
 
 /**
@@ -301,6 +302,10 @@ export function findInternalTransfers(
 
   for (const out of outs) {
     let best: { mv: BankMovement; days: number } | null = null;
+    // Every incoming that fits, not only the winner: how MANY fit is the
+    // difference between a pair and a guess, and the caller cannot work that
+    // out from a single answer.
+    let fitting = 0;
     for (const inc of ins) {
       if (taken.has(inc.id)) continue;
       if (out.accountRef && inc.accountRef && out.accountRef === inc.accountRef) continue;
@@ -308,15 +313,38 @@ export function findInternalTransfers(
         continue;
       const days = daysBetween(out.date, inc.date);
       if (days > config.dateToleranceDays) continue;
+      fitting++;
       if (!best || days < best.days) best = { mv: inc, days };
     }
     if (best) {
       taken.add(best.mv.id);
+      const gap = Math.abs(Math.abs(out.amountCents) - best.mv.amountCents);
+      const reasons: TransferReason[] = [
+        gap === 0 ? "oppositeAmount" : "amountWithinTolerance",
+        "differentAccounts",
+      ];
+      if (best.days === 0) reasons.push("sameDate");
+      else reasons.push("dateWithinTolerance");
       found.push({
         outMovementId: out.id,
         inMovementId: best.mv.id,
         amountCents: Math.abs(out.amountCents),
         daysApart: best.days,
+        reasons,
+        /**
+         * THE PAIR THAT IS ONLY A GUESS.
+         *
+         * A real quarter repeats amounts — the same 60,00 EUR transfer every
+         * week, the same round top-up — and "nearest by date" then picks one
+         * of several equally good candidates and says nothing. Marking that
+         * pair moves two movements out of the queue and out of the profit
+         * figures, and if it is the wrong two, both errors are invisible:
+         * the amounts still net to zero. So the count of rivals travels with
+         * the proposal, and a caller can refuse to accept in bulk what it
+         * cannot tell apart.
+         */
+        alternatives: fitting - 1,
+        ambiguous: fitting > 1,
       });
     }
   }

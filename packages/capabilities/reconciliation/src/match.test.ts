@@ -259,9 +259,13 @@ describe("internal transfers", () => {
       ],
       cfg(),
     );
-    expect(found).toEqual([
-      { outMovementId: "out", inMovementId: "in", amountCents: 100000, daysApart: 1 },
-    ]);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({
+      outMovementId: "out",
+      inMovementId: "in",
+      amountCents: 100000,
+      daysApart: 1,
+    });
   });
 
   it("does not pair two opposite movements on the SAME account", () => {
@@ -289,6 +293,71 @@ describe("internal transfers", () => {
     expect(found).toHaveLength(2);
     expect(found[0]).toMatchObject({ outMovementId: "out1", inMovementId: "in1", daysApart: 0 });
     expect(found[1]).toMatchObject({ outMovementId: "out2", inMovementId: "in2" });
+  });
+
+  it("says WHY it paired them, not just that it did", () => {
+    const [pair] = findInternalTransfers(
+      [
+        mv({ id: "out", amountCents: -100000, date: "2026-03-20", accountRef: "A" }),
+        mv({ id: "in", amountCents: 100000, date: "2026-03-20", accountRef: "B" }),
+      ],
+      cfg(),
+    );
+    expect(pair!.reasons).toEqual(
+      expect.arrayContaining(["oppositeAmount", "differentAccounts", "sameDate"]),
+    );
+    expect(pair!.ambiguous).toBe(false);
+    expect(pair!.alternatives).toBe(0);
+  });
+
+  /* THE PAIR THAT IS ONLY A GUESS. A real quarter repeats amounts — the same
+     weekly transfer, the same round top-up — and "nearest by date" then picks
+     one of several equally good candidates and says nothing about the others.
+     Marking the wrong two is invisible afterwards: the amounts still net to
+     zero. So the count of rivals travels with the proposal. */
+  it("counts the look-alikes it had to choose between", () => {
+    const found = findInternalTransfers(
+      [
+        mv({ id: "out", amountCents: -60000, date: "2026-03-20", accountRef: "A" }),
+        mv({ id: "in1", amountCents: 60000, date: "2026-03-20", accountRef: "B" }),
+        mv({ id: "in2", amountCents: 60000, date: "2026-03-21", accountRef: "C" }),
+        mv({ id: "in3", amountCents: 60000, date: "2026-03-22", accountRef: "B" }),
+      ],
+      cfg(),
+    );
+    expect(found[0]!.inMovementId).toBe("in1");
+    expect(found[0]!.alternatives).toBe(2);
+    expect(found[0]!.ambiguous).toBe(true);
+  });
+
+  it("is not ambiguous when the rivals are ruled out by amount or account", () => {
+    const found = findInternalTransfers(
+      [
+        mv({ id: "out", amountCents: -60000, date: "2026-03-20", accountRef: "A" }),
+        mv({ id: "in1", amountCents: 60000, date: "2026-03-20", accountRef: "B" }),
+        // Same amount, same account as the outgoing: a refund, not a transfer.
+        mv({ id: "in2", amountCents: 60000, date: "2026-03-20", accountRef: "A" }),
+        // Different amount, beyond tolerance.
+        mv({ id: "in3", amountCents: 61000, date: "2026-03-20", accountRef: "C" }),
+      ],
+      cfg(),
+    );
+    expect(found[0]!.inMovementId).toBe("in1");
+    expect(found[0]!.ambiguous).toBe(false);
+  });
+
+  it("names the near-miss amount as within tolerance rather than opposite", () => {
+    const [pair] = findInternalTransfers(
+      [
+        mv({ id: "out", amountCents: -100030, date: "2026-03-22", accountRef: "A" }),
+        mv({ id: "in", amountCents: 100000, date: "2026-03-20", accountRef: "B" }),
+      ],
+      cfg(),
+    );
+    expect(pair!.reasons).toContain("amountWithinTolerance");
+    expect(pair!.reasons).toContain("dateWithinTolerance");
+    expect(pair!.reasons).not.toContain("oppositeAmount");
+    expect(pair!.reasons).not.toContain("sameDate");
   });
 
   it("ignores a pair too far apart in time to be one transfer", () => {
