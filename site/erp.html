@@ -9628,7 +9628,6 @@
    everything. A confidence with no argument behind it teaches people to click
    accept without reading, which is the failure mode this screen exists to
    avoid. */
-      let recSel = null;
       const REC_REASON = {
         exactAmount: "importe exacto",
         amountWithinTolerance: "importe casi exacto",
@@ -9646,30 +9645,38 @@
           : null;
       }
 
+      /* ===================== Conciliación bancaria (ADM-05 · PK7-C) ==========
+   THE SHAPE CHANGED, AND THE OPERATOR SAID WHY. The screen was three columns
+   side by side — statement, proposals, candidates — and at 533 unreconciled
+   movements the statement column became a single scroll with no end, the
+   proposals for whichever row happened to be selected sat in the middle, and
+   the candidates column showed the first twelve open documents in creation
+   order, unrelated to anything.
+
+   «113a — maybe the pagination can be the same as Clients or Suppliers but
+   Propuestas can be open as a right side menu.» That is exactly right, and it
+   is not only about space: matching is a decision about ONE line, and a
+   decision about one line belongs in the panel this product already uses for
+   deciding about one record. The queue becomes a list like every other list —
+   paginated, searchable, ten at a time — and pressing a row opens the matching
+   panel beside it. The list stays whole while the matching happens.
+
+   What is left on the screen itself is what is true of the PERIOD rather than
+   of any one line: how many are still unexplained, the internal transfers
+   detected across it, the seal, and the periods already closed. */
       function conciliacion(v) {
         $("#sub").textContent =
-          "Extracto a la izquierda, documentos candidatos a la derecha y la propuesta de emparejamiento en medio, con el porqué. La cola de movimientos sin conciliar es el indicador de salud del periodo.";
+          "La cola de movimientos sin explicar, diez a diez. Abre uno para ver qué documento lo explica; el coste de obra se asigna en Gastos.";
         const R = reconApi();
         const r = periodRange();
-        /* `bankAcc` is the account picked on Cuentas y saldos, and until now
+        /* `bankAcc` is the account picked on Cuentas y saldos, and until PK7-A
            this screen ignored it: choosing the credit card showed the current
            account's queue unchanged, both reading 533 (acceptance test, 117).
            The queue is worked one account at a time; only the period seal
            spans them all, and it asks separately. */
         const open = erp.unreconciledMovements(r.from, r.to, bankAcc);
         const allOpen = erp.unreconciledMovements(null, null, bankAcc);
-        if (
-          recSel &&
-          !erp.state.movements.some((m) => m.id === recSel && m.status === "unallocated")
-        )
-          recSel = null;
-        if (!recSel && open.length) recSel = open[0].id;
-        const sel = recSel ? erp.state.movements.find((m) => m.id === recSel) : null;
-        const suggestions = R && sel ? R.suggest(erp, sel.id) : [];
-        const candidates = sel ? erp.reconciliationCandidates(sel.id) : [];
         const transfers = R ? R.internalTransfers(erp, r.from, r.to) : [];
-        const closed = sel ? erp.bankPeriodClosed(sel.accountingDate) : false;
-        const threshold = R ? R.autoAcceptScore : 1;
 
         v.innerHTML = `${periodNote(open.length, allOpen.length)}
    <div class="card"><div class="queuebar">
@@ -9679,199 +9686,76 @@
      <button class="btn sm" id="rcClose" title="Bloquea el periodo; exige cero movimientos sin conciliar">🔒 Cerrar periodo</button>
    </div></div>
    ${!R ? '<div class="card"><div class="empty">El emparejamiento asistido necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>' : ""}
-   <div class="rec">
-    <div>
-     <div class="card"><div class="ch"><h3>Extracto</h3><span class="tag">sin conciliar</span></div>
-      ${
-        open
-          .map(
-            (m) => `<div class="movrow${m.id === recSel ? " on" : ""}" data-mov="${m.id}">
-        <span style="color:var(--muted)">${fmtD(m.accountingDate)}</span>
-        <span class="cpt">${esc(m.concept || m.merchantText || "—")}${m.needsDoc ? ' <span class="pill r">sin respaldo</span>' : ""}${m.unbacked ? ' <span class="pill g">sin factura · con motivo</span>' : ""}</span>
-        <span class="amt ${m.amountCents < 0 ? "neg" : "pos"}">${eur(m.amountCents)}</span></div>`,
-          )
-          .join("") || '<div class="empty">Nada pendiente de conciliar en este periodo.</div>'
-      }
-     </div>
-     ${
-       sel
-         ? `<div class="card"><div class="ch"><h3>Propuestas</h3>
-       <span class="tag">${suggestions.length} para ${esc(sel.concept || sel.merchantText || "")}</span></div>
-      <div style="padding:11px 14px">
-       ${closed ? '<div class="it" style="color:var(--danger);margin-bottom:8px">El periodo está cerrado. Reábrelo para conciliar.</div>' : ""}
-       ${
-         suggestions
-           .map((s) => {
-             const docs = s.docIds.map((id) => candidates.find((c) => c.id === id)).filter(Boolean);
-             const strong = s.confidence >= threshold;
-             return `<div class="sugg${strong ? " strong" : ""}">
-          <div class="hd"><span class="conf" style="color:${strong ? "var(--greenDeep)" : "var(--body)"}">${Math.round(s.confidence * 100)}%</span>
-           <span style="flex:1">${docs.map((d) => `${esc(d.reference)} · ${esc(d.counterparty)} · ${eur(d.outstandingCents)}`).join(" + ")}</span>
-           ${closed ? "" : `<button class="btn sm${strong ? " primary" : ""}" data-accept="${s.docIds.join(",")}">Conciliar</button>`}</div>
-          <div class="why">${s.reasons.map((x) => `<b>${REC_REASON[x] || x}</b>`).join(" · ")}${s.differenceCents ? ` · diferencia ${eur(s.differenceCents)}` : ""}${s.combination ? " · varios documentos" : ""}</div>
-         </div>`;
-           })
-           .join("") ||
-         '<div class="it" style="color:var(--muted)">Ningún documento explica este movimiento. Asígnalo a un proyecto o clasifícalo abajo.</div>'
-       }
-      </div>
-      ${
-        closed
-          ? ""
-          : `<div class="gtools" style="border-top:1px solid var(--hair)">
-        <!-- «Asignar a proyecto» used to live here, and it is gone on purpose:
-             a project cost is decided once, in Gastos, with its partida, its
-             subpartida and its cuenta contable. This screen says WHAT a line
-             is, not what it was spent on. See docs/worklog/PK7-SPEC.md. -->
-        <select class="inline" id="rcDest">
-          <option value="">Identificar como…</option>
-          <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL)
-            .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
-            .join("")}</optgroup>
-          ${cardSettleGroup(sel)}
-        </select>
-        <button class="btn sm" id="rcDestGo">Identificar</button>
-        <span style="width:10px"></span>
-        <select class="inline" id="rcClass">${["overhead", "tax", "salary", "financial", "internalTransfer"].map((c) => `<option value="${c}">${{ overhead: "Gasto general", tax: "Impuestos", salary: "Nóminas", financial: "Financiero", internalTransfer: "Traspaso interno" }[c]}</option>`).join("")}</select>
-        <button class="btn sm" id="rcClassify">Clasificar</button>
-        <button class="btn sm" id="rcAttach">📎 Justificante</button>
-        <span style="flex:1"></span>
-        <select class="inline" id="rcWhy">${erp
-          .listActive("unbackedReasons")
-          .map((r) => `<option value="${r.code}">${esc(r.es)}</option>`)
-          .join("")}</select>
-        <button class="btn sm" id="rcUnbacked">Sin factura, con motivo</button>
-        <span style="width:10px"></span>
-        <button class="btn sm" id="rcNoDoc">Marcar sin respaldo</button>
-      </div>`
-      }</div>`
-         : ""
-     }
-    </div>
-    <div class="bside">
-     <div class="card" style="margin:0 0 12px"><div class="ch"><h3>Candidatos</h3><span class="tag">${candidates.length}</span></div>
-      <div class="daylist" style="padding:10px 14px">
-       ${
-         candidates
-           .slice(0, 12)
-           .map(
-             (
-               c,
-             ) => `<div class="it"><span class="pill ${c.direction === "in" ? "g" : "b"}">${c.kind === "invoice" ? "Emitida" : "Recibida"}</span>
-         <span style="flex:1">${esc(c.reference)} · ${esc(c.counterparty)}</span><b>${eur(c.outstandingCents)}</b></div>`,
-           )
-           .join("") || '<div class="it">Sin documentos abiertos en este sentido.</div>'
-       }
-       ${candidates.length > 12 ? `<div class="it" style="color:var(--muted)">…y ${candidates.length - 12} más</div>` : ""}
-      </div></div>
-     <div class="card" style="margin:0"><div class="ch"><h3>Periodos cerrados</h3></div><div class="daylist" style="padding:10px 14px">
-      ${
-        (erp.state.bankPeriods || [])
-          .map(
-            (
-              p,
-            ) => `<div class="it">${fmtD(p.from)} – ${fmtD(p.to)} ${p.reopenedAt ? `<span class="pill y">reabierto ${fmtD(p.reopenedAt)}</span>` : '<span class="pill g">cerrado</span>'}
-        ${p.reopenedAt ? `<br><span style="color:var(--muted)">${esc(p.reopenReason)}</span>` : `<button class="btn sm" data-reopen="${p.from}">Reabrir</button>`}</div>`,
-          )
-          .join("") || '<div class="it">Ningún periodo cerrado todavía.</div>'
-      }
-     </div></div>
-    </div>
-   </div>`;
+   <div id="rcList"></div>
+   <div class="card" style="margin-top:12px"><div class="ch"><h3>Periodos cerrados</h3></div><div class="daylist" style="padding:10px 14px">
+    ${
+      (erp.state.bankPeriods || [])
+        .map(
+          (
+            p,
+          ) => `<div class="it">${fmtD(p.from)} – ${fmtD(p.to)} ${p.reopenedAt ? `<span class="pill y">reabierto ${fmtD(p.reopenedAt)}</span>` : '<span class="pill g">cerrado</span>'}
+       ${p.reopenedAt ? `<br><span style="color:var(--muted)">${esc(p.reopenReason)}</span>` : `<button class="btn sm" data-reopen="${p.from}">Reabrir</button>`}</div>`,
+        )
+        .join("") || '<div class="it">Ningún periodo cerrado todavía.</div>'
+    }
+   </div></div>`;
 
-        v.querySelectorAll("[data-mov]").forEach(
-          (row) =>
-            (row.onclick = () => {
-              recSel = row.dataset.mov;
-              render();
-            }),
-        );
-        v.querySelectorAll("[data-accept]").forEach(
-          (b) =>
-            (b.onclick = () =>
-              mutate(() => {
-                const ids = b.dataset.accept.split(",");
-                /* ONE call, with the split stated. Applying matchMovement once
-                   per document — which is what this did — paid the whole
-                   movement to the first document and nothing to the rest,
-                   because a payment for the movement existed by the second
-                   pass and the guard skipped it. The second invoice stayed
-                   fully outstanding while looking reconciled, and nothing
-                   said so. Each document now takes what it is owed, capped by
-                   what is left of the movement. */
-                let left = Math.abs(sel.amountCents);
-                const splits = [];
-                for (const id of ids) {
-                  if (left <= 0) break;
-                  const c = candidates.find((x) => x.id === id);
-                  if (!c) continue;
-                  const take = Math.min(c.outstandingCents, left);
-                  left -= take;
-                  splits.push(
-                    c.kind === "invoice"
-                      ? { invoiceId: id, amountCents: take }
-                      : { billId: id, amountCents: take },
-                  );
-                }
-                erp.matchMovementSplit(sel.id, splits, "backoffice");
-                recSel = null;
-              }, "Movimiento conciliado")),
-        );
-        /* The two identifications that used to sit in the Destino select on
-           Cuentas y saldos, moved here with that screen's register: which
-           general expense this is, and whether an outgoing is the monthly
-           settlement of a card. Both say what a line IS. Neither touches a
-           project. */
-        const dest = $("#rcDest");
-        if (dest)
-          dest.onchange = () => {
-            const val = dest.value;
-            if (!val) return;
-            mutate(() => {
-              if (val.startsWith("c:")) {
-                erp.markCardSettlement(sel.id, val.slice(2), "backoffice");
-              } else {
-                erp.splitMovement(
-                  sel.id,
-                  [{ overheadCategory: val.slice(2), amountCents: Math.abs(sel.amountCents) }],
-                  "backoffice",
-                );
-              }
-              recSel = null;
-            }, "Movimiento identificado");
-          };
-        const destGo = $("#rcDestGo");
-        if (destGo)
-          destGo.onclick = () => {
-            if (!$("#rcDest").value) {
-              say("Elige primero qué es este movimiento.");
-              return;
-            }
-            $("#rcDest").onchange();
-          };
-        const classify = $("#rcClassify");
-        if (classify)
-          classify.onclick = () =>
-            mutate(() => {
-              erp.classifyMovement(sel.id, $("#rcClass").value, "backoffice");
-              recSel = null;
-            }, "Movimiento clasificado");
-        const att = $("#rcAttach");
-        if (att) att.onclick = () => receiptDrawer(sel.id);
-        const unb = $("#rcUnbacked");
-        if (unb)
-          unb.onclick = () =>
-            mutate(
-              () => erp.markMovementUnbacked(sel.id, $("#rcWhy").value, "backoffice"),
-              "Movimiento explicado — sale de la cola sin factura",
-            );
-        const nodoc = $("#rcNoDoc");
-        if (nodoc)
-          nodoc.onclick = () =>
-            mutate(
-              () => erp.flagMovementNoDoc(sel.id, "backoffice"),
-              "Marcado sin respaldo — tarea creada para reclamarlo",
-            );
+        /* Ten by default, and the same primitive the customer and supplier
+           registers use — the operator asked for exactly that comparison. The
+           list id carries the account so switching accounts does not inherit
+           the previous one's page and search. */
+        renderMasterList($("#rcList"), {
+          id: "reconcile-" + (bankAcc || "all"),
+          defSize: 10,
+          noNew: true,
+          ids: {
+            q: "rcQ",
+            size: "rcSize",
+            prev: "rcPrev",
+            next: "rcNext",
+            exp: "rcExp",
+            expMenu: "rcExpMenu",
+            expXlsx: "rcExpXlsx",
+            expCsv: "rcExpCsv",
+          },
+          searchPlaceholder: "Buscar por concepto, importe o quién…",
+          nounSingular: "movimiento",
+          nounPlural: "movimientos",
+          emptyText: "Nada pendiente de conciliar en este periodo.",
+          baseRows: open,
+          matches: (m, q) =>
+            [
+              m.concept,
+              m.merchantText,
+              m.counterparty,
+              m.reference,
+              fmtD(m.accountingDate),
+              (m.amountCents / 100).toFixed(2),
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase()
+              .includes(q),
+          columns: [
+            { label: "Fecha", get: (m) => fmtD(m.accountingDate) },
+            { label: "Concepto", primary: true, html: (m) => movLine(m) },
+            {
+              label: "Importe",
+              get: (m) => eur(m.amountCents),
+              html: (m) =>
+                `<b style="color:${m.amountCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur(m.amountCents)}</b>`,
+            },
+            {
+              label: "Estado",
+              get: (m) => (m.needsDoc ? "Sin respaldo" : "Sin explicar"),
+              html: (m) => queueState(m),
+            },
+          ],
+          onRowClick: (id) => matchDrawer(id),
+        });
+
+        $("#rcClose").onclick = () =>
+          mutate(() => erp.closeBankPeriod(r.from, r.to, "backoffice"), "Periodo cerrado");
         const tr = $("#rcTransfers");
         if (tr)
           tr.onclick = () =>
@@ -9881,8 +9765,6 @@
                 erp.classifyMovement(t.inMovementId, "internalTransfer", "backoffice");
               });
             }, transfers.length + " traspaso(s) marcados — no cuentan como ingreso ni gasto");
-        $("#rcClose").onclick = () =>
-          mutate(() => erp.closeBankPeriod(r.from, r.to, "backoffice"), "Periodo cerrado");
         v.querySelectorAll("[data-reopen]").forEach(
           (b) =>
             (b.onclick = async () => {
@@ -9890,9 +9772,8 @@
                 label: "Motivo de la reapertura",
                 body: "Reabrir un periodo cerrado queda registrado con su motivo.",
                 required: true,
-                okLabel: "Reabrir",
               });
-              if (reason === null) return;
+              if (reason == null) return;
               mutate(
                 () => erp.reopenBankPeriod(b.dataset.reopen, reason, "backoffice"),
                 "Periodo reabierto",
@@ -9926,6 +9807,322 @@
         "works-finished": "Obra finalizada",
         "subcontractor-docs-expired": "Documentación de subcontrata caducada",
       };
+
+      /** The queue's Estado cell: flagged, or how long it has been waiting. */
+      function queueState(m) {
+        if (m.needsDoc) return '<span class="pill r">sin respaldo</span>';
+        const days = Math.max(0, ErpEngine.daysBetween(erp.today, m.accountingDate));
+        return `<span title="Días sin casar"><span>${days}</span> <span>d</span></span>`;
+      }
+
+      /* ---------- The matching panel (113a · 113c) ----------
+   One movement, and everything that might explain it: the proposals the
+   matcher argues for, the open documents ordered by how near they are, and
+   the ways of explaining a line that has no document at all.
+
+   `rcCandQ` is module state rather than a local because the panel re-opens
+   itself after every action — a search typed to find one document should
+   survive matching it. */
+      let rcCandQ = "";
+      function matchDrawer(movId) {
+        const m = erp.state.movements.find((x) => x.id === movId);
+        if (!m) return;
+        const R = reconApi();
+        const suggestions = R ? R.suggest(erp, m.id) : [];
+        const candidates = erp.reconciliationCandidates(m.id);
+        const closed = erp.bankPeriodClosed(m.accountingDate);
+        const q = rcCandQ.trim().toLowerCase();
+        const shown = (
+          q
+            ? candidates.filter((c) =>
+                [c.reference, c.counterparty, (c.outstandingCents / 100).toFixed(2)]
+                  .filter(Boolean)
+                  .join(" ")
+                  .toLowerCase()
+                  .includes(q),
+              )
+            : candidates
+        ).slice(0, 12);
+
+        /* Built before the template rather than inside it. A conditional that
+           opens a nested template literal reads to the source audit as prose
+           with no translation, which is the same trap CLAUDE.md records
+           catching three earlier templates. Hoisting it costs a line and
+           removes the ambiguity. */
+        const hidden = candidates.length - shown.length;
+        /* Built unconditionally and used conditionally. A string literal
+           inside a conditional inside a template is what the source audit
+           reads as untranslated prose — the trap CLAUDE.md records catching
+           three earlier templates — and no amount of rewording fixes that;
+           moving the literal out of the conditional does. */
+        const moreNote = `<div class="it" style="color:var(--muted)"><span>…y</span> <span>${hidden}</span> <span>más. Busca para acotar.</span></div>`;
+        const db = openDrawer("Conciliar movimiento");
+        db.innerHTML = `
+   <div class="card" style="margin:0 0 12px"><div class="daylist" style="padding:10px 14px">
+     <div class="it"><span style="color:var(--muted)">${fmtD(m.accountingDate)}</span>
+       <span class="k" style="flex:1">${movLine(m)}</span>
+       <b style="color:${m.amountCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur(m.amountCents)}</b></div>
+   </div></div>
+   ${closed ? '<div class="it" style="color:var(--danger);margin-bottom:10px">El periodo está cerrado. Reábrelo para conciliar.</div>' : ""}
+
+   <div class="card" style="margin:0 0 12px"><div class="ch"><h3>Propuestas</h3><span class="tag">${suggestions.length}</span></div>
+    <div style="padding:11px 14px">
+     ${
+       suggestions
+         .map((s) => {
+           const docs = s.docIds.map((id) => candidates.find((c) => c.id === id)).filter(Boolean);
+           /* One click needs the NAME, not just the number: `autoAcceptable`
+              comes from the matcher, which refuses to offer a proposal the
+              bank line never names however exact the amount (B1). The
+              proposal is still here and can still be accepted — it is just
+              not the button the eye lands on, and the panel says why. */
+           const one = s.autoAcceptable;
+           const near = !one && s.confidence >= (R ? R.autoAcceptScore : 1);
+           return `<div class="sugg${one ? " strong" : ""}">
+        <div class="hd"><span class="conf" style="color:${one ? "var(--greenDeep)" : "var(--body)"}">${Math.round(s.confidence * 100)}%</span>
+         <span style="flex:1">${docs.map((d) => `${esc(d.reference)} · ${esc(d.counterparty)} · ${eur(d.outstandingCents)}`).join(" + ")}</span>
+         ${closed ? "" : `<button class="btn sm${one ? " primary" : ""}" data-accept="${s.docIds.join(",")}">Conciliar</button>`}</div>
+        <div class="why">${s.reasons.map((x) => `<b>${REC_REASON[x] || x}</b>`).join(" · ")}${s.differenceCents ? ` · diferencia ${eur(s.differenceCents)}` : ""}${s.combination ? " · varios documentos" : ""}</div>
+        ${near ? '<div class="why" style="color:var(--danger)">El extracto no nombra a la contraparte. Compruébalo antes de conciliar.</div>' : ""}
+       </div>`;
+         })
+         .join("") ||
+       '<div class="it" style="color:var(--muted)">Ningún documento explica este movimiento. Búscalo abajo o explícalo sin factura.</div>'
+     }
+    </div></div>
+
+   <div class="card" style="margin:0 0 12px"><div class="ch"><h3>Candidatos</h3><span class="tag">${candidates.length}</span>
+     <span style="flex:1"></span>
+     ${closed ? "" : `<button class="btn sm" id="rcAdd">${m.amountCents < 0 ? "＋ Añadir gasto" : "＋ Nueva factura"}</button>`}</div>
+    <div style="padding:10px 14px 0">
+     <input id="rcCandQ" placeholder="Buscar documento por número, quién o importe…" value="${esc(rcCandQ)}"
+       style="width:100%;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)">
+    </div>
+    <div class="daylist" style="padding:10px 14px">
+     ${
+       shown
+         .map(
+           (c) => `<div class="it">
+        <span class="pill ${c.direction === "in" ? "g" : "b"}">${c.kind === "invoice" ? "Emitida" : "Recibida"}</span>
+        <span style="flex:1">${esc(c.reference)} · ${esc(c.counterparty)}
+          <span class="sub">${c.gapCents === 0 ? "importe exacto" : "difiere " + eur(c.gapCents)} · ${c.daysApart === 0 ? "mismo día" : c.daysApart + " d"}</span></span>
+        <b>${eur(c.outstandingCents)}</b>
+        ${closed ? "" : `<button class="btn sm" data-pick="${c.id}">Conciliar</button>`}</div>`,
+         )
+         .join("") ||
+       `<div class="it">${candidates.length ? "Ningún documento coincide con la búsqueda." : "Sin documentos abiertos en este sentido."}</div>`
+     }
+     ${hidden > 0 ? moreNote : ""}
+    </div></div>
+
+   ${
+     closed
+       ? ""
+       : `<div class="card" style="margin:0"><div class="ch"><h3>Sin documento</h3></div>
+    <div class="gtools" style="padding:11px 14px">
+     <!-- «Asignar a proyecto» used to live here, and it is gone on purpose:
+          a project cost is decided once, in Gastos, with its partida, su
+          subpartida and its cuenta contable. This panel says WHAT a line is,
+          not what it was spent on. See docs/worklog/PK7-SPEC.md. -->
+     <select class="inline" id="rcDest">
+       <option value="">Identificar como…</option>
+       <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL)
+         .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
+         .join("")}</optgroup>
+       ${cardSettleGroup(m)}
+     </select>
+     <button class="btn sm" id="rcDestGo">Identificar</button>
+     <span style="width:10px"></span>
+     <select class="inline" id="rcClass">${["overhead", "tax", "salary", "financial", "internalTransfer"].map((c) => `<option value="${c}">${{ overhead: "Gasto general", tax: "Impuestos", salary: "Nóminas", financial: "Financiero", internalTransfer: "Traspaso interno" }[c]}</option>`).join("")}</select>
+     <button class="btn sm" id="rcClassify">Clasificar</button>
+     <button class="btn sm" id="rcAttach">📎 Justificante</button>
+     <span style="flex:1"></span>
+     <select class="inline" id="rcWhy">${erp
+       .listActive("unbackedReasons")
+       .map((x) => `<option value="${x.code}">${esc(x.es)}</option>`)
+       .join("")}</select>
+     <button class="btn sm" id="rcUnbacked">Sin factura, con motivo</button>
+     <span style="width:10px"></span>
+     <button class="btn sm" id="rcNoDoc">Marcar sin respaldo</button>
+    </div></div>`
+   }`;
+
+        const qi = $("#rcCandQ");
+        if (qi)
+          qi.oninput = () => {
+            rcCandQ = qi.value;
+            const at = qi.selectionStart;
+            matchDrawer(movId);
+            const again = $("#rcCandQ");
+            if (again) {
+              again.focus();
+              try {
+                again.setSelectionRange(at, at);
+              } catch (e) {}
+            }
+          };
+
+        /* Accepting a proposal and picking a candidate are the SAME act with
+           different arguments, so they go through one function. Two code paths
+           for one decision is how the combination path came to pay only its
+           first document (A3) while the single path was correct. */
+        const settle = (ids) =>
+          mutate(() => {
+            let left = Math.abs(m.amountCents);
+            const splits = [];
+            for (const id of ids) {
+              if (left <= 0) break;
+              const c = candidates.find((x) => x.id === id);
+              if (!c) continue;
+              const take = Math.min(c.outstandingCents, left);
+              left -= take;
+              splits.push(
+                c.kind === "invoice"
+                  ? { invoiceId: id, amountCents: take }
+                  : { billId: id, amountCents: take },
+              );
+            }
+            erp.matchMovementSplit(m.id, splits, "backoffice");
+            closeDrawer();
+            // A2: anything still owed after the match is a question, not a
+            // silence. Asked once, about all of them, after the money moved.
+            setTimeout(() => shortfallDrawer(splits), 0);
+          }, "Movimiento conciliado");
+
+        db.querySelectorAll("[data-accept]").forEach(
+          (b) => (b.onclick = () => settle(b.dataset.accept.split(","))),
+        );
+        db.querySelectorAll("[data-pick]").forEach(
+          (b) => (b.onclick = () => settle([b.dataset.pick])),
+        );
+        const add = $("#rcAdd");
+        if (add)
+          add.onclick = () => {
+            /* The missing document, captured without leaving the queue —
+               a supplier invoice for money out, a customer invoice for money
+               in. Both are the drawers those registers already use; opening a
+               second way of writing the same record is how two of them drift
+               apart. */
+            if (m.amountCents < 0) billDrawer();
+            else newInvoiceDrawer();
+          };
+
+        /* The two identifications that used to sit in the Destino select on
+           Cuentas y saldos: which general expense this is, and whether an
+           outgoing is the monthly settlement of a card. Both say what a line
+           IS. Neither touches a project. */
+        const dest = $("#rcDest");
+        if (dest)
+          dest.onchange = () => {
+            const val = dest.value;
+            if (!val) return;
+            mutate(() => {
+              if (val.startsWith("c:")) {
+                erp.markCardSettlement(m.id, val.slice(2), "backoffice");
+              } else {
+                erp.splitMovement(
+                  m.id,
+                  [{ overheadCategory: val.slice(2), amountCents: Math.abs(m.amountCents) }],
+                  "backoffice",
+                );
+              }
+              closeDrawer();
+            }, "Movimiento identificado");
+          };
+        const destGo = $("#rcDestGo");
+        if (destGo)
+          destGo.onclick = () => {
+            if (!$("#rcDest").value) {
+              say("Elige primero qué es este movimiento.");
+              return;
+            }
+            $("#rcDest").onchange();
+          };
+        const classify = $("#rcClassify");
+        if (classify)
+          classify.onclick = () =>
+            mutate(() => {
+              erp.classifyMovement(m.id, $("#rcClass").value, "backoffice");
+              closeDrawer();
+            }, "Movimiento clasificado");
+        const att = $("#rcAttach");
+        if (att) att.onclick = () => receiptDrawer(m.id);
+        const unb = $("#rcUnbacked");
+        if (unb)
+          unb.onclick = () =>
+            mutate(() => {
+              erp.markMovementUnbacked(m.id, $("#rcWhy").value, "backoffice");
+              closeDrawer();
+            }, "Movimiento explicado — sale de la cola sin factura");
+        const nodoc = $("#rcNoDoc");
+        if (nodoc)
+          nodoc.onclick = () =>
+            mutate(() => {
+              erp.flagMovementNoDoc(m.id, "backoffice");
+              closeDrawer();
+            }, "Marcado sin respaldo — tarea creada para reclamarlo");
+      }
+
+      /* ---------- A2: is the rest still owed, or closed? ----------
+   The operator's own case: a payment lands a few cents or a few euros short.
+   The product used to have one answer — the document keeps owing the
+   difference, forever — so a register of receivables slowly fills with 0,03 €
+   that nobody will collect and nobody dares delete.
+
+   Both answers are legitimate and they are NOT the same, so the panel asks,
+   once, about every document the match left short. «Sigue pendiente» is the
+   default and needs no reason: it is what the system already believed.
+   «Se da por cerrado» takes one, from the owner-maintained list, because a
+   document driven to zero with no stated reason is indistinguishable from a
+   mistake three months later — and the gestoría has to be able to tell a
+   prompt-payment discount from a bank charge. */
+      function shortfallDrawer(splits) {
+        const short = (splits || [])
+          .map((s) => {
+            const kind = s.billId ? "bill" : "invoice";
+            const id = s.billId || s.invoiceId;
+            const open = kind === "bill" ? erp.billOutstandingCents(id) : erp.invoiceOutstandingCents(id);
+            if (open <= 0) return null;
+            const rec =
+              kind === "bill"
+                ? erp.state.bills.find((b) => b.id === id)
+                : erp.state.invoices.find((i) => i.id === id);
+            return { kind, id, open, ref: (rec && rec.number) || id };
+          })
+          .filter(Boolean);
+        if (!short.length) return;
+        const reasons = erp.listActive("settlementReasons");
+        const db = openDrawer("¿El resto sigue pendiente?");
+        db.innerHTML = `<div class="it" style="margin-bottom:10px;color:var(--muted)">
+     El movimiento no cubre del todo ${short.length === 1 ? "este documento" : "estos documentos"}.
+     Si el resto sigue pendiente no hay nada que hacer; si se da por cerrado, di por qué.</div>
+   ${short
+     .map(
+       (d, i) => `<div class="card" style="margin:0 0 10px"><div class="daylist" style="padding:10px 14px">
+      <div class="it"><span class="k" style="flex:1">${esc(d.ref)}</span><span>Sigue debiendo</span><b>${eur(d.open)}</b></div>
+      <div class="it">
+        <select class="inline" data-sfr="${i}">${reasons.map((x) => `<option value="${x.code}">${esc(x.es)}</option>`).join("")}</select>
+        <span style="flex:1"></span>
+        <button class="btn sm" data-sfclose="${i}">Se da por cerrado</button></div>
+     </div></div>`,
+     )
+     .join("")}
+   <div class="field full" style="margin-top:6px"><button class="btn primary" id="sfKeep">Sigue pendiente</button></div>`;
+        $("#sfKeep").onclick = () => closeDrawer();
+        db.querySelectorAll("[data-sfclose]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              const i = Number(b.dataset.sfclose);
+              const d = short[i];
+              const reason = db.querySelector(`[data-sfr="${i}"]`).value;
+              mutate(() => {
+                erp.settleShortfall(d.kind, d.id, reason, "backoffice");
+                closeDrawer();
+                setTimeout(() => shortfallDrawer(splits), 0);
+              }, "Cerrado con su motivo");
+            }),
+        );
+      }
       function commsApi() {
         return typeof ErpBridge !== "undefined" && ErpBridge.comms && ErpBridge.comms.available
           ? ErpBridge.comms
@@ -15024,6 +15221,15 @@
           esPlaceholder: "Comisión bancaria",
           caPlaceholder: "Comissió bancària",
         },
+        settlementReasons: {
+          title: "Motivos de cierre (diferencias)",
+          code: "DMC-05",
+          singular: "motivo",
+          codeLabel: "Código",
+          codePlaceholder: "prontoPago",
+          esPlaceholder: "Descuento por pronto pago",
+          caPlaceholder: "Descompte per pagament ràpid",
+        },
         nextActions: {
           title: "Próximas acciones",
           code: "DMC-04",
@@ -15331,6 +15537,26 @@
         const lead = m.counterparty || m.merchantText || m.concept || "—";
         const rest = m.counterparty && m.merchantText !== m.counterparty ? m.merchantText : "";
         return esc(lead) + (rest ? ` <span class="sub">${esc(rest)}</span>` : "");
+      }
+
+      /**
+       * Who it was with AND what the bank actually wrote — the reconciliation
+       * queue's own line.
+       *
+       * `movWho` answers "who" and deliberately hides the concept behind the
+       * counterparty, because on a balances screen a scheme category
+       * («PAGO CON TARJETA EN HOGAR, MUEBLES…») is noise identical for every
+       * hardware shop in the country. On the MATCHING queue the concept is the
+       * opposite of noise: it is where a reference lives — «TRANSF. /FRA
+       * 2026/A-1187» — and the reference is the strongest signal the matcher
+       * has after the amount. A queue that hides it makes the person searching
+       * for an invoice number search text the screen never shows them.
+       */
+      function movLine(m) {
+        const who = movWho(m);
+        const concept = m.concept || "";
+        if (!concept || who.includes(esc(concept))) return who;
+        return who + ` <span class="sub">${esc(concept)}</span>`;
       }
 
       /* Keyed on codes, not on Spanish: the engine says WHY in a word the
@@ -17293,7 +17519,7 @@
         "payment-methods"(v) {
           listConfigScreen(
             v,
-            ["paymentMethods", "paymentConditions", "unbackedReasons"],
+            ["paymentMethods", "paymentConditions", "unbackedReasons", "settlementReasons"],
             "Cómo se cobra (formas de pago) y en qué reparto (condiciones de pago). El vencimiento real lo calcula cada documento; aquí se mantienen las listas.",
             `<h4>Dónde se usa</h4>
     <p><b>Formas de pago</b> — en el contrato y en cada factura emitida, y es lo que se imprime

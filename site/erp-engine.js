@@ -355,6 +355,20 @@
       { code: "interes", es: "Intereses", ca: "Interessos" },
       { code: "impuesto", es: "Cargo de impuestos", ca: "Càrrec d'impostos" },
     ],
+    /* A2, from the acceptance review: a payment lands a few cents or a few
+       euros short of what the document says, and the honest question is not
+       "did this match?" but «¿el resto sigue pendiente o se da por cerrado?».
+       Both answers are legitimate and they are not the same: still-pending
+       leaves the document owing, closed drives it to zero — and a document
+       driven to zero without a stated reason is a number the gestoría cannot
+       explain. Owner-maintained like every list here; the codes live on the
+       documents forever, the labels are what get edited. */
+    settlementReasons: [
+      { code: "prontoPago", es: "Descuento por pronto pago", ca: "Descompte per pagament ràpid" },
+      { code: "redondeo", es: "Redondeo", ca: "Arrodoniment" },
+      { code: "comisionBancaria", es: "Comisión bancaria", ca: "Comissió bancària" },
+      { code: "abonoPendiente", es: "Abono pendiente del proveedor", ca: "Abonament pendent" },
+    ],
     /* Package 1, slide 9: the milestone split printed on a presupuesto — "40%
        a la firma…" — was a free-text box, so the same split got retyped
        slightly differently every time and never came back for a comparison.
@@ -4770,7 +4784,8 @@
         this.state.invoices.filter((i) => i.rectifies === invId),
         (i) => i.totalCents,
       );
-      return inv.kind === "creditNote" ? 0 : inv.totalCents - collected - credited;
+      if (inv.kind === "creditNote") return 0;
+      return inv.totalCents - collected - credited - sum(inv.writeOffs || [], (w) => w.amountCents);
     }
     /**
      * Every issued invoice with its settlement state — the register a screen
@@ -5043,7 +5058,85 @@
         this.state.bills.filter((x) => x.creditNoteFor === billId),
         (x) => x.totalCents,
       );
-      return b.totalCents - paid - credited;
+      return b.totalCents - paid - credited - sum(b.writeOffs || [], (w) => w.amountCents);
+    }
+    /* ======================= A2 — is the rest still owed, or closed? ======
+       A payment lands short. Until now the product had one answer: the
+       document keeps owing the difference, forever, and a register of
+       receivables slowly fills with 0,03 € and 12,50 € that nobody will ever
+       collect and nobody dares delete. The other answer — this is closed, and
+       here is why — was not expressible at all.
+
+       Both are legitimate, they are not the same, and the difference is a
+       question only a person can answer. So the product asks it, and records
+       the answer: a write-off carries its reason code, its date and who said
+       so, and `billOutstandingCents` / `invoiceOutstandingCents` subtract it.
+
+       A reason is REQUIRED, and it comes from an owner-maintained list rather
+       than free text. «Se da por cerrado» with no reason is indistinguishable
+       from a mistake three months later, and the gestoría has to be able to
+       tell a prompt-payment discount from a bank charge from a credit note
+       that never arrived. Free text would answer the question in a way nothing
+       could ever total.
+
+       Written as a list rather than a single field because shortfalls repeat:
+       two partial payments can each round, and the second must not overwrite
+       the first's explanation. */
+    _writeOffTarget(kind, docId) {
+      if (kind === "bill") {
+        const b = this.state.bills.find((x) => x.id === docId);
+        if (!b) throw new Error("Bill not found");
+        return { rec: b, open: this.billOutstandingCents(docId) };
+      }
+      if (kind === "invoice") {
+        const i = this.state.invoices.find((x) => x.id === docId);
+        if (!i) throw new Error("Invoice not found");
+        if (i.kind === "creditNote")
+          throw new Error("Una factura rectificativa no se da por cerrada");
+        return { rec: i, open: this.invoiceOutstandingCents(docId) };
+      }
+      throw new Error("Unknown document kind: " + kind);
+    }
+    /**
+     * Close the rest of a document, with a reason.
+     *
+     * `amountCents` defaults to everything still outstanding, which is the
+     * case the drawer asks about. Passing more than is outstanding is refused
+     * rather than clamped: a screen that silently writes off less than it was
+     * told to has answered a different question than the one that was asked.
+     */
+    settleShortfall(kind, docId, reasonCode, user, amountCents) {
+      const { rec, open } = this._writeOffTarget(kind, docId);
+      if (open <= 0) throw new Error("Ese documento ya no debe nada");
+      const reason = this.listActive("settlementReasons").find((r) => r.code === reasonCode);
+      if (!reason) throw new Error("Elige un motivo de la lista");
+      const amount = amountCents == null ? open : Math.round(amountCents);
+      if (!(amount > 0)) throw new Error("El importe a cerrar tiene que ser positivo");
+      if (amount > open)
+        throw new Error(
+          "Se intentan cerrar " + amount + "c de un documento que sólo debe " + open + "c.",
+        );
+      if (!Array.isArray(rec.writeOffs)) rec.writeOffs = [];
+      const entry = {
+        id: this._id("wof"),
+        amountCents: amount,
+        reason: reasonCode,
+        date: this.state.today,
+        by: user || "backoffice",
+      };
+      rec.writeOffs.push(entry);
+      this._log(user, "settleShortfall", (rec.number || docId) + " · " + reasonCode);
+      return entry;
+    }
+    /** Undo one. The rest is owed again, and the register says so. */
+    undoSettleShortfall(kind, docId, writeOffId, user) {
+      const { rec } = this._writeOffTarget(kind, docId);
+      const list = rec.writeOffs || [];
+      const i = list.findIndex((w) => w.id === writeOffId);
+      if (i < 0) throw new Error("Ese cierre ya no existe");
+      const [gone] = list.splice(i, 1);
+      this._log(user, "undoSettleShortfall", (rec.number || docId) + " · " + gone.reason);
+      return gone;
     }
     payBills(pay, user) {
       // AP-04: partial + one payment many bills
@@ -5911,7 +6004,20 @@
           });
         }
       }
-      return out;
+      /* CLOSEST FIRST. The list used to arrive in whatever order the documents
+         were created, and the screen showed the first twelve of it — which,
+         on a busy quarter, is twelve documents chosen by age and unrelated to
+         the movement in front of you. Ordered by how far each one is from
+         this movement's amount, then by how far its date is, a person reading
+         the top of the list is reading the plausible answers. Each row now
+         also carries those two distances, so the screen can say WHY it is
+         near rather than merely putting it near the top. */
+      const target = Math.abs(m.amountCents);
+      for (const c of out) {
+        c.gapCents = Math.abs(c.outstandingCents - target);
+        c.daysApart = Math.abs(daysBetween(m.accountingDate, c.date));
+      }
+      return out.sort((a, b) => a.gapCents - b.gapCents || a.daysApart - b.daysApart);
     }
 
     /** A movement as the matcher's input value. Text is everything a bank wrote. */

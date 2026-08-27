@@ -1761,9 +1761,12 @@ touching any bank or expense screen.
   found it already did not — four views enumerated project cost separately and
   the per-partida table added up to less than the project it described. One
   enumeration now feeds all of them, with the invariant asserted directly.
-- **PK7-C — next.** The matching drawer: pagination, Propuestas as a
-  right-side panel, Candidatos rebuilt, and the «still owed or closed?»
-  question.
+- **PK7-C — done (2026-08-27).** The queue became a paginated, searchable list
+  like every other register, and matching moved into the panel a row opens.
+  Candidatos is ordered by nearness and says how near; a short payment now asks
+  whether the rest is still owed or closed, and «closed» takes a reason; and a
+  proposal the bank line does not name is never one click, however exact the
+  amount.
 - **PK7-D · E · F** — the matching drawer, Conciliados and internal
   transfers as pairs, bulk actions over a 535-row quarter, PDF statements.
 

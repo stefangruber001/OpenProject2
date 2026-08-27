@@ -540,6 +540,7 @@ window.CANEI_DICT.ca = {
   "Motivos sin factura (banco)": "Motius sense factura (banc)",
   "Comisión bancaria": "Comissió bancària",
   "Comissió bancària": "Comissió bancària",
+  "Descompte per pagament ràpid": "Descompte per pagament ràpid",
   "sin factura · con motivo": "sense factura · amb motiu",
   "＋ Cuenta": "＋ Compte",
   "Nueva cuenta": "Compte nou",
@@ -890,6 +891,34 @@ window.CANEI_DICT.ca = {
   "Movimiento asignado": "Moviment assignat",
   "Ir a Conciliación →": "Ves a Conciliació →",
   "Días sin casar": "Dies sense casar",
+  // ── PK7-C: la cua pagina i l'emparellament passa en un plafó al costat.
+  "La cola de movimientos sin explicar, diez a diez. Abre uno para ver qué documento lo explica; el coste de obra se asigna en Gastos.":
+    "La cua de moviments sense explicar, de deu en deu. Obre'n un per veure quin document l'explica; el cost d'obra s'assigna a Despeses.",
+  "Conciliar movimiento": "Concilia el moviment",
+  "Buscar por concepto, importe o quién…": "Cerca per concepte, import o qui…",
+  "Buscar documento por número, quién o importe…": "Cerca el document per número, qui o import…",
+  "Sin explicar": "Sense explicar",
+  "Sin respaldo": "Sense justificant",
+  "Sin documento": "Sense document",
+  "mismo día": "mateix dia",
+  "importe exacto": "import exacte",
+  "más. Busca para acotar.": "més. Cerca per acotar.",
+  "El extracto no nombra a la contraparte. Compruébalo antes de conciliar.":
+    "L'extracte no anomena la contrapart. Comprova-ho abans de conciliar.",
+  "Ningún documento explica este movimiento. Búscalo abajo o explícalo sin factura.":
+    "Cap document explica aquest moviment. Cerca'l a sota o explica'l sense factura.",
+  // ── A2: el que queda, ¿es deu encara o es dóna per tancat?
+  "¿El resto sigue pendiente?": "La resta continua pendent?",
+  "este documento": "aquest document",
+  "estos documentos": "aquests documents",
+  "Sigue debiendo": "Encara deu",
+  "Sigue pendiente": "Continua pendent",
+  "Se da por cerrado": "Es dóna per tancat",
+  "Cerrado con su motivo": "Tancat amb el seu motiu",
+  "Motivos de cierre (diferencias)": "Motius de tancament (diferències)",
+  "Descuento por pronto pago": "Descompte per pagament ràpid",
+  Redondeo: "Arrodoniment",
+  "Abono pendiente del proveedor": "Abonament pendent del proveïdor",
   // ── PK7-A: l'extracte demostra la seva pròpia aritmètica abans d'importar-se.
   "Saldo inicial del extracto": "Saldo inicial de l'extracte",
   "Saldo final del extracto": "Saldo final de l'extracte",

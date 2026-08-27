@@ -163,13 +163,35 @@ function score(
     reasons.push("counterpartyNamed");
   }
 
+  const confidence = round2(clamp01(points));
+  /**
+   * ONE CLICK NEEDS THE NAME, NOT JUST THE NUMBER.
+   *
+   * Acceptance review, B1: never auto-accept a proposal whose counterparty
+   * does not agree, however exact the amount. The score cannot express that on
+   * its own — exact amount, same date and a reference quoted in the concept
+   * reach 0.95 against a default threshold of 0.8 with the counterparty
+   * contributing nothing, and 0.95 is precisely the shape of paying supplier A
+   * while supplier B's invoice number sits in the bank concept. That is not a
+   * far-fetched case: it is what a copied payment reference looks like.
+   *
+   * So the gate is a conjunction, not a higher number. Raising the threshold
+   * to 0.96 would have suppressed genuine one-click matches that DO name the
+   * counterparty and merely fall a little short elsewhere, which is the wrong
+   * trade in the other direction. The proposal is still offered and can still
+   * be accepted — it just is not the button the eye lands on.
+   */
+  const autoAcceptable =
+    confidence >= config.autoAcceptScore && reasons.includes("counterpartyNamed");
+
   return {
     movementId: movement.id,
     docIds: docs.map((d) => d.id),
-    confidence: round2(clamp01(points)),
+    confidence,
     reasons,
     differenceCents,
     combination: docs.length > 1,
+    autoAcceptable,
   };
 }
 

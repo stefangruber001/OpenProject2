@@ -1003,3 +1003,65 @@ Fourteen new engine checks (344/344 manageability), the E2E rewritten where the
 controls moved, and PK7-A's three untranslated statement-preview strings
 translated — CI had gone red on the source-literal gate alone, at 231 against a
 ceiling of 228, with every other gate green.
+
+### PK7-C · The matching drawer (2026-08-27)
+
+**113a — the queue is a list, matching is a panel.** The operator: «maybe the
+pagination can be the same as Clients or Suppliers but Propuestas can be open as
+a right side menu.» Three columns side by side does not survive 533 movements —
+the statement column becomes a scroll with no end. The queue now uses
+`renderMasterList`, the same primitive the customer and supplier registers use:
+ten at a time, searchable, paginated. Pressing a row opens the matching panel
+beside it, so the list stays whole while the matching happens. What remains on
+the screen is what is true of the PERIOD — the count, the internal transfers,
+the seal, the periods already closed.
+
+**113c — Candidatos stops being a dead list.** It showed the first twelve open
+documents in creation order: on a busy quarter, twelve documents chosen by age
+and unrelated to the movement in front of you. `reconciliationCandidates` now
+orders by distance from this movement's amount, then by date, and each row
+carries both distances so the screen says **why** it is near — «importe exacto ·
+mismo día», «difiere 12,50 € · 3 d» — rather than merely putting it near the
+top. Searchable, every row actionable, and **＋ Añadir gasto** captures a missing
+document in place through the same drawers the registers use.
+
+**A2 — is the rest still owed, or closed?** A payment lands short and the
+product had one answer: the document owes the difference forever, so a
+receivables register fills with 0,03 € that nobody collects and nobody dares
+delete. The other answer could not be expressed at all. The panel now asks, once,
+about every document the match left short. «Sigue pendiente» needs nothing — it
+is what the system already believed. «Se da por cerrado» takes a reason from an
+owner-maintained list (descuento pronto pago · redondeo · comisión bancaria ·
+abono pendiente); `settleShortfall` records it with amount, date and author, and
+both outstanding readers subtract it. Required, and a code rather than free text:
+«closed» with nothing behind it is indistinguishable from a mistake three months
+later, and free text answers the question in a way nothing can total. Write-offs
+are a list, because two partial payments can each round. `undoSettleShortfall`
+puts the money back.
+
+**B1 — one click needs the name, not just the number.** Exact amount (0.45) +
+same date (0.20) + reference quoted in the concept (0.30) = **0.95** against a
+threshold of 0.8, with the counterparty contributing nothing — which is exactly
+what paying supplier A with supplier B's reference in the concept looks like. The
+gate is therefore a conjunction, not a higher number: raising the threshold to
+0.96 would suppress genuine one-click matches that DO name the counterparty.
+`MatchSuggestion.autoAcceptable` is decided in the capability that owns the
+scoring; the host reads it instead of comparing to the threshold itself. The
+proposal is still there to accept deliberately, and the panel says in red why it
+is not one click.
+
+**Found on the way.** The queue was hiding the reference it exists to match on:
+`movWho` puts the concept behind the counterparty, which is right on a balances
+screen (a scheme category is noise) and wrong on a matching queue (the concept
+is where the reference lives). `movLine` shows both.
+
+**And a boundary error worth recording.** Replacing `conciliacion` by slicing
+from its `function` keyword to the next one swallowed what sat between them —
+`comSel`, `comTab`, `COM_FAMILY`, `COM_EVENT` — and messaging died with «comSel
+is not defined» while every reconciliation check passed. Second time this session
+a careless boundary in a 22 000-line file broke a screen far from the edit. Found
+by replaying the sequence in a scratch browser and reading the console.
+
+Twelve new engine checks (356/356 manageability), three capability tests for B1
+with their negative control, the E2E rewritten everywhere the controls moved, and
+24 new dictionary entries in three languages.

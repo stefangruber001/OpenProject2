@@ -4458,11 +4458,13 @@ async function testBankAndCash(browser, base) {
     const identified = await pg.evaluate(async () => {
       goTab("banking", "_reconcile");
       await new Promise((r) => setTimeout(r, 700));
-      const row = document.querySelector(".movrow");
+      // PK7-C: the queue is a paginated list and matching is a panel, so the
+      // controls live in the drawer a row opens rather than on the screen.
+      const row = document.querySelector("#rcList tr.click");
       if (!row) return { skip: "nothing in the queue" };
+      const id = row.dataset.id;
       row.click();
       await new Promise((r) => setTimeout(r, 500));
-      const id = typeof recSel === "string" ? recSel : null;
       const sel = document.getElementById("rcDest");
       if (!sel || !id) return { sel: !!sel, id };
       const opt = [...sel.querySelectorAll("option")].find((o) => o.value === "o:office");
@@ -4488,12 +4490,24 @@ async function testBankAndCash(browser, base) {
 
     /* The removal, asserted as a removal. «Asignar a proyecto» is gone from
        the queue: a bank row cannot decide project cost any more. */
-    const noAssign = await pg.evaluate(() => ({
-      proj: !!document.getElementById("rcProj"),
-      assign: !!document.getElementById("rcAssign"),
-      kind: !!document.getElementById("rcKind"),
-      classify: !!document.getElementById("rcClassify"),
-    }));
+    const noAssign = await pg.evaluate(async () => {
+      const row = document.querySelector("#rcList tr.click");
+      if (row) {
+        row.click();
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      const out = {
+        proj: !!document.getElementById("rcProj"),
+        assign: !!document.getElementById("rcAssign"),
+        kind: !!document.getElementById("rcKind"),
+        classify: !!document.getElementById("rcClassify"),
+      };
+      // The panel's scrim covers the page; anything that navigates next needs
+      // it gone or its click lands on the overlay.
+      closeDrawer();
+      await new Promise((r) => setTimeout(r, 300));
+      return out;
+    });
     if (!noAssign.proj && !noAssign.assign && !noAssign.kind && noAssign.classify)
       ok("ADM-05: «Asignar a proyecto» is gone from Conciliación; classification stays");
     else bad("ADM-05: project assignment removed from the queue", JSON.stringify(noAssign));
@@ -4683,15 +4697,15 @@ async function testBankAndCash(browser, base) {
     const settled = await pg.evaluate(async (cardId) => {
       goTab("banking", "_reconcile");
       await new Promise((r) => setTimeout(r, 800));
-      const rows = [...document.querySelectorAll(".movrow")];
+      const rows = [...document.querySelectorAll("#rcList tr.click")];
       for (const row of rows) {
+        const id = row.dataset.id;
         row.click();
         await new Promise((r) => setTimeout(r, 350));
         const sel = document.getElementById("rcDest");
         if (!sel) continue;
         const opt = [...sel.querySelectorAll("option")].find((o) => o.value === "c:" + cardId);
         if (!opt) continue;
-        const id = recSel;
         sel.value = "c:" + cardId;
         sel.dispatchEvent(new Event("change", { bubbles: true }));
         await new Promise((r) => setTimeout(r, 500));
@@ -4715,7 +4729,11 @@ async function testBankAndCash(browser, base) {
     //    stops asking — only unexplained ones stay flagged.
     await pg.evaluate(() => goTab("banking", "_reconcile"));
     await pg.waitForTimeout(700);
-    const unb = await pg.evaluate(() => {
+    const unb = await pg.evaluate(async () => {
+      const row = document.querySelector("#rcList tr.click");
+      if (!row) return null;
+      row.click();
+      await new Promise((r) => setTimeout(r, 500));
       const b = document.getElementById("rcUnbacked");
       const sel = document.getElementById("rcWhy");
       if (!b || !sel) return null;
@@ -4723,13 +4741,17 @@ async function testBankAndCash(browser, base) {
       return { w: Math.round(r.width), h: Math.round(r.height), reasons: sel.options.length };
     });
     if (unb && unb.w > 60 && unb.reasons >= 4)
-      ok(`1D: the queue offers «Sin factura, con motivo» with ${unb.reasons} reasons`);
+      ok(`1D: the matching panel offers «Sin factura, con motivo» with ${unb.reasons} reasons`);
     else bad("1D: unbacked control", JSON.stringify(unb));
 
-    const marked = await pg.evaluate(() => {
+    const marked = await pg.evaluate(async () => {
       const before = erp.unreconciledMovements().length;
-      const id = document.querySelector(".movrow") && document.querySelector(".movrow").dataset.mov;
+      const row = document.querySelector("#rcList tr.click");
+      const id = row && row.dataset.id;
+      row.click();
+      await new Promise((r) => setTimeout(r, 500));
       document.getElementById("rcUnbacked").click();
+      await new Promise((r) => setTimeout(r, 400));
       const m = erp.state.movements.find((x) => x.id === id);
       return {
         before,
@@ -6784,25 +6806,48 @@ async function testAdmin(browser, base) {
     await bootedShell(pg);
     await pg.waitForTimeout(900);
     await openTab(pg, "banking", "_reconcile");
-    const openBefore = await pg.locator(".movrow").count();
-    if (openBefore > 0) ok(`conciliación: unreconciled statement lines are listed (${openBefore})`);
-    else bad("conciliación: statement lines listed", "no .movrow");
+    /* PK7-C: the queue is the shared list primitive — paginated, searchable,
+       ten at a time — and matching happens in a panel beside it. The operator
+       asked for exactly that comparison: «maybe the pagination can be the same
+       as Clients or Suppliers but Propuestas can be open as a right side
+       menu.» Counting rows in the DOM now counts a PAGE, so the queue's true
+       length comes from the engine and the page from the table. */
+    const queueShape = await pg.evaluate(() => ({
+      queue: erp.unreconciledMovements(periodRange().from, periodRange().to, bankAcc).length,
+      rows: document.querySelectorAll("#rcList tr.click").length,
+      search: !!document.getElementById("rcQ"),
+      pager: !!document.getElementById("rcNext"),
+      noPanel: !document.getElementById("rcDest"),
+    }));
+    if (queueShape.queue > 0 && queueShape.rows > 0 && queueShape.rows <= 10)
+      ok(
+        `conciliación: the queue paginates like every other register (${queueShape.rows} of ${queueShape.queue})`,
+      );
+    else bad("conciliación: queue paginated", JSON.stringify(queueShape));
+    if (queueShape.search && queueShape.pager && queueShape.noPanel)
+      ok(
+        "conciliación: it searches and pages, and holds no matching controls until a row is opened",
+      );
+    else bad("conciliación: queue shape", JSON.stringify(queueShape));
+    const openBefore = queueShape.queue;
 
-    // Select the line whose free text quotes an invoice number.
-    let picked = false;
-    for (let i = 0; i < openBefore; i++) {
-      const t = await pg.locator(".movrow").nth(i).innerText();
-      if (/FAC-2026-0002/.test(t)) {
-        await pg.locator(".movrow").nth(i).click();
-        picked = true;
-        break;
+    // Open the line whose free text quotes an invoice number — through the
+    // list, which is now the only way in.
+    const picked = await pg.evaluate(async () => {
+      const rows = [...document.querySelectorAll("#rcList tr.click")];
+      for (const row of rows) {
+        if (/FAC-2026-0002/.test(row.textContent)) {
+          row.click();
+          await new Promise((r) => setTimeout(r, 600));
+          return true;
+        }
       }
-    }
-    await pg.waitForTimeout(500);
+      return false;
+    });
     if (!picked) bad("conciliación: seeded statement line with a quoted reference", "not found");
 
     const suggText = await pg
-      .locator(".sugg")
+      .locator("#dbody .sugg")
       .first()
       .innerText()
       .catch(() => "");
@@ -6812,9 +6857,38 @@ async function testAdmin(browser, base) {
       ok("conciliación: the match proposal shows its confidence AND its reasons");
     else bad("conciliación: proposal carries reasons", suggText.slice(0, 120));
 
-    await pg.locator("[data-accept]").first().click();
-    await pg.waitForTimeout(700);
-    const openAfter = await pg.locator(".movrow").count();
+    /* 113c: the candidates beside the proposals are ordered by how near they
+       are to THIS movement and say how near, rather than being the first
+       twelve open documents in creation order. */
+    const cands = await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("#dbody [data-pick]")].map((b) =>
+        b.closest(".it").textContent.replace(/\s+/g, " "),
+      );
+      const mv = erp.state.movements.find((m) => /FAC-2026-0002/.test(m.concept || ""));
+      const list = mv ? erp.reconciliationCandidates(mv.id) : [];
+      return {
+        shown: rows.length,
+        saysDistance: rows.filter((t) => /importe exacto|difiere/.test(t)).length,
+        ordered: list.every((c, i) => i === 0 || list[i - 1].gapCents <= c.gapCents),
+        search: !!document.getElementById("rcCandQ"),
+        add: !!document.getElementById("rcAdd"),
+      };
+    });
+    if (cands.shown > 0 && cands.saysDistance === cands.shown && cands.ordered)
+      ok(`conciliación: candidates are nearest-first and say how near (${cands.shown})`);
+    else bad("conciliación: candidates ordered", JSON.stringify(cands));
+    if (cands.search && cands.add)
+      ok("conciliación: the candidate list is searchable and can capture a missing document");
+    else bad("conciliación: candidate tools", JSON.stringify(cands));
+
+    await pg.locator("#dbody [data-accept]").first().click();
+    await pg.waitForTimeout(900);
+    // The shortfall panel may open on top; dismiss it by keeping the rest owed.
+    if ((await pg.locator("#sfKeep").count()) > 0) await pg.locator("#sfKeep").click();
+    await pg.waitForTimeout(500);
+    const openAfter = await pg.evaluate(
+      () => erp.unreconciledMovements(periodRange().from, periodRange().to, bankAcc).length,
+    );
     if (openAfter === openBefore - 1)
       ok("conciliación: accepting a proposal clears the line from the queue");
     else bad("conciliación: accepted line leaves the queue", `${openBefore} → ${openAfter}`);
@@ -6823,11 +6897,141 @@ async function testAdmin(browser, base) {
     if ((await trBtn.count()) > 0) {
       await trBtn.click();
       await pg.waitForTimeout(700);
-      const afterTr = await pg.locator(".movrow").count();
+      const afterTr = await pg.evaluate(
+        () => erp.unreconciledMovements(periodRange().from, periodRange().to, bankAcc).length,
+      );
       if (afterTr === openAfter - 2)
         ok("conciliación: the mirrored transfer pair is detected and cleared as internal");
       else bad("conciliación: internal transfer pair", `${openAfter} → ${afterTr}`);
     } else bad("conciliación: internal transfer detected", "no #rcTransfers button");
+
+    /* ── A2: a short payment asks the one question that matters ──────────
+       The operator's own case. A movement that does not cover the document is
+       not a failed match — it is a match plus a question: is the rest still
+       owed, or is it closed? Both answers are legitimate and they are not the
+       same, so the panel asks, and «closed» takes a reason. */
+    const shortfall = await pg.evaluate(async () => {
+      const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
+      const sup = erp.state.parties.find((p) => (p.roles || []).includes("supplier"));
+      const bill = erp.registerBill(
+        { supplierId: sup.id, number: "E2E-A2", baseCents: 100000, allocations: [] },
+        "bo",
+      );
+      const full = erp.billOutstandingCents(bill.id);
+      erp.importMovements(
+        acc.id,
+        [
+          {
+            accountingDate: erp.today,
+            concept: "PAGO CORTO E2E " + sup.name,
+            amountCents: -(full - 1250),
+          },
+        ],
+        "bo",
+      );
+      const mv = erp.state.movements[erp.state.movements.length - 1];
+      bankAcc = acc.id;
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 800));
+      matchDrawer(mv.id);
+      await new Promise((r) => setTimeout(r, 500));
+      const pick = [...document.querySelectorAll("#dbody [data-pick]")].find((b) =>
+        b.closest(".it").textContent.includes("E2E-A2"),
+      );
+      if (!pick) return { found: false };
+      pick.click();
+      await new Promise((r) => setTimeout(r, 800));
+      const asked = !!document.getElementById("sfKeep");
+      const owed = erp.billOutstandingCents(bill.id);
+      // Answer it: closed, with a reason.
+      const reasonSel = document.querySelector("[data-sfr]");
+      const reason = reasonSel ? reasonSel.value : null;
+      const closeBtn = document.querySelector("[data-sfclose]");
+      if (closeBtn) closeBtn.click();
+      await new Promise((r) => setTimeout(r, 700));
+      const rec = erp.state.bills.find((b) => b.id === bill.id);
+      return {
+        found: true,
+        asked,
+        owedBefore: owed,
+        owedAfter: erp.billOutstandingCents(bill.id),
+        writeOff: (rec.writeOffs || [])[0] || null,
+        reasonOffered: reason,
+        stillMatched: !!(mv.matched && mv.matched.documents.length === 1),
+      };
+    });
+    if (shortfall.found && shortfall.asked && shortfall.owedBefore === 1250)
+      ok("A2: a short payment asks whether the rest is still owed or closed");
+    else bad("A2: the question is asked", JSON.stringify(shortfall));
+    if (
+      shortfall.owedAfter === 0 &&
+      shortfall.writeOff &&
+      shortfall.writeOff.reason &&
+      shortfall.writeOff.amountCents === 1250 &&
+      shortfall.stillMatched
+    )
+      ok(
+        `A2: «se da por cerrado» drives it to zero with its reason recorded (${shortfall.writeOff.reason})`,
+      );
+    else bad("A2: closed with a reason", JSON.stringify(shortfall));
+
+    /* ── B1: one click needs the name, not just the number ────────────────
+       An exact amount on the same day with the document's reference in the
+       concept scores 0.95 against a threshold of 0.8 — and if the bank line
+       never names the counterparty, that is what paying the wrong supplier
+       with the right reference looks like. It stays a proposal you can press;
+       it is not the button the eye lands on, and the panel says why. */
+    const b1 = await pg.evaluate(async () => {
+      const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
+      const sup = erp.state.parties.find((p) => (p.roles || []).includes("supplier"));
+      const bill = erp.registerBill(
+        { supplierId: sup.id, number: "E2E-B1-9931", baseCents: 40000, allocations: [] },
+        "bo",
+      );
+      const owed = erp.billOutstandingCents(bill.id);
+      erp.importMovements(
+        acc.id,
+        [
+          {
+            accountingDate: erp.today,
+            concept: "TRANSFERENCIA /FRA E2E-B1-9931",
+            amountCents: -owed,
+          },
+        ],
+        "bo",
+      );
+      const mv = erp.state.movements[erp.state.movements.length - 1];
+      const sugg = ErpBridge.reconciliation.suggest(erp, mv.id);
+      const mine = sugg.find((x) => x.docIds.includes(bill.id));
+      matchDrawer(mv.id);
+      await new Promise((r) => setTimeout(r, 600));
+      const cards = [...document.querySelectorAll("#dbody .sugg")];
+      const card = cards.find((c) => c.textContent.includes("E2E-B1-9931"));
+      return {
+        confidence: mine ? mine.confidence : null,
+        autoAcceptable: mine ? mine.autoAcceptable : null,
+        namesCounterparty: mine ? mine.reasons.includes("counterpartyNamed") : null,
+        strong: card ? card.classList.contains("strong") : null,
+        primaryButton: card ? !!card.querySelector("button.primary") : null,
+        warns: card ? /no nombra a la contraparte/.test(card.textContent) : null,
+        stillOfferd: card ? !!card.querySelector("[data-accept]") : null,
+      };
+    });
+    if (
+      b1.confidence >= 0.8 &&
+      b1.namesCounterparty === false &&
+      b1.autoAcceptable === false &&
+      b1.primaryButton === false &&
+      b1.warns
+    )
+      ok(
+        `B1: a ${Math.round(b1.confidence * 100)}% match the line does not name is offered, but never as one click`,
+      );
+    else bad("B1: auto-accept needs the counterparty", JSON.stringify(b1));
+    if (b1.stillOfferd) ok("B1: …and it is still there to accept deliberately");
+    else bad("B1: proposal still offered", JSON.stringify(b1));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
 
     // Closing must REFUSE while anything is still unreconciled — the whole
     // point of a closed period is that it cannot contain an open question.

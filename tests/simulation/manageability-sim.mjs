@@ -3231,6 +3231,141 @@ assert(
   closes("a general expense changes no project");
 }
 
+/* ===================================================================== PK7-C
+   IS THE REST STILL OWED, OR CLOSED? (A2) — and the two rules around it.
+   ===================================================================== */
+{
+  const e = new ERP("2026-08-27");
+  const cli = e.addParty(
+    {
+      roles: ["customer"],
+      name: "Cli 7C",
+      taxId: "12345678Z",
+      billStreet: "s",
+      billPostalCode: "08001",
+      billCity: "BCN",
+      mobile: "600111222",
+      email: "cli7c@example.com",
+    },
+    "bo",
+  );
+  const sup = e.addParty(
+    { roles: ["supplier"], name: "Materiales Vallès SA", taxId: "B12345674" },
+    "bo",
+  );
+  const acc = e.addBankAccount({ name: "Banco 7C", kind: "bank" }, "bo");
+
+  const bill = e.registerBill(
+    { supplierId: sup.id, number: "7C-1", baseCents: 100000, allocations: [] },
+    "bo",
+  );
+  const full = e.billOutstandingCents(bill.id);
+
+  /* The payment lands 12,50 € short — a prompt-payment discount taken by the
+     payer, which is the operator's own example. */
+  e.importMovements(
+    acc.id,
+    [
+      {
+        accountingDate: "2026-08-20",
+        concept: "PAGO MATERIALES VALLES",
+        amountCents: -(full - 1250),
+      },
+    ],
+    "bo",
+  );
+  const mv = e.state.movements[e.state.movements.length - 1];
+  e.matchMovementSplit(mv.id, [{ billId: bill.id, amountCents: full - 1250 }], "bo");
+  assert(
+    e.billOutstandingCents(bill.id) === 1250,
+    "a short payment leaves exactly the shortfall owing",
+    String(e.billOutstandingCents(bill.id)),
+  );
+
+  /* A reason is required, and it has to be one of the tenant's own. «Closed»
+     with no reason is indistinguishable from a mistake three months later. */
+  throws(() => e.settleShortfall("bill", bill.id, "", "bo"), "closing the rest needs a reason");
+  throws(
+    () => e.settleShortfall("bill", bill.id, "porque-si", "bo"),
+    "the reason has to come from the list",
+  );
+  throws(
+    () => e.settleShortfall("bill", bill.id, "redondeo", "bo", 5000),
+    "closing more than is owed is refused",
+  );
+
+  const wof = e.settleShortfall("bill", bill.id, "prontoPago", "bo");
+  assert(
+    e.billOutstandingCents(bill.id) === 0,
+    "closing the rest drives the document to zero",
+    String(e.billOutstandingCents(bill.id)),
+  );
+  assert(
+    wof.reason === "prontoPago" && wof.amountCents === 1250 && wof.date && wof.by,
+    "the close records its reason, its amount, its date and who said so",
+    JSON.stringify(wof),
+  );
+  throws(
+    () => e.settleShortfall("bill", bill.id, "redondeo", "bo"),
+    "a settled document cannot be closed twice",
+  );
+
+  /* Reversible, because PK7-D's Deshacer has to be able to unwind it and
+     because a wrong reason chosen in a hurry must not be permanent. */
+  e.undoSettleShortfall("bill", bill.id, wof.id, "bo");
+  assert(
+    e.billOutstandingCents(bill.id) === 1250,
+    "undoing the close puts the rest back on the register",
+    String(e.billOutstandingCents(bill.id)),
+  );
+
+  /* The same on the money-in side, and the payment itself is untouched by
+     either: closing a shortfall explains a document, it does not move cash. */
+  const paidBefore = e.state.payments.filter((p) => p.movementId === mv.id).length;
+  e.settleShortfall("bill", bill.id, "redondeo", "bo");
+  assert(
+    e.state.payments.filter((p) => p.movementId === mv.id).length === paidBefore &&
+      mv.matched &&
+      mv.matched.documents.length === 1,
+    "closing the rest leaves the payment and the match exactly as they were",
+    JSON.stringify(mv.matched),
+  );
+
+  /* CANDIDATES, CLOSEST FIRST (113c). The list used to arrive in creation
+     order and the screen showed the first twelve of it — twelve documents
+     chosen by age and unrelated to the movement in front of you. */
+  const far = e.registerBill(
+    { supplierId: sup.id, number: "7C-FAR", baseCents: 500000, allocations: [] },
+    "bo",
+  );
+  const near = e.registerBill(
+    { supplierId: sup.id, number: "7C-NEAR", baseCents: 20000, allocations: [] },
+    "bo",
+  );
+  e.importMovements(
+    acc.id,
+    [{ accountingDate: "2026-08-22", concept: "PAGO 7C", amountCents: -24200 }],
+    "bo",
+  );
+  const probe = e.state.movements[e.state.movements.length - 1];
+  const cands = e.reconciliationCandidates(probe.id);
+  assert(
+    cands.length >= 2 && cands[0].id === near.id,
+    "the nearest document in amount is offered first",
+    cands.map((c) => c.reference + ":" + c.gapCents).join(", "),
+  );
+  assert(
+    cands.every((c) => typeof c.gapCents === "number" && typeof c.daysApart === "number"),
+    "every candidate carries how far it is, so the screen can say why",
+    JSON.stringify(cands[0]),
+  );
+  assert(
+    cands[0].gapCents <= cands[cands.length - 1].gapCents && far.id !== cands[0].id,
+    "and the far one is not first",
+    cands[0].reference,
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

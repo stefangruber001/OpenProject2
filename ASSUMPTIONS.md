@@ -5208,3 +5208,111 @@ preview's opening/closing balances and its two pills — past the source-literal
 ceiling of 228, and CI said so on the one gate that checks it while every other
 gate stayed green. They are translated now, along with PK7-B's eleven, and the
 count is back at the ceiling rather than above it.
+
+## PK7-C · The matching drawer (2026-08-27)
+
+Four items from the acceptance review, and one of them changed the shape of
+the screen rather than adding to it.
+
+**113a — the queue is a list, and matching is a panel.** «Maybe the pagination
+can be the same as Clients or Suppliers but Propuestas can be open as a right
+side menu.» The screen was three columns side by side, and at 533 unreconciled
+movements the statement column was a single scroll with no end, the proposals
+sat in the middle for whichever row happened to be selected, and the candidates
+column showed twelve documents in creation order. The queue now uses
+`renderMasterList` — the same primitive the customer and supplier registers use,
+paginated ten at a time, searchable — and pressing a row opens the matching
+panel beside it. The list stays whole while the matching happens.
+
+That is not only about space. Matching is a decision about ONE line, and this
+product already has a place for deciding about one record. Every screen that
+invents a second one is a screen somebody has to learn separately.
+
+What stays on the screen itself is what is true of the PERIOD rather than of
+any one line: how many are unexplained, the internal transfers detected across
+it, the seal, and the periods already closed.
+
+**113c — Candidatos was a dead list.** Twelve open documents in creation order,
+which on a busy quarter means twelve documents chosen by age and unrelated to
+the movement in front of you. `reconciliationCandidates` now returns them
+ordered by how near each is to this movement's amount, then by date, and each
+row carries both distances so the screen can say **why** it is near rather than
+merely putting it near the top («importe exacto · mismo día», «difiere 12,50 € ·
+3 d»). The list is searchable, every row is actionable, and **＋ Añadir gasto**
+captures the missing document without leaving the queue — `billDrawer` for money
+out, `newInvoiceDrawer` for money in, the same drawers those registers use,
+because a second way of writing the same record is how two of them drift apart.
+
+**A2 — is the rest still owed, or closed?** The product had exactly one answer
+when a payment landed short: the document keeps owing the difference, forever.
+A register of receivables then fills with 0,03 € and 12,50 € that nobody will
+collect and nobody dares delete. The other answer — this is closed, and here is
+why — could not be expressed at all.
+
+Both are legitimate, they are not the same, and only a person knows which. So
+the panel asks, once, about every document the match left short. «Sigue
+pendiente» is the default and needs nothing: it is what the system already
+believed. «Se da por cerrado» takes a reason from an owner-maintained list —
+descuento pronto pago · redondeo · comisión bancaria · abono pendiente — and
+`settleShortfall` writes it with its amount, its date and who said so;
+`billOutstandingCents` and `invoiceOutstandingCents` subtract it.
+
+**The reason is required, and it is a code rather than free text.** «Closed»
+with nothing behind it is indistinguishable from a mistake three months later,
+and the gestoría has to be able to tell a prompt-payment discount from a bank
+charge from a credit note that never arrived. Free text would answer the
+question in a way nothing could ever total. Write-offs are a **list** rather
+than one field because shortfalls repeat — two partial payments can each round —
+and the second must not overwrite the first's explanation. `undoSettleShortfall`
+puts the money back on the register, because PK7-D's Deshacer has to unwind it
+and because a reason chosen in a hurry must not be permanent.
+
+Closing a shortfall explains a document; it does not move cash. The payment and
+the match are untouched, and there is a check that says so.
+
+**B1 — one click needs the name, not just the number.** Never auto-accept a
+proposal whose counterparty does not agree, however exact the amount. The score
+cannot carry that rule on its own: exact amount (0.45) plus same date (0.20)
+plus a reference quoted in the concept (0.30) reaches **0.95** against a default
+threshold of 0.8 with the counterparty contributing nothing — and 0.95 is
+precisely the shape of paying supplier A while supplier B's invoice number sits
+in the bank concept. That is not far-fetched; it is what a copied payment
+reference looks like.
+
+So the gate is a conjunction rather than a higher number. Raising the threshold
+to 0.96 would have suppressed genuine one-click matches that DO name the
+counterparty and merely fall short elsewhere — the wrong trade in the other
+direction. `MatchSuggestion` now carries `autoAcceptable`, decided in the
+capability that owns the scoring, and the host reads it instead of comparing to
+the threshold itself. The proposal is still offered and can still be accepted
+deliberately; it is not the button the eye lands on, and the panel says in red
+why not.
+
+### Found while doing it
+
+**The queue was hiding the reference it exists to match on.** `movWho` answers
+"who was this with" and deliberately puts the concept behind the counterparty,
+because on a balances screen a scheme category — «PAGO CON TARJETA EN HOGAR,
+MUEBLES…» — is noise identical for every hardware shop in the country. On the
+matching queue the concept is the opposite of noise: it is where a reference
+lives, and the reference is the strongest signal the matcher has after the
+amount. A queue that hides it makes somebody searching for an invoice number
+search text the screen never shows them. `movLine` shows both; `movWho` is
+unchanged where it was right.
+
+**A boundary error, caught by the suite and worth recording.** Replacing
+`conciliacion` by slicing from its `function` keyword to the next one swallowed
+what sat between them — the Comunicaciones comment, `comSel`, `comTab`,
+`COM_FAMILY` and `COM_EVENT` — and the messaging screen died with «comSel is
+not defined» while the reconciliation checks all passed. This is the second time
+this session a careless boundary in a 22 000-line file has broken a screen far
+from the one being edited (PK7-A's duplicate `bankAcc`). The failure was
+diagnosed by replaying the sequence in a scratch browser and reading the console,
+not by re-reading the diff.
+
+**Three template literals the source audit reads as prose.** A string literal
+inside a conditional inside a template literal is reported as untranslated text
+with no dictionary entry, which CLAUDE.md already records catching three earlier
+templates. No amount of rewording fixes it; moving the literal out of the
+conditional does. Two conditionals are now named functions and one is built
+unconditionally and used conditionally.

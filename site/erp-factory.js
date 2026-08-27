@@ -1866,13 +1866,16 @@ var ErpFactory = (() => {
       points += W_COUNTERPARTY;
       reasons.push("counterpartyNamed");
     }
+    const confidence = round2(clamp01(points));
+    const autoAcceptable = confidence >= config.autoAcceptScore && reasons.includes("counterpartyNamed");
     return {
       movementId: movement.id,
       docIds: docs.map((d) => d.id),
-      confidence: round2(clamp01(points)),
+      confidence,
       reasons,
       differenceCents,
-      combination: docs.length > 1
+      combination: docs.length > 1,
+      autoAcceptable
     };
   }
   function* subsets(docs, maxSize) {

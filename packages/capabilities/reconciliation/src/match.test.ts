@@ -303,6 +303,88 @@ describe("internal transfers", () => {
   });
 });
 
+describe("one click needs the name, not just the number (B1)", () => {
+  /* The case the acceptance review named: everything agrees except who was
+     paid. Exact amount, same day, and the document's own reference sitting in
+     the bank concept — which is what happens when a payment reference is
+     copied from the wrong invoice — reaches 0.95 against a threshold of 0.8.
+     High confidence, and the wrong supplier. */
+  const lookalike = () =>
+    suggestMatches(
+      mv({
+        id: "m1",
+        amountCents: -121000,
+        date: "2026-03-20",
+        text: "TRANSFERENCIA /FRA 2026-A-1187",
+      }),
+      [
+        doc({
+          id: "b1",
+          amountCents: 121000,
+          direction: "out",
+          reference: "2026-A-1187",
+          counterparty: "Materiales Vallès SA",
+          date: "2026-03-20",
+        }),
+      ],
+      cfg(),
+    );
+
+  it("scores it high and still refuses to make it one click", () => {
+    const [top] = lookalike();
+    expect(top!.confidence).toBeGreaterThanOrEqual(0.8);
+    expect(top!.reasons).toContain("exactAmount");
+    expect(top!.reasons).not.toContain("counterpartyNamed");
+    expect(top!.autoAcceptable).toBe(false);
+  });
+
+  it("offers one click once the line names the counterparty too", () => {
+    const [top] = suggestMatches(
+      mv({
+        id: "m1",
+        amountCents: -121000,
+        date: "2026-03-20",
+        text: "TRANSFERENCIA MATERIALES VALLES /FRA 2026-A-1187",
+      }),
+      [
+        doc({
+          id: "b1",
+          amountCents: 121000,
+          direction: "out",
+          reference: "2026-A-1187",
+          counterparty: "Materiales Vallès SA",
+          date: "2026-03-20",
+        }),
+      ],
+      cfg(),
+    );
+    expect(top!.reasons).toContain("counterpartyNamed");
+    expect(top!.autoAcceptable).toBe(true);
+  });
+
+  it("still needs the score: the name alone is not enough", () => {
+    /* Counterparty named, amount a little off and nothing else agreeing —
+       0.15 + 0.30 = 0.45, well under the threshold. The gate is a conjunction
+       in both directions. */
+    const [top] = suggestMatches(
+      mv({ id: "m1", amountCents: -121030, date: "2026-04-30", text: "PAGO MATERIALES VALLES" }),
+      [
+        doc({
+          id: "b1",
+          amountCents: 121000,
+          direction: "out",
+          counterparty: "Materiales Vallès SA",
+          date: "2026-03-20",
+        }),
+      ],
+      cfg(),
+    );
+    expect(top!.reasons).toContain("counterpartyNamed");
+    expect(top!.confidence).toBeLessThan(0.8);
+    expect(top!.autoAcceptable).toBe(false);
+  });
+});
+
 describe("config", () => {
   it("defaults to a week of slack, half a euro, and three documents", () => {
     expect(cfg()).toEqual({

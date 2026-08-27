@@ -63,6 +63,16 @@ export interface MatchSuggestion {
   differenceCents: Cents;
   /** True when more than one document is needed to explain the movement. */
   combination: boolean;
+  /**
+   * May a caller offer this as one click?
+   *
+   * NOT simply `confidence >= autoAcceptScore`. A proposal whose counterparty
+   * the bank line never names is never auto-acceptable, however exact the
+   * amount — see the note on `counterpartyNamed` in match.ts. The score alone
+   * cannot carry that rule, because the whole point is that a very high score
+   * can be reached without it.
+   */
+  autoAcceptable: boolean;
 }
 
 /** Two movements that are the same money moving between the caller's own accounts. */
