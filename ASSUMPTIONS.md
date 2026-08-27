@@ -5024,3 +5024,101 @@ false` (it signed with nothing attached) and `signedDoc: false` (it recorded no
 document). With the guards back, both hold. The check drives the real drawer and
 attaches a real PDF through the file input, so it exercises the path a person
 uses rather than the method behind it.
+
+## PK7-A · The numbers that aren't true (2026-08-27)
+
+The V2 acceptance protocol reached phase 13 and the operator's comments on
+steps 107–132 turned up five defects. Four of the five were the same defect
+wearing different clothes: **the system holding a number that is not true and
+not saying so.** This session fixes four of them; the fifth (107, PDF import)
+is PK7-F.
+
+**111 — the opening balance was read and thrown away.** The importer has always
+parsed the SALDO column into `balanceCents` per row, and nothing has ever used
+it; `openingCents` defaults to zero. Against the operator's own BBVA file that
+is not a rounding error — 479 rows, opening 24.000,00 + Σ −10.235,63 =
+13.764,37, matching the bank to the cent, where the product showed
+−10.235,63: wrong by **exactly** the opening balance, and silent about it.
+
+`statementBalance(rows)` now derives the opening from the oldest row as
+`saldo − importe`, and reports `{openingCents, closingCents, sumCents, closes,
+from, to}`. It is computed over **all** parsed rows, never over the fresh ones:
+a balance is a chain, and a chain with duplicates removed is not the file's
+chain. It is direction-agnostic, because BBVA exports newest-first and the same
+bank's other export does not.
+
+**Endpoints plus sum, deliberately — not a per-row running chain.** A per-row
+check is stricter and would be wrong more often: a bank may list same-date rows
+in an order other than the one it applied them in, and the chain then fails on a
+file that is perfectly valid. Refusing a correct statement is the worse error,
+so the check is exactly as strong as the claim being made — that the endpoints
+and the movements between them agree.
+
+**An import that does not close is refused before anything is written.** A
+dropped or duplicated row breaks the arithmetic, and importing anyway bakes a
+wrong balance into the account, where it looks like every other balance. There
+is no half-import: the check runs before the first movement is pushed.
+
+**Absent is honest; wrong is not.** `bbva-tarjeta.xlsx` carries no SALDO column
+and `statementBalance` returns `null`. The drawer says so in amber and the
+import proceeds. A card export that cannot prove its balance is not a broken
+file — it is a file that makes no claim, and the product should not invent one
+on its behalf.
+
+**A second check, narrower than the first, and that narrowness is load-bearing.**
+When an import establishes an account's opening balance, the account's own
+computed balance at the statement's closing date is compared against the
+statement, and the import is **rolled back** — movements removed, opening
+restored — if they disagree. The first version of this ran on every import and
+took the full browser suite from green to 546/550: an account that already had
+movements, from a seed or an earlier period, has an opening balance that has
+nothing to do with this file's, and comparing them fails correctly on a correct
+import. The file's own arithmetic gates every import; the account comparison
+only runs when this import is the thing that set the opening balance
+(`!hadMovements`). The narrow check is the true one.
+
+**A3 — one movement, several documents, and only one of them paid.**
+`matchMovement` takes a single target, so the interface looped over the chosen
+documents calling it once each. The `if (!pays)` guard inside meant the first
+document absorbed the movement's entire amount and every later one was paid
+nothing — while `m.matched` ended up naming only the **last** one. Two documents
+selected, one settled, one untouched, and the record pointing at the wrong one.
+
+`matchMovementSplit(movId, splits, user)` replaces the loop: it validates the
+split is non-empty, refuses to exceed the movement, refuses to mix supplier and
+customer documents in one movement, and creates **one** payment or collection
+carrying every allocation. `m.matched.documents` names all of them.
+
+**A4 — outstanding could go negative, quietly.** `payBills` had no guard, so
+allocating 900 € against a document owing 300 € left it at −600 € and nobody
+said anything. Both directions now refuse, and the refusal names the honest
+alternatives rather than just saying no: the movement covers several documents,
+it is an advance on account, or it is a duplicate to be refunded. Each
+allocation in a split is capped by that document's own outstanding, so the
+combination path cannot get there either.
+
+**117a — the queue ignored which account was selected.** `unreconciledMovements`
+took a period and no account, so Conciliación showed every account's queue
+whatever Cuentas y saldos had selected. That is why selecting the credit card
+showed the same 533 as the current account — not demonstration data, and not
+the preview panel, both of which were investigated and cleared first. The
+account parameter is optional, and its absence still means _all accounts_,
+because the period seal genuinely needs that.
+
+**The fixtures are synthesised, and that is not a compromise.** The operator's
+real file carries a live IBAN, full card numbers and the names of real people
+and suppliers; it will never be in this repository. `make-bbva-fixtures.py`
+already produced BBVA-shaped workbooks — empty BENEFICIARIO cells, a SALDO
+column, Spanish number formats — and they are what the new checks run against.
+One assertion was rewritten during the session for the same reason: it began as
+a magic constant lifted from the real file, and is now the property that
+actually matters (`st.openingCents !== 0 && st.sumCents !== st.closingCents` —
+the opening balance is load-bearing, whatever it happens to be).
+
+**Also here.** The branch note in `docs/worklog/WORKLOG.md` still told a new
+session to open the repository on a `claude/**` branch retired on 2026-08-16.
+`CLAUDE.md` and `PROGRESS.md` were already correct; the third copy was not, and
+a stale instruction in the file that says «continuing from anywhere» is the one
+that gets followed. And the specification agreed across the acceptance review is
+committed as `docs/worklog/PK7-SPEC.md`, so the rule PK7-B through PK7-F
+implement is written down before the screens are built to it.

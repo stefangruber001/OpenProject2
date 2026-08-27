@@ -4737,6 +4737,22 @@
       const allocated = sum(rec.allocations, (a) => a.amountCents);
       rec.onAccountCents = rec.amountCents - allocated;
       if (rec.onAccountCents < 0) throw new Error("Allocations exceed the amount received");
+      /* The customer side of A4. Money received over and above an invoice is
+         a real thing — an advance — but it belongs in `onAccountCents`, where
+         it is visible, not pushed into the invoice to make its balance
+         negative. Same reasoning and same placement as payBills: before the
+         collection is pushed, or the outstanding already includes it. */
+      for (const a of rec.allocations) {
+        const open = this.invoiceOutstandingCents(a.invoiceId);
+        if (a.amountCents > open + 1)
+          throw new Error(
+            "Se intentan cobrar " +
+              a.amountCents +
+              "c de una factura que sólo tiene pendiente " +
+              open +
+              "c. El exceso es un cobro a cuenta, no parte de esta factura.",
+          );
+      }
       this.state.collections.push(rec);
       this._log(user, "recordCollection", rec.amountCents + "c");
       return rec;
@@ -5046,6 +5062,23 @@
       const s = sum(rec.billAllocations, (a) => a.amountCents);
       if (Math.abs(s - rec.amountCents) > 1)
         throw new Error("Payment must equal its bill allocations");
+      /* No document may be paid more than it is owed (A4). Without this a
+         4.000 € transfer matched against a 2.420 € invoice drove its balance
+         to −1.580 € in silence, and a negative outstanding is not a number
+         anybody reads as an error — it is a number that quietly changes what
+         is owed to a supplier. Checked BEFORE the payment is pushed, or
+         billOutstandingCents would already be counting it. */
+      for (const a of rec.billAllocations) {
+        const open = this.billOutstandingCents(a.billId);
+        if (a.amountCents > open + 1)
+          throw new Error(
+            "Se intentan pagar " +
+              a.amountCents +
+              "c de un documento que sólo debe " +
+              open +
+              "c. Si el movimiento cubre varios documentos, repártelo entre ellos.",
+          );
+      }
       this.state.payments.push(rec);
       for (const a of rec.billAllocations) {
         const b = this.state.bills.find((x) => x.id === a.billId);
@@ -5122,6 +5155,67 @@
       return m;
     }
     /**
+     * The statement's OWN arithmetic, read off the file it came in.
+     *
+     * Every real export carries a running balance beside each amount — BBVA
+     * calls the column SALDO — and the parser has always stored it, on every
+     * movement, and nothing has ever read it back. That omission is defect 111
+     * of the acceptance test: `accountBalanceCents` is `openingCents + Σ`, and
+     * `openingCents` defaults to zero, so importing a statement that begins
+     * mid-history produces a balance short by exactly the money the account
+     * held before the first row. On the operator's own file: the bank says
+     * 13.764,37 and the product said −10.235,63, the difference being the
+     * 24.000,00 nobody had told it about.
+     *
+     * The file answers it itself. The chronologically first row knows what the
+     * balance was before it (`saldo − importe`), the last row knows what it
+     * became, and the two must be joined by the sum of everything between. If
+     * they are not, the file was not read completely — which is worth refusing
+     * an import over, because the alternative is a register that looks right.
+     *
+     * Endpoints and the sum, deliberately, rather than checking every row
+     * against the one before it. The failures worth refusing an import over —
+     * a dropped row, a misparsed amount, a sign read backwards — all move the
+     * sum, so all are caught. A per-row chain would additionally catch a typo
+     * in a middle balance, which changes nothing (balances are evidence, only
+     * amounts are imported), and would reject a perfectly good file whenever
+     * the bank lists two movements of the same date in an order that is not
+     * the order it applied them. Refusing a valid statement is the worse
+     * error of the two.
+     *
+     * Returns null rather than guessing when the rows carry no balance at all
+     * (an older export, a format with no such column): unverifiable is a
+     * different answer from wrong, and only one of them should block anybody.
+     */
+    statementBalance(rows) {
+      const list = (rows || []).filter((r) => r && r.accountingDate);
+      if (!list.length) return null;
+      // Every row must carry one. A chain with a hole in it cannot be checked,
+      // and pretending otherwise would verify a subset and call it the file.
+      if (list.some((r) => r.balanceCents == null)) return null;
+      /* Statements arrive newest-first as often as oldest-first — BBVA exports
+         descending — so the direction is read from the rows rather than
+         assumed. Ties on a date keep their file order, which is the only
+         evidence available about the sequence within a day. */
+      const descending =
+        list.length > 1 && list[0].accountingDate > list[list.length - 1].accountingDate;
+      const chrono = descending ? list.slice().reverse() : list.slice();
+      const first = chrono[0];
+      const last = chrono[chrono.length - 1];
+      const openingCents = cents(first.balanceCents) - cents(first.amountCents);
+      const closingCents = cents(last.balanceCents);
+      const sumCents = sum(list, (r) => cents(r.amountCents));
+      const dates = list.map((r) => r.accountingDate).sort();
+      return {
+        openingCents,
+        closingCents,
+        sumCents,
+        closes: openingCents + sumCents === closingCents,
+        from: dates[0],
+        to: dates[dates.length - 1],
+      };
+    }
+    /**
      * Rows a statement import would ADD, and rows it would duplicate (§5.3
      * "detección de duplicados y de solapamiento de periodos ya cargados").
      *
@@ -5183,9 +5277,14 @@
         overlapsExistingPeriod: overlaps,
         from: dates[0] || null,
         to: dates[dates.length - 1] || null,
+        /* Computed over ALL rows, never over `fresh`: the running balance is a
+           chain, and a chain with the duplicates removed does not join up. The
+           caller hands this straight back to importMovements, which is why it
+           is returned rather than recomputed there from the rows it writes. */
+        statement: this.statementBalance(rows),
       };
     }
-    importMovements(accountId, rows, user, { batch = true } = {}) {
+    importMovements(accountId, rows, user, { batch = true, statement = null } = {}) {
       // BNK-01: retain all export fields
       /* Every import is a batch, and the batch is remembered. An import is the
          one act in this product that writes hundreds of records at once from a
@@ -5200,6 +5299,27 @@
           sealed.length +
             " movimientos caen en un periodo cerrado — reábrelo en Conciliación antes de importar",
         );
+      /* A statement that does not add up is a statement that was not read.
+         Refusing it is the whole point of defect 111: the alternative is a
+         register that looks right, which is the failure nobody catches. */
+      if (statement && !statement.closes)
+        throw new Error(
+          "El extracto no cuadra consigo mismo: saldo inicial " +
+            statement.openingCents +
+            "c + movimientos " +
+            statement.sumCents +
+            "c ≠ saldo final " +
+            statement.closingCents +
+            "c. No se importa nada.",
+        );
+      const acc = this.state.bankAccounts.find((a) => a.id === accountId);
+      /* The opening balance can only be learned from the FIRST statement an
+         account ever receives. A later file starts mid-history, so its own
+         opening is not the account's — reading it there would move the floor
+         under every movement already filed. */
+      const hadMovements = this.state.movements.some((m) => m.accountId === accountId);
+      const openingBefore = acc ? acc.openingCents : 0;
+      if (statement && acc && !hadMovements) acc.openingCents = statement.openingCents;
       const importId = this._id("imp");
       const out = rows.map((r) => {
         const rec = {
@@ -5237,6 +5357,40 @@
         this.state.movements.push(rec);
         return rec;
       });
+      /* THE CHECK THE ACCEPTANCE TEST ASKED FOR, and the reason it runs here
+         rather than in the preview: the preview can only predict, this knows.
+         Reconciling against `cashCount` — the same arqueo the cash screen
+         prints — means the number verified is the number the operator will
+         read, not a parallel calculation that agrees with itself.
+         Verified AFTER writing and rolled back on failure, because duplicate
+         suppression makes "what will the balance be" genuinely hard to predict
+         and genuinely easy to compute once the rows are in.
+
+         ONLY WHEN THIS IMPORT SET THE OPENING BALANCE. The comparison asks
+         "does the account agree with the bank", and that question is only
+         answerable when the account's whole history came from this statement's
+         lineage. An account already holding movements entered by hand, or
+         seeded, or imported from a different range, will legitimately disagree
+         with any one statement's closing figure — refusing there would block
+         good imports to protect against nothing. The file's own arithmetic,
+         checked above, is what actually guards defect 111, and it is checked
+         every time. */
+      if (statement && acc && !hadMovements) {
+        const after = this.cashCount(accountId, null, statement.to).closingCents;
+        if (after !== statement.closingCents) {
+          this.state.movements = this.state.movements.filter((m) => m.importId !== importId);
+          acc.openingCents = openingBefore;
+          throw new Error(
+            "Tras importar, el saldo a " +
+              statement.to +
+              " sería " +
+              after +
+              "c y el extracto dice " +
+              statement.closingCents +
+              "c. No se ha importado nada.",
+          );
+        }
+      }
       if (batch && out.length)
         this.state.importBatches.push({
           id: importId,
@@ -5537,6 +5691,79 @@
       this._log(user, "classifyMovement", movId + " → " + klass);
       return m;
     }
+    /**
+     * One movement against SEVERAL documents — the case a single transfer
+     * paying two invoices has always been, and which the product got wrong.
+     *
+     * `matchMovement` takes one document and creates the payment for the whole
+     * movement. Calling it once per document — which is exactly what the
+     * reconciliation screen did with a combined proposal — meant the first
+     * document was paid the entire amount and every later one was paid
+     * nothing, because a payment for the movement already existed by then and
+     * the guard skipped it. The invoice left unpaid still looked unpaid; the
+     * first was overpaid; and `matched` named only whichever document happened
+     * to be processed last. Nothing failed and nothing said so.
+     *
+     * So the split is stated, not inferred: each document is named with the
+     * amount of THIS movement that settles it, one payment (or one collection)
+     * carries them all, and the totals have to agree before anything is
+     * written. Over-allocation is caught downstream by payBills /
+     * recordCollection, which now refuse to pay a document more than it owes.
+     */
+    matchMovementSplit(movId, splits, user) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      const list = (splits || []).filter((s) => s && s.amountCents);
+      if (!list.length) throw new Error("Indica qué documentos explica el movimiento");
+      const total = sum(list, (s) => cents(s.amountCents));
+      const movTotal = Math.abs(cents(m.amountCents));
+      if (total > movTotal + 1)
+        throw new Error("El reparto suma " + total + "c y el movimiento es de " + movTotal + "c");
+      const bills = list.filter((s) => s.billId);
+      const invoices = list.filter((s) => s.invoiceId);
+      if (bills.length && invoices.length)
+        throw new Error("Un movimiento no puede pagar facturas emitidas y recibidas a la vez");
+      if (bills.length) {
+        this.payBills(
+          {
+            amountCents: total,
+            method:
+              m.card ||
+              (this.state.bankAccounts.find((a) => a.id === m.accountId) || {}).kind === "card"
+                ? "card"
+                : "transfer",
+            billAllocations: bills.map((s) => ({
+              billId: s.billId,
+              amountCents: cents(s.amountCents),
+            })),
+            movementId: movId,
+          },
+          user,
+        );
+        m.class = "projectCost";
+      } else {
+        const first = this.state.invoices.find((i) => i.id === invoices[0].invoiceId);
+        this.recordCollection(
+          {
+            partyId: first.partyId,
+            amountCents: total,
+            method: "transfer",
+            allocations: invoices.map((s) => ({
+              invoiceId: s.invoiceId,
+              amountCents: cents(s.amountCents),
+            })),
+            movementId: movId,
+          },
+          user,
+        );
+        m.class = "customerReceipt";
+      }
+      // What it settled, all of it — not the last one considered.
+      m.matched = { documents: list.map((s) => ({ ...s })) };
+      m.status = "matched";
+      this._log(user, "matchMovementSplit", movId + " → " + list.length + " doc(s)");
+      return m;
+    }
     matchMovement(movId, target, user) {
       // BNK-04
       const m = this.state.movements.find((x) => x.id === movId);
@@ -5616,12 +5843,22 @@
     }
 
     /** Every movement of a period that nothing yet explains (§5.3's health indicator). */
-    unreconciledMovements(from, to) {
+    /**
+     * `accountId` is optional, and its absence means every account on purpose:
+     * closing a period is a company-wide act and must see the whole queue.
+     * The reconciliation SCREEN is the opposite — it is worked one account at
+     * a time, and until this argument existed it ignored the account picker
+     * entirely, so selecting the credit card showed the current account's
+     * queue unchanged. 533 movements either way, which is how it went
+     * unnoticed until somebody counted them (acceptance test, step 117).
+     */
+    unreconciledMovements(from, to, accountId) {
       return this.state.movements.filter(
         (m) =>
           m.status === "unallocated" &&
           !m.unbacked &&
           !m.excludedFromPL &&
+          (!accountId || m.accountId === accountId) &&
           (!from || m.accountingDate >= from) &&
           (!to || m.accountingDate <= to),
       );

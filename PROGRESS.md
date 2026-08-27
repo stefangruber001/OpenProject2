@@ -1739,3 +1739,28 @@ rewritten — a scope table searched pane-wide (a one-line chapter's total equal
 its line's, so wrong money still "appeared"), and the annex check ran on a page
 whose images were already cached. Each was caught by running the negative
 control, not by reading the code.
+
+## Package 7 — the acceptance test's phase 13 (from 2026-08-27)
+
+**In flight.** The V2 protocol was run end to end; phase 15 passed, phase 13
+(bank import · reconcile · seal) did not. Six sessions, planned in full and
+recorded in `docs/worklog/WORKLOG.md` → Package 7. The rule the package
+implements is written down first, in **`docs/worklog/PK7-SPEC.md`**: _Gastos
+decides, Conciliación identifies, Avance económico reports._ Read that before
+touching any bank or expense screen.
+
+- **PK7-A — done (2026-08-27).** Four defects, all of them a number held
+  silently while untrue: the opening balance parsed and discarded (111), one
+  movement paying only the first of several documents (A3), outstanding going
+  negative without a word (A4), and the reconciliation queue ignoring which
+  account was selected (117a).
+- **PK7-B — next.** Make the rule structural: the bank screens stop assigning
+  project cost, Gastos remains the only place that does.
+- **PK7-C · D · E · F** — the matching drawer, Conciliados and internal
+  transfers as pairs, bulk actions over a 535-row quarter, PDF statements.
+
+Two constraints fixed by evidence, not preference: a real quarter is ~535
+movements, most of them small card purchases, so `gasto general` cannot be
+document-only; and **the operator's real bank data never enters this
+repository** — it carries a live IBAN, full card numbers and real names. All
+checks run against synthesised BBVA-shaped fixtures.

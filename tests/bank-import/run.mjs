@@ -346,6 +346,199 @@ assert(
   JSON.stringify(why6),
 );
 
+// =============================================================================
+// PK7-A · The statement's own arithmetic (acceptance test, defect 111)
+//
+// The running balance beside each amount — BBVA calls it SALDO — has always
+// been parsed, stored on every movement, and never read back. So an account's
+// balance was `openingCents + Σ`, with `openingCents` left at zero, and a
+// statement beginning mid-history produced a figure short by exactly the money
+// the account already held. On the tenant's own file the bank said 13.764,37
+// and the product said −10.235,63: the 24.000,00 nobody had told it about.
+// =============================================================================
+
+// `cuenta` and `tarjeta` are already parsed above — the same two fixtures, read once.
+const st = new ERP("2026-08-18").statementBalance(cuenta.rows);
+
+assert(
+  st && st.closes,
+  "111: the account fixture's saldos join up — opening + Σ = closing",
+  JSON.stringify(st),
+);
+// The defect itself, stated as a property rather than as a constant: with the
+// opening balance left at zero the account would read `sumCents`, and that is
+// not the closing balance the bank printed. Which is exactly what the operator
+// saw — the sum of the movements where the balance should have been.
+assert(
+  st && st.openingCents !== 0 && st.sumCents !== st.closingCents,
+  "111: the opening balance is load-bearing — the movements alone do not reach the closing balance",
+  st && `Σ ${st.sumCents} vs closing ${st.closingCents}`,
+);
+
+// Direction is read from the rows. A real BBVA export is newest-first; the same
+// file ascending must yield the same three numbers, or the check would depend
+// on how the bank happened to sort it.
+const asc = new ERP("2026-08-18").statementBalance(cuenta.rows.slice().reverse());
+assert(
+  asc && asc.openingCents === st.openingCents && asc.closingCents === st.closingCents,
+  "111: newest-first and oldest-first read identically",
+  JSON.stringify(asc),
+);
+
+// The end-to-end promise: after importing, the account reads what the bank printed.
+const e7 = new ERP("2026-08-18");
+const acc7 = e7.addBankAccount({ name: "BBVA cuenta corriente", kind: "bank" }, "bo");
+const pv7 = e7.previewImport(acc7.id, cuenta.rows);
+e7.importMovements(acc7.id, pv7.fresh, "bo", { statement: pv7.statement });
+assert(
+  e7.accountBalanceCents(acc7.id) === st.closingCents,
+  "111: after the import the account equals the statement's closing balance, to the cent",
+  `${e7.accountBalanceCents(acc7.id)} vs ${st.closingCents}`,
+);
+assert(
+  e7.state.bankAccounts.find((a) => a.id === acc7.id).openingCents === st.openingCents,
+  "111: …because the opening balance came off the file",
+  e7.state.bankAccounts.find((a) => a.id === acc7.id).openingCents,
+);
+
+// A dropped row is the failure this refuses. Nothing is written — not the
+// movements, not the opening balance — because a register that looks right is
+// worse than an import that stopped.
+const holedRows = cuenta.rows.filter((_, i) => i !== 2);
+const holedStatement = new ERP("2026-08-18").statementBalance(holedRows);
+assert(
+  !holedStatement.closes,
+  "111: losing one row breaks the chain",
+  JSON.stringify(holedStatement),
+);
+const e8 = new ERP("2026-08-18");
+const acc8 = e8.addBankAccount({ name: "BBVA", kind: "bank" }, "bo");
+let refusedImport = null;
+try {
+  e8.importMovements(acc8.id, holedRows, "bo", { statement: holedStatement });
+} catch (err) {
+  refusedImport = err.message;
+}
+assert(refusedImport, "111: an import that does not add up is refusedImport", refusedImport);
+assert(
+  e8.state.movements.length === 0 &&
+    e8.state.bankAccounts.find((a) => a.id === acc8.id).openingCents === 0,
+  "111: …and nothing at all was written",
+  `${e8.state.movements.length} movs`,
+);
+
+// A card export carries no balance column. Unverifiable is not the same answer
+// as wrong, and only one of them should stop anybody importing.
+assert(
+  new ERP("2026-08-18").statementBalance(tarjeta.rows) === null,
+  "111: a statement with no saldo column reports null rather than guessing",
+);
+
+// =============================================================================
+// PK7-A · One movement, several documents (A3) and overPaid-payment (A4)
+// =============================================================================
+
+const e9 = new ERP("2026-08-18");
+const sup9 =
+  e9.state.parties.find((p) => p.roles.includes("supplier")) ||
+  e9.addParty(
+    {
+      roles: ["supplier"],
+      name: "Proveedor",
+      taxId: "A58818501",
+      billStreet: "C/ A 1",
+      billPostalCode: "08001",
+      billCity: "Barcelona",
+      billProvince: "Barcelona",
+      billCountry: "España",
+      mobile: "600111222",
+    },
+    "bo",
+  );
+const bA = e9.registerBill({ supplierId: sup9.id, number: "A-1", baseCents: 200000 }, "bo");
+const bB = e9.registerBill({ supplierId: sup9.id, number: "A-2", baseCents: 130578 }, "bo");
+const acc9 = e9.addBankAccount({ name: "BBVA", kind: "bank" }, "bo");
+const both = bA.totalCents + bB.totalCents;
+const [mov9] = e9.importMovements(
+  acc9.id,
+  [{ accountingDate: "2026-08-10", concept: "TRANSF", amountCents: -both }],
+  "bo",
+);
+e9.matchMovementSplit(
+  mov9.id,
+  [
+    { billId: bA.id, amountCents: bA.totalCents },
+    { billId: bB.id, amountCents: bB.totalCents },
+  ],
+  "bo",
+);
+assert(
+  e9.billOutstandingCents(bA.id) === 0 && e9.billOutstandingCents(bB.id) === 0,
+  "A3: one transfer covering two invoices settles BOTH",
+  `${e9.billOutstandingCents(bA.id)} / ${e9.billOutstandingCents(bB.id)}`,
+);
+assert(
+  mov9.matched.documents.length === 2,
+  "A3: …and the movement records both, not whichever was processed last",
+  JSON.stringify(mov9.matched),
+);
+assert(
+  e9.state.payments.filter((p) => p.movementId === mov9.id).length === 1,
+  "A3: one movement makes one payment, however many documents it covers",
+);
+
+// A4: a document can never be paid more than it owes. Before this the balance
+// simply went negative, which reads as a figure rather than as an error.
+const bC = e9.registerBill({ supplierId: sup9.id, number: "A-3", baseCents: 100000 }, "bo");
+const [mov10] = e9.importMovements(
+  acc9.id,
+  [{ accountingDate: "2026-08-11", concept: "TRANSF GRANDE", amountCents: -300000 }],
+  "bo",
+);
+let overPaid = null;
+try {
+  e9.matchMovementSplit(mov10.id, [{ billId: bC.id, amountCents: 300000 }], "bo");
+} catch (err) {
+  overPaid = err.message;
+}
+assert(overPaid, "A4: overPaid-paying a document is refusedImport", overPaid);
+assert(
+  e9.billOutstandingCents(bC.id) > 0,
+  "A4: …and its outstanding never goes negative",
+  e9.billOutstandingCents(bC.id),
+);
+
+// =============================================================================
+// PK7-A · The queue is worked one account at a time (117)
+// =============================================================================
+
+const e11 = new ERP("2026-08-18");
+const bank11 = e11.addBankAccount({ name: "Cuenta", kind: "bank" }, "bo");
+const card11 = e11.addBankAccount({ name: "Tarjeta", kind: "card" }, "bo");
+e11.importMovements(
+  bank11.id,
+  [{ accountingDate: "2026-08-01", concept: "UNO", amountCents: -1000 }],
+  "bo",
+);
+e11.importMovements(
+  card11.id,
+  [
+    { accountingDate: "2026-08-02", concept: "DOS", amountCents: -200 },
+    { accountingDate: "2026-08-03", concept: "TRES", amountCents: -300 },
+  ],
+  "bo",
+);
+assert(
+  e11.unreconciledMovements().length === 3,
+  "117: with no account named, the queue spans them all — what closing a period needs",
+);
+assert(
+  e11.unreconciledMovements(null, null, bank11.id).length === 1 &&
+    e11.unreconciledMovements(null, null, card11.id).length === 2,
+  "117: naming the account narrows it — the card no longer shows the bank's queue",
+  `${e11.unreconciledMovements(null, null, bank11.id).length} / ${e11.unreconciledMovements(null, null, card11.id).length}`,
+);
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} bank-import checks passed`);
