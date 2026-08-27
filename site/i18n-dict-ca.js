@@ -895,6 +895,39 @@ window.CANEI_DICT.ca = {
   "La cola de movimientos sin explicar, diez a diez. Abre uno para ver qué documento lo explica; el coste de obra se asigna en Gastos.":
     "La cua de moviments sense explicar, de deu en deu. Obre'n un per veure quin document l'explica; el cost d'obra s'assigna a Despeses.",
   "Conciliar movimiento": "Concilia el moviment",
+  Conciliados: "Conciliats",
+  "Quedan movimientos sin conciliar — no se puede cerrar el periodo":
+    "Queden moviments sense conciliar — no es pot tancar el període",
+  // ── PK7-D: Conciliats, les vies de tornada i els traspassos com a parells.
+  "Lo que ya está explicado, y cómo. Cada línea puede deshacerse: deshacer una conciliación deshace también el pago que creó, y no toca el coste de obra.":
+    "El que ja està explicat, i com. Cada línia es pot desfer: desfer una conciliació desfà també el pagament que va crear, i no toca el cost d'obra.",
+  "Buscar por concepto, importe o explicación…": "Cerca per concepte, import o explicació…",
+  "Todavía no hay nada explicado en este periodo.":
+    "Encara no hi ha res explicat en aquest període.",
+  "movimientos explicados en el periodo": "moviments explicats al període",
+  Explicación: "Explicació",
+  "↩ Deshacer": "↩ Desfés",
+  "Deshacer la explicación": "Desfés l'explicació",
+  "Reabre el periodo": "Reobre el període",
+  "Conciliados →": "Conciliats →",
+  "← Volver a la cola": "← Torna a la cua",
+  "Un traspaso son dos movimientos. Deshacerlo devuelve LOS DOS a la cola.":
+    "Un traspàs són dos moviments. Desfer-lo torna ELS DOS a la cua.",
+  "Traspaso deshecho — los dos movimientos vuelven a la cola":
+    "Traspàs desfet — els dos moviments tornen a la cua",
+  "Traspaso marcado — los dos movimientos salen de la cola":
+    "Traspàs marcat — els dos moviments surten de la cua",
+  "Traspasos entre cuentas propias": "Traspassos entre comptes propis",
+  "Marcar como traspaso": "Marca com a traspàs",
+  "Marcar los": "Marca els",
+  seguros: "segurs",
+  "movimientos encajaban igual de bien. Compruébalo antes de marcarlo.":
+    "moviments encaixaven igual de bé. Comprova-ho abans de marcar-lo.",
+  "Con justificante": "Amb justificant",
+  Clasificado: "Classificat",
+  "importe opuesto exacto": "import oposat exacte",
+  "importe casi opuesto": "import quasi oposat",
+  "cuentas distintas": "comptes diferents",
   "＋ Añadir gasto": "＋ Afegeix despesa",
   // Els noms dels registres, ara claus estables.
   clientes: "clients",

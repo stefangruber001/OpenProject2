@@ -6990,17 +6990,150 @@ async function testAdmin(browser, base) {
       ok("conciliación: accepting a proposal clears the line from the queue");
     else bad("conciliación: accepted line leaves the queue", `${openBefore} → ${openAfter}`);
 
-    const trBtn = pg.locator("#rcTransfers");
-    if ((await trBtn.count()) > 0) {
-      await trBtn.click();
-      await pg.waitForTimeout(700);
-      const afterTr = await pg.evaluate(
-        () => erp.unreconciledMovements(periodRange().from, periodRange().to, bankAcc).length,
+    /* ── PK7-D: a transfer is a PAIR, and the screen shows the counterpart ──
+       This was a number and a button — «3 traspaso(s) detectado(s)» and
+       «Marcar como internos» — which asked somebody to accept three guesses
+       they could not see. Marking the wrong pair moves two movements out of
+       the queue AND out of the profit figures, and the mistake is invisible
+       afterwards because the amounts still net to zero. */
+    const pairShape = await pg.evaluate(() => {
+      const cards = [...document.querySelectorAll("[data-tpair]")].map((b) =>
+        b.closest(".sugg").textContent.replace(/\s+/g, " "),
       );
-      if (afterTr === openAfter - 2)
-        ok("conciliación: the mirrored transfer pair is detected and cleared as internal");
-      else bad("conciliación: internal transfer pair", `${openAfter} → ${afterTr}`);
-    } else bad("conciliación: internal transfer detected", "no #rcTransfers button");
+      const found = ErpBridge.reconciliation.internalTransfers(
+        erp,
+        periodRange().from,
+        periodRange().to,
+      );
+      return {
+        cards: cards.length,
+        proposals: found.length,
+        namesBothAccounts: cards.filter((t) => (t.match(/→/g) || []).length === 1).length,
+        saysWhy: cards.filter((t) => /importe opuesto|cuentas distintas/.test(t)).length,
+        carriesReasons: found.every((t) => (t.reasons || []).length >= 3),
+        knowsAmbiguity: found.every((t) => typeof t.alternatives === "number"),
+      };
+    });
+    if (
+      pairShape.cards > 0 &&
+      pairShape.cards === pairShape.proposals &&
+      pairShape.namesBothAccounts === pairShape.cards &&
+      pairShape.saysWhy === pairShape.cards
+    )
+      ok(
+        `conciliación: every transfer shows both legs and why they were paired (${pairShape.cards})`,
+      );
+    else bad("conciliación: transfer proposals", JSON.stringify(pairShape));
+    if (pairShape.carriesReasons && pairShape.knowsAmbiguity)
+      ok("conciliación: …and each proposal knows how many look-alikes it beat");
+    else bad("conciliación: transfer reasons", JSON.stringify(pairShape));
+
+    const marked = await pg.evaluate(async () => {
+      const found = ErpBridge.reconciliation.internalTransfers(
+        erp,
+        periodRange().from,
+        periodRange().to,
+      );
+      const t = found.find((x) => !x.ambiguous);
+      if (!t) return { skip: "no unambiguous pair in the demo period" };
+      const btn = document.querySelector("[data-tpair]");
+      btn.click();
+      await new Promise((r) => setTimeout(r, 700));
+      const out = erp.state.movements.find((m) => m.id === t.outMovementId);
+      const inc = erp.state.movements.find((m) => m.id === t.inMovementId);
+      return {
+        bothMarked: out.class === "internalTransfer" && inc.class === "internalTransfer",
+        linked:
+          out.transferPair &&
+          out.transferPair.withMovementId === inc.id &&
+          inc.transferPair &&
+          inc.transferPair.withMovementId === out.id,
+        outId: out.id,
+        inId: inc.id,
+        queue: erp.unreconciledMovements(periodRange().from, periodRange().to, bankAcc).length,
+      };
+    });
+    const afterTr = marked.skip ? openAfter : marked.queue;
+    if (marked.skip) ok(`conciliación: transfer marking skipped — ${marked.skip}`);
+    else if (marked.bothMarked && marked.linked && afterTr === openAfter - 2)
+      ok("conciliación: marking one pair marks BOTH legs and clears both from the queue");
+    else bad("conciliación: internal transfer pair", JSON.stringify(marked));
+
+    /* ── 113e: Conciliados — what was decided, how, and the way back ──────
+       Undoing from EITHER leg must return both: pressing Deshacer on the
+       incoming line and getting the outgoing one back is the whole point of
+       storing the link. */
+    const done = await pg.evaluate(async () => {
+      goTab("banking", "_reconciled");
+      await new Promise((r) => setTimeout(r, 900));
+      const rows = erp.explainedMovements(periodRange().from, periodRange().to, bankAcc);
+      return {
+        rows: rows.length,
+        shown: document.querySelectorAll("#rdList tr.click").length,
+        undoButtons: document.querySelectorAll("[data-undo]").length,
+        hows: [...new Set(rows.map((r) => r.how))].sort(),
+        saysHow: [...document.querySelectorAll("#rdList .pill")].length > 0,
+      };
+    });
+    if (done.rows > 0 && done.shown > 0 && done.undoButtons === done.shown && done.saysHow)
+      ok(`113e: Conciliados lists what is explained and how (${done.hows.join(", ")})`);
+    else bad("113e: Conciliados", JSON.stringify(done));
+
+    const undone = marked.skip
+      ? null
+      : await pg.evaluate(
+          async (ids) => {
+            const before = erp.unreconciledMovements(
+              periodRange().from,
+              periodRange().to,
+              bankAcc,
+            ).length;
+            // Press Deshacer on the INCOMING leg; the outgoing one must come
+            // back with it.
+            erp.unexplainMovement(ids.inId, "bo");
+            render();
+            await new Promise((r) => setTimeout(r, 500));
+            const out = erp.state.movements.find((m) => m.id === ids.outId);
+            const inc = erp.state.movements.find((m) => m.id === ids.inId);
+            return {
+              before,
+              after: erp.unreconciledMovements(periodRange().from, periodRange().to, bankAcc)
+                .length,
+              bothBack: out.status === "unallocated" && inc.status === "unallocated",
+              unlinked: !out.transferPair && !inc.transferPair,
+              backInPL: !out.excludedFromPL && !inc.excludedFromPL,
+            };
+          },
+          { outId: marked.outId, inId: marked.inId },
+        );
+    if (!undone) ok("113e: Deshacer on a pair skipped — no pair was marked");
+    else if (
+      undone.bothBack &&
+      undone.unlinked &&
+      undone.backInPL &&
+      undone.after === undone.before + 2
+    )
+      ok("113e: Deshacer on one leg returns BOTH movements to the queue");
+    else bad("113e: Deshacer returns both legs", JSON.stringify(undone));
+
+    /* The safety property, in the browser: undoing a reconciliation must not
+       move project cost. It is what makes correcting a mistake safe at all. */
+    const safety = await pg.evaluate(async () => {
+      const p = erp.state.projects.find((x) => !x.closed);
+      const before = erp.actualCostCents(p.id);
+      const row = erp
+        .explainedMovements(null, null, null)
+        .find((r) => r.how === "matched" && r.undoable);
+      if (!row) return { skip: "nothing matched and undoable" };
+      erp.unexplainMovement(row.id, "bo");
+      return { before, after: erp.actualCostCents(p.id) };
+    });
+    if (safety.skip) ok(`113e: cost-safety skipped — ${safety.skip}`);
+    else if (safety.before === safety.after)
+      ok(`113e: undoing a reconciliation leaves project cost untouched (${safety.before}c)`);
+    else bad("113e: undo moves no cost", JSON.stringify(safety));
+    await pg.evaluate(() => goTab("banking", "_reconcile"));
+    await pg.waitForTimeout(600);
 
     /* ── A2: a short payment asks the one question that matters ──────────
        The operator's own case. A movement that does not cover the document is
