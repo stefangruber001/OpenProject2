@@ -5494,6 +5494,7 @@ and two checks go red, which is what makes them evidence.
 **Also verified as a negative control:** narrowing `unmarkInternalTransfer` to
 the leg that was pressed turns «Deshacer on one leg returns BOTH» red, and the
 queue count with it.
+
 ## S31 · PK-A — a job is linked back to its contract (2026-08-28)
 
 UAT CP 60 + CP 92, one cause with three symptoms. On a live workspace the job
@@ -5528,3 +5529,30 @@ contract → approved variation and asserts the chain — link set, annex
 built and returns the minted series numbers, so the register later suites read
 is byte-identical. Negative controls red first: the write-back removed turns
 the chain check red; the migration step gutted turns two m19 checks red.
+
+## S32 · PK-B — the forecast sees every chapter, and «cuadra» is measured (2026-08-28)
+
+Two follow-ups to the operator's CP 83/86 report, on top of the PK7 unification
+that already made all four cost readers share `projectCostRows`.
+
+**The forecast bridge dropped variation chapters.** `projectValue` iterated
+`p.baseline.chapters` alone, so a variation budget's cost — real money,
+already spent — was silently absent from the capability's cost list and the
+projection ran on a job that looked cheaper than it was. Only the view's
+hand-merge hid it. The bridge now walks the baseline chapters first (their
+order is meaningful) and appends every chapter `chapterEconomics` or
+`committedByChapter` knows beyond them, with numbers normalised to strings —
+`Object.keys` yields strings and a numeric baseline num would otherwise be
+counted twice. Proven in the variation suite: the 120,00 € bill on the joined
+chapter must appear in `forecast().byChapter` exactly once; with the append
+removed the check reads `present:false`.
+
+**«Cuadra» is a claim, so it is measured before it is printed.** The economics
+screen said «la tabla de arriba cuadra con el proyecto» unconditionally
+whenever nothing waited to be split — the exact sentence the operator
+photographed above a table sitting 45 € short of its own card. The table's
+rows are now built once, summed, added to the pending rows and compared to
+`projectEconomics().actualCents` to the cent; agreement keeps the sentence,
+disagreement prints a red «No cuadra» pill with both figures. Negative
+control: a 45 € error injected into the sum flips the screen to «No cuadra»
+and the new e2e check red — the screen can no longer reassure while wrong.
