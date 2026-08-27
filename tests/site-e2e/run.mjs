@@ -6185,6 +6185,98 @@ async function testContractCreation(browser, base) {
       ok("COM-04: a contract this system drew up still renders as its own document");
     else bad("COM-04: generated contract renders its document", JSON.stringify(fromBudget));
 
+    /* Operator's UAT, CP 60 + CP 92 — one cause, three symptoms. On a live
+       workspace the job exists BEFORE the contract (acceptance creates it,
+       the contract is drawn up afterwards), and nothing wrote the contract
+       back onto the job: approved variations generated no annex, «Cobros
+       previstos» said the job had no contract, and the CON-11 gates went
+       quiet. The engine now writes the reverse link when the contract is
+       filed.
+
+       Built, not hunted: the register's own contracts were all created the
+       other way round (or without a job at all), so this drives the REAL
+       order end to end — quote, acceptance, job, THEN contract, then an
+       approved variation — and asserts the chain, not the field. Everything
+       it creates is removed afterwards and the minted series numbers are
+       returned, so the register the later suites read is byte-identical. */
+    const chain = await pg.evaluate(() => {
+      const party = erp.state.parties.find(
+        (p) => p.roles.includes("customer") && erp.partyCompleteness(p.id).ok,
+      );
+      if (!party) return { built: false };
+      const bud = erp.createBudget({ partyId: party.id }, "e2e");
+      const ch = erp.addChapter(bud.id, { name: "Albañilería" }, "e2e");
+      erp.addLine(bud.id, ch.id, {
+        desc: "Enfoscado e2e",
+        unit: "m2",
+        qtyMilli: 10000,
+        priceCents: 2000,
+        costCents: 1200,
+      });
+      const v = erp.currentVersion(bud.id);
+      erp.issueVersion(bud.id, { channel: "print" }, "e2e");
+      erp.acceptVersion(bud.id, v.id, { evidenceRef: "ok-e2e.pdf" }, "e2e");
+      const prj = erp.createProjectFromAcceptance(bud.id, "e2e");
+      const beforeLink = prj.contractId;
+      const con = erp.createContract(
+        bud.id,
+        { duration: { estimatedDays: 30 }, installments: [{ trigger: "onSignature", pct: 100 }] },
+        "e2e",
+      );
+      const linked = erp.project(prj.id).contractId;
+      const chg = erp.addChange(
+        prj.id,
+        { desc: "Regresión e2e — humedad", reason: "e2e", chapterNum: ch.num },
+        "e2e",
+      );
+      erp.priceChange(chg.id, 50000, 30000, 2, "e2e");
+      erp.approveChange(chg.id, { evidenceRef: "wa-e2e.png" }, "e2e");
+      const after = erp.state.contracts.find((x) => x.id === con.id);
+      const out = {
+        built: true,
+        beforeLink,
+        linked: linked === con.id,
+        annexes: after.annexes.length,
+        annexNumber: erp.state.changes.find((x) => x.id === chg.id).annexNumber,
+        currentDiffers: erp.contractValue(con.id).differs,
+      };
+      // Cancel releases the job — the other half of the same rule.
+      after.signature = { customerSignedAt: null, companySignedAt: null, method: null };
+      erp.cancelContract(con.id, "e2e", "e2e");
+      out.releasedOnCancel = erp.project(prj.id).contractId === null;
+      // Put the register back exactly as it was.
+      erp.state.changes = erp.state.changes.filter((x) => x.id !== chg.id);
+      erp.state.contracts = erp.state.contracts.filter((x) => x.id !== con.id);
+      erp.state.projects = erp.state.projects.filter((x) => x.id !== prj.id);
+      erp.state.budgets = erp.state.budgets.filter((x) => x.id !== bud.id);
+      const year = erp.today.slice(0, 4);
+      for (const [type, num] of [
+        ["contract", con.number],
+        ["budget", bud.number],
+      ]) {
+        const ser = erp.state.series[type];
+        if (ser && ser.issued[ser.issued.length - 1] === num) {
+          ser.issued.pop();
+          ser.next--;
+          if (ser.byYear && ser.byYear[year] != null) ser.byYear[year]--;
+        }
+      }
+      return out;
+    });
+    if (
+      chain.built &&
+      chain.beforeLink === null &&
+      chain.linked &&
+      chain.annexes === 1 &&
+      /-A\d+$/.test(chain.annexNumber || "") &&
+      chain.currentDiffers &&
+      chain.releasedOnCancel
+    )
+      ok(
+        "COM-04: job before contract still links back, the variation reaches the annex chain, and cancel releases the job",
+      );
+    else bad("COM-04: job↔contract link", JSON.stringify(chain));
+
     // ---- an incomplete customer blocks, without burning a number ----------
     await pg.evaluate(() => {
       conWork = null;

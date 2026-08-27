@@ -621,6 +621,63 @@ assert(r2.applied.length === 0, "a current blob applies no further migrations");
   );
 }
 
+/* ---- step 19 in isolation: the job↔contract backfill ------------------------
+   The fixture cannot exercise this step — its seeder happens to create every
+   contract before its project, so every fixture project already carries the
+   link and the step is a no-op there. These blobs are the cases the live
+   workspace actually holds. */
+{
+  const m19 = M.MIGRATIONS.find((m) => m.to === 19);
+
+  // The reported case: job created at acceptance, contract drawn up after.
+  const unlinked = m19.up({
+    projects: [{ id: "prj_a", budgetId: "bud_1", contractId: null }],
+    contracts: [{ id: "con_a", budgetId: "bud_1", status: "draft" }],
+  });
+  assert(
+    unlinked.projects[0].contractId === "con_a",
+    "m19: an unlinked job is linked to its budget's contract",
+  );
+
+  // A link an operator (or the engine) already made is never reassigned.
+  const linked = m19.up({
+    projects: [{ id: "prj_b", budgetId: "bud_2", contractId: "con_other" }],
+    contracts: [{ id: "con_b", budgetId: "bud_2", status: "draft" }],
+  });
+  assert(
+    linked.projects[0].contractId === "con_other",
+    "m19: an already-linked job keeps its link",
+  );
+
+  // A cancelled contract must not start gating a job it no longer governs.
+  const cancelled = m19.up({
+    projects: [{ id: "prj_c", budgetId: "bud_3", contractId: null }],
+    contracts: [
+      { id: "con_dead", budgetId: "bud_3", status: "cancelled" },
+      { id: "con_live", budgetId: "bud_3", status: "draft" },
+    ],
+  });
+  assert(
+    cancelled.projects[0].contractId === "con_live",
+    "m19: a cancelled contract is skipped in favour of the live one",
+  );
+
+  // A quick project has no budget and therefore nothing to match on.
+  const quick = m19.up({
+    projects: [{ id: "prj_d", budgetId: null, contractId: null }],
+    contracts: [{ id: "con_d", budgetId: null, status: "draft" }],
+  });
+  assert(
+    quick.projects[0].contractId === null,
+    "m19: a quick project (no budget) is untouched — null does not match null",
+  );
+
+  // Idempotent, and tolerant of the arrays being absent entirely.
+  const again = m19.up(JSON.parse(JSON.stringify(unlinked)));
+  assert(JSON.stringify(again) === JSON.stringify(unlinked), "m19: re-running changes nothing");
+  m19.up({});
+}
+
 // ---- the dangerous direction is refused ------------------------------------
 throws(
   () => M.migrate({ ...v1, schemaVersion: M.CURRENT_VERSION + 1 }),

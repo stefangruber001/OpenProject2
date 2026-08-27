@@ -5404,3 +5404,38 @@ Collapse the two addresses into one → the small print prints the letterhead
 address and the check catches it. The banner control also showed the check
 taking two others down with it as a timeout; the navigation now falls back to
 `go("company")` so one broken thing reports as one failed check.
+
+## S31 · PK-A — a job is linked back to its contract (2026-08-28)
+
+UAT CP 60 + CP 92, one cause with three symptoms. On a live workspace the job
+exists BEFORE the contract — acceptance creates it, the contract is drawn up
+afterwards — and nothing wrote the contract back onto the job. So
+`project.contractId` stayed null forever: approved variations generated **no
+contract annex** (CON-12 checked the link and found nothing), «Cobros
+previstos» said the job had no contract, and both CON-11 gates — works cannot
+start unsigned, the first invoice is refused unsigned — went silent. The demo
+never showed any of it because the seeder happens to create every contract
+before its project, the one order the old lookup handled.
+
+**The fix is in `_finishContract`,** the one place both contract paths end, so
+neither order of work can leave the job unlinked. Rules: never overwrite an
+existing link; an external contract names no budget, so its drawer now offers
+an optional job picker («— sin obra asociada —» stays the default);
+`cancelContract` releases the job, because a cancelled contract must not keep
+gating it and the no-overwrite rule would otherwise block a replacement
+contract from ever taking the slot.
+
+**Migration step 19** repairs the records created before the fix: link-only,
+first non-cancelled contract by budgetId, already-linked and quick projects
+untouched, idempotent. Deliberately **no retro-annexes** for variations
+approved while the link was missing — their amounts are already counted, and
+inventing numbered annexes after the fact would rewrite a paper trail. The
+operator chose this explicitly.
+
+**Tested by building, not hunting** (the register's own contracts were all
+created the other way round): the e2e drives quote → acceptance → job →
+contract → approved variation and asserts the chain — link set, annex
+`…-A1` minted, current amount differs, cancel releases — then removes what it
+built and returns the minted series numbers, so the register later suites read
+is byte-identical. Negative controls red first: the write-back removed turns
+the chain check red; the migration step gutted turns two m19 checks red.

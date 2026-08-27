@@ -19398,6 +19398,15 @@
       <input id="cn_date" type="date" value="${esc(erp.today)}" max="${esc(erp.today)}" style="margin-left:auto"></label></div>
     <div class="it"><label class="opt">Referencia externa
       <input id="cn_ref" placeholder="Opcional — su propia numeración" style="margin-left:auto"></label></div>
+    <div class="it"><label class="opt">Obra
+      <select id="cn_proj" style="margin-left:auto">
+       <option value="">— sin obra asociada —</option>
+       ${erp.state.projects
+         .filter((p) => !p.contractId && p.status === "active")
+         .map((p) => `<option value="${esc(p.id)}"${s.projectId === p.id ? " selected" : ""}>${esc(p.code)}</option>`)
+         .join("")}
+      </select></label></div>
+    <div class="it" style="color:var(--muted)">Un contrato externo no nombra ningún presupuesto, así que la obra a la que pertenece hay que decirla aquí — o dejarlo sin asociar.</div>
     <div class="it" style="display:block"><label class="opt" style="margin-bottom:6px">Contrato firmado</label>
      <div id="cn_doc"></div></div>
    </div></div>`
@@ -19600,6 +19609,7 @@
               hitos,
               doc: heldDoc,
               signedDoc: heldSigned,
+              projectId: $("#cn_proj") ? $("#cn_proj").value || null : null,
               partyId,
               propertyId: $("#cn_prop").value || null,
               base: $("#cn_base").value,
@@ -19623,6 +19633,7 @@
                 vatBp: +$("#cn_vat").value,
                 date: $("#cn_date").value || erp.today,
                 externalRef: $("#cn_ref").value.trim() || null,
+                projectId: $("#cn_proj") ? $("#cn_proj").value || null : null,
                 document: evid && evid.value(),
                 installments,
                 duration: { estimatedDays: days },

@@ -1775,3 +1775,26 @@ movements, most of them small card purchases, so `gasto general` cannot be
 document-only; and **the operator's real bank data never enters this
 repository** — it carries a live IBAN, full card numbers and real names. All
 checks run against synthesised BBVA-shaped fixtures.
+
+## Correction program — package ledger (started 2026-08-28)
+
+Autonomous execution, operator-approved: one package at a time, full gates,
+push, CI green, then the next without asking. Plan:
+`/root/.claude/plans/steady-jingling-floyd.md` (R1→R2→R3). Any resume reads
+THIS ledger and continues with the first package not marked done.
+
+| Package | Scope                                                                                                         | Status                                                                 |
+| ------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| PK-A    | job↔contract link: engine write-back, external job picker, cancel releases, migration 19                      | **done** — 569/569 e2e, sims green, m19 5 checks + 2 negative controls |
+| PK-B    | A2 verification + erp-bridge variation chapters + honest «cuadra» sentence                                    | next                                                                   |
+| PK-F    | all documents on the redesign (templates refresh, CaneiSheet renderer, facts adapters, wire app, label layer) | pending                                                                |
+| PK-G    | document language: party.docLanguage, invoice/change language fields, selector everywhere, EN contract        | pending                                                                |
+| PK-H    | every generated email → Drafts of if@2iberia.com (erp-eml.js, fileDraft, queue status)                        | pending                                                                |
+| PK-C    | small fixes: A6 A7 A8 A9 A13 A14 B1                                                                           | pending                                                                |
+| PK-D    | S-curve: sample at asOf, actual-from-zero, no 1-point projection, dot                                         | pending                                                                |
+| PK-E    | A12 blocker translation split + dicts · A15 test party cleanup + server-e2e hygiene                           | pending                                                                |
+| PK-I    | UAT V3 + final consolidated report                                                                            | pending                                                                |
+
+Parked (never blocking): A3 Safari PDF crash (needs the operator's console
+line) · if@2iberia.com mailbox password (operator runs ops/set-email.sh) ·
+IBAN + logo in Configuración › Empresa (operator).
