@@ -5562,16 +5562,20 @@
             { k: "staff", lab: "Personal interno", code: "DMT-04" },
           ],
         },
+        /* «Empresa» is first in Configuración, and first for a reason: on a
+           workspace that has never been configured it is the only screen that
+           matters. ORG-01 refuses every invoice until it is filled in, and
+           until this session the blocker pointed at a screen that did not
+           exist. Keep this comment OUT of the object below — the navigation
+           manifest generator parses SECTIONS with a regex that expects the
+           first sub to follow `subs: [` immediately, and a comment there makes
+           the whole section invisible to the phone and tablet builds. */
         {
           k: "settings",
           ic: "⚙️",
           lab: "Configuración",
           short: "Config.",
           subs: [
-            /* First, and first for a reason: on a workspace that has never been
-               configured this is the only screen that matters. ORG-01 refuses
-               every invoice until it is filled in, and until this session the
-               blocker pointed at a screen that did not exist. */
             { k: "company", lab: "Empresa", code: "ORG-01" },
             { k: "items", lab: "Partidas y subpartidas", code: "DMC-01" },
             { k: "price-list", lab: "Lista de precios", code: "DMC-02" },

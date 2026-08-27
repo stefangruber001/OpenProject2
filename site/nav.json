@@ -59,8 +59,8 @@
     },
     {
       "id": "settings",
-      "code": "DMC-01",
-      "path": "erp.html#items",
+      "code": "ORG-01",
+      "path": "erp.html#company",
       "icon": "gearshape.fill",
       "label": {
         "es": "Config.",
