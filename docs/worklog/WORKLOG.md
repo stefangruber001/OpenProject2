@@ -24,11 +24,11 @@ but is still where the `XXX-00` requirement ids cited throughout the code
 (MDM-03, CAP-04, GES-07 …) are defined.
 
 **Continuing from anywhere.** Everything needed is in this repository: open it
-on the branch the session mandate designates (sessions 1-3 used
-`claude/orin-project-status-1q50dt`, the default named in `CLAUDE.md`;
-sessions 4-11 used `claude/candi-programme-session-4-07amo8`) and read `CLAUDE.md` → this
-file → the newest `SESSION-NN.md` context pack. Nothing lives on any one
-machine.
+on `main` — the trunk and the only long-lived branch — and read `CLAUDE.md` →
+this file → the newest `SESSION-NN.md` context pack. Nothing lives on any one
+machine. (Sessions 1-3 used `claude/orin-project-status-1q50dt` and sessions
+4-12 used `claude/candi-programme-session-4-07amo8`; **both were retired on
+2026-08-16** and neither is a place to start work. See ASSUMPTIONS #170.)
 Check `node --version` first: sessions 1-3 ran on a host with no Node
 toolchain and their worklogs describe workarounds (a JavaScriptCore shim, a
 hand-edited lockfile) that are irrelevant wherever Node exists.
@@ -854,3 +854,152 @@ commands at all, so the generator already persists in remote mode.
 Ten new site-e2e checks; 434/434 passing, 118/118 vitest, 149/149 year sim,
 226/226 manageability sim, boundaries · lint · check-types · i18n coverage all
 green.
+
+## Package 7 — what the acceptance test found (2026-08-27)
+
+The V2 acceptance protocol (`CaneiUATE2EENV2.pdf`, 17 phases / 142 checks) was
+run end to end: a colleague covered steps 1–106, the operator reviewed 107–132
+and returned `20260827_Comments.docx`. Phase 15 passed in full. Phase 13 — bank
+import · reconcile · seal — did not, and investigating the comments against
+`main` turned up **five defects, four of which nobody had reported**.
+
+The operator also settled the model that had been implicit until now, and it is
+the spine of the package: **Gastos decides, Conciliación identifies, Avance
+económico reports.** Cost is classified once, in Gastos — project · Partida ·
+Subpartida · cuenta contable, split by percentage where it spans several. Bank
+reconciliation exists to say _which document a bank line is_, for cash flow, and
+never to assign cost. `cuenta contable` is the gestoría's own axis and is
+unrelated to Partida/Subpartida. The whole agreement is written down in
+`docs/worklog/PK7-SPEC.md`, committed in PK7-A so the screens in PK7-B onwards
+are built to a rule that already exists on paper.
+
+Two facts reshaped the plan. **A real quarter is ~535 movements** — the supplied
+BBVA PDF has 535 rows and most are small card purchases — so requiring every one
+to carry a document makes step 116's period seal, correct in principle,
+unusable in practice; `gasto general` is therefore not document-only, and bulk
+actions come before per-merchant rules. And **the operator's real bank data
+never enters this repository**: it carries a live IBAN, full card numbers and
+real names. Every check runs against synthesised BBVA-shaped fixtures.
+
+### PK7-A · The numbers that aren't true (2026-08-27)
+
+Four defects, one class: a number that is not true, held silently.
+
+**111.** The importer had parsed the SALDO column into `balanceCents` since it
+was written and never once used it, while `openingCents` defaulted to zero.
+Measured against the operator's own file: 479 rows, 0 skipped, opening
+24.000,00 + Σ −10.235,63 = **13.764,37**, matching the bank exactly — where the
+product showed −10.235,63, short by precisely the opening balance and saying
+nothing. `statementBalance(rows)` now derives the opening from the oldest row
+(`saldo − importe`), reports opening · closing · sum · whether it closes, and is
+computed over all parsed rows rather than the fresh ones, because a balance is a
+chain and a chain with the duplicates removed is not the file's chain. It is
+direction-agnostic; BBVA exports newest-first and other exports do not.
+
+The check is **endpoints plus sum, deliberately, not a per-row running chain**.
+A per-row chain is stricter and wrong more often: banks list same-date rows in
+an order other than the one they applied them in, and refusing a valid statement
+is the worse error. An import that does not close is refused **before anything
+is written** — no half-import, no wrong balance sitting among the right ones.
+A file with no SALDO column at all (the card export) returns `null`, says so in
+amber, and imports: absent is honest, wrong is not.
+
+A second check compares the resulting account balance against the statement's
+closing figure and rolls the import back if they disagree — but **only when this
+import established the opening balance**. The first version ran on every import
+and took the browser suite to 546/550, failing correctly on correct imports into
+accounts that already had movements from another period. The file's arithmetic
+gates every import; the account comparison gates only the one that set the
+opening. Narrowing it was the fix, and the narrowness is the point.
+
+**A3.** `matchMovement` takes one target, so the interface looped over the
+chosen documents — and the `if (!pays)` guard meant the first document absorbed
+the whole movement, every later one was paid nothing, and `m.matched` named only
+the last. `matchMovementSplit` replaces the loop with one payment carrying every
+allocation, refusing an empty split, an over-allocation, and any mixing of
+supplier and customer documents in one movement.
+
+**A4.** `payBills` and `recordCollection` had no over-allocation guard, so
+outstanding went negative in silence. Both refuse now, and name the honest
+alternatives — several documents, an advance on account, a duplicate to be
+refunded — instead of only saying no.
+
+**117a.** `unreconciledMovements` took a period and no account, so the queue
+showed every account whatever Cuentas y saldos had selected. That is the 533 the
+operator saw under both the current account and the credit card — investigated
+and cleared as demonstration data (the seed has 14) and as the preview panel
+before the real cause was found. The parameter is optional; its absence still
+means all accounts, because the period seal needs that.
+
+Three new fixture-backed blocks in `tests/bank-import/run.mjs` (71/71): the
+statement arithmetic, direction-independence, the opening balance proved
+load-bearing as a property rather than a constant copied from real data,
+end-to-end balance equality, a dropped row refused with nothing written, the
+card export returning `null`, the two-invoice split, the over-payment refusal
+and the account narrowing. Full gates green: **557/557** browser, 330/330
+manageability, 149/149 year sim, 126 unit, lint · types · boundaries · i18n.
+
+### PK7-B · Gastos decides, Conciliación identifies (2026-08-27)
+
+The rule from `PK7-SPEC.md`, made structural rather than written down.
+
+**Cuentas y saldos stops deciding.** It carried the whole movement register with
+a Clase select and a Destino select on every row, and Destino could put a cost
+on a project — a second door into a decision that already had one. It now
+answers what it is for: one row per account with its balance, Total disponible,
+import, undo import, and the **last five movements read-only**. The evidence
+stays; the decision leaves. A balance with no sight of what moved it cannot be
+sanity-checked, which is why removing the register is not the same as removing
+the last five lines.
+
+**Classification moved rather than vanished.** Saying WHAT a line is belongs in
+Conciliación. Two identifications came across: which general expense a line is —
+the **category**, not just the class, which a bare `rcClass` would have lost —
+and whether an outgoing settles a card. Neither touches a project.
+**«Asignar a proyecto» is gone**, and the E2E asserts its absence, because this
+control has now moved three times and a removal nothing asserts comes back.
+
+**What still writes a project onto a movement:** petty cash, by the operator's
+own rule — cash spent on site belongs to a job and usually has no document. The
+Caja drawer already carried the full cascade (project → its partidas → that
+partida's subpartidas), so BNK-02's acceptance check moved there, where the
+requirement now lives.
+
+#### The gap that "keep reading" was hiding
+
+Verifying that costs allocated from the bank screens still appear found that
+they already did not, in exactly PK7-A's class: **the per-partida table did not
+add up to the project it describes.**
+
+Four views enumerated the same costs separately. `actualCostCents` counted bills,
+labour, direct movement allocations and confirmed tickets. `chapterCosts` counted
+all four. `chapterEconomics` counted **two**. `unassignedChapterCosts` — whose
+entire job is to itemise the difference between the project total and the
+partida rows — counted three and omitted movements. A petty-cash cost on a job
+therefore contributed to the project's actual cost and appeared in **no row of
+either table**: not in its partida, and not in the block that exists to say what
+is missing. Measured on a fixture: project 15.000, partida rows 10.000,
+pending 0.
+
+Four enumerations of one thing disagree eventually; the only question is when.
+They are now one. `projectCostRows(projectId)` yields every cost with the
+partida it landed on or `null`, and the other four are views of it. The
+invariant is asserted directly — **partida table + pending = project cost** —
+after every kind of cost the simulation produces, and the negative control
+confirms it goes red on precisely the old behaviour (`10000 + 0 ≠ 13000`).
+
+`assignChapterSplit` now accepts a movement, so petty cash can be given its
+partida from the block that lists it; before, that threw «Unknown cost source».
+And `splitMovement` stopped stamping `class = "projectCost"` on splits that name
+no project — a general expense labelled «coste de obra» while the allocation
+underneath said otherwise.
+
+**D1 was verified, not fixed.** Re-splitting a paid invoice across partidas
+moves the cost, leaves `actualCostCents` unchanged and leaves the payment and
+the match untouched. It already worked; it lacked a test saying so, and the
+independence of the two axes is the whole claim of this package.
+
+Fourteen new engine checks (344/344 manageability), the E2E rewritten where the
+controls moved, and PK7-A's three untranslated statement-preview strings
+translated — CI had gone red on the source-literal gate alone, at 231 against a
+ceiling of 228, with every other gate green.

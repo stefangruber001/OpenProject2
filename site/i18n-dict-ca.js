@@ -890,6 +890,26 @@ window.CANEI_DICT.ca = {
   "Movimiento asignado": "Moviment assignat",
   "Ir a Conciliación →": "Ves a Conciliació →",
   "Días sin casar": "Dies sense casar",
+  // ── PK7-A: l'extracte demostra la seva pròpia aritmètica abans d'importar-se.
+  "Saldo inicial del extracto": "Saldo inicial de l'extracte",
+  "Saldo final del extracto": "Saldo final de l'extracte",
+  "El extracto no cuadra consigo mismo: el saldo inicial más los movimientos no dan el saldo final. No se importa nada — puede faltar alguna fila o haberse leído mal una columna.":
+    "L'extracte no quadra amb si mateix: el saldo inicial més els moviments no donen el saldo final. No s'importa res — pot faltar alguna fila o s'ha llegit malament una columna.",
+  "Este extracto no trae columna de saldo, así que no se puede comprobar que esté completo.":
+    "Aquest extracte no porta columna de saldo, així que no es pot comprovar que estigui complet.",
+  // ── PK7-B: el pantalla de saldos deixa de classificar, la cua identifica.
+  "Cuántas cuentas hay y cuánto hay en cada una. Los movimientos se explican en Conciliación; el coste de obra se asigna en Gastos.":
+    "Quants comptes hi ha i quants diners hi ha a cadascun. Els moviments s'expliquen a Conciliació; el cost d'obra s'assigna a Despeses.",
+  "Últimos movimientos": "Darrers moviments",
+  "Sin movimientos todavía.": "Encara no hi ha moviments.",
+  "Sin conciliar": "Sense conciliar",
+  Explicado: "Explicat",
+  "Movimientos por explicar": "Moviments per explicar",
+  "Conciliar →": "Concilia →",
+  "Identificar como…": "Identifica com a…",
+  Identificar: "Identifica",
+  "Elige primero qué es este movimiento.": "Tria primer què és aquest moviment.",
+  "Movimiento identificado": "Moviment identificat",
   "Saldo inicial": "Saldo inicial",
   // ── ADM-01 Facturación (S10).
   "Facturas emitidas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos, las emitidas son inmutables, y un día de retraso ya se ve en rojo.":

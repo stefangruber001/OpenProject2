@@ -4427,37 +4427,49 @@ async function testBankAndCash(browser, base) {
       );
     else bad("1E: file stored and flag cleared", JSON.stringify(attached));
 
-    // ---- ADM-05: classification edited in the row ----
+    // ---- ADM-05: the screen answers "how much is where", and nothing else ----
+    /* PK7-B. This screen used to carry the whole movement register with a
+       Clase select and a Destino select on every row, and the Destino select
+       could put a cost on a project. `docs/worklog/PK7-SPEC.md` settles that:
+       Gastos decides, Conciliación identifies, Avance económico reports. The
+       controls are gone, and their ABSENCE is what is checked — a removal that
+       nothing asserts comes back. */
     await pg.goto(`${base}/erp.html#banking`, { waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(600);
-    const inline = await pg.evaluate(() => ({
+    const readonly = await pg.evaluate(() => ({
       classSelects: document.querySelectorAll("[data-bkclass]").length,
       destSelects: document.querySelectorAll("[data-bkdest]").length,
-      amberRows: document.querySelectorAll("#view tr.xrow.unapproved").length,
-      openMovements: erp.state.movements.filter(
-        (m) => m.status === "unallocated" && inPeriod(m.accountingDate),
-      ).length,
+      recent: document.querySelectorAll("#view .daylist .it").length,
+      accounts: document.querySelectorAll("#view [data-acct]").length,
+      hasImport: !!document.getElementById("bkImport"),
+      hasUndo: !!document.getElementById("bkUndo"),
+      toReconcile: !!document.getElementById("bToRec"),
     }));
-    if (inline.classSelects > 0 && inline.classSelects === inline.destSelects)
-      ok(`ADM-05: class and destination are edited in the row (${inline.classSelects} rows)`);
-    else bad("ADM-05: inline editing", JSON.stringify(inline));
-    if (inline.amberRows === inline.openMovements)
-      ok(`ADM-05: every unmatched movement carries the amber bar (${inline.amberRows})`);
-    else bad("ADM-05: amber on unmatched", JSON.stringify(inline));
+    if (readonly.classSelects === 0 && readonly.destSelects === 0)
+      ok("ADM-05: no movement is classified or assigned from Cuentas y saldos");
+    else bad("ADM-05: classification removed from the balances screen", JSON.stringify(readonly));
+    if (
+      readonly.accounts > 0 &&
+      readonly.recent > 0 &&
+      readonly.hasImport &&
+      readonly.hasUndo &&
+      readonly.toReconcile
+    )
+      ok(
+        `ADM-05: it keeps balances, import, undo and the last movements read-only (${readonly.accounts} accounts)`,
+      );
+    else bad("ADM-05: balances screen keeps what it is for", JSON.stringify(readonly));
 
     /* A destination list has to be readable by the person choosing. The
        operator, looking at a picker of bare codes: "with the code P-R001 is
        difficult to know what project it is … at some point 100 of projects
        will be there". The code still leads — it is what the lists are ordered
-       by — and the customer follows it. */
+       by — and the customer follows it. The picker moved to Gastos with the
+       decision it serves, so the rule is checked where it now lives. */
     const destLabels = await pg.evaluate(() => {
-      const sel = document.querySelector("[data-bkdest]");
-      if (!sel) return null;
-      const opts = [...sel.querySelectorAll('optgroup[label="Obras"] option')].map((o) =>
-        o.textContent.trim(),
-      );
       const projects = erp.state.projects.filter((p) => !p.closed);
+      const opts = projects.map((p) => projectPickLabel(p));
       return {
         count: opts.length,
         codeFirst: opts.every((t, i) => t.startsWith(projects[i].code)),
@@ -4501,7 +4513,7 @@ async function testBankAndCash(browser, base) {
         wide: r.getBoundingClientRect().width > 100,
         cents: money(r.textContent),
       }));
-      const totalRow = [...document.querySelectorAll("#view .daylist .it")].pop();
+      const totalRow = document.querySelector("#view [data-total]");
       return {
         accounts: erp.state.bankAccounts.length,
         kinds: [...new Set(erp.state.bankAccounts.map((a) => a.kind))].length,
@@ -4536,21 +4548,56 @@ async function testBankAndCash(browser, base) {
       else bad("ADM-05: line selects account", `${picked} ≠ ${firstAcct}`);
     }
 
-    // Classifying one in the row really writes it.
-    const target = await pg.evaluate(() => {
-      const el = document.querySelector("[data-bkclass]");
-      return el ? el.dataset.bkclass : null;
+    /* Classifying a line still works — in Conciliación, which is where saying
+       WHAT a movement is now belongs. The identification carries the general
+       expense's CATEGORY, which is the granularity the removed Destino select
+       had and a bare class would have lost. */
+    const identified = await pg.evaluate(async () => {
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 700));
+      const row = document.querySelector(".movrow");
+      if (!row) return { skip: "nothing in the queue" };
+      row.click();
+      await new Promise((r) => setTimeout(r, 500));
+      const id = typeof recSel === "string" ? recSel : null;
+      const sel = document.getElementById("rcDest");
+      if (!sel || !id) return { sel: !!sel, id };
+      const opt = [...sel.querySelectorAll("option")].find((o) => o.value === "o:office");
+      if (!opt) return { missing: "o:office" };
+      sel.value = "o:office";
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 500));
+      const m = erp.state.movements.find((x) => x.id === id);
+      return {
+        class: m.class,
+        category: (m.allocations || [])[0] && m.allocations[0].overheadCategory,
+        noProject: (m.allocations || []).every((a) => !a.projectId),
+      };
     });
-    if (target) {
-      await pg.selectOption(`[data-bkclass="${target}"]`, "overhead");
-      await pg.waitForTimeout(600);
-      const cls = await pg.evaluate(
-        (id) => (erp.state.movements.find((m) => m.id === id) || {}).class,
-        target,
-      );
-      if (cls === "overhead") ok("ADM-05: choosing a class in the row writes it straight away");
-      else bad("ADM-05: inline class writes", String(cls));
-    }
+    if (
+      identified &&
+      identified.class === "overhead" &&
+      identified.category === "office" &&
+      identified.noProject
+    )
+      ok("ADM-05: Conciliación identifies a line as a general expense, with its category");
+    else bad("ADM-05: identification in Conciliación", JSON.stringify(identified));
+
+    /* The removal, asserted as a removal. «Asignar a proyecto» is gone from
+       the queue: a bank row cannot decide project cost any more. */
+    const noAssign = await pg.evaluate(() => ({
+      proj: !!document.getElementById("rcProj"),
+      assign: !!document.getElementById("rcAssign"),
+      kind: !!document.getElementById("rcKind"),
+      classify: !!document.getElementById("rcClassify"),
+    }));
+    if (!noAssign.proj && !noAssign.assign && !noAssign.kind && noAssign.classify)
+      ok("ADM-05: «Asignar a proyecto» is gone from Conciliación; classification stays");
+    else bad("ADM-05: project assignment removed from the queue", JSON.stringify(noAssign));
+    /* Back to the accounts tab EXPLICITLY. The tab choice is remembered, so
+       navigating to #banking after visiting Conciliación reopens Conciliación
+       — and everything downstream that reaches for #bkSel finds nothing. */
+    await openTab(pg, "banking", "_bankAccounts");
 
     // ---- Gap 13: a cost that lands on an account, not a project ----
     const gap13 = await pg.evaluate(() => {
@@ -4718,38 +4765,45 @@ async function testBankAndCash(browser, base) {
     if (onCard === 3) ok("1C: the card statement lands on the card account (3 movements)");
     else bad("1C: card statement import", String(onCard));
 
-    // A negative movement on the BANK offers the settlement destination.
-    const settleOffer = await pg.evaluate(() => {
+    /* A negative movement on the BANK offers the settlement destination — in
+       Conciliación now, with the rest of the identifications (PK7-B). Saying
+       "this outgoing is the card's monthly settlement" is a statement about
+       what the line IS, not about what the money bought, so it belongs beside
+       the other answers to that question rather than on the balances screen. */
+    await pg.evaluate(() => {
       const bank = erp.state.bankAccounts.find((a) => a.kind === "bank");
       const sel = document.getElementById("bkSel");
       sel.value = bank.id;
       sel.dispatchEvent(new Event("change", { bubbles: true }));
-      return bank.id;
     });
     await pg.waitForTimeout(500);
-    const group = await pg.evaluate(() => {
-      const sels = [...document.querySelectorAll("[data-bkdest]")];
-      const withGroup = sels.filter((sel) =>
-        [...sel.querySelectorAll("optgroup")].some((g) => /Liquidación de tarjeta/.test(g.label)),
-      );
-      return { total: sels.length, offered: withGroup.length };
-    });
-    if (group.offered > 0)
-      ok(
-        `1C: outgoing bank rows offer «Liquidación de tarjeta» (${group.offered} of ${group.total})`,
-      );
-    else bad("1C: settlement optgroup", JSON.stringify(group));
-
-    const settled = await pg.evaluate((cardId) => {
-      const sel = [...document.querySelectorAll("[data-bkdest]")].find((x) =>
-        [...x.querySelectorAll("optgroup")].some((g) => /Liquidación de tarjeta/.test(g.label)),
-      );
-      if (!sel) return null;
-      sel.value = "c:" + cardId;
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
-      const m = erp.state.movements.find((x) => x.id === sel.dataset.bkdest);
-      return { class: m.class, link: m.cardSettlement && m.cardSettlement.accountId };
+    const settled = await pg.evaluate(async (cardId) => {
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 800));
+      const rows = [...document.querySelectorAll(".movrow")];
+      for (const row of rows) {
+        row.click();
+        await new Promise((r) => setTimeout(r, 350));
+        const sel = document.getElementById("rcDest");
+        if (!sel) continue;
+        const opt = [...sel.querySelectorAll("option")].find((o) => o.value === "c:" + cardId);
+        if (!opt) continue;
+        const id = recSel;
+        sel.value = "c:" + cardId;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 500));
+        const m = erp.state.movements.find((x) => x.id === id);
+        return {
+          offered: true,
+          class: m.class,
+          link: m.cardSettlement && m.cardSettlement.accountId,
+        };
+      }
+      return { offered: false, rows: rows.length };
     }, cardAcc);
+    if (settled && settled.offered)
+      ok("1C: outgoing bank lines offer «Liquidación de tarjeta» in Conciliación");
+    else bad("1C: settlement optgroup", JSON.stringify(settled));
     if (settled && settled.class === "internalTransfer" && settled.link === cardAcc)
       ok("1C: picking it marks the bank line as the card's settlement, an internal transfer");
     else bad("1C: settlement written", JSON.stringify(settled));
@@ -6983,19 +7037,20 @@ async function testAdmin(browser, base) {
       ok("gestoría: the send is recorded with its recipient and its justified exceptions");
     else bad("gestoría: send record", gesText.slice(-200));
 
-    // ---- §5.4 Banco keeps position and forecast, and hands allocation over.
-    //      Both are tabs of ADM-05 now, so this asserts the ACCOUNTS tab still
-    //      has no allocation control on it — the point of the split.
+    // ---- §5.4 Banco keeps position and hands identification over.
+    /*  The history of this check is the argument. Session 11 moved allocation
+        OUT of this screen; the v4 programme's S11 brought it back as a row
+        control because §3.2 asked for classification edited in the row; PK7-B
+        takes it out again, and for a reason neither earlier round had: the
+        operator settled that a project cost is decided ONCE, in Gastos. What
+        this screen must never carry is any control that decides where money
+        went — neither the old free-text field nor the row selects that
+        replaced it. It carries balances and a door to Conciliación. */
     await openTab(pg, "banking", "_bankAccounts");
-    // Session 11 moved allocation OUT of this screen; S11 of the v4 programme
-    // brings it back deliberately, because §3.2 asks for classification and
-    // assignment edited in the row. What must not come back is the old
-    // free-text allocation input divorced from a document — the selects here
-    // write through the same `splitMovement` Conciliación does.
     const oldInputs = await pg.locator("#view input[data-mov]").count();
-    const rowSelects = await pg.locator("#view [data-bkdest]").count();
-    if (oldInputs === 0 && rowSelects > 0)
-      ok(`ADM-05: assignment is a row control, not a free-text field (${rowSelects} rows)`);
+    const rowSelects = await pg.locator("#view [data-bkdest], #view [data-bkclass]").count();
+    if (oldInputs === 0 && rowSelects === 0)
+      ok("ADM-05: the balances screen decides nothing — no field, no row select");
     else bad("banco: row assignment", `old=${oldInputs} selects=${rowSelects}`);
     await pg.click("#bToRec");
     await pg.waitForTimeout(600);
@@ -9396,26 +9451,66 @@ async function testErp(browser, base) {
       ok("erp: budgets module lists versioned budgets");
     else bad("erp: budgets module", preText.slice(0, 80));
 
-    // BNK-02: a movement is allocated to a job by its project number. Session
-    // 11 moved the gesture off Banco and into Conciliación — casar el
-    // movimiento y repartirlo son el mismo acto — so the requirement is
-    // asserted where it now lives, not where it used to.
-    await openTab(pg, "banking", "_reconcile");
-    const inp = pg.locator("#rcProj");
-    if ((await inp.count()) > 0) {
-      await inp.fill("P-2026-0001");
-      await pg.click("#rcAssign");
-      await pg.waitForTimeout(500);
-      const toastTxt = await pg
-        .locator("#toast")
-        .innerText()
-        .catch(() => "");
-      if (/Movimiento asignado/.test(toastTxt))
-        ok("erp: BNK-02 — movement allocated to a job by its project number");
-      else bad("erp: BNK-02 allocation", toastTxt.slice(0, 100));
-    } else {
-      bad("erp: BNK-02 allocation", "no allocation control on the reconciliation screen");
-    }
+    /* BNK-02: a movement's cost reaches a job. The gesture has moved twice —
+       off Banco into Conciliación in session 11, and out of Conciliación
+       altogether in PK7-B, because a project cost is decided once, in Gastos.
+       What survives on a movement is the operator's own exception: petty cash
+       spent on site, which names a project and usually has no document behind
+       it. The requirement is asserted where it now lives, with the cascade it
+       carries: project → its partidas → that partida's subpartidas. */
+    await pg.goto(`${base}/erp.html#petty-cash`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(600);
+    const pettyToJob = await pg.evaluate(async () => {
+      const out = document.getElementById("cashOut");
+      if (!out) return { skip: "no till on this build" };
+      out.click();
+      await new Promise((r) => setTimeout(r, 400));
+      const dest = document.getElementById("ca_dest");
+      if (!dest) return { dest: false };
+      const prj = erp.state.projects.find(
+        (p) => !p.closed && p.baseline && (p.baseline.chapters || []).length,
+      );
+      if (!prj) return { skip: "no open project with a baseline" };
+      dest.value = "p:" + prj.id;
+      dest.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 300));
+      const chap = document.getElementById("ca_chap");
+      const offered = [...chap.querySelectorAll("option")].map((o) => o.value).filter(Boolean);
+      const mine = new Set(prj.baseline.chapters.map((c) => String(c.num)));
+      chap.value = offered[0];
+      chap.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 300));
+      document.getElementById("ca_c").value = "Tornillería E2E";
+      document.getElementById("ca_a").value = "12.50";
+      document.getElementById("ca_go").click();
+      await new Promise((r) => setTimeout(r, 500));
+      const m = erp.state.movements.filter((x) => x.concept === "Tornillería E2E").pop();
+      return {
+        offeredOnlyMine: offered.length > 0 && offered.every((n) => mine.has(String(n))),
+        offered: offered.length,
+        projectId: m && (m.allocations || [])[0] && m.allocations[0].projectId,
+        chapterNum: m && (m.allocations || [])[0] && m.allocations[0].chapterNum,
+        wanted: prj.id,
+        inChapterCosts:
+          m &&
+          erp
+            .chapterCosts(prj.id, m.allocations[0].chapterNum)
+            .some((r) => r.source === "movement" && r.ref === "Tornillería E2E"),
+      };
+    });
+    if (pettyToJob && pettyToJob.skip) ok(`erp: BNK-02 skipped — ${pettyToJob.skip}`);
+    else if (
+      pettyToJob &&
+      pettyToJob.projectId === pettyToJob.wanted &&
+      pettyToJob.chapterNum &&
+      pettyToJob.offeredOnlyMine &&
+      pettyToJob.inChapterCosts
+    )
+      ok(
+        `erp: BNK-02 — petty cash reaches the job and its partida, offering only that project's ${pettyToJob.offered}`,
+      );
+    else bad("erp: BNK-02 allocation", JSON.stringify(pettyToJob));
 
     // MDM: every party field is correctable from the UI (edit drawer → updateParty)
     await pg.evaluate(() => (location.hash = "customers"));

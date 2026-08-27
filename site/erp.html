@@ -8714,14 +8714,16 @@
         );
         // Correcting the kind re-prices the entry — correctHours reads the rate
         // band for the new kind — so this is a real correction, not a relabel.
-        document.querySelectorAll("[data-hkind]").forEach(
-          (sel) =>
-            (sel.onchange = () =>
-              mutate(
-                () => erp.correctHours(sel.dataset.hkind, { kind: sel.value }, "operations"),
-                "Tipo de hora actualizado",
-              )),
-        );
+        document
+          .querySelectorAll("[data-hkind]")
+          .forEach(
+            (sel) =>
+              (sel.onchange = () =>
+                mutate(
+                  () => erp.correctHours(sel.dataset.hkind, { kind: sel.value }, "operations"),
+                  "Tipo de hora actualizado",
+                )),
+          );
         document
           .querySelectorAll("[data-approve]")
           .forEach(
@@ -8789,8 +8791,7 @@
                 workerId: $("#nh_w").value,
                 projectId: $("#nh_p").value,
                 chapterNum: $("#nh_c").value || null,
-                lineId:
-                  $("#nh_lwrap").style.display !== "none" ? $("#nh_l").value || null : null,
+                lineId: $("#nh_lwrap").style.display !== "none" ? $("#nh_l").value || null : null,
                 kind: $("#nh_k").value,
                 hoursMilli: Math.round(hrs * 1000),
                 date: $("#nh_d").value || day,
@@ -9028,9 +9029,7 @@
        */
       function nextCatalogueCode(chapterCode) {
         if (!chapterCode) return "";
-        const taken = new Set(
-          erp.state.catalogue.map((x) => String(x.code || "").toUpperCase()),
-        );
+        const taken = new Set(erp.state.catalogue.map((x) => String(x.code || "").toUpperCase()));
         const prefix = String(chapterCode).toUpperCase();
         for (let n = 101; n < 1000; n++) {
           const candidate = `${prefix}-${n}`;
@@ -9378,8 +9377,7 @@
       function listOptionsUnits(selected, compact) {
         if (compact) {
           const rows = erp.listActive("units").slice();
-          if (selected && !rows.some((r) => r.code === selected))
-            rows.unshift({ code: selected });
+          if (selected && !rows.some((r) => r.code === selected)) rows.unshift({ code: selected });
           return rows
             .map(
               (r) =>
@@ -9580,7 +9578,11 @@
             const xr = Math.round((+$("#w_xrate").value || 0) * 100);
             erp.addWorkerRate(
               rec.id,
-              { from: erp.today, rateCentsPerHour: rate, extraRateCentsPerHour: xr > 0 ? xr : null },
+              {
+                from: erp.today,
+                rateCentsPerHour: rate,
+                extraRateCentsPerHour: xr > 0 ? xr : null,
+              },
               "backoffice",
             );
             closeDrawer();
@@ -9707,8 +9709,13 @@
           "Extracto a la izquierda, documentos candidatos a la derecha y la propuesta de emparejamiento en medio, con el porqué. La cola de movimientos sin conciliar es el indicador de salud del periodo.";
         const R = reconApi();
         const r = periodRange();
-        const open = erp.unreconciledMovements(r.from, r.to);
-        const allOpen = erp.unreconciledMovements();
+        /* `bankAcc` is the account picked on Cuentas y saldos, and until now
+           this screen ignored it: choosing the credit card showed the current
+           account's queue unchanged, both reading 533 (acceptance test, 117).
+           The queue is worked one account at a time; only the period seal
+           spans them all, and it asks separately. */
+        const open = erp.unreconciledMovements(r.from, r.to, bankAcc);
+        const allOpen = erp.unreconciledMovements(null, null, bankAcc);
         if (
           recSel &&
           !erp.state.movements.some((m) => m.id === recSel && m.status === "unallocated")
@@ -9770,15 +9777,27 @@
         closed
           ? ""
           : `<div class="gtools" style="border-top:1px solid var(--hair)">
-        <input class="inline" id="rcProj" placeholder="Nº de proyecto">
-        <select class="inline" id="rcKind"><option value="material">Material</option><option value="labour">Mano de obra</option><option value="subcontract">Industrial</option><option value="other">Otro</option></select>
-        <button class="btn sm" id="rcAssign">Asignar a proyecto</button>
+        <!-- «Asignar a proyecto» used to live here, and it is gone on purpose:
+             a project cost is decided once, in Gastos, with its partida, its
+             subpartida and its cuenta contable. This screen says WHAT a line
+             is, not what it was spent on. See docs/worklog/PK7-SPEC.md. -->
+        <select class="inline" id="rcDest">
+          <option value="">Identificar como…</option>
+          <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL)
+            .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
+            .join("")}</optgroup>
+          ${cardSettleGroup(sel)}
+        </select>
+        <button class="btn sm" id="rcDestGo">Identificar</button>
         <span style="width:10px"></span>
         <select class="inline" id="rcClass">${["overhead", "tax", "salary", "financial", "internalTransfer"].map((c) => `<option value="${c}">${{ overhead: "Gasto general", tax: "Impuestos", salary: "Nóminas", financial: "Financiero", internalTransfer: "Traspaso interno" }[c]}</option>`).join("")}</select>
         <button class="btn sm" id="rcClassify">Clasificar</button>
         <button class="btn sm" id="rcAttach">📎 Justificante</button>
         <span style="flex:1"></span>
-        <select class="inline" id="rcWhy">${erp.listActive("unbackedReasons").map((r) => `<option value="${r.code}">${esc(r.es)}</option>`).join("")}</select>
+        <select class="inline" id="rcWhy">${erp
+          .listActive("unbackedReasons")
+          .map((r) => `<option value="${r.code}">${esc(r.es)}</option>`)
+          .join("")}</select>
         <button class="btn sm" id="rcUnbacked">Sin factura, con motivo</button>
         <span style="width:10px"></span>
         <button class="btn sm" id="rcNoDoc">Marcar sin respaldo</button>
@@ -9830,29 +9849,64 @@
             (b.onclick = () =>
               mutate(() => {
                 const ids = b.dataset.accept.split(",");
-                // One movement against several documents is exactly §5.3's partial
-                // reconciliation; matchMovement takes one at a time, so a combination is
-                // applied document by document against the same movement.
-                ids.forEach((id) => {
+                /* ONE call, with the split stated. Applying matchMovement once
+                   per document — which is what this did — paid the whole
+                   movement to the first document and nothing to the rest,
+                   because a payment for the movement existed by the second
+                   pass and the guard skipped it. The second invoice stayed
+                   fully outstanding while looking reconciled, and nothing
+                   said so. Each document now takes what it is owed, capped by
+                   what is left of the movement. */
+                let left = Math.abs(sel.amountCents);
+                const splits = [];
+                for (const id of ids) {
+                  if (left <= 0) break;
                   const c = candidates.find((x) => x.id === id);
-                  erp.matchMovement(
-                    sel.id,
-                    c.kind === "invoice" ? { invoiceId: id } : { billId: id },
-                    "backoffice",
+                  if (!c) continue;
+                  const take = Math.min(c.outstandingCents, left);
+                  left -= take;
+                  splits.push(
+                    c.kind === "invoice"
+                      ? { invoiceId: id, amountCents: take }
+                      : { billId: id, amountCents: take },
                   );
-                });
+                }
+                erp.matchMovementSplit(sel.id, splits, "backoffice");
                 recSel = null;
               }, "Movimiento conciliado")),
         );
-        const assign = $("#rcAssign");
-        if (assign)
-          assign.onclick = () =>
+        /* The two identifications that used to sit in the Destino select on
+           Cuentas y saldos, moved here with that screen's register: which
+           general expense this is, and whether an outgoing is the monthly
+           settlement of a card. Both say what a line IS. Neither touches a
+           project. */
+        const dest = $("#rcDest");
+        if (dest)
+          dest.onchange = () => {
+            const val = dest.value;
+            if (!val) return;
             mutate(() => {
-              const ref = $("#rcProj").value.trim();
-              if (!ref) throw new Error("Escribe el número de proyecto");
-              erp.allocateMovementToProject(sel.id, ref, $("#rcKind").value, "backoffice");
+              if (val.startsWith("c:")) {
+                erp.markCardSettlement(sel.id, val.slice(2), "backoffice");
+              } else {
+                erp.splitMovement(
+                  sel.id,
+                  [{ overheadCategory: val.slice(2), amountCents: Math.abs(sel.amountCents) }],
+                  "backoffice",
+                );
+              }
               recSel = null;
-            }, "Movimiento asignado");
+            }, "Movimiento identificado");
+          };
+        const destGo = $("#rcDestGo");
+        if (destGo)
+          destGo.onclick = () => {
+            if (!$("#rcDest").value) {
+              say("Elige primero qué es este movimiento.");
+              return;
+            }
+            $("#rcDest").onchange();
+          };
         const classify = $("#rcClassify");
         if (classify)
           classify.onclick = () =>
@@ -12485,7 +12539,9 @@
                   value: c.es,
                   label: c.es,
                   group: "Del catálogo",
-                  hint: n ? n + (n === 1 ? " subpartida" : " subpartidas") : "sin subpartidas todavía",
+                  hint: n
+                    ? n + (n === 1 ? " subpartida" : " subpartidas")
+                    : "sin subpartidas todavía",
                 };
               });
             options.push({ value: "__free__", label: "Otro nombre…", group: "Fuera del catálogo" });
@@ -12769,26 +12825,32 @@
             if (!list.length) return;
             const found = erp.findLine(budgetId, lineId, vsel);
             const chapId = found ? found.chapter.id : chapterId;
-            mutate(() => {
-              const [first, ...rest] = list;
-              erp.editLine(budgetId, lineId, lineFromCatalogueItem(first), {
-                audit: true,
-                user: "backoffice",
-              });
-              attachCatalogueImages(budgetId, lineId, first);
-              for (const it of rest) {
-                // Quantity 1 rather than 0: a subpartida at zero contributes
-                // nothing to the total, so a chapter of them reads as free.
-                const line = erp.addLine(
-                  budgetId,
-                  chapId,
-                  Object.assign(lineFromCatalogueItem(it), { qtyMilli: 1000 }),
-                );
-                attachCatalogueImages(budgetId, line.id, it);
-              }
-            }, `${list.length} subpartida${list.length === 1 ? "" : "s"} del catálogo`);
+            mutate(
+              () => {
+                const [first, ...rest] = list;
+                erp.editLine(budgetId, lineId, lineFromCatalogueItem(first), {
+                  audit: true,
+                  user: "backoffice",
+                });
+                attachCatalogueImages(budgetId, lineId, first);
+                for (const it of rest) {
+                  // Quantity 1 rather than 0: a subpartida at zero contributes
+                  // nothing to the total, so a chapter of them reads as free.
+                  const line = erp.addLine(
+                    budgetId,
+                    chapId,
+                    Object.assign(lineFromCatalogueItem(it), { qtyMilli: 1000 }),
+                  );
+                  attachCatalogueImages(budgetId, line.id, it);
+                }
+              },
+              `${list.length} subpartida${list.length === 1 ? "" : "s"} del catálogo`,
+            );
           },
-          { chapter: chapterId ? chapterCatalogueCode(budgetId, vsel, chapterId) : "", multi: true },
+          {
+            chapter: chapterId ? chapterCatalogueCode(budgetId, vsel, chapterId) : "",
+            multi: true,
+          },
         );
       }
       function attachCatalogueImages(budgetId, lineId, it) {
@@ -13155,7 +13217,8 @@
         $("#bRows")
           .querySelectorAll("[data-cat]")
           .forEach((btn) => {
-            btn.onclick = () => openCatalogueForLine(id, vsel, btn.dataset.cat, btn.dataset.catchap);
+            btn.onclick = () =>
+              openCatalogueForLine(id, vsel, btn.dataset.cat, btn.dataset.catchap);
           });
         $("#bRows")
           .querySelectorAll("[data-addline]")
@@ -13218,11 +13281,14 @@
                   danger: true,
                 });
                 if (!okDel) return;
-                mutate(() => {
-                  erp.removeChapter(id, chapId, "backoffice");
-                  // The tree's selection cannot survive the thing it selected.
-                  if (bChapter === chapId) bChapter = null;
-                }, `Partida eliminada${n ? ` · ${n} subpartida${n === 1 ? "" : "s"}` : ""}`);
+                mutate(
+                  () => {
+                    erp.removeChapter(id, chapId, "backoffice");
+                    // The tree's selection cannot survive the thing it selected.
+                    if (bChapter === chapId) bChapter = null;
+                  },
+                  `Partida eliminada${n ? ` · ${n} subpartida${n === 1 ? "" : "s"}` : ""}`,
+                );
               }),
           );
         $("#bRows")
@@ -13905,22 +13971,26 @@
         }
         // Proposed, never decided: a tax id can be read off a page, but binding a
         // cost to the wrong company is not a choice a screen should make alone.
-        const guess = cf && cf.issuerTaxId
-          ? suppliers.find((p) => (p.taxId || "").toUpperCase() === cf.issuerTaxId.toUpperCase())
-          : null;
+        const guess =
+          cf && cf.issuerTaxId
+            ? suppliers.find((p) => (p.taxId || "").toUpperCase() === cf.issuerTaxId.toUpperCase())
+            : null;
         const base = cf ? cf.baseCents || 0 : 0;
-        billAlloc = (cap && cap.allocations && cap.allocations.length
-          ? cap.allocations.map((a) => ({
-              projectId: a.projectId || "",
-              overheadCategory: a.overheadCategory || "",
-              chapterNum: a.chapterNum || "",
-              lineId: a.lineId || "",
-              kind: a.kind || "material",
-              amountCents: a.amountCents,
-            }))
-          : [blankAlloc(base)]);
+        billAlloc =
+          cap && cap.allocations && cap.allocations.length
+            ? cap.allocations.map((a) => ({
+                projectId: a.projectId || "",
+                overheadCategory: a.overheadCategory || "",
+                chapterNum: a.chapterNum || "",
+                lineId: a.lineId || "",
+                kind: a.kind || "material",
+                amountCents: a.amountCents,
+              }))
+            : [blankAlloc(base)];
 
-        const db = openDrawer(cap ? "Registrar documento como factura" : "Nueva factura de proveedor");
+        const db = openDrawer(
+          cap ? "Registrar documento como factura" : "Nueva factura de proveedor",
+        );
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Proveedor *</label><select id="bd_sup">
      ${suppliers.map((p) => `<option value="${p.id}"${guess && guess.id === p.id ? " selected" : ""}>${esc(p.name)}${p.taxId ? " · " + esc(p.taxId) : ""}</option>`).join("")}
@@ -15241,35 +15311,57 @@
         wireListConfig(v);
       }
 
-        /* The dry run, shown before anything is written. `previewImport` is
+      /* The dry run, shown before anything is written. `previewImport` is
            the engine's own dedupe — date│amount│CONCEPT — so a statement
            re-exported next month with three weeks of overlap imports only its
            new rows, and the operator sees the counts before agreeing. Rows the
            parser could not read are named here too: a skipped row that nobody
            is told about is a missing movement found at reconciliation time. */
       function statementPreviewDrawer(accountId, parsed) {
-          const pv = erp.previewImport(accountId, parsed.rows);
-          const acc = erp.state.bankAccounts.find((a) => a.id === accountId);
-          const db = openDrawer("Importar extracto · " + (acc ? acc.name : ""));
-          db.innerHTML = `<div class="card"><div class="daylist">
+        const pv = erp.previewImport(accountId, parsed.rows);
+        const acc = erp.state.bankAccounts.find((a) => a.id === accountId);
+        const db = openDrawer("Importar extracto · " + (acc ? acc.name : ""));
+        db.innerHTML = `<div class="card"><div class="daylist">
      <div class="it"><span>Periodo del extracto</span><span style="flex:1"></span><b>${pv.from ? fmtD(pv.from) + " — " + fmtD(pv.to) : "—"}</b></div>
      <div class="it"><span>Movimientos nuevos</span><span style="flex:1"></span><b>${pv.fresh.length}</b></div>
      <div class="it"><span>Ya importados</span><span style="flex:1"></span><b>${pv.duplicates.length}</b></div>
      <div class="it"><span>Filas no legibles</span><span style="flex:1"></span><b>${parsed.skipped}</b></div>
      ${pv.closedRows ? `<div class="it"><span>En un periodo cerrado</span><span style="flex:1"></span><b>${pv.closedRows}</b></div>` : ""}
+     ${
+       pv.statement
+         ? `<div class="it"><span>Saldo inicial del extracto</span><span style="flex:1"></span><b>${eur(pv.statement.openingCents)}</b></div>
+     <div class="it"><span>Saldo final del extracto</span><span style="flex:1"></span><b>${eur(pv.statement.closingCents)}</b></div>`
+         : ""
+     }
     </div>
     ${pv.overlapsExistingPeriod ? '<div style="padding:0 12px 10px"><span class="pill y">El periodo se solapa con movimientos ya importados; los repetidos no se volverán a crear.</span></div>' : ""}
     ${pv.closedRows ? '<div style="padding:0 12px 10px"><span class="pill r">Hay movimientos dentro de un periodo cerrado. Reábrelo en la pestaña Conciliación, en «Periodos cerrados», y vuelve a importar.</span></div>' : ""}
+    ${
+      /* The file's own arithmetic, before a single row is written. A statement
+         whose saldos do not join up was not read completely, and importing it
+         produces a register that looks right — which is the failure the
+         acceptance test caught and the one nobody would catch again. */
+      pv.statement && !pv.statement.closes
+        ? '<div style="padding:0 12px 10px"><span class="pill r">El extracto no cuadra consigo mismo: el saldo inicial más los movimientos no dan el saldo final. No se importa nada — puede faltar alguna fila o haberse leído mal una columna.</span></div>'
+        : ""
+    }
+    ${
+      !pv.statement
+        ? '<div style="padding:0 12px 10px"><span class="pill y">Este extracto no trae columna de saldo, así que no se puede comprobar que esté completo.</span></div>'
+        : ""
+    }
     <div style="display:flex;gap:8px;padding:0 12px 12px">
      <span style="flex:1"></span>
-     <button class="btn primary" id="stGo"${pv.fresh.length && !pv.closedRows ? "" : " disabled"}>Importar</button>
+     <button class="btn primary" id="stGo"${pv.fresh.length && !pv.closedRows && !(pv.statement && !pv.statement.closes) ? "" : " disabled"}>Importar</button>
     </div></div>`;
-          $("#stGo").onclick = () =>
-            mutate(() => {
-              erp.importMovements(accountId, pv.fresh, "backoffice");
-              closeDrawer();
-            }, "Extracto importado");
-        }
+        $("#stGo").onclick = () =>
+          mutate(() => {
+            // The statement travels with the rows: it was computed over ALL
+            // of them, and the engine checks the resulting balance against it.
+            erp.importMovements(accountId, pv.fresh, "backoffice", { statement: pv.statement });
+            closeDrawer();
+          }, "Extracto importado");
+      }
 
       /* Paying the card off is not a cost — the purchases on the card are, and
          counting the monthly charge too counts every one of them twice. So a
@@ -15282,9 +15374,7 @@
         if (!acc || acc.kind === "card" || m.amountCents >= 0) return "";
         const cards = erp.state.bankAccounts.filter((a) => a.kind === "card");
         if (!cards.length) return "";
-        const opts = cards
-          .map((c) => `<option value="c:${c.id}">${esc(c.name)}</option>`)
-          .join("");
+        const opts = cards.map((c) => `<option value="c:${c.id}">${esc(c.name)}</option>`).join("");
         return `<optgroup label="Liquidación de tarjeta">${opts}</optgroup>`;
       }
 
@@ -15470,8 +15560,16 @@
             );
           })
           .join("");
+        /* `data-total` rather than a positional lookup — the last `.it` on the
+           screen. PK7-B added a second `.daylist` below this card, and a check
+           that found the total by position started reading a movement row
+           instead. A hook the screen owns cannot be moved out from under a
+           reader by a layout change somewhere else.
+           (The phrase above is deliberately unquoted: the source audit reads a
+           double-quoted fragment in a comment as a user-visible literal, and
+           this comment failed that gate once already.) */
         const total =
-          `<div class="it" style="border-top:1px solid var(--line)">` +
+          `<div class="it" data-total="1" style="border-top:1px solid var(--line)">` +
           `<span>Total disponible</span><span style="flex:1"></span>` +
           `<b>${eur0(erp.cashPosition().totalCents)}</b></div>`;
         return (
@@ -15591,7 +15689,13 @@
    xlsx; the xlsx names the files; the files are in the archive. */
       async function buildAccountantZip(quarter, pkg) {
         const ext = (t) =>
-          /pdf/i.test(t || "") ? ".pdf" : /png/i.test(t || "") ? ".png" : /jpe?g/i.test(t || "") ? ".jpg" : ".bin";
+          /pdf/i.test(t || "")
+            ? ".pdf"
+            : /png/i.test(t || "")
+              ? ".png"
+              : /jpe?g/i.test(t || "")
+                ? ".jpg"
+                : ".bin";
         const safe = (x) =>
           String(x || "")
             .normalize("NFD")
@@ -15624,16 +15728,30 @@
 
         // Every bill of the quarter brings its paper.
         const billDocName = {};
-        for (const b of erp.state.bills.filter((x) => pkg.receivedBills.some((t) => t.invoiceNumber === x.number))) {
+        for (const b of erp.state.bills.filter((x) =>
+          pkg.receivedBills.some((t) => t.invoiceNumber === x.number),
+        )) {
           const cap = b.capId ? erp.state.captured.find((c) => c.id === b.capId) : null;
-          const key = (b.supportingDoc && b.supportingDoc.storageKey) || (cap && cap.imageRef) || null;
+          const key =
+            (b.supportingDoc && b.supportingDoc.storageKey) || (cap && cap.imageRef) || null;
           billDocName[b.id] = await addDoc(key, "factura_" + (b.number || b.id));
         }
 
         const acc = (id) => (erp.state.bankAccounts.find((a) => a.id === id) || {}).name || "";
         const eurTxt = (c) => (c / 100).toFixed(2).replace(".", ",");
         const rows = [
-          ["Fecha", "Cuenta", "Concepto", "Importe (€)", "Documento", "Nº documento", "Tercero", "NIF", "Motivo sin factura", "Justificante"],
+          [
+            "Fecha",
+            "Cuenta",
+            "Concepto",
+            "Importe (€)",
+            "Documento",
+            "Nº documento",
+            "Tercero",
+            "NIF",
+            "Motivo sin factura",
+            "Justificante",
+          ],
         ];
         for (const m of pkg.bankMovements) {
           let docType = "";
@@ -15664,7 +15782,10 @@
               m.unbacked.reason
             : "";
           const ownDoc = m.supportingDoc
-            ? await addDoc(m.supportingDoc.storageKey, "mov_" + m.accountingDate + "_" + (m.concept || ""))
+            ? await addDoc(
+                m.supportingDoc.storageKey,
+                "mov_" + m.accountingDate + "_" + (m.concept || ""),
+              )
             : "";
           const matchedBillDoc =
             m.matched && m.matched.billId ? billDocName[m.matched.billId] || "" : "";
@@ -15686,7 +15807,12 @@
           path: "conciliacion.xlsx",
           bytes: new Uint8Array(await xlsx.arrayBuffer()),
         });
-        return { blob: zipStore(files), entries: files.map((f) => f.path), missing, rows: rows.length - 1 };
+        return {
+          blob: zipStore(files),
+          entries: files.map((f) => f.path),
+          missing,
+          rows: rows.length - 1,
+        };
       }
 
       /* Every cost behind one chapter of one job, grouped by subpartida when the
@@ -17451,9 +17577,31 @@
     Conciliación keeps its own tab: assisted matching is a different job from
     classifying a card payment, and it is the only screen that drives the
     reconciliation capability. */
+        /* ---------- Cuentas y saldos (ADM-05) ----------
+           WHAT THIS SCREEN IS FOR, after the acceptance review: how much is
+           where, and getting a statement in. Nothing else.
+
+           It used to carry the whole movement register with a Clase select and
+           a Destino select on every row, and the Destino select could put a
+           cost on a project. That is the rule the operator settled in
+           `docs/worklog/PK7-SPEC.md`: **Gastos decides, Conciliación
+           identifies, Avance económico reports.** A project cost is classified
+           once, in Gastos, with its partida, its subpartida, its cuenta
+           contable and its split. A bank row that could also assign one was a
+           second door into the same decision, and two doors into one decision
+           is how the same euro gets counted twice and how nobody can say which
+           screen is right.
+
+           Classification did not disappear — it moved to Conciliación, where
+           saying WHAT a line is belongs. What is gone from here is the ability
+           to assign a project from a bank row, and it is gone deliberately.
+
+           The last five movements stay, read-only: a balance with no sight of
+           what moved it is a number you cannot sanity-check, and "am I looking
+           at the right account?" is answered by seeing the last few lines. */
         _bankAccounts(v) {
           $("#sub").textContent =
-            "Saldos, movimientos y clasificación. La clase y el destino se editan en la propia fila; lo que sigue sin casar lleva una barra ámbar y dice cuántos días lleva ahí.";
+            "Cuántas cuentas hay y cuánto hay en cada una. Los movimientos se explican en Conciliación; el coste de obra se asigna en Gastos.";
           const accs = erp.state.bankAccounts;
           /* A register with no account yet is where a real tenant starts — the
              demo seed ships two, so this branch only ever runs on the one day
@@ -17468,20 +17616,17 @@
             return;
           }
           if (bankAcc && !accs.some((a) => a.id === bankAcc)) bankAcc = "";
-          const movAll = erp.state.movements.filter((m) => !bankAcc || m.accountId === bankAcc);
-          const movs = movAll.filter((m) => inPeriod(m.accountingDate));
-          // Balances and the unmatched count are now stated per account, in
-          // accountLines() — one figure for all of them was the thing being
-          // fixed, so nothing here recomputes a total to display beside it.
-          const CLASSES = [
-            ["projectCost", "Coste de obra"],
-            ["overhead", "Gasto general"],
-            ["tax", "Impuestos"],
-            ["salary", "Nóminas"],
-            ["financial", "Financiero"],
-            ["internalTransfer", "Traspaso interno"],
-            ["customerReceipt", "Cobro de cliente"],
-          ];
+          // The last five of the SELECTED account, or of all of them when none
+          // is chosen — the same rule the picker already states, applied to a
+          // window instead of to a register.
+          const recent = erp.state.movements
+            .filter((m) => !bankAcc || m.accountId === bankAcc)
+            .slice()
+            .sort((a, b) => String(b.accountingDate).localeCompare(String(a.accountingDate)))
+            .slice(0, 5);
+          const openAll = erp.state.movements.filter(
+            (m) => (!bankAcc || m.accountId === bankAcc) && m.status === "unallocated",
+          ).length;
 
           v.innerHTML = `
    <div class="stepbar">
@@ -17494,54 +17639,24 @@
      <button class="btn sm" id="bkImport">⬆ Importar extracto (.xlsx)</button>
      <button class="btn sm" id="bkUndo">↩ Deshacer importación</button>
      <input type="file" id="bkFile" accept=".xlsx" style="display:none">
-     <button class="btn sm" id="bToRec">Ir a Conciliación →</button>
+     <button class="btn sm primary" id="bToRec">Ir a Conciliación →</button>
    </div>
    ${accountLines(accs)}
-   ${periodNote(movs.length, movAll.length)}
-   <div class="card"><div class="ch"><h3>Movimientos</h3><span class="tag">${movs.length}</span></div>
-   <div class="scroll"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Clase</th><th>Destino</th><th>Antigüedad</th></tr></thead><tbody>
+   <div class="card"><div class="ch"><h3>Últimos movimientos</h3><span class="tag">${recent.length}</span></div>
+   <div class="daylist" style="padding:10px 14px">
    ${
-     movs
-       .slice()
-       .reverse()
-       .map((m) => {
-         const open = m.status === "unallocated";
-         const age = open ? Math.max(0, ErpEngine.daysBetween(erp.today, m.accountingDate)) : 0;
-         const alloc = (m.allocations || []).length
-           ? (m.allocations || [])
-               .map((a) =>
-                 a.projectId
-                   ? erp.project(a.projectId).code
-                   : OVERHEAD_LABEL[a.overheadCategory] || a.overheadCategory || "—",
-               )
-               .join(", ")
-           : null;
-         return `<tr class="xrow${open ? " unapproved" : ""}">
-      <td>${fmtD(m.accountingDate)}</td>
-      <td class="k">${movWho(m)}${m.card ? ` <span class="pill b">${esc(m.card)}</span>` : ""}</td>
-      <td class="num" style="color:${m.amountCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur(m.amountCents)}</td>
-      <td><select class="inline" data-bkclass="${m.id}">
-        <option value="">—</option>
-        ${CLASSES.map(([k, l]) => `<option value="${k}"${m.class === k ? " selected" : ""}>${esc(l)}</option>`).join("")}
-      </select></td>
-      <td><select class="inline" data-bkdest="${m.id}">
-        <option value="">${alloc ? esc(alloc) : "—"}</option>
-        <optgroup label="Obras">${erp.state.projects
-          .filter((p) => !p.closed)
-          .map((p) => `<option value="p:${p.id}">${esc(projectPickLabel(p))}</option>`)
-          .join("")}</optgroup>
-        <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL)
-          .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
-          .join("")}</optgroup>
-        ${cardSettleGroup(m)}
-      </select></td>
-      <td>${open ? `<span title="Días sin casar"><span>${age}</span> <span>d</span></span>` : '<span class="pill g">Casado</span>'}</td>
-     </tr>`;
-       })
-       .join("") ||
-     '<tr><td colspan="6"><div class="empty">Sin movimientos en el periodo.</div></td></tr>'
+     recent
+       .map(
+         (m) => `<div class="it">
+      <span style="color:var(--muted)">${fmtD(m.accountingDate)}</span>
+      <span class="k" style="flex:1">${movWho(m)}${m.card ? ` <span class="pill b">${esc(m.card)}</span>` : ""}</span>
+      ${m.status === "unallocated" ? '<span class="pill y">Sin conciliar</span>' : '<span class="pill g">Explicado</span>'}
+      <b style="color:${m.amountCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur(m.amountCents)}</b></div>`,
+       )
+       .join("") || '<div class="it">Sin movimientos todavía.</div>'
    }
-   </tbody></table></div></div>`;
+   ${openAll ? `<div class="it" style="border-top:1px solid var(--hair)"><span style="flex:1">Movimientos por explicar</span><span class="pill y">${openAll}</span><button class="btn sm" id="bkToRec2">Conciliar →</button></div>` : ""}
+   </div></div>`;
 
           $("#bkSel").onchange = (e) => {
             bankAcc = e.target.value;
@@ -17557,6 +17672,7 @@
               }),
           );
           $("#bToRec").onclick = () => goTab("banking", "_reconcile");
+          if ($("#bkToRec2")) $("#bkToRec2").onclick = () => goTab("banking", "_reconcile");
           $("#bkNew").onclick = () => newAccountDrawer();
           /* The statement lands on ONE account — importing into "all accounts"
              would have to guess, and a guess about which bank a movement
@@ -17588,40 +17704,6 @@
             }
             statementPreviewDrawer(bankAcc, parsed);
           };
-          v.querySelectorAll("[data-bkclass]").forEach(
-            (sel) =>
-              (sel.onchange = () => {
-                if (!sel.value) return;
-                mutate(
-                  () => erp.classifyMovement(sel.dataset.bkclass, sel.value, "backoffice"),
-                  "Movimiento clasificado",
-                );
-              }),
-          );
-          v.querySelectorAll("[data-bkdest]").forEach(
-            (sel) =>
-              (sel.onchange = () => {
-                const val = sel.value;
-                if (!val) return;
-                mutate(() => {
-                  const m = erp.state.movements.find((x) => x.id === sel.dataset.bkdest);
-                  if (val.startsWith("c:")) {
-                    erp.markCardSettlement(m.id, val.slice(2), "backoffice");
-                    return;
-                  }
-                  const amount = Math.abs(m.amountCents);
-                  erp.splitMovement(
-                    m.id,
-                    [
-                      val.startsWith("p:")
-                        ? { projectId: val.slice(2), kind: "material", amountCents: amount }
-                        : { overheadCategory: val.slice(2), amountCents: amount },
-                    ],
-                    "backoffice",
-                  );
-                }, "Movimiento asignado");
-              }),
-          );
         },
 
         /* ---------- Lista de precios (DMC-02, spec §DMC-02) ----------
@@ -20522,7 +20604,8 @@
             const val = dest.value;
             const pid = val.startsWith("p:") ? val.slice(2) : "";
             $("#ca_chapwrap").style.display = pid ? "" : "none";
-            if (pid) $("#ca_chap").innerHTML = '<option value="">—</option>' + chapterOptions(pid, "");
+            if (pid)
+              $("#ca_chap").innerHTML = '<option value="">—</option>' + chapterOptions(pid, "");
             paintLine();
           };
           const paintLine = () => {
@@ -20551,7 +20634,10 @@
      sign < 0
        ? `<div class="field full"><label>Trabajador (si es un pago a su nombre)</label><select id="ca_w">
       <option value="">—</option>
-      ${erp.state.workers.filter((w) => w.active !== false).map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join("")}
+      ${erp.state.workers
+        .filter((w) => w.active !== false)
+        .map((w) => `<option value="${w.id}">${esc(w.name)}</option>`)
+        .join("")}
      </select></div>`
        : ""
    }
@@ -20590,7 +20676,10 @@
                       ? {
                           projectId: dest.slice(2),
                           chapterNum: $("#ca_chap").value || null,
-                          lineId: $("#ca_line") && $("#ca_linewrap").style.display !== "none" ? $("#ca_line").value || null : null,
+                          lineId:
+                            $("#ca_line") && $("#ca_linewrap").style.display !== "none"
+                              ? $("#ca_line").value || null
+                              : null,
                           kind: "material",
                           amountCents: amt,
                         }
@@ -21787,7 +21876,9 @@
       </div>
       ${variations
         .map(
-          (v) => `<div class="card" style="margin-top:10px"><div class="ch"><h3>${esc(v.b.number)}</h3>
+          (
+            v,
+          ) => `<div class="card" style="margin-top:10px"><div class="ch"><h3>${esc(v.b.number)}</h3>
         <span class="pill g">adicional aceptado</span></div>
        ${scopeTable(v.doc)}</div>`,
         )
@@ -21896,7 +21987,8 @@
         };
         $("#gEnd").onchange = () =>
           mutate(
-            () => erp.updateProject(gProject, { targetEnd: $("#gEnd").value || null }, "backoffice"),
+            () =>
+              erp.updateProject(gProject, { targetEnd: $("#gEnd").value || null }, "backoffice"),
             "Fin previsto actualizado",
           );
         VIEWS._ganttBody($("#gBody"));

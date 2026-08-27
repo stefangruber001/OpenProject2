@@ -2934,6 +2934,33 @@ window.CANEI_DICT = {
     ["Movimiento asignado", "Transaction allocated"],
     ["Ir a Conciliación →", "Go to Reconciliation →"],
     ["Días sin casar", "Days unmatched"],
+    // ── PK7-A: the statement proves its own arithmetic before it is imported.
+    ["Saldo inicial del extracto", "Statement opening balance"],
+    ["Saldo final del extracto", "Statement closing balance"],
+    [
+      "El extracto no cuadra consigo mismo: el saldo inicial más los movimientos no dan el saldo final. No se importa nada — puede faltar alguna fila o haberse leído mal una columna.",
+      "The statement does not agree with itself: the opening balance plus the transactions do not give the closing balance. Nothing is imported — a row may be missing or a column may have been read wrongly.",
+    ],
+    [
+      "Este extracto no trae columna de saldo, así que no se puede comprobar que esté completo.",
+      "This statement carries no balance column, so there is no way to check that it is complete.",
+    ],
+    // ── PK7-B: the balances screen stops classifying, the queue starts
+    //    identifying. See docs/worklog/PK7-SPEC.md.
+    [
+      "Cuántas cuentas hay y cuánto hay en cada una. Los movimientos se explican en Conciliación; el coste de obra se asigna en Gastos.",
+      "How many accounts there are and how much is in each. Transactions are explained in Reconciliation; job cost is assigned in Expenses.",
+    ],
+    ["Últimos movimientos", "Latest transactions"],
+    ["Sin movimientos todavía.", "No transactions yet."],
+    ["Sin conciliar", "Unreconciled"],
+    ["Explicado", "Explained"],
+    ["Movimientos por explicar", "Transactions to explain"],
+    ["Conciliar →", "Reconcile →"],
+    ["Identificar como…", "Identify as…"],
+    ["Identificar", "Identify"],
+    ["Elige primero qué es este movimiento.", "Choose what this transaction is first."],
+    ["Movimiento identificado", "Transaction identified"],
     // ── ADM-01 Facturación (S10).
     [
       "Facturas emitidas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos, las emitidas son inmutables, y un día de retraso ya se ve en rojo.",
