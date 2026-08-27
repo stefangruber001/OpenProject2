@@ -32,6 +32,14 @@ tbody td{padding:4px 8px}
 .note{margin:3mm 0;padding:7px 10px}
 .sig .line{margin-top:9mm}
 .docfoot{padding-top:3mm}}
+.doctbl{width:100%;border-collapse:collapse}
+.doctbl>thead>tr>td,.doctbl>tbody>tr>td{padding:0;vertical-align:top}
+.runbar{border-bottom:1.5px solid #48733C;padding-bottom:4px;margin-bottom:6mm;display:flex;justify-content:space-between;align-items:baseline;font-family:"Roboto Serif",Georgia,serif;font-size:6.8pt;color:#48733C}
+.runbar b{font-weight:600;letter-spacing:0;text-transform:uppercase;font-size:6.8pt}
+.runbar .rb{font-variant-numeric:tabular-nums}
+.flexcol{display:flex;flex-direction:column;min-height:255mm}
+.chap{break-inside:avoid}
+@media print{.inner{min-height:auto;display:block}.flexcol{min-height:auto}}
 .serif{font-family:"Roboto Serif",Georgia,serif}
 .wm{position:absolute;top:0;right:0;width:96mm;height:64mm;overflow:hidden;z-index:0;pointer-events:none}
 .wm svg{position:absolute;top:-36mm;right:-32mm;width:128mm;height:auto;display:block}
@@ -43,16 +51,16 @@ tbody td{padding:4px 8px}
 .docref{text-align:right;flex:none}
 .doctype{font-family:"Roboto Serif",Georgia,serif;font-weight:500;font-size:9pt;letter-spacing:0;text-transform:uppercase;color:#48733C}
 .docnum{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:18pt;color:#000;font-variant-numeric:tabular-nums;margin-top:2px;letter-spacing:0}
-.meta{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border-top:1px solid #E0E0E0;border-bottom:1px solid #E0E0E0;margin-top:5mm}
-.meta>div{padding:6px 11px 7px;border-left:1px solid #E0E0E0}
+.meta{display:grid;grid-auto-flow:column;grid-auto-columns:auto;justify-content:start;border-top:1px solid #E0E0E0;border-bottom:1px solid #E0E0E0;margin-top:5mm}
+.meta>div{padding:6px 9px 7px;border-left:1px solid #E0E0E0}
 .meta>div:first-child{border-left:0;padding-left:0}
 .lbl{font:600 6.6pt Inter,sans-serif;letter-spacing:0;text-transform:uppercase;color:#767676;margin-bottom:3px}
-.val{font:600 9.2pt Inter,sans-serif;color:#000;font-variant-numeric:tabular-nums}
+.val{font:600 9.2pt Inter,sans-serif;color:#000;font-variant-numeric:tabular-nums;white-space:nowrap}
 .val .badge{margin-top:-2px}
 h1{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:17.5pt;letter-spacing:-.01em;color:#000;margin:5.5mm 0 0;text-wrap:pretty}
 .subject{font-size:9.4pt;color:#3D3D3D;margin-top:1.5mm;max-width:155mm;text-wrap:pretty}
 .facts{display:flex;flex-wrap:wrap;row-gap:3mm;margin-top:5mm}
-.facts>div{padding:0 12mm 0 0;margin-right:12mm;border-right:1px solid #E0E0E0}
+.facts>div{padding:0 7mm 0 0;margin-right:7mm;border-right:1px solid #E0E0E0}
 .facts>div:last-child{border-right:0;margin-right:0;padding-right:0}
 .fig{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:13.5pt;color:#000;font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap}
 .fig.hero{font-size:17pt}
@@ -158,6 +166,7 @@ a:hover{color:#375A2E;text-decoration:underline;text-underline-offset:2px}
 <div class="sheet">
 
 <div class="inner">
+<table class="doctbl"><thead><tr><td><div class="runbar"><b>CaneiSubirats</b><span class="rb">Factura · FAC-2026-0021</span></div></td></tr></thead><tbody><tr><td><div class="flexcol">
 <header class="hdr">
   <div class="lockup"><svg class="sym" viewBox="0 0 118.391 137.002" xmlns="http://www.w3.org/2000/svg"><path fill="#48733C" fill-rule="nonzero" d="M60.449 0 0 38.374V137.002H118.391V38.445ZM107.462 126.073H71.480L56.137 122.671V71.986L82.416 65.524H45.953V126.073H10.929V44.382L60.318 13.028L107.462 44.311Z"/></svg>
     <div><div class="wordmark">CaneiSubirats</div><div class="tagline">Reformes senzillament complexes</div></div>
@@ -215,6 +224,7 @@ a:hover{color:#375A2E;text-decoration:underline;text-underline-offset:2px}
   <div class="site"><div class="url">www.caneisubirats.com</div><div class="loc">Sant Just Desvern · Barcelona</div></div>
 </footer>
 </div>
+</div></td></tr></tbody></table>
 </div>
 </div>
 </body>
