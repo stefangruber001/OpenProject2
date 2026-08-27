@@ -9870,6 +9870,30 @@
         "subcontractor-docs-expired": "Documentación de subcontrata caducada",
       };
 
+      /**
+       * How near a candidate is, as ELEMENTS rather than a sentence.
+       *
+       * «difiere 284,70 € · 58 d» is one text node, and one text node per
+       * amount-and-days combination is an unbounded set of strings no
+       * dictionary can ever hold — the translator reported eighteen of them
+       * as untranslatable from a single quarter of demonstration data. The
+       * repo learnt this once already, on the allocation remainder: "a
+       * sentence with a number inside it is one text node no dictionary can
+       * hold… Splitting them fixes all three languages with no interpolation
+       * rule at all." The words are keys; the figures stand alone beside them.
+       */
+      function candDistance(c) {
+        const amount =
+          c.gapCents === 0
+            ? "<span>importe exacto</span>"
+            : `<span>difiere</span> <span>${eur(c.gapCents)}</span>`;
+        const when =
+          c.daysApart === 0
+            ? "<span>mismo día</span>"
+            : `<span>${c.daysApart}</span> <span>d</span>`;
+        return `<span class="sub">${amount} · ${when}</span>`;
+      }
+
       /** The queue's Estado cell: flagged, or how long it has been waiting. */
       function queueState(m) {
         if (m.needsDoc) return '<span class="pill r">sin respaldo</span>';
@@ -9967,7 +9991,7 @@
            (c) => `<div class="it">
         <span class="pill ${c.direction === "in" ? "g" : "b"}">${c.kind === "invoice" ? "Emitida" : "Recibida"}</span>
         <span style="flex:1">${esc(c.reference)} · ${esc(c.counterparty)}
-          <span class="sub">${c.gapCents === 0 ? "importe exacto" : "difiere " + eur(c.gapCents)} · ${c.daysApart === 0 ? "mismo día" : c.daysApart + " d"}</span></span>
+          ${candDistance(c)}</span>
         <b>${eur(c.outstandingCents)}</b>
         ${closed ? "" : `<button class="btn sm" data-pick="${c.id}">Conciliar</button>`}</div>`,
          )
@@ -11334,6 +11358,23 @@
        * toolbar buttons when a block has neither (a read-mostly sub-list still
        * gets its own search and pagination either way).
        */
+      /**
+       * «6 movimientos», «6 de 12 clientes» — as elements, not as a sentence.
+       *
+       * Built as one text node this is a distinct string for every count the
+       * data can produce, which no dictionary can hold and the translator
+       * reports as a miss once per number. The lesson is already written down
+       * on the allocation remainder ("a sentence with a number inside it is
+       * one text node no dictionary can hold"); this is the same shape in the
+       * primitive every register shares, so fixing it here fixes all of them.
+       * `textContent` is unchanged, which is what the checks read.
+       */
+      function countTag(shown, total, sing, plur) {
+        const noun = shown === 1 ? sing : plur;
+        const of = total == null ? "" : `<span>de</span> <span>${total}</span> `;
+        return `<span>${shown}</span> ${of}<span>${esc(noun)}</span>`;
+      }
+
       function renderMasterList(v, cfg) {
         const st = getListState(cfg.id, cfg.fixedSize || cfg.defSize);
         if (cfg.fixedSize) st.pageSize = cfg.fixedSize;
@@ -11376,7 +11417,7 @@
         <button class="btn sm" id="${ids.expCsv}" style="justify-content:flex-start;border:0;background:none">CSV (.csv)</button>
       </span></span>`
     }
-    <span class="tag">${rows.length}${q ? ` de ${base.length}` : ""} ${rows.length === 1 ? sing : plur}</span></div>
+    <span class="tag">${countTag(rows.length, q ? base.length : null, sing, plur)}</span></div>
    <div class="card"><div class="scroll"><table class="mlist"><thead><tr>
      ${cols.map((c) => `<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>
    ${

@@ -2941,6 +2941,34 @@ window.CANEI_DICT = {
       "The queue of unexplained transactions, ten at a time. Open one to see which document explains it; job cost is assigned in Expenses.",
     ],
     ["Conciliar movimiento", "Reconcile transaction"],
+    ["＋ Añadir gasto", "＋ Add expense"],
+    // The register nouns. `countTag` renders the figure and the noun as
+    // separate elements, so each noun is a stable key instead of one
+    // untranslatable string per count the data happens to produce.
+    ["clientes", "clients"],
+    ["documento", "document"],
+    ["documentos", "documents"],
+    ["industrial", "trade contractor"],
+    ["industriales", "trade contractors"],
+    ["oportunidades", "opportunities"],
+    ["proveedores", "suppliers"],
+    ["trabajadores", "workers"],
+    ["visita programada", "scheduled visit"],
+    ["visitas programadas", "scheduled visits"],
+    ["visita realizada", "completed visit"],
+    ["visitas realizadas", "completed visits"],
+    ["movimiento", "transaction"],
+    ["movimientos", "transactions"],
+    // The matcher's reasons, which the host translates from codes. They have
+    // been on screen since S11 and in no dictionary: the crawl that reads
+    // RENDERED pages is what found them, because every other gate enumerates
+    // places a string might live and these live in a lookup table.
+    ["importe casi exacto", "amount within tolerance"],
+    ["misma fecha", "same date"],
+    ["referencia citada", "reference quoted"],
+    ["tercero coincidente", "counterparty matches"],
+    ["signo correcto", "direction agrees"],
+    ["difiere", "differs by"],
     ["Buscar por concepto, importe o quién…", "Search by description, amount or who…"],
     ["Buscar documento por número, quién o importe…", "Search documents by number, who or amount…"],
     ["Sin explicar", "Unexplained"],

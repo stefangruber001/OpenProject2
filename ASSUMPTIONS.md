@@ -5316,6 +5316,42 @@ with no dictionary entry, which CLAUDE.md already records catching three earlier
 templates. No amount of rewording fixes it; moving the literal out of the
 conditional does. Two conditionals are now named functions and one is built
 unconditionally and used conditionally.
+
+**And the gate that actually caught something: the translator miss ledger.**
+The four gates above each answer "what is untranslated" by enumerating places a
+string might live. The crawl reads RENDERED pages, and it went from 49 to 81.
+Two causes, one of them a lesson this repository had already written down.
+
+«difiere 284,70 € · 58 d» is **one text node**, and one text node per
+amount-and-days combination is an unbounded set of strings no dictionary can
+hold: eighteen of them from a single quarter of demonstration data. The rule was
+recorded on the allocation remainder — «a sentence with a number inside it is one
+text node no dictionary can hold… Splitting them fixes all three languages with
+no interpolation rule at all» — and writing the candidate distance as a sentence
+broke it again. `candDistance` renders the words as keys and the figures beside
+them.
+
+The second cause was **`REC_REASON`**: «referencia citada», «signo correcto»,
+«tercero coincidente» have been on screen since S11 and in no dictionary. The
+crawl is what found them, because every other gate enumerates places a string
+might live and these live in a lookup table.
+
+**Fixing them found a third, in the primitive every register shares.**
+`renderMasterList`'s count read `${rows.length} ${plur}` — «6 movimientos» —
+which is the same fault in the one place it costs the most. `countTag` renders
+the figure and the noun as separate elements, so each noun is a stable key
+instead of one untranslatable string per count the data happens to produce. It
+made the count go UP first, to 54: the nouns of twelve other registers had been
+hiding inside those combined strings and each now needed its own entry. They
+have one. **48 in English and 109 in Catalan**, below both ceilings, and the
+ratchet in `ci.yml` moved with them — except that a parallel session had already
+lowered them to 47 and 108, so «＋ Añadir gasto» was translated too and the
+measurement now sits exactly on their numbers rather than one above.
+
+I did not run this gate before the first push, which is why CI went red on it.
+It is the slowest of the six — two viewports over thirty-four pages, about
+fourteen minutes — and that is exactly the reason to run it rather than assume.
+
 ## S30 · Configuración › Empresa, and the end of the hidden defaults (2026-08-27)
 
 The operator asked where the company data is entered. It could not be entered
