@@ -2519,6 +2519,9 @@ window.CANEI_DICT.ca = {
     "Afegiu-lo com a pagador del projecte abans d'emetre-li una factura.",
   "Datos fiscales del cliente incompletos": "Dades fiscals del client incompletes",
   "Faltan los datos de la empresa": "Falten les dades de l'empresa",
+  "— sin obra asociada —": "— sense obra associada —",
+  "Un contrato externo no nombra ningún presupuesto, así que la obra a la que pertenece hay que decirla aquí — o dejarlo sin asociar.":
+    "Un contracte extern no anomena cap pressupost, així que l'obra a la qual pertany s'ha de dir aquí — o deixar-ho sense associar.",
   "⚠ El logotipo tiene que ser una imagen (PNG o JPG)":
     "⚠ El logotip ha de ser una imatge (PNG o JPG)",
   "Estos valores eran fijos dentro del programa y ahora se leen de aquí. Un presupuesto o un contrato que ya existe conserva los suyos.":

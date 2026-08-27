@@ -2776,6 +2776,28 @@
           (i.adjustCents || 0);
       });
       this.state.contracts.push(rec);
+      /* The reverse link. `createProjectFromAcceptance` looks a contract up
+         by budgetId — but the REAL order of work is the other way round: the
+         acceptance creates the job immediately and the contract is drawn up
+         afterwards, so on a live workspace every `project.contractId` stayed
+         null forever. (The demo seeder happens to create contracts first,
+         which is exactly why months of demo use never showed it.) Everything
+         downstream reads this link: the CON-11 signature gates, CON-12's
+         annex chain on an approved variation, the expected-collections
+         recalculation, the control tower's contracted amount. Written here,
+         in the one place both contract paths finish, so neither order of
+         work can leave the job unlinked. Never overwrites: a project already
+         linked to another contract keeps it. */
+      const linkTo =
+        rec.projectId ||
+        (rec.budgetId
+          ? (this.state.projects.find((p) => p.budgetId === rec.budgetId) || {}).id
+          : null);
+      if (linkTo) {
+        const prj = this.state.projects.find((p) => p.id === linkTo);
+        if (prj && !prj.contractId) prj.contractId = rec.id;
+      }
+      delete rec.projectId; // a linking hint, not a field of the contract
       this._log(user, logAs, rec.number);
       return rec;
     }
@@ -2819,6 +2841,9 @@
         }),
         // Only the parts a person types; id/number/origin/totals stay ours.
         {
+          // An external contract names no budget, so the job it belongs to
+          // cannot be inferred — the operator says which, or none.
+          projectId: d.projectId || null,
           installments: d.installments || [],
           duration: Object.assign({ estimatedDays: null }, d.duration || {}),
           guarantees: d.guarantees || [],
@@ -9640,6 +9665,12 @@
         throw new Error("A signed contract cannot be cancelled here — needs a formal annex");
       c.status = "cancelled";
       c.cancelReason = reason || "";
+      /* Release the job. A cancelled contract must not keep gating it —
+         CON-11 would refuse works and the first invoice on the strength of a
+         contract that no longer exists, and a replacement contract could
+         never take the slot (the reverse link never overwrites). */
+      const prj = this.state.projects.find((p) => p.contractId === c.id);
+      if (prj) prj.contractId = null;
       this._log(user, "cancelContract", c.number);
       return c;
     }

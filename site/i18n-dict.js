@@ -4598,6 +4598,11 @@ window.CANEI_DICT = {
     ],
     ["Datos fiscales del cliente incompletos", "Customer tax details incomplete"],
     ["Faltan los datos de la empresa", "Your company details are missing"],
+    ["— sin obra asociada —", "— no site linked —"],
+    [
+      "Un contrato externo no nombra ningún presupuesto, así que la obra a la que pertenece hay que decirla aquí — o dejarlo sin asociar.",
+      "An external contract names no quote, so the site it belongs to has to be said here — or left unlinked.",
+    ],
     [
       "⚠ El logotipo tiene que ser una imagen (PNG o JPG)",
       "⚠ The logo has to be an image (PNG or JPG)",

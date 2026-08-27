@@ -767,6 +767,55 @@
         return s;
       },
     },
+    {
+      to: 19,
+      name: "a job is linked back to its contract",
+      /*
+       * THE LINK THAT WAS ONLY EVER WRITTEN IN ONE DIRECTION.
+       *
+       * `createProjectFromAcceptance` looks a contract up by budgetId at the
+       * moment the job is created — but on a live workspace the job is
+       * created the moment the quote is accepted, and the contract is drawn
+       * up AFTERWARDS, so the lookup finds nothing and `project.contractId`
+       * stays null forever. (The demo seeder creates contracts first, which
+       * is why the demo never showed it.) Everything downstream reads the
+       * link: CON-11's signature gates, CON-12's annex chain on an approved
+       * variation, the expected-collections recalculation, the control
+       * tower's contracted amount. The operator's UAT hit all four at once —
+       * an approved variation with no annex and a collections screen
+       * claiming the job had no contract.
+       *
+       * The engine now writes the link when the contract is filed; this step
+       * repairs the records created before it did. Rules, in order:
+       *   · a project already linked keeps its link — a re-run, or a link an
+       *     operator made deliberately, is never reassigned;
+       *   · only non-cancelled contracts count — a cancelled contract must
+       *     not start gating a job it no longer governs;
+       *   · the match is by budgetId, first qualifying contract wins, which
+       *     is deterministic because contracts are filed in creation order;
+       *   · a quick project (budgetId null) is untouched.
+       *
+       * Link only — deliberately NO retro-annexes for variations approved
+       * while the link was missing: their amounts are already counted in the
+       * project's economics, and inventing numbered annexes months after the
+       * fact would rewrite a paper trail. The operator chose this.
+       */
+      up: function (s) {
+        var projects = Array.isArray(s.projects) ? s.projects : [];
+        var contracts = Array.isArray(s.contracts) ? s.contracts : [];
+        for (var i = 0; i < projects.length; i++) {
+          var p = projects[i];
+          if (p.contractId || !p.budgetId) continue;
+          for (var c = 0; c < contracts.length; c++) {
+            if (contracts[c].budgetId === p.budgetId && contracts[c].status !== "cancelled") {
+              p.contractId = contracts[c].id;
+              break;
+            }
+          }
+        }
+        return s;
+      },
+    },
   ];
 
   /**
