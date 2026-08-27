@@ -3021,6 +3021,216 @@ assert(
   );
 }
 
+/* ===================================================================== PK7-B
+   GASTOS DECIDES, CONCILIACIÓN IDENTIFIES, AVANCE ECONÓMICO REPORTS.
+
+   Three properties, and the third is the one that had been quietly false.
+   ===================================================================== */
+{
+  const e = new ERP("2026-08-27");
+  const cli = e.addParty(
+    {
+      roles: ["customer"],
+      name: "Cli 7B",
+      taxId: "12345678Z",
+      billStreet: "s",
+      billPostalCode: "08001",
+      billCity: "BCN",
+      mobile: "600111222",
+      email: "cli7b@example.com",
+    },
+    "bo",
+  );
+  const sup = e.addParty({ roles: ["supplier"], name: "Prov 7B", taxId: "B12345674" }, "bo");
+  const bg = e.createBudget({ partyId: cli.id }, "bo");
+  const c1 = e.addChapter(bg.id, { name: "Demoliciones" }, "bo");
+  const c2 = e.addChapter(bg.id, { name: "Pintura" }, "bo");
+  const l1 = e.addLine(
+    bg.id,
+    c1.id,
+    { desc: "Tabique", unit: "m2", qtyMilli: 10000, priceCents: 2000, costCents: 1000 },
+    "bo",
+  );
+  const l2 = e.addLine(
+    bg.id,
+    c2.id,
+    { desc: "Pintar", unit: "m2", qtyMilli: 10000, priceCents: 1000, costCents: 500 },
+    "bo",
+  );
+  e.issueVersion(bg.id, {}, "bo");
+  e.acceptVersion(bg.id, e.currentVersion(bg.id).id, { evidenceRef: "ok" }, "bo");
+  const pj = e.createProjectFromAcceptance(bg.id, "bo");
+
+  /* THE INVARIANT. The per-partida table plus the pending-assignment block
+     must add up to the project's own actual cost, whatever the cost's source.
+     They used to enumerate separately — bills and labour in one, bills, labour
+     and tickets in the other, movements in NEITHER — so a cost paid straight
+     from an account counted towards the project and appeared in no row of
+     either. Now one enumeration feeds all of them, and this is the property
+     that keeps it that way. */
+  const closes = (label) => {
+    const total = e.actualCostCents(pj.id);
+    const byCh = e.chapterEconomics(pj.id).reduce((s, r) => s + r.actualCents, 0);
+    const pending = e.unassignedChapterCosts(pj.id).reduce((s, r) => s + r.amountCents, 0);
+    assert(
+      byCh + pending === total,
+      "the partida table plus what is pending equals the project's cost — " + label,
+      byCh + " + " + pending + " ≠ " + total,
+    );
+  };
+  closes("nothing spent yet");
+
+  const b1 = e.registerBill(
+    {
+      supplierId: sup.id,
+      number: "7B-1",
+      baseCents: 10000,
+      allocations: [{ projectId: pj.id, lineId: l1.id, kind: "material", amountCents: 10000 }],
+    },
+    "bo",
+  );
+  closes("a supplier invoice on a partida");
+
+  const acc = e.addBankAccount({ name: "Banco 7B", kind: "bank" }, "bo");
+  const till = e.addBankAccount({ name: "Caja 7B", kind: "till" }, "bo");
+
+  /* Petty cash on site: a project, and no partida yet — the operator's own
+     exception, and the case that used to vanish from both tables at once. */
+  const petty = e.recordCashMovement(
+    till.id,
+    {
+      accountingDate: "2026-08-20",
+      concept: "Tornillería 7B",
+      amountCents: -3000,
+      supportingDocRef: null,
+    },
+    "op",
+  );
+  e.splitMovement(petty.id, [{ projectId: pj.id, kind: "material", amountCents: 3000 }], "op");
+  closes("petty cash on the job with no partida");
+  assert(
+    e.unassignedChapterCosts(pj.id).some((r) => r.source === "movement"),
+    "a project cost paid from an account is listed as pending a partida",
+    JSON.stringify(e.unassignedChapterCosts(pj.id)),
+  );
+
+  /* …and it can be given one, from the same block, through the same method a
+     bill line uses. Before PK7-B this threw "Unknown cost source: movement". */
+  const row = e.unassignedChapterCosts(pj.id).find((r) => r.source === "movement");
+  e.assignChapterSplit(pj.id, row.id, [{ chapterNum: c2.num, amountCents: 3000 }], "bo");
+  closes("after the petty cash is assigned a partida");
+  assert(
+    e.chapterCosts(pj.id, c2.num).some((r) => r.source === "movement" && r.amountCents === 3000),
+    "the assigned petty cash appears under its partida",
+    JSON.stringify(e.chapterCosts(pj.id, c2.num)),
+  );
+
+  /* THE CASCADE. A subpartida belongs to one partida of one project, and the
+     engine refuses the ones that do not — not merely omits them from a list.
+     A screen can be rebuilt; this is what makes the rebuild safe. */
+  {
+    const other = e.createQuickProject(
+      { partyId: cli.id, desc: "Otra", activityLine: "reforma", valueCents: 100000 },
+      "bo",
+    );
+    throws(
+      () =>
+        e.registerBill(
+          {
+            supplierId: sup.id,
+            number: "7B-X",
+            baseCents: 1000,
+            allocations: [
+              { projectId: other.id, lineId: l1.id, kind: "material", amountCents: 1000 },
+            ],
+          },
+          "bo",
+        ),
+      "a subpartida of another project is refused",
+    );
+    throws(
+      () =>
+        e.registerBill(
+          {
+            supplierId: sup.id,
+            number: "7B-Y",
+            baseCents: 1000,
+            allocations: [
+              {
+                projectId: pj.id,
+                chapterNum: c2.num,
+                lineId: l1.id,
+                kind: "material",
+                amountCents: 1000,
+              },
+            ],
+          },
+          "bo",
+        ),
+      "a subpartida of ANOTHER partida of the same project is refused",
+    );
+  }
+
+  /* D1. Re-splitting a paid invoice across partidas moves the COST and leaves
+     the PAYMENT and the MATCH exactly where they were. The two axes are
+     independent — Gastos decides, Conciliación identifies — and this is that
+     independence, measured. */
+  e.importMovements(
+    acc.id,
+    [{ accountingDate: "2026-08-21", concept: "PAGO PROV 7B", amountCents: -12100 }],
+    "bo",
+  );
+  const pay = e.state.movements[e.state.movements.length - 1];
+  e.matchMovementSplit(pay.id, [{ billId: b1.id, amountCents: 12100 }], "bo");
+  const paidOut = e.billOutstandingCents(b1.id);
+  const costBefore = e.actualCostCents(pj.id);
+  e.allocateBill(
+    b1.id,
+    [
+      { projectId: pj.id, lineId: l1.id, kind: "material", amountCents: 4000 },
+      { projectId: pj.id, lineId: l2.id, kind: "material", amountCents: 6000 },
+    ],
+    "bo",
+  );
+  const byChAfter = e.chapterEconomics(pj.id);
+  assert(
+    e.actualCostCents(pj.id) === costBefore,
+    "re-splitting a paid invoice does not change what the project cost",
+    costBefore + " → " + e.actualCostCents(pj.id),
+  );
+  assert(
+    byChAfter.find((r) => String(r.num) === String(c2.num)).actualCents === 6000 + 3000,
+    "the re-split moves the money to the other partida",
+    JSON.stringify(byChAfter),
+  );
+  assert(
+    e.billOutstandingCents(b1.id) === paidOut &&
+      pay.matched &&
+      pay.matched.documents.length === 1 &&
+      e.state.payments.filter((x) => x.movementId === pay.id).length === 1,
+    "the payment and the match are untouched by the re-split",
+    JSON.stringify({ out: e.billOutstandingCents(b1.id), matched: pay.matched }),
+  );
+  closes("after D1");
+
+  /* A general expense identified from Conciliación is an overhead, and says
+     so. `splitMovement` used to stamp every split «coste de obra» whatever it
+     named, which the allocation underneath then contradicted. */
+  e.importMovements(
+    acc.id,
+    [{ accountingDate: "2026-08-22", concept: "PAPELERIA 7B", amountCents: -4500 }],
+    "bo",
+  );
+  const gen = e.state.movements[e.state.movements.length - 1];
+  e.splitMovement(gen.id, [{ overheadCategory: "office", amountCents: 4500 }], "bo");
+  assert(
+    gen.class === "overhead" && !gen.allocations.some((a) => a.projectId),
+    "a split that names no project is a general expense, not a project cost",
+    gen.class,
+  );
+  closes("a general expense changes no project");
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

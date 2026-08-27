@@ -938,3 +938,68 @@ end-to-end balance equality, a dropped row refused with nothing written, the
 card export returning `null`, the two-invoice split, the over-payment refusal
 and the account narrowing. Full gates green: **557/557** browser, 330/330
 manageability, 149/149 year sim, 126 unit, lint · types · boundaries · i18n.
+
+### PK7-B · Gastos decides, Conciliación identifies (2026-08-27)
+
+The rule from `PK7-SPEC.md`, made structural rather than written down.
+
+**Cuentas y saldos stops deciding.** It carried the whole movement register with
+a Clase select and a Destino select on every row, and Destino could put a cost
+on a project — a second door into a decision that already had one. It now
+answers what it is for: one row per account with its balance, Total disponible,
+import, undo import, and the **last five movements read-only**. The evidence
+stays; the decision leaves. A balance with no sight of what moved it cannot be
+sanity-checked, which is why removing the register is not the same as removing
+the last five lines.
+
+**Classification moved rather than vanished.** Saying WHAT a line is belongs in
+Conciliación. Two identifications came across: which general expense a line is —
+the **category**, not just the class, which a bare `rcClass` would have lost —
+and whether an outgoing settles a card. Neither touches a project.
+**«Asignar a proyecto» is gone**, and the E2E asserts its absence, because this
+control has now moved three times and a removal nothing asserts comes back.
+
+**What still writes a project onto a movement:** petty cash, by the operator's
+own rule — cash spent on site belongs to a job and usually has no document. The
+Caja drawer already carried the full cascade (project → its partidas → that
+partida's subpartidas), so BNK-02's acceptance check moved there, where the
+requirement now lives.
+
+#### The gap that "keep reading" was hiding
+
+Verifying that costs allocated from the bank screens still appear found that
+they already did not, in exactly PK7-A's class: **the per-partida table did not
+add up to the project it describes.**
+
+Four views enumerated the same costs separately. `actualCostCents` counted bills,
+labour, direct movement allocations and confirmed tickets. `chapterCosts` counted
+all four. `chapterEconomics` counted **two**. `unassignedChapterCosts` — whose
+entire job is to itemise the difference between the project total and the
+partida rows — counted three and omitted movements. A petty-cash cost on a job
+therefore contributed to the project's actual cost and appeared in **no row of
+either table**: not in its partida, and not in the block that exists to say what
+is missing. Measured on a fixture: project 15.000, partida rows 10.000,
+pending 0.
+
+Four enumerations of one thing disagree eventually; the only question is when.
+They are now one. `projectCostRows(projectId)` yields every cost with the
+partida it landed on or `null`, and the other four are views of it. The
+invariant is asserted directly — **partida table + pending = project cost** —
+after every kind of cost the simulation produces, and the negative control
+confirms it goes red on precisely the old behaviour (`10000 + 0 ≠ 13000`).
+
+`assignChapterSplit` now accepts a movement, so petty cash can be given its
+partida from the block that lists it; before, that threw «Unknown cost source».
+And `splitMovement` stopped stamping `class = "projectCost"` on splits that name
+no project — a general expense labelled «coste de obra» while the allocation
+underneath said otherwise.
+
+**D1 was verified, not fixed.** Re-splitting a paid invoice across partidas
+moves the cost, leaves `actualCostCents` unchanged and leaves the payment and
+the match untouched. It already worked; it lacked a test saying so, and the
+independence of the two axes is the whole claim of this package.
+
+Fourteen new engine checks (344/344 manageability), the E2E rewritten where the
+controls moved, and PK7-A's three untranslated statement-preview strings
+translated — CI had gone red on the source-literal gate alone, at 231 against a
+ceiling of 228, with every other gate green.

@@ -5505,7 +5505,12 @@
       if (Math.abs(sum(allocations, (a) => a.amountCents) - Math.abs(m.amountCents)) > 1)
         throw new Error("Split must total the movement");
       m.allocations = allocations.map((a) => this.withAccountCode(a));
-      m.class = "projectCost";
+      /* The class follows the destinations rather than being assumed. A split
+         that names no project is a general expense, and calling it «coste de
+         obra» put a label on the screen that the allocation underneath it
+         contradicted — harmless to the totals, because the project filter
+         finds nothing, and wrong to read, which is its own defect. */
+      m.class = allocations.some((a) => a.projectId) ? "projectCost" : "overhead";
       m.status = "allocated";
       this._log(user, "splitMovement", movId);
       return m;
@@ -6746,48 +6751,104 @@
     }
 
     /* =========================== FIN — project economics =========================== */
-    actualCostCents(projectId) {
-      // FIN-02: bills + labour + direct movement allocations (no double count with matched bills)
-      const bills =
-        sum(
-          this.state.bills.filter((b) => !b.creditNoteFor),
-          (b) =>
-            sum(
-              b.allocations.filter((a) => a.projectId === projectId),
-              (a) => a.amountCents,
-            ),
-        ) -
-        sum(
-          this.state.bills.filter((b) => b.creditNoteFor),
-          (b) =>
-            sum(
-              b.allocations.filter((a) => a.projectId === projectId),
-              (a) => a.amountCents,
-            ),
-        ); // AP-09 reduces
-      const labour = this.labourCostCents(projectId);
+    /**
+     * Every cost that has reached this project, one row per allocation, each
+     * carrying the partida it landed on or `null` when it has none yet.
+     *
+     * ONE enumeration behind four views — the project total, the per-partida
+     * table, the partida drawer and the pending-assignment block. They used to
+     * enumerate separately and disagreed: a cost paid straight from an account
+     * (petty cash on site, which is the one place the product still assigns a
+     * project outside Gastos) counted towards the project's actual cost and
+     * appeared in NO row of the table that is supposed to explain it — not
+     * even in the block whose whole job is to itemise the difference. A
+     * per-partida table that adds up to less than the project it describes is
+     * the same class of fault as a balance that ignores its opening figure.
+     *
+     * Movements behind a bill are excluded, exactly as before: the bill has
+     * already carried that cost and counting the payment too would double it.
+     */
+    projectCostRows(projectId) {
+      const out = [];
+      const chap = (v) => (v || v === 0 ? String(v) : null);
+      this.state.bills.forEach((b) => {
+        (b.allocations || []).forEach((a, i) => {
+          if (a.projectId !== projectId) return;
+          out.push({
+            source: "bill",
+            id: "bill:" + b.id + ":" + i,
+            ref: b.number,
+            party: b.supplierId ? this.party(b.supplierId).name : "",
+            desc: b.supplierId ? this.billSupplier(b).name : "",
+            date: b.date,
+            chapterNum: chap(a.chapterNum),
+            lineId: a.lineId || null,
+            kind: a.kind || "material",
+            amountCents: b.creditNoteFor ? -a.amountCents : a.amountCents,
+          });
+        });
+      });
+      this.state.labour.forEach((l) => {
+        if (l.projectId !== projectId) return;
+        const who = (this.state.workers.find((w) => w.id === l.workerId) || {}).name || "";
+        out.push({
+          source: "labour",
+          id: "labour:" + l.id + ":0",
+          ref: who,
+          party: who,
+          desc: (l.hoursMilli / 1000).toString() + " h",
+          date: l.date,
+          chapterNum: chap(l.chapterNum),
+          lineId: l.lineId || null,
+          kind: "labour",
+          amountCents: l.costCents,
+        });
+      });
       const billMovIds = new Set(this.state.payments.map((p) => p.movementId).filter(Boolean));
-      const direct = sum(
-        this.state.movements.filter(
-          (m) => m.class === "projectCost" && !billMovIds.has(m.id) && !m.matched,
-        ),
-        (m) =>
-          sum(
-            m.allocations.filter((a) => a.projectId === projectId),
-            (a) => a.amountCents,
-          ),
-      );
-      const captured = sum(
-        this.state.captured.filter(
-          (c) => c.status === "allocated" && !c.billId && ["ticket"].includes(c.docType),
-        ),
-        (c) =>
-          sum(
-            c.allocations.filter((a) => a.projectId === projectId),
-            (a) => a.amountCents,
-          ),
-      );
-      return bills + labour + direct + captured;
+      this.state.movements.forEach((m) => {
+        if (m.class !== "projectCost" || billMovIds.has(m.id) || m.matched) return;
+        (m.allocations || []).forEach((a, i) => {
+          if (a.projectId !== projectId) return;
+          out.push({
+            source: "movement",
+            id: "movement:" + m.id + ":" + i,
+            ref: m.concept || m.merchantText || "",
+            party: m.counterparty || "",
+            desc: "",
+            date: m.accountingDate,
+            chapterNum: chap(a.chapterNum),
+            lineId: a.lineId || null,
+            kind: a.kind || "material",
+            amountCents: a.amountCents,
+          });
+        });
+      });
+      this.state.captured.forEach((c) => {
+        if (c.status !== "allocated" || c.billId || !["ticket"].includes(c.docType)) return;
+        (c.allocations || []).forEach((a, i) => {
+          if (a.projectId !== projectId) return;
+          out.push({
+            source: "capture",
+            id: "capture:" + c.id + ":" + i,
+            ref: c.stdName || c.reference || c.id,
+            party: (c.confirmed && c.confirmed.issuerName) || "",
+            desc: (c.confirmed && c.confirmed.issuerName) || "",
+            date: (c.confirmed && c.confirmed.date) || c.capturedAt || "",
+            chapterNum: chap(a.chapterNum),
+            lineId: a.lineId || null,
+            kind: a.kind || "material",
+            amountCents: a.amountCents,
+          });
+        });
+      });
+      return out.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    }
+    actualCostCents(projectId) {
+      // FIN-02: bills + labour + direct movement allocations + confirmed
+      // tickets, counted once each. `projectCostRows` is the single
+      // enumeration; a credit note's allocations arrive already negated (AP-09
+      // reduces) and a movement behind a bill is already excluded there.
+      return sum(this.projectCostRows(projectId), (r) => r.amountCents);
     }
     projectEconomics(projectId) {
       // FIN-01/02/03
@@ -6842,67 +6903,28 @@
      */
     chapterCosts(projectId, chapterNum) {
       const num = String(chapterNum);
-      const out = [];
-      for (const b of this.state.bills)
-        for (const a of b.allocations || [])
-          if (a.projectId === projectId && String(a.chapterNum) === num)
-            out.push({
-              source: "bill",
-              ref: b.number,
-              date: b.date,
-              desc: this.billSupplier(b).name,
-              lineId: a.lineId || null,
-              amountCents: b.creditNoteFor ? -a.amountCents : a.amountCents,
-            });
-      for (const l of this.state.labour)
-        if (l.projectId === projectId && String(l.chapterNum) === num)
-          out.push({
-            source: "labour",
-            ref: (this.state.workers.find((w) => w.id === l.workerId) || {}).name || "",
-            date: l.date,
-            desc: (l.hoursMilli / 1000).toString() + " h",
-            lineId: l.lineId || null,
-            amountCents: l.costCents,
-          });
-      const billMovIds = new Set(this.state.payments.map((x) => x.movementId).filter(Boolean));
-      for (const m of this.state.movements)
-        if (m.class === "projectCost" && !billMovIds.has(m.id) && !m.matched)
-          for (const a of m.allocations || [])
-            if (a.projectId === projectId && String(a.chapterNum) === num)
-              out.push({
-                source: "movement",
-                ref: m.concept || m.merchantText || "",
-                date: m.accountingDate,
-                desc: "",
-                lineId: a.lineId || null,
-                amountCents: a.amountCents,
-              });
-      for (const c of this.state.captured)
-        if (c.status === "allocated" && !c.billId && ["ticket"].includes(c.docType))
-          for (const a of c.allocations || [])
-            if (a.projectId === projectId && String(a.chapterNum) === num)
-              out.push({
-                source: "capture",
-                ref: c.stdName || c.id,
-                date: (c.confirmed && c.confirmed.date) || "",
-                desc: (c.confirmed && c.confirmed.issuerName) || "",
-                lineId: a.lineId || null,
-                amountCents: a.amountCents,
-              });
-      return out.sort((a, b2) => String(a.date).localeCompare(String(b2.date)));
+      return this.projectCostRows(projectId)
+        .filter((r) => r.chapterNum === num)
+        .map((r) => ({
+          source: r.source,
+          ref: r.ref,
+          date: r.date,
+          desc: r.desc,
+          lineId: r.lineId,
+          amountCents: r.amountCents,
+        }));
     }
     chapterEconomics(projectId) {
       // FIN-03 at chapter level
       const p = this.project(projectId);
+      /* All four sources, not just bills and labour. A cost paid straight from
+         an account and a confirmed ticket both reach `actualCostCents`; while
+         this table enumerated only two of the four it added up to less than
+         the project it describes, and nothing on screen said why. */
       const actualByCh = {};
-      for (const b of this.state.bills)
-        for (const a of b.allocations)
-          if (a.projectId === projectId && a.chapterNum)
-            actualByCh[a.chapterNum] =
-              (actualByCh[a.chapterNum] || 0) + (b.creditNoteFor ? -a.amountCents : a.amountCents);
-      for (const l of this.state.labour)
-        if (l.projectId === projectId && l.chapterNum)
-          actualByCh[l.chapterNum] = (actualByCh[l.chapterNum] || 0) + l.costCents;
+      for (const r of this.projectCostRows(projectId))
+        if (r.chapterNum)
+          actualByCh[r.chapterNum] = (actualByCh[r.chapterNum] || 0) + r.amountCents;
       const rows = p.baseline.chapters.map((c) => ({
         num: c.num,
         name: c.name,
@@ -6959,60 +6981,20 @@
      */
     unassignedChapterCosts(projectId) {
       this.project(projectId);
-      const rows = [];
-      for (const b of this.state.bills)
-        b.allocations.forEach((a, i) => {
-          if (a.projectId !== projectId || a.chapterNum) return;
-          rows.push({
-            id: "bill:" + b.id + ":" + i,
-            source: "bill",
-            ref: b.number,
-            party: b.supplierId ? this.party(b.supplierId).name : "",
-            date: b.date,
-            amountCents: b.creditNoteFor ? -a.amountCents : a.amountCents,
-            kind: a.kind || "material",
-          });
-        });
-      for (const l of this.state.labour) {
-        if (l.projectId !== projectId || l.chapterNum) continue;
-        rows.push({
-          id: "labour:" + l.id + ":0",
-          source: "labour",
-          ref: l.date,
-          party: l.workerId
-            ? (this.state.workers.find((w) => w.id === l.workerId) || {}).name || ""
-            : "",
-          date: l.date,
-          amountCents: l.costCents,
-          kind: "labour",
-        });
-      }
-      for (const c of this.state.captured)
-        c.allocations.forEach((a, i) => {
-          if (a.projectId !== projectId || a.chapterNum) return;
-          rows.push({
-            id: "capture:" + c.id + ":" + i,
-            source: "capture",
-            ref: c.stdName || c.reference || c.id,
-            party: (c.confirmed && c.confirmed.issuerName) || "",
-            date: (c.confirmed && c.confirmed.date) || c.capturedAt,
-            amountCents: a.amountCents,
-            kind: a.kind || "material",
-          });
-        });
-      return rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      return this.projectCostRows(projectId)
+        .filter((r) => !r.chapterNum)
+        .map((r) => ({
+          id: r.id,
+          source: r.source,
+          // An hours entry has no reference of its own; the day it was worked
+          // is what identifies it on this list, and always has.
+          ref: r.source === "labour" ? r.date : r.ref,
+          party: r.party,
+          date: r.date,
+          amountCents: r.amountCents,
+          kind: r.kind,
+        }));
     }
-    /**
-     * Split one of those rows across partidas — the only place in the product
-     * where a cost acquires a chapter (§3.2, PRY-02).
-     *
-     * A split writes SIBLING allocations rather than editing one in place, so
-     * the amount that reached the project is conserved by construction: the
-     * row is replaced by rows that add up to it. Every partida has to exist
-     * in the project's frozen baseline, because a chapter number nothing
-     * recognises is a cost that has left the project's own accounting without
-     * leaving the project.
-     */
     assignChapterSplit(projectId, rowId, splits, user) {
       const p = this.project(projectId);
       const parts = Array.isArray(splits) ? splits : [];
@@ -7027,8 +7009,19 @@
       });
       const [source, recId, idxRaw] = String(rowId).split(":");
       const idx = Number(idxRaw);
+      /* A movement joins the same path as a bill and a ticket: it holds
+         `allocations`, so splitting it across partidas is the identical act.
+         It reaches this list because petty cash on site names a project and
+         often no partida — the one project cost the product still records
+         outside Gastos, by the operator's own rule. */
       const collection =
-        source === "bill" ? this.state.bills : source === "capture" ? this.state.captured : null;
+        source === "bill"
+          ? this.state.bills
+          : source === "capture"
+            ? this.state.captured
+            : source === "movement"
+              ? this.state.movements
+              : null;
       if (source === "labour") {
         const l = this.state.labour.find((x) => x.id === recId);
         if (!l || l.projectId !== projectId) throw new Error("Cost not found on this project");

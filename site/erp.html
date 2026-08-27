@@ -9719,9 +9719,18 @@
         closed
           ? ""
           : `<div class="gtools" style="border-top:1px solid var(--hair)">
-        <input class="inline" id="rcProj" placeholder="Nº de proyecto">
-        <select class="inline" id="rcKind"><option value="material">Material</option><option value="labour">Mano de obra</option><option value="subcontract">Industrial</option><option value="other">Otro</option></select>
-        <button class="btn sm" id="rcAssign">Asignar a proyecto</button>
+        <!-- «Asignar a proyecto» used to live here, and it is gone on purpose:
+             a project cost is decided once, in Gastos, with its partida, its
+             subpartida and its cuenta contable. This screen says WHAT a line
+             is, not what it was spent on. See docs/worklog/PK7-SPEC.md. -->
+        <select class="inline" id="rcDest">
+          <option value="">Identificar como…</option>
+          <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL)
+            .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
+            .join("")}</optgroup>
+          ${cardSettleGroup(sel)}
+        </select>
+        <button class="btn sm" id="rcDestGo">Identificar</button>
         <span style="width:10px"></span>
         <select class="inline" id="rcClass">${["overhead", "tax", "salary", "financial", "internalTransfer"].map((c) => `<option value="${c}">${{ overhead: "Gasto general", tax: "Impuestos", salary: "Nóminas", financial: "Financiero", internalTransfer: "Traspaso interno" }[c]}</option>`).join("")}</select>
         <button class="btn sm" id="rcClassify">Clasificar</button>
@@ -9808,15 +9817,38 @@
                 recSel = null;
               }, "Movimiento conciliado")),
         );
-        const assign = $("#rcAssign");
-        if (assign)
-          assign.onclick = () =>
+        /* The two identifications that used to sit in the Destino select on
+           Cuentas y saldos, moved here with that screen's register: which
+           general expense this is, and whether an outgoing is the monthly
+           settlement of a card. Both say what a line IS. Neither touches a
+           project. */
+        const dest = $("#rcDest");
+        if (dest)
+          dest.onchange = () => {
+            const val = dest.value;
+            if (!val) return;
             mutate(() => {
-              const ref = $("#rcProj").value.trim();
-              if (!ref) throw new Error("Escribe el número de proyecto");
-              erp.allocateMovementToProject(sel.id, ref, $("#rcKind").value, "backoffice");
+              if (val.startsWith("c:")) {
+                erp.markCardSettlement(sel.id, val.slice(2), "backoffice");
+              } else {
+                erp.splitMovement(
+                  sel.id,
+                  [{ overheadCategory: val.slice(2), amountCents: Math.abs(sel.amountCents) }],
+                  "backoffice",
+                );
+              }
               recSel = null;
-            }, "Movimiento asignado");
+            }, "Movimiento identificado");
+          };
+        const destGo = $("#rcDestGo");
+        if (destGo)
+          destGo.onclick = () => {
+            if (!$("#rcDest").value) {
+              say("Elige primero qué es este movimiento.");
+              return;
+            }
+            $("#rcDest").onchange();
+          };
         const classify = $("#rcClassify");
         if (classify)
           classify.onclick = () =>
@@ -15466,8 +15498,13 @@
             );
           })
           .join("");
+        /* `data-total` rather than "the last .it on the screen": PK7-B added a
+           second `.daylist` below this card, and a check that found the total
+           by position started reading a movement row instead. A hook the
+           screen owns cannot be moved out from under a reader by a layout
+           change somewhere else. */
         const total =
-          `<div class="it" style="border-top:1px solid var(--line)">` +
+          `<div class="it" data-total="1" style="border-top:1px solid var(--line)">` +
           `<span>Total disponible</span><span style="flex:1"></span>` +
           `<b>${eur0(erp.cashPosition().totalCents)}</b></div>`;
         return (
@@ -17475,9 +17512,31 @@
     Conciliación keeps its own tab: assisted matching is a different job from
     classifying a card payment, and it is the only screen that drives the
     reconciliation capability. */
+        /* ---------- Cuentas y saldos (ADM-05) ----------
+           WHAT THIS SCREEN IS FOR, after the acceptance review: how much is
+           where, and getting a statement in. Nothing else.
+
+           It used to carry the whole movement register with a Clase select and
+           a Destino select on every row, and the Destino select could put a
+           cost on a project. That is the rule the operator settled in
+           `docs/worklog/PK7-SPEC.md`: **Gastos decides, Conciliación
+           identifies, Avance económico reports.** A project cost is classified
+           once, in Gastos, with its partida, its subpartida, its cuenta
+           contable and its split. A bank row that could also assign one was a
+           second door into the same decision, and two doors into one decision
+           is how the same euro gets counted twice and how nobody can say which
+           screen is right.
+
+           Classification did not disappear — it moved to Conciliación, where
+           saying WHAT a line is belongs. What is gone from here is the ability
+           to assign a project from a bank row, and it is gone deliberately.
+
+           The last five movements stay, read-only: a balance with no sight of
+           what moved it is a number you cannot sanity-check, and "am I looking
+           at the right account?" is answered by seeing the last few lines. */
         _bankAccounts(v) {
           $("#sub").textContent =
-            "Saldos, movimientos y clasificación. La clase y el destino se editan en la propia fila; lo que sigue sin casar lleva una barra ámbar y dice cuántos días lleva ahí.";
+            "Cuántas cuentas hay y cuánto hay en cada una. Los movimientos se explican en Conciliación; el coste de obra se asigna en Gastos.";
           const accs = erp.state.bankAccounts;
           /* A register with no account yet is where a real tenant starts — the
              demo seed ships two, so this branch only ever runs on the one day
@@ -17492,20 +17551,17 @@
             return;
           }
           if (bankAcc && !accs.some((a) => a.id === bankAcc)) bankAcc = "";
-          const movAll = erp.state.movements.filter((m) => !bankAcc || m.accountId === bankAcc);
-          const movs = movAll.filter((m) => inPeriod(m.accountingDate));
-          // Balances and the unmatched count are now stated per account, in
-          // accountLines() — one figure for all of them was the thing being
-          // fixed, so nothing here recomputes a total to display beside it.
-          const CLASSES = [
-            ["projectCost", "Coste de obra"],
-            ["overhead", "Gasto general"],
-            ["tax", "Impuestos"],
-            ["salary", "Nóminas"],
-            ["financial", "Financiero"],
-            ["internalTransfer", "Traspaso interno"],
-            ["customerReceipt", "Cobro de cliente"],
-          ];
+          // The last five of the SELECTED account, or of all of them when none
+          // is chosen — the same rule the picker already states, applied to a
+          // window instead of to a register.
+          const recent = erp.state.movements
+            .filter((m) => !bankAcc || m.accountId === bankAcc)
+            .slice()
+            .sort((a, b) => String(b.accountingDate).localeCompare(String(a.accountingDate)))
+            .slice(0, 5);
+          const openAll = erp.state.movements.filter(
+            (m) => (!bankAcc || m.accountId === bankAcc) && m.status === "unallocated",
+          ).length;
 
           v.innerHTML = `
    <div class="stepbar">
@@ -17518,54 +17574,24 @@
      <button class="btn sm" id="bkImport">⬆ Importar extracto (.xlsx)</button>
      <button class="btn sm" id="bkUndo">↩ Deshacer importación</button>
      <input type="file" id="bkFile" accept=".xlsx" style="display:none">
-     <button class="btn sm" id="bToRec">Ir a Conciliación →</button>
+     <button class="btn sm primary" id="bToRec">Ir a Conciliación →</button>
    </div>
    ${accountLines(accs)}
-   ${periodNote(movs.length, movAll.length)}
-   <div class="card"><div class="ch"><h3>Movimientos</h3><span class="tag">${movs.length}</span></div>
-   <div class="scroll"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Clase</th><th>Destino</th><th>Antigüedad</th></tr></thead><tbody>
+   <div class="card"><div class="ch"><h3>Últimos movimientos</h3><span class="tag">${recent.length}</span></div>
+   <div class="daylist" style="padding:10px 14px">
    ${
-     movs
-       .slice()
-       .reverse()
-       .map((m) => {
-         const open = m.status === "unallocated";
-         const age = open ? Math.max(0, ErpEngine.daysBetween(erp.today, m.accountingDate)) : 0;
-         const alloc = (m.allocations || []).length
-           ? (m.allocations || [])
-               .map((a) =>
-                 a.projectId
-                   ? erp.project(a.projectId).code
-                   : OVERHEAD_LABEL[a.overheadCategory] || a.overheadCategory || "—",
-               )
-               .join(", ")
-           : null;
-         return `<tr class="xrow${open ? " unapproved" : ""}">
-      <td>${fmtD(m.accountingDate)}</td>
-      <td class="k">${movWho(m)}${m.card ? ` <span class="pill b">${esc(m.card)}</span>` : ""}</td>
-      <td class="num" style="color:${m.amountCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur(m.amountCents)}</td>
-      <td><select class="inline" data-bkclass="${m.id}">
-        <option value="">—</option>
-        ${CLASSES.map(([k, l]) => `<option value="${k}"${m.class === k ? " selected" : ""}>${esc(l)}</option>`).join("")}
-      </select></td>
-      <td><select class="inline" data-bkdest="${m.id}">
-        <option value="">${alloc ? esc(alloc) : "—"}</option>
-        <optgroup label="Obras">${erp.state.projects
-          .filter((p) => !p.closed)
-          .map((p) => `<option value="p:${p.id}">${esc(projectPickLabel(p))}</option>`)
-          .join("")}</optgroup>
-        <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL)
-          .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
-          .join("")}</optgroup>
-        ${cardSettleGroup(m)}
-      </select></td>
-      <td>${open ? `<span title="Días sin casar"><span>${age}</span> <span>d</span></span>` : '<span class="pill g">Casado</span>'}</td>
-     </tr>`;
-       })
-       .join("") ||
-     '<tr><td colspan="6"><div class="empty">Sin movimientos en el periodo.</div></td></tr>'
+     recent
+       .map(
+         (m) => `<div class="it">
+      <span style="color:var(--muted)">${fmtD(m.accountingDate)}</span>
+      <span class="k" style="flex:1">${movWho(m)}${m.card ? ` <span class="pill b">${esc(m.card)}</span>` : ""}</span>
+      ${m.status === "unallocated" ? '<span class="pill y">Sin conciliar</span>' : '<span class="pill g">Explicado</span>'}
+      <b style="color:${m.amountCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur(m.amountCents)}</b></div>`,
+       )
+       .join("") || '<div class="it">Sin movimientos todavía.</div>'
    }
-   </tbody></table></div></div>`;
+   ${openAll ? `<div class="it" style="border-top:1px solid var(--hair)"><span style="flex:1">Movimientos por explicar</span><span class="pill y">${openAll}</span><button class="btn sm" id="bkToRec2">Conciliar →</button></div>` : ""}
+   </div></div>`;
 
           $("#bkSel").onchange = (e) => {
             bankAcc = e.target.value;
@@ -17581,6 +17607,7 @@
               }),
           );
           $("#bToRec").onclick = () => goTab("banking", "_reconcile");
+          if ($("#bkToRec2")) $("#bkToRec2").onclick = () => goTab("banking", "_reconcile");
           $("#bkNew").onclick = () => newAccountDrawer();
           /* The statement lands on ONE account — importing into "all accounts"
              would have to guess, and a guess about which bank a movement
@@ -17612,40 +17639,6 @@
             }
             statementPreviewDrawer(bankAcc, parsed);
           };
-          v.querySelectorAll("[data-bkclass]").forEach(
-            (sel) =>
-              (sel.onchange = () => {
-                if (!sel.value) return;
-                mutate(
-                  () => erp.classifyMovement(sel.dataset.bkclass, sel.value, "backoffice"),
-                  "Movimiento clasificado",
-                );
-              }),
-          );
-          v.querySelectorAll("[data-bkdest]").forEach(
-            (sel) =>
-              (sel.onchange = () => {
-                const val = sel.value;
-                if (!val) return;
-                mutate(() => {
-                  const m = erp.state.movements.find((x) => x.id === sel.dataset.bkdest);
-                  if (val.startsWith("c:")) {
-                    erp.markCardSettlement(m.id, val.slice(2), "backoffice");
-                    return;
-                  }
-                  const amount = Math.abs(m.amountCents);
-                  erp.splitMovement(
-                    m.id,
-                    [
-                      val.startsWith("p:")
-                        ? { projectId: val.slice(2), kind: "material", amountCents: amount }
-                        : { overheadCategory: val.slice(2), amountCents: amount },
-                    ],
-                    "backoffice",
-                  );
-                }, "Movimiento asignado");
-              }),
-          );
         },
 
         /* ---------- Lista de precios (DMC-02, spec §DMC-02) ----------

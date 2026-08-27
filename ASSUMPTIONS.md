@@ -5122,3 +5122,89 @@ a stale instruction in the file that says «continuing from anywhere» is the on
 that gets followed. And the specification agreed across the acceptance review is
 committed as `docs/worklog/PK7-SPEC.md`, so the rule PK7-B through PK7-F
 implement is written down before the screens are built to it.
+
+## PK7-B · Gastos decides, Conciliación identifies (2026-08-27)
+
+The rule made structural. `docs/worklog/PK7-SPEC.md` states it; this session is
+where the screens stop contradicting it.
+
+**Cuentas y saldos stops deciding anything.** It carried the whole movement
+register with a Clase select and a Destino select on every row, and the Destino
+select could put a cost on a project. That was a second door into a decision
+that already had one — Gastos, where the cost gets its partida, its subpartida,
+its cuenta contable and its split. Two doors into one decision is how the same
+euro gets counted twice and how nobody can say which screen is right. The screen
+now answers what it is for: how much is where, plus getting a statement in.
+
+**The last five movements stay, read-only.** A balance with no sight of what
+moved it is a number that cannot be sanity-checked, and «am I looking at the
+right account?» is answered by seeing the last few lines. Removing the register
+is not the same as removing the evidence.
+
+**Classification did not disappear, it moved.** Saying WHAT a line is belongs in
+Conciliación with the rest of that question. Two identifications came across
+with it: which general expense a line is — the CATEGORY, not just the class,
+which a bare `rcClass` would have lost — and whether an outgoing is a card's
+monthly settlement. Both say what a line is. Neither touches a project.
+
+**«Asignar a proyecto» is gone from Conciliación.** A movement is matched to a
+document, explained another way, or left in the queue. The E2E asserts the
+absence: a removal that nothing asserts comes back, and this control has now
+moved three times.
+
+**What still writes a project onto a movement, and why.** Petty cash. The
+operator's own rule: cash spent on site belongs to a job and usually has no
+document behind it. The Caja drawer already carried the full cascade — project →
+its partidas → that partida's subpartidas — so the exception was already built
+correctly and needed only to be pinned. BNK-02's acceptance check moved there,
+because that is where the requirement now lives.
+
+**Reading never stopped.** `actualCostCents` and `chapterCosts` keep their
+movement branch, so costs allocated from the bank screens during testing still
+appear. Removing the read would have made real records vanish.
+
+### The gap that "keep reading" turned out to be hiding
+
+Verifying the reading path found that it was already broken, and in the PK7-A
+class: **the per-partida table did not add up to the project it describes.**
+
+Four views enumerated the same costs separately. `actualCostCents` counted
+bills, labour, direct movement allocations and confirmed tickets.
+`chapterCosts` counted all four. `chapterEconomics` counted **two** — bills and
+labour. `unassignedChapterCosts`, whose entire job is to itemise the difference
+between the project total and the partida rows, counted three and omitted
+movements. So a petty-cash cost on a job contributed to the project's actual
+cost and appeared in **no row of either table** — not in the partida it belonged
+to, and not in the block that exists to explain what is missing. Measured on a
+fixture: project 15.000, partida rows 10.000, pending 0.
+
+Four enumerations of one thing will disagree; the only question is when. They
+are now **one**: `projectCostRows(projectId)` yields every cost with the partida
+it landed on or `null`, and the other four are views of it. The invariant that
+keeps it true is asserted directly — _partida table + pending = project cost_ —
+after every kind of cost the simulation can produce, and the negative control
+confirms it goes red on exactly the old behaviour (`10000 + 0 ≠ 13000`).
+
+**And the block can now act on what it lists.** `assignChapterSplit` accepted
+bills, tickets and hours; a movement row would have thrown «Unknown cost
+source: movement». A movement holds `allocations` like a bill does, so splitting
+one across partidas is the identical act. Petty cash can be given its partida
+from Avance económico, which is what listing it there implies.
+
+**A smaller one on the way past.** `splitMovement` stamped `class =
+"projectCost"` on every split whatever it named, so a general expense was
+labelled «coste de obra» while the allocation underneath it said otherwise.
+Harmless to the totals — the project filter finds nothing — and wrong to read,
+which is its own defect. The class follows the destinations now.
+
+**D1, verified rather than fixed.** Re-splitting an invoice across partidas
+after it has been paid moves the cost, leaves `actualCostCents` unchanged, and
+leaves the payment and the match exactly where they were. It already worked;
+what it lacked was a test saying so. It has one, because the independence of the
+two axes is the whole claim of this package.
+
+**Also here.** PK7-A pushed three untranslated strings — the statement
+preview's opening/closing balances and its two pills — past the source-literal
+ceiling of 228, and CI said so on the one gate that checks it while every other
+gate stayed green. They are translated now, along with PK7-B's eleven, and the
+count is back at the ceiling rather than above it.
