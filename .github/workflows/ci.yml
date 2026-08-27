@@ -251,8 +251,8 @@ jobs:
       - name: Translation coverage (translator miss ledger)
         if: always()
         run: |
-          node tests/i18n/miss-crawl.mjs --lang en --max 49
-          node tests/i18n/miss-crawl.mjs --lang ca --max 110
+          node tests/i18n/miss-crawl.mjs --lang en --max 47
+          node tests/i18n/miss-crawl.mjs --lang ca --max 108
 
   bundle:
     name: Capability bundle (build, browser-safety, drift)

@@ -626,21 +626,93 @@
    */
   function blankConfig() {
     return {
-      legalName: "",
+      /* --- who the company is (ORG-01) --- */
+      legalName: "", // denominación social, as registered
+      tradeName: "", // what it trades as, when that differs
       taxId: "",
+      logo: null, // an uploaded file {storageKey,name,type,size}
+      logoRef: "canei-logo", // the named pictogram, for the vector document stack
+
+      /* --- the registered office, and where the work is actually run from ---
+         Two addresses because a company has two: the one the register holds
+         and the one on the letterhead. They are printed in different places —
+         the trading address in the header, the registered office in the small
+         print — and mirroring one onto the other is a decision the operator
+         makes with a tick box, not something inferred here. */
+      regStreet: "",
+      regPostalCode: "",
+      regCity: "",
+      regProvince: "Barcelona",
+      regCountry: "España",
+      sameAsRegistered: false,
       street: "",
       postalCode: "",
       city: "",
       province: "Barcelona",
       country: "España",
+
+      /* --- the mercantile register, which commercial correspondence carries --- */
       registry: "",
+      registryTomo: "",
+      registryFolio: "",
+      registryHoja: "",
+
+      /* --- how to reach it --- */
       phone: "",
       email: "",
       web: "",
+
+      /* --- where it gets paid (AR-02) --- */
       iban: "",
-      logoRef: "canei-logo",
+      bic: "",
+      bankName: "",
+
+      /* --- the company's own defaults, which used to be literals in this
+         file. Every value below is the number that was hard-coded at the site
+         that now reads it, so an unconfigured workspace behaves exactly as it
+         did before this record grew. --- */
+      defaultVatBp: 1000,
+      defaultIrpfBp: 0,
+      paymentTermsDays: 30,
+      quoteValidityDays: 30,
+      defaultLanguage: "es",
+      latePaymentInterestPctYear: 8,
+      graceDays: 7,
+      scheduleWithinDays: 7,
+      startWithinDays: 15,
       marginThresholdBp: 1500,
+
+      /* --- free text printed under every document --- */
+      legalFooter: "",
     };
+  }
+
+  /**
+   * One address filled in means both are known.
+   *
+   * A company that has typed only its trading address still has a registered
+   * office — the same one — and a document that printed an empty «domicilio
+   * social» beside a full header would look like a fault rather than a blank
+   * field. Mirrors whichever side is missing, and honours the operator's tick
+   * box when they say the two are the same.
+   */
+  function normaliseAddresses(c) {
+    const hasReg = !!(c.regStreet || c.regCity);
+    const hasTrade = !!(c.street || c.city);
+    if (c.sameAsRegistered || (hasReg && !hasTrade)) {
+      c.street = c.regStreet;
+      c.postalCode = c.regPostalCode;
+      c.city = c.regCity;
+      c.province = c.regProvince;
+      c.country = c.regCountry;
+    } else if (hasTrade && !hasReg) {
+      c.regStreet = c.street;
+      c.regPostalCode = c.postalCode;
+      c.regCity = c.city;
+      c.regProvince = c.province;
+      c.regCountry = c.country;
+    }
+    return c;
   }
 
   /* =============================================================================
@@ -921,7 +993,10 @@
      * unreadable, and it names a property rather than the thing to go and do.
      */
     _requireConfig(what) {
-      if (!this.state.config)
+      // Not «does the record exist» but «is it usable»: a workspace that saved
+      // the form with the NIF still blank has a config object and no identity,
+      // and issuing against it would print an anonymous invoice.
+      if (!this.companyConfigured())
         throw new Error(
           `Cannot issue ${what}: the company's own details are not set up yet ` +
             `(Configuración › Empresa). A document carries the seller's identity, so it ` +
@@ -942,7 +1017,81 @@
      * operator sees after opening the setup screen and saving nothing.
      */
     _configForRead() {
-      return this.state.config || blankConfig();
+      /* MERGED, not returned as stored. A workspace configured before this
+         record grew has none of the newer keys, and a default read as
+         `undefined` is worse than one read as a blank: `addDays(today,
+         undefined)` is an invalid date, and it would reach a customer's
+         document. Merging means an older stored record keeps every value it
+         has and inherits the rest. */
+      return normaliseAddresses(Object.assign(blankConfig(), this.state.config || {}));
+    }
+    /**
+     * The seller's own block, built once for every document.
+     *
+     * Four builders each concatenated the address themselves, which is how the
+     * quote came to print a header the change order did not, and why adding a
+     * trading address would otherwise have meant four edits. One function, one
+     * shape: change the company record and every document changes with it,
+     * which is exactly what the operator asked this record to be.
+     */
+    /**
+     * The company's own record, for a screen to read and edit.
+     *
+     * Blank-filled and normalised, exactly as the document builders see it, so
+     * the form shows the same values the printed sheet will carry.
+     */
+    companyProfile() {
+      return this._configForRead();
+    }
+    /**
+     * What is still missing before this company can issue a document.
+     *
+     * The four the law needs on a factura (RD 1619/2012): who is issuing, its
+     * tax number, where it is, and — because a bill nobody can pay is not a
+     * bill — the account to pay into. Returned as field keys so the caller
+     * decides the wording, and so ORG-01 and the setup screen can never
+     * disagree about what "configured" means.
+     */
+    companyMissing() {
+      const c = this._configForRead();
+      return ["legalName", "taxId", "street", "iban"].filter((k) => !String(c[k] || "").trim());
+    }
+    companyConfigured() {
+      return this.companyMissing().length === 0;
+    }
+    _issuerBlock() {
+      const c = this._configForRead();
+      const line = (street, pc, city) =>
+        [street, [pc, city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+      return {
+        legalName: c.legalName,
+        // What the company trades as, falling back to what it is called in the
+        // register: a header has to say something.
+        tradeName: c.tradeName || c.legalName,
+        taxId: c.taxId,
+        // Where the work is run from — the letterhead address.
+        address: line(c.street, c.postalCode, c.city),
+        // The registered office, for the small print. Equal to the one above
+        // in the ordinary case, and that is fine: printing it twice is honest.
+        registeredAddress: line(c.regStreet, c.regPostalCode, c.regCity),
+        registry: [
+          c.registry,
+          c.registryTomo && "Tomo " + c.registryTomo,
+          c.registryFolio && "Folio " + c.registryFolio,
+          c.registryHoja && "Hoja " + c.registryHoja,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        phone: c.phone,
+        email: c.email,
+        web: c.web,
+        iban: c.iban,
+        bic: c.bic,
+        bankName: c.bankName,
+        logo: c.logo,
+        logoRef: c.logoRef,
+        legalFooter: c.legalFooter,
+      };
     }
     /**
      * The document series this ERP issues, and their prefixes.
@@ -1566,7 +1715,11 @@
 
     /* =========================== PRE/QUO — budgets & versions =========================== */
     createBudget(b, user) {
-      // PRE-15 header
+      // PRE-15 header. The defaults are the company's, not this file's — see
+      // blankConfig: validity, language and the tax rates all used to be
+      // literals here and in a second place each, which is how a rate changed
+      // in one and not the other.
+      const cfg = this._configForRead();
       const rec = Object.assign(
         {
           id: this._id("bud"),
@@ -1576,14 +1729,14 @@
           partyId: null,
           propertyId: null,
           preparedBy: user || "backoffice",
-          validityDate: addDays(this.state.today, 30),
+          validityDate: addDays(this.state.today, cfg.quoteValidityDays),
           status: "draft",
-          language: "es",
+          language: cfg.defaultLanguage,
           activityLine: "renovation",
           surfaceM2: 0,
           discountCents: 0,
-          vatBp: 1000,
-          irpfBp: 0,
+          vatBp: cfg.defaultVatBp,
+          irpfBp: cfg.defaultIrpfBp,
           paymentConditions: "",
           exclusions: [],
           assumptions: [],
@@ -2191,7 +2344,7 @@
          on it. Stamped here, the printed date is always send + 30. The
          header-edit API keeps accepting validityDate, so the old behaviour
          is one hidden control away (HIDDEN_CONTROLS in the shell). */
-      b.validityDate = addDays(when, 30);
+      b.validityDate = addDays(when, this._configForRead().quoteValidityDays);
       b.status = "issued";
       const o = this.state.opportunities.find(
         (x) => x.partyId === b.partyId && !["won", "lost"].includes(x.status),
@@ -2204,22 +2357,13 @@
       // QUO-05/07 + QUO-10 + DOC-01: customer doc from data; no internal cost
       const b = this.budget(budgetId);
       const v = this.version(budgetId, versionId);
-      const cfg = this._configForRead();
       const t = this.budgetTotals(budgetId, versionId);
       return {
         docType: "PRESUPUESTO",
         number: b.number,
         version: v.vNumber,
         date: v.date,
-        issuer: {
-          legalName: cfg.legalName,
-          taxId: cfg.taxId,
-          address: `${cfg.street}, ${cfg.postalCode} ${cfg.city}`,
-          phone: cfg.phone,
-          email: cfg.email,
-          iban: cfg.iban,
-          logoRef: cfg.logoRef,
-        }, // DOC-01
+        issuer: this._issuerBlock(), // DOC-01
         customer: (({ name, taxId, billStreet, billPostalCode, billCity }) => ({
           name,
           taxId,
@@ -2543,6 +2687,8 @@
      *                structured data is our index of it.
      */
     _contractRecord({ origin, partyId, propertyId, valueCents, vatBp, language, date }) {
+      // The company's own defaults, not literals in two places — see blankConfig.
+      const cfg = this._configForRead();
       const vatCents = pctOf(valueCents, vatBp);
       return {
         id: this._id("con"),
@@ -2563,8 +2709,8 @@
         totalCents: valueCents + vatCents, // CON-03 structured
         installments: [], // CON-04 {pct|amountCents, trigger, stageRef, expectedDate, invoicedInvoiceId, status}
         initiation: {
-          scheduleWithinDays: 7,
-          startWithinDays: 15,
+          scheduleWithinDays: cfg.scheduleWithinDays,
+          startWithinDays: cfg.startWithinDays,
           firstPaymentDate: null,
           committedStartDate: null,
         }, // CON-05
@@ -2577,17 +2723,17 @@
           deviationReason: null,
         }, // CON-06
         penalties: {
-          latePaymentInterestPctYear: 8,
+          latePaymentInterestPctYear: cfg.latePaymentInterestPctYear,
           delayPenaltyCentsPerWeek: 0,
           capCents: 0,
-          graceDays: 7,
+          graceDays: cfg.graceDays,
           suspendingEvents: ["customer delay", "force majeure", "approved change"],
         }, // CON-07
         guarantees: [], // CON-08 {category, months, startDate, expiryDate}
         clauseBlockVersions: this.state.clauseBlocks
           .filter((cb) => cb.effectiveFrom <= this.state.today)
           .map((cb) => cb.id), // CON-09
-        language: language || "es", // CON-10
+        language: language || cfg.defaultLanguage, // CON-10
         signature: { customerSignedAt: null, companySignedAt: null, method: null, document: null }, // CON-11
         status: "draft",
         annexes: [],
@@ -2667,7 +2813,7 @@
           valueCents: d.valueCents,
           // Same default a new budget takes, so a hand-entered contract and a
           // quoted one start from the same rate rather than two different ones.
-          vatBp: d.vatBp != null ? d.vatBp : 1000,
+          vatBp: d.vatBp != null ? d.vatBp : this._configForRead().defaultVatBp,
           language: d.language,
           date: d.date,
         }),
@@ -2684,6 +2830,7 @@
     }
     createContract(budgetId, terms, user) {
       // CON-01..14
+      const cfg = this._configForRead(); // the company's defaults, not literals
       const b = this.budget(budgetId);
       if (!b.acceptedVersionId) throw new Error("Contract requires an accepted budget version"); // CON-02
       this._requireComplete(b.partyId, "contract"); // 7.5 parties control
@@ -2707,8 +2854,8 @@
           totalCents: t.grandCents, // CON-03 structured
           installments: [], // CON-04 {pct|amountCents, trigger, stageRef, expectedDate, invoicedInvoiceId, status}
           initiation: {
-            scheduleWithinDays: 7,
-            startWithinDays: 15,
+            scheduleWithinDays: cfg.scheduleWithinDays,
+            startWithinDays: cfg.startWithinDays,
             firstPaymentDate: null,
             committedStartDate: null,
           }, // CON-05
@@ -2721,10 +2868,10 @@
             deviationReason: null,
           }, // CON-06
           penalties: {
-            latePaymentInterestPctYear: 8,
+            latePaymentInterestPctYear: cfg.latePaymentInterestPctYear,
             delayPenaltyCentsPerWeek: 0,
             capCents: 0,
-            graceDays: 7,
+            graceDays: cfg.graceDays,
             suspendingEvents: ["customer delay", "force majeure", "approved change"],
           }, // CON-07
           guarantees: [], // CON-08 {category, months, startDate, expiryDate}
@@ -2927,7 +3074,6 @@
     renderContractDoc(contractId) {
       const c = this.state.contracts.find((x) => x.id === contractId);
       if (!c) throw new Error("Contract not found");
-      const cfg = this._configForRead();
       const project = this.state.projects.find((p) => p.contractId === c.id) || null;
       const v = this.contractValue(c.id);
       return {
@@ -2935,14 +3081,7 @@
         number: c.number,
         date: c.date,
         language: c.language,
-        issuer: {
-          legalName: cfg.legalName,
-          taxId: cfg.taxId,
-          address: `${cfg.street}, ${cfg.postalCode} ${cfg.city}`,
-          phone: cfg.phone,
-          email: cfg.email,
-          iban: cfg.iban,
-        },
+        issuer: this._issuerBlock(),
         customer: (({ name, taxId, billStreet, billPostalCode, billCity }) => ({
           name,
           taxId,
@@ -4106,7 +4245,7 @@
          preview beside every other reason the invoice is not ready. It was
          previously only enforced at issue, where it surfaced as a thrown
          error from a button — the same fact, delivered as a crash. */
-      if (!this.state.config)
+      if (!this.companyConfigured())
         out.push({
           code: "ORG-01",
           label: "Faltan los datos de la empresa",
@@ -4521,7 +4660,12 @@
         // A payer may carry terms of their own — a contractor at 60 days
         // beside an end customer at 30 — falling back to the party record so a
         // renegotiated term is not stale in a second copy.
-        dueDate: addDays(this.state.today, payer.paymentTermsDays || party.paymentTermsDays || 30),
+        dueDate: addDays(
+          this.state.today,
+          payer.paymentTermsDays ||
+            party.paymentTermsDays ||
+            this._configForRead().paymentTermsDays,
+        ),
         paymentMethod: party.paymentMethod,
         // Soft read, unlike the issuing path below. A preview draws what the
         // document would say; an unconfigured workspace makes that "no account
@@ -4566,7 +4710,6 @@
      * printed reads one object rather than reaching into engine state.
      */
     _invoiceDoc(rec) {
-      const cfg = this._configForRead();
       const project = this.state.projects.find((x) => x.id === rec.projectId) || null;
       const rectified = rec.rectifies
         ? this.state.invoices.find((i) => i.id === rec.rectifies || i.number === rec.rectifies)
@@ -4576,14 +4719,12 @@
         number: rec.number,
         date: rec.date,
         dueDate: rec.dueDate,
-        issuer: {
-          legalName: cfg.legalName,
-          taxId: cfg.taxId,
-          address: `${cfg.street}, ${cfg.postalCode} ${cfg.city}`,
-          phone: cfg.phone,
-          email: cfg.email,
-          iban: rec.iban || cfg.iban,
-        },
+        // The IBAN is the one exception to reading live: an issued invoice
+        // carries the account it told the customer to pay into, and that must
+        // not move under a payment already in flight.
+        issuer: Object.assign(this._issuerBlock(), {
+          iban: rec.iban || this._configForRead().iban,
+        }),
         customer: (({ name, taxId, billStreet, billPostalCode, billCity }) => ({
           name,
           taxId,
@@ -4669,7 +4810,12 @@
         // A payer may carry terms of their own — a contractor at 60 days
         // beside an end customer at 30 — falling back to the party record so a
         // renegotiated term is not stale in a second copy.
-        dueDate: addDays(this.state.today, payer.paymentTermsDays || party.paymentTermsDays || 30),
+        dueDate: addDays(
+          this.state.today,
+          payer.paymentTermsDays ||
+            party.paymentTermsDays ||
+            this._configForRead().paymentTermsDays,
+        ),
         paymentMethod: party.paymentMethod,
         iban: this._requireConfig(inv.kind === "creditNote" ? "a credit note" : "an invoice").iban, // AR-02
         rectifies: inv.rectifies || null,
@@ -9409,17 +9555,12 @@
       if (!c) throw new Error("Change not found");
       const p = this.project(c.projectId);
       const con = p.contractId ? this.state.contracts.find((x) => x.id === p.contractId) : null;
-      const cfg = this._configForRead();
       return {
         docType: "MODIFICACION",
         number: c.annexNumber || null,
         date: c.approvedAt || c.date,
         contractNumber: con ? con.number : null,
-        issuer: {
-          legalName: cfg.legalName,
-          taxId: cfg.taxId,
-          address: `${cfg.street}, ${cfg.postalCode} ${cfg.city}`,
-        },
+        issuer: this._issuerBlock(),
         customer: (({ name, taxId, billStreet, billPostalCode, billCity }) => ({
           name,
           taxId,

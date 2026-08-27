@@ -5316,3 +5316,55 @@ with no dictionary entry, which CLAUDE.md already records catching three earlier
 templates. No amount of rewording fixes it; moving the literal out of the
 conditional does. Two conditionals are now named functions and one is built
 unconditionally and used conditionally.
+## S30 · Configuración › Empresa, and the end of the hidden defaults (2026-08-27)
+
+The operator asked where the company data is entered. It could not be entered
+anywhere. `configureEntity` has existed since ORG-01 was written and its only
+caller was the demo seeder — which is precisely why nobody noticed for months:
+the demonstration workspace arrives with an identity and the live one starts
+blank. On the live workspace that meant **no invoice could ever be issued**
+(ORG-01 refuses, and it named «Configuración › Empresa», a screen that did not
+exist), the contract printed `EMPRESA —`, and the quote went to the customer
+with no issuer block at all.
+
+**The screen.** First in Configuración, because on an unconfigured workspace it
+is the only screen that matters. A banner on the Torre says so until it is
+filled in — the demo can never show that state, so it had to be built for the
+case the demo hides.
+
+**Two addresses, on purpose.** A company has the one the mercantile register
+holds and the one on its letterhead; Canei's differ. They are stored separately
+and printed in different places — trading address in the header, registered
+office and the register entry in the small print — rather than fighting over
+one field. Whichever side is left blank mirrors the other, so a company with a
+single address types it once.
+
+**Every default that was a literal now lives here.** Quote validity (30 days,
+in two places), the tax rates, the payment term, the contract's grace period
+and late-payment interest, the initiation window: all of them were numbers
+inside the engine, several of them written twice, which is how a rate changes
+in one place and not the other. They now read from the company record, each
+defaulting to exactly the number it replaced — so an unconfigured workspace
+behaves as it always did, and a configured one is the single source.
+
+**One issuer block.** `_issuerBlock()` replaces four hand-built copies of the
+same fields. The quote had a logo field nothing drew (`logoRef`, dead since it
+was written); the change order printed no phone; only the invoice froze its
+IBAN. One function now, so a company change cannot reach three documents and
+miss the fourth.
+
+**Documents re-render live — the operator's explicit choice.** An issued
+invoice reads today's company record rather than a snapshot of the one it was
+issued under. Asked directly, the operator answered «the ERP will always be for
+this company». The consequence is recorded here rather than argued: if the NIF
+or the registered office ever changed, invoices already filed would print the
+new one. The IBAN is the exception and keeps its per-invoice snapshot, because
+a payment already in flight must not be redirected.
+
+**Negative controls, all three red before they were green.** Restore the
+hard-coded 30-day validity → the new quote is stamped 30 and the check fails.
+Silence the Torre banner → the unconfigured workspace announces nothing.
+Collapse the two addresses into one → the small print prints the letterhead
+address and the check catches it. The banner control also showed the check
+taking two others down with it as a timeout; the navigation now falls back to
+`go("company")` so one broken thing reports as one failed check.

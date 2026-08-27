@@ -2463,6 +2463,47 @@ window.CANEI_DICT.ca = {
     "Afegiu-lo com a pagador del projecte abans d'emetre-li una factura.",
   "Datos fiscales del cliente incompletos": "Dades fiscals del client incompletes",
   "Faltan los datos de la empresa": "Falten les dades de l'empresa",
+  "⚠ El logotipo tiene que ser una imagen (PNG o JPG)":
+    "⚠ El logotip ha de ser una imatge (PNG o JPG)",
+  "Estos valores eran fijos dentro del programa y ahora se leen de aquí. Un presupuesto o un contrato que ya existe conserva los suyos.":
+    "Aquests valors eren fixos dins del programa i ara es llegeixen d'aquí. Un pressupost o un contracte que ja existeix conserva els seus.",
+  "Quién emite los documentos de esta empresa, dónde está, cómo se le paga y con qué valores por defecto trabaja. Todo lo que sale impreso — presupuestos, contratos y facturas — se lee de aquí.":
+    "Qui emet els documents d'aquesta empresa, on és, com se li paga i amb quins valors per defecte treballa. Tot el que surt imprès — pressupostos, contractes i factures — es llegeix d'aquí.",
+  Logotipo: "Logotip",
+  Tomo: "Tom",
+  Folio: "Foli",
+  Hoja: "Full",
+  "Texto que se imprime al pie de cada documento": "Text que s'imprimeix al peu de cada document",
+  "Dirección de trabajo": "Adreça de treball",
+  "Valores por defecto": "Valors per defecte",
+  "Pie legal": "Peu legal",
+  "Arrastra aquí el logotipo (PNG o JPG), o búscalo en el dispositivo.":
+    "Arrossega aquí el logotip (PNG o JPG), o cerca'l al dispositiu.",
+  "la denominación social": "la denominació social",
+  "el NIF": "el NIF",
+  "la dirección": "l'adreça",
+  "el IBAN": "l'IBAN",
+  "Denominación social *": "Denominació social *",
+  "Domicilio social *": "Domicili social *",
+  "BIC / SWIFT": "BIC / SWIFT",
+  "IVA por defecto (%)": "IVA per defecte (%)",
+  "IRPF por defecto (%)": "IRPF per defecte (%)",
+  "Interés de demora (% anual)": "Interès de demora (% anual)",
+  "Días de cortesía": "Dies de cortesia",
+  "Planificar en (días)": "Planificar en (dies)",
+  "Empezar en (días)": "Començar en (dies)",
+  "Margen mínimo, alerta (%)": "Marge mínim, alerta (%)",
+  "Datos de la empresa guardados": "Dades de l'empresa desades",
+  "sin ellos no se puede emitir ninguna factura.": "sense elles no es pot emetre cap factura.",
+  "Sin estos datos no se puede emitir ninguna factura.":
+    "Sense aquestes dades no es pot emetre cap factura.",
+  "La empresa puede emitir presupuestos, contratos y facturas.":
+    "L'empresa pot emetre pressupostos, contractes i factures.",
+  "el que consta en el Registro": "el que consta al Registre",
+  "la que va en la cabecera": "la que va a la capçalera",
+  "Igual que el domicilio social": "Igual que el domicili social",
+  "va al pie de los documentos": "va al peu dels documents",
+  "se aplican a lo nuevo, no a lo ya emitido": "s'apliquen al que és nou, no al que ja s'ha emès",
   "Complete el nombre fiscal, el NIF, la dirección y el IBAN en Configuración › Empresa. La factura lleva la identidad del emisor y no puede emitirse sin ella.":
     "Ompliu el nom fiscal, el NIF, l'adreça i l'IBAN a Configuració › Empresa. " +
     "La factura porta la identitat de l'emissor i no es pot emetre sense ella.",
