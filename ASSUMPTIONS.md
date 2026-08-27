@@ -5556,3 +5556,29 @@ rows are now built once, summed, added to the pending rows and compared to
 disagreement prints a red «No cuadra» pill with both figures. Negative
 control: a 45 € error injected into the sum flips the screen to «No cuadra»
 and the new e2e check red — the screen can no longer reassure while wrong.
+
+## S33 · PK-F — one design for every document (2026-08-28)
+
+**The renderer speaks the design; the descriptors speak the data; the label
+layer speaks the language.** `erp-sheet.js` renders the `CaneiDocTypes.build()`
+doc shape as the documentos design system, with the same `tr` hook the PDF
+writer already had; `erp-doc-i18n.js` fills that hook in es/ca/en (English and
+Catalan reuse the app dictionaries' wording where a pair exists; departures —
+«Vencimiento» → "Due date", not the screen dictionary's "Expiry"; «Orden» →
+"Order", not "Sort order" — are deliberate, a paper meaning is not a screen
+meaning). The Spanish column restores the accents the descriptors dropped for
+the PDF writer.
+
+**Engine cents win over recomputed cents.** `erp-facts.js` builds each
+document from live records and then overwrites the money rows with the
+engine's exact `vatCents`/`totalCents` — a legal figure re-derived from a rate
+is not the figure on the issued invoice.
+
+**Gaps are stated, not invented.** The engine has no valuation history, so the
+certificación sheet certifies TO DATE (previous = 0) and says so in its period
+label; a change order is one priced concept, so its table has one row; a
+purchase order has no delivery window or site contact ("—"); there is no
+accountant party record, so the quarterly package names its recipient
+generically. The three kinds with no backing record at all — albarán, acta de
+entrega, parte de trabajo — are refused by `docFor` rather than printed with
+sample numbers.
