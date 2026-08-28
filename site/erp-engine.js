@@ -1059,6 +1059,21 @@
     companyConfigured() {
       return this.companyMissing().length === 0;
     }
+    /**
+     * The language a document should speak — N1's chain, resolved once:
+     * an explicit choice wins; else the job's budget (the customer accepted
+     * it in that language); else the customer's own preference; else the
+     * company default. Empty docLanguage means "follow the company".
+     */
+    _docLanguageFor(explicit, projectId, partyId) {
+      if (explicit) return explicit;
+      const p = projectId ? this.state.projects.find((x) => x.id === projectId) : null;
+      const b = p && p.budgetId ? this.state.budgets.find((x) => x.id === p.budgetId) : null;
+      if (b && b.language) return b.language;
+      const party = partyId ? this.state.parties.find((x) => x.id === partyId) : null;
+      if (party && party.docLanguage) return party.docLanguage;
+      return this._configForRead().defaultLanguage || "es";
+    }
     _issuerBlock() {
       const c = this._configForRead();
       const line = (street, pc, city) =>
@@ -1173,6 +1188,9 @@
           mobile: "",
           email: "",
           preferredChannel: "mobile", // MDM-04
+          // N1 · the language THIS customer's documents print in. Empty means
+          // "follow the company default" — an explicit choice, not a gap.
+          docLanguage: "",
           leadSource: "",
           // No activityLine here on purpose. A "línea de actividad" belongs to
           // the WORK, not to the person paying for it — the same customer can
@@ -1731,7 +1749,8 @@
           preparedBy: user || "backoffice",
           validityDate: addDays(this.state.today, cfg.quoteValidityDays),
           status: "draft",
-          language: cfg.defaultLanguage,
+          // Resolved below once the party is known — N1's chain.
+          language: "",
           activityLine: "renovation",
           surfaceM2: 0,
           discountCents: 0,
@@ -1751,6 +1770,8 @@
         },
         b,
       );
+      // N1: explicit choice > this customer's docLanguage > company default.
+      rec.language = this._docLanguageFor(rec.language, null, rec.partyId);
       this.state.budgets.push(rec);
       this.newVersion(rec.id, { reason: "Versión inicial", author: user }, true);
       this._log(user, "createBudget", rec.number);
@@ -2964,6 +2985,33 @@
       return c;
     }
     /**
+     * N1 · the language a contract prints in, changeable while it is still
+     * paper in motion. A SIGNED contract is a fact: the customer signed the
+     * words they were shown, and re-printing them in another language would
+     * be a document nobody agreed to — same reasoning as invoice immutability.
+     */
+    setContractLanguage(id, language, user) {
+      const c = this.state.contracts.find((x) => x.id === id);
+      if (!c) throw new Error("Contract not found");
+      if (!["es", "ca", "en"].includes(language)) throw new Error("Unknown language: " + language);
+      if (c.signature && c.signature.customerSignedAt)
+        throw new Error("El contrato firmado conserva su idioma (CON-10)");
+      c.language = language;
+      this._log(user, "setContractLanguage", c.number + " " + language);
+      return c;
+    }
+    /** N1 · same rule for a change order: free until approved, frozen after —
+     *  an approved annex is part of the signed chain. */
+    setChangeLanguage(id, language, user) {
+      const c = this.state.changes.find((x) => x.id === id);
+      if (!c) throw new Error("Change not found");
+      if (!["es", "ca", "en"].includes(language)) throw new Error("Unknown language: " + language);
+      if (c.approvedAt) throw new Error("La adenda aprobada conserva su idioma");
+      c.language = language;
+      this._log(user, "setChangeLanguage", (c.annexNumber || c.id) + " " + language);
+      return c;
+    }
+    /**
      * Move the expected dates of a contract's payment milestones — item 14 of
      * the money chain, which the v4 document asks about and which did not
      * exist.
@@ -3501,6 +3549,7 @@
           costCents: 0,
           scheduleImpactDays: 0,
           photoRef: null,
+          language: "", // N1 · resolved at render through the same chain
           status: "identified",
           sentAt: null,
           approvedAt: null,
@@ -4696,6 +4745,9 @@
         // document would say; an unconfigured workspace makes that "no account
         // number yet", not an error page. The refusal belongs at issue.
         iban: (this.state.config && this.state.config.iban) || "",
+        // N1: the language the issued document will speak, resolved the same
+        // way the issuing path resolves it — a preview must not lie.
+        language: this._docLanguageFor(draft.language, p.id, payer.partyId),
         rectifies: draft.rectifies || null,
         rectifyReason: draft.rectifyReason || null,
       };
@@ -4766,6 +4818,9 @@
         irpfCents: rec.irpfCents,
         totalCents: rec.totalCents,
         paymentMethod: rec.paymentMethod,
+        // N1: records issued before the field resolve through the same chain,
+        // which lands on the budget language they were always printed beside.
+        language: rec.language || this._docLanguageFor(null, rec.projectId, rec.partyId),
         rectifies: rectified ? rectified.number : null,
         rectifyReason: rec.rectifyReason || null,
       };
@@ -4843,6 +4898,8 @@
         ),
         paymentMethod: party.paymentMethod,
         iban: this._requireConfig(inv.kind === "creditNote" ? "a credit note" : "an invoice").iban, // AR-02
+        // N1: chosen at creation, frozen at issue with the rest of the record.
+        language: this._docLanguageFor(inv.language, p.id, payer.partyId),
         rectifies: inv.rectifies || null,
         rectifyReason: inv.rectifyReason || null, // VFU-02
         installmentIdx: inv.installmentIdx != null ? inv.installmentIdx : null,
@@ -9776,6 +9833,8 @@
         docType: "MODIFICACION",
         number: c.annexNumber || null,
         date: c.approvedAt || c.date,
+        language:
+          c.language || (con && con.language) || this._docLanguageFor(null, p.id, p.partyId),
         contractNumber: con ? con.number : null,
         issuer: this._issuerBlock(),
         customer: (({ name, taxId, billStreet, billPostalCode, billCity }) => ({

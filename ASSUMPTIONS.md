@@ -5594,3 +5594,27 @@ the mark and the ready-made plate now travel through the descriptor as
 presentation hints). The contract gained its missing «Descargar PDF» through
 the same print route as the rest; the guard was proven red first by pointing
 the pane and the download back at `.cdoc`.
+
+## S34 · PK-G — the language a document speaks is chosen, once (2026-08-28)
+
+**One chain, resolved in one place.** `_docLanguageFor(explicit, projectId,
+partyId)`: an explicit choice wins; else the job's budget (the customer
+accepted it in that language); else the customer's own `docLanguage`; else the
+company default. New budgets resolve it at creation, invoices at preview AND
+issue through the same helper (a preview must not lie), change orders at
+render through their contract. Records issued before the field resolve live
+through the same chain, which lands on the language they were always printed
+beside — no migration needed for an additive field with an honest fallback.
+
+**Frozen with the signature, like the money.** A signed contract keeps its
+language (`setContractLanguage` refuses, CON-10 reasoning: the customer
+signed the words they were shown); an approved adenda likewise; an issued
+invoice carries `language` inside the immutable record. Until then the
+operator's «standard drop-down at the bottom» — the same control under the
+contract pane, the change drawer, and in the invoice generator's tax card —
+changes it on the spot, and a frozen document shows the reason instead of a
+live control.
+
+**Proven red-first.** The 4×3 language matrix (quote, contract, change order,
+invoice × es/ca/en, sentinel = the totals row's own label) went red when one
+EN table entry was neutered, and the generator's selector check with it.

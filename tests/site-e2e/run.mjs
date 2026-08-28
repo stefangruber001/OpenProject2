@@ -10851,6 +10851,83 @@ async function testI18n(browser, base) {
     const jLang = await pg.evaluate(() => document.documentElement.lang);
     if (jLang === "es") ok("i18n: English-base page adopts Spanish choice");
     else bad("i18n: journey adopts ES", `lang=${jLang}`);
+
+    /* ===== N1 (PK-G): every document kind renders in the chosen language ===
+       The kinds the app generates, rendered through the same seam the panes
+       use, in the three languages — the sentinel is the totals row's own
+       label, which exists on all of them and differs in all three. */
+    await pg.goto(`${base}/erp.html`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(2500);
+    const matrix = await pg.evaluate(() => {
+      const sentinel = { es: /base imponible/i, ca: /base imposable/i, en: /taxable base/i };
+      const st = erp.state;
+      const bud = st.budgets.find((x) => x.acceptedVersionId) || st.budgets[0];
+      const con = st.contracts.find((c) => c.origin !== "external" && c.status !== "cancelled");
+      const chg = st.changes.find((c) => c.annexNumber) || st.changes[0];
+      const inv = st.invoices.find((i) => i.kind !== "creditNote");
+      const cases = [
+        ["presupuesto", { budgetId: bud.id }],
+        ["contrato", { contractId: con.id }],
+        ["ordenCambio", { changeId: chg.id }],
+        ["factura", { invoiceId: inv.id }],
+      ];
+      const out = [];
+      for (const [kind, refs] of cases)
+        for (const lang of ["es", "ca", "en"]) {
+          const div = document.createElement("div");
+          div.innerHTML = sheetDocHtml(kind, refs, lang);
+          const text = div.textContent;
+          if (!sentinel[lang].test(text)) out.push(kind + ":" + lang);
+        }
+      return out;
+    });
+    if (matrix.length === 0)
+      ok("N1: 4 document kinds render in es, ca and en — 12 of 12 speak the chosen language");
+    else bad("N1: language matrix", matrix.join(" "));
+
+    /* The chain: a customer's docLanguage decides their next quote, and the
+       generator's own selector reprints the draft on the spot. */
+    const chain = await pg.evaluate(() => {
+      const R = {};
+      const pty = erp.state.parties.find(
+        (x) => x.roles.includes("customer") && erp.partyCompleteness(x.id).ok,
+      );
+      const before = pty.docLanguage || "";
+      erp.updateParty(pty.id, { docLanguage: "en" }, "e2e");
+      const b = erp.createBudget({ partyId: pty.id }, "e2e");
+      R.follows = b.language === "en";
+      // clean up: the register must not keep the probe budget or the flip
+      erp.state.budgets = erp.state.budgets.filter((x) => x.id !== b.id);
+      const s = erp.state.series.budget;
+      if (s) {
+        s.issued = s.issued.filter((n) => n !== b.number);
+        s.next--;
+        const y = String(new Date().getFullYear());
+        if (s.byYear && s.byYear[y]) s.byYear[y]--;
+      }
+      erp.updateParty(pty.id, { docLanguage: before }, "e2e");
+      return R;
+    });
+    if (chain.follows) ok("N1: a customer's document language decides their next quote");
+    else bad("N1: docLanguage chain", JSON.stringify(chain));
+
+    const gen = await pg.evaluate(async () => {
+      const p = erp.state.projects.find((x) => x.contractId) || erp.state.projects[0];
+      invOpen(p.id);
+      await new Promise((r) => setTimeout(r, 600));
+      const sel = document.querySelector("#inv_lang");
+      if (!sel) return { sel: false };
+      sel.value = "en";
+      sel.dispatchEvent(new Event("change"));
+      await new Promise((r) => setTimeout(r, 500));
+      const text = document.querySelector("#invDoc").innerText;
+      const en = /taxable base/i.test(text) && /invoice/i.test(text);
+      document.querySelector("#invBack")?.click();
+      return { sel: true, en };
+    });
+    if (gen.sel && gen.en)
+      ok("N1: the generator's own selector reprints the draft in English on the spot");
+    else bad("N1: generator selector", JSON.stringify(gen));
     await clear();
   } catch (e) {
     bad("i18n toggle", String(e).slice(0, 160));

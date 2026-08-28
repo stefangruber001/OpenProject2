@@ -8348,11 +8348,10 @@
       function changeDocDrawer(id) {
         const doc = erp.renderChangeDoc(id);
         const db = openDrawer("Adenda" + (doc.number ? " " + doc.number : ""));
-        /* The annex prints in the language its contract speaks. */
-        const con = doc.contractNumber
-          ? erp.state.contracts.find((x) => x.number === doc.contractNumber)
-          : null;
-        db.innerHTML = sheetDocHtml("ordenCambio", { changeId: id }, (con && con.language) || "es");
+        db.innerHTML =
+          sheetDocHtml("ordenCambio", { changeId: id }, doc.language) +
+          changeLangFootHtml(id, doc);
+        wireChangeLangFoot(id);
         paintImages(db);
       }
 
@@ -19187,6 +19186,17 @@
    <div class="field"><label>Móvil *</label><input id="e_mob" value="${esc(p.mobile || "")}"></div>
    <div class="field"><label>Fijo</label><input id="e_land" value="${esc(p.landline || "")}"></div>
    <div class="field full"><label>Email</label><input id="e_mail" value="${esc(p.email || "")}"></div>
+   <div class="field"><label>Idioma de sus documentos</label><select id="e_dlang">${[
+     ["", "— idioma de la empresa —"],
+     ["es", "Español"],
+     ["ca", "Català"],
+     ["en", "English"],
+   ]
+     .map(
+       ([v, l]) =>
+         `<option value="${v}"${(p.docLanguage || "") === v ? " selected" : ""}>${l}</option>`,
+     )
+     .join("")}</select></div>
    <div class="field"><label>Origen del contacto</label><select id="e_src">${listOptions("leadSources", p.leadSource)}</select></div>
    <div class="field"><label>Línea de negocio</label><input id="e_bl" value="${esc(p.businessLine || "")}" placeholder="p. ej. Reformas"></div>
    <div class="field"><label>Categoría (proveedores)</label><input id="e_cat" value="${esc(p.category || "")}" placeholder="p. ej. Materiales"></div>
@@ -19271,6 +19281,7 @@
               landline: $("#e_land").value.trim(),
               email: $("#e_mail").value.trim(),
               leadSource: $("#e_src").value,
+              docLanguage: $("#e_dlang").value,
               businessLine: $("#e_bl").value.trim(),
               category: $("#e_cat").value.trim(),
               aliases: $("#e_alias")
@@ -20431,6 +20442,36 @@
         const doc = CaneiErpFacts.docFor(erp, kind, refs, CaneiDocTypes);
         return `<div class="cnsheet">${CaneiSheet.render(doc, erp._issuerBlock(), CaneiDocI18n.tr(lang || "es"), { pict: typeof ErpPictograms !== "undefined" ? ErpPictograms : null })}</div>`;
       }
+      /** N1 · the operator's "standard drop-down at the bottom" — the same
+       *  language control under every document panel. Frozen documents show
+       *  the reason instead of a live control. */
+      function docLangFootHtml(idAttr, current, disabled, reason) {
+        return `<div class="doclangfoot" style="display:flex;gap:8px;align-items:center;margin:8px 0 2px;font-size:12.5px">
+    <label for="${idAttr}">Idioma del documento</label>
+    <select id="${idAttr}"${disabled ? " disabled" : ""}>
+      ${["es", "ca", "en"].map((v) => `<option value="${v}"${current === v ? " selected" : ""}>${LANG_NAME[v]}</option>`).join("")}
+    </select>
+    ${disabled && reason ? `<span style="color:var(--muted);font-size:11.5px">${esc(reason)}</span>` : ""}
+   </div>`;
+      }
+      function changeLangFootHtml(id, doc) {
+        const c = erp.state.changes.find((x) => x.id === id);
+        return docLangFootHtml(
+          "chgLang",
+          doc.language,
+          !!(c && c.approvedAt),
+          "La adenda aprobada conserva su idioma",
+        );
+      }
+      function wireChangeLangFoot(id) {
+        const sel = $("#chgLang");
+        if (!sel || sel.disabled) return;
+        sel.onchange = () =>
+          mutate(() => {
+            erp.setChangeLanguage(id, sel.value, "backoffice");
+            changeDocDrawer(id);
+          }, "Idioma del documento actualizado");
+      }
       /** The quote's graphic annex, unchanged: pages of plates after the sheet
        *  (as a SIBLING of .cnsheet — the sheet's caged styles must not touch
        *  the annex figures), still img[data-blob] for paintImages to fill. */
@@ -21366,6 +21407,7 @@
           irpfBp: 0,
           installmentIdx: null,
           changeId: null,
+          language: null, // N1 · null = customer's language, else company default
           rectifies: (opts && opts.rectifies) || null,
           rectifyReason: "",
         };
@@ -21462,6 +21504,7 @@
           irpfBp: w.irpfBp,
           installmentIdx: w.installmentIdx,
           changeId: w.changeId,
+          language: w.language,
           rectifies: w.rectifies,
           rectifyReason: w.rectifyReason,
         };
@@ -21547,6 +21590,16 @@
      </select></div>
      <div class="field"><label>IVA (%)</label><input id="inv_vat" type="number" step="0.1" value="${((w.vatBp != null ? w.vatBp : p.vatBp) / 100).toFixed(1)}"></div>
      <div class="field"><label>Retención IRPF (%)</label><input id="inv_irpf" type="number" step="0.1" value="${(w.irpfBp / 100).toFixed(1)}"></div>
+     <div class="field"><label>Idioma del documento</label><select id="inv_lang">
+      ${[
+        ["", "— según el cliente —"],
+        ["es", "Español"],
+        ["ca", "Català"],
+        ["en", "English"],
+      ]
+        .map(([v, l]) => `<option value="${v}"${(w.language || "") === v ? " selected" : ""}>${l}</option>`)
+        .join("")}
+     </select></div>
     </div>
    </div>
 
@@ -21619,6 +21672,10 @@
           w.irpfBp = Math.round(+e.target.value * 100) || 0;
           invSync();
         };
+        $("#inv_lang").onchange = (e) => {
+          w.language = e.target.value || null;
+          invSync();
+        };
         $("#invIssue").onclick = invIssue;
         invSync(comp);
       }
@@ -21677,6 +21734,7 @@
           doc.innerHTML = sheetDocHtml(
             pv.doc.docType === "FACTURA RECTIFICATIVA" ? "rectificativa" : "factura",
             { doc: pv.doc },
+            pv.doc.language,
           );
           paintImages(doc); // the company logo is a stored blob like any other
         }
@@ -21740,9 +21798,11 @@
       function downloadInvoicePdf(number) {
         const inv = erp.renderInvoiceDoc(number);
         printSheetHtml(
-          sheetDocHtml(inv.docType === "FACTURA RECTIFICATIVA" ? "rectificativa" : "factura", {
-            invoiceId: number,
-          }),
+          sheetDocHtml(
+            inv.docType === "FACTURA RECTIFICATIVA" ? "rectificativa" : "factura",
+            { invoiceId: number },
+            inv.language,
+          ),
         );
       }
       /** The generated contract, printable at last — same route as the rest. */
@@ -22021,11 +22081,26 @@
           return;
         }
         const rec = erp.state.contracts.find((x) => x.number === d.number);
-        host.innerHTML = sheetDocHtml(
-          "contrato",
-          { contractId: rec && rec.id, lineText: (l) => lineDesc(l, d.language) },
-          d.language,
-        );
+        const signed = !!(d.signature && d.signature.customerSignedAt);
+        host.innerHTML =
+          sheetDocHtml(
+            "contrato",
+            { contractId: rec && rec.id, lineText: (l) => lineDesc(l, d.language) },
+            d.language,
+          ) +
+          docLangFootHtml(
+            "conLang",
+            d.language,
+            signed,
+            "El contrato firmado conserva su idioma",
+          );
+        const langSel = $("#conLang");
+        if (langSel && !langSel.disabled)
+          langSel.onchange = () =>
+            mutate(() => {
+              erp.setContractLanguage(rec.id, langSel.value, "backoffice");
+              contractDocPane(erp.renderContractDoc(rec.id));
+            }, "Idioma del documento actualizado");
         paintImages(host); // the company logo is a stored blob like any other
       }
 

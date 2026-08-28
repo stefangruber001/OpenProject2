@@ -2727,6 +2727,12 @@ window.CANEI_DICT = {
     ["Cantidad", "Quantity"],
     ["Idioma del documento", "Document language"],
     ["Idioma del documento actualizado", "Document language updated"],
+    // N1 · the document-language chain (PK-G)
+    ["Idioma de sus documentos", "Language of their documents"],
+    ["— idioma de la empresa —", "— company language —"],
+    ["— según el cliente —", "— per the customer —"],
+    ["El contrato firmado conserva su idioma", "A signed contract keeps its language"],
+    ["La adenda aprobada conserva su idioma", "An approved addendum keeps its language"],
     ["Español", "Spanish"],
     ["Condiciones de pago actualizadas", "Payment terms updated"],
     ["Validez actualizada", "Validity updated"],
