@@ -7438,6 +7438,202 @@ async function testAdmin(browser, base) {
     await pg.evaluate(() => closeDrawer());
     await pg.waitForTimeout(300);
 
+    /* ── PK7-E: clearing the quarter — select many, then one action ───────
+       Three fresh, small, undocumented card lines — exactly the shape a real
+       quarter is mostly made of — checked, ranged with shift-click, and
+       cleared in one bulk action through the same two calls the single-row
+       panel makes. */
+    const bulkSetup = await pg.evaluate(async () => {
+      const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
+      bankAcc = acc.id;
+      const movs = erp.importMovements(
+        acc.id,
+        [
+          { accountingDate: erp.today, concept: "E2E BULK CAFE 1", amountCents: -260 },
+          { accountingDate: erp.today, concept: "E2E BULK CAFE 2", amountCents: -310 },
+          { accountingDate: erp.today, concept: "E2E BULK CAFE 3", amountCents: -280 },
+        ],
+        "bo",
+      );
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 800));
+      const boxes = movs.map((m) => document.querySelector(`[data-sel="${m.id}"]`));
+      return { ids: movs.map((m) => m.id), allBoxesFound: boxes.every(Boolean) };
+    });
+    if (bulkSetup.allBoxesFound)
+      ok("PK7-E: three fresh transactions render with their own checkbox");
+    else bad("PK7-E: checkboxes render", JSON.stringify(bulkSetup));
+
+    const rcRangePick = await pg.evaluate(async (ids) => {
+      const box = (id) => document.querySelector(`[data-sel="${id}"]`);
+      box(ids[0]).click();
+      await new Promise((r) => setTimeout(r, 300));
+      // Shift-click the third to range-select all three.
+      box(ids[2]).dispatchEvent(new MouseEvent("click", { bubbles: true, shiftKey: true }));
+      await new Promise((r) => setTimeout(r, 300));
+      return {
+        selSize: rcSel.size,
+        allChecked: ids.every((id) => box(id).checked),
+        barMentions: (document.getElementById("rcSelBar") || {}).innerText || "",
+      };
+    }, bulkSetup.ids);
+    if (rcRangePick.selSize === 3 && rcRangePick.allChecked)
+      ok("PK7-E: shift-click ranges the selection across the checked rows");
+    else bad("PK7-E: range select", JSON.stringify(rcRangePick));
+    if (/3/.test(rcRangePick.barMentions) && /Vaciar|Identificar/.test(rcRangePick.barMentions))
+      ok("PK7-E: the bulk-action bar appears once something is picked");
+    else bad("PK7-E: bulk bar appears", rcRangePick.barMentions.slice(0, 160));
+
+    /* `autoAnswerModals` (installed at the top of this suite) is already
+       polling the page every 80ms and pressing the accept button on whatever
+       `.modal` it finds — that is what answers «Clasificar en bloque» here,
+       not this test reaching into the dialog itself. A manual search for the
+       button races the poller and reads as a false failure if it loses; the
+       honest check is the STATE the confirm was supposed to produce, waited
+       for rather than assumed. */
+    const classified = await pg.evaluate(async (ids) => {
+      document.getElementById("rcBulkCat").value = "office";
+      document.getElementById("rcBulkClassify").click();
+      await new Promise((r) => setTimeout(r, 900));
+      const rows = ids.map((id) => erp.state.movements.find((m) => m.id === id));
+      return {
+        selSizeAfter: rcSel.size,
+        allOverhead: rows.every(
+          (m) =>
+            m.class === "overhead" &&
+            m.allocations[0] &&
+            m.allocations[0].overheadCategory === "office",
+        ),
+        allUnbacked: rows.every((m) => m.unbacked && m.unbacked.reason),
+        stillOpen: erp.unreconciledMovements(null, null, bankAcc).filter((m) => ids.includes(m.id))
+          .length,
+      };
+    }, bulkSetup.ids);
+    if (classified.allOverhead && classified.allUnbacked)
+      ok("PK7-E: «Identificar» classifies every selected row with a category AND a reason");
+    else bad("PK7-E: bulk classify", JSON.stringify(classified));
+    if (classified.stillOpen === 0 && classified.selSizeAfter === 0)
+      ok("PK7-E: the three rows leave the queue and the selection clears itself");
+    else bad("PK7-E: queue clears, selection resets", JSON.stringify(classified));
+
+    /* Conciliados shows the LABEL, not the engine's own code — «Oficina», not
+       «office». `explainedHow` maps it; the engine still returns the bare
+       key, because codes are the engine's business and labels are the
+       host's. */
+    const labelShown = await pg.evaluate(async (id) => {
+      goTab("banking", "_reconciled");
+      await new Promise((r) => setTimeout(r, 800));
+      const q = document.getElementById("rdQ");
+      q.value = "E2E BULK CAFE 1";
+      q.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 400));
+      const row = document.querySelector("#rdList tr.click");
+      return row ? row.innerText.replace(/\s+/g, " ") : "NOTFOUND";
+    }, bulkSetup.ids[0]);
+    if (/Oficina/.test(labelShown) && !/\boffice\b/.test(labelShown))
+      ok("PK7-E: Conciliados shows the category's label, not the engine's internal code");
+    else bad("PK7-E: overhead label in Conciliados", labelShown);
+
+    /* «Seleccionar toda esta página», checked against whatever the page
+       actually holds — the queue by now carries rows other tests left behind
+       — and then EMPTIED again with «Vaciar» rather than acted on, so this
+       check touches nothing those other rows still need for what runs after
+       it. */
+    const pageSel = await pg.evaluate(async () => {
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 800));
+      const pageIds = [...document.querySelectorAll("#rcList tr.click")].map((tr) => tr.dataset.id);
+      document.getElementById("rcSelAll").click();
+      await new Promise((r) => setTimeout(r, 300));
+      const allSelected = pageIds.length > 0 && pageIds.every((id) => rcSel.has(id));
+      document.getElementById("rcSelClear").click();
+      await new Promise((r) => setTimeout(r, 300));
+      return { pageCount: pageIds.length, allSelected, sizeAfterClear: rcSel.size };
+    });
+    if (pageSel.allSelected && pageSel.sizeAfterClear === 0)
+      ok(
+        `PK7-E: «Seleccionar toda esta página» picks every row on screen (${pageSel.pageCount}), «Vaciar» drops them all`,
+      );
+    else bad("PK7-E: select all this page / clear", JSON.stringify(pageSel));
+
+    /* «Marcar sin respaldo», on its own fresh pair — checked one at a time,
+       not through «Seleccionar toda esta página», so this touches only the
+       two rows the check is actually about. */
+    const noDoc = await pg.evaluate(async () => {
+      const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
+      const movs = erp.importMovements(
+        acc.id,
+        [
+          { accountingDate: erp.today, concept: "E2E SUBCONTRATA 1", amountCents: -22000 },
+          { accountingDate: erp.today, concept: "E2E SUBCONTRATA 2", amountCents: -18000 },
+        ],
+        "bo",
+      );
+      render();
+      await new Promise((r) => setTimeout(r, 500));
+      const before = erp.state.tasks.length;
+      movs.forEach((m) => document.querySelector(`[data-sel="${m.id}"]`).click());
+      await new Promise((r) => setTimeout(r, 300));
+      document.getElementById("rcBulkNoDoc").click();
+      await new Promise((r) => setTimeout(r, 900));
+      const rows = movs.map((m) => erp.state.movements.find((x) => x.id === m.id));
+      return {
+        tasksAdded: erp.state.tasks.length - before,
+        wanted: movs.length,
+        allFlagged: rows.every((m) => m.needsDoc === true),
+        selSizeAfter: rcSel.size,
+      };
+    });
+    if (noDoc.tasksAdded === noDoc.wanted && noDoc.allFlagged)
+      ok(
+        `PK7-E: «Marcar sin respaldo» flags every row and creates a task for each one (${noDoc.tasksAdded})`,
+      );
+    else bad("PK7-E: bulk mark without support", JSON.stringify(noDoc));
+    if (noDoc.selSizeAfter === 0) ok("PK7-E: the selection clears after this action too");
+    else bad("PK7-E: selection resets after no-doc", JSON.stringify(noDoc));
+
+    /* ONE Deshacer clears BOTH what the bulk action wrote — the category AND
+       the reason — and the row goes straight back to the queue, not to a
+       second explanation asking for a second press. */
+    const rcBulkUndone = await pg.evaluate(async (id) => {
+      goTab("banking", "_reconciled");
+      await new Promise((r) => setTimeout(r, 800));
+      const before = erp.unreconciledMovements(null, null, null).some((m) => m.id === id);
+      // The row for THIS movement specifically, not merely the first one on
+      // the page — the earlier checks left other explained rows on the same
+      // list, and «first Deshacer found» would undo whichever of them
+      // happened to render on top.
+      const q = document.getElementById("rdQ");
+      q.value = "E2E BULK CAFE 1";
+      q.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 400));
+      document.querySelector("[data-undo]").click();
+      // Same poller, same reason not to reach for the modal directly here.
+      await new Promise((r) => setTimeout(r, 900));
+      const m = erp.state.movements.find((x) => x.id === id);
+      return {
+        beforeInQueue: before,
+        status: m.status,
+        unbacked: m.unbacked,
+        allocations: m.allocations,
+        backInQueue: erp.unreconciledMovements(null, null, null).some((x) => x.id === id),
+      };
+    }, bulkSetup.ids[0]);
+    if (
+      !rcBulkUndone.beforeInQueue &&
+      rcBulkUndone.status === "unallocated" &&
+      !rcBulkUndone.unbacked &&
+      rcBulkUndone.allocations.length === 0 &&
+      rcBulkUndone.backInQueue
+    )
+      ok("PK7-E: one Deshacer on a bulk-classified row clears the category AND the reason");
+    else bad("PK7-E: Deshacer on a bulk-classified row", JSON.stringify(rcBulkUndone));
+
+    // Back to Conciliación itself — a page reload here would reset the tab to
+    // Cuentas y saldos and pull #rcClose out from under the very next check.
+    await pg.evaluate(() => goTab("banking", "_reconcile"));
+    await pg.waitForTimeout(600);
+
     // Closing must REFUSE while anything is still unreconciled — the whole
     // point of a closed period is that it cannot contain an open question.
     await pg.click("#rcClose");

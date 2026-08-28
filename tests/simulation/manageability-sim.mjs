@@ -3572,6 +3572,159 @@ assert(
   throws(() => e.unexplainMovement(fee.id, "bo"), "and Deshacer is refused inside a sealed period");
 }
 
+/* ===================================================================== PK7-E
+   CLEARING THE QUARTER — bulk actions run the SAME calls the single-row
+   panel runs, on a filtered set, and Deshacer undoes all of what they wrote
+   in one press.
+   ===================================================================== */
+{
+  const e = new ERP("2026-08-27");
+  const sup = e.addParty({ roles: ["supplier"], name: "Prov 7E", taxId: "B12345674" }, "bo");
+  const acc = e.addBankAccount({ name: "Banco 7E", kind: "bank" }, "bo");
+  const till = e.addBankAccount({ name: "Caja 7E", kind: "till" }, "bo");
+
+  const cards = e.importMovements(
+    acc.id,
+    [
+      { accountingDate: "2026-08-01", concept: "CAFETERIA 1", amountCents: -260 },
+      { accountingDate: "2026-08-02", concept: "CAFETERIA 2", amountCents: -310 },
+      { accountingDate: "2026-08-03", concept: "CAFETERIA 3", amountCents: -280 },
+    ],
+    "bo",
+  );
+
+  /* A row already explained another way — matched to a document — before the
+     bulk action runs. `splitMovement` itself carries NO guard against an
+     already-matched movement (only `markMovementUnbacked` does); the bulk
+     loop's own filter is the only thing standing between it and a shortcut
+     the single-row panel would never permit. */
+  const bill = e.registerBill(
+    { supplierId: sup.id, number: "7E-1", baseCents: 5000, allocations: [] },
+    "bo",
+  );
+  const owed = e.billOutstandingCents(bill.id);
+  e.importMovements(
+    acc.id,
+    [{ accountingDate: "2026-08-04", concept: "PAGO PROV 7E", amountCents: -owed }],
+    "bo",
+  );
+  const paid = e.state.movements[e.state.movements.length - 1];
+  e.matchMovementSplit(paid.id, [{ billId: bill.id, amountCents: owed }], "bo");
+
+  /* THE BULK LOOP, exactly as the queue's «Identificar» button runs it: one
+     category, one reason, applied through the same two engine calls the
+     single-row panel uses, filtered to rows still open at the moment of the
+     click. */
+  const targets = [...cards.map((m) => m.id), paid.id];
+  const before = e.unreconciledMovements(null, null, acc.id).length;
+  for (const id of targets) {
+    const m = e.state.movements.find((x) => x.id === id);
+    if (!m || m.status !== "unallocated") continue;
+    e.splitMovement(
+      id,
+      [{ overheadCategory: "office", amountCents: Math.abs(m.amountCents) }],
+      "bo",
+    );
+    e.markMovementUnbacked(id, "comision", "bo");
+  }
+  assert(
+    e.unreconciledMovements(null, null, acc.id).length === before - cards.length,
+    "the bulk classify clears exactly the open rows, not the already-matched one",
+    String(e.unreconciledMovements(null, null, acc.id).length),
+  );
+  assert(
+    e.billOutstandingCents(bill.id) === 0 &&
+      paid.matched &&
+      paid.matched.documents.length === 1 &&
+      paid.allocations.length === 0,
+    "the already-matched row is untouched — no shortcut around its own guard",
+    JSON.stringify({ outstanding: e.billOutstandingCents(bill.id), allocations: paid.allocations }),
+  );
+  for (const m of cards) {
+    assert(
+      m.class === "overhead" &&
+        m.allocations[0].overheadCategory === "office" &&
+        m.unbacked.reason === "comision",
+      "each classified row carries both the category and the reason",
+      JSON.stringify({ class: m.class, allocations: m.allocations, unbacked: m.unbacked }),
+    );
+  }
+
+  /* THE BUG THIS BLOCK WAS WRITTEN TO CATCH. `movementExplanation` reports
+     "allocated" for a row that carries BOTH a category and a reason, because
+     that check runs first — and a Deshacer that cleared only what was
+     REPORTED, rather than everything the bulk action WROTE, would leave
+     `unbacked` behind: the row would come back explained a second time
+     instead of returning to the queue, and "one Deshacer" would have quietly
+     become two. */
+  const one = cards[0];
+  const explanation = e.movementExplanation(one);
+  assert(
+    explanation.how === "allocated",
+    "the compound row is reported as allocated — reasons come second",
+    explanation.how,
+  );
+  e.unexplainMovement(one.id, "bo");
+  assert(
+    one.status === "unallocated" && !one.unbacked && one.allocations.length === 0 && !one.class,
+    "ONE Deshacer clears the category AND the reason, not just the one that was reported",
+    JSON.stringify({ status: one.status, unbacked: one.unbacked, allocations: one.allocations }),
+  );
+  assert(
+    e.unreconciledMovements(null, null, acc.id).some((m) => m.id === one.id),
+    "…and the row is back in the queue after that single press",
+    String(e.unreconciledMovements(null, null, acc.id).some((m) => m.id === one.id)),
+  );
+
+  /* BULK "MARCAR SIN RESPALDO": the same call the single row makes, once per
+     movement — a task per document owed, not one task for the whole batch. A
+     fresh batch, deliberately: `cards[1]`/`cards[2]` are still carrying the
+     category-and-reason the earlier loop wrote them, and a bulk action never
+     runs twice on a row that already left the queue. */
+  const missing = e.importMovements(
+    acc.id,
+    [
+      { accountingDate: "2026-08-06", concept: "SUBCONTRATA SIN FACTURA 1", amountCents: -22000 },
+      { accountingDate: "2026-08-06", concept: "SUBCONTRATA SIN FACTURA 2", amountCents: -18000 },
+    ],
+    "bo",
+  );
+  const tasksBefore = e.state.tasks.length;
+  for (const m of missing) {
+    if (m.status !== "unallocated") continue;
+    e.flagMovementNoDoc(m.id, "bo");
+  }
+  assert(
+    e.state.tasks.length === tasksBefore + missing.length,
+    "one task per movement, not one task for the batch",
+    String(e.state.tasks.length - tasksBefore),
+  );
+  assert(
+    missing.every((m) => m.needsDoc === true),
+    "every bulk-flagged row is marked needing its own receipt",
+    JSON.stringify(missing.map((m) => m.needsDoc)),
+  );
+
+  /* PETTY CASH is untouched by any of this — the bulk action only ever runs
+     against what was in the queue's selection, and a movement never selected
+     stays exactly as the operator left it. */
+  const petty = e.recordCashMovement(
+    till.id,
+    {
+      accountingDate: "2026-08-05",
+      concept: "Tornillería 7E",
+      amountCents: -1200,
+      supportingDocRef: null,
+    },
+    "op",
+  );
+  assert(
+    petty.status === "unallocated" && !petty.class,
+    "a movement outside the selection is not touched by the bulk action",
+    JSON.stringify({ status: petty.status, class: petty.class }),
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

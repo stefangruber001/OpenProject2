@@ -1773,7 +1773,13 @@ touching any bank or expense screen.
   counterpart is shown with its reasons, a pair the matcher had to guess
   between look-alikes is labelled and kept out of the bulk action, and every
   action works on both legs.
-- **PK7-E · F** — bulk actions over a 535-row quarter, PDF statements.
+- **PK7-E — done (2026-08-28).** Select-all-on-page and select-range on the
+  queue, then one action: classify as general expense with a reason, or mark
+  without support — the same two calls the single-row panel makes, filtered
+  to rows still open at the moment of the click. Verifying it exposed a
+  two-press bug in PK7-D's own Deshacer for exactly the compound state this
+  package creates; fixed and pinned with a negative control.
+- **PK7-F** — PDF bank statements.
 
 Two constraints fixed by evidence, not preference: a real quarter is ~535
 movements, most of them small card purchases, so `gasto general` cannot be

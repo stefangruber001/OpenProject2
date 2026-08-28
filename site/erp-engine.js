@@ -5638,16 +5638,24 @@
       if (e.how === "internalTransfer" && m.transferPair)
         return this.unmarkInternalTransfer(movId, user);
       if (e.how === "matched") return this.unmatchMovement(movId, user);
-      // Everything else is a flag or a classification this layer set, and the
-      // way back is to clear exactly what was set — not to call unmatch, which
-      // would void payments that were never created.
-      if (e.how === "unbacked") m.unbacked = null;
+      /* Everything else is a flag or a classification this layer set, and the
+         way back is to clear ALL of it — not to call unmatch, which would
+         void payments that were never created, and not to clear only
+         whichever ONE field `movementExplanation` picked to report. A bulk
+         classification writes an overhead category AND an unbacked reason
+         together (PK7-E — "a class and a reason", the operator's own words
+         for this exact case), and the explanation reports only "allocated"
+         because that check runs first; clearing allocations alone would have
+         left `unbacked` behind, and the row would have come back explained a
+         second time instead of returning to the queue. Deshacer promised to
+         be ONE press regardless of how many flags a screen wrote. */
       if (e.how === "receipted") {
         m.needsDoc = true;
         m.docRef = null;
         m.docKey = null;
       }
-      if (e.how === "cardSettlement") m.cardSettlement = null;
+      m.unbacked = null;
+      m.cardSettlement = null;
       m.allocations = [];
       m.class = null;
       m.excludedFromPL = false;

@@ -9665,7 +9665,18 @@
 
    What is left on the screen itself is what is true of the PERIOD rather than
    of any one line: how many are still unexplained, the internal transfers
-   detected across it, the seal, and the periods already closed. */
+   detected across it, the seal, and the periods already closed.
+
+   PK7-E adds ONE more thing that is true of many lines at once: a real
+   quarter is ~535 rows, most of them small card purchases nobody will ever
+   attach an invoice to, and asking for one row per click is the difference
+   between an afternoon and an impossibility. `rcSel` holds the ids checked
+   so far — across page turns, since clearing it on every page flip would
+   undo exactly the accumulation a large quarter needs — and it self-heals
+   every render: an id that has left the queue (explained, by this bulk
+   action or any other) is dropped rather than carried as a stale reference. */
+      let rcSel = new Set(),
+        rcSelAnchor = null;
       function conciliacion(v) {
         $("#sub").textContent =
           "La cola de movimientos sin explicar, diez a diez. Abre uno para ver qué documento lo explica; el coste de obra se asigna en Gastos.";
@@ -9679,6 +9690,8 @@
         const open = erp.unreconciledMovements(r.from, r.to, bankAcc);
         const allOpen = erp.unreconciledMovements(null, null, bankAcc);
         const transfers = R ? R.internalTransfers(erp, r.from, r.to) : [];
+        const openIds = new Set(open.map((m) => m.id));
+        for (const id of [...rcSel]) if (!openIds.has(id)) rcSel.delete(id);
 
         v.innerHTML = `${periodNote(open.length, allOpen.length)}
    <div class="card"><div class="queuebar">
@@ -9689,6 +9702,7 @@
    </div></div>
    ${transferCard(transfers)}
    ${!R ? '<div class="card"><div class="empty">El emparejamiento asistido necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>' : ""}
+   <div id="rcSelBar"></div>
    <div id="rcList"></div>
    <div class="card" style="margin-top:12px"><div class="ch"><h3>Periodos cerrados</h3></div><div class="daylist" style="padding:10px 14px">
     ${
@@ -9740,6 +9754,7 @@
               .toLowerCase()
               .includes(q),
           columns: [
+            { label: "", html: (m) => rcSelCheckbox(m.id) },
             { label: "Fecha", get: (m) => fmtD(m.accountingDate) },
             { label: "Concepto", primary: true, html: (m) => movLine(m) },
             {
@@ -9756,6 +9771,21 @@
           ],
           onRowClick: (id) => matchDrawer(id),
         });
+        /* The checkbox's own click handler stops the event there — without
+           this, ticking a box would also fire the row's onclick and open the
+           matching panel underneath it. */
+        v.querySelectorAll("[data-sel]").forEach(
+          (cb) =>
+            (cb.onclick = (ev) => {
+              ev.stopPropagation();
+              rcToggleSel(cb.dataset.sel, ev.shiftKey);
+            }),
+        );
+        /* Read from the DOM rather than recomputed here: it is guaranteed to
+           be exactly the ids `renderMasterList` just painted — the same
+           search and the same page — with no pagination math duplicated and
+           no chance of the two disagreeing. */
+        renderRcSelBar([...v.querySelectorAll("#rcList tr.click")].map((tr) => tr.dataset.id));
 
         $("#rcClose").onclick = () =>
           mutate(() => erp.closeBankPeriod(r.from, r.to, "backoffice"), "Periodo cerrado");
@@ -9855,6 +9885,169 @@
         if (m.needsDoc) return '<span class="pill r">sin respaldo</span>';
         const days = Math.max(0, ErpEngine.daysBetween(erp.today, m.accountingDate));
         return `<span title="Días sin casar"><span>${days}</span> <span>d</span></span>`;
+      }
+
+      /** The queue row's own checkbox, reflecting the current selection. */
+      function rcSelCheckbox(id) {
+        return `<input type="checkbox" data-sel="${id}"${rcSel.has(id) ? " checked" : ""}>`;
+      }
+      /**
+       * PK7-E: check one row, or extend the pick to a whole run of them.
+       *
+       * A plain click toggles the row it lands on. Shift+click ADDS the run
+       * between the last row touched and this one — never removes, because on
+       * a page of fifty losing rows already picked to a stray shift-click,
+       * with no warning before it happened, is the one mistake this screen
+       * cannot afford. The anchor only means anything within the page that is
+       * currently painted — a range spanning a page nobody has rendered has
+       * no DOM order to compute from — so a shift-click against an anchor from
+       * an earlier page falls back to a plain toggle rather than guessing.
+       */
+      function rcToggleSel(id, shiftKey) {
+        const pageIds = [...document.querySelectorAll("#rcList tr.click")].map(
+          (tr) => tr.dataset.id,
+        );
+        const anchorIdx = rcSelAnchor ? pageIds.indexOf(rcSelAnchor) : -1;
+        if (shiftKey && anchorIdx >= 0) {
+          const here = pageIds.indexOf(id);
+          const [lo, hi] = anchorIdx < here ? [anchorIdx, here] : [here, anchorIdx];
+          for (let i = lo; i <= hi; i++) rcSel.add(pageIds[i]);
+        } else if (rcSel.has(id)) {
+          rcSel.delete(id);
+        } else {
+          rcSel.add(id);
+        }
+        rcSelAnchor = id;
+        render();
+      }
+      /**
+       * The controls for the two bulk actions, shown once something is picked.
+       *
+       * Both run the EXACT calls the single-row panel runs — `splitMovement` +
+       * `markMovementUnbacked` for «Identificar», `flagMovementNoDoc` for
+       * «Marcar sin respaldo» — reusing its own option lists and labels
+       * verbatim. A bulk action that took a shortcut the single row forbids
+       * (skipping the reason, skipping the per-document task) would clear the
+       * queue while answering a different question than the one it asks.
+       */
+      function rcBulkControls() {
+        return `<select class="inline" id="rcBulkCat">
+     <option value="">Identificar como…</option>
+     ${Object.entries(OVERHEAD_LABEL)
+       .map(([k, l]) => `<option value="${k}">${esc(l)}</option>`)
+       .join("")}
+    </select>
+    <select class="inline" id="rcBulkWhy">${erp
+      .listActive("unbackedReasons")
+      .map((x) => `<option value="${x.code}">${esc(x.es)}</option>`)
+      .join("")}</select>
+    <button class="btn sm primary" id="rcBulkClassify">Identificar</button>
+    <span style="width:10px"></span>
+    <button class="btn sm" id="rcBulkNoDoc">Marcar sin respaldo</button>`;
+      }
+      /**
+       * The bulk-action bar itself: how many are picked, and what can be done
+       * to all of them at once.
+       *
+       * «Seleccionar toda esta página» is deliberately page-scoped, not
+       * "select everything" — the operator raises Filas por pantalla (up to
+       * 50) and works the quarter in a handful of passes, each one a page the
+       * operator actually looked at, rather than one click reaching hundreds
+       * of rows nobody read. The pick itself persists across page turns so
+       * those passes accumulate instead of resetting each time, and it
+       * self-heals every render — an id already explained drops out on its
+       * own (see the note above `conciliacion`).
+       */
+      function renderRcSelBar(pageIds) {
+        const bar = $("#rcSelBar");
+        if (!bar) return;
+        if (!pageIds.length) {
+          bar.innerHTML = "";
+          return;
+        }
+        const n = rcSel.size;
+        const pageSelected = pageIds.every((id) => rcSel.has(id));
+        bar.innerHTML = `<div class="card" style="margin:0 0 12px"><div class="gtools">
+     <label style="display:flex;align-items:center;gap:6px">
+       <input type="checkbox" id="rcSelAll"${pageSelected ? " checked" : ""}>
+       <span>Seleccionar toda esta página</span> <span>(${pageIds.length})</span>
+     </label>
+     ${
+       n
+         ? `<span class="tag"><span>${n}</span> <span>seleccionados</span></span>
+      <button class="btn sm" id="rcSelClear">Vaciar</button>`
+         : ""
+     }
+     <span style="flex:1"></span>
+     ${n ? rcBulkControls() : ""}
+    </div></div>`;
+
+        $("#rcSelAll").onchange = (ev) => {
+          if (ev.target.checked) pageIds.forEach((id) => rcSel.add(id));
+          else pageIds.forEach((id) => rcSel.delete(id));
+          render();
+        };
+        const clr = $("#rcSelClear");
+        if (clr)
+          clr.onclick = () => {
+            rcSel.clear();
+            rcSelAnchor = null;
+            render();
+          };
+        if (!n) return;
+
+        /* Every id is re-checked against the LIVE record at run time, not
+           trusted from the moment it was ticked — the same discipline the
+           single-row path already has to have, since nothing here is
+           different from clicking the row and pressing the same button. A
+           row that has since matched or otherwise left the queue is skipped
+           rather than fought with; it is not this action's job to explain
+           what already got explained another way. */
+        $("#rcBulkClassify").onclick = async () => {
+          const cat = $("#rcBulkCat").value;
+          if (!cat) {
+            say("Elige primero la categoría de gasto general.");
+            return;
+          }
+          const why = $("#rcBulkWhy").value;
+          const yes = await askConfirm("Clasificar en bloque", {
+            body: "Los movimientos seleccionados se identifican como gasto general, con el motivo elegido. Cada uno puede deshacerse por separado desde Conciliados.",
+            okLabel: "Identificar",
+          });
+          if (!yes) return;
+          const ids = [...rcSel];
+          mutate(() => {
+            for (const id of ids) {
+              const m = erp.state.movements.find((x) => x.id === id);
+              if (!m || m.status !== "unallocated") continue;
+              erp.splitMovement(
+                id,
+                [{ overheadCategory: cat, amountCents: Math.abs(m.amountCents) }],
+                "backoffice",
+              );
+              erp.markMovementUnbacked(id, why, "backoffice");
+            }
+            rcSel.clear();
+            rcSelAnchor = null;
+          }, ids.length + " movimiento(s) identificados como gasto general");
+        };
+        $("#rcBulkNoDoc").onclick = async () => {
+          const yes = await askConfirm("Marcar sin respaldo", {
+            body: "Los movimientos seleccionados se marcan sin respaldo, con una tarea para reclamar el justificante de cada uno. Cada uno puede deshacerse por separado desde Conciliados.",
+            okLabel: "Marcar sin respaldo",
+          });
+          if (!yes) return;
+          const ids = [...rcSel];
+          mutate(() => {
+            for (const id of ids) {
+              const m = erp.state.movements.find((x) => x.id === id);
+              if (!m || m.status !== "unallocated") continue;
+              erp.flagMovementNoDoc(id, "backoffice");
+            }
+            rcSel.clear();
+            rcSelAnchor = null;
+          }, ids.length + " movimiento(s) marcados sin respaldo — una tarea por cada uno");
+        };
       }
 
       /* Why two movements were paired, in the operator's words. Same shape as
@@ -10036,11 +10229,23 @@
         const rest = m.counterparty && m.concept && m.concept !== m.counterparty ? m.concept : "";
         return esc(lead) + (rest ? ` <span class="sub">${esc(rest)}</span>` : "");
       }
-      /** How it was explained, and against what. Built outside the template. */
+      /**
+       * How it was explained, and against what. Built outside the template.
+       *
+       * `m.detail` on an "allocated" row is the engine's own code — a project
+       * code when the allocation names a project, an overhead CATEGORY KEY
+       * ("office") when it does not, because the engine returns codes and the
+       * host owns their labels (project codes are already the thing a person
+       * reads; an overhead key is not). `OVERHEAD_LABEL[detail]` catches the
+       * second case and leaves a project code untouched — the two never
+       * collide, since a project code has the shape "P-YYYY-NNNN" and no
+       * overhead key does.
+       */
       function explainedHow(m) {
         const label = EXPLAINED_HOW[m.how] || m.how;
         const tone = m.how === "matched" ? "g" : m.how === "closedPeriod" ? "y" : "b";
-        const detail = m.detail ? ` <span class="sub">${esc(m.detail)}</span>` : "";
+        const shown = m.detail ? OVERHEAD_LABEL[m.detail] || m.detail : "";
+        const detail = shown ? ` <span class="sub">${esc(shown)}</span>` : "";
         return `<span class="pill ${tone}">${esc(label)}</span>${detail}`;
       }
       /** The way back, or the reason there is not one. */

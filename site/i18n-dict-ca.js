@@ -943,6 +943,16 @@ window.CANEI_DICT.ca = {
   "importe casi opuesto": "import quasi oposat",
   "cuentas distintas": "comptes diferents",
   "＋ Añadir gasto": "＋ Afegeix despesa",
+  // ── PK7-E: tancar el trimestre — selecciona'n molts, una sola acció.
+  "Seleccionar toda esta página": "Selecciona tota aquesta pàgina",
+  seleccionados: "seleccionats",
+  Vaciar: "Buida",
+  "Clasificar en bloque": "Classifica en bloc",
+  "Los movimientos seleccionados se identifican como gasto general, con el motivo elegido. Cada uno puede deshacerse por separado desde Conciliados.":
+    "Els moviments seleccionats s'identifiquen com a despesa general, amb el motiu triat. Cada un es pot desfer per separat des de Conciliats.",
+  "Los movimientos seleccionados se marcan sin respaldo, con una tarea para reclamar el justificante de cada uno. Cada uno puede deshacerse por separado desde Conciliados.":
+    "Els moviments seleccionats es marquen sense justificant, amb una tasca per reclamar el justificant de cada un. Cada un es pot desfer per separat des de Conciliats.",
+  "Elige primero la categoría de gasto general.": "Tria primer la categoria de despesa general.",
   // Els noms dels registres, ara claus estables.
   clientes: "clients",
   documento: "document",
@@ -2524,6 +2534,10 @@ window.CANEI_DICT.ca = {
     "Marcat sense justificant — s'ha creat una tasca per reclamar-lo",
   "traspaso(s) marcados — no cuentan como ingreso ni gasto":
     "traspàs(os) marcats — no compten com a ingrés ni despesa",
+  "movimiento(s) identificados como gasto general":
+    "moviment(s) identificats com a despesa general",
+  "movimiento(s) marcados sin respaldo — una tarea por cada uno":
+    "moviment(s) marcats sense justificant — una tasca per a cada un",
   "Periodo cerrado": "Període tancat",
   "Periodo reabierto": "Període reobert",
   "Presupuesto enviado": "Pressupost enviat",
