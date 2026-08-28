@@ -3881,7 +3881,7 @@ window.CANEI_DICT = {
     // The column header over a registration DATE, in all three places it is
     // used — not the priority level, which would make "Registered" wrong.
     ["Alta", "Registered"],
-    ["Buscar cliente por nombre", "Search customer by name"],
+    ["Buscar cliente por nombre o NIF", "Search customer by name or tax id"],
     ["NIF / CIF", "Tax ID"],
     ["← ERP", "← ERP"],
     ["Cobros / Pagos (DSO / DPO)", "Collection / payment days (DSO / DPO)"],
@@ -4385,9 +4385,9 @@ window.CANEI_DICT = {
       "Customer register. Required data is validated before invoicing or contracting.",
     ],
     ["Ningún cliente coincide con la búsqueda.", "No customer matches the search."],
-    ["Buscar proveedor por nombre", "Search supplier by name"],
+    ["Buscar proveedor por nombre o NIF", "Search supplier by name or tax id"],
     ["Ningún proveedor coincide con la búsqueda.", "No supplier matches the search."],
-    ["Buscar industrial por nombre", "Search trade contractor by name"],
+    ["Buscar industrial por nombre o NIF", "Search trade contractor by name or tax id"],
     ["Ninguna subcontrata coincide con la búsqueda.", "No subcontract matches the search."],
     ["Buscar por nombre", "Search by name"],
     ["Ningún trabajador coincide con la búsqueda.", "No worker matches the search."],
@@ -5145,6 +5145,11 @@ window.CANEI_DICT = {
     [new RegExp("^Justificante · (.+)$"), "Receipt · $1"],
     [new RegExp("^Costes · (.+)$"), "Costs · $1"],
     [new RegExp("^Importar extracto · (.+)$"), "Import statement · $1"],
+    // MDM-03: the hard tax-id refusal, which names the record holding it.
+    [
+      new RegExp("^Ya existe un registro activo con ese NIF: (.+)$"),
+      "A record with that tax id is already active: $1",
+    ],
     [
       new RegExp("^«¿Qué se pregunta sobre (.+)\\?» es obligatorio\\.$"),
       "«What is being asked about $1?» is required.",

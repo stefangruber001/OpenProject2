@@ -11674,6 +11674,24 @@
       const PROJECT_SUBS = ["progress", "economics", "variations", "purchasing", "labour"];
       let projFilter = "",
         projStatus = "open";
+      /**
+       * A register search that also looks at the tax identifier.
+       *
+       * The party registers searched name and code only, which made the one
+       * question the engine's hard uniqueness rule forces you to ask —
+       * "who already holds this NIF?" — unanswerable from any screen: the
+       * refusal names an identifier, and nothing would search for one. Case
+       * and punctuation are dropped on both sides, so the identifier found by
+       * pasting it from a refusal is the same one however either was typed.
+       */
+      const taxHit = (p, q) => {
+        const needle = q.replace(/[^0-9a-z]/gi, "");
+        if (!needle) return false; // «-» must not match every record that has a NIF
+        return String(p.taxId || "")
+          .toLowerCase()
+          .replace(/[^0-9a-z]/g, "")
+          .includes(needle);
+      };
       /* One list drives the table head AND the export, so a column can never be
    added to the screen and quietly missing from the file. The accessor returns
    plain text: the table renders pills, a spreadsheet cell cannot. */
@@ -16595,12 +16613,14 @@
             },
             newLabel: "＋ Nuevo",
             onNew: () => newPartyDrawer("customer"),
-            searchPlaceholder: "Buscar cliente por nombre",
+            searchPlaceholder: "Buscar cliente por nombre o NIF",
             nounSingular: "cliente",
             nounPlural: "clientes",
             baseRows: erp.state.parties.filter((p) => p.active && p.roles.includes("customer")),
             matches: (p, q) =>
-              p.name.toLowerCase().includes(q) || String(p.code).toLowerCase().includes(q),
+              p.name.toLowerCase().includes(q) ||
+              String(p.code).toLowerCase().includes(q) ||
+              taxHit(p, q),
             columns: CLI_COLS,
             onRowClick: (id) => partyDrawer(id),
             exportFile: "clientes",
@@ -16631,7 +16651,7 @@
             },
             newLabel: "＋ Nuevo",
             onNew: () => newPartyDrawer("supplier"),
-            searchPlaceholder: "Buscar proveedor por nombre",
+            searchPlaceholder: "Buscar proveedor por nombre o NIF",
             nounSingular: "proveedor",
             nounPlural: "proveedores",
             baseRows: erp.state.parties.filter(
@@ -16640,7 +16660,8 @@
             matches: (p, q) =>
               p.name.toLowerCase().includes(q) ||
               String(p.code).toLowerCase().includes(q) ||
-              (p.category || "").toLowerCase().includes(q),
+              (p.category || "").toLowerCase().includes(q) ||
+              taxHit(p, q),
             columns: [
               { label: "Código", primary: true, get: (p) => p.code },
               { label: "Nombre / Razón social", primary: true, get: (p) => p.name },
@@ -16719,14 +16740,16 @@
             },
             newLabel: "＋ Nuevo",
             onNew: () => newPartyDrawer("subcontractor"),
-            searchPlaceholder: "Buscar industrial por nombre",
+            searchPlaceholder: "Buscar industrial por nombre o NIF",
             nounSingular: "industrial",
             nounPlural: "industriales",
             baseRows: erp.state.parties.filter(
               (p) => p.active && p.roles.includes("subcontractor"),
             ),
             matches: (p, q) =>
-              p.name.toLowerCase().includes(q) || String(p.code).toLowerCase().includes(q),
+              p.name.toLowerCase().includes(q) ||
+              String(p.code).toLowerCase().includes(q) ||
+              taxHit(p, q),
             columns: [
               { label: "Código", primary: true, get: (p) => p.code },
               { label: "Nombre / Razón social", primary: true, get: (p) => p.name },

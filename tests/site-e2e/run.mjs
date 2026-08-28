@@ -10239,6 +10239,59 @@ async function testInlineCustomer(browser, base) {
     if (inMaster) ok("maestros: the client filed from the lead is on the Clientes list");
     else bad("maestros: inline client appears in master data", "no row for its NIF");
 
+    /* MDM-03 · the refusal has to be answerable from the screen.
+       Reported from the operator's own instance: registering a client was
+       refused with «Duplicate active party for tax id 07300000F», and no
+       register would search a tax id, so the record holding it could not be
+       found from the message that named it. Both halves are checked here —
+       the search finds it, and the refusal says who. */
+    await pg.fill("#cliQ", TAX);
+    await pg.waitForTimeout(500);
+    const byTax = await pg.evaluate(
+      (tax) =>
+        [...document.querySelectorAll("table tbody tr")].filter((tr) =>
+          tr.textContent.includes(tax),
+        ).length,
+      TAX,
+    );
+    if (byTax === 1) ok("maestros: a client can be found by pasting the NIF into the search box");
+    else bad("maestros: search by tax id", `rows matching ${TAX}: ${byTax}`);
+    // …and punctuation typed into the box does not lose the record.
+    await pg.fill("#cliQ", TAX.slice(0, 4) + "-" + TAX.slice(4).toLowerCase());
+    await pg.waitForTimeout(500);
+    const byMessyTax = await pg.evaluate(
+      (tax) =>
+        [...document.querySelectorAll("table tbody tr")].some((tr) => tr.textContent.includes(tax)),
+      TAX,
+    );
+    if (byMessyTax) ok("maestros: …however the operator punctuates or cases it");
+    else bad("maestros: search by messy tax id", "the dashed, lower-case form found nothing");
+
+    await pg.fill("#cliQ", "");
+    await pg.evaluate(() => newPartyDrawer("customer"));
+    await pg.waitForTimeout(400);
+    await pg.fill("#f_name", "E2E Cliente NIF repetido");
+    await pg.fill("#f_tax", TAX);
+    await pg.fill("#f_mob", "600555333");
+    await pg.fill("#f_street", "Carrer Repetit 1");
+    await pg.fill("#f_cp", "08003");
+    await pg.fill("#f_city", "Barcelona");
+    await pg.click("#f_save");
+    await pg.waitForTimeout(700);
+    const dupRefusal = await pg.locator("#toast").innerText();
+    const dupBlocked = await pg.evaluate(
+      () => !erp.state.parties.some((p) => p.name === "E2E Cliente NIF repetido"),
+    );
+    if (dupBlocked && dupRefusal.includes(NAME))
+      ok("maestros: a duplicate NIF is refused by NAMING the record that already holds it");
+    else
+      bad(
+        "maestros: duplicate NIF refusal names the holder",
+        `${dupRefusal} · blocked=${dupBlocked}`,
+      );
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
+
     /* A client with no tax identifier yet is still a client.
        "If you don't have the Tax number always from beginning available, still
        make it possible to add customer… no tax number should not block the

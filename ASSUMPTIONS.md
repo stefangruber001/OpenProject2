@@ -5684,6 +5684,58 @@ because a parser being right in a unit test says nothing about the screen,
 the same reasoning the existing `.xlsx` browser check (`1B`) was already
 built on.
 
+## MDM-03 · a refusal that names nobody (2026-08-28)
+
+Reported from the operator's own instance: registering a client was refused
+with «Duplicate active party for tax id 07300000F», and the operator could
+not find any duplicate. They were right — nothing in the product would have
+shown it to them.
+
+**Three separate reasons the record was unreachable.** The rule
+(`_assertTaxIdFree`) reads the WHOLE party file; Clientes lists only parties
+carrying the `customer` role, so a supplier, industrial, autónomo or adviser
+holding that identifier is refused from a screen that will never display it.
+No register's search looked at the tax id at all — Clientes matched name and
+code, Proveedores name, code and category — so pasting the number from the
+refusal into the search box was guaranteed to return nothing even when the
+record was sitting on the page. And the message named the identifier the
+operator already knew rather than the record they did not, in English, in a
+Spanish interface, because it was a raw engine string with no dictionary
+entry.
+
+**The refusal now names the holder** — name and code — which is the same
+courtesy the SOFT duplicate warning beside it has always extended
+(«⚠ Posible duplicado de X»). It is the hard rule, so it is the one that
+most needed to be actionable. The engine keeps naming the record, not its
+role: role→label mapping stays in the host, per the code-vs-label rule.
+
+**And the identifier is compared the way it is validated.** `validTaxId`
+normalised case and punctuation; the uniqueness rule compared the stored
+strings raw. So «35336088-s» and «35336088S» were two taxpayers to a HARD
+rule that exists to stop exactly that — one customer's invoices split across
+two records, and the filing built from them wrong. Both now go through
+`normTaxId`.
+
+**The three registers search the tax id**, punctuation- and case-insensitively,
+so the number in the refusal is a working search term. Placeholders say so.
+
+Proven red-first at both levels: reverting the engine turns the three new
+manageability checks red with the operator's own message
+(«Duplicate active party for tax id 35336088S», and the dashed form not
+throwing at all), and the browser suite drives the real screen — pasting the
+NIF finds the row, the dashed lower-case form still finds it, and a duplicate
+registration is refused by a toast naming the existing record.
+
+**Not addressed here, and worth the operator knowing.** Their instance
+carries leftover records from the server-e2e suite (a lead whose client is named
+`E2E 2026-08-07T22:09:32.550Z` is visible on the Leads screen). That suite
+mints customers with `freshTaxId(Date.now() + n)` — the last eight digits of
+the epoch millisecond plus its NIF letter — and `07300000F` is exactly a
+value that generator can emit (7300000 % 23 = 7 → «F»). So the record
+blocking them is most likely one of those. Cleaning test records out of a
+live tenant is a separate decision from making the refusal honest, which is
+all this change does.
+
 ## S32 · PK-B — the forecast sees every chapter, and «cuadra» is measured (2026-08-28)
 
 Two follow-ups to the operator's CP 83/86 report, on top of the PK7 unification

@@ -520,6 +520,45 @@ assert(
     reused = false;
   }
   assert(reused, "an INACTIVE tax-id holder does not block re-registration");
+
+  /* The refusal has to NAME the record it is protecting.
+     Reported from the operator's own instance: registering a client was
+     refused with «Duplicate active party for tax id 07300000F» and nothing
+     in the product would say which record held it — this rule reads the
+     whole party file, Clientes lists only the customer role, and no
+     register's search looked at a tax id at all. A refusal that names an
+     identifier the operator cannot search for is a dead end. */
+  const named = new ERP("2026-03-02");
+  named.addParty(
+    { ...base, roles: ["supplier"], name: "Suministros Ocultos SL", taxId: "35336088S" },
+    "t",
+  );
+  let refusal = "";
+  try {
+    named.addParty({ ...base, name: "Cliente Nuevo", taxId: "35336088S" }, "t");
+  } catch (e) {
+    refusal = e.message;
+  }
+  assert(
+    refusal.includes("Suministros Ocultos SL"),
+    "the tax-id refusal names the record that holds it",
+    refusal,
+  );
+  assert(
+    /T-\d{4}/.test(refusal),
+    "…and its code, so it can be found in whichever register it lives in",
+    refusal,
+  );
+
+  /* Case and punctuation are presentation, not identity. The uniqueness rule
+     compared stored strings raw while validation normalised, so the same
+     taxpayer typed with a dash walked straight past a HARD rule. */
+  const punct = new ERP("2026-03-02");
+  punct.addParty({ ...base, name: "Canónico", taxId: "35336088S" }, "t");
+  throws(
+    () => punct.addParty({ ...base, name: "Con guion", taxId: "35336088-s" }, "t"),
+    "the same tax id written with a dash and in lower case is still the same tax id",
+  );
 }
 
 // -----------------------------------------------------------------------------

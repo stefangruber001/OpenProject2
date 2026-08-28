@@ -78,10 +78,22 @@
 
   /* ---------------- validators (MDM-03, MDM-08) ---------------- */
   const NIF_L = "TRWAGMYFPDXBNJZSQVHLCKE";
-  function validTaxId(v) {
-    v = String(v || "")
+  /**
+   * A tax identifier reduced to what actually identifies it.
+   *
+   * Case and punctuation are presentation, not identity: «07300000-f» and
+   * «07300000F» are one taxpayer. Validation has always normalised this way;
+   * the UNIQUENESS rule did not, and compared the stored strings raw — so the
+   * hard MDM-03 rule could be walked straight past by typing the same
+   * identifier with a dash. Both now ask the same question of the same value.
+   */
+  function normTaxId(v) {
+    return String(v || "")
       .toUpperCase()
       .replace(/[^0-9A-Z]/g, "");
+  }
+  function validTaxId(v) {
+    v = normTaxId(v);
     if (/^[0-9]{8}[A-Z]$/.test(v)) return NIF_L[parseInt(v.slice(0, 8), 10) % 23] === v[8]; // DNI/NIF
     if (/^[XYZ][0-9]{7}[A-Z]$/.test(v)) {
       const n = { X: "0", Y: "1", Z: "2" }[v[0]] + v.slice(1, 8);
@@ -1239,13 +1251,27 @@
      * Deliberately scoped to active parties: deactivation is how this system
      * retires a record, and a retired holder must not block a legitimate
      * re-registration under the same identifier.
+     *
+     * THE REFUSAL NAMES THE RECORD THAT CAUSED IT. It used to say only
+     * «Duplicate active party for tax id X», which tells the operator that
+     * something in the file holds that identifier but not WHAT — and nothing
+     * in the product would tell them either: this rule reads the whole party
+     * file, while Clientes shows only parties with the customer role, and no
+     * register's search looked at the tax id at all. So a legitimate
+     * registration was refused, in English, pointing at a record the operator
+     * could not reach. The name is what makes it findable, and it is the same
+     * courtesy the SOFT duplicate warning beside it has always extended.
      */
     _assertTaxIdFree(taxId, selfId) {
-      if (!taxId) return;
+      const key = normTaxId(taxId);
+      if (!key) return;
       const clash = this.state.parties.find(
-        (x) => x.active && x.id !== selfId && x.taxId === taxId,
+        (x) => x.active && x.id !== selfId && normTaxId(x.taxId) === key,
       );
-      if (clash) throw new Error("Duplicate active party for tax id " + taxId);
+      if (clash)
+        throw new Error(
+          "Ya existe un registro activo con ese NIF: " + clash.name + " (" + clash.code + ")",
+        );
     }
     /** Soft warning at capture time — a suspect, not a refusal. */
     findDuplicateParty(rec) {

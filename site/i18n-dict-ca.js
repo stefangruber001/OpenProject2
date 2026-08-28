@@ -1686,7 +1686,7 @@ window.CANEI_DICT.ca = {
   Móvil: "Mòbil",
   "C.P.": "C.P.",
   Alta: "Alta",
-  "Buscar cliente por nombre": "Cercar client per nom",
+  "Buscar cliente por nombre o NIF": "Cercar client per nom o NIF",
   "NIF / CIF": "NIF / CIF",
   "← ERP": "← ERP",
   "Cobros / Pagos (DSO / DPO)": "Cobraments / Pagaments (DSO / DPO)",
@@ -2355,9 +2355,9 @@ window.CANEI_DICT.ca = {
   "Registro de clientes. Los datos obligatorios se validan antes de facturar o contratar.":
     "Registre de clients. Les dades obligatòries es validen abans de facturar o contractar.",
   "Ningún cliente coincide con la búsqueda.": "Cap client coincideix amb la cerca.",
-  "Buscar proveedor por nombre": "Cercar proveïdor per nom",
+  "Buscar proveedor por nombre o NIF": "Cercar proveïdor per nom o NIF",
   "Ningún proveedor coincide con la búsqueda.": "Cap proveïdor coincideix amb la cerca.",
-  "Buscar industrial por nombre": "Cercar industrial per nom",
+  "Buscar industrial por nombre o NIF": "Cercar industrial per nom o NIF",
   "Ninguna subcontrata coincide con la búsqueda.": "Cap subcontracta coincideix amb la cerca.",
   "Buscar por nombre": "Cercar per nom",
   "Ningún trabajador coincide con la búsqueda.": "Cap treballador coincideix amb la cerca.",
@@ -4196,6 +4196,10 @@ window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Justificante · (.+)$"), "Justificant · $1"],
   [new RegExp("^Costes · (.+)$"), "Costos · $1"],
   [new RegExp("^Importar extracto · (.+)$"), "Importar extracte · $1"],
+  [
+    new RegExp("^Ya existe un registro activo con ese NIF: (.+)$"),
+    "Ja existeix un registre actiu amb aquest NIF: $1",
+  ],
   [
     new RegExp("^«¿Qué se pregunta sobre (.+)\\?» es obligatorio\\.$"),
     "«Què es pregunta sobre $1?» és obligatori.",
