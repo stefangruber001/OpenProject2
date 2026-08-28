@@ -5946,3 +5946,25 @@ reasoning inline. The booted-workspace audit, which is what an operator
 actually sees, is unaffected and stays at zero.
 
 **Reversible: yes** — a ceiling number and a comment; no product code moved.
+
+### 184 · S1 CP autofill ships province-only; the planned GeoNames generator is deferred (2026-08-28)
+
+The S1 plan called for `tools/build-geo.mjs` fetching GeoNames' `ES.txt` at
+build time and committing a generated `site/erp-geo.js` (~11k postal codes →
+city + province). This session's outbound network is allow-listed to
+npm/pypi/Anthropic only — GeoNames and every other general host return a
+403 policy denial through the proxy, confirmed with curl and by searching
+npm/pypi for a bundled CP dataset (none exists; the ones that do fetch live).
+No fabricated data was written in its place.
+
+Put to the operator as a blocker rather than guessed: **province now, city
+later**. Shipped instead: a hand-verified 52-entry `CP_PROVINCE` table
+(Spain's two-digit province-code prefixes, INE-standard names) inline in
+`site/erp.html`, wired on `#f_cp`/`#e_cp` input to fill Provincia only —
+still editable, no silent city guess. The planned generator and full
+city-level `erp-geo.js` remain open work for a session with network access
+to GeoNames (or an operator-supplied dataset).
+
+**Reversible: yes** — an additive lookup table and an `oninput` handler; the
+full generator can replace it without touching callers, since both fill the
+same field.

@@ -10186,6 +10186,9 @@ async function testInlineCustomer(browser, base) {
     await pg.fill("#f_mob", "600999888");
     await pg.fill("#f_street", "Carrer de Prova 7");
     await pg.fill("#f_cp", "08001");
+    const provAuto = await pg.evaluate(() => document.querySelector("#f_prov")?.value);
+    if (provAuto === "Barcelona") ok("lead: typing a C.P. fills Provincia automatically");
+    else bad("lead: C.P. → Provincia autofill", provAuto);
     await pg.fill("#f_city", "Barcelona");
     await pg.click("#f_save");
     await pg.waitForTimeout(700);
@@ -10331,6 +10334,123 @@ async function testInlineCustomer(browser, base) {
     if (untaxed.onList)
       ok("cliente: the gap is visible on the Clientes list, not only in the form");
     else bad("cliente: pending NIF marked on the list", JSON.stringify(untaxed));
+
+    /* MDM-03 · the refusal has to say WHAT is wrong, not just that it is.
+       Reported on 28/08: «Invalid Tax ID» and nothing else. */
+    await pg.evaluate(() => newPartyDrawer("customer"));
+    await pg.waitForTimeout(400);
+    await pg.fill("#f_name", "E2E NIF con letra mala");
+    await pg.fill("#f_tax", "07000000F"); // wrong check letter — correct is L
+    await pg.fill("#f_mob", "600555222");
+    await pg.fill("#f_street", "Carrer Mal 4");
+    await pg.fill("#f_cp", "08005");
+    await pg.fill("#f_city", "Barcelona");
+    await pg.click("#f_save");
+    await pg.waitForTimeout(500);
+    const nifRefusal = await pg.locator("#toast").innerText();
+    if (nifRefusal.includes("DNI") && nifRefusal.includes("L"))
+      ok("cliente: an invalid NIF is refused naming the format and the correct letter");
+    else bad("cliente: NIF refusal explains itself", nifRefusal);
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
+
+    /* COM-01 · a new client has nowhere to be given an inmueble.
+       Reported on 28/08 alongside the raw-code-as-name symptom: the picker
+       offered no way to create one, and the printed document reads a
+       client's name off whichever inmueble is chosen. */
+    await pg.evaluate(() => (location.hash = "leads"));
+    await pg.waitForTimeout(700);
+    await pg.click("text=＋ Nueva oportunidad");
+    await pg.waitForTimeout(500);
+    const hasNewProp = await pg.evaluate(() =>
+      [...(document.querySelector("#o_prop")?.options || [])].some(
+        (o) => o.value === "__newprop__",
+      ),
+    );
+    if (hasNewProp) ok("lead: the inmueble picker offers «＋ Nuevo inmueble…»");
+    else bad("lead: inmueble picker offers inline creation", "no __newprop__ option");
+
+    await pg.fill("#o_work", "E2E: trabajo con inmueble nuevo");
+    await pg.selectOption("#o_prop", "__newprop__");
+    await pg.waitForTimeout(400);
+    const propForm = await pg.evaluate(() => ({
+      title: document.querySelector("#dttl")?.textContent,
+      street: !!document.querySelector("#pr_street"),
+    }));
+    if (propForm.title === "＋ Nuevo inmueble" && propForm.street)
+      ok("lead: picking it opens the real inmueble form");
+    else bad("lead: inline inmueble form opens", JSON.stringify(propForm));
+
+    await pg.fill("#pr_street", "C/ Nueva Vivienda 9");
+    await pg.fill("#pr_cp", "08960");
+    await pg.fill("#pr_city", "Sant Just Desvern");
+    await pg.click("#pr_save");
+    await pg.waitForTimeout(600);
+    const propBack = await pg.evaluate(() => ({
+      title: document.querySelector("#dttl")?.textContent,
+      work: document.querySelector("#o_work")?.value,
+      propLabel: document.querySelector("#o_prop")?.selectedOptions?.[0]?.textContent || "",
+      propCount: erp.state.properties.filter((p) => p.street === "C/ Nueva Vivienda 9").length,
+    }));
+    if (
+      propBack.title === "Nueva oportunidad" &&
+      propBack.work === "E2E: trabajo con inmueble nuevo" &&
+      propBack.propCount === 1 &&
+      propBack.propLabel.includes("C/ Nueva Vivienda 9")
+    )
+      ok("lead: creating an inmueble continues the lead with it selected");
+    else bad("lead: inline inmueble reaches state and selection", JSON.stringify(propBack));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
+
+    /* Maestros → Clientes: "en Maestros / Clientes debería poder asignarse
+       inmuebles a un cliente" — the read-only list gained ＋ Añadir and a
+       per-row ✏️, both driving the same propertyDrawer the lead uses. */
+    await pg.evaluate(() => (location.hash = "customers"));
+    await pg.waitForTimeout(700);
+    await pg.fill("#cliQ", NAME);
+    await pg.waitForTimeout(500);
+    await pg.locator("#view table.mlist tr.click").first().click();
+    await pg.waitForTimeout(500);
+    const hasAddBtn = await pg.evaluate(() => !!document.querySelector("#p_propnew"));
+    if (hasAddBtn) ok("maestros: the client's own drawer offers ＋ Añadir inmueble");
+    else bad("maestros: inmueble add button present", "no #p_propnew");
+    await pg.click("#p_propnew");
+    await pg.waitForTimeout(400);
+    await pg.fill("#pr_street", "C/ Desde Maestros 5");
+    await pg.fill("#pr_cp", "08960");
+    await pg.fill("#pr_city", "Sant Just Desvern");
+    await pg.click("#pr_save");
+    await pg.waitForTimeout(600);
+    const listedAfterAdd = await pg.evaluate(() =>
+      document.body.innerHTML.includes("C/ Desde Maestros 5"),
+    );
+    if (listedAfterAdd) ok("maestros: the inmueble just added appears back on the client's drawer");
+    else bad("maestros: added inmueble visible on return", "not found in drawer HTML");
+
+    const editBtn = await pg.evaluate(() => {
+      const rec = erp.state.properties.find((p) => p.street === "C/ Desde Maestros 5");
+      const btn = rec && document.querySelector(`[data-prop="${rec.id}"]`);
+      return !!btn;
+    });
+    if (editBtn) ok("maestros: the added inmueble carries its own edit button");
+    else bad("maestros: per-inmueble edit button", "not found");
+    await pg.evaluate(() => {
+      const rec = erp.state.properties.find((p) => p.street === "C/ Desde Maestros 5");
+      document.querySelector(`[data-prop="${rec.id}"]`).click();
+    });
+    await pg.waitForTimeout(400);
+    await pg.fill("#pr_street", "C/ Corregida Desde Maestros 6");
+    await pg.click("#pr_save");
+    await pg.waitForTimeout(600);
+    const editedOk = await pg.evaluate(() =>
+      document.body.innerHTML.includes("C/ Corregida Desde Maestros 6"),
+    );
+    if (editedOk) ok("maestros: editing an inmueble updates it and returns to the client");
+    else bad("maestros: inmueble edit round-trip", "corrected street not visible");
+    await pg.evaluate(() => closeDrawer());
+    await pg.fill("#cliQ", "");
+    await pg.waitForTimeout(300);
 
     if (errs.length) bad("cliente en línea: no console errors", errs.slice(0, 2).join(" | "));
     else ok("cliente en línea: no console errors");

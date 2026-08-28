@@ -120,7 +120,7 @@ assert(
 );
 assert(
   erp.state.importConflicts.some(
-    (c) => c.reason === "rechazado" && /tax identifier/i.test(c.detail || ""),
+    (c) => c.reason === "rechazado" && /NIF\/CIF/i.test(c.detail || ""),
   ),
   "the engine's own rejection reason is preserved for the operator",
 );

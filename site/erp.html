@@ -19458,16 +19458,34 @@
    <div class="card"><div class="ch"><h3>Historial</h3></div><div class="daylist">
      <div class="it"><b>${h.budgets.length}</b> presupuestos · <b>${h.contracts.length}</b> contratos · <b>${h.projects.length}</b> proyectos</div>
      <div class="it"><b>${h.invoices.length}</b> facturas · <b>${h.receipts.length}</b> recibos · <b>${h.bills.length}</b> facturas recibidas</div>
-     ${erp.state.properties
-       .filter((x) => x.partyId === id)
-       .map((x) => `<div class="it">🏠 ${esc(x.street)} (${x.surfaceM2} m²)</div>`)
-       .join("")}
+   </div></div>
+   <div class="card"><div class="ch"><h3>Inmuebles</h3><button class="btn sm" id="p_propnew">＋ Añadir</button></div><div class="daylist">
+     ${
+       erp.state.properties
+         .filter((x) => x.partyId === id)
+         .map(
+           (x) =>
+             `<div class="it"><span style="flex:1">🏠 ${esc(x.street)}${x.city ? ", " + esc(x.city) : ""} (${x.surfaceM2} m²)</span><button class="btn sm" data-prop="${x.id}">✏️</button></div>`,
+         )
+         .join("") || `<div class="it">Sin inmuebles asociados todavía.</div>`
+     }
    </div></div>
    <div style="display:flex;gap:8px;margin-top:10px">
      <button class="btn primary" id="p_edit">✏️ Editar datos</button>
      <button class="btn" id="p_act">${p.active ? "Desactivar" : "Reactivar"}</button>
    </div>`;
         $("#p_edit").onclick = () => editPartyDrawer(id);
+        $("#p_propnew").onclick = () =>
+          propertyDrawer(null, { partyId: id, back: () => partyDrawer(id), onSaved: () => partyDrawer(id) });
+        db.querySelectorAll("[data-prop]").forEach(
+          (btn) =>
+            (btn.onclick = () =>
+              propertyDrawer(btn.dataset.prop, {
+                partyId: id,
+                back: () => partyDrawer(id),
+                onSaved: () => partyDrawer(id),
+              })),
+        );
         $("#p_act").onclick = () =>
           mutate(
             () => {
@@ -19492,7 +19510,7 @@
         ];
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Nombre o razón social *</label><input id="e_name" value="${esc(p.name)}"></div>
-   <div class="field"><label>NIF / CIF / NIE <span class="lateflag" id="e_taxflag" title="Sin NIF no se puede facturar ni contratar — la ficha existe igual y se completa después">⚠</span></label><input id="e_tax" value="${esc(p.taxId || "")}"></div>
+   <div class="field"><label>NIF / CIF / NIE <span class="lateflag" id="e_taxflag" title="Sin NIF no se puede facturar ni contratar — la ficha existe igual y se completa después">⚠</span></label><input id="e_tax" value="${esc(p.taxId || "")}" placeholder="12345678Z / B12345674"></div>
    <div class="field"><label>Tipo</label><select id="e_type">${[
      ["individual", "Particular"],
      ["company", "Empresa"],
@@ -19503,13 +19521,13 @@
      .join("")}</select></div>
    <div class="field full"><label>Roles</label><div style="display:flex;gap:12px;flex-wrap:wrap;padding:6px 0">${ROLES.map(([v, l]) => `<label style="display:flex;gap:5px;align-items:center;font-size:12.5px"><input type="checkbox" data-role="${v}"${p.roles.includes(v) ? " checked" : ""}>${l}</label>`).join("")}</div></div>
    <div class="field full"><label>Dirección de facturación *</label><input id="e_street" value="${esc(p.billStreet || "")}"></div>
-   <div class="field"><label>C.P. *</label><input id="e_cp" value="${esc(p.billPostalCode || "")}"></div>
+   <div class="field"><label>C.P. *</label><input id="e_cp" value="${esc(p.billPostalCode || "")}" maxlength="5" inputmode="numeric"></div>
    <div class="field"><label>Población *</label><input id="e_city" value="${esc(p.billCity || "")}"></div>
    <div class="field"><label>Provincia</label><input id="e_prov" value="${esc(p.billProvince || "")}"></div>
    <div class="field"><label>Persona de contacto</label><input id="e_contact" value="${esc(p.contactPerson || "")}"></div>
-   <div class="field"><label>Móvil *</label><input id="e_mob" value="${esc(p.mobile || "")}"></div>
-   <div class="field"><label>Fijo</label><input id="e_land" value="${esc(p.landline || "")}"></div>
-   <div class="field full"><label>Email</label><input id="e_mail" value="${esc(p.email || "")}"></div>
+   <div class="field"><label>Móvil *</label><input id="e_mob" value="${esc(p.mobile || "")}" placeholder="600 123 456"></div>
+   <div class="field"><label>Fijo</label><input id="e_land" value="${esc(p.landline || "")}" placeholder="93 123 45 67"></div>
+   <div class="field full"><label>Email</label><input id="e_mail" value="${esc(p.email || "")}" placeholder="nombre@dominio.com"></div>
    <div class="field"><label>Idioma de sus documentos</label><select id="e_dlang">${[
      ["", "— idioma de la empresa —"],
      ["es", "Español"],
@@ -19550,6 +19568,7 @@
             '<button class="btn danger" id="e_del">🗑 Eliminar</button>',
         );
         wireLateFlag("#e_tax", "#e_taxflag");
+        wireCpProvince("#e_cp", "#e_prov");
         /* §3.1: a party carrying economic documents is never deleted, it is
      deactivated — an issued invoice must still be explainable years later,
      and it cannot be if the customer behind it is gone. The engine refuses
@@ -19671,14 +19690,14 @@
         ];
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Nombre o razón social *</label><input id="f_name"></div>
-   <div class="field"><label>NIF / CIF / NIE <span class="lateflag" id="f_taxflag" title="Sin NIF no se puede facturar ni contratar — la ficha se crea igual y se completa después">⚠</span></label><input id="f_tax" placeholder="12345678Z"></div>
+   <div class="field"><label>NIF / CIF / NIE <span class="lateflag" id="f_taxflag" title="Sin NIF no se puede facturar ni contratar — la ficha se crea igual y se completa después">⚠</span></label><input id="f_tax" placeholder="12345678Z / B12345674"></div>
    ${role ? "" : `<div class="field"><label>Rol</label><select id="f_role">${ROLE.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></div>`}
    <div class="field"><label>Persona de contacto</label><input id="f_contact"></div>
-   <div class="field"><label>Teléfono</label><input id="f_land"></div>
-   <div class="field"><label>Móvil *</label><input id="f_mob"></div>
-   <div class="field full"><label>Email</label><input id="f_mail"></div>
+   <div class="field"><label>Teléfono</label><input id="f_land" placeholder="93 123 45 67"></div>
+   <div class="field"><label>Móvil *</label><input id="f_mob" placeholder="600 123 456"></div>
+   <div class="field full"><label>Email</label><input id="f_mail" placeholder="nombre@dominio.com"></div>
    <div class="field full"><label>Dirección de facturación *</label><input id="f_street"></div>
-   <div class="field"><label>C.P. *</label><input id="f_cp"></div>
+   <div class="field"><label>C.P. *</label><input id="f_cp" placeholder="08960" maxlength="5" inputmode="numeric"></div>
    <div class="field"><label>Población *</label><input id="f_city"></div>
    <div class="field"><label>Provincia</label><input id="f_prov" value="Barcelona"></div>
    <div class="field"><label>Origen del contacto *</label><select id="f_src">${listOptions("leadSources")}</select></div>
@@ -19689,6 +19708,7 @@
         // `.field` is a COLUMN flex box, so the row has to be asked for — left
         // as it was, the two buttons would stack full-width on top of each other.
         if (back) $("#f_back").onclick = closeDrawer;
+        wireCpProvince("#f_cp", "#f_prov");
         wireLateFlag("#f_tax", "#f_taxflag");
         $("#f_save").onclick = () => {
           // A duplicate suspect is a soft warning (findDuplicateParty), never a
@@ -19746,6 +19766,90 @@
     typed. The flag is a statement about the RECORD, not a validation error:
     nothing is refused, and the same mark appears on the list so the gap is
     still visible tomorrow, when whoever has to chase it is looking. */
+      /**
+       * Spain's province from a postal code's own first two digits — the one
+       * part of an address a C.P. determines exactly. Reported from the demo
+       * on 28/08: typing a postal code left Población and Provincia empty,
+       * both marked required, both left for the operator to type by hand.
+       *
+       * Provincia only: the CP→MUNICIPIO half needs a real dataset (tens of
+       * thousands of postal codes, several municipalities sharing one CP in
+       * places), and this build has no path to one — see ASSUMPTIONS.md.
+       * Fifty-two provinces is a table small enough to read, check against
+       * the official INE list, and trust; a municipality guess quietly wrong
+       * on a real invoice is worse than Población staying a field the
+       * operator fills in, which is exactly today's behaviour, unchanged.
+       */
+      const CP_PROVINCE = {
+        "01": "Araba/Álava",
+        "02": "Albacete",
+        "03": "Alicante/Alacant",
+        "04": "Almería",
+        "05": "Ávila",
+        "06": "Badajoz",
+        "07": "Illes Balears",
+        "08": "Barcelona",
+        "09": "Burgos",
+        10: "Cáceres",
+        11: "Cádiz",
+        12: "Castellón/Castelló",
+        13: "Ciudad Real",
+        14: "Córdoba",
+        15: "A Coruña",
+        16: "Cuenca",
+        17: "Girona",
+        18: "Granada",
+        19: "Guadalajara",
+        20: "Gipuzkoa",
+        21: "Huelva",
+        22: "Huesca",
+        23: "Jaén",
+        24: "León",
+        25: "Lleida",
+        26: "La Rioja",
+        27: "Lugo",
+        28: "Madrid",
+        29: "Málaga",
+        30: "Murcia",
+        31: "Navarra",
+        32: "Ourense",
+        33: "Asturias",
+        34: "Palencia",
+        35: "Las Palmas",
+        36: "Pontevedra",
+        37: "Salamanca",
+        38: "Santa Cruz de Tenerife",
+        39: "Cantabria",
+        40: "Segovia",
+        41: "Sevilla",
+        42: "Soria",
+        43: "Tarragona",
+        44: "Teruel",
+        45: "Toledo",
+        46: "Valencia/València",
+        47: "Valladolid",
+        48: "Bizkaia",
+        49: "Zamora",
+        50: "Zaragoza",
+        51: "Ceuta",
+        52: "Melilla",
+      };
+      function provinceForCp(cp) {
+        const s = String(cp || "").trim();
+        return /^\d{5}$/.test(s) ? CP_PROVINCE[s.slice(0, 2)] || "" : "";
+      }
+      /** Fills Provincia live as a five-digit C.P. is typed. Stays editable
+    afterwards — a table this small does not try to be the last word on an
+    address, only a faster start than typing all three fields by hand. */
+      function wireCpProvince(cpSel, provSel) {
+        const cpInp = $(cpSel),
+          provInp = $(provSel);
+        if (!cpInp || !provInp) return;
+        cpInp.addEventListener("input", () => {
+          const prov = provinceForCp(cpInp.value);
+          if (prov) provInp.value = prov;
+        });
+      }
       function wireLateFlag(inputSel, flagSel) {
         const inp = $(inputSel),
           flag = $(flagSel);
@@ -19796,19 +19900,75 @@
           `<option value="${NEW_PARTY}">＋ Nuevo cliente…</option>`
         );
       }
+      /** Same idea as NEW_PARTY, for the picker one field below it. */
+      const NEW_PROPERTY = "__newprop__";
       /** Every inmueble on file for one client — "" is always offered first (a lead
-    with no known address yet is normal; the client record itself is not). */
+    with no known address yet is normal; the client record itself is not).
+    The sentinel only appears once a client is chosen — a property with no
+    owner to attach it to is not a thing this screen can create. */
       function propertyOptions(partyId, selected) {
         const props = erp.state.properties.filter((p) => p.partyId === partyId);
-        return (
-          `<option value="">— sin inmueble asociado —</option>` +
-          props
-            .map(
-              (p) =>
-                `<option value="${p.id}"${p.id === selected ? " selected" : ""}>${esc(p.street)}${p.city ? ", " + esc(p.city) : ""}</option>`,
-            )
-            .join("")
-        );
+        const rows = props
+          .map(
+            (p) =>
+              `<option value="${p.id}"${p.id === selected ? " selected" : ""}>${esc(p.street)}${p.city ? ", " + esc(p.city) : ""}</option>`,
+          )
+          .join("");
+        const sentinel = partyId
+          ? `<option value="${NEW_PROPERTY}">＋ Nuevo inmueble…</option>`
+          : "";
+        return `<option value="">— sin inmueble asociado —</option>` + rows + sentinel;
+      }
+      const PROPERTY_PART = [
+        ["dwelling", "Vivienda"],
+        ["commonArea", "Zona común / comunidad"],
+        ["commercialUnit", "Local comercial"],
+      ];
+      /**
+       * A new or edited inmueble.
+       *
+       * Reported on 28/08: a new client has no inmueble yet, the picker offered
+       * no way to make one, and — because the presupuestador and the printed
+       * document both read the client's NAME off whichever inmueble is chosen
+       * (a mapping this session did not invent and does not change here) — a
+       * client with none showed as a raw internal code instead of their name.
+       * The picker gained a door exactly like the client picker's own
+       * «＋ Nuevo cliente…»; this is the room behind it.
+       *
+       * `partyId` is fixed by the caller for a NEW inmueble and never edited
+       * here — moving one to a different client is a deliberate act, not a
+       * side effect of correcting its street name, which is why
+       * `updateProperty` refuses to patch it at all.
+       */
+      function propertyDrawer(id, opts) {
+        const { partyId, back, onSaved } = opts || {};
+        const pr = id ? erp.property(id) : null;
+        const db = openDrawer(pr ? "Editar inmueble" : "＋ Nuevo inmueble", back);
+        db.innerHTML = `<div class="fgrid">
+   <div class="field full"><label>Dirección *</label><input id="pr_street" value="${esc(pr ? pr.street : "")}"></div>
+   <div class="field"><label>C.P.</label><input id="pr_cp" value="${esc(pr ? pr.postalCode : "")}" maxlength="5" inputmode="numeric" placeholder="08960"></div>
+   <div class="field"><label>Población</label><input id="pr_city" value="${esc(pr ? pr.city : "")}"></div>
+   <div class="field"><label>Tipo</label><select id="pr_part">${PROPERTY_PART.map(([v, l]) => `<option value="${v}"${(pr ? pr.part : "dwelling") === v ? " selected" : ""}>${l}</option>`).join("")}</select></div>
+   <div class="field"><label>Superficie (m²)</label><input id="pr_m2" type="number" min="0" step="1" value="${pr ? pr.surfaceM2 : ""}"></div>
+   <div class="field full" style="margin-top:8px${back ? ";flex-direction:row;gap:8px" : ""}"><button class="btn primary" id="pr_save"${back ? ` style="flex:1"` : ""}>${pr ? "Guardar cambios" : "Crear inmueble"}</button>${back ? `<button class="btn" id="pr_back">Cancelar</button>` : ""}</div></div>`;
+        if (back) $("#pr_back").onclick = closeDrawer;
+        $("#pr_save").onclick = () =>
+          mutate(() => {
+            const street = $("#pr_street").value.trim();
+            if (!street) throw new Error("La dirección es obligatoria");
+            const patch = {
+              street,
+              postalCode: $("#pr_cp").value.trim(),
+              city: $("#pr_city").value.trim(),
+              part: $("#pr_part").value,
+              surfaceM2: Math.round(+$("#pr_m2").value || 0),
+            };
+            const rec = pr
+              ? erp.updateProperty(id, patch, "backoffice")
+              : erp.addProperty(Object.assign({ partyId }, patch), "backoffice");
+            closeDrawer();
+            if (onSaved) onSaved(rec);
+          }, pr ? "Inmueble actualizado" : "Inmueble creado");
       }
       /* ---------- COM-04 · creating a contract (Package 2, slide 4) ----------
    "No hay opción de crear/subir nuevo contrato" — and it was more literal
@@ -20213,6 +20373,18 @@
           chosen = e.target.value;
           $("#o_prop").innerHTML = propertyOptions(chosen, null);
         };
+        // The select node itself survives a client change (only its options are
+        // replaced above), so one handler here covers every repaint.
+        $("#o_prop").onchange = (e) => {
+          if (e.target.value !== NEW_PROPERTY) return;
+          const draftNow = takeDraft();
+          propertyDrawer(null, {
+            partyId: chosen,
+            back: () => newOpportunityDrawer(draftNow),
+            onSaved: (rec) =>
+              newOpportunityDrawer(Object.assign({}, draftNow, { propertyId: rec.id })),
+          });
+        };
         wireCreatableSelect("#o_next", "nextActions", "Próxima acción");
         $("#o_save").onclick = () =>
           mutate(() => {
@@ -20223,7 +20395,10 @@
             erp.addOpportunity(
               {
                 partyId: $("#o_party").value,
-                propertyId: $("#o_prop").value || null,
+                propertyId:
+                  $("#o_prop").value && $("#o_prop").value !== NEW_PROPERTY
+                    ? $("#o_prop").value
+                    : null,
                 requestedWork: work,
                 source: $("#o_src").value,
                 expectedValue: Math.round((+$("#o_val").value || 0) * 100),

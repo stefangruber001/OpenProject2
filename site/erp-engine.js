@@ -138,6 +138,46 @@
     if (/[NPQRSW]/.test(letter)) return control === controlLetter; // letter-only orgs
     return control === String(controlDigit) || control === controlLetter; // either is accepted
   }
+  /**
+   * Why `validTaxId` said no, in words a person can act on.
+   *
+   * The refusal used to be "Invalid tax identifier: 07000000F" — the value
+   * the operator had just typed, handed back with an adjective, in English,
+   * on a Spanish screen. It explains nothing: not which document type was
+   * detected, not which character is wrong, not what it should have been.
+   * Reported from the demo on 28/08 as exactly that — a message that gives
+   * no purchase on the problem.
+   *
+   * This mirrors `validTaxId`'s own branches, because the shape it detects
+   * IS the answer to "what did you mean to type": a DNI typed with the wrong
+   * check letter is a different mistake from nine characters that match no
+   * Spanish document at all. Returns null when the value is valid — callers
+   * already know it is not, from `validTaxId`, before they call this.
+   */
+  function taxIdReason(v) {
+    const s = normTaxId(v);
+    if (/^[0-9]{8}[A-Z]$/.test(s)) {
+      const expected = NIF_L[parseInt(s.slice(0, 8), 10) % 23];
+      return expected === s[8]
+        ? null
+        : `DNI/NIF: la letra de control no corresponde — para ${s.slice(0, 8)} debería ser ${expected}, no ${s[8]}.`;
+    }
+    if (/^[XYZ][0-9]{7}[A-Z]$/.test(s)) {
+      const n = { X: "0", Y: "1", Z: "2" }[s[0]] + s.slice(1, 8);
+      const expected = NIF_L[parseInt(n, 10) % 23];
+      return expected === s[8]
+        ? null
+        : `NIE: la letra de control no corresponde — para ${s.slice(0, 8)} debería ser ${expected}, no ${s[8]}.`;
+    }
+    if (/^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$/.test(s))
+      return cifControlOk(s)
+        ? null
+        : `CIF: el dígito o letra de control no corresponde a los siete dígitos ${s.slice(1, 8)}.`;
+    if (/^[A-Z]{2}[0-9A-Z]{2,13}$/.test(s)) return null; // EU VAT — structural only
+    if (s.length !== 9)
+      return `No tiene la longitud de un DNI, NIE o CIF español (9 caracteres) ni la de un IVA intracomunitario (dos letras de país + dígitos).`;
+    return `El formato no corresponde a un DNI/NIF (8 dígitos y una letra), un NIE (X, Y o Z seguido de 7 dígitos y una letra) ni un CIF (una letra seguida de 7 dígitos y un dígito o letra).`;
+  }
   function validIban(v) {
     v = String(v || "")
       .toUpperCase()
@@ -1231,7 +1271,7 @@
       );
       rec.accountingCode = rec.accountingCode || "43" + rec.code.replace(/\D/g, ""); // MDM-09 aligned pair
       if (rec.taxId && !validTaxId(rec.taxId))
-        throw new Error("Invalid tax identifier: " + rec.taxId); // MDM-03
+        throw new Error("NIF/CIF no válido — " + taxIdReason(rec.taxId)); // MDM-03
       this._assertTaxIdFree(rec.taxId, rec.id); // MDM-03, hard rule
       const dup = this.findDuplicateParty(rec);
       rec.duplicateSuspect = dup ? dup.id : null;
@@ -1294,7 +1334,8 @@
     }
     updateParty(id, patch, user) {
       const p = this.party(id);
-      if (patch.taxId && !validTaxId(patch.taxId)) throw new Error("Invalid tax identifier");
+      if (patch.taxId && !validTaxId(patch.taxId))
+        throw new Error("NIF/CIF no válido — " + taxIdReason(patch.taxId));
       if (patch.taxId) this._assertTaxIdFree(patch.taxId, p.id); // MDM-03 on edit too
       if (patch.bank && patch.bank.iban && !validIban(patch.bank.iban))
         throw new Error("Invalid IBAN");
@@ -1442,6 +1483,29 @@
       this.state.properties.push(rec);
       this._log(user, "addProperty", rec.id);
       return rec;
+    }
+    property(id) {
+      const pr = this.state.properties.find((x) => x.id === id);
+      if (!pr) throw new Error("Property not found");
+      return pr;
+    }
+    /**
+     * MDM-05's edit path — addProperty had no way back to a record once
+     * created, which is why every inmueble in the system came from the seed:
+     * nothing on screen could add one, and nothing could fix a typo in one
+     * either. `id` and `partyId` are excluded: reassigning an inmueble to a
+     * different client is a different operation (move it explicitly) than
+     * correcting its own fields, and conflating the two is how a client's
+     * address quietly becomes somebody else's.
+     */
+    updateProperty(id, patch, user) {
+      const pr = this.property(id);
+      const clean = Object.assign({}, patch);
+      delete clean.id;
+      delete clean.partyId;
+      Object.assign(pr, clean);
+      this._log(user, "updateProperty", pr.id);
+      return pr;
     }
     partyHistory(id) {
       // MDM-13
@@ -6903,7 +6967,7 @@
         w,
       ); // rateHistory {from, rateCentsPerHour}; docs {kind, expiresOn, docRef}
       if (rec.taxId && !validTaxId(rec.taxId))
-        throw new Error("Invalid tax identifier: " + rec.taxId);
+        throw new Error("NIF/CIF no válido — " + taxIdReason(rec.taxId));
       this.state.workers.push(rec);
       this._log(user, "addWorker", rec.name);
       return rec;
@@ -6915,7 +6979,7 @@
       const w = this.state.workers.find((x) => x.id === id);
       if (!w) throw new Error("Worker not found");
       if (patch.taxId && !validTaxId(patch.taxId))
-        throw new Error("Invalid tax identifier: " + patch.taxId);
+        throw new Error("NIF/CIF no válido — " + taxIdReason(patch.taxId));
       Object.assign(w, patch);
       this._log(user, "updateWorker", w.name);
       return w;

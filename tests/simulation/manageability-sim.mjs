@@ -559,6 +559,97 @@ assert(
     () => punct.addParty({ ...base, name: "Con guion", taxId: "35336088-s" }, "t"),
     "the same tax id written with a dash and in lower case is still the same tax id",
   );
+
+  /* The refusal has to say WHAT is wrong, not just that something is.
+     Reported on 28/08: «Invalid Tax ID» and nothing else — no format, no
+     character, no fix. A wrong DNI check letter and nine characters that
+     match no Spanish document at all are two different mistakes, and the
+     message now says which one this is, and for the DNI/NIE case names the
+     letter that WOULD be correct. */
+  const badLetter = new ERP("2026-03-02");
+  let reason = "";
+  try {
+    badLetter.addParty({ ...base, name: "Letra mala", taxId: "07000000F" }, "t");
+  } catch (e) {
+    reason = e.message;
+  }
+  assert(
+    reason.includes("DNI/NIF") && reason.includes("debería ser L"),
+    "a DNI with the wrong check letter names the format AND the correct letter",
+    reason,
+  );
+  const badCif = new ERP("2026-03-02");
+  reason = "";
+  try {
+    badCif.addParty({ ...base, name: "CIF malo", taxId: "B12345678" }, "t");
+  } catch (e) {
+    reason = e.message;
+  }
+  assert(reason.includes("CIF"), "a bad CIF names itself as a CIF, not a generic refusal", reason);
+  const noShape = new ERP("2026-03-02");
+  reason = "";
+  try {
+    noShape.addParty({ ...base, name: "Sin forma", taxId: "1234" }, "t");
+  } catch (e) {
+    reason = e.message;
+  }
+  assert(
+    /longitud/.test(reason),
+    "a value too short to be any Spanish document says so, not «invalid»",
+    reason,
+  );
+  // And a genuinely valid identifier is unaffected by any of the above.
+  const ok = new ERP("2026-03-02");
+  const okRec = ok.addParty({ ...base, name: "Bien", taxId: "07000000L" }, "t");
+  assert(okRec.taxId === "07000000L", "a correct DNI is still accepted outright");
+}
+
+// -----------------------------------------------------------------------------
+// MDM-05: inmuebles can be READ BACK and CORRECTED, not only created.
+//
+// addProperty existed with no way back to a record once made — every
+// property() call, no getter, no update — so every inmueble in the system
+// came from the seed. Reported on 28/08 as two symptoms of the same gap: a
+// new client has nowhere to be given a property, and Maestros → Clientes
+// could show one but never fix a typo in it.
+// -----------------------------------------------------------------------------
+{
+  const e = new ERP("2026-03-02");
+  const cust = e.addParty(
+    { roles: ["customer"], name: "Con Inmueble", billStreet: "x", billPostalCode: "08960" },
+    "t",
+  );
+  const pr = e.addProperty(
+    { partyId: cust.id, street: "C/ Prova 1", postalCode: "08960", city: "Sant Just" },
+    "t",
+  );
+  assert(e.property(pr.id).id === pr.id, "property(id) reads back what addProperty created");
+  throws(() => e.property("nope"), "property(id) refuses an id that does not exist");
+
+  const updated = e.updateProperty(pr.id, { street: "C/ Corregida 2", surfaceM2: 88 }, "t");
+  assert(
+    updated.street === "C/ Corregida 2" && updated.surfaceM2 === 88,
+    "updateProperty corrects the fields it is given",
+  );
+  assert(
+    e.property(pr.id).partyId === cust.id,
+    "…without touching fields the patch did not mention",
+  );
+
+  // Reassignment is a different, deliberate act — not a side effect of fixing a street name.
+  const other = e.addParty(
+    { roles: ["customer"], name: "Otro Cliente", billStreet: "y", billPostalCode: "08008" },
+    "t",
+  );
+  e.updateProperty(pr.id, { partyId: other.id, street: "Intento de robo" }, "t");
+  assert(
+    e.property(pr.id).partyId === cust.id,
+    "updateProperty refuses to move a property to a different client",
+  );
+  assert(
+    e.property(pr.id).street === "Intento de robo",
+    "…while the field actually offered still saves",
+  );
 }
 
 // -----------------------------------------------------------------------------
