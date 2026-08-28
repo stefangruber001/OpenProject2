@@ -1121,6 +1121,9 @@
         stroke-width: 1.6;
         stroke-dasharray: 4 3;
       }
+      .curve .cdot {
+        fill: var(--green);
+      }
       .curve .cact {
         fill: none;
         stroke: var(--green);
@@ -7108,6 +7111,16 @@
     <path class="cplan" d="${path("plannedPct")}"></path>
     <path class="cproj" d="${path("projectedPct")}"></path>
     <path class="cact" d="${path("actualPct")}"></path>
+    ${
+      /* A10 · a run of one point draws no line; the dot says the observation
+         exists rather than leaving a blank chart on day one. */
+      (() => {
+        const drawable = pts.map((p, i) => [p.actualPct, i]).filter(([v]) => v != null);
+        return drawable.length === 1
+          ? `<circle class="cdot" cx="${x(drawable[0][1]).toFixed(1)}" cy="${y(drawable[0][0]).toFixed(1)}" r="3.5"></circle>`
+          : "";
+      })()
+    }
     <text x="${L}" y="${H - 8}">${fmtD(pts[0].date)}</text>
     <text x="${W - R}" y="${H - 8}" text-anchor="end">${fmtD(pts[pts.length - 1].date)}</text>
   </svg>`;

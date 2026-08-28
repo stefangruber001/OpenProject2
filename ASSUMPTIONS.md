@@ -5738,3 +5738,27 @@ names the catalogue code (A9); the send lands on the quotes register where
 the sent quote actually is (A13); and a line carrying money with no words —
 placeholder dots included — blocks the send (A14), because that is the one
 row on a document nobody can defend later.
+
+## S37 · PK-D — the S-curve stops lying by omission (2026-08-28)
+
+**Zero is the record.** Before the first observation the actual line now sits
+at zero from the plan's start: on day one nothing had been recorded because
+nothing had been done, and a chart with no actual line at all read as broken
+to the person it was drawn for. Beyond `asOf` the line still ends — the
+future has no record.
+
+**One observation is not a pace.** The projection is withheld until the
+progress log carries two distinct dates (entries on one afternoon are one
+day of evidence); until then the projected line is null and the finish is
+the plan's own, because a forecast extrapolated from a single day swings
+wildly with that day. A run of one drawable point renders as a dot, never
+as a blank. The curve always samples exactly at `asOf`, so the actual line
+reaches today and the projection takes off from a date somebody is standing
+on. tracking.test.ts was adjusted deliberately (fixtures now log two dates
+where they expect a projection) and gained the two new rules as tests; the
+committed bundle was regenerated from the changed capability.
+
+**Dates print as the operator sees them.** The e2e suite launches Chromium
+with --lang=es-ES: the two native date inputs keep ISO values, and their
+display follows the browser locale — the operator's Spanish browser shows
+dd/mm/yyyy, and now the suite tests exactly that rendering.

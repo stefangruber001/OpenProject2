@@ -61,7 +61,11 @@ async function main() {
   const base = `http://127.0.0.1:${port}`;
   await waitForServer(base);
 
-  const browser = await chromium.launch({ executablePath: CHROME });
+  /* A10 · the operator's browser is Spanish, and native date inputs render
+     in the browser's locale — running the suite in es-ES makes the screens
+     under test show the dd/mm/yyyy the operator actually sees. Values stay
+     ISO; only the paint changes. */
+  const browser = await chromium.launch({ executablePath: CHROME, args: ["--lang=es-ES"] });
   /* Every suite, in order. A list rather than thirty-four await statements so
      that `--only <substring>` can pick one out: the whole run takes about
      twelve minutes, and diagnosing one broken suite by re-running all of them
@@ -3976,6 +3980,43 @@ async function testProjectTracking(browser, base) {
     if (paths === 3 && curveTag.some((t) => /planificado .* real .* pts/.test(t)))
       ok("tracking: S curve draws planned, actual and projected");
     else bad("tracking: S curve", `paths=${paths} tags=${curveTag.join(" | ").slice(0, 80)}`);
+
+    // A10 · a run of one drawable point cannot make a line — the chart marks
+    // it with a dot instead of drawing nothing, and still emits its three
+    // paths for everything that reads them.
+    const a10dot = await pg.evaluate(() => {
+      const mk = (date, plannedPct, actualPct, projectedPct) => ({
+        date,
+        plannedPct,
+        actualPct,
+        projectedPct,
+      });
+      const svg = curveChart({
+        asOf: "2026-01-05",
+        points: [
+          mk("2026-01-01", 0, null, null),
+          mk("2026-01-05", 10, 5, null),
+          mk("2026-01-12", 30, null, null),
+        ],
+      });
+      return {
+        dot: /class="cdot"/.test(svg),
+        paths: (svg.match(/<path /g) || []).length,
+        noDotWithTwo: !/class="cdot"/.test(
+          curveChart({
+            asOf: "2026-01-05",
+            points: [
+              mk("2026-01-01", 0, 0, null),
+              mk("2026-01-05", 10, 5, null),
+              mk("2026-01-12", 30, null, null),
+            ],
+          }),
+        ),
+      };
+    });
+    if (a10dot.dot && a10dot.paths === 3 && a10dot.noDotWithTwo)
+      ok("A10: a single observation renders as a dot, never as a blank chart");
+    else bad("A10: single-point dot", JSON.stringify(a10dot));
 
     // ---- the one progress control (Package 3 slide 3) ----------------------
     // Two controls used to record the same fact: this grid, and PRY-01's

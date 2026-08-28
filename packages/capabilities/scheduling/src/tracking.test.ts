@@ -46,19 +46,54 @@ describe("progress curve", () => {
     expect(c.projectedFinish).toBe(c.plannedFinish);
   });
 
+  /* A10 · a pace needs two points: the fixtures now carry two observation
+     dates, because a projection from fewer is withheld by design. */
   it("pushes the finish out when the pace is behind, and pulls it in when ahead", () => {
     const plan = fourWeeks();
-    const behind = progressCurve(withProgress(plan, [50, 0, 0, 0]), sched(plan), {
+    const twoDays = (pct1: number, pct2: number): ProgressEntry[] => [
+      { taskId: plan.tasks[0]!.id, date: "2026-09-09", pct: pct1 },
+      { taskId: plan.tasks[0]!.id, date: "2026-09-11", pct: pct2 },
+    ];
+    const behind = progressCurve(withProgress(plan, [50, 0, 0, 0], twoDays(20, 50)), sched(plan), {
       asOf: "2026-09-11",
     });
     expect(behind.performanceIndex).toBeLessThan(1);
     expect(behind.projectedFinish > behind.plannedFinish).toBe(true);
 
-    const ahead = progressCurve(withProgress(plan, [100, 100, 0, 0]), sched(plan), {
-      asOf: "2026-09-11",
-    });
+    const ahead = progressCurve(
+      withProgress(
+        fourWeeks(),
+        [100, 100, 0, 0],
+        [
+          { taskId: plan.tasks[0]!.id, date: "2026-09-09", pct: 100 },
+          { taskId: plan.tasks[1]!.id, date: "2026-09-11", pct: 100 },
+        ],
+      ),
+      sched(plan),
+      { asOf: "2026-09-11" },
+    );
     expect(ahead.performanceIndex).toBeGreaterThan(1);
     expect(ahead.projectedFinish < ahead.plannedFinish).toBe(true);
+  });
+
+  it("withholds the projection while the log carries a single day of evidence", () => {
+    const plan = withProgress(
+      fourWeeks(),
+      [50, 0, 0, 0],
+      [{ taskId: fourWeeks().tasks[0]!.id, date: "2026-09-11", pct: 50 }],
+    );
+    const c = progressCurve(plan, sched(plan), { asOf: "2026-09-11", samples: 60 });
+    // One observation is not a pace: no projected line, and the finish is
+    // the plan's own rather than a forecast nobody made.
+    expect(c.points.every((p) => p.projectedPct === null)).toBe(true);
+    expect(c.projectedFinish).toBe(c.plannedFinish);
+  });
+
+  it("always samples the curve exactly at asOf", () => {
+    const plan = withProgress(fourWeeks(), [50, 0, 0, 0]);
+    // A sparse sampling step would otherwise skip over today.
+    const c = progressCurve(plan, sched(plan), { asOf: "2026-09-16", samples: 3 });
+    expect(c.points.some((p) => p.date === "2026-09-16")).toBe(true);
   });
 
   it("declines to judge a pace before any work was due", () => {
@@ -88,12 +123,15 @@ describe("progress curve", () => {
     expect(c.actualPct).toBe(50);
   });
 
-  it("has no actual line at all before the first observation", () => {
+  it("draws the actual line at zero before the first observation", () => {
     const plan = fourWeeks();
     const c = progressCurve(plan, sched(plan), { asOf: "2026-09-25", samples: 60 });
-    // Null, not zero: "nobody wrote anything down" and "nothing was done" are
-    // different claims and only one of them is supported.
-    expect(c.points.every((p) => p.actualPct === null)).toBe(true);
+    // A10 · zero, from the plan's start: nothing recorded IS the record, and
+    // a chart with no actual line at all read as broken to the person it was
+    // drawn for. Beyond asOf the line still ends — the future has no record.
+    expect(
+      c.points.every((p) => (p.date <= c.asOf ? p.actualPct === 0 : p.actualPct === null)),
+    ).toBe(true);
   });
 
   it("weights by value when the caller knows what each task is worth", () => {
@@ -108,7 +146,15 @@ describe("progress curve", () => {
   });
 
   it("projects forward from where the work actually is, without a jump", () => {
-    const plan = withProgress(fourWeeks(), [50, 0, 0, 0]);
+    const base = fourWeeks();
+    const plan = withProgress(
+      base,
+      [50, 0, 0, 0],
+      [
+        { taskId: base.tasks[0]!.id, date: "2026-09-09", pct: 20 },
+        { taskId: base.tasks[0]!.id, date: "2026-09-11", pct: 50 },
+      ],
+    );
     const c = progressCurve(plan, sched(plan), { asOf: "2026-09-11", samples: 60 });
     const future = c.points.filter((p) => p.projectedPct !== null);
     expect(future.length).toBeGreaterThan(0);
@@ -119,7 +165,15 @@ describe("progress curve", () => {
   });
 
   it("ends the curve on the later of the planned and projected finishes", () => {
-    const plan = withProgress(fourWeeks(), [40, 0, 0, 0]);
+    const base = fourWeeks();
+    const plan = withProgress(
+      base,
+      [40, 0, 0, 0],
+      [
+        { taskId: base.tasks[0]!.id, date: "2026-09-09", pct: 15 },
+        { taskId: base.tasks[0]!.id, date: "2026-09-11", pct: 40 },
+      ],
+    );
     const c = progressCurve(plan, sched(plan), { asOf: "2026-09-11" });
     expect(c.points[c.points.length - 1]!.date).toBe(c.projectedFinish);
   });
