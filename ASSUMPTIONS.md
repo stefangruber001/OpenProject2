@@ -5494,6 +5494,7 @@ and two checks go red, which is what makes them evidence.
 **Also verified as a negative control:** narrowing `unmarkInternalTransfer` to
 the leg that was pressed turns «Deshacer on one leg returns BOTH» red, and the
 queue count with it.
+
 ## S31 · PK-A — a job is linked back to its contract (2026-08-28)
 
 UAT CP 60 + CP 92, one cause with three symptoms. On a live workspace the job
@@ -5528,3 +5529,83 @@ contract → approved variation and asserts the chain — link set, annex
 built and returns the minted series numbers, so the register later suites read
 is byte-identical. Negative controls red first: the write-back removed turns
 the chain check red; the migration step gutted turns two m19 checks red.
+
+## PK7-E · Clearing the quarter (2026-08-28)
+
+Select-all-on-page and select-range, then one action over the run: classify
+as general expense with a reason, or mark without support — so a real
+quarter's ~535 movements is worked in a handful of page-sized passes rather
+than one row at a time. Internal transfers already had their own bulk path,
+built in PK7-D alongside the single-pair one, because pairing is inherently a
+proposal-and-accept mechanism, not a row-selection one; nothing here
+duplicates it.
+
+**The queue's own checkbox column, and nothing invented for it.** A checkbox
+per row, wired with `stopPropagation` so ticking one does not also open the
+matching panel underneath it. «Seleccionar toda esta página» reads the ids
+`renderMasterList` just rendered straight off the DOM (`#rcList tr.click`)
+rather than recomputing pagination and search independently — the two could
+never disagree, because one is read from what the other just painted.
+Shift-click extends the pick to the run between the last row touched and
+this one, on the CURRENT page only: an anchor from an earlier page has no
+DOM order to compute a range from, and falls back to a plain toggle rather
+than guessing across pages nobody has rendered.
+
+**The pick persists across page turns, deliberately.** Clearing it on every
+page flip would undo exactly the accumulation a 535-row quarter needs — the
+whole point is picking page 1's fifty, moving to page 2, picking fifty more,
+and applying one action to all hundred at once. It self-heals every render:
+an id that has left the queue (explained by this action, by a different one,
+by the single-row panel, by switching accounts) drops out on its own rather
+than being carried as a stale reference nobody asked to keep.
+
+**Both bulk actions run the exact calls the single-row panel runs.** «Identificar»
+is `splitMovement` (the category) followed by `markMovementUnbacked` (the
+reason) — the operator's own words for this case, from `docs/worklog/PK7-SPEC.md`:
+"A document where one exists; otherwise a class and a reason." «Marcar sin
+respaldo» is `flagMovementNoDoc`, once per movement — a task for each
+document still owed, not one task for the batch, because thirty missing
+receipts are thirty things to chase. A bulk action that took a shortcut the
+single row forbids — skipping the reason, skipping the per-document task —
+would clear the queue while answering a different question than the one it
+asks.
+
+**Every id is re-checked against the live record at the moment of the
+click**, not trusted from whenever it was ticked: `if (m.status !== "unallocated") continue;`
+before either engine call. `splitMovement` itself carries no guard against an
+already-matched movement — only `markMovementUnbacked` does — so this filter
+is the only thing standing between a bulk action and a shortcut the
+single-row panel would never permit. A negative-control engine check proves
+it: an already-matched row included in the target set is left completely
+untouched, its outstanding balance and its match exactly as they were.
+
+### The bug this session's own feature exposed in PK7-D
+
+Verifying that a bulk-classified row could be undone in one press found that
+it could not. `movementExplanation` reports a row carrying BOTH an overhead
+category and an unbacked reason as `"allocated"` — that check runs first —
+and `unexplainMovement`'s generic branch cleared only what was _reported_,
+not everything a screen had _written_: `m.allocations = []` ran, but
+`m.unbacked` was untouched, because only the `e.how === "unbacked"` line
+cleared it and `e.how` was `"allocated"` here. One press turned the row from
+"allocated" into "unbacked" instead of back into the queue — Deshacer became
+two presses for exactly the compound state PK7-E introduces. Fixed by
+clearing `unbacked` and `cardSettlement` unconditionally in that branch,
+proven by a negative control that reproduces the original two-press bug when
+reverted.
+
+**A second, smaller gap on the way past.** Conciliados showed a bulk- (or
+single-row-) classified movement's category as `office` — the engine's own
+internal key — rather than `Oficina`, because `movementExplanation`'s
+`detail` field is, correctly, a bare code (the engine returns codes; the host
+owns labels), and `explainedHow` was displaying it raw. `OVERHEAD_LABEL[detail] || detail`
+fixes it without touching the engine: a project code (`P-2026-0001`) passes
+through unchanged, since no overhead key has that shape.
+
+**And a false negative in my own test harness, not the product.** The suite
+already runs a background poller (`autoAnswerModals`) that answers every
+confirm dialog every 80ms — installed once, for the whole test file — so a
+test that also manually searches for and clicks the same dialog's button is
+racing it, and loses more often than it looks like it should. Both new
+confirm checks were rewritten to click the action and wait for the resulting
+state rather than reach into the dialog a second time.

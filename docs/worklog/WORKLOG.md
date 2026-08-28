@@ -1123,3 +1123,54 @@ evidence; narrowing the unmark to one leg turns the pair checks red too.
 Fourteen new engine checks (370/370), four new capability tests with their
 negative control, six new browser checks, and 23 dictionary entries in three
 languages.
+
+### PK7-E · Clearing the quarter (2026-08-28)
+
+Select-all-on-page and select-range, then one action: classify as general
+expense with a reason, or mark without support. A checkbox column on the
+queue, wired with `stopPropagation` so ticking one does not open the matching
+panel underneath it; «Seleccionar toda esta página» reads the ids
+`renderMasterList` just rendered off the DOM rather than recomputing
+pagination independently, so the two can never disagree. Shift-click extends
+to the run between the last row touched and this one, on the current page
+only. The pick persists across page turns — clearing it on every flip would
+undo exactly the accumulation a 535-row quarter needs — and self-heals every
+render, dropping any id that has already left the queue.
+
+Both actions run the exact calls the single-row panel runs — `splitMovement`
+
+- `markMovementUnbacked` for «Identificar» (the operator's own words: "a
+  class and a reason"), `flagMovementNoDoc` once per movement for «Marcar sin
+  respaldo», a task per document owed rather than one for the batch. Every id
+  is re-checked against the live record at click time (`status !== "unallocated"`
+  skipped), since `splitMovement` itself carries no guard against an
+  already-matched row — only `markMovementUnbacked` does — and that filter is
+  the only thing standing between a bulk action and a shortcut the single row
+  forbids. A negative control proves it: an already-matched row in the target
+  set is left completely untouched.
+
+**Found by building this: PK7-D's Deshacer had a two-press bug for exactly
+the compound state PK7-E creates.** `movementExplanation` reports a row
+carrying both a category and a reason as `"allocated"` (that check runs
+first), and `unexplainMovement`'s generic branch cleared only what was
+_reported_ — `m.allocations`, not `m.unbacked` — so one press turned the row
+from "allocated" into "unbacked" instead of back into the queue. Fixed by
+clearing both unconditionally; a negative control reproduces the original bug
+when reverted.
+
+Also on the way: Conciliados was showing a classified row's category as
+`office` (the engine's own code) rather than `Oficina`, since `explainedHow`
+displayed `m.detail` raw. `OVERHEAD_LABEL[detail] || detail` fixes it in the
+host, where labels belong; a project code passes through unchanged.
+
+And in the test suite itself: the harness already runs a background poller
+answering every confirm dialog every 80ms, so a check that also manually
+searches for and clicks the same button races it and reads as a false
+failure. Both new confirm checks click the action and wait for the resulting
+state instead.
+
+Eleven new engine checks (381/381 manageability, plus a negative control),
+ten new browser checks, and eight dictionary entries in three languages —
+two of them toast strings the source scanner catches even though `toast()`
+itself never calls the translator, the same as an existing PK7-D entry this
+session had wrongly assumed was exempt.

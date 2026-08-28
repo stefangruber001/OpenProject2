@@ -2992,6 +2992,20 @@ window.CANEI_DICT = {
     ["importe casi opuesto", "almost opposite amount"],
     ["cuentas distintas", "different accounts"],
     ["＋ Añadir gasto", "＋ Add expense"],
+    // ── PK7-E: clearing the quarter — select many, then one action.
+    ["Seleccionar toda esta página", "Select this whole page"],
+    ["seleccionados", "selected"],
+    ["Vaciar", "Clear"],
+    ["Clasificar en bloque", "Classify in bulk"],
+    [
+      "Los movimientos seleccionados se identifican como gasto general, con el motivo elegido. Cada uno puede deshacerse por separado desde Conciliados.",
+      "The selected transactions are identified as a general expense, with the chosen reason. Each one can be undone separately from Reconciled.",
+    ],
+    [
+      "Los movimientos seleccionados se marcan sin respaldo, con una tarea para reclamar el justificante de cada uno. Cada uno puede deshacerse por separado desde Conciliados.",
+      "The selected transactions are marked without evidence, with a task to chase the receipt for each one. Each one can be undone separately from Reconciled.",
+    ],
+    ["Elige primero la categoría de gasto general.", "Choose the general expense category first."],
     // The register nouns. `countTag` renders the figure and the noun as
     // separate elements, so each noun is a stable key instead of one
     // untranslatable string per count the data happens to produce.
@@ -4584,6 +4598,14 @@ window.CANEI_DICT = {
     [
       "traspaso(s) marcados — no cuentan como ingreso ni gasto",
       "transfer(s) marked — they count as neither income nor expense",
+    ],
+    [
+      "movimiento(s) identificados como gasto general",
+      "transaction(s) identified as a general expense",
+    ],
+    [
+      "movimiento(s) marcados sin respaldo — una tarea por cada uno",
+      "transaction(s) marked without evidence — a task for each one",
     ],
     ["Periodo cerrado", "Period closed"],
     ["Periodo reabierto", "Period reopened"],
