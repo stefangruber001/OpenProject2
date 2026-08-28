@@ -2750,6 +2750,12 @@ window.CANEI_DICT = {
     // Not words at all — the MIME type the drafts endpoint requires. Identity
     // pair so the audit knows it was seen and judged, not missed.
     ["message/rfc822", "message/rfc822"],
+    // PK-C · the small visible fixes
+    ["viendo solo", "showing only"],
+    ["Línea con importe y sin descripción", "A line with an amount and no description"],
+    ["× ver todas", "× show all"],
+    ["(IVA incl.)", "(VAT incl.)"],
+    ["sobre el contratado (IVA incl.)", "over the contracted amount (VAT incl.)"],
     ["Español", "Spanish"],
     ["Condiciones de pago actualizadas", "Payment terms updated"],
     ["Validez actualizada", "Validity updated"],

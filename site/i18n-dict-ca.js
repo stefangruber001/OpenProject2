@@ -740,6 +740,11 @@ window.CANEI_DICT.ca = {
   "⚠ No se pudo contactar con el servidor para archivar el borrador":
     "⚠ No s'ha pogut contactar amb el servidor per arxivar l'esborrany",
   "message/rfc822": "message/rfc822",
+  "viendo solo": "veient només",
+  "Línea con importe y sin descripción": "Línia amb import i sense descripció",
+  "× ver todas": "× veure totes",
+  "(IVA incl.)": "(IVA incl.)",
+  "sobre el contratado (IVA incl.)": "sobre el contractat (IVA incl.)",
   Español: "Espanyol",
   "Condiciones de pago actualizadas": "Condicions de pagament actualitzades",
   "Validez actualizada": "Validesa actualitzada",

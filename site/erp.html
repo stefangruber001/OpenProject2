@@ -142,6 +142,20 @@
         transition: 0.15s;
         white-space: nowrap;
       }
+      /* A7 · a button that will not act says so with more than the cursor —
+         the same treatment the wizard steps already had (.stp[disabled]). */
+      .btn[disabled],
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+      /* A8 · the hidden attribute means hidden, whatever display the class
+         gave the element — a file input inside a label still opens. */
+      [hidden] {
+        display: none !important;
+      }
       .btn:hover {
         border-color: color-mix(in srgb, var(--green) 40%, var(--line));
         transform: translateY(-1px);
@@ -4025,6 +4039,15 @@
         border-bottom: 1px solid var(--line);
         background: var(--paper);
       }
+      .drawer .dfoot2 {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 10px 14px;
+        border-top: 1px solid var(--line);
+        background: var(--paper);
+        flex: none;
+      }
       .drawer .db {
         overflow-y: auto;
         padding: 14px 18px 30px;
@@ -5005,6 +5028,11 @@
         <span style="flex: 1"></span><button class="btn sm" id="dClose">Cerrar</button>
       </div>
       <div class="db" id="dbody"></div>
+      <!-- A9 · the drawer's action bar. A save button that lives at the end
+           of a long scroll is a save button half the phones never see; this
+           slot sits OUTSIDE the scroller, pinned, and openDrawer empties it
+           on every open so no drawer inherits the previous one's buttons. -->
+      <div class="dfoot2" id="dfoot" hidden></div>
     </aside>
     <!-- §3's floating button for frequent site actions. Phones only; see the
          .fab rule for why. -->
@@ -7347,7 +7375,7 @@
         return ch.lines
           .map(
             (l) =>
-              `<option value="${l.id}"${l.id === sel ? " selected" : ""}>${esc(l.num)} · ${esc(lineDesc(l).slice(0, 48))}</option>`,
+              `<option value="${l.id}"${l.id === sel ? " selected" : ""}>${l.code ? esc(l.code) + " · " : ""}${esc(l.num)} · ${esc(lineDesc(l).slice(0, 48))}</option>`,
           )
           .join("");
       }
@@ -8709,8 +8737,10 @@
    <div class="field"><label>Tipo</label><select id="nh_k"><option value="normal">Normal</option><option value="extra">Extra</option><option value="festivo">Festivo</option></select></div>
    <div class="field"><label>Horas *</label><input id="nh_h" type="number" step="0.25" min="0"></div>
    <div class="field"><label>Fecha</label><input id="nh_d" type="date" value="${day}"></div>
-   <div class="field full" style="margin-top:6px"><button class="btn primary" id="nh_go">Registrar</button></div>
   </div>`;
+        // A9 · the action is pinned under the form, visible without scrolling
+        // — the operator's photo showed it clipped off the bottom of a phone.
+        drawerFoot('<button class="btn primary" id="nh_go" style="flex:1">Registrar</button>');
         const fillLines = () => {
           const opts = lineOptionsFor($("#nh_p").value, $("#nh_c").value, "");
           $("#nh_lwrap").style.display = opts ? "" : "none";
@@ -12998,7 +13028,7 @@
      }
      <span class="pill ${meta[2]}">${meta[1]}</span>
      ${locked && stage !== "accepted" ? '<span class="pill b">Congelada</span>' : ""}
-     <div class="tot"><span>Total</span><b id="pbTotal">${eur(t.grandCents)}</b></div>
+     <div class="tot"><span>Total <span style="font-weight:400;color:var(--muted)">(IVA incl.)</span></span><b id="pbTotal">${eur(t.grandCents)}</b></div>
      <div class="acts">
       ${locked && !b.acceptedVersionId ? '<button class="btn sm" id="bNewVer">Nueva versión</button>' : ""}
       <button class="btn sm" id="bSave">Guardar</button>
@@ -13759,9 +13789,20 @@
       function builderRows(id, vsel, locked, SECL) {
         const V = erp.version(id, vsel);
         const chapters = bChapter ? V.chapters.filter((c) => c.id === bChapter) : V.chapters;
-        $("#bGridTag").textContent = bChapter
-          ? "partida seleccionada"
-          : `${V.chapters.length} partidas`;
+        /* A6 · a filtered grid says so out loud and offers the way back. The
+           quiet «partida seleccionada» read as rows having vanished — the
+           operator's own words — so the tag now names the filter and clears
+           it in one click. */
+        if (bChapter) {
+          const cur = V.chapters.find((c) => c.id === bChapter);
+          $("#bGridTag").innerHTML =
+            `<span>viendo solo</span> <span translate="no">${esc(cur ? cur.num + ". " + cur.name : "—")}</span> ` +
+            `<button class="btn sm" id="bChapAll" style="margin-left:6px">× ver todas</button>`;
+          $("#bChapAll").onclick = () => {
+            bChapter = null;
+            render();
+          };
+        } else $("#bGridTag").textContent = `${V.chapters.length} partidas`;
         const cols = locked ? 12 : 13;
         /* Resolved ONCE per render, not once per line. `chapterCatalogueCode`
            walks the chapter list and then the itemChapters list; on a quote with
@@ -15159,6 +15200,13 @@
                 }
               }
               closeDrawer();
+              /* A13 · the operator lands on the quotes register, where the
+                 quote they just sent sits in «Enviados» — the locked builder
+                 they used to land on left them unsure anything had happened.
+                 The chapter filter dies with the send (A6): the next quote
+                 must not open pre-filtered to this partida. */
+              bChapter = null;
+              window.go("quotes"); // window.: `go` is the button in this scope
             }, "Presupuesto enviado — versión congelada");
             // A real send — even the WhatsApp text prefill — is a browser
             // side effect, not a state mutation, so it happens once mutate()
@@ -19304,7 +19352,19 @@
         else t.textContent = title;
         $("#scrim").classList.add("on");
         $("#drawer").classList.add("on");
+        // A9 · every open starts with no footer; a drawer that wants one
+        // fills it after building its body (drawerFoot below).
+        const df = $("#dfoot");
+        df.innerHTML = "";
+        df.hidden = true;
         return $("#dbody");
+      }
+      /** A9 · put a drawer's action buttons in the pinned footer. */
+      function drawerFoot(html) {
+        const df = $("#dfoot");
+        df.innerHTML = html;
+        df.hidden = false;
+        return df;
       }
       function closeDrawer() {
         const back = drawerDismiss;
@@ -19437,11 +19497,12 @@
        ? `<div class="field full"><label>IBAN (opcional — el cambio queda registrado)</label><input id="e_iban" value="${esc((p.bank && p.bank.iban) || "")}" placeholder="ES.."></div>`
        : `<div class="field full"><label>IBAN</label><div class="pill y" style="width:fit-content">Oculto — su perfil no tiene permiso para ver datos bancarios</div></div>`
    }
-   <div class="field full"><label>Notas</label><input id="e_notes" value="${esc(p.notes || "")}"></div>
-   <div class="field full" style="margin-top:8px;display:flex;gap:8px;align-items:center">
-     <button class="btn primary" id="e_save">Guardar cambios</button>
-     <span style="flex:1"></span>
-     <button class="btn danger" id="e_del">🗑 Eliminar</button></div></div>`;
+   <div class="field full"><label>Notas</label><input id="e_notes" value="${esc(p.notes || "")}"></div></div>`;
+        // A9 · save and delete pinned under the form, never behind a scroll.
+        drawerFoot(
+          '<button class="btn primary" id="e_save" style="flex:1">Guardar cambios</button>' +
+            '<button class="btn danger" id="e_del">🗑 Eliminar</button>',
+        );
         wireLateFlag("#e_tax", "#e_taxflag");
         /* §3.1: a party carrying economic documents is never deleted, it is
      deactivated — an issued invoice must still be explainable years later,
@@ -21896,7 +21957,7 @@
     <button class="btn sm" id="invBack" title="Volver al registro de facturas">← Facturas</button>
     <div class="who"><b>Nueva factura</b><span>${esc(p.code)} · ${esc(erp.party(p.partyId).name)}</span></div>
     <span style="flex:1"></span>
-    <div class="tot"><span>Total</span><b id="invTotal">—</b></div>
+    <div class="tot"><span>Total <span style="font-weight:400;color:var(--muted)">(IVA incl.)</span></span><b id="invTotal">—</b></div>
    </div>
    <div class="con2">
     <!-- The sheet IS the flex child, exactly as #conDoc is on the contract.
@@ -22697,9 +22758,13 @@
         // added one column the doc could not have known about: where the date came
         // from, now that a plan can move it.
         const sum = d.installments.reduce((s, i) => s + i.amountCents, 0);
-        const diff = sum - d.originalCents;
+        /* B1 · the milestones were priced on the GROSS (contract total, tax
+           included); comparing their sum against the taxable base painted a
+           red «sobre el contratado» on every contract with tax. Gross against
+           gross, and both labels say which figure they are. */
+        const diff = sum - d.originalTotalCents;
         host.innerHTML = `<div class="scroll"><table><thead><tr>
-     <th>Motivo</th><th class="num">Importe</th><th>Prevista</th><th>Factura</th></tr></thead><tbody>
+     <th>Motivo</th><th class="num">Importe <span style="font-weight:400;color:var(--muted)">(IVA incl.)</span></th><th>Prevista</th><th>Factura</th></tr></thead><tbody>
    ${
      d.installments
        .map(
@@ -22713,11 +22778,11 @@
        .join("") ||
      '<tr><td colspan="4"><div class="empty">Este contrato no tiene hitos de pago.</div></td></tr>'
    }
-   <tr class="tot"><td>Suma de hitos</td><td class="num">${eur(sum)}</td>
+   <tr class="tot"><td>Suma de hitos <span style="font-weight:400;color:var(--muted)">(IVA incl.)</span></td><td class="num">${eur(sum)}</td>
      <td colspan="2">${
        Math.abs(diff) <= d.installments.length
-         ? '<span class="pill g">cuadra con el contratado</span>'
-         : `<span class="pill r">${diff > 0 ? "+" : ""}${eur(diff)} sobre el contratado</span>`
+         ? `<span class="pill g">cuadra con el contratado</span> <span style="color:var(--muted)"><span translate="no">${eur(d.originalTotalCents)}</span> <span>base</span> <span translate="no">${eur(d.originalCents)}</span></span>`
+         : `<span class="pill r"><span translate="no">${diff > 0 ? "+" : ""}${eur(diff)}</span> <span>sobre el contratado (IVA incl.)</span></span>`
      }</td></tr>
    </tbody></table></div>
    <div class="daylist" style="margin-top:10px"><div class="it" style="color:var(--muted)">Una fecha marcada «de la planificación» la movió el calendario de obra, no una persona. Una fecha fija y un hito ya facturado nunca se mueven solos.</div></div>`;

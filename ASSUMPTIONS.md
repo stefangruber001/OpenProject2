@@ -5609,6 +5609,7 @@ test that also manually searches for and clicks the same dialog's button is
 racing it, and loses more often than it looks like it should. Both new
 confirm checks were rewritten to click the action and wait for the resulting
 state rather than reach into the dialog a second time.
+
 ## S32 · PK-B — the forecast sees every chapter, and «cuadra» is measured (2026-08-28)
 
 Two follow-ups to the operator's CP 83/86 report, on top of the PK7 unification
@@ -5716,3 +5717,24 @@ typography (em-dashes, a true minus) is outside Latin-1; one code point past
 255 corrupts the PDF stream and breaks btoa for anyone attaching the file.
 The writer now maps every string through a WinAnsi table at its single tr
 seam; what WinAnsi cannot say degrades to honest ASCII.
+
+## S36 · PK-C — the small fixes the UAT could see (2026-08-28)
+
+**B1 was a units bug wearing a label costume.** The milestones are priced on
+the contract's GROSS (createContract splits `totalCents`); the pane compared
+their sum against the taxable base, so every taxed contract wore a permanent
+red «sobre el contratado» pill — by exactly the tax. And the right gross is
+the ORIGINAL one: annexes bill through their own invoices, so a contract
+with annexes must not ask the milestone plan to cover them. `contractValue`
+now exposes both grosses, the pane compares like against like, and every
+figure says whether it is gross or base.
+
+**The rest are honesty-of-the-screen fixes.** A filtered builder names its
+filter and clears it in one click (A6), and the filter dies with the send;
+a disabled button looks disabled (A7); `[hidden]` always hides (A8); drawer
+actions live in a pinned footer the scroller cannot swallow, emptied on
+every open so no drawer inherits another's buttons (A9); the hours picker
+names the catalogue code (A9); the send lands on the quotes register where
+the sent quote actually is (A13); and a line carrying money with no words —
+placeholder dots included — blocks the send (A14), because that is the one
+row on a document nobody can defend later.
