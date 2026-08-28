@@ -93,8 +93,36 @@
   const BAND = { cliente: C.blue, cobro: rgb("#fbf0cf"), proveedor: C.grey, interno: C.grey };
 
   /* ============================================================ the engine */
+  /* The standard fonts speak WinAnsi, and a JS string does not: an em-dash
+     is U+2014 where the PDF wants 0x97, and one untranslated code point past
+     255 corrupts the stream (and breaks btoa for anyone attaching the file).
+     The label layer writes real typography — «—», «…», a true minus — so the
+     writer maps it rather than asking every caller to avoid it. Anything
+     WinAnsi genuinely cannot say degrades to its nearest honest ASCII. */
+  const WINANSI = {
+    "\u2014": "\x97",
+    "\u2013": "\x96",
+    "\u2018": "\x91",
+    "\u2019": "\x92",
+    "\u201c": "\x93",
+    "\u201d": "\x94",
+    "\u2026": "\x85",
+    "\u20ac": "\x80",
+    "\u2212": "-",
+    "\u00a0": " ",
+  };
+  function winAnsi(s) {
+    let out = "";
+    for (const ch of String(s)) out += ch.charCodeAt(0) > 255 ? WINANSI[ch] || "?" : ch;
+    return out;
+  }
+
   function Doc(opts) {
     this.o = opts;
+    // Every string the writer touches goes through the caller's tr and then
+    // through the WinAnsi map — one seam, so no code path can skip it.
+    const rawTr = opts.tr || String;
+    this.o = Object.assign({}, opts, { tr: (s) => winAnsi(rawTr(s)) });
     this.pages = [];
     this.c = "";
     this.y = 0;

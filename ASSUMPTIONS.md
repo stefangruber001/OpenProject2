@@ -5618,3 +5618,22 @@ live control.
 **Proven red-first.** The 4×3 language matrix (quote, contract, change order,
 invoice × es/ca/en, sentinel = the totals row's own label) went red when one
 EN table entry was neutered, and the generator's selector check with it.
+
+## S35 · PK-H — every generated email becomes a mailbox draft (2026-08-28)
+
+**The queue stays log-only; the draft is the new fact beside it.** The
+mandate's "no real sends" holds: the moment a message is marked sent in the
+comms queue, its .eml — the covering text in the approved email design plus
+the document's own PDF — is ALSO filed into the company mailbox's Drafts
+(if@2iberia.com once the operator runs ops/set-email.sh; the password never
+enters the repository). "Sending" means opening the draft anywhere and
+pressing send there. The outcome is recorded per row («en el buzón» /
+«sin buzón — solo registrado» / «no archivado») — a fact, not a status, so
+the queue's own lifecycle and its e2e pin stay untouched. MIME assembly
+moved to erp-eml.js and journey.html consumes it — one builder, no drift.
+
+**WinAnsi at the writer, not at every caller.** The label layer's real
+typography (em-dashes, a true minus) is outside Latin-1; one code point past
+255 corrupts the PDF stream and breaks btoa for anyone attaching the file.
+The writer now maps every string through a WinAnsi table at its single tr
+seam; what WinAnsi cannot say degrades to honest ASCII.

@@ -2733,6 +2733,23 @@ window.CANEI_DICT = {
     ["— según el cliente —", "— per the customer —"],
     ["El contrato firmado conserva su idioma", "A signed contract keeps its language"],
     ["La adenda aprobada conserva su idioma", "An approved addendum keeps its language"],
+    // N2 · mailbox drafts (PK-H)
+    ["en el buzón", "in the mailbox"],
+    ["sin buzón — solo registrado", "no mailbox — recorded only"],
+    ["no archivado", "not filed"],
+    [
+      "Sin buzón configurado — el mensaje queda solo registrado",
+      "No mailbox connected — the message is recorded only",
+    ],
+    ["Borrador archivado en el buzón", "Draft filed in the mailbox"],
+    ["⚠ No se pudo archivar el borrador:", "⚠ Could not file the draft:"],
+    [
+      "⚠ No se pudo contactar con el servidor para archivar el borrador",
+      "⚠ Could not reach the server to file the draft",
+    ],
+    // Not words at all — the MIME type the drafts endpoint requires. Identity
+    // pair so the audit knows it was seen and judged, not missed.
+    ["message/rfc822", "message/rfc822"],
     ["Español", "Spanish"],
     ["Condiciones de pago actualizadas", "Payment terms updated"],
     ["Validez actualizada", "Validity updated"],

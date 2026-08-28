@@ -254,3 +254,23 @@ document and run the drill again.** That gap is the whole point of the exercise.
 Never edit application code on the server. The container is rebuilt from
 `main` on every deploy, so anything changed in place is silently reverted
 within 60 seconds — and the change exists nowhere in the history.
+
+---
+
+## 10. The company mailbox (drafts from the ERP)
+
+Every email the ERP generates — quote sends, invoice covers, reminders — is
+ALSO filed as a draft in the company mailbox's Drafts folder, so "sending"
+means opening the draft on any device and pressing send there. Nothing is
+ever sent by the server itself (mandate: no real sends).
+
+To connect the mailbox, run **on the server**, as the operator:
+
+    ./ops/set-email.sh if@2iberia.com
+
+The script asks for the password interactively and writes the six
+`ERP_MAIL_*` env keys into `.env` — the password never enters the
+repository, a shell history, or a chat. Verify with `pnpm test:mailbox`
+against the live IMAP if in doubt. Until the mailbox is connected the ERP
+degrades loudly: each message is recorded in the queue with «sin buzón —
+solo registrado» and the operator is told once per session.

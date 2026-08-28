@@ -9201,6 +9201,55 @@ async function testSendAndVersions(browser, base) {
       )
         ok("send: the covering email is recorded through the same comms queue as everything else");
       else bad("send: email recorded via comms queue", JSON.stringify(result));
+
+      /* ===== N2 (PK-H): the same send also files a mailbox draft =========
+         In this local run there is no server, so the honest outcome is
+         "none" — recorded beside the row, shown on the queue screen, never
+         pretending a mailbox exists. The .eml itself is built and checked:
+         headers, the X-Unsent draft marker, and the quote's own PDF
+         attached — a real %PDF, not a placeholder. */
+      await pg.waitForTimeout(600);
+      const draft = await pg.evaluate((args) => {
+        const b = erp.budget(args.id);
+        const q = erp.state.commsQueue.find((x) => x.subjectRef === b.number);
+        const att = draftAttachmentFor(q);
+        const eml = CaneiEml.build({
+          fromName: "Canei",
+          fromEmail: "if@2iberia.com",
+          toName: "X",
+          toEmail: q.to,
+          subject: "s",
+          text: "t",
+          html: "<p>h</p>",
+          attachments: att ? [att] : [],
+        });
+        return {
+          filed: q.filed || null,
+          emlOk:
+            /^From: /.test(eml) &&
+            eml.includes("X-Unsent: 1") &&
+            eml.includes("multipart/mixed") &&
+            eml.includes("multipart/alternative"),
+          attName: att && att.name,
+          attIsPdf: !!att && atob(att.b64.slice(0, 8)).startsWith("%PDF"),
+        };
+      }, em);
+      if (draft.filed === "none")
+        ok("N2: with no mailbox the draft outcome is recorded honestly — «sin buzón»");
+      else bad("N2: filing outcome", JSON.stringify(draft));
+      if (draft.emlOk && /\.pdf$/.test(draft.attName || "") && draft.attIsPdf)
+        ok(`N2: the .eml draft carries the quote's own PDF (${draft.attName})`);
+      else bad("N2: eml + attachment", JSON.stringify(draft));
+
+      const queueShows = await pg.evaluate(() => {
+        go("messaging");
+        comTab = "cola";
+        render();
+        return document.querySelector("#view").innerText;
+      });
+      if (/sin buzón — solo registrado/.test(queueShows))
+        ok("N2: the queue screen shows where each draft ended up");
+      else bad("N2: queue filed column", queueShows.replace(/\n/g, " ").slice(0, 160));
     }
 
     // ---- send: "en mano", backdated -----------------------------------------

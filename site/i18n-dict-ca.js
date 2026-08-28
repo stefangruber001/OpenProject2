@@ -730,6 +730,16 @@ window.CANEI_DICT.ca = {
   "— según el cliente —": "— segons el client —",
   "El contrato firmado conserva su idioma": "El contracte signat conserva el seu idioma",
   "La adenda aprobada conserva su idioma": "L'adenda aprovada conserva el seu idioma",
+  "en el buzón": "a la bústia",
+  "sin buzón — solo registrado": "sense bústia — només registrat",
+  "no archivado": "no arxivat",
+  "Sin buzón configurado — el mensaje queda solo registrado":
+    "Sense bústia configurada — el missatge queda només registrat",
+  "Borrador archivado en el buzón": "Esborrany arxivat a la bústia",
+  "⚠ No se pudo archivar el borrador:": "⚠ No s'ha pogut arxivar l'esborrany:",
+  "⚠ No se pudo contactar con el servidor para archivar el borrador":
+    "⚠ No s'ha pogut contactar amb el servidor per arxivar l'esborrany",
+  "message/rfc822": "message/rfc822",
   Español: "Espanyol",
   "Condiciones de pago actualizadas": "Condicions de pagament actualitzades",
   "Validez actualizada": "Validesa actualitzada",

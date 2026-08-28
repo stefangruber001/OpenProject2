@@ -1794,7 +1794,7 @@ THIS ledger and continues with the first package not marked done.
 | PK-B    | A2 verification + erp-bridge variation chapters + honest «cuadra» sentence                                    | **done** — 576/576 e2e on merged tree, both checks red-first           |
 | PK-F    | all documents on the redesign (templates refresh, CaneiSheet renderer, facts adapters, wire app, label layer) | **done** — 577/577 e2e, doc gates green, design guard red-first        |
 | PK-G    | document language: party.docLanguage, invoice/change language fields, selector everywhere, EN contract        | **done** — 580/580 e2e, 4×3 matrix red-first, frozen-at-signature      |
-| PK-H    | every generated email → Drafts of if@2iberia.com (erp-eml.js, fileDraft, queue status)                        | pending                                                                |
+| PK-H    | every generated email → Drafts of if@2iberia.com (erp-eml.js, fileDraft, queue status)                        | **done** — 583/583 e2e, .eml+PDF checked, filing outcome red-first     |
 | PK-C    | small fixes: A6 A7 A8 A9 A13 A14 B1                                                                           | pending                                                                |
 | PK-D    | S-curve: sample at asOf, actual-from-zero, no 1-point projection, dot                                         | pending                                                                |
 | PK-E    | A12 blocker translation split + dicts · A15 test party cleanup + server-e2e hygiene                           | pending                                                                |

@@ -1300,6 +1300,7 @@
      unmarked while nothing failed. -->
     <script src="erp-pictograms.js"></script>
     <script src="erp-pdf.js"></script>
+    <script src="erp-eml.js"></script>
     <script src="i18n-dict.js"></script>
     <script src="i18n-dict-ca.js"></script>
     <script src="i18n.js"></script>
@@ -2142,7 +2143,7 @@
         while (arr.some((f) => f.name === base + "-" + i + ext)) i++;
         return base + "-" + i + ext;
       }
-      const textToB64 = (t) => btoa(unescape(encodeURIComponent(t)));
+      const textToB64 = CaneiEml.textToB64; // shared with erp.html — see erp-eml.js
       function b64ToBytes(b64) {
         const bin = atob(b64);
         const a = new Uint8Array(bin.length);
@@ -2834,99 +2835,19 @@
           notes,
         };
       }
-      function chunk(s) {
-        return s.replace(/.{1,76}/g, "$&\r\n").trimEnd();
-      }
+      /* MIME assembly lives in erp-eml.js now — one builder for this page
+         and for erp.html's mailbox drafts, so the two can never drift. */
       function buildEml(c) {
-        const CRLF = "\r\n";
-        const bnd = "CANEI_" + Math.random().toString(36).slice(2, 10);
-        const html = emailDoc(c);
-        let m = "";
-        m +=
-          "From: " +
-          BRAND.name +
-          " <" +
-          BRAND.from +
-          ">" +
-          CRLF +
-          "To: " +
-          S.customer +
-          " <" +
-          S.email +
-          ">" +
-          CRLF +
-          "Subject: " +
-          c.subject +
-          CRLF;
-        m +=
-          "X-Unsent: 1" +
-          CRLF +
-          "MIME-Version: 1.0" +
-          CRLF +
-          'Content-Type: multipart/mixed; boundary="' +
-          bnd +
-          '"' +
-          CRLF +
-          CRLF;
-        m +=
-          "--" +
-          bnd +
-          CRLF +
-          'Content-Type: multipart/alternative; boundary="' +
-          bnd +
-          '_a"' +
-          CRLF +
-          CRLF;
-        m +=
-          "--" +
-          bnd +
-          "_a" +
-          CRLF +
-          'Content-Type: text/plain; charset="utf-8"' +
-          CRLF +
-          "Content-Transfer-Encoding: base64" +
-          CRLF +
-          CRLF +
-          chunk(textToB64(emailText(c))) +
-          CRLF +
-          CRLF;
-        m +=
-          "--" +
-          bnd +
-          "_a" +
-          CRLF +
-          'Content-Type: text/html; charset="utf-8"' +
-          CRLF +
-          "Content-Transfer-Encoding: base64" +
-          CRLF +
-          CRLF +
-          chunk(textToB64(html)) +
-          CRLF +
-          CRLF;
-        m += "--" + bnd + "_a--" + CRLF + CRLF;
-        if (c.attach) {
-          const pdf = buildDocPdf(c.attach.doc());
-          m +=
-            "--" +
-            bnd +
-            CRLF +
-            'Content-Type: application/pdf; name="' +
-            c.attach.name +
-            '"' +
-            CRLF +
-            "Content-Transfer-Encoding: base64" +
-            CRLF +
-            'Content-Disposition: attachment; filename="' +
-            c.attach.name +
-            '"' +
-            CRLF +
-            CRLF +
-            chunk(pdf) +
-            CRLF +
-            CRLF;
-        }
-        m += "--" + bnd + "--" + CRLF;
-        return m;
+        return CaneiEml.build({
+          fromName: BRAND.name,
+          fromEmail: BRAND.from,
+          toName: S.customer,
+          toEmail: S.email,
+          subject: c.subject,
+          text: emailText(c),
+          html: emailDoc(c),
+          attachments: c.attach ? [{ name: c.attach.name, b64: buildDocPdf(c.attach.doc()) }] : [],
+        });
       }
       function download(name, mime, data) {
         const blob = data instanceof Blob ? data : new Blob([data], { type: mime });

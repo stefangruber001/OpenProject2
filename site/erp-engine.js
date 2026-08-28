@@ -8328,6 +8328,22 @@
       this._log(user, "recordCommunicationSent", q.key);
       return q;
     }
+    /**
+     * N2 · where the draft of this message ended up. NOT a status — the
+     * queue's own lifecycle (draft/approved/sent) is untouched — but a fact
+     * beside it: "mailbox" (filed in the company Drafts), "none" (no mailbox
+     * connected, recorded only), "error" (tried and failed, said out loud).
+     */
+    recordCommunicationFiled(id, outcome, user) {
+      const q = this.state.commsQueue.find((x) => x.id === id);
+      if (!q) throw new Error("Queued message not found");
+      if (!["mailbox", "none", "error"].includes(outcome))
+        throw new Error("Unknown filing outcome: " + outcome);
+      q.filed = outcome;
+      q.filedAt = this.state.today;
+      this._log(user, "recordCommunicationFiled", q.key + " " + outcome);
+      return q;
+    }
 
     /* =========================== DAS — alerts, tasks, control tower =========================== */
     addTask(t, user) {

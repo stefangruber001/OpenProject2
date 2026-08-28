@@ -5043,6 +5043,7 @@
     <script src="erp-doc-i18n.js"></script>
     <script src="erp-facts.js"></script>
     <script src="erp-sheet.js"></script>
+    <script src="erp-eml.js"></script>
     <script src="erp-migrations.js"></script>
     <script src="erp-store.js"></script>
     <script src="erp-import.js"></script>
@@ -10642,19 +10643,30 @@
         };
         return `<div class="card"><div class="ch"><h3>Cola</h3>
     <span class="tag">nada sale sin aprobación — el envío real no está conectado</span></div>
-   <div class="scroll"><table><thead><tr><th>Vence</th><th>Asunto</th><th>Plantilla</th><th>Destinatario</th><th>Canal</th><th>Estado</th><th></th></tr></thead><tbody>
+   <div class="scroll"><table><thead><tr><th>Vence</th><th>Asunto</th><th>Plantilla</th><th>Destinatario</th><th>Canal</th><th>Estado</th><th>Borrador</th><th></th></tr></thead><tbody>
    ${
      queue
        .slice()
        .reverse()
        .map((q) => {
          const st = ST[q.status] || [q.status, ""];
+         // N2 · where this message's draft ended up — a fact beside the
+         // status, never a status of its own.
+         const filed =
+           q.filed === "mailbox"
+             ? '<span class="pill g">en el buzón</span>'
+             : q.filed === "none"
+               ? '<span class="pill y">sin buzón — solo registrado</span>'
+               : q.filed === "error"
+                 ? '<span class="pill r">no archivado</span>'
+                 : "—";
          return `<tr><td>${fmtD(q.dueDate)}</td><td class="k">${esc(q.subjectRef)}</td><td>${esc(q.templateKey)}</td>
       <td>${esc(q.to || "—")}</td><td>${esc(q.channel)}</td><td><span class="pill ${st[1]}">${st[0]}</span></td>
+      <td>${filed}</td>
       <td>${q.status === "draft" ? `<button class="btn sm primary" data-approve-msg="${q.id}">Aprobar</button> <button class="btn sm danger" data-cancel-msg="${q.id}">Cancelar</button>` : ""}
        ${q.status === "approved" ? `<button class="btn sm" data-sent-msg="${q.id}">Registrar envío</button>` : ""}</td></tr>`;
        })
-       .join("") || '<tr><td colspan="7"><div class="empty">La cola está vacía.</div></td></tr>'
+       .join("") || '<tr><td colspan="8"><div class="empty">La cola está vacía.</div></td></tr>'
    }
    </tbody></table></div>
    ${
@@ -10691,10 +10703,10 @@
           .forEach(
             (b) =>
               (b.onclick = () =>
-                mutate(
-                  () => erp.recordCommunicationSent(b.dataset.sentMsg, "backoffice"),
-                  "Registrado como enviado",
-                )),
+                mutate(() => {
+                  const q = erp.recordCommunicationSent(b.dataset.sentMsg, "backoffice");
+                  fileDraftForComm(q); // N2 · the draft goes to the mailbox
+                }, "Registrado como enviado")),
           );
       }
 
@@ -14937,6 +14949,7 @@
                     );
                     erp.approveCommunication(q.id, "backoffice");
                     erp.recordCommunicationSent(q.id, "backoffice");
+                    fileDraftForComm(q); // N2 · the draft goes to the mailbox
                   }
                 }
               }
@@ -20441,6 +20454,156 @@
       function sheetDocHtml(kind, refs, lang) {
         const doc = CaneiErpFacts.docFor(erp, kind, refs, CaneiDocTypes);
         return `<div class="cnsheet">${CaneiSheet.render(doc, erp._issuerBlock(), CaneiDocI18n.tr(lang || "es"), { pict: typeof ErpPictograms !== "undefined" ? ErpPictograms : null })}</div>`;
+      }
+      /* ==================== N2 · every email becomes a draft ====================
+         The engine's comms queue stays log-only (the mandate: no real sends).
+         What changes: the moment a message is marked sent, its .eml draft is
+         ALSO filed into the company mailbox's Drafts — if@2iberia.com once the
+         operator connects it with ops/set-email.sh — so "sending" means
+         opening the draft on a phone and pressing send there. Every outcome
+         is recorded beside the queue row; silence is not one of the options. */
+      let mailboxNoticed = false;
+      function fileDraft(eml) {
+        if (typeof ErpStore === "undefined" || !ErpStore.isRemote())
+          return Promise.resolve("none");
+        return fetch(ErpStore.apiBase() + "/api/~/erp/draft", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "message/rfc822" },
+          body: eml,
+        })
+          .then((r) =>
+            r
+              .json()
+              .then((b) => ({ ok: r.ok, status: r.status, b }))
+              .catch(() => ({ ok: r.ok, status: r.status, b: {} })),
+          )
+          .then(({ ok, status, b }) => {
+            if (ok && b.delivered) return "mailbox";
+            if (status === 503) {
+              // Not connected yet. Said once per session, not on every draft.
+              if (!mailboxNoticed) {
+                mailboxNoticed = true;
+                toast("Sin buzón configurado — el mensaje queda solo registrado");
+              }
+              return "none";
+            }
+            toast("⚠ No se pudo archivar el borrador: " + ((b && b.message) || "HTTP " + status));
+            return "error";
+          })
+          .catch(() => {
+            toast("⚠ No se pudo contactar con el servidor para archivar el borrador");
+            return "error";
+          });
+      }
+      /** The message body in the approved email design — lockup, the
+       *  template wording, the company legal foot. Inline-safe HTML:
+       *  this lands in a mail client, not in this app. */
+      function draftEmailHtml(subject, bodyText) {
+        const iss = erp._issuerBlock();
+        const paras = String(bodyText || "")
+          .split(/\n{2,}|\n/)
+          .filter(Boolean)
+          .map((l) => `<p style="margin:0 0 12px">${esc(l)}</p>`)
+          .join("");
+        return `<!doctype html><html><body style="margin:0;padding:0;background:#EDEDEB">
+  <div style="max-width:620px;margin:0 auto;padding:28px 26px;background:#fff;font:400 14px/1.55 Arial,Helvetica,sans-serif;color:#3D3D3D">
+   <div style="display:flex;align-items:center;gap:10px;border-bottom:2px solid #48733C;padding-bottom:12px;margin-bottom:18px">
+    <svg width="26" height="30" viewBox="0 0 118.391 137.002" xmlns="http://www.w3.org/2000/svg"><path fill="#48733C" fill-rule="nonzero" d="M60.449 0 0 38.374V137.002H118.391V38.445ZM107.462 126.073H71.480L56.137 122.671V71.986L82.416 65.524H45.953V126.073H10.929V44.382L60.318 13.028L107.462 44.311Z"/></svg>
+    <span style="font:400 20px Georgia,serif;color:#000">${esc(iss.tradeName || iss.legalName || "")}</span>
+   </div>
+   ${paras}
+   <div style="border-top:2px solid #48733C;margin-top:22px;padding-top:10px;font:400 11px/1.6 Georgia,serif;color:#48733C">
+    ${esc([iss.legalName, iss.taxId, iss.registeredAddress || iss.address].filter(Boolean).join(" · "))}<br>
+    ${esc([iss.phone, iss.email, iss.web].filter(Boolean).join(" · "))}
+   </div>
+  </div></body></html>`;
+      }
+      /** The document behind a queued message, as a PDF attachment — the same
+       *  facts and the same design the panes print. Nothing invented: a
+       *  subjectRef this cannot resolve simply attaches nothing. */
+      function draftAttachmentFor(q) {
+        try {
+          let kind = null,
+            refs = null,
+            lang = "es";
+          if (/^PRE-/.test(q.subjectRef || "")) {
+            const b = erp.state.budgets.find((x) => x.number === q.subjectRef);
+            if (b) {
+              kind = b.acceptedVersionId ? "presupuestoAceptado" : "presupuesto";
+              refs = { budgetId: b.id };
+              lang = b.language || "es";
+            }
+          } else if (/^(FAC|ABO)-/.test(q.subjectRef || "")) {
+            const inv = erp.state.invoices.find((x) => x.number === q.subjectRef);
+            if (inv) {
+              kind = inv.kind === "creditNote" ? "rectificativa" : "factura";
+              refs = { invoiceId: inv.id };
+              lang = inv.language || "es";
+            }
+          } else if (/^CTR-/.test(q.subjectRef || "")) {
+            const c = erp.state.contracts.find(
+              (x) => x.number === q.subjectRef && x.origin !== "external",
+            );
+            if (c) {
+              kind = "contrato";
+              refs = { contractId: c.id };
+              lang = c.language || "es";
+            }
+          }
+          if (!kind) return null;
+          const doc = CaneiErpFacts.docFor(erp, kind, refs, CaneiDocTypes);
+          const iss = erp._issuerBlock();
+          const brand = {
+            wordmark: iss.tradeName,
+            legal: iss.legalName,
+            slogan: "",
+            cif: iss.taxId,
+            address: iss.address,
+            phone: iss.phone,
+            from: iss.email,
+            iban: iss.iban,
+          };
+          const pdf = CaneiPdf.build(doc, brand, CaneiDocI18n.tr(lang));
+          return { name: q.subjectRef + ".pdf", b64: btoa(pdf) };
+        } catch (e) {
+          return null; // a draft without its attachment still beats no draft
+        }
+      }
+      /** Called wherever a message is marked sent: build the .eml, file it,
+       *  record the outcome beside the queue row. Fire-and-forget — the send
+       *  itself never waits on the mailbox. */
+      function fileDraftForComm(q) {
+        try {
+          const iss = erp._issuerBlock();
+          const tpl = erp.commsTemplate(q.templateKey) || { subject: "", body: "" };
+          const C = commsApi();
+          const subject =
+            (C && tpl.subject ? C.render(tpl.subject, q.vars) : tpl.subject) ||
+            q.event + " · " + (q.subjectRef || "");
+          const body = C ? C.render(tpl.body, q.vars) : tpl.body;
+          const att = draftAttachmentFor(q);
+          const party = erp.state.parties.find((x) => x.email === q.to);
+          const eml = CaneiEml.build({
+            fromName: iss.tradeName || iss.legalName,
+            fromEmail: iss.email || "",
+            toName: party ? party.name : "",
+            toEmail: q.to || "",
+            subject,
+            text: body,
+            html: draftEmailHtml(subject, body),
+            attachments: att ? [att] : [],
+          });
+          fileDraft(eml).then((outcome) => {
+            erp.recordCommunicationFiled(q.id, outcome, "backoffice");
+            persist();
+            if (outcome === "mailbox") toast("Borrador archivado en el buzón");
+          });
+        } catch (e) {
+          try {
+            erp.recordCommunicationFiled(q.id, "error", "backoffice");
+          } catch (_) {}
+        }
       }
       /** N1 · the operator's "standard drop-down at the bottom" — the same
        *  language control under every document panel. Frozen documents show
