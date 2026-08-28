@@ -154,6 +154,8 @@
     ".plate{display:inline-flex;flex-direction:column;align-items:center;gap:1px;line-height:1}",
     ".plate svg{display:block}",
     ".platec{font:600 8px Inter,sans-serif;letter-spacing:.02em;color:#767676;white-space:nowrap}",
+    /* the discreet mark on a row whose picture waits in the graphic annex */
+    ".amark{font:700 7px Inter,sans-serif;color:#48733C;border:1px solid #48733C;border-radius:3px;padding:0 2px;margin-left:4px;vertical-align:super}",
     ".sig{display:grid;gap:14mm}",
     ".sig .line{border-top:1px solid #000;margin-top:11mm;padding-top:5px;font-size:7.8pt;color:#767676}",
     ".terms{margin-top:auto;padding-top:4.5mm}",
@@ -212,9 +214,15 @@
     const d = this.doc,
       b = this.brand;
     const wordmark = b.wordmark || b.tradeName || b.legalName || "";
-    const mark = b.logo
-      ? '<img class="sym" src="' + esc(b.logo) + '" alt="">'
-      : houseSvg("sym", "#48733C");
+    // The company's uploaded logo is a stored blob, not a URL: it renders as
+    // img[data-blob] for the host's paintImages() to fill, exactly like every
+    // other stored image. A plain string is taken as a URL (tests, emails).
+    const mark =
+      b.logo && b.logo.storageKey
+        ? '<img class="sym" data-blob="' + esc(b.logo.storageKey) + '" alt="">'
+        : typeof b.logo === "string" && b.logo
+          ? '<img class="sym" src="' + esc(b.logo) + '" alt="">'
+          : houseSvg("sym", "#48733C");
     this.push(
       '<header class="hdr"><div class="lockup">' +
         mark +
@@ -320,7 +328,10 @@
   /** The line's plate, when the pictogram module is around. Derived from the
    *  item's own words unless the caller named one — same rule as the PDF. */
   Sheet.prototype.plate = function (r, chapterName) {
-    const PICT = this.opts.pict || root.CaneiPictograms;
+    // A row may carry its plate ready-made (the app's plateFor knows the
+    // catalogue); otherwise derive one from the row's own words.
+    if (r.plateHtml) return '<span class="pictwrap">' + r.plateHtml + "</span>";
+    const PICT = this.opts.pict || root.ErpPictograms;
     if (!PICT || !r.code) return "";
     const key = PICT.pick({
       pictogram: r.pictogram,
@@ -328,7 +339,7 @@
       chapter: r.chapter,
       chapterName: chapterName,
     });
-    return '<span class="pictwrap">' + PICT.plate(key, r.chapter || "", r.chapter, 18) + "</span>";
+    return '<span class="pictwrap">' + PICT.plate(key, r.code || "", r.chapter, 18) + "</span>";
   };
 
   Sheet.prototype.groups = function () {
@@ -357,6 +368,9 @@
         const desc =
           (plate ? '<div class="descell">' + plate + "<div>" : "") +
           esc(r.item) +
+          // Pictures never enter a row: the row carries a mark and the
+          // picture waits in the annex, so a table of numbers stays one.
+          (r.flag ? '<sup class="amark" title="anexo">A</sup>' : "") +
           (r.code ? ' <span class="notecell">' + esc(r.code) + "</span>" : "") +
           (r.note ? '<br><span class="notecell">' + esc(r.note) + "</span>" : "") +
           (plate ? "</div></div>" : "");
@@ -700,6 +714,53 @@
   }
 
   /**
+   * The same stylesheet, caged for a host page that has styles of its own.
+   *
+   * Every selector is prefixed with the scope DOUBLED (`.cnsheet.cnsheet .lbl`)
+   * so a sheet rule outguns the host's own single- and double-class rules for
+   * the same names (`.lbl`, `.note`, `.meta` — the app uses them all), while
+   * host rules never gain new subjects. `@page` is dropped: the host owns its
+   * print geometry, and a second `@page` would change how EVERYTHING the host
+   * prints, not just the sheet. `@media print` survives with its inner rules
+   * scoped the same way.
+   */
+  function scopedCss(scope) {
+    const pre = scope + scope + " ";
+    const scopeRules = (block) =>
+      block.replace(/(^|\})\s*([^@{}][^{}]*)\{/g, (m, brace, sels) => {
+        const scoped = sels
+          .split(",")
+          .map((s) => pre + s.trim())
+          .join(",");
+        return (brace || "") + scoped + "{";
+      });
+    const out = [];
+    let inMedia = false;
+    for (const raw of (SHEET_CSS + "\n" + PRINT_CSS).split("\n")) {
+      const rule = raw.trim();
+      if (!rule) continue;
+      if (rule.startsWith("@page")) continue;
+      if (rule.startsWith("@media")) {
+        if (rule.endsWith("}")) {
+          // single-line block: scope what sits between its braces
+          const i = rule.indexOf("{");
+          out.push(rule.slice(0, i + 1) + scopeRules(rule.slice(i + 1, rule.length - 1)) + "}");
+        } else {
+          // the multi-line print block: open it, rule lines follow
+          out.push(rule);
+          inMedia = true;
+        }
+      } else if (inMedia && rule === "}") {
+        out.push(rule);
+        inMedia = false;
+      } else {
+        out.push(scopeRules(rule));
+      }
+    }
+    return out.join("\n");
+  }
+
+  /**
    * A complete standalone document — the only supported way to show a sheet
    * inside the app (iframe srcdoc) or to print one (own window). Neither
    * stylesheet can reach the other; see ISOLATION above.
@@ -725,5 +786,5 @@
     );
   }
 
-  return { render, css, page, BAND_TONE };
+  return { render, css, scopedCss, page, BAND_TONE };
 });

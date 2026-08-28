@@ -147,7 +147,7 @@
 
   /** renderBudgetDoc chapters → facts chapters (base scope only: options and
    *  out-of-scope never total into the document's money). */
-  function budgetChapters(doc) {
+  function budgetChapters(doc, lineText, marked, plateHtml) {
     return doc.chapters
       .filter((c) => (c.section || "base") === "base" && c.lines.length)
       .map((c) => ({
@@ -156,7 +156,12 @@
         rows: c.lines.map((l) => ({
           chapter: (l.code || "").split("-")[0] || String(c.num),
           code: l.code || "",
-          item: l.desc,
+          // The caller may supply the line's wording in the document's own
+          // language (the app's lineDesc knows the catalogue); the record's
+          // snapshot is the fallback.
+          item: lineText ? lineText(l) : l.desc,
+          flag: !!(marked && marked.has(l.num)),
+          plateHtml: plateHtml ? plateHtml(l, c.name) : null,
           note: "",
           qty: String(l.qty),
           unit: l.unit || "",
@@ -213,7 +218,7 @@
         (doc.duration && doc.duration.plannedFinish) || (prj && prj.dates && prj.dates.targetEnd),
       );
       f.taxRate = (doc.vatBp || 0) / 100;
-      f.chapters = bdoc ? budgetChapters(bdoc) : [];
+      f.chapters = bdoc ? budgetChapters(bdoc, refs.lineText, null, refs.plateHtml) : [];
 
       const total = doc.currentCents + Math.round((doc.currentCents * (doc.vatBp || 0)) / 10000);
       f.milestones = doc.installments.map((i, idx) => ({
@@ -594,7 +599,7 @@
     f.dates.validUntil = dmy(doc.validityDate);
     f.dates.accepted = dmy(v.customerResponse && v.customerResponse.date);
     f.taxRate = doc.totals.vatBp / 100;
-    f.chapters = budgetChapters(doc);
+    f.chapters = budgetChapters(doc, refs.lineText, refs.marked, refs.plateHtml);
     if (v.customerResponse && v.customerResponse.acceptedBy)
       f.customer.contact = f.customer.contact || v.customerResponse.acceptedBy;
 
@@ -613,22 +618,35 @@
   }
 
   function invoiceDoc(erp, refs, DOCS, kind) {
-    const doc = erp.renderInvoiceDoc(refs.invoiceId);
-    const rec = erp.state.invoices.find(
-      (i) => i.id === refs.invoiceId || i.number === refs.invoiceId,
-    );
+    // refs.doc = an unissued preview (previewInvoice's projection) — same
+    // shape as renderInvoiceDoc, but with no record behind it yet.
+    const doc = refs.doc || erp.renderInvoiceDoc(refs.invoiceId);
+    const rec = refs.doc
+      ? null
+      : erp.state.invoices.find((i) => i.id === refs.invoiceId || i.number === refs.invoiceId);
 
     const f = baseFacts(erp);
-    f.customer = partyBlock(erp.party(rec.partyId));
+    f.customer = rec
+      ? partyBlock(erp.party(rec.partyId))
+      : {
+          name: doc.customer.name,
+          nif: dash(doc.customer.taxId),
+          contact: "",
+          address: dash(doc.customer.address),
+          email: "",
+        };
     f.company.iban = doc.issuer.iban || f.company.iban;
+    const projectId = rec ? rec.projectId : null;
     f.project = projectBlock(
       erp,
-      rec.projectId && erp.state.projects.some((p) => p.id === rec.projectId)
-        ? rec.projectId
-        : null,
+      projectId && erp.state.projects.some((p) => p.id === projectId) ? projectId : null,
     );
+    if (f.project.code === "—" && doc.projectCode) f.project.code = doc.projectCode;
     if (f.project.site === "—" && doc.worksAddress) f.project.site = doc.worksAddress;
-    f.numbers.invoice = kind === "rectificativa" ? doc.rectifies || "—" : doc.number;
+    // The unnumbered preview says so in the document itself — the number is
+    // assigned at issue, and the pane's whole point is showing that honestly.
+    const number = doc.number || "Sin numerar — el numero se asigna al emitir";
+    f.numbers.invoice = kind === "rectificativa" ? doc.rectifies || "—" : number;
     f.numbers.creditNote = doc.number;
     f.dates.issued = dmy(doc.date);
     f.dates.due = dmy(doc.dueDate);

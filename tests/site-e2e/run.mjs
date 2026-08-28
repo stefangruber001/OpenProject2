@@ -2063,23 +2063,25 @@ async function testBudgetBuilder(browser, base) {
       ok("annex: internal-only pictures stay out of the customer document");
     else bad("annex: internal picture leaked", "internal caption found in the document");
 
-    // The row carries a discreet mark and NOT the picture.
-    const marks = await pg.locator("#dbody .chapline .amark").count();
-    const inRow = await pg.locator("#dbody .chapline img").count();
+    // The row carries a discreet mark and NOT the picture (PK-F: the mark
+    // now lives on the sheet's table rows).
+    const marks = await pg.locator("#dbody .cnsheet .amark").count();
+    const inRow = await pg.locator("#dbody .cnsheet tbody img").count();
     if (marks >= 2 && inRow === 0) ok("annex: the line's row gets a mark, never the picture");
     else bad("annex: row mark", `marks=${marks} imagesInRows=${inRow}`);
 
-    // The annex comes after the totals and before the conditions.
+    // PK-F: the redesigned sheet closes with its own terms, so the annex
+    // follows the WHOLE document as its own pages — after the sheet that
+    // holds the totals, never inside a row.
     const order = await pg.evaluate(() => {
-      const doc = document.querySelector("#dbody .doc");
-      const kids = [...doc.children];
+      const kids = [...document.querySelector("#dbody").children];
+      const sheet = kids.findIndex((k) => k.classList.contains("cnsheet"));
       const annex = kids.findIndex((k) => k.classList.contains("annexpg"));
-      const conds = kids.length - 1; // the validity/conditions line closes the doc
-      const totals = kids.findIndex((k) => /TOTAL/.test(k.textContent || ""));
-      return { annex, conds, totals };
+      const totalsInSheet = sheet >= 0 && /TOTAL/i.test(kids[sheet].innerText || "");
+      return { sheet, annex, totalsInSheet };
     });
-    if (order.totals >= 0 && order.annex > order.totals && order.annex < order.conds)
-      ok("annex: printed after the totals and before the conditions");
+    if (order.sheet >= 0 && order.annex > order.sheet && order.totalsInSheet)
+      ok("annex: printed after the document and its totals, as its own pages");
     else bad("annex: position in the document", JSON.stringify(order));
     await pg.locator("#dClose").click();
     await pg.waitForTimeout(200);
@@ -2197,7 +2199,12 @@ async function testBudgetBuilder(browser, base) {
          as three missing pictures and was in fact three rows that are not
          partidas. The class now says which is which in the markup rather than
          leaving the test to guess. */
-      const lines = [...document.querySelectorAll("#dbody .chapline.item")];
+      /* PK-F: the printed quote is the approved sheet — an item row is a
+         body row carrying the description cell, which chapter and subtotal
+         rows do not have. */
+      const lines = [...document.querySelectorAll("#dbody .cnsheet tbody tr")].filter((tr) =>
+        tr.querySelector(".descell"),
+      );
       const wantPlate = item.code + " · " + want;
       // The row this partida became, found by the description it carries
       // rather than by a word written into the test.
@@ -5431,7 +5438,11 @@ async function testInvoiceGenerator(browser, base) {
     await pg.waitForTimeout(700);
     const screen = await pg.evaluate(() => ({
       fs: document.body.classList.contains("fs"),
-      sheet: !!document.querySelector("#invDoc.cdoc"),
+      // PK-F: the pane renders the approved design — the sheet, never the
+      // retired .cdoc idiom. Both halves of the guard matter.
+      sheet:
+        !!document.querySelector("#invDoc .cnsheet .sheet") &&
+        !document.querySelector("#invDoc .cdoc"),
       // The number is minted at issue, never at draft — the sheet has to say
       // so where the number goes, or a draft reads like an issued invoice.
       unnumbered: /Sin numerar/i.test(document.querySelector("#invDoc").innerText),
@@ -5580,16 +5591,18 @@ async function testInvoiceGenerator(browser, base) {
         const d = erp.renderInvoiceDoc(n);
         const sheet = document.createElement("div");
         sheet.className = "printsheet";
-        sheet.innerHTML = `<div class="cdoc">${invoiceDocHtml(d)}</div>`;
+        sheet.innerHTML = sheetDocHtml("factura", { invoiceId: n });
         document.body.appendChild(sheet);
         const text = sheet.innerText;
+        const design =
+          !!sheet.querySelector(".cnsheet .sheet") && !sheet.querySelector(".cdoc, .doc");
         sheet.remove();
         return {
           type: d.docType,
           number: d.number,
           lines: d.lines.length,
           total: d.totalCents,
-          printable: /FACTURA/i.test(text) && text.includes(d.number),
+          printable: /FACTURA/i.test(text) && text.includes(d.number) && design,
         };
       }, after.number);
       if (doc.type === "FACTURA" && doc.lines > 0 && doc.total > 0 && doc.printable)
@@ -5673,7 +5686,11 @@ async function testContract(browser, base) {
         zones: grid ? grid.children.length : 0,
         docCol: cols[0] || 0,
         panelCol: cols[1] || 0,
-        docTranslateOff: document.querySelector(".cdoc")?.getAttribute("translate") === "no",
+        // PK-F: the document is the approved sheet, which carries its own
+        // translate="no" — machine translation must never touch a document.
+        docTranslateOff:
+          document.querySelector("#conDoc .sheet")?.getAttribute("translate") === "no" &&
+          !document.querySelector("#conDoc .cdoc"),
         tabs: [...document.querySelectorAll("[data-contab]")].map((b) => b.textContent),
       };
     });
@@ -5760,11 +5777,32 @@ async function testContract(browser, base) {
 
     // The document is built from data — it names the customer and totals its
     // own milestones, which no uploaded PDF in this system could do.
-    const docText = await pg.locator(".cdoc").innerText();
+    const docText = await pg.locator("#conDoc").innerText();
     const named = await pg.evaluate(() => erp.renderContractDoc(conWork.id).customer.name);
     if (new RegExp(named.slice(0, 12).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(docText))
       ok("COM-04: the document is rendered from data, customer and all");
     else bad("COM-04: document from data", docText.replace(/\n/g, " ").slice(0, 120));
+
+    // PK-F: the contract finally has a download, and what it prints is the
+    // approved sheet — never the retired idioms.
+    const conDl = await pg.evaluate(async () => {
+      let during = null;
+      const orig = window.print;
+      window.print = () => {
+        during =
+          !!document.querySelector(".printsheet .cnsheet .sheet") &&
+          !document.querySelector(".printsheet .cdoc, .printsheet .doc");
+      };
+      const btn = document.querySelector("#conDl");
+      if (btn) btn.click();
+      await new Promise((r) => setTimeout(r, 900));
+      const after = !!document.querySelector(".printsheet");
+      window.print = orig;
+      return { btn: !!btn, during, after };
+    });
+    if (conDl.btn && conDl.during === true && !conDl.after)
+      ok("COM-04: «Descargar PDF» prints the contract as the approved sheet, then cleans up");
+    else bad("COM-04: contract download", JSON.stringify(conDl));
 
     // Package 2 slide 6, a real bug: guaranteeCategories is engine vocabulary
     // (executionAndFinishes/installations/structural) and was printed
@@ -6730,9 +6768,10 @@ async function testProcurement(browser, base) {
 
     await pg.locator("[data-doc]").first().click();
     await pg.waitForTimeout(300);
-    const adenda = await pg.locator(".drawer .doc").innerText();
+    const adenda = await pg.locator(".drawer .cnsheet").innerText();
     if (
-      /MODIFICACIÓN CONTRACTUAL/.test(adenda) &&
+      // PK-F: the adenda prints as the approved «Orden de cambio» sheet.
+      /ORDEN DE CAMBIO/i.test(adenda) &&
       !/coste/i.test(adenda) &&
       !/margen/i.test(adenda)
     )
@@ -9235,7 +9274,10 @@ async function testSendAndVersions(browser, base) {
       let existsDuring = null;
       const origPrint = window.print;
       window.print = () => {
-        existsDuring = !!document.querySelector(".printsheet .doc");
+        // PK-F: what prints is the approved sheet — and only that design.
+        existsDuring =
+          !!document.querySelector(".printsheet .cnsheet .sheet") &&
+          !document.querySelector(".printsheet .doc, .printsheet .cdoc");
       };
       document.querySelector("#sbDownload").click();
       await new Promise((r) => setTimeout(r, 900));
@@ -10576,7 +10618,7 @@ async function testI18n(browser, base) {
       // translation.
       tabs: [...document.querySelectorAll("[data-contab]")].map((b) => b.textContent).join(" "),
       panel: document.querySelector("#conBody").innerText,
-      doc: document.querySelector(".cdoc").innerText,
+      doc: document.querySelector("#conDoc").innerText,
       lang: erp.renderContractDoc(conWork.id).language,
     }));
     if (
@@ -10749,9 +10791,11 @@ async function testI18n(browser, base) {
       await pg.waitForTimeout(300);
       await pg.locator("#bPreview").click();
       await pg.waitForTimeout(600);
-      const docEs = await pg.locator("#dbody .doc").innerText();
+      const docEs = await pg.locator("#dbody .cnsheet").innerText();
       const around = await pg.locator("#dbody .card").first().innerText();
-      if (/PRESUPUESTO/.test(docEs) && /Base imponible/.test(docEs) && /Validez/.test(docEs))
+      // The label strip prints uppercase (a CSS transform innerText keeps),
+      // so the word is matched case-blind — the language is the claim here.
+      if (/PRESUPUESTO/.test(docEs) && /Base imponible/.test(docEs) && /Validez/i.test(docEs))
         ok("i18n: a Spanish document stays Spanish while the operator reads English");
       else bad("i18n: document opts out of the toggle", docEs.replace(/\n/g, " ").slice(0, 160));
       if (/Versions/i.test(around) && !/Versiones/.test(around))
@@ -10768,7 +10812,7 @@ async function testI18n(browser, base) {
       await pg.waitForTimeout(300);
       await pg.locator("#bPreview").click();
       await pg.waitForTimeout(600);
-      const docCa = await pg.locator("#dbody .doc").innerText();
+      const docCa = await pg.locator("#dbody .cnsheet").innerText();
       if (/PRESSUPOST/.test(docCa) && /Base imposable/.test(docCa) && !/PRESUPUESTO/.test(docCa))
         ok("i18n: the same quote emitted in Catalan, chosen per customer not per operator");
       else bad("i18n: Catalan document", docCa.replace(/\n/g, " ").slice(0, 160));

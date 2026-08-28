@@ -1792,7 +1792,7 @@ THIS ledger and continues with the first package not marked done.
 | ------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | PK-A    | job↔contract link: engine write-back, external job picker, cancel releases, migration 19                      | **done** — 569/569 e2e, sims green, m19 5 checks + 2 negative controls |
 | PK-B    | A2 verification + erp-bridge variation chapters + honest «cuadra» sentence                                    | **done** — 576/576 e2e on merged tree, both checks red-first           |
-| PK-F    | all documents on the redesign (templates refresh, CaneiSheet renderer, facts adapters, wire app, label layer) | pending                                                                |
+| PK-F    | all documents on the redesign (templates refresh, CaneiSheet renderer, facts adapters, wire app, label layer) | **done** — 577/577 e2e, doc gates green, design guard red-first        |
 | PK-G    | document language: party.docLanguage, invoice/change language fields, selector everywhere, EN contract        | pending                                                                |
 | PK-H    | every generated email → Drafts of if@2iberia.com (erp-eml.js, fileDraft, queue status)                        | pending                                                                |
 | PK-C    | small fixes: A6 A7 A8 A9 A13 A14 B1                                                                           | pending                                                                |

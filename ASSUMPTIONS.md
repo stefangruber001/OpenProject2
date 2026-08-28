@@ -5582,3 +5582,15 @@ accountant party record, so the quarterly package names its recipient
 generically. The three kinds with no backing record at all — albarán, acta de
 entrega, parte de trabajo — are refused by `docFor` rather than printed with
 sample numbers.
+
+**PK-F wiring notes (F4).** The four in-app documents render through
+`sheetDocHtml()` — the sheet CSS is injected once, caged as
+`.cnsheet.cnsheet …` so the app's `.lbl`/`.meta`/`.note` and the design's
+never restyle each other. The externally-signed contract pane keeps the
+`.cdoc` frame: it is a viewer of the customer's own file, not a generated
+document, and the e2e design guard covers generated panes only. The quote
+keeps its graphic annex (pages appended after the sheet, marks on the rows —
+the mark and the ready-made plate now travel through the descriptor as
+presentation hints). The contract gained its missing «Descargar PDF» through
+the same print route as the rest; the guard was proven red first by pointing
+the pane and the download back at `.cdoc`.
