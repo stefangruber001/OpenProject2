@@ -34,6 +34,17 @@ let serverVersion = 5;
 let probes = 0;
 const blobs = new Map();
 
+/* The state document, modelled the way the real server models it: one stored
+   document, one version, and a PUT that is refused unless it quotes the
+   version currently held. `stateDelayMs` is how the race gets opened
+   deterministically — a real PUT of a full ERP document takes seconds, the
+   workspace's persist() debounce is 140 ms, and the gap between those two
+   numbers is the whole bug. */
+const stateDoc = { state: { seeded: true }, version: 3 };
+let stateDelayMs = 0;
+/** Every PUT the server saw, in the order it saw them. */
+let statePuts = [];
+
 const HARNESS = `<!doctype html><html><head><meta name="erp-api" content="" />
 <meta charset="utf-8" /><title>sync harness</title></head><body>
 <input id="field" />
@@ -89,6 +100,41 @@ const server = createServer(async (req, res) => {
   if (url.pathname === "/api/~/erp/version") {
     probes += 1;
     return send(200, { tenant: "t", versions: { state: serverVersion } });
+  }
+  if (url.pathname === "/api/~/erp/state") {
+    if (req.method === "PUT") {
+      const chunks = [];
+      for await (const c of req) chunks.push(c);
+      let body = {};
+      try {
+        body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      } catch {
+        return send(400, { error: "BAD_REQUEST", message: "Body must be JSON." });
+      }
+      if (stateDelayMs) await new Promise((r) => setTimeout(r, stateDelayMs));
+      statePuts.push({ expectedVersion: body.expectedVersion, state: body.state });
+      // The real rule, verbatim in effect: quote the version we hold, or be
+      // refused. saveErpDocument() raises STALE_WRITE, which guarded() maps
+      // to 409 with the two versions in the body.
+      if (body.expectedVersion !== stateDoc.version) {
+        return send(409, {
+          error: "STALE_WRITE",
+          message: "Somebody else saved while you were working.",
+          expectedVersion: body.expectedVersion,
+          currentVersion: stateDoc.version,
+        });
+      }
+      stateDoc.state = body.state;
+      stateDoc.version += 1;
+      return send(200, { tenant: "t", version: stateDoc.version, migrated: [] });
+    }
+    return send(200, {
+      tenant: "t",
+      version: stateDoc.version,
+      seeded: true,
+      migrated: [],
+      state: stateDoc.state,
+    });
   }
   if (url.pathname === "/harness.html") return send(200, HARNESS, "text/html");
   if (url.pathname === "/local.html") return send(200, LOCAL_HARNESS, "text/html");
@@ -374,6 +420,105 @@ for (const [page_, expect] of [
   await page.goto(BASE + "/store-local.html", { waitUntil: "domcontentloaded" });
   const [remote, url] = await page.evaluate(() => [ErpStore.isRemote(), ErpStore.blobUrl("img_x")]);
   check("local mode: no server, and blobUrl says so", remote === false && url === null);
+  await page.close();
+}
+
+// ---------------------------------------------------------------------------
+// 11. ONE OPERATOR NEVER COLLIDES WITH THEMSELVES.
+//
+//     Reported from the demo: «Somebody else saved before you» on a machine
+//     nobody else was using, and once it appeared it never went away.
+//
+//     The mechanism: persist() debounces at 140 ms, a PUT of the whole ERP
+//     document takes seconds, and remoteSaveState quoted `remoteVersion` at
+//     the moment it was CALLED. Two saves 140 ms apart therefore both quoted
+//     the same version; the first bumped the server, the second was refused
+//     as a stale write. Worse, the banner is permanent and remoteVersion
+//     never advances past a 409, so every later save was refused too — the
+//     session was over.
+//
+//     The fix is serialisation, so the second save quotes the version the
+//     first one returned. Asserted on the SERVER's view (what it was asked
+//     for and what it ended up holding), not on the absence of a banner: a
+//     banner that failed to render for any other reason would pass that.
+// ---------------------------------------------------------------------------
+{
+  const page = await browser.newPage();
+  page.on("pageerror", (e) => console.log("   [pageerror] " + e.message));
+  await page.goto(BASE + "/store.html", { waitUntil: "domcontentloaded" });
+
+  stateDoc.state = { seeded: true };
+  stateDoc.version = 3;
+  statePuts = [];
+  stateDelayMs = 300; // a slow, realistic full-document PUT
+
+  // Read first, exactly as the workspace does at boot: that is what teaches
+  // this browser which version it holds.
+  await page.evaluate(() => ErpStore.loadState());
+  await page.waitForTimeout(150);
+
+  // Three saves inside one debounce window, none of them awaited — the
+  // keystroke pattern that produced the report.
+  const outcome = await page.evaluate(async () => {
+    const saves = [
+      ErpStore.saveState({ seeded: true, note: "first" }),
+      ErpStore.saveState({ seeded: true, note: "second" }),
+      ErpStore.saveState({ seeded: true, note: "third" }),
+    ];
+    const settled = await Promise.allSettled(saves);
+    return {
+      rejected: settled.filter((s) => s.status === "rejected").map((s) => String(s.reason)),
+      version: ErpStore.version(),
+    };
+  });
+
+  const banner = await page.evaluate(() => !!document.getElementById("canei-save-failed"));
+  const refused = statePuts.filter((p) => p.expectedVersion !== 3 && p.expectedVersion !== 4);
+  check(
+    "three rapid saves from one browser: none refused, the newest is what the server holds",
+    outcome.rejected.length === 0 &&
+      !banner &&
+      stateDoc.state.note === "third" &&
+      refused.length === 0 &&
+      outcome.version === stateDoc.version,
+    `rejected=${JSON.stringify(outcome.rejected)} banner=${banner} ` +
+      `held=${JSON.stringify(stateDoc.state.note)} clientVersion=${outcome.version} ` +
+      `serverVersion=${stateDoc.version} puts=${JSON.stringify(statePuts.map((p) => p.expectedVersion))}`,
+  );
+
+  // …and the queue does not swallow work: a save that starts after the
+  // others have drained still lands on top of them.
+  const after = await page.evaluate(async () => {
+    await ErpStore.saveState({ seeded: true, note: "later" });
+    return ErpStore.version();
+  });
+  check(
+    "a save after the queue drains still lands, quoting the version it was given",
+    stateDoc.state.note === "later" && after === stateDoc.version,
+    `held=${JSON.stringify(stateDoc.state.note)} client=${after} server=${stateDoc.version}`,
+  );
+
+  // A GENUINE conflict must still be refused and still shout. This is the
+  // property the serialisation must not have bought away.
+  stateDoc.version += 1; // somebody else saved, on another device
+  const conflict = await page.evaluate(() =>
+    ErpStore.saveState({ seeded: true, note: "mine" }).then(
+      () => "resolved",
+      (e) => String(e.message || e),
+    ),
+  );
+  await page.waitForTimeout(150);
+  const conflictBanner = await page.evaluate(() => {
+    const el = document.getElementById("canei-save-failed");
+    return el ? el.textContent : "";
+  });
+  check(
+    "a real conflict from another device is still refused, and still says so",
+    /409/.test(conflict) && /Somebody else saved before you/.test(conflictBanner),
+    `outcome=${conflict} banner=${JSON.stringify(conflictBanner.slice(0, 80))}`,
+  );
+
+  stateDelayMs = 0;
   await page.close();
 }
 

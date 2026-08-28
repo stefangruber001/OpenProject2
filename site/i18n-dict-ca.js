@@ -1590,6 +1590,8 @@ window.CANEI_DICT.ca = {
     "Arrossega aquí el correu o el document d'acceptació (PDF o imatge), o cerca'l al dispositiu.",
   "⚠ Sólo se puede adjuntar un PDF o una imagen": "⚠ Només es pot adjuntar un PDF o una imatge",
   "⚠ No se ha podido guardar el archivo": "⚠ No s'ha pogut desar el fitxer",
+  "⚠ No se ha podido guardar el archivo — el documento no se ha registrado":
+    "⚠ No s'ha pogut desar el fitxer — el document no s'ha registrat",
   Aceptación: "Acceptació",
   "Fecha de aceptación": "Data d'acceptació",
   "Ir a otra versión": "Ves a una altra versió",

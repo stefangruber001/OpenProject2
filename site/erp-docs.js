@@ -194,7 +194,72 @@
       );
     }
 
+    /* ONE FLUSH ON THE WIRE AT A TIME — the same rule, and the same reason,
+       as remoteSaveState in erp-store.js: `version` must be read when the
+       write is SENT, not when it is asked for, or two writes started close
+       together both quote the stale one and the second is refused as
+       somebody else's work. These screens are worse for it than the main
+       register — Master Data is a form of many small fields, each `set()`
+       flushing the whole document.
+
+       Simpler than the store's queue because there is no document to park:
+       `doc` is a live object that every `set()` has already mutated, so
+       "flush again afterwards" is enough to guarantee the last edit reaches
+       the server. Parked callers are answered by that later flush. */
+    var flushing = null;
+    var flushAgain = null; // [{resolve, reject}] waiting on the next flush
+
     function flush() {
+      if (flushing) {
+        if (!flushAgain) flushAgain = [];
+        var parked = flushAgain;
+        return new Promise(function (resolve, reject) {
+          parked.push({ resolve: resolve, reject: reject });
+        });
+      }
+      var done = sendDoc();
+      flushing = done;
+      done.then(
+        function () {
+          flushing = null;
+          drainFlush(null);
+        },
+        function (e) {
+          flushing = null;
+          drainFlush(e);
+        },
+      );
+      return done;
+    }
+
+    function drainFlush(err) {
+      var waiters = flushAgain;
+      if (!waiters) return;
+      flushAgain = null;
+      if (err) {
+        // Not retried: on a 409 the next write is refused for the same
+        // reason, and the notice has already told the operator. Resolving
+        // here would report a save that never happened.
+        waiters.forEach(function (w) {
+          w.reject(err);
+        });
+        return;
+      }
+      flush().then(
+        function (v) {
+          waiters.forEach(function (w) {
+            w.resolve(v);
+          });
+        },
+        function (e) {
+          waiters.forEach(function (w) {
+            w.reject(e);
+          });
+        },
+      );
+    }
+
+    function sendDoc() {
       return fetch(url, {
         method: "PUT",
         credentials: "same-origin",

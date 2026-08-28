@@ -6047,3 +6047,104 @@ avoided by restructuring rather than translating, matching the ASSUMPTIONS
 **Reversible: yes** — all four changes are additive or narrowing (a required
 field, a hidden form section, a removed button, a moved CSS rule); no data
 migration, no engine method removed.
+
+### 187 · The self-409 was fixed by serialising saves, NOT by retrying them (2026-08-28)
+
+The plan for S3 said: "On 409 where we raced ourselves, adopt + retry once;
+genuine cross-client conflict keeps the banner." The retry is deliberately
+NOT implemented, and the reason is the same one the plan itself flagged as
+the session's risk ("retry-once must not mask real conflicts").
+
+**What the bug actually was.** `remoteSaveState` read `remoteVersion` at the
+moment it was CALLED, and nothing stopped two calls being in flight at once.
+`persist()` debounces at 140 ms; a PUT of the whole ERP document takes
+seconds. So two saves inside one slow request both quoted the same version,
+the first bumped the server, and the second was refused — by its own author,
+on a machine nobody else was using. Then it stuck: `remoteVersion` never
+advances past a 409, so every later save was refused for the same reason and
+the session was over.
+
+**Why serialisation alone is the whole fix.** With one PUT on the wire at a
+time, a save reads `remoteVersion` when it is SENT, after the previous
+response has been adopted. A client can no longer collide with itself at all,
+which means every remaining 409 is genuinely another device. `erp-sync.js`
+was checked and never writes `remoteVersion` — it only reads it to offer a
+reload — so there is no other path that could desynchronise it.
+
+**Why the retry would then be actively wrong.** Once self-409 is impossible,
+"adopt the server's version and send again" is precisely "overwrite whatever
+the other device just saved, silently". That is the one thing the version
+check exists to prevent, and there is no longer any legitimate case it would
+serve. The banner stays; a real conflict is still refused; the browser suite
+asserts exactly that (`site-sync` case 11, third check).
+
+**Newest-wins parking, and why callers may be answered by a later write.**
+A save arriving while one is in flight is parked, and a newer document
+REPLACES a parked one rather than queueing behind it. These are
+whole-document writes, so the newest already contains everything the older
+ones did; every parked caller is resolved by the write that supersedes it,
+which keeps `persistNow()` truthful — it must not report success for a
+document that never left, and it does not: a failed write rejects the parked
+waiters with the same error rather than retrying them.
+
+**Verified red-first** in `tests/site-sync/run.mjs` (real browser, real
+`erp-store.js`, stub server modelling the real version rule with a 300 ms
+delay): before the fix, three saves 0 ms apart produced `puts=[3,3,3]`, two
+409s, the banner, and a server holding only the FIRST document — the
+operator's later two edits lost. After: `puts=[3,4]`, nothing refused, no
+banner, server holding the newest.
+
+`erp-docs.js` (Master Data, Datos Financieros) had the identical race and got
+the identical treatment, simpler because `doc` is a live object every `set()`
+has already mutated — "flush again afterwards" is enough there, with no
+document to park.
+
+### 188 · The attachment allow-list moved to lib/ so it could have a test (2026-08-28)
+
+`application/pdf` was missing from the blob endpoint's allow-list while the
+workspace's own attach control has always offered PDFs — `EV_ACCEPT` is
+`"image/*,application/pdf"`, and `evidenceField` stores a PDF byte for byte
+on purpose, because a re-encoded document is no longer the document that was
+signed. So every accepted-quote email, signed contract and delivery note the
+operator attached was refused by the server with «Attachments must be an
+image», on a screen that had just invited the file.
+
+**The list moved to `apps/web/lib/attachments.ts`** rather than being edited
+in place. The route module imports the session, the tenant resolver and the
+blob store, so nothing in it can carry a unit test — which is exactly how a
+security-relevant list came to disagree with the client for however long. The
+same move was made for `public-paths.ts`, for the same reason, after the same
+class of bug; this follows that precedent deliberately. `attachments.test.ts`
+pins the list whole (a membership check would pass just as happily on a list
+with one extra entry) and runs in `pnpm test` on every CI run — unlike
+server-e2e, which only runs in the deploy workflow against a real container.
+
+**Why a PDF is safe here and an SVG still is not.** The endpoint serves a PDF
+back as `application/pdf`, which a browser hands to a viewer rather than
+executing against this origin: it is content. An SVG is markup that can carry
+script, and serving one from the company's own origin would put it beside the
+session cookie. `image/svg+xml` stays out, and both the unit test and the new
+server-e2e case assert that it is still refused — widening the list for PDFs
+must not have widened it for that.
+
+**Verified red-first:** emptying `DOCUMENTS` turns two unit checks red on the
+exact property. The server-e2e round trip (PUT a real minimal PDF → 2xx → GET
+the same bytes back with the right content type) cannot run in this sandbox —
+no Docker daemon and no postgres — and runs in the deploy workflow.
+
+### 189 · captureSave no longer writes a reference to bytes that never landed (2026-08-28)
+
+`ErpStore.putBlob(key, w.file).catch(() => null)` swallowed the upload
+failure and the document record was written anyway, carrying an `imageRef` to
+a file that is nowhere. That is the same invisible failure the blob store was
+built to end, arriving from the other side: the record syncs perfectly and
+the document simply is not there.
+
+The `.catch` is gone, so a failed upload rejects and the record is not
+written. The capture panel stays open holding the file, and says so, which is
+the recoverable state — the operator presses Guardar again rather than
+hunting for the document a second time. On the server the store already
+raises its own banner for the underlying failure; this only stops the record.
+
+Locally IndexedDB does not fail this way, so the rule costs nothing there.
+Both new strings carry ES/EN/CA entries.

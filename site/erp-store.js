@@ -190,7 +190,39 @@
       });
   }
 
-  function remoteSaveState(state) {
+  /* ------------------------------------------------------------------ *
+   * ONE SAVE ON THE WIRE AT A TIME.
+   *
+   * Reported from the demo: «Somebody else saved before you» on a machine
+   * nobody else was using, and once it appeared it never went away.
+   *
+   * Nobody else HAD saved. `persist()` in the workspace debounces at 140 ms;
+   * a PUT of the whole ERP document takes seconds; and the version was read
+   * out of `remoteVersion` at the moment the save was CALLED. So two saves
+   * 140 ms apart both quoted the same version, the first one bumped the
+   * server, and the second was refused as a stale write — by its own author.
+   * The banner then made it permanent: `remoteVersion` never advances past a
+   * 409, so every save after the first collision was refused for the same
+   * reason, and the session was effectively over.
+   *
+   * The rule below is that a save reads `remoteVersion` when it is SENT, not
+   * when it is asked for, which is only possible if there is never more than
+   * one in flight. What arrives while one is out is parked; a newer document
+   * REPLACES a parked one rather than queueing behind it, because these are
+   * whole-document writes and the newest already contains everything the
+   * older ones did. Every parked caller is answered by the save that
+   * supersedes it, so `persistNow()` still reports truthfully.
+   *
+   * NOT DONE, deliberately: adopting the server's version and retrying after
+   * a 409. With the writes serialised there is no such thing as a self-
+   * inflicted 409 any more, so every remaining one is genuinely somebody
+   * else — and quietly retrying over their work is exactly what the version
+   * check exists to prevent. See ASSUMPTIONS #187.
+   * ------------------------------------------------------------------ */
+  var savingNow = null; // the PUT currently on the wire, or null
+  var savingNext = null; // { state, waiters: [{resolve, reject}] } — the newest parked document
+
+  function putState(state) {
     return fetch(stateUrl(), {
       method: "PUT",
       credentials: "same-origin",
@@ -228,6 +260,73 @@
         }
         throw e;
       });
+  }
+
+  /** Send one document, then hand the wire to whatever was parked behind it. */
+  function sendState(state) {
+    var done = putState(state);
+    savingNow = done;
+    // `then` on BOTH outcomes, and the handlers re-throw nothing: this chain
+    // exists to release the wire, and the caller's own rejection must reach
+    // the caller unchanged.
+    done.then(
+      function (body) {
+        savingNow = null;
+        drainState(null, body);
+      },
+      function (e) {
+        savingNow = null;
+        drainState(e, null);
+      },
+    );
+    return done;
+  }
+
+  function drainState(err, body) {
+    var next = savingNext;
+    if (!next) return;
+    savingNext = null;
+    if (err) {
+      /* A refused save is not retried with a newer document. On a 409 the
+         parked write would be refused for the same reason a moment later; on
+         a network failure the banner has already told the operator their
+         changes are not saved and offered the only fix there is. Answering
+         the parked callers with the same error keeps `persistNow()` honest —
+         it must never resolve for a document that never left. */
+      next.waiters.forEach(function (w) {
+        w.reject(err);
+      });
+      void body;
+      return;
+    }
+    sendState(next.state).then(
+      function (b) {
+        next.waiters.forEach(function (w) {
+          w.resolve(b);
+        });
+      },
+      function (e) {
+        next.waiters.forEach(function (w) {
+          w.reject(e);
+        });
+      },
+    );
+  }
+
+  function remoteSaveState(state) {
+    if (!savingNow) return sendState(state);
+    if (savingNext) {
+      // Supersede: the parked document is replaced, its waiters are not. They
+      // asked "is my work saved", and the answer they are owed is the outcome
+      // of the write that carries it — which is now this newer one.
+      savingNext.state = state;
+    } else {
+      savingNext = { state: state, waiters: [] };
+    }
+    var parked = savingNext;
+    return new Promise(function (resolve, reject) {
+      parked.waiters.push({ resolve: resolve, reject: reject });
+    });
   }
 
   /* ------------------------------------------------------------------ *

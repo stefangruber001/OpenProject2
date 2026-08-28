@@ -244,6 +244,61 @@ async function main() {
     );
   }
 
+  /* --- ATTACHMENTS THAT ARE NOT PHOTOGRAPHS -------------------------------
+     The page asks for a PDF wherever it asks for the document behind a
+     decision — the email accepting a quote, the signed contract, the
+     delivery note behind an extra: `EV_ACCEPT` is "image/*,application/pdf"
+     and `evidenceField` stores a PDF byte for byte, because a document that
+     has been re-encoded is no longer the document that was signed. The blob
+     endpoint's allow-list was images only, so every one of those uploads was
+     refused by the server while the screen offered them. Reported on 28/08.
+
+     A real (tiny) PDF, not a renamed text file: the point is the round trip,
+     and a check that would pass on bytes no reader could open is not one. */
+  {
+    const key = `ev_e2e_${RUN.toString(36)}`;
+    const pdf = Buffer.from(
+      "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n" +
+        "2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +
+        "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 99 99]>>endobj\n" +
+        "trailer<</Root 1 0 R>>\n%%EOF\n",
+      "utf8",
+    );
+    const put = await fetch(`${BASE}/api/${TENANT}/erp/blob/${key}`, {
+      method: "PUT",
+      headers: { "content-type": "application/pdf" },
+      body: pdf,
+    });
+    const putBody = await json(put);
+    check(
+      "a PDF attachment is accepted, not refused as 'must be an image'",
+      put.ok,
+      `HTTP ${put.status} ${JSON.stringify(putBody).slice(0, 140)}`,
+    );
+
+    const got = await fetch(`${BASE}/api/${TENANT}/erp/blob/${key}`);
+    const back = Buffer.from(await got.arrayBuffer());
+    check(
+      "and comes back byte for byte, as a PDF",
+      got.ok &&
+        (got.headers.get("content-type") || "").startsWith("application/pdf") &&
+        back.equals(pdf),
+      `HTTP ${got.status} type=${got.headers.get("content-type")} bytes=${back.length}/${pdf.length}`,
+    );
+
+    // The allow-list is still a list. An SVG is a document that can carry
+    // script, served from the company's own origin beside its session
+    // cookie — widening the list for PDFs must not have widened it for that.
+    const svg = await fetch(`${BASE}/api/${TENANT}/erp/blob/${key}_svg`, {
+      method: "PUT",
+      headers: { "content-type": "image/svg+xml" },
+      body: '<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>',
+    });
+    check("an SVG is still refused", svg.status === 400, `HTTP ${svg.status}`);
+
+    await fetch(`${BASE}/api/${TENANT}/erp/blob/${key}`, { method: "DELETE" });
+  }
+
   // --- business rules still belong to the engine --------------------------
   {
     const res = await command({

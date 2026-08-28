@@ -15026,7 +15026,15 @@
           return f ? f.value : null;
         };
         const key = "cap_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-        const store = ErpStore.putBlob(key, w.file).catch(() => null);
+        /* A REFERENCE IS ONLY WRITTEN IF THE BYTES LANDED.
+           `.catch(() => null)` swallowed the upload failure and the record was
+           written anyway, carrying an `imageRef` to a document that is
+           nowhere — the same invisible failure the blob store was built to
+           end, arriving from the other direction. On the server the store
+           already raises its own banner; here the save is abandoned so the
+           person still has the file in front of them to try again. Locally
+           IndexedDB does not fail this way, and the same rule costs nothing. */
+        const store = ErpStore.putBlob(key, w.file);
         store
           .then(() => {
             mutate(() => {
@@ -15081,7 +15089,15 @@
               );
             }, "Documento guardado");
           })
-          .then(() => captureClose());
+          .then(
+            () => captureClose(),
+            () => {
+              // The panel stays open, holding the file: the operator can press
+              // Guardar again once the connection is back, without hunting for
+              // the document a second time.
+              toast("⚠ No se ha podido guardar el archivo — el documento no se ha registrado");
+            },
+          );
       }
 
       function builderIssues(id, issues) {

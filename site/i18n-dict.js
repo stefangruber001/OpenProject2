@@ -3760,6 +3760,10 @@ window.CANEI_DICT = {
     ],
     ["⚠ Sólo se puede adjuntar un PDF o una imagen", "⚠ Only a PDF or an image can be attached"],
     ["⚠ No se ha podido guardar el archivo", "⚠ The file could not be saved"],
+    [
+      "⚠ No se ha podido guardar el archivo — el documento no se ha registrado",
+      "⚠ The file could not be saved — the document has not been recorded",
+    ],
     // PK2-B: version navigator + send drawer.
     ["Ir a otra versión", "Go to another version"],
     ["Fecha de envío", "Send date"],
