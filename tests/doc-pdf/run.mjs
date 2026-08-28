@@ -269,6 +269,148 @@ check(
 );
 
 /* ==========================================================================
+   S5 · THE GRAPHIC ANNEX, AND THE SIGNATURES THAT CLOSE THE OFFER.
+
+   Until this session the quote DOWNLOAD went through the browser's print
+   dialog, for one reason: this writer could not draw a photograph, and a
+   quote without its annex is not the quote. The cost of that route was the
+   browser's own furniture printed into the margins (its URL, the date) and a
+   downloaded file that differed from the one already attached to the email,
+   which this writer produced.
+
+   So the annex is asserted on the FILE: real image XObjects carrying the
+   original JPEG bytes, extra pages that exist only because of them, and the
+   captions still readable as text. Plus the two properties that are easy to
+   get subtly wrong — a progressive JPEG must be refused rather than embedded
+   (DCTDecode is specified for baseline, and the failure is silent), and the
+   signature lines must sit at the FOOT of the page rather than floating
+   wherever the flow left them.
+   ========================================================================== */
+{
+  const jpegBaseline = fs.readFileSync(
+    resolve(ROOT, "tests/fixtures/img/plate-baseline.jpg"),
+    "latin1",
+  );
+  const jpegProgressive = fs.readFileSync(
+    resolve(ROOT, "tests/fixtures/img/plate-progressive.jpg"),
+    "latin1",
+  );
+
+  const plate = (n, jpeg) => ({
+    jpeg,
+    groupNum: "2",
+    groupName: "Alicatados",
+    itemNum: "2." + n,
+    itemLabel: "Alicatado de gres porcelanico 60x60 en bano principal",
+    caption: "",
+    sequence: 0,
+    siblings: 0,
+  });
+  const withAnnex = (plates, perPage) =>
+    Object.assign({}, doc, {
+      annex: {
+        perPage: perPage || 2,
+        label: "Anexo grafico",
+        pageWord: "pagina",
+        ofWord: "de",
+        itemWord: "subpartida",
+        pages: plates.map((ps, i) => ({ number: i + 1, plates: ps })),
+      },
+    });
+
+  // Two annex pages, three photographs, two of them the SAME bytes — which
+  // must cost one XObject, not two.
+  const annexDoc = withAnnex([
+    [plate(1, jpegBaseline), plate(2, jpegBaseline)],
+    [plate(3, jpegBaseline)],
+  ]);
+  const plain = build(doc, BRAND, tr);
+  const withPix = build(annexDoc, BRAND, tr);
+  const aFile = resolve(OUT, "presupuesto-anexo.pdf");
+  fs.writeFileSync(aFile, Buffer.from(withPix, "latin1"));
+
+  const countPages = (s) => (s.match(/\/Type\s*\/Page[^s]/g) || []).length;
+  check(
+    "the annex adds its own pages",
+    countPages(withPix) === countPages(plain) + 2,
+    `${countPages(plain)} → ${countPages(withPix)} pages`,
+  );
+
+  const xobjects = (withPix.match(/\/Subtype\s*\/Image/g) || []).length;
+  check(
+    "the photographs are image XObjects, and a repeat costs one copy",
+    xobjects === 1,
+    `${xobjects} image object(s) for 3 plates of the same picture`,
+  );
+  check(
+    "…carried as DCTDecode, i.e. the original JPEG bytes",
+    /\/Filter\s*\/DCTDecode/.test(withPix) && withPix.includes(jpegBaseline.slice(0, 64)),
+    "the JPEG's own header is present in the stream",
+  );
+  check(
+    "…declared at the size the JPEG itself says",
+    /\/Width 240\/Height 160/.test(withPix.replace(/\s+/g, " ").replace(/ \//g, "/")),
+    (withPix.match(/\/Width \d+\/Height \d+/) || ["none"])[0],
+  );
+  const drawn = (withPix.match(/\/Im\d+ Do/g) || []).length;
+  check("…and actually drawn, once per plate", drawn === 3, `${drawn} draw operators`);
+
+  const aTxt = spawnSync("pdftotext", ["-layout", aFile, "-"], { encoding: "utf8" }).stdout || "";
+  check(
+    "the annex names the partida and the subpartida, as text",
+    /Anexo grafico/.test(aTxt) && /Alicatados/.test(aTxt) && /subpartida 2\.1/.test(aTxt),
+    (aTxt.match(/Anexo grafico[^\n]*/) || ["not found"])[0].trim(),
+  );
+
+  /* A PROGRESSIVE JPEG IS REFUSED, NOT EMBEDDED. DCTDecode is specified for
+     baseline; a progressive one renders as anything from a grey box to a
+     crash depending on the reader. The document must still be a document —
+     one unreadable photograph does not cost the customer their quote — so
+     the plate frame is drawn empty and everything else survives. */
+  const progDoc = withAnnex([[plate(1, jpegProgressive)]]);
+  let progOut = null;
+  try {
+    progOut = build(progDoc, BRAND, tr);
+  } catch (e) {
+    progOut = null;
+  }
+  check(
+    "a progressive JPEG is refused without taking the document with it",
+    !!progOut &&
+      !/\/Subtype\s*\/Image/.test(progOut) &&
+      countPages(progOut) === countPages(plain) + 1,
+    progOut ? `${countPages(progOut)} pages, no image object` : "build threw",
+  );
+
+  /* SIGNATURES AT THE FOOT OF THE PAGE THEY LAND ON.
+     They used to sit wherever the flow left them — on a last page that was
+     half empty, «Conforme» floated in the middle with a hand's width of
+     nothing under it. Asserted in POINTS from the bottom of the page, read
+     out of the content stream, because that is the property; "the text is
+     present somewhere" passed on the broken build. */
+  {
+    const m = [...plain.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)].map((x) => x[1]);
+    const last = m[m.length - 1] || "";
+    // The caption's own Td, on the last content stream.
+    const ys = [...last.matchAll(/([\d.]+) ([\d.]+) Td \((?:Por |Conforme)/g)].map((x) =>
+      Number(x[2]),
+    );
+    const MM = 72 / 25.4;
+    /* 40mm up a 297mm page: comfortably clear of the footer (which ends
+       around 16mm) and nowhere near where the flow would have dropped the
+       block on a page that still had room. Not tighter than that, because
+       the exact pin is a design number and this check is about the property,
+       not about defending one measurement against the next tweak to it. */
+    const okY = ys.length > 0 && ys.every((y) => y < 40 * MM);
+    check(
+      "the signature lines are pinned to the foot of the last page",
+      okY,
+      ys.length ? `baseline at ${(Math.min(...ys) / MM).toFixed(1)}mm from the foot` : "not found",
+    );
+  }
+}
+
+/* ==========================================================================
    Every document type, not just the quote.
 
    The writer used to be exercised by one document, which is how `Count 1`

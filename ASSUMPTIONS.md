@@ -6227,3 +6227,77 @@ has sent anything".
 
 **Reversible: yes** — a disabled state and three sentences; no send path
 changed for a customer who has the contact detail the channel needs.
+
+### 193 · The quote PDF is written, not printed — and the annex is in it (2026-08-28)
+
+The download went through `printSheetHtml` + `window.print()`, for one honest
+reason: this writer could not draw a photograph, and a quote without its
+graphic annex is not the quote. The costs of that route were both visible to
+the customer — the browser prints its own URL and the date into the margins
+of a document the company sends out — and invisible to us: the file the
+customer downloaded and the file attached to the covering email were produced
+by two different routes, so they could differ, and nothing compared them.
+
+Both now come from `CaneiPdf.build`. What that needed:
+
+**JPEG embedding, as DCTDecode.** PDF understands JPEG natively, so the bytes
+go in compressed exactly as they arrived — a 400 KB photograph costs 400 KB
+of file and no CPU. Decoding one in JavaScript to re-emit it as a raw
+FlateDecode bitmap would be slower, larger and lossier. `/Width` and
+`/Height` are read from the JPEG's own frame header rather than from what the
+caller thinks it asked canvas for: a mismatch there is a torn image in some
+readers and a clean one in others.
+
+**Baseline only, and refused rather than mangled.** DCTDecode is specified
+for baseline JPEG; a progressive one renders as anything from a grey box to a
+crash depending on the reader, which is the worst failure available for a
+document somebody signs. `jpegInfo` refuses C2/C6/CA/CE, `addImage` turns
+that into "no picture" rather than an exception, and the plate prints as an
+empty frame — one unreadable photograph must not cost the customer their
+quote. The host makes it moot anyway: every image goes through a canvas
+re-encode, including one that is already a JPEG, which guarantees baseline
+whatever arrived and incidentally strips the EXIF orientation flag that makes
+portrait site photos print sideways.
+
+**One copy per picture.** Plates are keyed by their bytes, so the same
+photograph on three plates is one XObject. The seeded quote: 3 plates, 3
+distinct images, 26 KB total.
+
+**The frame fits the photograph.** A first render sized each plate to
+whatever page height was going spare, which put a 240×160 picture inside a
+frame three times its height in a field of pale green. Each plate is now
+registered before its box is measured and the box takes the picture's own
+aspect ratio, capped by the room the page has.
+
+**Signatures pinned to the foot.** They used to sit wherever the flow left
+them: on the fixture document the caption printed 260mm up a 297mm page, with
+a hand's width of nothing beneath it, on the one document a person is meant
+to sign and return. Pinned at `M.bottom + 40` — measured up from the footer,
+because the foot rule and the two company lines occupy the space below it —
+which puts the caption 26mm from the bottom edge. Red-first: reverting the
+pin moves it back to 260.4mm and the check fails.
+
+**Verified against a real reader, not just the bytes:** `pdfimages -list`
+reports the three plates as `jpeg rgb 8bpc` images, and the rendered pages
+show the annex with its captions, accents and page numbering intact.
+`printSheetHtml` stays for the in-app preview and for the invoice and
+contract downloads — only the quote download moved this session.
+
+### 194 · The plan's on-screen `.sig` mirror was not needed (2026-08-28)
+
+S5's plan called for giving `.sig` the `margin-top:auto` idiom in
+`erp-sheet.js` so the preview would mirror the pinned PDF. Measured in the
+browser before changing it: on the seeded quote the preview already has
+terms 1071→1285, signatures 1285→1348 and the footer at 1348 — the signature
+block already sits directly above the footer, because `.terms{margin-top:auto}`
+pushes the whole tail down as one.
+
+Adding a third `margin-top:auto` would have made it worse, not better: CSS
+splits the free space equally between every flex child that asks for it, so a
+third claimant would have opened a gap between the terms box and the
+signatures that is not there today — and it would have done so to every
+document sharing this stylesheet, invoices and contracts included.
+
+No change made. The fourth of the plan's premises to be checked and found
+already satisfied (see #190 for the first three); recorded here so the next
+session does not "fix" it.

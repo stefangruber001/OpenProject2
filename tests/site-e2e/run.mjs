@@ -9936,24 +9936,49 @@ async function testSendAndVersions(browser, base) {
     await pg.waitForTimeout(700);
     await pg.click("#bSend");
     await pg.waitForTimeout(400);
-    const printResult = await pg.evaluate(async () => {
-      let existsDuring = null;
+    /* S5 · «⤓ Descargar» WRITES A PDF; IT NO LONGER OPENS THE PRINT DIALOG.
+       The dialog route printed the browser's own furniture — its URL and the
+       date — into the margins of a document the customer receives, and it
+       meant the downloaded file and the one attached to the covering email
+       were produced by two different routes. Both now come from
+       `CaneiPdf.build`.
+
+       Asserted on the BYTES: a real PDF header, and the print dialog never
+       opening. `URL.createObjectURL` is intercepted only for the finished
+       PDF — `imageUrl()` uses the same call to build the <img> sources for
+       the annex, and stubbing it wholesale makes a perfectly good document
+       report zero photographs. */
+    const dl = await pg.evaluate(async () => {
+      let printed = false;
+      let caught = null;
       const origPrint = window.print;
       window.print = () => {
-        // PK-F: what prints is the approved sheet — and only that design.
-        existsDuring =
-          !!document.querySelector(".printsheet .cnsheet .sheet") &&
-          !document.querySelector(".printsheet .doc, .printsheet .cdoc");
+        printed = true;
       };
+      const origCreate = URL.createObjectURL;
+      URL.createObjectURL = (b) => {
+        if (b && b.type === "application/pdf") {
+          caught = b;
+          return "blob:stub";
+        }
+        return origCreate.call(URL, b);
+      };
+      const origClick = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {};
       document.querySelector("#sbDownload").click();
-      await new Promise((r) => setTimeout(r, 900));
-      const existsAfter = !!document.querySelector(".printsheet");
+      await new Promise((r) => setTimeout(r, 1800));
       window.print = origPrint;
-      return { existsDuring, existsAfter };
+      URL.createObjectURL = origCreate;
+      HTMLAnchorElement.prototype.click = origClick;
+      if (!caught) return { printed, blob: false };
+      const buf = new Uint8Array(await caught.arrayBuffer());
+      let head = "";
+      for (let i = 0; i < 8; i++) head += String.fromCharCode(buf[i]);
+      return { printed, blob: true, size: buf.length, head, type: caught.type };
     });
-    if (printResult.existsDuring && !printResult.existsAfter)
-      ok("send: «⤓ Descargar» prints exactly the customer document, then cleans up");
-    else bad("send: download PDF print sheet", JSON.stringify(printResult));
+    if (dl.blob && dl.head === "%PDF-1.4" && !dl.printed && dl.size > 3000)
+      ok(`send: «⤓ Descargar» writes a real PDF, with no print dialog (${dl.size} bytes)`);
+    else bad("send: quote download is a written PDF", JSON.stringify(dl));
 
     /* S4 · THE SAME QUOTE AS A SPREADSHEET.
        A customer comparing line by line, or an aparejador who wants the
@@ -10056,55 +10081,75 @@ async function testSendAndVersions(browser, base) {
       ok(`send: no address, no email — the button says why («${noMail.label}»)`);
     else bad("send: email without an address is not blocked", JSON.stringify(noMail));
 
-    /* Part 2 · item 9 — the graphic annex reached the customer as blank
-       plates. Not a missing blob and not a 404: downloadBudgetPdf awaited the
-       image URL and then printed, so the browser had decoded nothing yet.
-       Measured before the fix on the seeded quote: 0 of 3 images paintable AT
-       PRINT TIME, 3 of 3 a second later — the pictures always existed, the
-       document just left before they arrived.
+    /* Part 2 · item 9, carried forward to the new route — THE ANNEX MUST
+       ACTUALLY BE IN THE FILE.
 
-       So this asserts the property that actually failed: at the instant
-       print() is called, every annex image is decoded. Waiting first and then
-       counting would pass on the broken build, which is exactly how this
-       survived a suite that already checked the sheet's contents. */
-    /* A COLD page: the first download in this suite already cached the blob
-       URLs and let the browser decode them, so a second print paints straight
-       from cache and passes even on the broken build — a negative control ran
-       green until this was moved to its own context. The customer's very
-       first download is the case that matters. */
+       The bug this guards was: downloadBudgetPdf awaited the image URL and
+       then printed, so the browser had decoded nothing yet and the customer
+       received blank plates. Measured then: 0 of 3 images paintable at print
+       time, 3 of 3 a second later. The print route is gone (S5), so the
+       property is now asserted where it lives — in the PDF's own bytes:
+       DCTDecode image XObjects, one per plate, and pages that exist only
+       because of them.
+
+       A COLD page, for the same reason it always was: an earlier download in
+       this suite warmed the blob URLs, and a check that passes off a warm
+       cache passed on the broken build too. */
     const cold = await browser.newContext({ viewport: { width: 1400, height: 950 } });
     const cpg = await cold.newPage();
     await cpg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
     await cpg.waitForSelector("#p1 .secitem", { timeout: 15000 });
     await cpg.waitForTimeout(600);
-    const annexAtPrint = await cpg.evaluate(async () => {
-      const withImgs = erp.state.budgets.find((x) =>
-        x.versions.some((v) =>
-          v.chapters.some((c) => c.lines.some((l) => (l.imageRefs || []).length)),
-        ),
-      );
+    const annexInFile = await cpg.evaluate(async () => {
+      const withImgs = erp.state.budgets.find((x) => {
+        const d = erp.renderBudgetDoc(x.id, x.currentVersionId);
+        const a = ErpBridge.docs.annex(d);
+        return a.enabled && a.pages.length;
+      });
       if (!withImgs) return { skipped: true };
-      let shot = null;
-      const origPrint = window.print;
-      window.print = () => {
-        const imgs = [...document.querySelectorAll(".printsheet img[data-blob]")];
-        shot = { total: imgs.length, painted: imgs.filter((i) => i.naturalWidth > 0).length };
+      const vid = withImgs.acceptedVersionId || withImgs.currentVersionId;
+      const wanted = ErpBridge.docs.annex(erp.renderBudgetDoc(withImgs.id, vid));
+      let caught = null;
+      const origCreate = URL.createObjectURL;
+      URL.createObjectURL = (b) => {
+        if (b && b.type === "application/pdf") {
+          caught = b;
+          return "blob:stub";
+        }
+        return origCreate.call(URL, b);
       };
-      await downloadBudgetPdf(withImgs.id, withImgs.acceptedVersionId || withImgs.currentVersionId);
-      window.print = origPrint;
-      return shot || { total: 0, painted: 0 };
+      const origClick = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {};
+      await downloadBudgetPdf(withImgs.id, vid);
+      URL.createObjectURL = origCreate;
+      HTMLAnchorElement.prototype.click = origClick;
+      if (!caught) return { plates: wanted.plateCount, drawn: 0, images: 0 };
+      const buf = new Uint8Array(await caught.arrayBuffer());
+      let raw = "";
+      for (let i = 0; i < buf.length; i += 8192) {
+        raw += String.fromCharCode.apply(null, buf.subarray(i, i + 8192));
+      }
+      return {
+        plates: wanted.plateCount,
+        annexPages: wanted.pages.length,
+        images: raw.split("/Subtype/Image").length - 1,
+        drawn: (raw.match(/\/Im\d+ Do/g) || []).length,
+        dct: raw.indexOf("/Filter/DCTDecode") >= 0,
+      };
     });
     await cold.close();
-    if (
-      annexAtPrint.skipped ||
-      (annexAtPrint.total > 0 && annexAtPrint.painted === annexAtPrint.total)
+    if (annexInFile.skipped) ok("send: no quote carries annex images in this register");
+    else if (
+      annexInFile.plates > 0 &&
+      annexInFile.drawn === annexInFile.plates &&
+      annexInFile.images > 0 &&
+      annexInFile.dct
     )
       ok(
-        annexAtPrint.skipped
-          ? "send: no quote carries annex images in this register"
-          : `send: every annex image is painted before printing (${annexAtPrint.painted}/${annexAtPrint.total})`,
+        `send: the annex is embedded in the downloaded PDF ` +
+          `(${annexInFile.drawn} plates over ${annexInFile.annexPages} pages, DCTDecode)`,
       );
-    else bad("send: annex images blank at print time", JSON.stringify(annexAtPrint));
+    else bad("send: annex missing from the downloaded PDF", JSON.stringify(annexInFile));
 
     /* The operator's own sequence, reported 20/08: send v1.0, start v1.1,
        then the customer answers v1.0 — which is the ordinary case, because

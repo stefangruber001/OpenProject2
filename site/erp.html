@@ -21265,14 +21265,142 @@
         window.print();
         sheet.remove();
       }
+      /**
+       * A stored picture as baseline-JPEG bytes the PDF writer can embed.
+       *
+       * Everything goes through a canvas, including a file that is already a
+       * JPEG. That looks wasteful and is deliberate: the writer embeds the
+       * bytes verbatim under DCTDecode, which is specified for BASELINE
+       * JPEG, and a phone photograph is quite often progressive — the writer
+       * refuses those rather than producing a file that renders as a grey box
+       * in one reader and fine in another. A canvas re-encode is the one
+       * cheap way to guarantee baseline whatever arrived, and it also strips
+       * the EXIF orientation flag by drawing the image as the browser
+       * decoded it, which is what stops a portrait site photo printing on
+       * its side.
+       *
+       * Capped at 1600px on the long edge: an annex plate is about 80mm wide
+       * on paper, so beyond that the file grows and the print does not.
+       * Returns null on anything unreadable — the annex draws an empty frame
+       * and the quote still goes out.
+       */
+      async function plateJpegBytes(key) {
+        try {
+          const url = await imageUrl(key);
+          if (!url) return null;
+          const img = await new Promise((res, rej) => {
+            const el = new Image();
+            el.onload = () => res(el);
+            el.onerror = rej;
+            el.src = url;
+          });
+          const long = Math.max(img.naturalWidth, img.naturalHeight) || 1;
+          const scale = Math.min(1, 1600 / long);
+          const cv = document.createElement("canvas");
+          cv.width = Math.max(1, Math.round(img.naturalWidth * scale));
+          cv.height = Math.max(1, Math.round(img.naturalHeight * scale));
+          const cx = cv.getContext("2d");
+          // White underneath: a PNG with transparency would otherwise come
+          // out of the JPEG encoder on black.
+          cx.fillStyle = "#fff";
+          cx.fillRect(0, 0, cv.width, cv.height);
+          cx.drawImage(img, 0, 0, cv.width, cv.height);
+          const blob = await new Promise((res) => cv.toBlob(res, "image/jpeg", 0.82));
+          if (!blob) return null;
+          const buf = new Uint8Array(await blob.arrayBuffer());
+          // A BINARY STRING, one code unit per byte — the representation the
+          // writer works in end to end (btoa on the attachment path, latin1
+          // in the tests). Built in chunks because a spread over a megabyte
+          // of bytes overflows the argument list.
+          let out = "";
+          for (let i = 0; i < buf.length; i += 8192) {
+            out += String.fromCharCode.apply(null, buf.subarray(i, i + 8192));
+          }
+          return out;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      /**
+       * The quote, downloaded as a real PDF written by this application.
+       *
+       * It used to go through the browser's print dialog, and that route is
+       * why the operator's downloaded quotes carried the browser's own
+       * furniture — its URL and the date printed into the margins, which
+       * nobody wants on a document they send a customer (reported 28/08).
+       * Worse, it meant the file the customer downloaded and the file
+       * attached to the covering email were produced by two different
+       * routes, so they could differ and did.
+       *
+       * Now both come from `CaneiPdf.build`. The annex travels IN the
+       * descriptor — the same composer decides which picture belongs to
+       * which subpartida, so the page on screen and the page in the file
+       * cannot disagree — with each plate's bytes resolved and re-encoded
+       * before the writer runs, because the writer is synchronous and a
+       * photograph that is still loading is a blank frame.
+       */
       async function downloadBudgetPdf(id, versionId) {
+        const b = erp.budget(id);
         const doc = erp.renderBudgetDoc(id, versionId);
         const annex =
           typeof ErpBridge !== "undefined" && ErpBridge.docs
             ? ErpBridge.docs.annex(doc)
             : { enabled: false, pages: [], plateCount: 0, markedItems: [] };
         const perPage = (doc.annex && doc.annex.imagesPerPage) || 2;
-        await printSheetHtml(budgetSheetHtml(id, versionId, doc, annex, perPage));
+        const kind = b.acceptedVersionId === versionId ? "presupuestoAceptado" : "presupuesto";
+        const lang = doc.language || "es";
+        const L = DOCL[lang] || DOCL.es;
+        const descriptor = CaneiErpFacts.docFor(
+          erp,
+          kind,
+          {
+            budgetId: id,
+            versionId,
+            lineText: (l) => lineDesc(l, lang),
+            marked: new Set(annex.markedItems),
+          },
+          CaneiDocTypes,
+        );
+        if (annex.enabled && annex.pages && annex.pages.length) {
+          const pages = [];
+          for (const pg of annex.pages) {
+            const plates = [];
+            for (const p of pg.plates) {
+              plates.push(Object.assign({}, p, { jpeg: await plateJpegBytes(p.ref) }));
+            }
+            pages.push({ number: pg.number, plates });
+          }
+          descriptor.annex = {
+            pages,
+            perPage,
+            label: L.annex,
+            pageWord: L.page,
+            ofWord: L.of,
+            itemWord: L.item,
+          };
+        }
+        const iss = erp._issuerBlock();
+        const pdf = CaneiPdf.build(
+          descriptor,
+          {
+            wordmark: iss.tradeName,
+            legal: iss.legalName,
+            slogan: "",
+            cif: iss.taxId,
+            address: iss.address,
+            phone: iss.phone,
+            from: iss.email,
+            iban: iss.iban,
+          },
+          CaneiDocI18n.tr(lang),
+        );
+        const bytes = new Uint8Array(pdf.length);
+        for (let i = 0; i < pdf.length; i++) bytes[i] = pdf.charCodeAt(i) & 0xff;
+        downloadBlob(
+          new Blob([bytes], { type: "application/pdf" }),
+          `${b.number}-v${doc.version}.pdf`,
+        );
       }
       /**
        * The same quote as a spreadsheet.

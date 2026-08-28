@@ -117,6 +117,79 @@
     return out;
   }
 
+  /* ============================================================ photographs
+   *
+   * The graphic annex is the one part of a quote that is not type, and until
+   * now this writer could not draw it at all: the download went through the
+   * browser's print dialog precisely because that route could render an
+   * <img>. That cost the document its own page furniture (the browser prints
+   * its URL and the date into the margins) and made the downloaded file
+   * different from the one attached to the email, which this writer already
+   * produced. One writer, one document — so it has to be able to draw a
+   * photograph.
+   *
+   * DCTDecode, which is to say: the JPEG goes into the file COMPRESSED, byte
+   * for byte, exactly as it arrived. PDF understands JPEG natively, so there
+   * is no decode step here and no pixel loop — a 400 KB photograph costs 400
+   * KB of PDF and no CPU. Decoding one in JavaScript to re-encode it as a raw
+   * FlateDecode bitmap would be slower, larger, and lossier.
+   *
+   * BASELINE ONLY, and the host guarantees it: every image is re-encoded
+   * through a canvas before it reaches this file, which emits baseline. A
+   * progressive JPEG is REFUSED rather than embedded, because DCTDecode is
+   * specified for baseline and a progressive one renders as anything from a
+   * grey box to a crash depending on the reader — the worst failure available
+   * for a document somebody signs.
+   */
+
+  /**
+   * Width, height and colour space, read from the JPEG's own frame header.
+   *
+   * Not guessed and not passed in: the caller knows the pixel size it asked
+   * canvas for, but the file is the thing being embedded and the file is what
+   * the PDF's /Width and /Height must agree with. A mismatch there is a
+   * skewed or torn image in some readers and a clean one in others.
+   */
+  function jpegInfo(bin) {
+    if (bin.charCodeAt(0) !== 0xff || bin.charCodeAt(1) !== 0xd8) {
+      throw new Error("erp-pdf: not a JPEG (no SOI marker)");
+    }
+    let i = 2;
+    while (i < bin.length) {
+      if (bin.charCodeAt(i) !== 0xff) {
+        i++;
+        continue;
+      }
+      let marker = bin.charCodeAt(i + 1);
+      // Fill bytes: a run of 0xFF before the marker is legal padding.
+      while (marker === 0xff) marker = bin.charCodeAt(++i + 1);
+      // Standalone markers carry no length: skip without reading one.
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+        i += 2;
+        continue;
+      }
+      const len = (bin.charCodeAt(i + 2) << 8) | bin.charCodeAt(i + 3);
+      const isFrame =
+        marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+      if (isFrame) {
+        // C2 is progressive; C9/CA/CB are arithmetic-coded. Neither is what
+        // DCTDecode promises, and both are silent corruption rather than a
+        // clear failure, so they stop here.
+        if (marker === 0xc2 || marker === 0xc6 || marker === 0xca || marker === 0xce) {
+          throw new Error("erp-pdf: progressive JPEG cannot be embedded — re-encode as baseline");
+        }
+        const h = (bin.charCodeAt(i + 5) << 8) | bin.charCodeAt(i + 6);
+        const w = (bin.charCodeAt(i + 7) << 8) | bin.charCodeAt(i + 8);
+        const comps = bin.charCodeAt(i + 9);
+        if (!w || !h) throw new Error("erp-pdf: JPEG frame declares no size");
+        return { w, h, comps };
+      }
+      if (marker === 0xda) break; // start of scan: the header is over
+      i += 2 + len;
+    }
+    throw new Error("erp-pdf: JPEG has no frame header");
+  }
+
   function Doc(opts) {
     this.o = opts;
     // Every string the writer touches goes through the caller's tr and then
@@ -127,8 +200,60 @@
     this.c = "";
     this.y = 0;
     this.pageNo = 0;
+    /* Every photograph the document draws, once each. Keyed by the JPEG bytes
+       themselves, so the same picture used on two plates costs one copy in
+       the file — which is the normal case when a subpartida's reference image
+       is also the one photographed on site. */
+    this.images = [];
+    this.imageIx = Object.create(null);
     this.newPage(true);
   }
+
+  /**
+   * Register a JPEG and get the resource name to draw it by.
+   *
+   * Returns null rather than throwing when the bytes are unusable, because
+   * one unreadable photograph must not cost the customer their quote: the
+   * plate frame is drawn empty and the document is still a document. The
+   * throw is kept for the shape of the ARGUMENT (not a JPEG at all), which is
+   * a programming mistake rather than a bad file.
+   */
+  Doc.prototype.addImage = function (bin) {
+    if (!bin) return null;
+    const seen = this.imageIx[bin];
+    if (seen) return seen;
+    let info;
+    try {
+      info = jpegInfo(bin);
+    } catch (e) {
+      return null;
+    }
+    const name = "Im" + (this.images.length + 1);
+    this.images.push({ name, bin, w: info.w, h: info.h, comps: info.comps });
+    this.imageIx[bin] = name;
+    return name;
+  };
+
+  /**
+   * Draw a registered image into the box (x, y, w, h), preserving its aspect
+   * ratio and centring what is left over.
+   *
+   * A photograph stretched to fill a frame is the one thing a customer
+   * notices immediately — a bathroom that is not square in the picture reads
+   * as carelessness about the bathroom.
+   */
+  Doc.prototype.image = function (name, x, y, w, h) {
+    const im = this.images.find((i) => i.name === name);
+    if (!im) return;
+    const scale = Math.min(w / im.w, h / im.h);
+    const dw = im.w * scale,
+      dh = im.h * scale;
+    const dx = x + (w - dw) / 2,
+      dy = y + (h - dh) / 2;
+    this.c +=
+      `q ${dw.toFixed(2)} 0 0 ${dh.toFixed(2)} ${dx.toFixed(2)} ${dy.toFixed(2)} cm ` +
+      `/${name} Do Q\n`;
+  };
 
   Doc.prototype.esc = function (s) {
     return this.o.tr(s).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
@@ -707,18 +832,124 @@
     this.y -= 8;
   };
 
+  /**
+   * The signature lines, pinned to the FOOT of the page they land on.
+   *
+   * They used to sit wherever the flow left them, so a quote whose last page
+   * was half empty printed «Conforme — el cliente» floating in the middle of
+   * it with a hand's width of nothing underneath. On a document somebody is
+   * meant to sign and return, the place to sign is the bottom of the page —
+   * that is where a person looks, and where a scanner crops to.
+   *
+   * PIN is measured from the footer up, not from the content down: the foot
+   * rule and the two company lines occupy up to `M.bottom + 22`, and the
+   * caption sits 11pt BELOW its own rule, so the rule cannot go lower than
+   * about `M.bottom + 37` without printing the caption into the footer.
+   */
   Doc.prototype.signatures = function () {
     const d = this.o.doc;
     if (!d.signatures || !d.signatures.length) return;
-    this.need(58);
+    const PIN = M.bottom + 40;
+    // A new page only when the block would otherwise collide with what is
+    // already on this one — not on the flowed height, which is the whole
+    // point of pinning.
+    if (this.y < PIN + 30) this.newPage();
+    this.y = PIN;
     const cw = (CONTENT_W - 24) / d.signatures.length;
-    this.y -= 26;
     d.signatures.forEach((s, i) => {
       const x = X0 + i * (cw + 24);
       this.rule(x, this.y, cw, C.ink, 0.8);
       this.text(x, this.y - 11, 7.5, FONT.sans, C.muted, s);
     });
     this.y -= 22;
+  };
+
+  /**
+   * The graphic annex: the photographs, after the document and its totals.
+   *
+   * Same content and same order as the on-screen annex — it is composed by
+   * the same capability (`ErpBridge.docs.annex`) and handed here already laid
+   * out into pages of plates. This function only draws what it was given, so
+   * the page a customer downloads and the page they see on screen cannot
+   * disagree about which picture belongs to which subpartida.
+   *
+   * `doc.annex` shape: { pages: [{ number, plates: [{ jpeg, groupNum,
+   * groupName, itemNum, itemLabel, caption, sequence, siblings }] }],
+   * perPage, label, pageWord, ofWord, itemWord }. `jpeg` is a binary string
+   * or absent; a plate whose bytes never arrived still prints its caption
+   * inside an empty frame, because a missing photograph the reader can SEE is
+   * better than a caption silently dropped.
+   */
+  Doc.prototype.annex = function () {
+    const a = this.o.doc.annex;
+    if (!a || !a.pages || !a.pages.length) return;
+    const perRow = Math.min(Math.max(1, a.perPage || 2), 2);
+    for (const pg of a.pages) {
+      this.newPage();
+      this.text(
+        X0,
+        this.y - 9,
+        9,
+        FONT.sansB,
+        C.green,
+        `${a.label || "Anexo grafico"} - ${a.pageWord || "pagina"} ${pg.number} ${a.ofWord || "de"} ${a.pages.length}`,
+        { tracking: 0.04 },
+      );
+      this.y -= 16;
+      this.rule(X0, this.y, CONTENT_W, C.line);
+      this.y -= 14;
+
+      const gap = 12;
+      const cw = (CONTENT_W - gap * (perRow - 1)) / perRow;
+      const capH = 30;
+      const rowCount = Math.ceil(pg.plates.length / perRow);
+      // The tallest a row may be if they are all to fit on this page.
+      const maxRowH = (this.y - (M.bottom + 30)) / Math.max(1, rowCount);
+
+      /* THE FRAME FITS THE PHOTOGRAPH, not the leftover page. Sizing it to
+         whatever height was going spare put a 240x160 picture inside a frame
+         three times its height, centred in a field of pale green — which is
+         what a first render showed. So each plate is registered BEFORE its
+         box is measured, and the box takes the picture's own aspect ratio,
+         capped by the room the page has. A plate whose bytes never arrived
+         has no ratio to ask for and falls back to 2:3, the shape most
+         phone photographs land in. */
+      const boxes = pg.plates.map((p) => {
+        const name = this.addImage(p.jpeg);
+        const im = name && this.images.find((x) => x.name === name);
+        const ratio = im ? im.h / im.w : 2 / 3;
+        return { name, h: Math.min(maxRowH - capH - 6, cw * ratio) };
+      });
+
+      let top = this.y;
+      for (let r = 0; r < rowCount; r++) {
+        const row = boxes.slice(r * perRow, r * perRow + perRow);
+        // One height per row, so two pictures of different shapes still sit
+        // on a common baseline rather than stepping down the page.
+        const frameH = Math.max(60, ...row.map((b) => b.h));
+        row.forEach((b, col) => {
+          const p = pg.plates[r * perRow + col];
+          const x = X0 + col * (cw + gap);
+          // The frame is drawn whether or not the photograph arrived: it is
+          // the shape of the page, and a page that reflows because one file
+          // was missing is a different document.
+          this.rect(x, top - frameH, cw, frameH, C.wash);
+          if (b.name) this.image(b.name, x + 2, top - frameH + 2, cw - 4, frameH - 4);
+          const head = `${p.groupNum}. ${p.groupName} - ${a.itemWord || "subpartida"} ${p.itemNum}`;
+          this.text(x, top - frameH - 11, 7.5, FONT.sansB, C.ink, head);
+          const tail =
+            (p.itemLabel || "") +
+            (p.sequence ? ` (${p.sequence} ${a.ofWord || "de"} ${p.siblings})` : "");
+          const lines = this.wrap(tail, FONT.sans, 7, cw);
+          lines.slice(0, 2).forEach((ln, k) => {
+            this.text(x, top - frameH - 21 - k * 9, 7, FONT.sans, C.body, ln);
+          });
+        });
+        top -= frameH + capH + 6;
+      }
+      // Each annex page opens its own; nothing else flows onto this one.
+      this.y = M.bottom + 30;
+    }
   };
 
   /** Drawn onto every page after layout, so it can carry "page n of m". */
@@ -764,7 +995,35 @@
     const fontIds = fonts.map(([, base]) =>
       push(`<</Type/Font/Subtype/Type1/BaseFont/${base}/Encoding/WinAnsiEncoding>>`),
     );
-    const res = "<</Font<<" + fonts.map(([id], i) => `/${id} ${fontIds[i]} 0 R`).join("") + ">>>>";
+    /* The photographs, as DCTDecode XObjects carrying the original JPEG bytes.
+       `/Length` is the byte count and the string is a binary string — one code
+       unit per byte, which is what the whole writer already assumes (the
+       attachment path calls btoa on it, and the tests read it as latin1). A
+       UTF-8 encode anywhere on this path would double the high bytes and move
+       every xref offset, so the bytes must stay in this representation until
+       the very last conversion. */
+    const imageIds = this.images.map((im) =>
+      push(
+        `<</Type/XObject/Subtype/Image/Width ${im.w}/Height ${im.h}` +
+          `/ColorSpace/${im.comps === 1 ? "DeviceGray" : im.comps === 4 ? "DeviceCMYK" : "DeviceRGB"}` +
+          `/BitsPerComponent 8/Filter/DCTDecode/Length ${im.bin.length}>>\nstream\n${im.bin}\nendstream`,
+      ),
+    );
+    /* ONE resource dictionary, shared by every page, listing every image in
+       the document. A per-page dictionary would be tidier and is not worth
+       the bookkeeping: an XObject named in the resources but never drawn on
+       that page costs a reader nothing (it is only ever fetched when a `Do`
+       asks for it), whereas a page whose resources are missing an image it
+       does draw is a blank frame in some readers and an error in others. */
+    const xobj = this.images.length
+      ? "/XObject<<" + this.images.map((im, i) => `/${im.name} ${imageIds[i]} 0 R`).join("") + ">>"
+      : "";
+    const res =
+      "<</Font<<" +
+      fonts.map(([id], i) => `/${id} ${fontIds[i]} 0 R`).join("") +
+      ">>" +
+      xobj +
+      ">>";
 
     const pageIds = [];
     for (const st of streams) {
@@ -851,7 +1110,13 @@
     }
 
     d.blocks();
+    // Signatures close the OFFER, so they come before the annex: the annex is
+    // an appendix of photographs, and a signature line under the last
+    // photograph would read as signing for the pictures. Same order as the
+    // on-screen sheet, where `.sig` lives inside the sheet and the annex
+    // pages follow it.
     d.signatures();
+    d.annex();
     return d.finish();
   }
 
