@@ -5968,3 +5968,82 @@ to GeoNames (or an operator-supplied dataset).
 **Reversible: yes** — an additive lookup table and an `oninput` handler; the
 full generator can replace it without touching callers, since both fill the
 same field.
+
+### 185 · S2's builder-width bug wasn't the scroll question the plan expected (2026-08-28)
+
+The plan called for "a horizontal-scroll wrapper + min-widths" on the
+presupuestador's line table between 700px and 1180px. Before writing any CSS,
+the drawer was opened in a real browser at 960px (screenshot in the session
+log) — and there was no scroll problem: `.scroll{overflow-x:auto}` and
+`.pbpane{overflow:auto}` already contain the table correctly at every width
+tested (390 through 1400px, page `scrollWidth` never exceeded the viewport).
+
+**What was actually broken:** the delete button's full-text label
+("Eliminar subpartida") was rendering — and visibly clipping 107px past the
+right edge of a 960px screen — because `.pbdel .dellbl{display:inline}` sat
+in the `@media(max-width:1180px)` "one pane at a time" block, a rule written
+for the CARD layout's roomy 44px-tall button row. Card mode itself only
+starts at `700px`, so the 700–1180px band showed the full label inside the
+desktop table's 34px column with nowhere to put it. The button's own
+bounding box stayed on-screen throughout (a table cell does not grow for
+unwrapped text) — a naive `scrollWidth`-only regression test would have
+missed this entirely, which is why the new e2e check reads the LABEL's own
+rect, not the button's.
+
+**Fix:** moved the dellbl/delx toggle from the 1180px block into the 700px
+one, where the roomy card-mode button geometry it assumes actually exists.
+Verified red-first (reverted → the new check fails with `right:1067` on a
+960px viewport; restored → passes) and visually at 390/701/900/960/1179/1181px.
+
+**Scope held to the actual bug**, not the plan's assumed one — no min-widths,
+no scroll-wrapper changes, no touching the "not a horizontal scrollbar over
+the sale price" 3-pane design in the `>1180px` block. "S2 is a targeted CSS
+pass, not a redesign" is exactly the plan's own instruction.
+
+### 186 · S2's other three items, and where they departed from the plan (2026-08-28)
+
+- **Auto-code proposal already existed** (`nextCatalogueCode` + its wiring,
+  labelled "Package 2 · item 6" in the code) — the plan assumed it needed
+  building. Extended only to also fire once when a Partida is _seeded_ on
+  open (see below), since a preselected value never fires the `change` event
+  the existing proposal listens for.
+- **Partida required:** `addCatalogueItem` now refuses an empty `chapter`;
+  the "— sin partida —" option is gone from the create/edit form. `Object`
+  reordered so the refusal fires before the record is pushed to state.
+  `importCatalogue`'s bulk-upsert path (unused by any UI or test, grepped)
+  gained the same guard as a skip condition rather than an uncaught throw, so
+  a future caller degrades a bad row instead of losing the rest of the batch.
+  An item whose stored chapter doesn't match any active one (retired chapter,
+  or — hypothetically, none exist in current data — a pre-rule orphan) gets
+  its own value added as an extra option, so editing it can never silently
+  reassign the chapter to whatever happens to sort first.
+- **Preselect, not lock.** The plan said "preselect and lock" when opened
+  from a chapter-scoped catalogue search or the register's own tree filter.
+  Implemented as an ordinary preselect only — every other prefilled field in
+  this app (S1's CP→Provincia included) stays editable, and a locked-only
+  Partida would be the one field in this drawer with different rules from
+  every other one, for a case (the operator meant a different partida) that
+  costs one click to fix either way.
+- **Tipo/Marca/Modelo hidden**, Calidad kept, exactly as decided. The
+  engine's own default for a new item's `type` changed from `"material"` to
+  `""` — grepped clean, nothing computes from a budget line's `type`, only
+  `LINE_TYPE[l.type]` renders it as a spec-line bit. Defaulting every new
+  item to a fabricated "material" bit under its description (visible on the
+  builder and every printed document) would have been a regression the hide
+  itself introduced, not a neutral no-op. Existing brand/model/type values
+  are untouched — omitted from the save patch entirely, not blanked.
+- **"Foto de la visita" removed** from the images-to-add panel per the
+  operator's item 2 (materials/expected-result only). `source: "visit"`
+  stays valid on whatever is already attached that way.
+
+**Verified:** manageability-sim 396/396 (2 new red-first checks: the refusal,
+and no fabricated Tipo), import-sim/migrations-sim/scheduling-sim/year-sim/
+bank-import(-pdf) all green, full site-e2e 624/624, i18n gates unchanged at
+207/207 (one new label "Partida *" added to both dictionaries; a second
+scanner false-positive from the register's own seed-chapter ternary was
+avoided by restructuring rather than translating, matching the ASSUMPTIONS
+#183 precedent), lint/boundaries/check-types/test/build all green.
+
+**Reversible: yes** — all four changes are additive or narrowing (a required
+field, a hidden form section, a removed button, a moved CSS rule); no data
+migration, no engine method removed.

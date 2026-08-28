@@ -1234,6 +1234,7 @@ window.CANEI_DICT = {
     ["Razón social / nombre completo *", "Legal / full name *"],
     ["Cliente / prospecto *", "Customer / prospect *"],
     ["Descripción *", "Description *"],
+    ["Partida *", "Line item *"],
     ["Tipo % *", "Rate % *"],
     ["Almacén *", "Warehouse *"],
     ["SKU del artículo *", "Item SKU *"],

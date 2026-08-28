@@ -1675,7 +1675,12 @@
           desc: "",
           customerWording: "",
           unit: "ud",
-          type: "material",
+          // Not "material": the field is unused (Package 8 review, 28/08) and a
+          // fabricated default is worse than an honest gap — see taxIdReason's
+          // own reasoning for the same call on a different field. Left in the
+          // schema so a record written before the form dropped it still reads
+          // and prints correctly; nothing computes from it (grepped clean).
+          type: "",
           chapter: "",
           active: true,
           imageRefs: [],
@@ -1691,6 +1696,12 @@
         },
         it,
       );
+      // Package 8 review (28/08): a subpartida with no partida is unfindable —
+      // the register's own tree can only show it under an orphan bucket, and
+      // the builder's catalogue picker can only offer it from "todas las
+      // partidas". Existing orphans (if any) are grandfathered; only creation
+      // is refused, so nothing already in the catalogue is touched.
+      if (!rec.chapter) throw new Error("La partida es obligatoria");
       this.state.catalogue.push(rec);
       this._log(user, "addCatalogueItem", rec.code);
       return rec;
@@ -9375,11 +9386,14 @@
       // CAT-10: controlled upsert preserving the source reference
       const res = { added: 0, updated: 0, skipped: 0 };
       for (const r of rows) {
-        if (!r.code || !r.desc) {
+        const existing = this.state.catalogue.find((i) => i.code === r.code);
+        // A partida is required on CREATE (see addCatalogueItem); an update
+        // to an already-catalogued item never needs one, so the guard only
+        // widens the skip condition for the branch that would otherwise throw.
+        if (!r.code || !r.desc || (!existing && !r.chapter)) {
           res.skipped++;
           continue;
         }
-        const existing = this.state.catalogue.find((i) => i.code === r.code);
         if (existing) {
           Object.assign(existing, {
             desc: r.desc,

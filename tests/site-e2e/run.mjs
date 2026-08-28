@@ -1995,6 +1995,28 @@ async function testBudgetBuilder(browser, base) {
       ok(`builder: three zones at once (${tree} chapters · ${gridRows} lines · live totals)`);
     else bad("builder: three zones", `tree=${tree} rows=${gridRows} totals=${totals}`);
 
+    /* S2 · a laptop width (960px, between the 700px card breakpoint and the
+       1180px stacking one) used to show the delete button's FULL "Eliminar
+       subpartida" LABEL — a rule meant for the card layout's roomy row —
+       inside the desktop table's 34px column. The button's own box stayed
+       put (a table cell does not grow for unwrapped text), so the check
+       reads the LABEL's box, the element that actually painted 107px past
+       the edge of the screen while the button reported nothing wrong. */
+    await pg.setViewportSize({ width: 960, height: 900 });
+    await pg.waitForTimeout(250);
+    const delLbl = await pg.evaluate(() => {
+      const lbl = document.querySelector(".pbdel .dellbl");
+      if (!lbl) return null;
+      const shown = getComputedStyle(lbl).display !== "none";
+      const r = lbl.getBoundingClientRect();
+      return { shown, right: Math.round(r.right), vw: window.innerWidth };
+    });
+    if (delLbl && !delLbl.shown)
+      ok(`builder: the delete control stays an icon at 960px, not a clipped label`);
+    else bad("builder: delete label visible (and clipped) at 960px", JSON.stringify(delLbl));
+    await pg.setViewportSize({ width: 1400, height: 950 });
+    await pg.waitForTimeout(250);
+
     // The panel recalculates ON EVERY KEYSTROKE, not on blur. Type into a
     // price field and read the total back without leaving the field.
     const totalOf = async () => pg.locator("#bSide .row.big b").innerText();
@@ -8690,16 +8712,21 @@ async function testControlTowerAndDay(browser, base) {
     if (reordered.moved) ok("DMC-01: chapters reorder, and the order lives in the document");
     else bad("DMC-01 reorder", JSON.stringify(reordered));
 
-    // brand/model/quality are the doc's DMC-01 columns and must round-trip.
+    // S2 (Package 8 review, 28/08): Tipo, Marca and Modelo are hidden from
+    // this form — unused, per the operator — but the fields themselves and
+    // any value already on a record must survive untouched. Quality stays.
     await pg.evaluate(() => (location.hash = "items"));
     await pg.waitForTimeout(400);
     await pg.locator("#catNew").click();
     await pg.waitForTimeout(300);
+    const hidden = await pg.evaluate(
+      () => !document.querySelector("#ci_type, #ci_brand, #ci_model"),
+    );
+    if (hidden) ok("DMC-01: Tipo, Marca and Modelo are not in the subpartida form");
+    else bad("DMC-01: Tipo/Marca/Modelo still in the form", "");
     const catCode = "E2E-" + String(Date.now()).slice(-5);
     await pg.locator("#ci_code").fill(catCode);
     await pg.locator("#ci_desc").fill("Partida de prueba");
-    await pg.locator("#ci_brand").fill("MarcaX");
-    await pg.locator("#ci_model").fill("ModeloY");
     await pg.locator("#ci_qual").fill("alta");
     await pg.locator("#ci_cost").fill("12.50");
     await pg.locator("#ci_save").click();
@@ -8708,23 +8735,49 @@ async function testControlTowerAndDay(browser, base) {
       const i = erp.state.catalogue.find((x) => x.code === c);
       return i
         ? {
+            type: i.type,
             brand: i.brand,
             model: i.model,
+            chapter: i.chapter,
             quality: i.quality,
             cost: i.defaultCostCents,
-            price: i.defaultPriceCents,
           }
         : null;
     }, catCode);
     if (
       made &&
-      made.brand === "MarcaX" &&
-      made.model === "ModeloY" &&
+      made.type === "" &&
+      made.brand === "" &&
+      made.model === "" &&
+      !!made.chapter &&
       made.quality === "alta" &&
       made.cost === 1250
     )
-      ok("DMC-01: brand, model and quality capture and persist");
-    else bad("DMC-01 brand/model/quality", JSON.stringify(made));
+      ok(
+        "DMC-01: a new subpartida carries a partida, quality, and no fabricated Tipo/Marca/Modelo",
+      );
+    else bad("DMC-01 new subpartida fields", JSON.stringify(made));
+
+    // An item the price book ALREADY carries brand/model on (from before this
+    // form change) must keep them across an edit that never mentions them.
+    const preserved = await pg.evaluate(async () => {
+      const before = erp.state.catalogue.find((i) => i.brand && i.model && i.active !== false);
+      if (!before) return { skipped: true };
+      catalogueItemDrawer(before.id);
+      await new Promise((r) => setTimeout(r, 250));
+      const qualEl = document.querySelector("#ci_qual");
+      if (!qualEl) return { opened: false };
+      qualEl.value = before.quality + " (revisado)";
+      qualEl.dispatchEvent(new Event("input"));
+      document.querySelector("#ci_save").click();
+      await new Promise((r) => setTimeout(r, 300));
+      const after = erp.state.catalogue.find((i) => i.id === before.id);
+      return { id: before.id, brand: after.brand, model: after.model, wantBrand: before.brand };
+    });
+    if (preserved.skipped) ok("DMC-01: no legacy brand/model item to check (skipped)");
+    else if (preserved.brand === preserved.wantBrand && preserved.model)
+      ok(`DMC-01: editing a subpartida never wipes its existing Marca/Modelo (${preserved.brand})`);
+    else bad("DMC-01 brand/model preserved on edit", JSON.stringify(preserved));
 
     /* Part 2 · item 6 — the drawer proposes the next free code for the chosen
        partida, and the margin is shown where the two figures that make it are

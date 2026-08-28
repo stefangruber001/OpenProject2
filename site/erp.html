@@ -2883,13 +2883,6 @@
         .descell input {
           flex: 1 1 auto;
         }
-        /* …and here it says so. */
-        .pbdel .dellbl {
-          display: inline;
-        }
-        .pbdel .delx {
-          display: none;
-        }
         /* A real touch target. `.btn.sm` is 26px, which is fine under a mouse
            and under the 44px minimum every phone platform asks for — and this
            is the one button on the row that destroys something, so a mis-tap
@@ -4653,7 +4646,21 @@
           width: 100%;
           min-height: 38px;
         }
-        /* The one destructive control on the card keeps the full 44px. */
+        /* The one destructive control on the card keeps the full 44px, and
+           only here does it say what it does: a card gives it its own full
+           row, which a 34px table column never has room for. Below 1180px
+           but above this card breakpoint the row is still a real <table>, so
+           the label stayed an icon (the unconditional rule above) and moved
+           HERE from the 1180px stacking block — where it used to switch on
+           for every tabbed-single-pane width, printing "Eliminar subpartida"
+           into a 34px cell it could not fit and clipping the button past the
+           edge of the screen at ordinary laptop widths (measured at 960px). */
+        .pbdel .dellbl {
+          display: inline;
+        }
+        .pbdel .delx {
+          display: none;
+        }
         .bgrid table.cards tr.pbrow > td.c-del .btn {
           width: 100%;
           min-height: 44px;
@@ -9030,19 +9037,24 @@
         return "";
       }
 
-      function catalogueItemDrawer(id) {
+      function catalogueItemDrawer(id, opts) {
         const it = id ? erp.state.catalogue.find((x) => x.id === id) : null;
+        // `opts.chapter` seeds a NEW item's Partida with the one the operator
+        // was already looking at (Package 8 review, 28/08: opened from a
+        // chapter-scoped catalogue search, "＋ Nueva subpartida" landed the
+        // item with no partida at all — the one thing that made it findable
+        // again). Still an ordinary preselect, not locked: the operator can
+        // change it, same as every other prefilled field in this app.
+        const seedChap = !it && opts && opts.chapter ? opts.chapter : "";
         const db = openDrawer(it ? `${it.code} · ${it.desc}` : "Nueva subpartida");
         const chapters = erp.listActive("itemChapters");
-        const TYPE = [
-          ["material", "Material"],
-          ["ownLabour", "Mano de obra propia"],
-          ["subcontract", "Subcontrata"],
-          ["machinery", "Maquinaria"],
-          ["professional", "Profesional"],
-          ["waste", "Gestión de residuos"],
-          ["other", "Otros"],
-        ];
+        // A record whose stored chapter is retired or, from before this rule,
+        // empty: with no "sin partida" option left to catch it, an unmatched
+        // <select> defaults to the FIRST active chapter and a save would
+        // silently reassign it. Adding its own value as an extra option means
+        // the drawer shows exactly what is stored until the operator picks
+        // something else — it is never invented.
+        const orphan = it && !chapters.some((c) => c.code === it.chapter);
         const val = (k, d) => esc(it ? (it[k] ?? d) : d);
         db.innerHTML = `<div class="fgrid">
    ${
@@ -9050,15 +9062,12 @@
        ? `<div class="field"><label>Código</label><input value="${esc(it.code)}" disabled title="Las líneas de presupuesto guardan el código; no se cambia."></div>`
        : `<div class="field"><label>Código *</label><input id="ci_code" placeholder="ALB-011"></div>`
    }
-   <div class="field"><label>Partida</label><select id="ci_chap">
-     <option value="">— sin partida —</option>
-     ${chapters.map((c) => `<option value="${esc(c.code)}"${it && it.chapter === c.code ? " selected" : ""}>${esc(c.es)}</option>`).join("")}</select></div>
+   <div class="field"><label>Partida *</label><select id="ci_chap">
+     ${orphan ? `<option value="${esc(it.chapter)}" selected>${esc(it.chapter ? chapterLabel(it.chapter) : "— sin partida —")}</option>` : ""}
+     ${chapters.map((c) => `<option value="${esc(c.code)}"${(it ? it.chapter : seedChap) === c.code ? " selected" : ""}>${esc(c.es)}</option>`).join("")}</select></div>
    <div class="field full"><label>Descripción *</label><input id="ci_desc" value="${val("desc", "")}"></div>
    <div class="field full"><label>Cómo se le dice al cliente <span style="font-weight:400;color:var(--muted)">(si difiere)</span></label><input id="ci_cw" value="${val("customerWording", "")}"></div>
    <div class="field"><label>Unidad</label><select id="ci_unit">${listOptionsUnits(it ? it.unit : "ud")}</select></div>
-   <div class="field"><label>Tipo</label><select id="ci_type">${TYPE.map(([v, l]) => `<option value="${v}"${it && it.type === v ? " selected" : ""}>${l}</option>`).join("")}</select></div>
-   <div class="field"><label>Marca</label><input id="ci_brand" value="${val("brand", "")}"></div>
-   <div class="field"><label>Modelo</label><input id="ci_model" value="${val("model", "")}"></div>
    <div class="field"><label>Calidad</label><input id="ci_qual" value="${val("quality", "")}" placeholder="estándar / alta"></div>
    <div class="field"><label>Coste de referencia (€)</label><input id="ci_cost" type="number" min="0" step="0.01" value="${it ? it.defaultCostCents / 100 : ""}"></div>
    <div class="field"><label>Precio de referencia (€)</label><input id="ci_price" type="number" min="0" step="0.01" value="${it && it.defaultPriceCents ? it.defaultPriceCents / 100 : ""}"></div>
@@ -9139,6 +9148,10 @@
               if (mine) return;
               codeEl.value = nextCatalogueCode(chapEl.value);
             });
+            // A seeded Partida (opened from a chapter-scoped search) never
+            // fires "change" on its own — the value was already selected
+            // when the drawer painted — so the code is proposed once here too.
+            if (seedChap) codeEl.value = nextCatalogueCode(seedChap);
           }
         }
 
@@ -9158,9 +9171,6 @@
                 customerWording: $("#ci_cw").value.trim(),
                 chapter: $("#ci_chap").value,
                 unit: $("#ci_unit").value,
-                type: $("#ci_type").value,
-                brand: $("#ci_brand").value.trim(),
-                model: $("#ci_model").value.trim(),
                 quality: $("#ci_qual").value.trim(),
                 defaultCostCents: money("#ci_cost"),
                 defaultPriceCents: money("#ci_price"),
@@ -9329,7 +9339,7 @@
         $("#cp_cancel").onclick = close;
         $("#cp_new").onclick = () => {
           close();
-          catalogueItemDrawer(null);
+          catalogueItemDrawer(null, { chapter });
         };
         if (multi)
           $("#cp_add").onclick = () => {
@@ -15509,11 +15519,16 @@
 
       /* ---------- Gallery for one line (Improvement #1) ----------
    The pictures of a line are managed here and printed nowhere near it. Sources
-   are the four the spec names: the catalogue item's own reference picture, a
-   photo from the site visit, a file from this computer, and the phone camera
-   (same input, `capture` set, which is what a mobile browser needs to open the
-   camera instead of the file browser). Everything is compressed before it is
-   stored. */
+   are the catalogue item's own reference picture, a file from this computer,
+   and the phone camera (same input, `capture` set, which is what a mobile
+   browser needs to open the camera instead of the file browser). Everything
+   is compressed before it is stored.
+
+   A fourth source — a photo from the site visit — was removed here (Package
+   8 review, 28/08): these pictures are materials and expected result, shown
+   to the customer, and a visit photo is neither. `source: "visit"` stays a
+   valid value for images already attached that way before this change; only
+   the button that adds a new one is gone. */
       function lineImagesDrawer(budgetId, lineId) {
         const b = erp.budget(budgetId),
           vsel = b.currentVersionId;
@@ -15526,10 +15541,6 @@
         const catImgs = ((item && item.imageRefs) || []).filter(
           (r) => !l.imageRefs.some((x) => x.storageKey === (r.storageKey || r)),
         );
-        const visitPhotos = erp.state.visits
-          .flatMap((x) => (x.photos || []).map((p) => (typeof p === "string" ? p : p.storageKey)))
-          .filter(Boolean)
-          .filter((p) => !l.imageRefs.some((x) => x.storageKey === p));
         const SRC = { catalogue: "catálogo", visit: "visita", upload: "archivo", camera: "cámara" };
 
         const db = openDrawer(`Imágenes · ${l.num} ${l.desc || ""}`);
@@ -15572,7 +15583,6 @@
      <div class="it"><label class="btn sm">Desde el ordenador<input type="file" id="imgFile" accept="image/*" multiple hidden></label>
        <label class="btn sm">Cámara<input type="file" id="imgCam" accept="image/*" capture="environment" hidden></label></div>
      ${catImgs.length ? `<div class="it"><button class="btn sm" id="imgCat">Imagen del catálogo (${catImgs.length})</button></div>` : ""}
-     ${visitPhotos.length ? `<div class="it"><button class="btn sm" id="imgVisit">Foto de la visita (${visitPhotos.length})</button></div>` : ""}
    </div></div>`
    }`;
 
@@ -15646,18 +15656,6 @@
               );
               lineImagesDrawer(budgetId, lineId);
             }, "Imagen del catálogo añadida");
-        const vis = $("#imgVisit");
-        if (vis)
-          vis.onclick = () =>
-            mutate(() => {
-              erp.attachLineImage(
-                budgetId,
-                lineId,
-                { storageKey: visitPhotos[0], source: "visit" },
-                "backoffice",
-              );
-              lineImagesDrawer(budgetId, lineId);
-            }, "Foto de la visita añadida");
       }
 
       /** Compress → blob store → engine reference. Bytes never enter the state blob. */
@@ -18023,7 +18021,11 @@
               );
             };
           });
-          $("#catNew").onclick = () => catalogueItemDrawer(null);
+          $("#catNew").onclick = () => {
+            const isOrphanBucket = catChapter === "~";
+            const seed = isOrphanBucket ? "" : catChapter;
+            catalogueItemDrawer(null, { chapter: seed });
+          };
           v.querySelectorAll("tr.click").forEach(
             (tr) => (tr.onclick = () => catalogueItemDrawer(tr.dataset.item)),
           );

@@ -122,6 +122,7 @@ const itTile = erp.addCatalogueItem({
   desc: "Alicatado gres porcelánico",
   unit: "m2",
   type: "material",
+  chapter: "REV",
   defaultCostCents: 1800,
   defaultPriceCents: 3400,
 });
@@ -130,6 +131,7 @@ const itDemo = erp.addCatalogueItem({
   desc: "Demolición tabique",
   unit: "m2",
   type: "ownLabour",
+  chapter: "DEM",
   defaultCostCents: 950,
   defaultPriceCents: 1600,
 });
@@ -138,6 +140,7 @@ const itDamp = erp.addCatalogueItem({
   desc: "Tratamiento antihumedad inyección",
   unit: "l",
   type: "material",
+  chapter: "VAR",
   defaultCostCents: 2400,
   defaultPriceCents: 0,
 });

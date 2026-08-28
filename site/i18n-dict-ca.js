@@ -2256,6 +2256,7 @@ window.CANEI_DICT.ca = {
   "Nueva fecha fin": "Nova data de fi",
   "Descripción *": "Descripció *",
   "Código *": "Codi *",
+  "Partida *": "Partida *",
   "Nueva tarifa (€/hora)": "Nova tarifa (€/hora)",
   "Vigente desde": "Vigent des de",
   Asunto: "Assumpte",

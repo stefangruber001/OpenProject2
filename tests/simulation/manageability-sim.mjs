@@ -113,11 +113,23 @@ throws(
 
 // catalogue + package + price
 const item = erp.addCatalogueItem(
-  { code: "IT1", desc: "Tabique", unit: "m2", defaultCostCents: 1000, defaultPriceCents: 2000 },
+  {
+    code: "IT1",
+    desc: "Tabique",
+    unit: "m2",
+    chapter: "ALB",
+    defaultCostCents: 1000,
+    defaultPriceCents: 2000,
+  },
   "bo",
 );
+assert(item.type === "", "a new catalogue item has no fabricated Tipo", item.type);
 erp.updateCatalogueItem(item.id, { desc: "Tabique cartón-yeso", defaultPriceCents: 2100 }, "bo");
 assert(erp.state.catalogue[0].defaultPriceCents === 2100, "updateCatalogueItem price");
+throws(
+  () => erp.addCatalogueItem({ code: "IT9", desc: "Sin partida", unit: "ud" }, "bo"),
+  "addCatalogueItem refuses an empty chapter",
+);
 const wp = erp.addWorkPackage(
   { name: "Pack", unit: "u", components: [{ itemId: item.id, qtyPerUnitMilli: 1000 }] },
   "bo",
