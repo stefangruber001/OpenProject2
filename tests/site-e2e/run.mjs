@@ -6472,119 +6472,126 @@ async function testContractCreation(browser, base) {
       ok("COM-04: the contract list offers «＋ Nuevo contrato»");
     else bad("COM-04: new-contract button exists", "no #conNew");
 
-    // ---- a contract signed outside this system ----------------------------
+    /* S6 · THERE IS NO SECOND WAY TO MAKE A CONTRACT.
+       The drawer used to offer «firmado fuera de este sistema» — a contract
+       that named no quote, inherited no figures, and agreed with nothing.
+       The operator's mandate (28/08) is that a contract exists because a
+       customer accepted a quote; signing happens outside and comes back as
+       an uploaded document against the contract this system generated.
+
+       Asserted as an ABSENCE, which is the only thing that can be asserted
+       about a removed path — plus the presence of the one that replaced it,
+       so "the drawer failed to render" cannot pass this. */
+    /* Every accepted quote in the seed already has a contract, so this first
+       open is the EMPTY state — which is a property in its own right: with
+       nowhere for a contract to come from the drawer has to say so, not show
+       a form that cannot be saved. */
     await pg.click("#conNew");
     await pg.waitForTimeout(500);
-    await pg.evaluate(() => {
-      const r = [...document.querySelectorAll('input[name="cnmode"]')].find(
-        (x) => x.value === "external",
-      );
-      r.checked = true;
-      r.dispatchEvent(new Event("change"));
-    });
-    await pg.waitForTimeout(400);
-    const form = await pg.evaluate(() => ({
-      party: !!document.querySelector("#cn_party"),
-      base: !!document.querySelector("#cn_base"),
-      dropzone: !!document.querySelector("#cn_doc .evz"),
-      dateMax: document.querySelector("#cn_date")?.max || "",
-      today: erp.today,
+    const empty = await pg.evaluate(() => ({
+      radios: document.querySelectorAll('input[name="cnmode"]').length,
+      partyPicker: !!document.querySelector("#cn_party"),
+      amountField: !!document.querySelector("#cn_base"),
+      budgetPicker: !!document.querySelector("#cn_budget"),
+      text: (document.querySelector(".drawer") || {}).innerText || "",
     }));
-    if (form.party && form.base && form.dropzone && form.dateMax === form.today)
-      ok("COM-04: the manual path asks for the data and the signed file, and cannot be postdated");
-    else bad("COM-04: manual contract form", JSON.stringify(form));
+    if (
+      empty.radios === 0 &&
+      !empty.partyPicker &&
+      !empty.amountField &&
+      !empty.budgetPicker &&
+      /presupuesto aceptado/i.test(empty.text)
+    )
+      ok("COM-04: with no accepted quote free, the drawer says so instead of offering a dead form");
+    else bad("COM-04: contract drawer empty state", JSON.stringify(empty).slice(0, 220));
 
-    const picked = await pg.evaluate(() => {
+    // Free one, and the real form appears — still with no second mode, no
+    // typed amount and no client picker: those come from the quote.
+    await pg.evaluate(() => {
+      closeDrawer();
+      const c = erp.state.contracts.find((x) => x.budgetId);
+      if (c) c.budgetId = null;
+    });
+    await pg.waitForTimeout(200);
+    await pg.click("#conNew");
+    await pg.waitForTimeout(500);
+    const modes = await pg.evaluate(() => ({
+      radios: document.querySelectorAll('input[name="cnmode"]').length,
+      partyPicker: !!document.querySelector("#cn_party"),
+      amountField: !!document.querySelector("#cn_base"),
+      budgetPicker: !!document.querySelector("#cn_budget"),
+      signedUpload: !!document.querySelector("#cn_sdoc .evz"),
+      ref: !!document.querySelector("#cn_ref"),
+    }));
+    if (
+      modes.radios === 0 &&
+      !modes.partyPicker &&
+      !modes.amountField &&
+      modes.budgetPicker &&
+      modes.signedUpload &&
+      modes.ref
+    )
+      ok("COM-04: the only way to a contract is an accepted quote — no mode, no typed amount");
+    else bad("COM-04: contract drawer is budget-only", JSON.stringify(modes));
+    await pg.evaluate(() => closeDrawer());
+
+    /* AND THE HISTORY STILL READS. registerExternalContract stays in the
+       engine: contracts recorded that way before today are real, and the
+       document pane must still show the customer's own signed file rather
+       than printing a generated «CONTRATO DE OBRA» over the top of somebody
+       else's agreement. Driven through the ENGINE now, because the UI that
+       used to create one is exactly what this session removed. */
+    await pg.evaluate(() => closeDrawer());
+    const ext = await pg.evaluate(async () => {
       const p = erp.state.parties.find(
         (x) => x.active && x.roles.includes("customer") && erp.partyCompleteness(x.id).ok,
       );
-      if (!p) return null;
-      const sel = document.querySelector("#cn_party");
-      sel.value = p.id;
-      sel.dispatchEvent(new Event("change"));
-      return p.id;
+      if (!p) return { skipped: true };
+      const c = erp.registerExternalContract(
+        {
+          partyId: p.id,
+          valueCents: 1250000,
+          vatBp: 1000,
+          date: erp.today,
+          externalRef: "EXT-2026-77",
+          document: { storageKey: "none", name: "contrato.pdf", type: "application/pdf", size: 10 },
+          installments: [{ trigger: "onSignature", pct: 100 }],
+          duration: { estimatedDays: 45 },
+        },
+        "e2e",
+      );
+      conWork = { id: c.id, tab: "documento" };
+      go("contracts", c.id);
+      await new Promise((r) => setTimeout(r, 900));
+      const t = document.querySelector("#conDoc")?.innerText || "";
+      return {
+        origin: c.origin,
+        ref: c.externalRef,
+        value: c.valueCents,
+        days: c.duration.estimatedDays,
+        generated: /CONTRATO DE OBRA/.test(t),
+        saysExternal: /firmado fuera de este sistema/i.test(t),
+      };
     });
-    if (!picked) {
+    if (ext.skipped) {
       bad("COM-04: a complete customer exists to contract with", "none in the seed");
       return;
     }
-    await pg.fill("#cn_base", "12500");
-    await pg.fill("#cn_ref", "EXT-2026-77");
-    await pg.fill("#cn_days", "45");
-    const backdate = await pg.evaluate(() => {
-      const d = new Date(erp.today + "T00:00:00");
-      d.setDate(d.getDate() - 10);
-      const iso = d.toISOString().slice(0, 10);
-      document.querySelector("#cn_date").value = iso;
-      document.querySelector("#cn_signed").value = iso;
-      return iso;
-    });
-    await pg.setInputFiles("#cn_doc input[type=file]", {
-      name: "contrato-firmado.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from(minimalPdf(), "latin1"),
-    });
-    await pg.waitForTimeout(700);
-    // Two milestones, entered as rows — they feed ADM-08's cash forecast.
-    await pg.click("#cn_addh");
-    await pg.waitForTimeout(300);
-    await pg.evaluate(() => {
-      const rows = [...document.querySelectorAll("[data-hrow]")];
-      rows[0].querySelector("[data-hpct]").value = "40";
-      rows[0].querySelector("[data-hpct]").dispatchEvent(new Event("input"));
-      rows[1].querySelector("[data-htrig]").value = "onCompletion";
-      rows[1].querySelector("[data-hpct]").value = "60";
-      rows[1].querySelector("[data-hpct]").dispatchEvent(new Event("input"));
-    });
-    await pg.waitForTimeout(200);
-    await pg.click("#cn_save");
-    await pg.waitForTimeout(900);
-
-    const saved = await pg.evaluate(() => {
-      const c = erp.state.contracts[erp.state.contracts.length - 1];
-      return {
-        origin: c.origin,
-        value: c.valueCents,
-        total: c.totalCents,
-        date: c.date,
-        ref: c.externalRef,
-        docType: (c.document || {}).type || "",
-        signed: c.signature.customerSignedAt,
-        inst: c.installments.map((i) => i.amountCents),
-        days: c.duration.estimatedDays,
-      };
-    });
-    if (saved.origin === "external" && saved.value === 1250000 && saved.days === 45)
-      ok("COM-04: a contract signed elsewhere can be recorded with its own amount and term");
-    else bad("COM-04: external contract saved", JSON.stringify(saved));
-    if (saved.date === backdate && saved.signed === backdate && saved.ref === "EXT-2026-77")
+    if (
+      ext.origin === "external" &&
+      ext.value === 1250000 &&
+      ext.days === 45 &&
+      ext.ref === "EXT-2026-77"
+    )
       ok(
-        "COM-04: it keeps the real contract date, signature date and the customer's own reference",
+        "COM-04: a contract signed elsewhere is still recordable through the engine, with its own amount, term and reference",
       );
-    else bad("COM-04: external contract dates/ref", JSON.stringify({ saved, backdate }));
-    if (saved.docType === "application/pdf")
-      ok("COM-04: the signed file itself is stored on the contract");
-    else bad("COM-04: signed file stored", JSON.stringify(saved));
-    // 40/60 of 13.750 (12.500 + 10% IVA) — the milestones foot to the total.
-    if (saved.inst.length === 2 && saved.inst[0] + saved.inst[1] === saved.total)
-      ok("COM-04: the payment milestones foot to the contracted total");
-    else bad("COM-04: milestones foot", JSON.stringify(saved));
-
-    // THE point of `origin`: show what was signed, not what we would print.
-    await pg.waitForTimeout(500);
-    const pane = await pg.evaluate(() => {
-      const t = document.querySelector("#conDoc")?.innerText || "";
-      return {
-        generated: /CONTRATO DE OBRA/.test(t),
-        saysExternal: /firmado fuera de este sistema/i.test(t),
-        reachable:
-          !!document.querySelector("#conDoc canvas") ||
-          !!document.querySelector("#conDoc a[download]"),
-      };
-    });
-    if (!pane.generated && pane.saysExternal && pane.reachable)
-      ok("COM-04: an externally-signed contract shows the signed file, not a generated document");
-    else bad("COM-04: external contract document pane", JSON.stringify(pane));
+    else bad("COM-04: external contract via engine", JSON.stringify(ext));
+    if (!ext.generated && ext.saysExternal)
+      ok(
+        "COM-04: an externally-signed contract still shows the signed file, not a generated document",
+      );
+    else bad("COM-04: external contract document pane", JSON.stringify(ext));
 
     // ---- the normal path: from an accepted presupuesto ---------------------
     await pg.evaluate(() => {
@@ -6606,19 +6613,15 @@ async function testContractCreation(browser, base) {
     }
     await pg.click("#conNew");
     await pg.waitForTimeout(500);
-    const budgetMode = await pg.evaluate(() => {
-      const r = [...document.querySelectorAll('input[name="cnmode"]')].find(
-        (x) => x.value === "budget",
+    const budgetMode = await pg.evaluate(() => ({
+      sel: !!document.querySelector("#cn_budget"),
+      options: document.querySelectorAll("#cn_budget option").length,
+    }));
+    if (budgetMode.sel && budgetMode.options > 0)
+      ok(
+        `COM-04: the accepted presupuestos without a contract are the source list (${budgetMode.options})`,
       );
-      return {
-        enabled: !r.disabled,
-        checked: r.checked,
-        sel: !!document.querySelector("#cn_budget"),
-      };
-    });
-    if (budgetMode.enabled && budgetMode.checked && budgetMode.sel)
-      ok("COM-04: an accepted presupuesto is offered as the default source");
-    else bad("COM-04: budget mode default", JSON.stringify(budgetMode));
+    else bad("COM-04: budget picker", JSON.stringify(budgetMode));
 
     await pg.fill("#cn_days", "60");
     await pg.click("#cn_save");
@@ -6737,28 +6740,26 @@ async function testContractCreation(browser, base) {
       go("contracts");
     });
     await pg.waitForTimeout(600);
-    await pg.click("#conNew");
-    await pg.waitForTimeout(500);
-    await pg.evaluate(() => {
-      const r = [...document.querySelectorAll('input[name="cnmode"]')].find(
-        (x) => x.value === "external",
-      );
-      r.checked = true;
-      r.dispatchEvent(new Event("change"));
-    });
-    await pg.waitForTimeout(400);
+    /* S6 · the detour moved to the path that still exists. It used to hang
+       off the external form, where the operator picked the client; now the
+       client is whichever one the accepted quote belongs to, so the block is
+       reached by contracting a quote whose customer is missing a field.
+       Made incomplete deliberately and restored afterwards — the seed has no
+       accepted quote belonging to an incomplete customer, and waiting for
+       one would be a check that silently never runs. */
     const incomplete = await pg.evaluate(() => {
-      const p = erp.state.parties.find(
-        (x) => x.active && x.roles.includes("customer") && !erp.partyCompleteness(x.id).ok,
+      const b = erp.state.budgets.find(
+        (x) => x.acceptedVersionId && !erp.state.contracts.some((c) => c.budgetId === x.id),
       );
-      if (!p) return null;
-      const sel = document.querySelector("#cn_party");
-      sel.value = p.id;
-      sel.dispatchEvent(new Event("change"));
+      if (!b) return null;
+      const p = erp.party(b.partyId);
+      window.__restoreParty = { id: p.id, billStreet: p.billStreet };
+      p.billStreet = "";
+      newContractDrawer({ budgetId: b.id });
       return p.id;
     });
+    await pg.waitForTimeout(600);
     if (incomplete) {
-      await pg.fill("#cn_base", "3300");
       await pg.fill("#cn_days", "20");
       const before = await pg.evaluate(() => ({
         contracts: erp.state.contracts.length,
@@ -6779,7 +6780,44 @@ async function testContractCreation(browser, base) {
       if (after.issued === before.issued && after.issued === after.contracts)
         ok("COM-04: a refused contract burns no number — the series stays gap-free");
       else bad("COM-04: series gapless after refusal", JSON.stringify({ before, after }));
+      // Put the customer back the way it was found: later suites read this
+      // register, and a test that leaves a client broken makes the NEXT
+      // failure somebody else's mystery.
+      await pg.evaluate(() => {
+        const r = window.__restoreParty;
+        if (r) erp.party(r.id).billStreet = r.billStreet;
+        closeDrawer();
+      });
     }
+
+    /* S6 · THE NEXT STEP OFFERED WHERE THE LAST ONE ENDED. The operator used
+       to accept a quote and then go to another screen to find «＋ Nuevo
+       contrato» and pick that same quote out of a list. */
+    const fromQuote = await pg.evaluate(async () => {
+      // Free one again: the checks above deliberately consume the only
+      // uncontracted acceptance the seed has.
+      const held = erp.state.contracts.find((x) => x.budgetId);
+      if (held) held.budgetId = null;
+      const b = erp.state.budgets.find(
+        (x) => x.acceptedVersionId && !erp.state.contracts.some((c) => c.budgetId === x.id),
+      );
+      if (!b) return { skipped: true };
+      go("quotes", b.id);
+      await new Promise((r) => setTimeout(r, 900));
+      const btn = document.querySelector("#bContract");
+      if (!btn) return { button: false };
+      btn.click();
+      await new Promise((r) => setTimeout(r, 600));
+      const sel = document.querySelector("#cn_budget");
+      return { button: true, seeded: sel ? sel.value === b.id : false, wanted: b.number };
+    });
+    if (fromQuote.skipped) ok("COM-04: no free accepted quote left to offer a contract on");
+    else if (fromQuote.button && fromQuote.seeded)
+      ok(
+        `COM-04: an accepted quote offers «Crear contrato», opening on itself (${fromQuote.wanted})`,
+      );
+    else bad("COM-04: contract from the accepted quote", JSON.stringify(fromQuote));
+    await pg.evaluate(() => closeDrawer());
 
     if (errs.length) bad("COM-04 creation: no console errors", errs.slice(0, 2).join(" | "));
     else ok("COM-04 creation: no console errors");

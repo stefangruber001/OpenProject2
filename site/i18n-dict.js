@@ -3815,6 +3815,25 @@ window.CANEI_DICT = {
     ["＋ Nuevo contrato", "＋ New contract"],
     ["¿De dónde sale este contrato?", "Where does this contract come from?"],
     ["De un presupuesto aceptado", "From an accepted quote"],
+    // S6 (Package 8 · 28/08): a contract comes only from an accepted quote.
+    ["Referencia de la otra parte", "The other party's reference"],
+    [
+      "El importe, el IVA, el cliente y el inmueble salen del presupuesto: no se teclean dos veces.",
+      "The amount, the tax, the customer and the property come from the quote — they are not typed twice.",
+    ],
+    ["Todavía no hay de dónde", "Nothing to draw one from yet"],
+    [
+      "Un contrato sale siempre de un presupuesto aceptado — de ahí vienen el importe, el IVA, el cliente y el inmueble.",
+      "A contract always comes from an accepted quote — that is where the amount, the tax, the customer and the property come from.",
+    ],
+    [
+      "No hay ningún presupuesto aceptado sin contrato en este momento. Registre la respuesta del cliente sobre el presupuesto que haya aceptado y vuelva aquí.",
+      "There is no accepted quote without a contract right now. Record the customer's answer on the quote they accepted, then come back here.",
+    ],
+    [
+      "⚠ No hay ningún presupuesto aceptado sin contrato",
+      "⚠ No accepted quote is without a contract",
+    ],
     ["Firmado fuera de este sistema", "Signed outside this system"],
     ["Datos del contrato", "Contract details"],
     ["Importe sin IVA (€)", "Amount before VAT (€)"],

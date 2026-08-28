@@ -13084,6 +13084,18 @@
           ? '<button class="btn primary sm" id="bAnswer">Respuesta del cliente</button>'
           : ""
       }
+      ${
+        /* THE NEXT STEP, WHERE THE PREVIOUS ONE ENDED. A contract now comes
+           only from an accepted quote (S6), and the operator was expected to
+           accept it here and then go and find «＋ Nuevo contrato» on another
+           screen and pick this same quote out of a list. Offered on the quote
+           that has just been accepted, and only while it has no contract
+           yet — a second one against the same acceptance is what the picker
+           already refuses. */
+        b.acceptedVersionId && !erp.state.contracts.some((c) => c.budgetId === b.id)
+          ? '<button class="btn primary sm" id="bContract">Crear contrato</button>'
+          : ""
+      }
       ${locked ? "" : '<button class="btn primary sm" id="bSend">Enviar</button>'}
      </div>
     </div>
@@ -13274,6 +13286,10 @@
         if (send) send.onclick = () => sendBudgetDrawer(id);
         const answer = $("#bAnswer");
         if (answer) answer.onclick = () => budgetResponseDrawer(id, vsel);
+        const mkCon = $("#bContract");
+        // Seeded with THIS quote, so the picker opens on it rather than on
+        // whichever accepted quote happens to sort first.
+        if (mkCon) mkCon.onclick = () => newContractDrawer({ budgetId: id });
         const nv = $("#bNewVer");
         if (nv)
           nv.onclick = async () => {
@@ -20050,82 +20066,62 @@
    printing our own «CONTRATO DE OBRA» over the top of it would be inventing
    a document nobody signed. `origin` carries that distinction and the
    detail screen honours it. */
+      /**
+       * A contract, and the only way there is to make one.
+       *
+       * OPERATOR MANDATE (28/08): a contract exists because a customer
+       * accepted a quote. There is no second way to bring one into being —
+       * the amount, the tax, the client and the inmueble all come from the
+       * accepted version, so nothing is typed twice and nothing can disagree
+       * with the offer the customer actually signed.
+       *
+       * The «firmado fuera de este sistema» mode is GONE from this drawer.
+       * Signing always happens outside — at the notaría, on paper — and that
+       * is captured here as what it is: a signed document uploaded against a
+       * contract this system generated, plus the other party's own reference.
+       * It was never a second kind of contract, only a second way of typing
+       * one in, and having it meant a contract could exist that named no
+       * quote, inherited no figures, and agreed with nothing.
+       *
+       * `registerExternalContract` STAYS in the engine and the register still
+       * displays what it produced: contracts recorded that way before today
+       * are real history, and the document pane still shows the customer's
+       * own signed file rather than printing a generated one over it. What is
+       * removed is the way to make a NEW one from this screen.
+       */
       function newContractDrawer(seed) {
-        // An accepted presupuesto that has no contract yet is the normal
-        // starting point; the list is empty on a fresh dataset, which is
-        // exactly when the manual path is the only one that applies.
         const linkable = erp.state.budgets.filter(
           (b) => b.acceptedVersionId && !erp.state.contracts.some((c) => c.budgetId === b.id),
         );
         const s = seed || {};
-        let mode = s.mode || (linkable.length ? "budget" : "external");
         const db = openDrawer("Nuevo contrato");
-        let evid = null;
         let sevid = null;
         // A file already attached before the detour to fix the client must
         // survive it: the blob is in the store, so the RECORD is what has to
         // be carried back, not the upload.
-        let heldDoc = s.doc || null;
         let heldSigned = s.signedDoc || null;
         const paint = () => {
           db.innerHTML = `
-   <div class="card"><div class="ch"><h3>¿De dónde sale este contrato?</h3></div><div class="daylist" style="gap:9px">
-    <div class="it"><label class="opt">
-      <input type="radio" name="cnmode" value="budget" ${mode === "budget" ? "checked" : ""}${linkable.length ? "" : " disabled"}>
-      <span>De un presupuesto aceptado</span></label></div>
-    <div class="it" style="color:var(--muted);margin-top:-4px">${
-      linkable.length
-        ? "El importe, el IVA y el cliente salen del presupuesto: no se teclean dos veces."
-        : "No hay ningún presupuesto aceptado sin contrato todavía."
-    }</div>
-    <div class="it"><label class="opt">
-      <input type="radio" name="cnmode" value="external" ${mode === "external" ? "checked" : ""}>
-      <span>Firmado fuera de este sistema</span></label></div>
-    <div class="it" style="color:var(--muted);margin-top:-4px">En papel, por un abogado, o antes de usar este programa. Se guarda el archivo firmado y sus datos.</div>
-   </div></div>
    ${
-     mode === "budget"
-       ? `<div class="card"><div class="ch"><h3>Presupuesto</h3></div><div class="daylist" style="gap:9px">
-    <div class="it"><label class="opt">Presupuesto aceptado
+     linkable.length
+       ? `<div class="card"><div class="ch"><h3>Presupuesto aceptado</h3></div><div class="daylist" style="gap:9px">
+    <div class="it"><label class="opt">Presupuesto
       <select id="cn_budget" style="margin-left:auto">${linkable
         .map((b) => {
           const t = erp.budgetTotals(b.id, b.acceptedVersionId);
-          return `<option value="${esc(b.id)}">${esc(b.number)} · ${esc(erp.party(b.partyId).name)} · ${eur(t.grandCents)}</option>`;
+          return `<option value="${esc(b.id)}"${s.budgetId === b.id ? " selected" : ""}>${esc(b.number)} · ${esc(erp.party(b.partyId).name)} · ${eur(t.grandCents)}</option>`;
         })
         .join("")}</select></label></div>
+    <div class="it" style="color:var(--muted)">El importe, el IVA, el cliente y el inmueble salen del presupuesto: no se teclean dos veces.</div>
+    <div class="it"><label class="opt">Referencia de la otra parte
+      <input id="cn_ref" placeholder="Opcional — la numeración de la notaría o del cliente" style="margin-left:auto"></label></div>
    </div></div>`
-       : `<div class="card"><div class="ch"><h3>Datos del contrato</h3></div><div class="daylist" style="gap:9px">
-    <div class="it"><label class="opt">Cliente
-      <select id="cn_party" style="margin-left:auto">${partyOptions((p) => p.roles.includes("customer"))}</select></label></div>
-    <div class="it"><label class="opt">Inmueble
-      <select id="cn_prop" style="margin-left:auto"></select></label></div>
-    <div class="it"><label class="opt">Importe sin IVA (€)
-      <input id="cn_base" type="number" min="0" step="0.01" value="0" style="margin-left:auto"></label></div>
-    <div class="it"><label class="opt">IVA
-      <select id="cn_vat" style="margin-left:auto">
-       <option value="1000" selected>10%</option><option value="2100">21%</option><option value="0">0%</option>
-      </select></label></div>
-    <div class="it"><label class="opt">Fecha del contrato
-      <input id="cn_date" type="date" value="${esc(erp.today)}" max="${esc(erp.today)}" style="margin-left:auto"></label></div>
-    <div class="it"><label class="opt">Referencia externa
-      <input id="cn_ref" placeholder="Opcional — su propia numeración" style="margin-left:auto"></label></div>
-    <div class="it"><label class="opt">Obra
-      <select id="cn_proj" style="margin-left:auto">
-       <option value="">— sin obra asociada —</option>
-       ${erp.state.projects
-         .filter((p) => !p.contractId && p.status === "active")
-         .map(
-           (p) =>
-             `<option value="${esc(p.id)}"${s.projectId === p.id ? " selected" : ""}>${esc(p.code)}</option>`,
-         )
-         .join("")}
-      </select></label></div>
-    <div class="it" style="color:var(--muted)">Un contrato externo no nombra ningún presupuesto, así que la obra a la que pertenece hay que decirla aquí — o dejarlo sin asociar.</div>
-    <div class="it" style="display:block"><label class="opt" style="margin-bottom:6px">Contrato firmado</label>
-     <div id="cn_doc"></div></div>
+       : `<div class="card"><div class="ch"><h3>Todavía no hay de dónde</h3></div><div class="daylist">
+    <div class="it">Un contrato sale siempre de un presupuesto aceptado — de ahí vienen el importe, el IVA, el cliente y el inmueble.</div>
+    <div class="it">No hay ningún presupuesto aceptado sin contrato en este momento. Registre la respuesta del cliente sobre el presupuesto que haya aceptado y vuelva aquí.</div>
    </div></div>`
    }
-   <div class="card"><div class="ch"><h3>Ejecución</h3></div><div class="daylist" style="gap:9px">
+      <div class="card"><div class="ch"><h3>Ejecución</h3></div><div class="daylist" style="gap:9px">
     <div class="it"><label class="opt">Plazo de ejecución (días)
       <input id="cn_days" type="number" min="1" step="1" value="30" style="margin-left:auto"></label></div>
     <div class="it"><label class="opt">Inicio comprometido
@@ -20133,52 +20129,26 @@
     <div class="it"><label class="opt">Firmado el
       <input id="cn_signed" type="date" max="${esc(erp.today)}" style="margin-left:auto"></label></div>
     <div class="it" style="color:var(--muted)">Déjalo en blanco si todavía no está firmado. Puedes firmarlo más tarde desde el propio contrato.</div>
-    ${
-      /* CON-11 · a date without the signed copy is an assertion, not a fact.
-         The external form has always asked for the file under «Datos del
-         contrato»; this is the same demand for the contract we draw up. */
-      mode === "budget"
-        ? `<div class="it" style="display:block"><label class="opt" style="margin-bottom:6px">Contrato firmado</label>
-     <div id="cn_sdoc"></div></div>`
-        : ""
-    }
+    <!-- CON-11 · a date without the signed copy is an assertion, not a fact.
+         Signing happens outside this system — at the notaría, on paper — so
+         the signed copy coming back IS the event, and «Firmado el» without
+         it is refused below. -->
+    <div class="it" style="display:block"><label class="opt" style="margin-bottom:6px">Contrato firmado</label>
+     <div id="cn_sdoc"></div></div>
    </div></div>
    <div class="card"><div class="ch"><h3>Hitos de pago</h3><span class="tag" id="cn_hsum"></span></div>
     <div class="daylist" style="gap:9px" id="cn_hitos"></div>
     <div style="padding:0 16px 14px"><button class="btn sm" id="cn_addh">＋ Añadir hito</button></div>
    </div>
    <div style="margin-top:10px"><button class="btn primary" id="cn_save">Crear contrato</button></div>`;
-          db.querySelectorAll('input[name="cnmode"]').forEach((r) => {
-            r.onchange = () => {
-              mode = r.value;
-              evid = null;
-              paint();
-            };
+          sevid = evidenceField($("#cn_sdoc"), {
+            value: heldSigned,
+            prefix: "sig",
+            hint: "Sólo si ya está firmado: arrastra aquí el contrato firmado (PDF o imagen).",
+            onChange: (r) => {
+              heldSigned = r;
+            },
           });
-          if (mode === "external") {
-            const syncProps = () => {
-              $("#cn_prop").innerHTML = propertyOptions($("#cn_party").value, null);
-            };
-            $("#cn_party").onchange = syncProps;
-            syncProps();
-            evid = evidenceField($("#cn_doc"), {
-              value: heldDoc,
-              prefix: "con",
-              hint: "Arrastra aquí el contrato firmado (PDF o imagen), o búscalo en el dispositivo.",
-              onChange: (r) => {
-                heldDoc = r;
-              },
-            });
-          } else {
-            sevid = evidenceField($("#cn_sdoc"), {
-              value: heldSigned,
-              prefix: "sig",
-              hint: "Sólo si ya está firmado: arrastra aquí el contrato firmado (PDF o imagen).",
-              onChange: (r) => {
-                heldSigned = r;
-              },
-            });
-          }
           paintHitos();
           $("#cn_addh").onclick = () => {
             readHitos();
@@ -20193,13 +20163,7 @@
             const n = $(sel);
             if (n && v != null && v !== "") n.value = v;
           };
-          if (mode === "external" && s.partyId) {
-            set("#cn_party", s.partyId);
-            $("#cn_prop").innerHTML = propertyOptions(s.partyId, s.propertyId || null);
-          }
-          set("#cn_base", s.base);
-          set("#cn_vat", s.vat);
-          set("#cn_date", s.date);
+          set("#cn_budget", s.budgetId);
           set("#cn_ref", s.ref);
           set("#cn_days", s.days);
           set("#cn_start", s.start);
@@ -20263,6 +20227,10 @@
           });
         };
         const save = () => {
+          if (!linkable.length) {
+            toast("⚠ No hay ningún presupuesto aceptado sin contrato");
+            return;
+          }
           readHitos();
           const days = Math.round(+$("#cn_days").value || 0);
           const installments = hitos
@@ -20274,61 +20242,31 @@
             }));
           const signedOn = $("#cn_signed").value || null;
           const start = $("#cn_start").value || null;
+          const budgetId = $("#cn_budget").value;
           /* CON-11 · the signed copy is checked HERE, before anything is
              created. The engine refuses a signature without it, and letting
              that refusal happen between createContract and signContract would
              leave a numbered contract behind and report a failure — the worst
-             of both. In the external form the signed file IS the contract, so
-             that upload answers this on its own. */
-          const signedDoc = mode === "budget" ? (sevid && sevid.value()) || null : heldDoc;
+             of both. */
+          const signedDoc = (sevid && sevid.value()) || null;
           if (signedOn && !signedDoc) {
             toast("⚠ Adjunta el contrato firmado, o deja «Firmado el» en blanco");
             return;
           }
-          if (mode === "budget") {
-            mutate(() => {
-              const c = erp.createContract(
-                $("#cn_budget").value,
-                {
-                  installments,
-                  duration: { estimatedDays: days },
-                  initiation: {
-                    scheduleWithinDays: 7,
-                    startWithinDays: 15,
-                    firstPaymentDate: null,
-                    committedStartDate: start,
-                  },
-                },
-                "backoffice",
-              );
-              if (signedOn)
-                erp.signContract(
-                  c.id,
-                  { method: "physical", date: signedOn, evidence: signedDoc },
-                  "backoffice",
-                );
-              closeDrawer();
-              conWork = { id: c.id, tab: "datos" };
-            }, "Contrato creado");
-            return;
-          }
-          // The completeness block is real (decision 21 / RD 1619/2012), so
-          // rather than refusing and stopping, offer the missing fields here
-          // and come back to this drawer with everything typed so far intact.
-          const partyId = $("#cn_party").value;
-          const comp = partyId ? erp.partyCompleteness(partyId) : { ok: true };
+          /* The completeness block is real (decision 21 / RD 1619/2012) and
+             `createContract` raises it, so rather than letting a numbered
+             refusal reach the operator as a bare toast, offer the missing
+             fields and come back here with everything already typed intact.
+             This detour used to exist only on the external path, which is
+             the path that no longer exists — so it moves to the one that
+             does, where the client is the budget's rather than a picked one. */
+          const partyId = erp.budget(budgetId).partyId;
+          const comp = erp.partyCompleteness(partyId);
           if (!comp.ok) {
             const held = {
-              mode: "external",
               hitos,
-              doc: heldDoc,
-              signedDoc: heldSigned,
-              projectId: $("#cn_proj") ? $("#cn_proj").value || null : null,
-              partyId,
-              propertyId: $("#cn_prop").value || null,
-              base: $("#cn_base").value,
-              vat: $("#cn_vat").value,
-              date: $("#cn_date").value,
+              signedDoc,
+              budgetId,
               ref: $("#cn_ref").value,
               days: $("#cn_days").value,
               start,
@@ -20339,18 +20277,19 @@
             return;
           }
           mutate(() => {
-            const c = erp.registerExternalContract(
+            const c = erp.createContract(
+              budgetId,
               {
-                partyId,
-                propertyId: $("#cn_prop").value || null,
-                valueCents: Math.round((+$("#cn_base").value || 0) * 100),
-                vatBp: +$("#cn_vat").value,
-                date: $("#cn_date").value || erp.today,
-                externalRef: $("#cn_ref").value.trim() || null,
-                projectId: $("#cn_proj") ? $("#cn_proj").value || null : null,
-                document: evid && evid.value(),
                 installments,
                 duration: { estimatedDays: days },
+                /* Whatever the other side files this under — a protocol
+                   number from the notaria, or the customer own reference.
+                   Optional, and null rather than "" when nobody gave one:
+                   an empty string prints as a reference that exists and is
+                   blank. (Written without apostrophes on purpose: the
+                   source audit scans comments too, and a pair of them reads
+                   as a quoted string.) */
+                externalRef: $("#cn_ref").value.trim() || null,
                 initiation: {
                   scheduleWithinDays: 7,
                   startWithinDays: 15,
@@ -20368,7 +20307,7 @@
               );
             closeDrawer();
             conWork = { id: c.id, tab: "datos" };
-          }, "Contrato registrado");
+          }, "Contrato creado");
         };
         paint();
       }

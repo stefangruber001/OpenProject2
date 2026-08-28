@@ -799,7 +799,6 @@ window.CANEI_DICT.ca = {
   "Quitar la línea": "Treure la línia",
   "⤓ Descargar PDF": "⤓ Descarregar PDF",
   "Rectificar…": "Rectificar…",
-  "Presupuesto aceptado": "Pressupost acceptat",
   "Presupuesto aceptado — obra creada": "Pressupost acceptat — obra creada",
   "Presupuesto rechazado": "Pressupost rebutjat",
   "Lo que va a recibir el cliente": "El que rebrà el client",
@@ -1628,6 +1627,18 @@ window.CANEI_DICT.ca = {
   "＋ Nuevo contrato": "＋ Nou contracte",
   "¿De dónde sale este contrato?": "D'on surt aquest contracte?",
   "De un presupuesto aceptado": "D'un pressupost acceptat",
+  // S6 (Package 8 · 28/08): a contract comes only from an accepted quote.
+  "Presupuesto aceptado": "Pressupost acceptat",
+  "Referencia de la otra parte": "Referència de l'altra part",
+  "El importe, el IVA, el cliente y el inmueble salen del presupuesto: no se teclean dos veces.":
+    "L'import, l'IVA, el client i l'immoble surten del pressupost: no es teclegen dues vegades.",
+  "Todavía no hay de dónde": "Encara no hi ha d'on",
+  "Un contrato sale siempre de un presupuesto aceptado — de ahí vienen el importe, el IVA, el cliente y el inmueble.":
+    "Un contracte surt sempre d'un pressupost acceptat — d'allà vénen l'import, l'IVA, el client i l'immoble.",
+  "No hay ningún presupuesto aceptado sin contrato en este momento. Registre la respuesta del cliente sobre el presupuesto que haya aceptado y vuelva aquí.":
+    "No hi ha cap pressupost acceptat sense contracte en aquest moment. Registri la resposta del client sobre el pressupost que hagi acceptat i torni aquí.",
+  "⚠ No hay ningún presupuesto aceptado sin contrato":
+    "⚠ No hi ha cap pressupost acceptat sense contracte",
   "Firmado fuera de este sistema": "Signat fora d'aquest sistema",
   "Datos del contrato": "Dades del contracte",
   "Importe sin IVA (€)": "Import sense IVA (€)",

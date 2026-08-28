@@ -223,6 +223,68 @@ const con = erp.createContract(
   },
   "bo",
 );
+/* THE MILESTONES FOOT TO THE CONTRACTED TOTAL.
+   `_finishContract` turns each percentage into cents; what the customer is
+   asked to pay across the milestones must be what they contracted for. This
+   property lived only in a browser check that drove the external-contract
+   form, and S6 removed that form — the arithmetic is the ENGINE's, so it
+   belongs here.
+
+   Asserted as the engine's OWN contract, which is "within a cent per
+   milestone", not "exactly equal": each percentage is rounded
+   independently, so three of them can leave the sum a cent or two short, and
+   the code says so where it sets `adjustCents`. Measured before writing this
+   — a 40/30/30 split of the fixture total divides evenly, and 100001 cents
+   drifts by exactly 1 — so an equality assertion would have been green by
+   luck on this data and wrong about the rule. */
+const conSplit = (() => {
+  const b2 = erp.createBudget({ partyId: cust.id, activityLine: "renovation" }, "bo");
+  const ch = erp.addChapter(b2.id, { name: "Obra" }, "bo");
+  erp.addLine(b2.id, ch.id, { desc: "Trabajo", unit: "ud", qtyMilli: 1000, priceCents: 333333 });
+  erp.issueVersion(b2.id, { channel: "hand" }, "bo");
+  erp.acceptVersion(b2.id, erp.currentVersion(b2.id).id, { evidenceRef: "ok" }, "bo");
+  return erp.createContract(
+    b2.id,
+    {
+      installments: [
+        { pct: 40, trigger: "onSignature" },
+        { pct: 30, trigger: "atStage" },
+        { pct: 30, trigger: "onCompletion" },
+      ],
+      duration: { estimatedDays: 30 },
+    },
+    "bo",
+  );
+})();
+const splitSum = conSplit.installments.reduce((s, i) => s + i.amountCents, 0);
+assert(
+  Math.abs(splitSum - conSplit.totalCents) <= conSplit.installments.length,
+  "payment milestones foot to the contracted total",
+  `${conSplit.installments.map((i) => i.amountCents).join("+")} = ${splitSum} vs ${conSplit.totalCents}`,
+);
+assert(
+  conSplit.installments.length === 3 && conSplit.installments.every((i) => i.amountCents > 0),
+  "…as three separate milestones, each carrying real money",
+  JSON.stringify(conSplit.installments.map((i) => i.amountCents)),
+);
+/* …and `externalRef` reaches the record through `terms`. The drawer sends the
+   notaria's own numbering this way (S6); there is no whitelist to add it to,
+   which is what made the planned engine change unnecessary. */
+assert(
+  erp.createContract(
+    (() => {
+      const b3 = erp.createBudget({ partyId: cust.id, activityLine: "renovation" }, "bo");
+      const c3 = erp.addChapter(b3.id, { name: "Obra" }, "bo");
+      erp.addLine(b3.id, c3.id, { desc: "T", unit: "ud", qtyMilli: 1000, priceCents: 10000 });
+      erp.issueVersion(b3.id, { channel: "hand" }, "bo");
+      erp.acceptVersion(b3.id, erp.currentVersion(b3.id).id, { evidenceRef: "ok" }, "bo");
+      return b3.id;
+    })(),
+    { duration: { estimatedDays: 10 }, externalRef: "PROT-2026-99" },
+    "bo",
+  ).externalRef === "PROT-2026-99",
+  "createContract carries the other party's reference onto the record",
+);
 erp.markContractSent(con.id, "bo");
 assert(erp.state.contracts[0].status === "sent", "markContractSent");
 const con2status = erp.state.contracts[0];

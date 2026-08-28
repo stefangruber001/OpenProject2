@@ -6301,3 +6301,60 @@ document sharing this stylesheet, invoices and contracts included.
 No change made. The fourth of the plan's premises to be checked and found
 already satisfied (see #190 for the first three); recorded here so the next
 session does not "fix" it.
+
+### 195 · A contract now has exactly one origin, and the plan's engine change was already done (2026-08-28)
+
+**The mandate (operator, 28/08):** a contract exists because a customer
+accepted a quote. Signing always happens outside — at the notaría, on paper —
+and comes back as a signed document uploaded against the contract this system
+generated.
+
+**What was removed:** the «firmado fuera de este sistema» mode in
+`newContractDrawer`, with its own client picker, its own typed amount, its own
+tax rate and its own contract date. It was never a second KIND of contract,
+only a second way of typing one in — and having it meant a contract could
+exist that named no quote, inherited no figures, and agreed with nothing on
+file.
+
+**What deliberately stays:** `registerExternalContract` in the engine, and
+every screen that displays what it produced. Contracts recorded that way
+before today are real history; the document pane still shows the customer's
+own signed file rather than printing a generated «CONTRATO DE OBRA» over the
+top of somebody else's agreement. The e2e check for that property now drives
+the ENGINE rather than the removed form, which is the honest place for it.
+
+**The plan's engine change was not needed.** It called for adding
+`externalRef` to `createContract`'s terms whitelist. There is no whitelist:
+terms are merged wholesale with `Object.assign`, so `externalRef` already
+reached the record — verified by calling it before writing anything. The
+drawer simply had to start sending it. (Recorded as the fifth of this
+package's plan premises to be checked and found wrong; see #190 for the first
+three and #194 for the fourth.)
+
+**Noted, not fixed:** that wholesale merge means a caller could set `origin`,
+`number` or `partyId` through `terms` and produce a generated contract that
+lies about itself. Nothing does today, and closing it means auditing what the
+seed and history generators legitimately pass — real work, and not what this
+session was asked for. Left as a follow-up rather than widened into here.
+
+**The completeness detour moved rather than died.** `createContract` raises
+the MDM-10 block (decision 21 / RD 1619/2012), and the "offer the missing
+fields and come back with everything typed intact" detour existed only on the
+external path — the path that no longer exists. It now hangs off the budget
+path, where the client is the quote's rather than a picked one, so an
+incomplete customer still blocks the contract, still offers the fields, and
+still burns no number from the gap-free series.
+
+**And the next step is offered where the last one ended.** An accepted quote
+now carries «Crear contrato» in the builder toolbar, seeded with itself. The
+operator used to accept a quote and then go to another screen to find
+«＋ Nuevo contrato» and pick that same quote out of a list.
+
+**The empty state is a feature.** With no accepted quote free, the drawer says
+so and explains where a contract comes from, instead of showing a form that
+cannot be saved. Asserted in the suite, because "no way in" is only honest if
+the screen admits it.
+
+**Red-first:** all four new checks fail against the previous tree — two mode
+radios still present, no `#bContract` on the quote, and the completeness block
+never offered on the budget path.
