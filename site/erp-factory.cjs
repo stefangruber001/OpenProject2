@@ -1396,15 +1396,15 @@ function progressCurve(plan, schedule, options) {
   );
   const byId = new Map(plan.tasks.map((t) => [t.id, t]));
   const actualAt = (date) => {
-    let any = false;
     let sum = 0;
     for (const st of scheduled) {
       const recorded = recordedPctAt(log, st.taskId, date);
-      if (recorded !== null) any = true;
       sum += weightOf(options.weights, st) * (clamp(recorded ?? 0, 0, 100) / 100);
     }
-    return any ? pct(sum, totalWeight) : null;
+    return pct(sum, totalWeight);
   };
+  const observationDates = new Set(log.map((e) => e.date)).size;
+  const canProject = observationDates >= 2;
   const actualNow = pct(
     scheduled.reduce((s, st) => {
       const t = byId.get(st.taskId);
@@ -1416,7 +1416,7 @@ function progressCurve(plan, schedule, options) {
   const performanceIndex = plannedNow > 0 ? Math.round(actualNow / plannedNow * 100) / 100 : null;
   const remainingDays = asOf >= schedule.finish ? 0 : Math.max(0, workingDaysInclusive(cal, asOf, schedule.finish) - 1);
   const stretch = performanceIndex && performanceIndex > 0 ? 1 / performanceIndex : 1;
-  const projectedFinish = remainingDays === 0 ? schedule.finish : addWorkingDays(cal, snapForward(cal, asOf), Math.round(remainingDays * stretch));
+  const projectedFinish = !canProject || remainingDays === 0 ? schedule.finish : addWorkingDays(cal, snapForward(cal, asOf), Math.round(remainingDays * stretch));
   const horizon = projectedFinish > schedule.finish ? projectedFinish : schedule.finish;
   const span = Math.max(1, workingDaysInclusive(cal, schedule.start, horizon));
   const samples = Math.max(2, Math.min(options.samples ?? 24, span));
@@ -1431,7 +1431,7 @@ function progressCurve(plan, schedule, options) {
       // Anchored on the actual line so the two meet rather than jumping at
       // `asOf`, then continuing at the observed pace: the work the plan
       // expects between now and `date`, achieved at `performanceIndex` of it.
-      projectedPct: date > asOf ? clamp(actualNow + (plannedAt(date) - plannedNow) * (performanceIndex ?? 1), 0, 100) : null
+      projectedPct: canProject && date > asOf ? clamp(actualNow + (plannedAt(date) - plannedNow) * (performanceIndex ?? 1), 0, 100) : null
     });
   }
   const last = points[points.length - 1];
@@ -1440,8 +1440,17 @@ function progressCurve(plan, schedule, options) {
       date: horizon,
       plannedPct: plannedAt(horizon),
       actualPct: horizon <= asOf ? actualAt(horizon) : null,
-      projectedPct: horizon > asOf ? 100 : null
+      projectedPct: canProject && horizon > asOf ? 100 : null
     });
+  }
+  if (asOf >= schedule.start && asOf <= horizon && !points.some((pt) => pt.date === asOf)) {
+    points.push({
+      date: asOf,
+      plannedPct: plannedNow,
+      actualPct: actualAt(asOf),
+      projectedPct: null
+    });
+    points.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
   }
   return {
     asOf,

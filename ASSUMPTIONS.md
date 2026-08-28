@@ -5791,3 +5791,68 @@ typography (em-dashes, a true minus) is outside Latin-1; one code point past
 255 corrupts the PDF stream and breaks btoa for anyone attaching the file.
 The writer now maps every string through a WinAnsi table at its single tr
 seam; what WinAnsi cannot say degrades to honest ASCII.
+
+## S36 · PK-C — the small fixes the UAT could see (2026-08-28)
+
+**B1 was a units bug wearing a label costume.** The milestones are priced on
+the contract's GROSS (createContract splits `totalCents`); the pane compared
+their sum against the taxable base, so every taxed contract wore a permanent
+red «sobre el contratado» pill — by exactly the tax. And the right gross is
+the ORIGINAL one: annexes bill through their own invoices, so a contract
+with annexes must not ask the milestone plan to cover them. `contractValue`
+now exposes both grosses, the pane compares like against like, and every
+figure says whether it is gross or base.
+
+**The rest are honesty-of-the-screen fixes.** A filtered builder names its
+filter and clears it in one click (A6), and the filter dies with the send;
+a disabled button looks disabled (A7); `[hidden]` always hides (A8); drawer
+actions live in a pinned footer the scroller cannot swallow, emptied on
+every open so no drawer inherits another's buttons (A9); the hours picker
+names the catalogue code (A9); the send lands on the quotes register where
+the sent quote actually is (A13); and a line carrying money with no words —
+placeholder dots included — blocks the send (A14), because that is the one
+row on a document nobody can defend later.
+
+## S37 · PK-D — the S-curve stops lying by omission (2026-08-28)
+
+**Zero is the record.** Before the first observation the actual line now sits
+at zero from the plan's start: on day one nothing had been recorded because
+nothing had been done, and a chart with no actual line at all read as broken
+to the person it was drawn for. Beyond `asOf` the line still ends — the
+future has no record.
+
+**One observation is not a pace.** The projection is withheld until the
+progress log carries two distinct dates (entries on one afternoon are one
+day of evidence); until then the projected line is null and the finish is
+the plan's own, because a forecast extrapolated from a single day swings
+wildly with that day. A run of one drawable point renders as a dot, never
+as a blank. The curve always samples exactly at `asOf`, so the actual line
+reaches today and the projection takes off from a date somebody is standing
+on. tracking.test.ts was adjusted deliberately (fixtures now log two dates
+where they expect a projection) and gained the two new rules as tests; the
+committed bundle was regenerated from the changed capability.
+
+**Dates print as the operator sees them.** The e2e suite launches Chromium
+with --lang=es-ES: the two native date inputs keep ISO values, and their
+display follows the browser locale — the operator's Spanish browser shows
+dd/mm/yyyy, and now the suite tests exactly that rendering.
+
+## S38 · PK-E — blockers translate; the suite cleans up after itself (2026-08-28)
+
+**A12 · a blocker is a label beside data, and only one of them translates.**
+Every gate and budget-check row now renders the code pill and any data
+detail (a field list, figures, an identifier) in `translate="no"` spans and
+the label in its own node; the engine marks which details are data
+(`data: true`), because a heuristic guessing from the text was fragile the
+day it was written. The gate and check labels the toggle was missing —
+AR-11, CON-11, AR-10, both CHG-04s, and the five validateBudget messages —
+now carry pairs in both dictionaries. The issued-invoice path never shows
+the engine's thrown concatenation: the button is disabled while blocks
+exist and the gates card is the visible, translated surface.
+
+**A15 · a test fixture in a live company file.** `deleteParty` joins the
+server command whitelist (the engine still refuses any party carrying
+economic documents — the same rule the screen enforces), and the server e2e
+now ends by deleting every «E2E …» party — its own and every older run's.
+The row the operator saw is removed by the next deploy run's suite; until
+then it can be deleted from Configuración › Clientes with the same button.

@@ -278,6 +278,31 @@ async function main() {
     );
   }
 
+  // --- A15 · the suite cleans up after itself ------------------------------
+  // Every earlier run left its «E2E …» customer in the register — a test
+  // fixture in a live company file. deleteParty is the engine's own door
+  // (it refuses a party with economic documents), newly whitelisted; using
+  // it here both removes THIS run's row and every one an older run left.
+  {
+    const st = await json(await api(`/api/${TENANT}/erp/state`));
+    let v = st.version;
+    const leftovers = (st.state?.parties ?? []).filter((p) => /^E2E /.test(p.name));
+    let removed = 0;
+    for (const p of leftovers) {
+      const res = await command({ command: "deleteParty", args: [p.id], expectedVersion: v });
+      if (res.ok) {
+        removed++;
+        v = (await json(res)).version;
+      }
+    }
+    const after = await json(await api(`/api/${TENANT}/erp/state`));
+    check(
+      "the run's own test customer is gone, and so is every older run's",
+      !(after.state?.parties ?? []).some((p) => /^E2E /.test(p.name)),
+      `removed ${removed} of ${leftovers.length}`,
+    );
+  }
+
   for (const r of results) {
     console.log(`${r.pass ? "✓" : "✗"} ${r.name}${r.detail ? "  — " + r.detail : ""}`);
   }

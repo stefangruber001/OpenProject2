@@ -2308,6 +2308,21 @@
             });
           if (!l.pending && l.costCents > l.priceCents && l.priceCents > 0)
             issues.push({ level: "warn", line: l.num, msg: "Coste superior al precio de venta" });
+          /* A14 · a line carrying money and no words. The customer would be
+             asked to accept an amount for nothing nameable, which is the one
+             row on the document nobody can defend later. Placeholder text
+             («...», «-», «x») counts as empty — it is typed to get past the
+             cursor, not to describe work. */
+          if (
+            !l.pending &&
+            (l.lumpSum ? l.priceCents > 0 : qty > 0 && l.priceCents > 0) &&
+            !String(l.customerWording || l.desc || "").replace(/[\s.·\-_x?¿]+/gi, "")
+          )
+            issues.push({
+              level: "block",
+              line: l.num,
+              msg: "Línea con importe y sin descripción",
+            });
           if (l.pending)
             issues.push({ level: "warn", line: l.num, msg: "Línea pendiente de precio" });
         }
@@ -3097,10 +3112,21 @@
       const c = this.state.contracts.find((x) => x.id === contractId);
       if (!c) throw new Error("Contract not found");
       const annexCents = sum(c.annexes || [], (a) => a.valueCents);
+      const currentCents = c.valueCents + annexCents;
       return {
         originalCents: c.valueCents,
         annexCents,
-        currentCents: c.valueCents + annexCents,
+        currentCents,
+        /* B1 · the milestones are priced on the GROSS (createContract splits
+           rec.totalCents), so any screen summing them must compare against
+           a gross too — comparing against the base made every contract with
+           tax look overrun by exactly the tax. Two grosses, for two uses:
+           the ORIGINAL gross is what the milestones split (annexes bill
+           separately, through their own invoices); the vigente gross is what
+           the printed document quotes as the contract total today. */
+        vatBp: c.vatBp,
+        originalTotalCents: c.totalCents,
+        totalCents: currentCents + pctOf(currentCents, c.vatBp || 0),
         annexes: (c.annexes || []).length,
         differs: annexCents !== 0,
       };
@@ -3164,6 +3190,8 @@
         budgetNumber: c.budgetNumber,
         originalCents: v.originalCents,
         currentCents: v.currentCents,
+        totalCents: v.totalCents, // B1 · gross of the vigente amount
+        originalTotalCents: v.originalTotalCents, // B1 · what the milestones split
         vatBp: c.vatBp,
         installments: c.installments.map((i, idx) => ({
           idx,
@@ -4346,6 +4374,7 @@
             code: "MDM-10",
             label: "Datos fiscales del cliente incompletos",
             detail: comp.missing.join(", "),
+            data: true, // A12 · a field list is data — no translator touches it
           });
       }
       /* AR-11 — the guard the whole split rests on.
@@ -4378,6 +4407,7 @@
             code: "AR-11",
             label: "Excede lo que este cliente debe por esta obra",
             detail: `Pendiente ${(room / 100).toFixed(2)} €, factura ${(want / 100).toFixed(2)} €`,
+            data: true, // A12 · figures
           });
       }
       const contract = p.contractId
@@ -4413,7 +4443,12 @@
       if (draft.changeId) {
         const ch = this.state.changes.find((x) => x.id === draft.changeId);
         if (!ch)
-          out.push({ code: "CHG-04", label: "El adicional no existe", detail: draft.changeId });
+          out.push({
+            code: "CHG-04",
+            label: "El adicional no existe",
+            detail: draft.changeId,
+            data: true, // A12 · an identifier
+          });
         else if (!["approved", "executed"].includes(ch.status))
           out.push({
             code: "CHG-04",

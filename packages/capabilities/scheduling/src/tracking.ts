@@ -17,21 +17,28 @@ import type { Plan, ProgressEntry, Task } from "./model";
  * The first: the ACTUAL line is drawn from the progress log, never from
  * today's percentages. A task that is 60 % done today was not 60 % done last
  * month, and a curve that pretends otherwise makes every past week look like
- * it went to plan. Where the log is empty the actual line simply does not
- * exist before the first observation, which is the truthful answer.
+ * it went to plan. Before the first observation the line sits at ZERO from
+ * the plan's start: on day one nothing had been recorded because nothing had
+ * been done, and a chart with no actual line at all read as broken to the
+ * person it was drawn for — zero recorded is itself the record.
  *
  * The second: the PROJECTED line is an extrapolation and is labelled as one.
  * It stretches the remaining planned work by the pace observed so far — if
  * half the time has produced two thirds of the planned progress, the rest is
  * assumed to continue at that pace. That is a defensible guess, not a fact,
  * and `performanceIndex` is returned so a caller can show what it rests on.
+ * One observation is not a pace: until the log carries two distinct dates
+ * the projection is withheld entirely (null, finish = the plan's own),
+ * because a line extrapolated from a single day swings wildly with that
+ * day and reads as a forecast nobody made.
  */
 
 export interface CurvePoint {
   date: string;
   /** Cumulative planned progress, 0-100. */
   plannedPct: number;
-  /** Cumulative recorded progress, or null before the first observation. */
+  /** Cumulative recorded progress: zero before the first observation
+   *  (nothing recorded IS the record), null only after `asOf`. */
   actualPct: number | null;
   /** Extrapolated progress after `asOf`, or null on or before it. */
   projectedPct: number | null;
@@ -150,16 +157,21 @@ export function progressCurve(
     );
 
   const byId = new Map(plan.tasks.map((t) => [t.id, t]));
-  const actualAt = (date: string): number | null => {
-    let any = false;
+  const actualAt = (date: string): number => {
     let sum = 0;
     for (const st of scheduled) {
       const recorded = recordedPctAt(log, st.taskId, date);
-      if (recorded !== null) any = true;
       sum += weightOf(options.weights, st) * (clamp(recorded ?? 0, 0, 100) / 100);
     }
-    return any ? pct(sum, totalWeight) : null;
+    // Zero when nothing was recorded by `date` — the line exists from day
+    // one, at the only value the record supports.
+    return pct(sum, totalWeight);
   };
+
+  // A pace needs two points. Count distinct observation DATES, not entries:
+  // ten task rows logged on one afternoon are still one day of evidence.
+  const observationDates = new Set(log.map((e) => e.date)).size;
+  const canProject = observationDates >= 2;
 
   /** Today's figure comes from the tasks themselves, not the log: the log may
       lag behind an edit, and "where is it now" must match what the grid says. */
@@ -180,7 +192,7 @@ export function progressCurve(
     asOf >= schedule.finish ? 0 : Math.max(0, workingDaysInclusive(cal, asOf, schedule.finish) - 1);
   const stretch = performanceIndex && performanceIndex > 0 ? 1 / performanceIndex : 1;
   const projectedFinish =
-    remainingDays === 0
+    !canProject || remainingDays === 0
       ? schedule.finish
       : addWorkingDays(cal, snapForward(cal, asOf), Math.round(remainingDays * stretch));
 
@@ -200,7 +212,7 @@ export function progressCurve(
       // `asOf`, then continuing at the observed pace: the work the plan
       // expects between now and `date`, achieved at `performanceIndex` of it.
       projectedPct:
-        date > asOf
+        canProject && date > asOf
           ? clamp(actualNow + (plannedAt(date) - plannedNow) * (performanceIndex ?? 1), 0, 100)
           : null,
     });
@@ -211,8 +223,20 @@ export function progressCurve(
       date: horizon,
       plannedPct: plannedAt(horizon),
       actualPct: horizon <= asOf ? actualAt(horizon) : null,
-      projectedPct: horizon > asOf ? 100 : null,
+      projectedPct: canProject && horizon > asOf ? 100 : null,
     });
+  }
+  // A sample exactly at `asOf`, always: the step lands where it lands, and a
+  // curve whose actual line stops short of today — or whose projection takes
+  // off from a date nobody is standing on — reads as a gap in the story.
+  if (asOf >= schedule.start && asOf <= horizon && !points.some((pt) => pt.date === asOf)) {
+    points.push({
+      date: asOf,
+      plannedPct: plannedNow,
+      actualPct: actualAt(asOf),
+      projectedPct: null,
+    });
+    points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   }
 
   return {

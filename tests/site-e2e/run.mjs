@@ -61,7 +61,11 @@ async function main() {
   const base = `http://127.0.0.1:${port}`;
   await waitForServer(base);
 
-  const browser = await chromium.launch({ executablePath: CHROME });
+  /* A10 · the operator's browser is Spanish, and native date inputs render
+     in the browser's locale — running the suite in es-ES makes the screens
+     under test show the dd/mm/yyyy the operator actually sees. Values stay
+     ISO; only the paint changes. */
+  const browser = await chromium.launch({ executablePath: CHROME, args: ["--lang=es-ES"] });
   /* Every suite, in order. A list rather than thirty-four await statements so
      that `--only <substring>` can pick one out: the whole run takes about
      twelve minutes, and diagnosing one broken suite by re-running all of them
@@ -90,6 +94,7 @@ async function main() {
     testFirstRun,
     testBankAndCash,
     testContract,
+    testSmallFixes,
     testChangeApprovalEvidence,
     testContractCreation,
     testBudgetCreation,
@@ -3469,6 +3474,10 @@ async function testPresupuestador(browser, base) {
     await pg.waitForTimeout(400);
     await pg.locator("#sbGo").click();
     await pg.waitForTimeout(600);
+    // A13 · the send now lands on the quotes register; reopen the sent quote
+    // the way the operator would, and read the locked builder there.
+    await pg.evaluate((id) => window.go("quotes", id), draftId);
+    await pg.waitForTimeout(500);
     const afterSend = await pg.evaluate(
       (id) => ({
         stage: erp.budgetStage(id),
@@ -3971,6 +3980,43 @@ async function testProjectTracking(browser, base) {
     if (paths === 3 && curveTag.some((t) => /planificado .* real .* pts/.test(t)))
       ok("tracking: S curve draws planned, actual and projected");
     else bad("tracking: S curve", `paths=${paths} tags=${curveTag.join(" | ").slice(0, 80)}`);
+
+    // A10 · a run of one drawable point cannot make a line — the chart marks
+    // it with a dot instead of drawing nothing, and still emits its three
+    // paths for everything that reads them.
+    const a10dot = await pg.evaluate(() => {
+      const mk = (date, plannedPct, actualPct, projectedPct) => ({
+        date,
+        plannedPct,
+        actualPct,
+        projectedPct,
+      });
+      const svg = curveChart({
+        asOf: "2026-01-05",
+        points: [
+          mk("2026-01-01", 0, null, null),
+          mk("2026-01-05", 10, 5, null),
+          mk("2026-01-12", 30, null, null),
+        ],
+      });
+      return {
+        dot: /class="cdot"/.test(svg),
+        paths: (svg.match(/<path /g) || []).length,
+        noDotWithTwo: !/class="cdot"/.test(
+          curveChart({
+            asOf: "2026-01-05",
+            points: [
+              mk("2026-01-01", 0, 0, null),
+              mk("2026-01-05", 10, 5, null),
+              mk("2026-01-12", 30, null, null),
+            ],
+          }),
+        ),
+      };
+    });
+    if (a10dot.dot && a10dot.paths === 3 && a10dot.noDotWithTwo)
+      ok("A10: a single observation renders as a dot, never as a blank chart");
+    else bad("A10: single-point dot", JSON.stringify(a10dot));
 
     // ---- the one progress control (Package 3 slide 3) ----------------------
     // Two controls used to record the same fact: this grid, and PRY-01's
@@ -5711,6 +5757,194 @@ async function testInvoiceGenerator(browser, base) {
 // ── COM-04 Contrato (§3.2) — the last of the four full-screen surfaces, and
 //    the one column that earns the screen: «Importe vigente» goes amber the
 //    moment annexes exist, so nobody has to open a contract to find out.
+/* PK-C · the small visible fixes the UAT surfaced: disabled buttons that
+   look it, [hidden] that means it, the drawer's pinned action bar, the
+   builder's announced chapter filter, and the moneyed-line-with-no-words
+   block. Each check reads the real screen, not the code. */
+async function testSmallFixes(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  try {
+    await pg.goto(`${base}/erp.html`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(2500);
+
+    const r = await pg.evaluate(() => {
+      const R = {};
+      // A7 · a disabled button says so with more than the cursor
+      const b = document.createElement("button");
+      b.className = "btn";
+      b.disabled = true;
+      document.body.appendChild(b);
+      const cs = getComputedStyle(b);
+      R.a7 = { opacity: cs.opacity, cursor: cs.cursor };
+      b.remove();
+      // A8 · [hidden] wins whatever display a class gave the element
+      const h = document.createElement("div");
+      h.className = "it";
+      h.style.display = "flex";
+      h.hidden = true;
+      document.body.appendChild(h);
+      R.a8 = getComputedStyle(h).display;
+      h.remove();
+      return R;
+    });
+    if (r.a7.opacity === "0.55" && r.a7.cursor === "not-allowed")
+      ok("A7: a disabled .btn is visibly disabled — opacity and cursor agree");
+    else bad("A7: disabled style", JSON.stringify(r.a7));
+    if (r.a8 === "none") ok("A8: [hidden] means hidden, whatever the class says");
+    else bad("A8: hidden normalize", r.a8);
+
+    // A9 · the hours drawer's action sits in the pinned footer, the customer
+    // drawer's save/delete too, and the slot never leaks between drawers.
+    const a9 = await pg.evaluate(() => {
+      const R = {};
+      newHoursDrawer(erp.today);
+      R.hoursInFoot = !!document.querySelector("#dfoot #nh_go");
+      R.footVisible = !document.querySelector("#dfoot").hidden;
+      R.pickerHasCode = /[A-Z]{2,4}-\d+/.test(
+        (document.querySelector("#nh_l") || { innerHTML: "" }).innerHTML,
+      );
+      closeDrawer();
+      const pty = erp.state.parties.find((x) => x.roles.includes("customer"));
+      editPartyDrawer(pty.id);
+      R.saveInFoot = !!document.querySelector("#dfoot #e_save");
+      R.delInFoot = !!document.querySelector("#dfoot #e_del");
+      closeDrawer();
+      openDrawer("cualquier otro");
+      R.leak = document.querySelector("#dfoot").innerHTML !== "";
+      R.hiddenAgain = document.querySelector("#dfoot").hidden;
+      closeDrawer();
+      return R;
+    });
+    if (
+      a9.hoursInFoot &&
+      a9.footVisible &&
+      a9.saveInFoot &&
+      a9.delInFoot &&
+      !a9.leak &&
+      a9.hiddenAgain
+    )
+      ok("A9: drawer actions live in a pinned footer that never leaks between drawers");
+    else bad("A9: drawer footer", JSON.stringify(a9));
+
+    // A6 · a filtered builder announces the filter and clears it in one click
+    const a6open = await pg.evaluate(() => {
+      const b = erp.state.budgets.find((x) => erp.budgetStage(x) === "draft");
+      if (!b) return null;
+      window.go("quotes", b.id);
+      return b.id;
+    });
+    if (!a6open) bad("A6: a draft quote to filter", "none in the seed");
+    else {
+      await pg.waitForTimeout(700);
+      const a6 = await pg.evaluate((id) => {
+        const V = erp.currentVersion(id);
+        bChapter = V.chapters[0].id;
+        render();
+        const chip = document.querySelector("#bGridTag");
+        const before = {
+          announced: /viendo solo/i.test(chip.innerText),
+          // the .tag chrome uppercases what it shows — match the words, not the case
+          named: chip.innerText.toLowerCase().includes(V.chapters[0].name.toLowerCase()),
+          rows: document.querySelectorAll("#bRows tr.chaprow").length,
+        };
+        const btn = document.querySelector("#bChapAll");
+        if (btn) btn.click();
+        const after = {
+          cleared: bChapter === null,
+          rows: document.querySelectorAll("#bRows tr.chaprow").length,
+        };
+        return { before, after, chapters: V.chapters.length };
+      }, a6open);
+      if (
+        a6.before.announced &&
+        a6.before.named &&
+        a6.before.rows === 1 &&
+        a6.after.cleared &&
+        a6.after.rows === a6.chapters
+      )
+        ok("A6: the chapter filter names itself and «× ver todas» brings every row back");
+      else bad("A6: filter chip", JSON.stringify(a6));
+    }
+
+    // A14 · money with no words blocks the send, placeholders included
+    const a14 = await pg.evaluate(() => {
+      const pty = erp.state.parties.find((x) => x.roles.includes("customer"));
+      const b = erp.createBudget({ partyId: pty.id }, "e2e");
+      const ch = erp.addChapter(b.id, { name: "Prueba" }, "e2e");
+      erp.addLine(b.id, ch.id, {
+        desc: "",
+        unit: "ud",
+        qtyMilli: 1000,
+        priceCents: 5000,
+        costCents: 100,
+      });
+      const empty = erp
+        .validateBudget(b.id)
+        .some((i) => i.level === "block" && /sin descripción/.test(i.msg));
+      const v = erp.currentVersion(b.id);
+      v.chapters[0].lines[0].desc = "...";
+      const placeholder = erp
+        .validateBudget(b.id)
+        .some((i) => i.level === "block" && /sin descripción/.test(i.msg));
+      v.chapters[0].lines[0].desc = "Trabajo descrito";
+      const described = erp
+        .validateBudget(b.id)
+        .some((i) => i.level === "block" && /sin descripción/.test(i.msg));
+      // leave the register byte-identical: drop the probe budget and its number
+      erp.state.budgets = erp.state.budgets.filter((x) => x.id !== b.id);
+      const s = erp.state.series.budget;
+      if (s) {
+        s.issued = s.issued.filter((n) => n !== b.number);
+        s.next--;
+        const y = b.number.match(/-(\d{4})-/)[1];
+        if (s.byYear && s.byYear[y]) s.byYear[y]--;
+      }
+      return { empty, placeholder, described };
+    });
+    if (a14.empty && a14.placeholder && !a14.described)
+      ok("A14: a line with money and no words blocks the send — «...» included");
+    else bad("A14: empty description block", JSON.stringify(a14));
+
+    // A12 · a blocker row is a translatable label beside frozen data — the
+    // code pill and any data detail carry translate="no", the label has a
+    // dictionary pair in both languages, so the toggle reaches it.
+    const a12 = await pg.evaluate(() => {
+      // A credit note that names no invoice blocks with AR-10 on ANY job —
+      // the one blocker the seed can always produce without being mutated.
+      const p = erp.state.projects.find((x) => x.status !== "archived");
+      if (!p) return { skip: true };
+      invOpen(p.id);
+      invWork.basis = "credit";
+      invWork.kind = "creditNote";
+      invWork.rectifies = null;
+      invSync();
+      return new Promise((res) =>
+        setTimeout(() => {
+          const rows = [...document.querySelectorAll("#invGates .daylist .it")];
+          const structured = rows.filter((r) => r.querySelector('.pill[translate="no"]'));
+          const labels = structured
+            .map((r) => r.querySelector("span[style] > span")?.textContent?.trim())
+            .filter(Boolean);
+          const D = window.CANEI_DICT;
+          const paired = labels.filter(
+            (l) => D.pairs.some((x) => x[0] === l) && typeof D.ca[l] === "string",
+          );
+          document.querySelector("#invBack")?.click();
+          res({ rows: rows.length, structured: structured.length, labels, paired: paired.length });
+        }, 600),
+      );
+    });
+    if (a12.skip) bad("A12: a job for the blocked draft", "none in the seed");
+    else if (a12.structured > 0 && a12.paired === a12.labels.length)
+      ok(`A12: ${a12.paired} blocker label(s) split from their data and paired in both languages`);
+    else bad("A12: blocker rows", JSON.stringify(a12));
+  } catch (e) {
+    bad("small fixes", String(e).slice(0, 160));
+  } finally {
+    await pg.close();
+  }
+}
+
 async function testContract(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
   const errs = [];
@@ -5905,6 +6139,35 @@ async function testContract(browser, base) {
     await pg.locator('[data-contab="hitos"]').click();
     await pg.waitForTimeout(400);
     const hitos = await pg.locator("#conBody").innerText();
+    /* B1 · this contract carries tax and its milestones were split on the
+       gross, so the foot must say «cuadra» — the old base-vs-gross compare
+       painted every taxed contract red by exactly the tax. */
+    const b1 = await pg.evaluate(() => {
+      const val = erp.contractValue(conWork.id);
+      const d = erp.renderContractDoc(conWork.id);
+      const sum = d.installments.reduce((s, i) => s + i.amountCents, 0);
+      return {
+        taxed: (val.vatBp || 0) > 0,
+        // The milestones split the ORIGINAL gross; annexes bill separately.
+        agrees: Math.abs(sum - val.originalTotalCents) <= d.installments.length,
+        grossExposed:
+          typeof val.originalTotalCents === "number" && val.originalTotalCents > val.originalCents,
+      };
+    });
+    if (
+      b1.taxed &&
+      b1.agrees &&
+      b1.grossExposed &&
+      /cuadra con el contratado/i.test(hitos) &&
+      !/sobre el contratado/i.test(hitos) &&
+      /IVA incl\./i.test(hitos)
+    )
+      ok("B1: a taxed contract's milestones agree — gross against gross, labelled");
+    else
+      bad(
+        "B1: hitos VAT compare",
+        JSON.stringify(b1) + " " + hitos.replace(/\n/g, " ").slice(0, 120),
+      );
     if (/Suma de hitos/i.test(hitos) && /(cuadra|sobre el contratado)/i.test(hitos))
       ok("COM-04: the milestones foot against the contracted amount");
     else bad("COM-04: milestones foot", hitos.replace(/\n/g, " ").slice(0, 140));
@@ -9476,6 +9739,24 @@ async function testSendAndVersions(browser, base) {
       if (result.issued && result.channel === "email")
         ok("send: email channel issues and freezes the version");
       else bad("send: email issues version", JSON.stringify(result));
+
+      // A13 · the send lands on the quotes register — the sent quote in its
+      // own list — never back on the locked builder, and the chapter filter
+      // does not survive into the next quote (A6).
+      const landing = await pg.evaluate(() => ({
+        hash: location.hash.replace(/^#/, ""),
+        register: !!document.querySelector("#view table.mlist, #view .mlist"),
+        builderOpen: !!document.querySelector("#bRows"),
+        chapterFilter: typeof bChapter !== "undefined" ? bChapter : "?",
+      }));
+      if (
+        /quotes/.test(landing.hash) &&
+        landing.register &&
+        !landing.builderOpen &&
+        landing.chapterFilter === null
+      )
+        ok("A13: the send lands on the quotes register, filter cleared");
+      else bad("A13: landing after send", JSON.stringify(landing));
       if (
         result.queued &&
         result.queued.status === "sent" &&

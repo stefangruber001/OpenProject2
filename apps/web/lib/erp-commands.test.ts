@@ -57,6 +57,7 @@ describe("the command whitelist", () => {
         "approveChange",
         "completeTask",
         "deactivateParty",
+        "deleteParty",
         "markProgress",
         "payBills",
         "quarterlyPackage",
