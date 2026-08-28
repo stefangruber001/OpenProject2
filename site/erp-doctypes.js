@@ -92,6 +92,12 @@
         unit: r.unit || "",
         priceLabel: eur(r.price),
         amount: eur(r.amount),
+        // The presentation hints a caller may attach: the annex mark on a row
+        // whose picture waits at the back, and a ready-made plate from a host
+        // that knows the catalogue. Writers that don't draw them ignore them.
+        pictogram: r.pictogram,
+        flag: r.flag,
+        plateHtml: r.plateHtml,
       })),
       subtotal: eur(c.rows.reduce((s, r) => s + r.amount, 0)),
     }));

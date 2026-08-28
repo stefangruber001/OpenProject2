@@ -830,7 +830,6 @@ window.CANEI_DICT.ca = {
   "Documento guardado": "Document desat",
   "Leído del texto del PDF": "Llegit del text del PDF",
   "Datos leídos": "Dades llegides",
-  "No cuadra": "No quadra",
   Comprobado: "Comprovat",
   "Sin comprobar — revíselo": "Sense comprovar — reviseu-ho",
   "Un punto verde significa que algo ha comprobado el dato — un dígito de control, una fecha real, una suma que cuadra. Ámbar significa que nadie lo ha comprobado, por muy claro que se leyera.":
@@ -2533,6 +2532,9 @@ window.CANEI_DICT.ca = {
     "Afegiu-lo com a pagador del projecte abans d'emetre-li una factura.",
   "Datos fiscales del cliente incompletos": "Dades fiscals del client incompletes",
   "Faltan los datos de la empresa": "Falten les dades de l'empresa",
+  "No cuadra": "No quadra",
+  "La tabla de arriba no cuadra con el coste del proyecto.":
+    "La taula de dalt no quadra amb el cost del projecte.",
   "— sin obra asociada —": "— sense obra associada —",
   "Un contrato externo no nombra ningún presupuesto, así que la obra a la que pertenece hay que decirla aquí — o dejarlo sin asociar.":
     "Un contracte extern no anomena cap pressupost, així que l'obra a la qual pertany s'ha de dir aquí — o deixar-ho sense associar.",

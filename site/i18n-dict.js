@@ -4620,6 +4620,10 @@ window.CANEI_DICT = {
     ],
     ["Datos fiscales del cliente incompletos", "Customer tax details incomplete"],
     ["Faltan los datos de la empresa", "Your company details are missing"],
+    [
+      "La tabla de arriba no cuadra con el coste del proyecto.",
+      "The table above does not agree with the project's cost.",
+    ],
     ["— sin obra asociada —", "— no site linked —"],
     [
       "Un contrato externo no nombra ningún presupuesto, así que la obra a la que pertenece hay que decirla aquí — o dejarlo sin asociar.",

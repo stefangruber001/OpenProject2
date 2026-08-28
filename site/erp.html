@@ -810,16 +810,8 @@
       .daylist .it.active {
         font-weight: 600;
       }
-      .doc {
-        background: #fbfdf9;
-        border: 1px dashed var(--line);
-        border-radius: 12px;
-        padding: 18px 20px;
-        font-size: 12.5px;
-      }
       /* The company's own small print, under every document. Muted and small
          on purpose: it is the legally required line, not a selling point. */
-      .doc .dfoot,
       .cdoc .dfoot {
         margin-top: 14px;
         padding-top: 8px;
@@ -827,51 +819,6 @@
         font-size: 10.5px;
         line-height: 1.45;
         color: var(--muted);
-      }
-      .doc .dh {
-        display: flex;
-        justify-content: space-between;
-        gap: 14px;
-        border-bottom: 2px solid var(--green);
-        padding-bottom: 10px;
-        margin-bottom: 12px;
-      }
-      .doc .dh b {
-        font-family: var(--serif);
-        font-size: 16px;
-        color: var(--ink);
-      }
-      .chapline {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 8px;
-        padding: 3px 0;
-      }
-      /* The line's drawing on the quote itself. The description takes the room
-         it is given, so the mark is fixed and the text flexes — otherwise a
-         long subpartida squeezes the picture away on exactly the lines that most
-         need explaining. */
-      .chapline .chapmark {
-        flex: 0 0 auto;
-        line-height: 0;
-      }
-      .chapline > span:not(.chapmark) {
-        flex: 1 1 auto;
-        min-width: 0;
-      }
-      .chapline .pict {
-        color: #8a8f80;
-      }
-      /* On the printed quote the plate is small and its code smaller: it is
-         there so a reader can check the picture against the subpartida, not to
-         compete with the description beside it. */
-      .chapline .platec {
-        font-size: 6.5px;
-      }
-      .chapline .chapmark {
-        align-self: flex-start;
-        padding-top: 1px;
       }
 
       /* ---------- Gantt (spec §3.3 · §4.3) ---------- */
@@ -3732,15 +3679,6 @@
      Pictures never enter a line's row: they collect at the end of the document
      and the row carries a discreet mark instead, so a table of numbers stays a
      table of numbers whatever anyone attaches to it. */
-      .amark {
-        font: 700 8.5px var(--sans);
-        color: var(--green);
-        border: 1px solid var(--green);
-        border-radius: 3px;
-        padding: 0 2px;
-        margin-left: 4px;
-        vertical-align: super;
-      }
       .annexpg {
         border-top: 1px dashed var(--line);
         margin-top: 12px;
@@ -4036,7 +3974,6 @@
            `.cdoc` is the same idea for the contract and the factura, which are
            set as sheets rather than as cards; it needs the same treatment or
            it prints its own shadow. */
-        .printsheet .doc,
         .printsheet .cdoc {
           background: #fff;
           border: 0;
@@ -5096,6 +5033,16 @@
      erp-pdf.js, so the catalogue, the quote builder and the printed quote
      cannot show three different pictures of one subpartida. -->
     <script src="erp-pictograms.js"></script>
+    <!-- The one approved design, end to end: erp-pdf writes it as vector PDF,
+     erp-doctypes says what each document contains, erp-doc-i18n gives the
+     labels their three languages, erp-facts feeds live records in, and
+     erp-sheet renders the same design as HTML for every pane and print.
+     Pictograms must already be loaded — both writers draw the plates. -->
+    <script src="erp-pdf.js"></script>
+    <script src="erp-doctypes.js"></script>
+    <script src="erp-doc-i18n.js"></script>
+    <script src="erp-facts.js"></script>
+    <script src="erp-sheet.js"></script>
     <script src="erp-migrations.js"></script>
     <script src="erp-store.js"></script>
     <script src="erp-import.js"></script>
@@ -8401,19 +8348,12 @@
       function changeDocDrawer(id) {
         const doc = erp.renderChangeDoc(id);
         const db = openDrawer("Adenda" + (doc.number ? " " + doc.number : ""));
-        db.innerHTML = `<div class="doc">
-   <div class="dh"><div>${issuerLogoHtml(doc.issuer, 30)}<b>MODIFICACIÓN CONTRACTUAL${doc.number ? " " + doc.number : ""}</b><br>${esc(doc.issuer.tradeName || doc.issuer.legalName)}${doc.issuer.taxId ? " · " + esc(doc.issuer.taxId) : ""}<br>${esc(doc.issuer.address)}</div>
-    <div style="text-align:right">${esc(doc.customer.name)}<br>${esc(doc.customer.taxId)}<br>${esc(doc.customer.address)}</div></div>
-   <div class="chapline"><span>Proyecto</span><b>${esc(doc.project)}</b></div>
-   ${doc.contractNumber ? `<div class="chapline"><span>Contrato</span><b>${esc(doc.contractNumber)}</b></div>` : ""}
-   <div class="chapline"><span>${esc(doc.desc)}</span></div>
-   ${doc.reason ? `<div style="color:var(--muted);margin:6px 0">${esc(doc.reason)}</div>` : ""}
-   <div style="border-top:2px solid var(--green);padding-top:8px;margin-top:8px">
-    <div class="chapline"><span>Efecto en venta</span><b>${eur(doc.priceCents)}</b></div>
-    ${doc.scheduleImpactDays ? `<div class="chapline"><span>Efecto en plazo</span><b>${doc.scheduleImpactDays > 0 ? "+" : ""}${doc.scheduleImpactDays} días</b></div>` : ""}
-   </div>
-   <div style="margin-top:8px;color:var(--muted)">Fecha ${fmtD(doc.date)}</div>
-  </div>`;
+        /* The annex prints in the language its contract speaks. */
+        const con = doc.contractNumber
+          ? erp.state.contracts.find((x) => x.number === doc.contractNumber)
+          : null;
+        db.innerHTML = sheetDocHtml("ordenCambio", { changeId: id }, (con && con.language) || "es");
+        paintImages(db);
       }
 
       /* ---------- Horas (§4.6) ---------- */
@@ -10580,7 +10520,8 @@
           .map((s) => {
             const kind = s.billId ? "bill" : "invoice";
             const id = s.billId || s.invoiceId;
-            const open = kind === "bill" ? erp.billOutstandingCents(id) : erp.invoiceOutstandingCents(id);
+            const open =
+              kind === "bill" ? erp.billOutstandingCents(id) : erp.invoiceOutstandingCents(id);
             if (open <= 0) return null;
             const rec =
               kind === "bill"
@@ -10597,7 +10538,10 @@
      Si el resto sigue pendiente no hay nada que hacer; si se da por cerrado, di por qué.</div>
    ${short
      .map(
-       (d, i) => `<div class="card" style="margin:0 0 10px"><div class="daylist" style="padding:10px 14px">
+       (
+         d,
+         i,
+       ) => `<div class="card" style="margin:0 0 10px"><div class="daylist" style="padding:10px 14px">
       <div class="it"><span class="k" style="flex:1">${esc(d.ref)}</span><span>Sigue debiendo</span><b>${eur(d.open)}</b></div>
       <div class="it">
         <select class="inline" data-sfr="${i}">${reasons.map((x) => `<option value="${x.code}">${esc(x.es)}</option>`).join("")}</select>
@@ -18989,11 +18933,7 @@
       /* Basis points on the record, percent on the screen. The engine counts
          in basis points because 21 % of a cent has to land somewhere; nobody
          types "2100" for a tax rate. */
-      const COMPANY_BP = new Set([
-        "defaultVatBp",
-        "defaultIrpfBp",
-        "marginThresholdBp",
-      ]);
+      const COMPANY_BP = new Set(["defaultVatBp", "defaultIrpfBp", "marginThresholdBp"]);
       const companyField = (c, key) => {
         const f = COMPANY_FIELDS.find((x) => x[0] === key);
         const raw = c[key];
@@ -19094,7 +19034,9 @@
         const applySame = () => {
           const on = same.checked;
           mirrored.forEach((k, i) => {
-            const src = $("#co_" + ["regStreet", "regPostalCode", "regCity", "regProvince", "regCountry"][i]);
+            const src = $(
+              "#co_" + ["regStreet", "regPostalCode", "regCity", "regProvince", "regCountry"][i],
+            );
             const dst = $("#co_" + k);
             dst.disabled = on;
             if (on) dst.value = src.value;
@@ -19818,7 +19760,10 @@
        <option value="">— sin obra asociada —</option>
        ${erp.state.projects
          .filter((p) => !p.contractId && p.status === "active")
-         .map((p) => `<option value="${esc(p.id)}"${s.projectId === p.id ? " selected" : ""}>${esc(p.code)}</option>`)
+         .map(
+           (p) =>
+             `<option value="${esc(p.id)}"${s.projectId === p.id ? " selected" : ""}>${esc(p.code)}</option>`,
+         )
          .join("")}
       </select></label></div>
     <div class="it" style="color:var(--muted)">Un contrato externo no nombra ningún presupuesto, así que la obra a la que pertenece hay que decirla aquí — o dejarlo sin asociar.</div>
@@ -20669,30 +20614,36 @@
           : "";
       }
 
-      function renderBudgetDocHtml(doc, annex, marked, perPage, b, t) {
-        const L = DOCL[doc.language] || DOCL.es;
-        const SEC = L.sections;
-        return `<div class="doc" translate="no" lang="${esc(doc.language)}">
-    <div class="dh"><div>${issuerLogoHtml(doc.issuer, 34)}<b>${L.doc} ${doc.number} · v${doc.version}</b><br>${esc(doc.issuer.tradeName || doc.issuer.legalName)}${doc.issuer.taxId ? " · " + esc(doc.issuer.taxId) : ""}<br>${esc(doc.issuer.address)}</div>
-    <div style="text-align:right">${esc(doc.customer.name)}<br>${esc(doc.customer.taxId)}<br>${esc(doc.customer.address)}</div></div>
-    ${doc.chapters
-      .map(
-        (
-          c,
-        ) => `<div style="margin-bottom:8px"><b style="color:var(--greenDeep)">${esc(c.num)}. ${esc(c.name)}${SEC[c.section] || ""}</b>
-      ${c.lines.map((l) => `<div class="chapline item"><span class="chapmark">${plateFor(l, c.name, 22)}</span><span>${esc(l.num)} ${esc(lineDesc(l, doc.language))} — ${l.qty} ${esc(l.unit)} × ${eur(l.priceCents)}${marked.has(l.num) ? '<span class="amark" title="Ver anexo gráfico">A</span>' : ""}</span><b>${eur(l.totalCents)}</b></div>`).join("")}</div>`,
-      )
-      .join("")}
-    <div style="border-top:2px solid var(--green);padding-top:8px;margin-top:8px">
-      <div class="chapline"><span>${L.base}</span><b>${eur(doc.totals.taxableCents)}</b></div>
-      ${doc.totals.optionsCents ? `<div class="chapline"><span>${L.options}</span><span>${eur(doc.totals.optionsCents)}</span></div>` : ""}
-      <div class="chapline"><span>${L.vat} ${doc.totals.vatBp / 100}%</span><span>${eur(doc.totals.vatCents)}</span></div>
-      <div class="chapline" style="font-size:14px"><b>${L.total}</b><b>${eur(doc.totals.grandCents)}</b></div>
-      ${t.pendingCount ? `<div class="chapline"><span>${L.pending}</span><span>${t.pendingCount} · ~${eur(t.pendingEstCents)}</span></div>` : ""}
-    </div>
-    ${annex.pages
-      .map(
-        (pg) => `<div class="annexpg" data-annexpage="${pg.number}">
+      /* ================= the one approved design (PK-F) =================
+         Every generated document — quote, contract, change order, invoice —
+         renders through CaneiSheet from live records (erp-facts). The sheet's
+         stylesheet is injected ONCE, caged under .cnsheet so the app's own
+         .lbl/.meta/.note never collide with the design's (see
+         CaneiSheet.scopedCss). The old per-screen renderers are gone; this is
+         what enforces «no other old design is used to generate any document».
+       */
+      if (typeof CaneiSheet !== "undefined" && !document.getElementById("cnsheetCss")) {
+        const st = document.createElement("style");
+        st.id = "cnsheetCss";
+        st.textContent =
+          CaneiSheet.scopedCss(".cnsheet") +
+          /* app-side frame: a 210mm sheet scrolls inside a narrow pane
+             rather than widening it, and loses its screen chrome in print */
+          "\n.cnsheet{overflow-x:auto}.cnsheet .sheet{margin:0 auto}";
+        document.head.appendChild(st);
+      }
+      function sheetDocHtml(kind, refs, lang) {
+        const doc = CaneiErpFacts.docFor(erp, kind, refs, CaneiDocTypes);
+        return `<div class="cnsheet">${CaneiSheet.render(doc, erp._issuerBlock(), CaneiDocI18n.tr(lang || "es"), { pict: typeof ErpPictograms !== "undefined" ? ErpPictograms : null })}</div>`;
+      }
+      /** The quote's graphic annex, unchanged: pages of plates after the sheet
+       *  (as a SIBLING of .cnsheet — the sheet's caged styles must not touch
+       *  the annex figures), still img[data-blob] for paintImages to fill. */
+      function annexPagesHtml(annex, perPage, lang) {
+        const L = DOCL[lang] || DOCL.es;
+        return annex.pages
+          .map(
+            (pg) => `<div class="annexpg" data-annexpage="${pg.number}">
       <div class="ah">${L.annex} · ${L.page} ${pg.number} ${L.of} ${annex.pages.length}</div>
       <div class="plates" style="grid-template-columns:repeat(${Math.min(perPage, 2)},minmax(0,1fr))">
        ${pg.plates
@@ -20703,29 +20654,27 @@
          )
          .join("")}
       </div></div>`,
-      )
-      .join("")}
-    ${
-      (doc.exclusions || []).length
-        ? `<div style="margin-top:8px"><b>${L.exclusions}</b>
-      ${doc.exclusions.map((x) => `<div class="chapline"><span>· ${esc(x)}</span></div>`).join("")}</div>`
-        : ""
-    }
-    ${
-      (doc.assumptions || []).length
-        ? `<div style="margin-top:8px"><b>${L.assumptions}</b>
-      ${doc.assumptions.map((x) => `<div class="chapline"><span>· ${esc(x)}</span></div>`).join("")}</div>`
-        : ""
-    }
-    <div style="margin-top:8px;color:var(--muted)">${[
-      `${L.validity}: ${fmtD(b.validityDate)}`,
-      esc(b.paymentConditions),
-      doc.issuer.iban ? `IBAN ${esc(doc.issuer.iban)}` : "",
-    ]
-      .filter(Boolean)
-      .join(" · ")}</div>
-    ${issuerFootHtml(doc.issuer)}
-   </div>`;
+          )
+          .join("");
+      }
+      /** The quote as its sheet + annex. Accepted versions print as the frozen
+       *  «Presupuesto aceptado»; drafts and sent versions as «Presupuesto». */
+      function budgetSheetHtml(id, versionId, doc, annex, perPage) {
+        const b = erp.budget(id);
+        const kind = b.acceptedVersionId === versionId ? "presupuestoAceptado" : "presupuesto";
+        return (
+          sheetDocHtml(
+            kind,
+            {
+              budgetId: id,
+              versionId,
+              lineText: (l) => lineDesc(l, doc.language),
+              marked: new Set(annex.markedItems),
+              plateHtml: (l, chapName) => plateFor(l, chapName, 18),
+            },
+            doc.language,
+          ) + annexPagesHtml(annex, perPage, doc.language)
+        );
       }
       /**
        * The document as a standalone printable sheet — Package 2 slide 1's
@@ -20739,18 +20688,15 @@
        * called: paintImages() fires them off without waiting, and a picture
        * still loading when the print dialog opens prints as a blank frame.
        */
-      async function downloadBudgetPdf(id, versionId) {
-        const doc = erp.renderBudgetDoc(id, versionId);
-        const annex =
-          typeof ErpBridge !== "undefined" && ErpBridge.docs
-            ? ErpBridge.docs.annex(doc)
-            : { enabled: false, pages: [], plateCount: 0, markedItems: [] };
-        const marked = new Set(annex.markedItems);
-        const perPage = (doc.annex && doc.annex.imagesPerPage) || 2;
-        const b = erp.budget(id);
-        const t = erp.budgetTotals(id, versionId);
+      /** Isolate one sheet's HTML on the page and print it — the browser's
+       *  own dialog ("Guardar como PDF") is the established pattern here.
+       *  Every stored image is resolved AND decoded before print() fires:
+       *  a picture still loading when the dialog opens prints as a blank
+       *  frame, measured at 0 of 3 decoded on the seeded quote. The race
+       *  caps the wait so one corrupt file cannot hold the dialog shut. */
+      async function printSheetHtml(html) {
         const sheet = el("div", "printsheet");
-        sheet.innerHTML = renderBudgetDocHtml(doc, annex, marked, perPage, b, t);
+        sheet.innerHTML = html;
         document.body.appendChild(sheet);
         const imgs = [...sheet.querySelectorAll("img[data-blob]")];
         await Promise.all(
@@ -20761,17 +20707,6 @@
               return;
             }
             im.src = u;
-            /* Waiting for the URL is NOT waiting for the picture. print() used
-       to fire the instant the src was assigned, before the browser had
-       decoded a single byte, so the graphic annex went out to the customer
-       as blank plates with only their captions — measured on the seeded
-       quote: 0 of 3 images decoded at print time, 3 of 3 a second later.
-       The store was never the problem; the blobs were there all along.
-
-       decode() resolves when the image is actually paintable and rejects on
-       a file the browser cannot read, which is the alt text's job anyway.
-       The race caps the wait: one slow or corrupt picture must not hold the
-       print dialog shut on a document that is otherwise ready. */
             await Promise.race([
               im.decode().catch(() => {}),
               new Promise((r) => setTimeout(r, 5000)),
@@ -20780,6 +20715,15 @@
         );
         window.print();
         sheet.remove();
+      }
+      async function downloadBudgetPdf(id, versionId) {
+        const doc = erp.renderBudgetDoc(id, versionId);
+        const annex =
+          typeof ErpBridge !== "undefined" && ErpBridge.docs
+            ? ErpBridge.docs.annex(doc)
+            : { enabled: false, pages: [], plateCount: 0, markedItems: [] };
+        const perPage = (doc.annex && doc.annex.imagesPerPage) || 2;
+        await printSheetHtml(budgetSheetHtml(id, versionId, doc, annex, perPage));
       }
       function budgetDrawer(id, versionId) {
         const b = erp.budget(id);
@@ -20795,7 +20739,6 @@
           typeof ErpBridge !== "undefined" && ErpBridge.docs
             ? ErpBridge.docs.annex(doc)
             : { enabled: false, pages: [], plateCount: 0, markedItems: [] };
-        const marked = new Set(annex.markedItems);
         const perPage = (doc.annex && doc.annex.imagesPerPage) || 2;
         // Pre-existing bug, newly reachable: this used to mark the drawer
         // "(aceptada)" whenever the BUDGET had an accepted version, even
@@ -20846,7 +20789,7 @@
    </div></div>`
        : ""
    }
-   ${renderBudgetDocHtml(doc, annex, marked, perPage, b, t)}
+   ${budgetSheetHtml(id, vsel, doc, annex, perPage)}
    <div class="card" style="margin-top:12px"><div class="ch"><h3>Margen interno</h3><span class="tag">nunca aparece en el documento del cliente</span></div><div class="daylist">
     <div class="it">Coste interno base: <b>${eur(t.costBaseCents)}</b> · Margen: <b>${eur(t.marginBaseCents)} (${t.marginBasePct}%)</b></div>
     ${t.chapters
@@ -20951,6 +20894,49 @@
           ? Math.round((marginCents / e.currentRevenueCents) * 1000) / 10
           : 0;
         const SRC = { bill: "Factura", labour: "Horas", capture: "Documento" };
+        /* The rows the table will render, built HERE so their sum can be
+           checked against the project's own total before the screen claims
+           they agree. */
+        const tableRows = (() => {
+          const rows = f
+            ? f.byChapter.slice()
+            : erp.chapterEconomics(id).map((c) => ({
+                chapter: c.num,
+                budgetCents: c.budgetCostCents,
+                actualCents: c.actualCents,
+                varianceCents: c.actualCents - c.budgetCostCents,
+                varianceBp: 0,
+              }));
+          /* The factory forecast reads baseline + change orders and knows
+             nothing of variation budgets — so their chapters are merged in
+             from chapterEconomics, which does. Without this the forecast
+             bridge being loaded HID every variation from the table. */
+          if (f)
+            for (const c of erp.chapterEconomics(id))
+              if (c.variation && !rows.some((r) => String(r.chapter) === String(c.num)))
+                rows.push({
+                  chapter: c.num,
+                  budgetCents: c.budgetCostCents,
+                  actualCents: c.actualCents,
+                  varianceCents: c.actualCents - c.budgetCostCents,
+                  varianceBp: 0,
+                });
+          return rows;
+        })();
+        /* «Cuadra» is a claim, not a pleasantry — measured before it is
+           printed. The operator's UAT caught this screen saying «la tabla de
+           arriba cuadra con el proyecto» while the table sat 45 € short of
+           the card above it. Assigned rows plus what is waiting to be split
+           must equal the project's actual cost, to the cent. */
+        const tableCents =
+          tableRows.reduce((sum2, r) => sum2 + (r.actualCents || 0), 0) +
+          pend.reduce((sum2, r) => sum2 + r.amountCents, 0);
+        const tableAgrees = tableCents === e.actualCents;
+        const agreeNote = tableAgrees
+          ? '<div class="daylist"><div class="it">Todo el coste de esta obra tiene partida. La tabla de arriba cuadra con el proyecto.</div></div>'
+          : `<div class="daylist"><div class="it"><span class="pill r">No cuadra</span>
+        <span style="flex:1;margin-left:8px">La tabla de arriba no cuadra con el coste del proyecto.</span>
+        <b translate="no">${eur(tableCents)} / ${eur(e.actualCents)}</b></div></div>`;
 
         body.innerHTML = `
     <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
@@ -20967,32 +20953,7 @@
        <th>Partida</th><th class="num">Presupuestado</th><th class="num">Acumulado</th>
        <th class="num">Desviación</th><th class="num">%</th><th class="num">Margen</th><th></th></tr></thead><tbody>
      ${
-       (() => {
-         const rows = f
-           ? f.byChapter.slice()
-           : erp.chapterEconomics(id).map((c) => ({
-               chapter: c.num,
-               budgetCents: c.budgetCostCents,
-               actualCents: c.actualCents,
-               varianceCents: c.actualCents - c.budgetCostCents,
-               varianceBp: 0,
-             }));
-         /* The factory forecast reads baseline + change orders and knows
-            nothing of variation budgets — so their chapters are merged in
-            from chapterEconomics, which does. Without this the forecast
-            bridge being loaded HID every variation from the table. */
-         if (f)
-           for (const c of erp.chapterEconomics(id))
-             if (c.variation && !rows.some((r) => String(r.chapter) === String(c.num)))
-               rows.push({
-                 chapter: c.num,
-                 budgetCents: c.budgetCostCents,
-                 actualCents: c.actualCents,
-                 varianceCents: c.actualCents - c.budgetCostCents,
-                 varianceBp: 0,
-               });
-         return rows;
-       })()
+       tableRows
          .map((c) => {
            const base =
              (p.baseline.chapters || []).find((x) => String(x.num) === String(c.chapter)) || {};
@@ -21028,7 +20989,7 @@
         )
         .join("")}
      </tbody></table></div>`
-         : '<div class="daylist"><div class="it">Todo el coste de esta obra tiene partida. La tabla de arriba cuadra con el proyecto.</div></div>'
+         : agreeNote
      }
     </div>`;
 
@@ -21737,7 +21698,7 @@
          flex item with width:auto sizes to MAX-content: the sheet came out 602
          wide inside a 390 phone while the contract's, sized by .cdoc's own
          width:100%, measured 388 in the same place. -->
-    <div class="condoc"><div class="cdoc" translate="no" id="invDoc"></div></div>
+    <div class="condoc"><div translate="no" id="invDoc"></div></div>
     <div class="conpanel"><div id="invBody" style="padding:12px 14px 18px"></div></div>
    </div>
   </div>`;
@@ -21918,7 +21879,10 @@
         }
         const doc = $("#invDoc");
         if (doc) {
-          doc.innerHTML = invoiceDocHtml(pv.doc);
+          doc.innerHTML = sheetDocHtml(
+            pv.doc.docType === "FACTURA RECTIFICATIVA" ? "rectificativa" : "factura",
+            { doc: pv.doc },
+          );
           paintImages(doc); // the company logo is a stored blob like any other
         }
         const tot = $("#invTotal");
@@ -21974,55 +21938,28 @@
       }
 
       /**
-       * The document's INSIDE, for the preview pane and the printed sheet
-       * alike — one function, so what somebody approves on screen is what
-       * prints. It returns no wrapper: the pane's own `#invDoc` is the sheet,
-       * and `downloadInvoicePdf` supplies an identical one.
-       */
-      function invoiceDocHtml(doc) {
-        return `
-   <h1>${esc(doc.docType)}</h1>
-   <div class="meta">${doc.number ? esc(doc.number) : "Sin numerar — el número se asigna al emitir"} · ${fmtD(doc.date)}</div>
-   <!-- Both halves must be allowed to SHRINK, not just to wrap: a flex item's
-        default min-width is its content, and a min-width floor here made the
-        whole sheet 600 wide inside a 390 phone — the contract's own document,
-        which has no such floor, measures 388 in the same place. -->
-   <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px">
-    <div style="flex:1 1 170px;min-width:0;overflow-wrap:anywhere">${issuerLogoHtml(doc.issuer, 30)}<b>${esc(doc.issuer.tradeName || doc.issuer.legalName)}</b><br>${esc(doc.issuer.taxId)}<br>${esc(doc.issuer.address)}${doc.issuer.phone ? `<br>${esc(doc.issuer.phone)}` : ""}</div>
-    <div style="flex:1 1 170px;min-width:0;overflow-wrap:anywhere;text-align:right"><b>${esc(doc.customer.name)}</b><br>${esc(doc.customer.taxId)}<br>${esc(doc.customer.address)}</div>
-   </div>
-   <h2>Obra</h2>
-   <div class="pair"><span>Obra</span><span>${esc(doc.projectCode || "—")}</span></div>
-   ${doc.budgetNumber ? `<div class="pair"><span>Presupuesto</span><span>${esc(doc.budgetNumber)}</span></div>` : ""}
-   ${doc.worksAddress ? `<div class="pair"><span>Dirección</span><span>${esc(doc.worksAddress)}</span></div>` : ""}
-   ${doc.rectifies ? `<div class="pair"><span>Rectifica</span><span>${esc(doc.rectifies)}${doc.rectifyReason ? " · " + esc(doc.rectifyReason) : ""}</span></div>` : ""}
-   <h2>Detalle</h2>
-   <table><tbody>
-   ${doc.lines.map((l) => `<tr><td>${esc(l.desc || "—")}</td><td class="n">${eur(l.amountCents)}</td></tr>`).join("")}
-   </tbody></table>
-   <table style="margin-top:10px"><tbody>
-   <tr><td>Base imponible</td><td class="n">${eur(doc.baseCents)}</td></tr>
-   <tr><td>IVA ${doc.vatBp / 100}%</td><td class="n">${eur(doc.vatCents)}</td></tr>
-   ${doc.irpfCents ? `<tr><td>Retención IRPF ${doc.irpfBp / 100}%</td><td class="n">−${eur(doc.irpfCents)}</td></tr>` : ""}
-   <tr class="tot"><td>Total</td><td class="n">${eur(doc.totalCents)}</td></tr>
-   </tbody></table>
-   <h2>Pago</h2>
-   <div class="pair"><span>Vencimiento</span><span>${fmtD(doc.dueDate)}</span></div>
-   <div class="pair"><span>IBAN</span><span>${esc(doc.issuer.iban || "—")}</span></div>
-   ${issuerFootHtml(doc.issuer)}`;
-      }
-
-      /**
        * The issued invoice as a sheet the browser can save as PDF — the same
        * `.printsheet` route the presupuesto uses. No PDF library: the print
        * dialog's "Guardar como PDF" is the established pattern here.
        */
       function downloadInvoicePdf(number) {
-        const sheet = el("div", "printsheet");
-        sheet.innerHTML = `<div class="cdoc" translate="no">${invoiceDocHtml(erp.renderInvoiceDoc(number))}</div>`;
-        document.body.appendChild(sheet);
-        window.print();
-        sheet.remove();
+        const inv = erp.renderInvoiceDoc(number);
+        printSheetHtml(
+          sheetDocHtml(inv.docType === "FACTURA RECTIFICATIVA" ? "rectificativa" : "factura", {
+            invoiceId: number,
+          }),
+        );
+      }
+      /** The generated contract, printable at last — same route as the rest. */
+      function downloadContractPdf(contractId) {
+        const d = erp.renderContractDoc(contractId);
+        printSheetHtml(
+          sheetDocHtml(
+            "contrato",
+            { contractId, lineText: (l) => lineDesc(l, d.language) },
+            d.language,
+          ),
+        );
       }
 
       function invoiceDrawer(number) {
@@ -22189,10 +22126,18 @@
          ? '<button class="btn primary sm" id="conSign">Firmar contrato</button>'
          : ""
      }
+     ${
+       /* The missing download: every other document could leave the system
+          and the contract could not. External contracts keep their own
+          download — the signed file — inside the pane. */
+       d.origin !== "external"
+         ? '<button class="btn sm" id="conDl">⤓ Descargar PDF</button>'
+         : ""
+     }
      <span class="tag">${esc(LANG_NAME[d.language] || LANG_NAME.es)}</span></div>
    </div>
    <div class="con2">
-    <div class="condoc"><div class="cdoc" translate="no" id="conDoc"></div></div>
+    <div class="condoc"><div translate="no" id="conDoc"></div></div>
     <div class="conpanel">
       <div class="tabstrip" style="margin:0;padding:0 12px">
         ${TABS.map(([k, l]) => `<button class="tab${k === conWork.tab ? " on" : ""}" data-contab="${k}">${l}</button>`).join("")}
@@ -22205,6 +22150,8 @@
           conWork = null;
           render();
         };
+        const dl = $("#conDl");
+        if (dl) dl.onclick = () => downloadContractPdf(conWork.id);
         const sign = $("#conSign");
         if (sign) sign.onclick = () => signContractDrawer(conWork.id);
         v.querySelectorAll("[data-contab]").forEach(
@@ -22263,7 +22210,7 @@
       <div class="empty">No se ha podido dibujar el documento aquí.</div>${foot}</div>`;
         }
       }
-      /** The document. Every label comes from DOCL, not the i18n dictionary. */
+      /** The document — the approved design, in the contract's own language. */
       function contractDocPane(d) {
         const host = $("#conDoc");
         if (!host) return;
@@ -22278,132 +22225,12 @@
           externalContractPane(host, d);
           return;
         }
-        const L =
-          d.language === "ca"
-            ? {
-                doc: "CONTRACTE D'OBRA",
-                no: "Núm.",
-                date: "Data",
-                issuer: "Empresa",
-                cust: "Client",
-                work: "Obra",
-                budget: "Pressupost",
-                terms: "Condicions econòmiques",
-                base: "Import original",
-                annex: "Anexos",
-                cur: "Import vigent",
-                vat: "IVA",
-                mil: "Fites de pagament",
-                trig: "Motiu",
-                amt: "Import",
-                due: "Data prevista",
-                dur: "Termini d'execució",
-                days: "dies",
-                start: "Inici compromès",
-                pen: "Penalitzacions",
-                gua: "Garanties",
-                months: "mesos",
-                sign: "Signatura",
-                signed: "Signat el",
-                unsigned: "Pendent de signatura",
-                none: "—",
-              }
-            : {
-                doc: "CONTRATO DE OBRA",
-                no: "Nº",
-                date: "Fecha",
-                issuer: "Empresa",
-                cust: "Cliente",
-                work: "Obra",
-                budget: "Presupuesto",
-                terms: "Condiciones económicas",
-                base: "Importe original",
-                annex: "Anexos",
-                cur: "Importe vigente",
-                vat: "IVA",
-                mil: "Hitos de pago",
-                trig: "Motivo",
-                amt: "Importe",
-                due: "Fecha prevista",
-                dur: "Plazo de ejecución",
-                days: "días",
-                start: "Inicio comprometido",
-                pen: "Penalizaciones",
-                gua: "Garantías",
-                months: "meses",
-                sign: "Firma",
-                signed: "Firmado el",
-                unsigned: "Pendiente de firma",
-                none: "—",
-              };
-        const TR =
-          d.language === "ca"
-            ? {
-                onSignature: "A la signatura",
-                atWorksStart: "A l'inici d'obra",
-                atStage: "En arribar a una fase",
-                onCompletion: "A la finalització",
-                fixedDate: "Data fixa",
-              }
-            : CON_TRIGGER;
-        const GUA =
-          d.language === "ca"
-            ? {
-                executionAndFinishes: "Execució i acabats",
-                installations: "Instal·lacions",
-                structural: "Estructura",
-              }
-            : CON_GUARANTEE;
-        host.innerHTML = `
-   <h1>${esc(L.doc)}</h1>
-   <div class="meta">${esc(L.no)} ${esc(d.number)} · ${esc(L.date)} ${fmtD(d.date)}</div>
-
-   <h2>${esc(L.issuer)}</h2>
-   ${issuerLogoHtml(d.issuer, 30)}
-   <div class="pair"><span>${esc(d.issuer.legalName || L.none)}</span><span>${esc(d.issuer.taxId || "")}</span></div>
-   <div class="pair"><span>${esc(d.issuer.address || "")}</span><span>${esc(d.issuer.email || "")}</span></div>
-
-   <h2>${esc(L.cust)}</h2>
-   <div class="pair"><span>${esc(d.customer.name)}</span><span>${esc(d.customer.taxId || "")}</span></div>
-   <div class="pair"><span>${esc(d.customer.address || "")}</span><span></span></div>
-   <div class="pair"><span>${esc(L.work)}</span><span>${esc(d.projectCode || L.none)}</span></div>
-   <div class="pair"><span>${esc(L.budget)}</span><span>${esc(d.budgetNumber || L.none)}</span></div>
-
-   <h2>${esc(L.terms)}</h2>
-   <div class="pair"><span>${esc(L.base)}</span><span>${eur(d.originalCents)}</span></div>
-   ${d.currentCents !== d.originalCents ? `<div class="pair"><span>${esc(L.cur)}</span><span>${eur(d.currentCents)}</span></div>` : ""}
-   <div class="pair"><span>${esc(L.vat)}</span><span>${d.vatBp / 100}%</span></div>
-   <div class="pair"><span>${esc(L.dur)}</span><span>${d.duration.estimatedDays || "—"} ${esc(L.days)}</span></div>
-   <div class="pair"><span>${esc(L.start)}</span><span>${d.initiation.committedStartDate ? fmtD(d.initiation.committedStartDate) : L.none}</span></div>
-
-   <h2>${esc(L.mil)}</h2>
-   <table><thead><tr><th>${esc(L.trig)}</th><th class="n">${esc(L.amt)}</th><th>${esc(L.due)}</th></tr></thead><tbody>
-   ${
-     d.installments
-       .map(
-         (
-           i,
-         ) => `<tr><td>${esc(TR[i.trigger] || i.trigger)}${i.pct != null ? ` (${i.pct}%)` : ""}</td>
-     <td class="n">${eur(i.amountCents)}</td><td>${i.expectedDate ? fmtD(i.expectedDate) : L.none}</td></tr>`,
-       )
-       .join("") || `<tr><td colspan="3">${esc(L.none)}</td></tr>`
-   }
-   <tr class="tot"><td>${esc(L.amt)}</td><td class="n">${eur(d.installments.reduce((s, i) => s + i.amountCents, 0))}</td><td></td></tr>
-   </tbody></table>
-
-   ${
-     d.guarantees.length
-       ? `<h2>${esc(L.gua)}</h2>
-    ${d.guarantees.map((g) => `<div class="pair"><span>${esc(GUA[g.category] || g.category || "")}</span><span>${g.months || 0} ${esc(L.months)}</span></div>`).join("")}`
-       : ""
-   }
-
-   <h2>${esc(L.pen)}</h2>
-   <div class="pair"><span>${d.penalties.latePaymentInterestPctYear || 0}% · ${d.penalties.graceDays || 0} ${esc(L.days)}</span><span></span></div>
-
-   <h2>${esc(L.sign)}</h2>
-   <div class="pair"><span>${d.signature.customerSignedAt ? esc(L.signed) + " " + fmtD(d.signature.customerSignedAt) : esc(L.unsigned)}</span><span>${esc(d.signature.method || "")}</span></div>
-   ${issuerFootHtml(d.issuer)}`;
+        const rec = erp.state.contracts.find((x) => x.number === d.number);
+        host.innerHTML = sheetDocHtml(
+          "contrato",
+          { contractId: rec && rec.id, lineText: (l) => lineDesc(l, d.language) },
+          d.language,
+        );
         paintImages(host); // the company logo is a stored blob like any other
       }
 

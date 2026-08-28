@@ -5609,3 +5609,67 @@ test that also manually searches for and clicks the same dialog's button is
 racing it, and loses more often than it looks like it should. Both new
 confirm checks were rewritten to click the action and wait for the resulting
 state rather than reach into the dialog a second time.
+## S32 · PK-B — the forecast sees every chapter, and «cuadra» is measured (2026-08-28)
+
+Two follow-ups to the operator's CP 83/86 report, on top of the PK7 unification
+that already made all four cost readers share `projectCostRows`.
+
+**The forecast bridge dropped variation chapters.** `projectValue` iterated
+`p.baseline.chapters` alone, so a variation budget's cost — real money,
+already spent — was silently absent from the capability's cost list and the
+projection ran on a job that looked cheaper than it was. Only the view's
+hand-merge hid it. The bridge now walks the baseline chapters first (their
+order is meaningful) and appends every chapter `chapterEconomics` or
+`committedByChapter` knows beyond them, with numbers normalised to strings —
+`Object.keys` yields strings and a numeric baseline num would otherwise be
+counted twice. Proven in the variation suite: the 120,00 € bill on the joined
+chapter must appear in `forecast().byChapter` exactly once; with the append
+removed the check reads `present:false`.
+
+**«Cuadra» is a claim, so it is measured before it is printed.** The economics
+screen said «la tabla de arriba cuadra con el proyecto» unconditionally
+whenever nothing waited to be split — the exact sentence the operator
+photographed above a table sitting 45 € short of its own card. The table's
+rows are now built once, summed, added to the pending rows and compared to
+`projectEconomics().actualCents` to the cent; agreement keeps the sentence,
+disagreement prints a red «No cuadra» pill with both figures. Negative
+control: a 45 € error injected into the sum flips the screen to «No cuadra»
+and the new e2e check red — the screen can no longer reassure while wrong.
+
+## S33 · PK-F — one design for every document (2026-08-28)
+
+**The renderer speaks the design; the descriptors speak the data; the label
+layer speaks the language.** `erp-sheet.js` renders the `CaneiDocTypes.build()`
+doc shape as the documentos design system, with the same `tr` hook the PDF
+writer already had; `erp-doc-i18n.js` fills that hook in es/ca/en (English and
+Catalan reuse the app dictionaries' wording where a pair exists; departures —
+«Vencimiento» → "Due date", not the screen dictionary's "Expiry"; «Orden» →
+"Order", not "Sort order" — are deliberate, a paper meaning is not a screen
+meaning). The Spanish column restores the accents the descriptors dropped for
+the PDF writer.
+
+**Engine cents win over recomputed cents.** `erp-facts.js` builds each
+document from live records and then overwrites the money rows with the
+engine's exact `vatCents`/`totalCents` — a legal figure re-derived from a rate
+is not the figure on the issued invoice.
+
+**Gaps are stated, not invented.** The engine has no valuation history, so the
+certificación sheet certifies TO DATE (previous = 0) and says so in its period
+label; a change order is one priced concept, so its table has one row; a
+purchase order has no delivery window or site contact ("—"); there is no
+accountant party record, so the quarterly package names its recipient
+generically. The three kinds with no backing record at all — albarán, acta de
+entrega, parte de trabajo — are refused by `docFor` rather than printed with
+sample numbers.
+
+**PK-F wiring notes (F4).** The four in-app documents render through
+`sheetDocHtml()` — the sheet CSS is injected once, caged as
+`.cnsheet.cnsheet …` so the app's `.lbl`/`.meta`/`.note` and the design's
+never restyle each other. The externally-signed contract pane keeps the
+`.cdoc` frame: it is a viewer of the customer's own file, not a generated
+document, and the e2e design guard covers generated panes only. The quote
+keeps its graphic annex (pages appended after the sheet, marks on the rows —
+the mark and the ready-made plate now travel through the descriptor as
+presentation hints). The contract gained its missing «Descargar PDF» through
+the same print route as the rest; the guard was proven red first by pointing
+the pane and the download back at `.cdoc`.
