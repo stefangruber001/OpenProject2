@@ -1599,6 +1599,20 @@ window.CANEI_DICT.ca = {
   "Envío de presupuesto": "Enviament del pressupost",
   "Sin móvil registrado — añádalo en Datos maestros para poder abrir WhatsApp":
     "Sense mòbil registrat — afegeix-lo a Dades mestres per poder obrir el WhatsApp",
+  // S4 (Package 8 · 28/08): channel honesty, execution time, Excel export.
+  "Sin correo registrado — añádalo en Datos maestros para poder enviar por correo":
+    "Sense correu registrat — afegeix-lo a Dades mestres per poder enviar per correu",
+  "Añada un correo para enviar por email": "Afegeix un correu per enviar per correu electrònic",
+  "Se prepara un borrador en el buzón de la empresa. No se envía nada al cliente todavía.":
+    "Es prepara un esborrany a la bústia de l'empresa. Encara no s'envia res al client.",
+  "Se abre WhatsApp con el mensaje escrito. Usted decide cuándo enviarlo.":
+    "S'obre el WhatsApp amb el missatge escrit. Vostè decideix quan enviar-lo.",
+  "Queda registrado como entregado en mano en la fecha y hora que indique.":
+    "Queda registrat com a lliurat en mà a la data i hora que indiqui.",
+  "Plazo de ejecución": "Termini d'execució",
+  "Plazo de ejecución actualizado": "Termini d'execució actualitzat",
+  "⤓ Excel": "⤓ Excel",
+  "Precio ud.": "Preu un.",
   viendo: "veient",
   // PK2-C: contract layout, garantías fix, anexo approval evidence.
   "Efecto en venta": "Efecte en venda",

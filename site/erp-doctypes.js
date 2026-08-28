@@ -57,7 +57,18 @@
       {
         label: rightLabel || "Cliente",
         name: f.customer.name,
-        lines: [f.customer.nif, f.customer.contact, f.customer.address, f.customer.email],
+        /* The phone joins the block (Package 8 review, 28/08): whoever picks
+           the document up should be able to ring the customer from it rather
+           than looking them up on another screen. Falsy entries are dropped
+           downstream, so a customer with no mobile simply has one line
+           fewer — nothing prints an empty row. */
+        lines: [
+          f.customer.nif,
+          f.customer.contact,
+          f.customer.address,
+          f.customer.phone,
+          f.customer.email,
+        ],
       },
     ];
   }
@@ -136,19 +147,41 @@
           number: f.numbers.quote,
           audience: "cliente",
           title: "Presupuesto de obra",
-          subtitle: f.project.site,
+          /* WHAT THE JOB IS, then where it is. The heading used to be the
+             site address alone, so two quotes to one customer for two
+             different jobs were told apart only by their number. The
+             description is the customer's own words for what they asked
+             for; it falls back to the address when nothing said otherwise,
+             which is what this line always printed. */
+          subtitle: f.project.workName
+            ? f.project.workName + " · " + f.project.site
+            : f.project.site,
           meta: [
             ["Fecha", f.dates.issued],
             ["Valido hasta", f.dates.validUntil],
             ["Version", f.project.version],
             ["Contacto", f.company.phone],
           ],
+          /* The plazo is APPENDED, not swapped in for the project code. The
+             strip is `display:flex; flex-wrap:wrap` with a row-gap, so a
+             fifth entry wraps onto a second line rather than overflowing —
+             checked in erp-sheet.js rather than assumed, and both the
+             printable-margin gate and the PDF writer's pagination gate agree.
+             The operator asked for the plazo to be added; nothing asked for
+             the project reference to stop being printed.
+
+             Absent when nobody stated one: a promise nobody made must not
+             appear on a quote, least of all as a zero. */
           facts: [
             ["Base (sin impuesto)", eur(t.base)],
             ["Partidas", String(f.chapters.length)],
             ["Validez", f.project.validityDays + " dias"],
             ["Proyecto", f.project.code],
-          ],
+          ].concat(
+            f.project.executionDays
+              ? [["Plazo de ejecucion", f.project.executionDays + " dias"]]
+              : [],
+          ),
           parties: parties(f),
           groups: chapterGroups(f),
           sections: [

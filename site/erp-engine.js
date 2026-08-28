@@ -1860,6 +1860,17 @@
           paymentConditions: "",
           exclusions: [],
           assumptions: [],
+          /* How long the work itself takes, in working days. Asked for on the
+             quote (Package 8 review, 28/08): a customer comparing two offers
+             is choosing on price AND on when their kitchen is usable again,
+             and the document said nothing about the second. A COUNT of days
+             rather than a date, deliberately — the start depends on when they
+             accept, which is not known while the quote is being written, and
+             it is the same shape as the contract's `duration.estimatedDays`
+             so the contract can inherit it later without a conversion.
+             null, never 0: "not stated" and "immediate" are different
+             promises, and only one of them is safe to print. */
+          executionDays: null,
           versions: [],
           currentVersionId: null,
           acceptedVersionId: null,
@@ -2490,6 +2501,42 @@
       this._log(user, "issueVersion", b.number + " v" + v.vNumber);
       return this.renderBudgetDoc(budgetId, v.id);
     }
+    /**
+     * What the job IS, in the customer's own words, for the top of the quote.
+     *
+     * Reported on 28/08: the document was headed by the site address and a
+     * project code, so two quotes to the same customer for two different jobs
+     * were told apart only by their number. What is missing is the sentence
+     * they themselves said when they asked — "reforma integral del baño".
+     *
+     * Two sources, and nothing invented when both are silent. NOT taken from
+     * the project: a project record carries a code and an activity line and
+     * has never had a name field — `projectBlock` in erp-facts.js already
+     * says so where it falls back to the activity line — so reading one here
+     * would be inventing a field rather than reporting one.
+     *
+     *   1. the `requestedWork` of the opportunity behind it — reached through
+     *      the visit, because the link runs visit.budgetId → visit
+     *      .opportunityId and the budget carries no opportunity of its own;
+     *   2. "" — and the caller keeps whatever it already prints.
+     *
+     * Returns a string, never null, so callers can `||` it.
+     */
+    budgetWorkName(budgetId) {
+      const b = this.budget(budgetId);
+      const vis = this.state.visits.find((v) => v.budgetId === b.id && v.opportunityId);
+      const o = vis && this.state.opportunities.find((x) => x.id === vis.opportunityId);
+      if (o && o.requestedWork) return o.requestedWork;
+      /* No visit recorded — a quote written straight off a lead. The lead is
+         still findable through the customer, and an OPEN one for this
+         customer is the request this quote answers. Restricted to a single
+         candidate: with two open leads there is no way to tell which, and
+         printing the wrong job on a quote is worse than printing none. */
+      const open = this.state.opportunities.filter(
+        (x) => x.partyId === b.partyId && x.requestedWork && !["lost"].includes(x.status),
+      );
+      return open.length === 1 ? open[0].requestedWork : "";
+    }
     renderBudgetDoc(budgetId, versionId) {
       // QUO-05/07 + QUO-10 + DOC-01: customer doc from data; no internal cost
       const b = this.budget(budgetId);
@@ -2501,13 +2548,35 @@
         version: v.vNumber,
         date: v.date,
         issuer: this._issuerBlock(), // DOC-01
-        customer: (({ name, taxId, billStreet, billPostalCode, billCity }) => ({
+        customer: (({
+          name,
+          taxId,
+          billStreet,
+          billPostalCode,
+          billCity,
+          contactPerson,
+          mobile,
+          phone,
+          email,
+        }) => ({
           name,
           taxId,
           address: `${billStreet}, ${billPostalCode} ${billCity}`,
+          /* Who to ask and how to reach them. Reported on 28/08: the quote
+             named the company and nothing else, so the person handling it had
+             to look the customer up in another screen to phone them back. The
+             contact person is dropped when it merely repeats the customer's
+             own name, which is what it holds for an individual — a line that
+             says the same thing twice is noise on a document. */
+          contactPerson: contactPerson && contactPerson !== name ? contactPerson : "",
+          phone: mobile || phone || "",
+          email: email || "",
         }))(this.party(b.partyId)),
         language: b.language,
         validityDate: b.validityDate,
+        // Days, or null when nobody stated one. See createBudget.
+        executionDays: b.executionDays == null ? null : b.executionDays,
+        projectName: this.budgetWorkName(b.id),
         paymentConditions: b.paymentConditions,
         exclusions: b.exclusions,
         assumptions: b.assumptions,
@@ -9806,6 +9875,7 @@
         "paymentConditions",
         "exclusions",
         "assumptions",
+        "executionDays",
       ];
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
       // Package 3 slide 5: a validity date is how long the OFFER stands —

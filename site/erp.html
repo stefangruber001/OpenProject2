@@ -13159,6 +13159,13 @@
           The read-only pill keeps the policy visible, because a rule
           nobody can see reads as a bug. -->
      ${HIDDEN_CONTROLS.has("bcValid") ? `<span class="pill" title="Desde la fecha de emisión">Validez · 30 días</span>` : `<label>Validez <input type="date" id="bcValid" value="${esc(b.validityDate || "")}" min="${esc(erp.today)}"${dis}></label>`}
+     <!-- How long the work takes, which the customer asks right after the
+          price and the document could not answer. Blank means «no consta»
+          and prints nothing — a promise nobody made must not appear on a
+          quote as a zero. -->
+     <label>Plazo de ejecución <input type="number" id="bcDays" min="1" max="999" step="1"
+       placeholder="días" value="${b.executionDays == null ? "" : esc(String(b.executionDays))}"
+       style="width:74px"${dis}></label>
      <label>Idioma del documento
       <select id="bcLang"${dis}>
        <option value="es"${b.language === "es" ? " selected" : ""}>Español</option>
@@ -13301,6 +13308,16 @@
             el.onchange = () => mutate(() => erp.updateBudget(id, patch(el), "backoffice"), msg);
           };
           hdr($("#bcValid"), (el) => ({ validityDate: el.value }), "Validez actualizada");
+          // Blank clears it back to «no consta» rather than storing 0: the two
+          // mean different things and only one of them is safe to print.
+          hdr(
+            $("#bcDays"),
+            (el) => {
+              const n = parseInt(el.value, 10);
+              return { executionDays: Number.isFinite(n) && n > 0 ? n : null };
+            },
+            "Plazo de ejecución actualizado",
+          );
           hdr($("#bcLang"), (el) => ({ language: el.value }), "Idioma del documento actualizado");
           // Not `hdr()`: picking "＋ Nueva…" has to be intercepted before it
         }
@@ -15174,16 +15191,20 @@
        <option value="whatsapp">WhatsApp</option>
        <option value="hand">En mano</option>
       </select></label></div>
+    <div class="it" id="sbChannelHint"><span style="font-size:11.5px;color:var(--muted)"></span></div>
     <div class="it" id="sbWaWarn" style="display:none"><span class="pill y">Sin móvil registrado — añádalo en Datos maestros para poder abrir WhatsApp</span></div>
+    <div class="it" id="sbMailWarn" style="display:none"><span class="pill y">Sin correo registrado — añádalo en Datos maestros para poder enviar por correo</span></div>
     <div class="it" id="sbHandDateRow" style="display:none"><label class="opt">Fecha de envío
       <input id="sbHandDate" type="date" value="${esc(erp.today)}" max="${esc(erp.today)}" style="margin-left:auto"></label></div>
     <div class="it" id="sbHandTimeRow" style="display:none"><label class="opt">Hora
       <input id="sbHandTime" type="time" value="${nowHHMM()}" style="margin-left:auto"></label></div>
     <div class="it"><span>Al enviar, esta versión queda congelada: el documento del cliente se podrá reproducir siempre tal cual salió. Para cambiar algo después hay que crear una versión nueva.</span></div>
-    <div class="it"><button class="btn sm" id="sbDownload">⤓ Descargar</button><span style="flex:1"></span>
+    <div class="it"><button class="btn sm" id="sbDownload">⤓ Descargar</button>
+     <button class="btn sm" id="sbXlsx">⤓ Excel</button><span style="flex:1"></span>
      <button class="btn primary" id="sbGo"${blocks.length ? " disabled" : ""}>${blocks.length ? "Corrija los bloqueos primero" : "Enviar y congelar la versión"}</button></div>
    </div></div>`;
         $("#sbDownload").onclick = () => downloadBudgetPdf(id, vsel);
+        $("#sbXlsx").onclick = () => downloadBudgetXlsx(id, vsel);
         const chSel = $("#sbChannel");
         const go = $("#sbGo");
         // Progressive disclosure, not a second popup: slide 1 asked for a
@@ -15191,19 +15212,43 @@
         // already the one screen that question belongs to — a field that
         // only appears once it is relevant reads the same to the operator
         // and does not stack a modal on top of an open drawer.
+        /* WHAT EACH CHANNEL ACTUALLY DOES, said on the screen.
+           Reported on 28/08: nobody could tell from this drawer whether
+           "Correo electrónico" would send a mail to the customer. It does
+           not — the mandate is explicit that this system sends no real mail —
+           it files a draft in the company mailbox for a person to send. A
+           channel whose behaviour has to be guessed is a channel that gets
+           picked wrongly. */
+        const CH_HINT = {
+          email: "Se prepara un borrador en el buzón de la empresa. No se envía nada al cliente todavía.",
+          whatsapp: "Se abre WhatsApp con el mensaje escrito. Usted decide cuándo enviarlo.",
+          hand: "Queda registrado como entregado en mano en la fecha y hora que indique.",
+        };
+        const hint = $("#sbChannelHint").firstElementChild;
         const syncChannel = () => {
           const ch = chSel.value;
           const isHand = ch === "hand";
           const isWa = ch === "whatsapp";
+          const isMail = ch === "email";
           const waBlocked = isWa && !party.mobile;
+          /* THE SAME GUARD THE MOBILE ALREADY HAD.
+             Email with no address proceeded, filing a draft addressed to
+             `to: ""` — a communication recorded as sent that could never
+             reach anybody, and the version frozen behind it. Blocked here
+             exactly as WhatsApp is, because the two are the same mistake. */
+          const mailBlocked = isMail && !party.email;
           $("#sbHandDateRow").style.display = isHand ? "" : "none";
           $("#sbHandTimeRow").style.display = isHand ? "" : "none";
           $("#sbWaWarn").style.display = waBlocked ? "" : "none";
+          $("#sbMailWarn").style.display = mailBlocked ? "" : "none";
+          if (hint) hint.textContent = CH_HINT[ch] || "";
           if (!blocks.length) {
-            go.disabled = waBlocked;
+            go.disabled = waBlocked || mailBlocked;
             go.textContent = waBlocked
               ? "Añada un móvil para enviar por WhatsApp"
-              : "Enviar y congelar la versión";
+              : mailBlocked
+                ? "Añada un correo para enviar por email"
+                : "Enviar y congelar la versión";
           }
         };
         chSel.onchange = syncChannel;
@@ -21228,6 +21273,67 @@
             : { enabled: false, pages: [], plateCount: 0, markedItems: [] };
         const perPage = (doc.annex && doc.annex.imagesPerPage) || 2;
         await printSheetHtml(budgetSheetHtml(id, versionId, doc, annex, perPage));
+      }
+      /**
+       * The same quote as a spreadsheet.
+       *
+       * Asked for on 28/08: a customer who wants to compare line by line, or
+       * an aparejador who wants the measurements in a column, cannot do
+       * either with a PDF. This is the SAME document — it reads
+       * `renderBudgetDoc`, so a line that is pending, internal or excluded
+       * from the total is treated here exactly as the printed sheet treats
+       * it — laid out as rows instead of pages.
+       *
+       * Text cells throughout (`xlsxBlob` writes inline strings), so the
+       * amounts arrive formatted the way the document shows them rather than
+       * as floats a spreadsheet would re-round. This file is for reading and
+       * comparing, not for recomputing: the arithmetic already happened, in
+       * cents, in the engine.
+       */
+      function downloadBudgetXlsx(id, versionId) {
+        const b = erp.budget(id);
+        const doc = erp.renderBudgetDoc(id, versionId);
+        const money = (c) => eur(c).replace(/ ?€/, "").trim();
+        const rows = [
+          ["Nº", "Código", "Descripción", "Ud.", "Cantidad", "Precio ud.", "Importe"],
+        ];
+        for (const c of doc.chapters) {
+          // The chapter as its own banner row, so the file reads in the same
+          // order and the same groups as the paper does.
+          rows.push([c.num, "", c.name, "", "", "", ""]);
+          let sub = 0;
+          for (const l of c.lines) {
+            sub += l.totalCents;
+            rows.push([
+              l.num,
+              l.code || "",
+              l.desc,
+              l.unit,
+              String(l.qty),
+              money(l.priceCents),
+              money(l.totalCents),
+            ]);
+          }
+          // Summed from the lines that are actually in the file, not read off
+          // the chapter: renderBudgetDoc drops pending lines, and a subtotal
+          // that counted them would not match the column above it.
+          rows.push(["", "", "Subtotal " + c.name, "", "", "", money(sub)]);
+        }
+        rows.push([]);
+        rows.push(["", "", "Base imponible", "", "", "", money(doc.totals.taxableCents)]);
+        rows.push([
+          "",
+          "",
+          "IVA " + doc.totals.vatBp / 100 + "%",
+          "",
+          "",
+          "",
+          money(doc.totals.vatCents),
+        ]);
+        if (doc.totals.irpfCents)
+          rows.push(["", "", "Retención", "", "", "", money(-Math.abs(doc.totals.irpfCents))]);
+        rows.push(["", "", "Total", "", "", "", money(doc.totals.grandCents)]);
+        downloadBlob(xlsxBlob(b.number, rows), `${b.number}-v${doc.version}.xlsx`);
       }
       function budgetDrawer(id, versionId) {
         const b = erp.budget(id);

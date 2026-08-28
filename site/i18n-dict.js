@@ -3772,6 +3772,30 @@ window.CANEI_DICT = {
       "Sin móvil registrado — añádalo en Datos maestros para poder abrir WhatsApp",
       "No mobile on file — add one in Master data to open WhatsApp",
     ],
+    // S4 (Package 8 · 28/08): the send drawer says what each channel does,
+    // and refuses email with no address exactly as it refuses WhatsApp with
+    // no mobile. Plus the quote's execution time and its Excel export.
+    [
+      "Sin correo registrado — añádalo en Datos maestros para poder enviar por correo",
+      "No email on file — add one in Master data to send by email",
+    ],
+    ["Añada un correo para enviar por email", "Add an email address to send by email"],
+    [
+      "Se prepara un borrador en el buzón de la empresa. No se envía nada al cliente todavía.",
+      "A draft is prepared in the company mailbox. Nothing is sent to the customer yet.",
+    ],
+    [
+      "Se abre WhatsApp con el mensaje escrito. Usted decide cuándo enviarlo.",
+      "WhatsApp opens with the message written. You decide when to send it.",
+    ],
+    [
+      "Queda registrado como entregado en mano en la fecha y hora que indique.",
+      "Recorded as handed over in person at the date and time you give.",
+    ],
+    ["Plazo de ejecución", "Execution time"],
+    ["Plazo de ejecución actualizado", "Execution time updated"],
+    ["⤓ Excel", "⤓ Excel"],
+    ["Precio ud.", "Unit price"],
     ["viendo", "viewing"],
     // PK2-C: contract layout, garantías fix, anexo approval evidence.
     ["Efecto en venta", "Effect on the sale price"],

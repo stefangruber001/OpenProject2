@@ -9955,6 +9955,107 @@ async function testSendAndVersions(browser, base) {
       ok("send: «⤓ Descargar» prints exactly the customer document, then cleans up");
     else bad("send: download PDF print sheet", JSON.stringify(printResult));
 
+    /* S4 · THE SAME QUOTE AS A SPREADSHEET.
+       A customer comparing line by line, or an aparejador who wants the
+       measurements in a column, can do neither with a PDF. Asserted on the
+       bytes that actually leave: a real .xlsx is a ZIP, so the check reads
+       the magic number rather than trusting the filename. */
+    const xlsx = await pg.evaluate(async () => {
+      // Absent rather than throwing: a missing control must report itself as
+      // a failed check, not abort every check written after it.
+      if (!document.querySelector("#sbXlsx")) return { missing: true };
+      let caught = null;
+      const origCreate = URL.createObjectURL;
+      URL.createObjectURL = (blob) => {
+        caught = blob;
+        return "blob:stub";
+      };
+      const origClick = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {};
+      document.querySelector("#sbXlsx").click();
+      await new Promise((r) => setTimeout(r, 500));
+      URL.createObjectURL = origCreate;
+      HTMLAnchorElement.prototype.click = origClick;
+      if (!caught) return null;
+      const head = new Uint8Array(await caught.slice(0, 2).arrayBuffer());
+      return { size: caught.size, zip: head[0] === 0x50 && head[1] === 0x4b };
+    });
+    if (xlsx && xlsx.zip && xlsx.size > 500)
+      ok(`send: «⤓ Excel» writes a real workbook (${xlsx.size} bytes)`);
+    else bad("send: quote to Excel", JSON.stringify(xlsx));
+
+    /* S4 · A CHANNEL SAYS WHAT IT DOES, AND REFUSES WHAT IT CANNOT DO.
+       Email with no address used to proceed, filing a draft addressed to
+       `to: ""` — a communication recorded as sent that could never reach
+       anybody, with the version frozen behind it. WhatsApp already had this
+       guard; the two are the same mistake. */
+    const chan = await pg.evaluate(async () => {
+      const sel = document.querySelector("#sbChannel");
+      const go = document.querySelector("#sbGo");
+      const read = async (v) => {
+        sel.value = v;
+        sel.dispatchEvent(new Event("change"));
+        await new Promise((r) => setTimeout(r, 120));
+        return {
+          hint: (document.querySelector("#sbChannelHint") || {}).textContent?.trim() || "",
+          mailWarn:
+            document.querySelector("#sbMailWarn") &&
+            document.querySelector("#sbMailWarn").style.display !== "none",
+          disabled: !!go.disabled,
+          label: go.textContent.trim(),
+        };
+      };
+      return { email: await read("email"), wa: await read("whatsapp"), hand: await read("hand") };
+    });
+    const hintsDiffer =
+      chan &&
+      chan.email.hint &&
+      chan.wa.hint &&
+      chan.hand.hint &&
+      new Set([chan.email.hint, chan.wa.hint, chan.hand.hint]).size === 3;
+    if (hintsDiffer) ok("send: each channel says what it will actually do");
+    else bad("send: channel hints", JSON.stringify(chan));
+
+    // This budget's party HAS an email (the picker required a clean draft),
+    // so email must be allowed here — the guard must not block every send.
+    if (chan && !chan.email.disabled && !chan.email.mailWarn)
+      ok("send: email is offered when the customer has an address");
+    else bad("send: email wrongly blocked", JSON.stringify(chan && chan.email));
+
+    // …and refused when they do not. Driven by clearing the address on the
+    // real record and reopening, which is the state an operator reaches by
+    // registering a customer from a phone call.
+    const noMail = await pg.evaluate(async () => {
+      const b = erp.state.budgets.find((x) => erp.budgetStage(x) === "draft");
+      if (!b) return null;
+      const p = erp.party(b.partyId);
+      const had = p.email;
+      p.email = "";
+      closeDrawer();
+      go("quotes", b.id);
+      await new Promise((r) => setTimeout(r, 700));
+      document.querySelector("#bSend").click();
+      await new Promise((r) => setTimeout(r, 400));
+      const sel = document.querySelector("#sbChannel");
+      if (!sel) return { missing: "#sbChannel" };
+      sel.value = "email";
+      sel.dispatchEvent(new Event("change"));
+      await new Promise((r) => setTimeout(r, 150));
+      const goBtn = document.querySelector("#sbGo");
+      const out = {
+        warn:
+          document.querySelector("#sbMailWarn") &&
+          document.querySelector("#sbMailWarn").style.display !== "none",
+        disabled: !!goBtn.disabled,
+        label: goBtn.textContent.trim(),
+      };
+      p.email = had;
+      return out;
+    });
+    if (noMail && noMail.warn && noMail.disabled && /correo/i.test(noMail.label))
+      ok(`send: no address, no email — the button says why («${noMail.label}»)`);
+    else bad("send: email without an address is not blocked", JSON.stringify(noMail));
+
     /* Part 2 · item 9 — the graphic annex reached the customer as blank
        plates. Not a missing blob and not a 404: downloadBudgetPdf awaited the
        image URL and then printed, so the browser had decoded nothing yet.

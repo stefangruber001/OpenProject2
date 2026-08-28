@@ -299,6 +299,13 @@
     Subtotal: ["Subtotal", "Subtotal", "Subtotal"],
     "Condiciones de pago": ["Condiciones de pago", "Condicions de pagament", "Payment terms"],
     Notas: ["Notas", "Notes", "Notes"],
+    /* The two blocks the visit records and the quote now prints: what the
+       price assumes, and what it does not cover. */
+    Supuestos: ["Supuestos", "Supòsits", "Assumptions"],
+    Exclusiones: ["Exclusiones", "Exclusions", "Exclusions"],
+    // "Plazo de ejecucion" is NOT added here: it already exists further down
+    // (the contract's own label) and a second copy would be a second place to
+    // change it. The quote's new fact row reuses that entry verbatim.
 
     /* ---- party labels ---------------------------------------------------- */
     Contratista: ["Contratista", "Contractista", "Contractor"],

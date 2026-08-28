@@ -593,7 +593,16 @@
     const d = this.doc;
     const items = []
       .concat(d.payment && d.payment.length ? [["Condiciones de pago", d.payment]] : [])
-      .concat(d.notes && d.notes.length ? [["Notas", d.notes]] : []);
+      .concat(d.notes && d.notes.length ? [["Notas", d.notes]] : [])
+      /* What the price assumes, and what it does not cover. Both come off the
+         visit and both are contractual: an assumption that turns out false is
+         where a change order comes from, and an exclusion is the answer to
+         "but I thought that was included". Printed after the standing notes
+         because those are the same on every quote and these two are the ones
+         written for THIS job. Absent when empty — an «Exclusiones» heading
+         with nothing under it reads worse than no heading at all. */
+      .concat(d.assumptions && d.assumptions.length ? [["Supuestos", d.assumptions]] : [])
+      .concat(d.exclusions && d.exclusions.length ? [["Exclusiones", d.exclusions]] : []);
     if (!items.length) return;
     this.push(
       '<div class="terms">' +

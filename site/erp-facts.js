@@ -69,15 +69,21 @@
   }
 
   function partyBlock(p) {
-    if (!p) return { name: "—", nif: "—", contact: "", address: "—", email: "" };
+    if (!p) return { name: "—", nif: "—", contact: "", address: "—", email: "", phone: "" };
     return {
       name: p.name,
       nif: dash(p.taxId),
-      contact: p.contactPerson || "",
+      /* Not when it merely repeats the name. For an individual the contact
+         person IS the customer, and the block printed the same words twice —
+         "Elena Duran Mas" under "Elena Duran Mas". Reported on 28/08. */
+      contact: p.contactPerson && p.contactPerson !== p.name ? p.contactPerson : "",
       address: [p.billStreet, [p.billPostalCode, p.billCity].filter(Boolean).join(" ")]
         .filter(Boolean)
         .join(", "),
       email: p.email || "",
+      // The number somebody would actually ring: the mobile first, because
+      // that is the one a reformas customer answers.
+      phone: p.mobile || p.phone || "",
     };
   }
 
@@ -589,6 +595,16 @@
     const prj = erp.state.projects.find((x) => x.budgetId === b.id);
     f.project = projectBlock(erp, prj ? prj.id : null);
     if (f.project.site === "—") f.project.site = f.customer.address;
+    /* What the job IS, when the engine can say it — the customer's own words
+       from the request behind this quote. Its OWN field, deliberately not
+       `description`: that one falls back to the activity line, which is an
+       internal code word ("renovation") and has no business heading a
+       document the customer reads. Empty when nothing was recorded, and the
+       heading then keeps the site address it always printed. */
+    f.project.workName = doc.projectName || "";
+    // Days, or 0 for "nobody stated one" — the descriptor decides whether a
+    // row is printed at all, so the absence has to survive the trip.
+    f.project.executionDays = doc.executionDays || 0;
     f.project.version = doc.version;
     f.project.validityDays = Math.max(
       1,
@@ -614,6 +630,16 @@
     });
     d.facts[0][1] = eur(doc.totals.taxableCents);
     if (b.paymentConditions) d.payment = [b.paymentConditions].concat(d.payment.slice(1));
+    /* SUPUESTOS AND EXCLUSIONES REACH THE PAPER.
+       The engine has always emitted both — the visit records them and
+       renderBudgetDoc carries them — and this function dropped them on the
+       floor, so what the price DEPENDS ON and what it does NOT include were
+       captured on site, stored, and then never shown to the person they
+       protect. Reported on 28/08. Empty arrays stay absent: the block
+       renderer prints nothing for them, and an empty «Exclusiones» heading
+       reads as "we excluded something and won't say what". */
+    if (doc.assumptions && doc.assumptions.length) d.assumptions = doc.assumptions.slice();
+    if (doc.exclusions && doc.exclusions.length) d.exclusions = doc.exclusions.slice();
     return d;
   }
 

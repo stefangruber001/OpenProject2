@@ -6148,3 +6148,82 @@ raises its own banner for the underlying failure; this only stops the record.
 
 Locally IndexedDB does not fail this way, so the rule costs nothing there.
 Both new strings carry ES/EN/CA entries.
+
+### 190 · S4 found three of the plan's premises wrong, and said so rather than coding around them (2026-08-28)
+
+Each item was checked against a rendered descriptor before any of it was
+written — `docFor(erp, "presupuesto", …)` printed and read — rather than
+trusted from the plan. Three premises did not survive that.
+
+**"partyBlock gains contactPerson/phone/email."** Two of the three were
+already there and already printing. The real gap was the PHONE, and a defect
+the plan had not seen: for an individual, `contactPerson` holds the same
+string as `name`, so the customer block printed the person's name twice, one
+line under the other. The contact line is now dropped when it merely repeats
+the name, and the phone (mobile first — the number a reformas customer
+actually answers) joins the block.
+
+**"Print project name when a project exists."** A project record has no name
+field, and never has: it carries a code and an activity line, which is why
+`projectBlock` already falls back to the activity line and says so in a
+comment. Reading `prj.name` would have been inventing a field. The only
+truthful source is the customer's own words in the opportunity behind the
+quote (`requestedWork`), reached through `visit.budgetId → visit
+.opportunityId` because a budget carries no opportunity of its own. A quote
+written straight off a lead with no visit falls back to that customer's one
+open lead, and to nothing at all when there are two — printing the wrong job
+on a quote is worse than printing none. Carried in its own `workName` field
+rather than overloading `description`, precisely because `description` falls
+back to the raw activity line ("renovation"), which has no business heading a
+document a customer reads.
+
+**"A facts row for the plazo."** First written as a REPLACEMENT for the
+project code, justified by a four-across grid limit. That limit does not
+exist — `.facts` is `display:flex; flex-wrap:wrap` with a row-gap, so a fifth
+entry wraps. Corrected to append before commit: the operator asked for the
+plazo to be added, and nothing asked for the project reference to stop being
+printed. Verified with five facts through both document gates (printable
+margin, PDF pagination), not by reasoning about the CSS.
+
+**Two smaller ones.** "Plazo de ejecucion" already existed in
+`erp-doc-i18n.js` as the contract's label — a second copy would have been a
+second place to change it, so the quote reuses it verbatim. And
+`renderBudgetDoc`'s line shape is `qty`/`totalCents`, not the
+`qtyMilli`/`amountCents` the Excel writer was first drafted against; chapters
+carry no subtotal at all, so the export sums the lines it actually writes —
+`renderBudgetDoc` drops pending lines, and a subtotal that counted them would
+not match the column above it.
+
+### 191 · executionDays is a count, and null is not zero (2026-08-28)
+
+The quote now carries how long the work takes. A COUNT of working days, not a
+date: the start depends on when the customer accepts, which nobody knows
+while the quote is being written, and it is the same shape as the contract's
+`duration.estimatedDays` so a contract can inherit it later without a
+conversion.
+
+`null` when nobody stated one, never `0` — "not stated" and "immediate" are
+different promises and only one of them is safe to print. The builder's input
+clears back to null on a blank, the descriptor omits the row entirely, and
+the engine defaults it to null on create. Additive: no migration, and an
+existing budget simply has no plazo until somebody types one.
+
+### 192 · A channel that cannot work now says so before it is used (2026-08-28)
+
+Email with no address proceeded: it filed a draft addressed to `to: ""`,
+recorded the communication as sent, and froze the quote version behind it —
+a document that could never reach anybody, and a version that can no longer
+be edited. WhatsApp has always refused when there is no mobile; the two are
+the same mistake and now get the same guard, the same warning row and the
+same relabelled button.
+
+**Also added: one line saying what each channel actually does.** Nobody could
+tell from this drawer whether «Correo electrónico» would send mail to the
+customer. It does not — the mandate is explicit that this system sends none —
+it prepares a draft in the company mailbox for a person to send. A channel
+whose behaviour has to be guessed is a channel that gets picked wrongly, and
+the guess here was the difference between "the customer has it" and "nobody
+has sent anything".
+
+**Reversible: yes** — a disabled state and three sentences; no send path
+changed for a customer who has the contact detail the channel needs.
