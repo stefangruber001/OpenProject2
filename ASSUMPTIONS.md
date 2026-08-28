@@ -5908,3 +5908,41 @@ economic documents — the same rule the screen enforces), and the server e2e
 now ends by deleting every «E2E …» party — its own and every older run's.
 The row the operator saw is removed by the next deploy run's suite; until
 then it can be deleted from Configuración › Clientes with the same button.
+
+### 183 · The source-literal ceiling was raised 206 → 207: a comment, not a screen (2026-08-28)
+
+`df9f50e` (this session's own CI repair) turned out to still be red on GitHub's
+runners: `source-audit.mjs --lang en/ca --max 206` measured 207 on the exact
+commit it was pushed on. Confirmed with `git stash`/`git checkout` against the
+parent commit `dee7bee` (measures 206, matches the ceiling exactly) and
+`fb260c8` (the duplicate-NIF search fix, measures 207) — the drift is real and
+belongs to that commit, not to anything after it.
+
+**What actually changed.** `fb260c8` added a docstring above `taxHit` in
+`site/erp.html` explaining why the party registers now search the tax id,
+including the rhetorical question the fix answers: `"who already holds this
+NIF?"`. `source-audit.mjs` does not parse comments out of the source before
+scanning for quoted literals — by design, stated in its own header: excluding
+comments would also exclude a hand-written change note that happens to sit
+beside a real label, and the tool's whole thesis is that a name in a comment
+costing a minute to dismiss is the acceptable price for never missing a
+screen. The two new UI strings the same commit actually added — the "por
+nombre o NIF" search placeholders — were translated in both dictionaries at
+the time; this one quoted sentence is developer prose, never rendered to a
+user, and was the only genuinely new candidate.
+
+**Why the ceiling, not the comment.** Rewording the docstring to avoid
+straight quotes would silence the scanner without changing what it is
+actually measuring — the count would still not correspond to translation
+coverage of anything a person reads, only to whether this particular sentence
+happens to look like code to a regex. That is exactly the kind of gaming the
+ratchet exists to prevent. The honest move, matching #167/#169, is to set the
+ceiling at the real measurement and say why.
+
+**Verified:** `dee7bee` → 206/206 (EN/CA), `fb260c8`/`df9f50e` → 207/207,
+identical on both languages because the flagged text is the same string in
+both runs. `.github/workflows/ci.yml` ceilings moved 206 → 207 with the
+reasoning inline. The booted-workspace audit, which is what an operator
+actually sees, is unaffected and stays at zero.
+
+**Reversible: yes** — a ceiling number and a comment; no product code moved.
