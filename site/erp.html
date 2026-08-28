@@ -5047,6 +5047,11 @@
     <script src="erp-migrations.js"></script>
     <script src="erp-store.js"></script>
     <script src="erp-import.js"></script>
+    <!-- The PDF sibling of erp-import.js — same bank, the other export shape.
+     Depends on ErpImport for toCents/toIsoDate (loaded just above) and, only
+     once a .pdf is actually chosen, on ErpOcr.loadPdfjs() (below) for pdf.js
+     itself — nothing here fetches pdf.js on its own. -->
+    <script src="erp-import-pdf.js"></script>
     <!-- Typed capability layer: erp-factory.js is GENERATED from packages/erp-browser
      (do not edit by hand); erp-bridge.js is the seam erp.html calls through.
      Both degrade silently if unavailable, so the ERP still runs without them. -->
@@ -18277,9 +18282,9 @@
      </select>
      <button class="btn sm" id="bkNew">＋ Cuenta</button>
      <span style="flex:1"></span>
-     <button class="btn sm" id="bkImport">⬆ Importar extracto (.xlsx)</button>
+     <button class="btn sm" id="bkImport">⬆ Importar extracto (.xlsx / .pdf)</button>
      <button class="btn sm" id="bkUndo">↩ Deshacer importación</button>
-     <input type="file" id="bkFile" accept=".xlsx" style="display:none">
+     <input type="file" id="bkFile" accept=".xlsx,.pdf" style="display:none">
      <button class="btn sm primary" id="bToRec">Ir a Conciliación →</button>
    </div>
    ${accountLines(accs)}
@@ -18338,7 +18343,12 @@
             if (!file) return;
             let parsed;
             try {
-              parsed = await ErpImport.parseBbva(await file.arrayBuffer());
+              if (/\.pdf$/i.test(file.name)) {
+                const pdfjs = await ErpOcr.loadPdfjs();
+                parsed = await ErpImportPdf.parseBbvaPdf(await file.arrayBuffer(), pdfjs);
+              } else {
+                parsed = await ErpImport.parseBbva(await file.arrayBuffer());
+              }
             } catch (err) {
               say(String(err.message || err));
               return;

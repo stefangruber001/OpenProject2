@@ -1169,6 +1169,40 @@ searches for and clicks the same button races it and reads as a false
 failure. Both new confirm checks click the action and wait for the resulting
 state instead.
 
+### PK7-F · PDF bank statements (2026-08-28)
+
+Item 107, the last PK7 session. BBVA's other export shape — printed text, not
+a spreadsheet — fed through the exact same `previewImport`/`importMovements`
+path the .xlsx importer uses, so defect 111's opening/closing assertion
+protects a PDF import with no exemption. New sibling module
+`site/erp-import-pdf.js`: a PDF text layer is not a table, so reading is two
+passes — group pdf.js's per-text-run items into visual lines by y-position,
+then group lines into rows where a line starting with a date opens a new
+movement and everything after it, up to the next date, is a wrapped
+continuation of that movement's concept. Row-grouping resets at every PAGE
+boundary — a real statement reprints its column headers on every page, and
+the first version let page 2's header get swallowed into whichever movement
+fell last on page 1, caught by the fixture's own three-page layout.
+
+`parseBbvaPdf(arrayBuffer, pdfjs)` takes the loaded pdf.js module as a
+parameter, so it runs identically in the browser (`ErpOcr.loadPdfjs()`, the
+vendored copy OCR already uses) and under plain Node
+(`pdfjs-dist/legacy/build/pdf.mjs`, already a dependency via the OCR spike).
+New fixture `tests/fixtures/bbva-extracto.pdf` — hand-rolled, no library, same
+spirit as `erp-import.js`'s hand-rolled ZIP reader — reproduces the same
+account and an overlapping period to the two .xlsx fixtures, in the shape the
+plan describes (CONCEPTO and BENEF. merged, 6 columns collapsing to 5,
+amounts with their own " EUR" suffix, concepts wrapped across two or three
+lines), sixteen movements over three pages, with the same
+two-identical-payroll-payments trap PK7-A's fixture carries.
+
+Verified at three levels: `tests/bank-import-pdf/run.mjs` (the parser, and
+defect 111's refusal proved again specifically on PDF-sourced rows), the same
+file through the real `#bkFile` input in a real browser in the new `1B·PDF`
+site-e2e block, and CI's new `Bank statement import — PDF` step alongside the
+existing .xlsx one. No engine change, no bundle rebuild — `previewImport`,
+`importMovements` and `statementBalance` were already format-agnostic.
+
 Eleven new engine checks (381/381 manageability, plus a negative control),
 ten new browser checks, and eight dictionary entries in three languages —
 two of them toast strings the source scanner catches even though `toast()`

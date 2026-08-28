@@ -553,7 +553,7 @@ window.CANEI_DICT.ca = {
   "La cuenta necesita un nombre": "El compte necessita un nom",
   "Cuenta creada": "Compte creat",
   "Liquidación de tarjeta": "Liquidació de targeta",
-  "⬆ Importar extracto (.xlsx)": "⬆ Importar extracte (.xlsx)",
+  "⬆ Importar extracto (.xlsx / .pdf)": "⬆ Importar extracte (.xlsx / .pdf)",
   "Importar extracto ·": "Importar extracte ·",
   "Importar extracto": "Importar extracte",
   "Extracto importado": "Extracte importat",
@@ -567,6 +567,8 @@ window.CANEI_DICT.ca = {
     "El període se solapa amb moviments ja importats; els repetits no es tornaran a crear.",
   "No he encontrado la cabecera del extracto (Fecha / Concepto / Importe). ¿Es el export de movimientos de BBVA?":
     "No he trobat la capçalera de l'extracte (Fecha / Concepto / Importe). És l'export de moviments de BBVA?",
+  "No he encontrado ningún movimiento con fecha en el PDF. ¿Es un extracto de BBVA?":
+    "No he trobat cap moviment amb data al PDF. És un extracte de BBVA?",
   "Nueva factura de proveedor": "Nova factura de proveïdor",
   "Registrar documento como factura": "Registrar el document com a factura",
   "Registrar como factura": "Registrar com a factura",

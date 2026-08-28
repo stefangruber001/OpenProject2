@@ -5609,6 +5609,81 @@ test that also manually searches for and clicks the same dialog's button is
 racing it, and loses more often than it looks like it should. Both new
 confirm checks were rewritten to click the action and wait for the resulting
 state rather than reach into the dialog a second time.
+
+## PK7-F · PDF bank statements (2026-08-28)
+
+Item 107, the last PK7 session: BBVA's OTHER export shape, same account as
+PK7-A's .xlsx fixtures, an overlapping period — printed text instead of a
+spreadsheet's typed cells. Fed through the exact same `previewImport` /
+`importMovements` path, so PK7-A's opening/closing assertion (defect 111)
+protects a PDF import with no exemption: a statement whose saldos do not join
+up is refused, whichever file format it arrived in.
+
+**No file to test against, by decision 7 — so the column layout is inferred,
+logged, and reversible.** The two real files the tenant sent are never
+committed (live IBAN, card numbers, real names); the plan describes the PDF
+as "6 columns, CONCEPTO and BENEF. merged" against the .xlsx's 11. Read as:
+the .xlsx's F.CONTABLE, F.VALOR, CÓDIGO, CONCEPTO, BENEFICIARIO/ORDENANTE,
+OBSERVACIONES, IMPORTE, SALDO, DIVISA, OFICINA, REMESA collapses to Fecha,
+F.Valor, Concepto(now carrying what BENEFICIARIO and OBSERVACIONES held),
+Importe, Saldo — five printed columns, because the amount already carries its
+own currency suffix (`-8,41 EUR`) rather than a separate Divisa cell. If the
+operator's real PDF turns out to shape its columns differently, the fixture
+generator (`tests/fixtures/make-bbva-pdf-fixture.py`) and the parser
+(`site/erp-import-pdf.js`) are the two places to correct — same "parser swap,
+not surgery on the reconciliation screen" contract erp-import.js's own header
+already commits to for the .xlsx side.
+
+**A PDF text layer is not a table — pdf.js hands back one item per
+text-showing operator, each with its own (x, y), in whatever order the page
+drew them.** Reading proceeds in two passes: group items into visual LINES by
+y (2pt tolerance — a real baseline rarely shares an exact float across two
+runs), sorting each line's items by x; then group lines into ROWS, where a
+line beginning with a date starts a new movement and every line after it, up
+to the next date, is a wrapped continuation of that movement's concept — the
+one signal available, since a continuation carries no date and no amount of
+its own.
+
+**Row-grouping resets at every PAGE boundary, not just the file's first
+line — found by the fixture itself, not inferred in advance.** A real
+multi-page statement reprints its column headers on every page. The first
+version of `groupLines` treated everything after the last date on page 1 as
+belonging to that row, so page 2's own "F. OPERACION F. VALOR CONCEPTO …"
+silently became part of the concept of whichever movement fell last on page
+1 — caught because the fixture deliberately runs to three pages and puts one
+of the two identical-payroll rows (the same trap PK7-A's .xlsx fixture uses)
+right where a page break would land. `pdfLines` now returns one line-array
+per page and `groupLines` never carries an open row across a page boundary —
+which loses nothing, because neither this fixture nor a real statement wraps
+a single row's own lines across a page break.
+
+**Same account, same tests, one Node runtime difference.** The browser reads
+pdf.js from `site/vendor/pdfjs` via `ErpOcr.loadPdfjs()` — already vendored
+for OCR, nothing new fetched. `pdfjs-dist` (already an npm dependency, used
+by `tests/ocr-spike/measure.mjs`) gives the Node-side test the same library
+under `pdfjs-dist/legacy/build/pdf.mjs`. `parseBbvaPdf(arrayBuffer, pdfjs)`
+takes the loaded module as a parameter rather than loading it itself, so the
+same function runs identically from both callers — the same design
+`erp-ocr.js`'s own `pdfText` already uses (loaded lazily by its caller).
+
+**The fixture is a hand-rolled PDF, no library, same spirit as
+`erp-import.js`'s hand-rolled ZIP reader.** `%PDF-1.4`, standard Helvetica (no
+font embedding needed), one `Tj` text-showing operator per table cell so the
+reader is exercised on reassembling a row from several runs rather than
+handed one pre-joined string. Sixteen movements, three pages, opening
+25.000,00 €, closing 9.077,27 €, the same two-identical-payroll-payments trap
+PK7-A's `bbva-cuenta.xlsx` carries.
+
+**Verified at three levels, not two.** `tests/bank-import-pdf/run.mjs` proves
+the parser (Node, pdfjs-dist) and re-proves defect 111's refusal on
+PDF-sourced rows specifically — a fixture-format exemption from that
+protection was exactly the kind of gap PK7-A's own session was written to
+close. `tests/site-e2e/run.mjs`'s new `1B·PDF` block proves the same file
+through the REAL file input, in a REAL browser, through the vendored pdf.js —
+because a parser being right in a unit test says nothing about the screen,
+the same reasoning the existing `.xlsx` browser check (`1B`) was already
+built on.
+
 ## S32 · PK-B — the forecast sees every chapter, and «cuadra» is measured (2026-08-28)
 
 Two follow-ups to the operator's CP 83/86 report, on top of the PK7 unification

@@ -394,6 +394,9 @@ jobs:
       - name: Bank statement import (a real .xlsx fixture, through the same module)
         run: node tests/bank-import/run.mjs
 
+      - name: Bank statement import — PDF (the same account, the other shape)
+        run: node tests/bank-import-pdf/run.mjs
+
       # The client-review Part 1 as one story in one browser: statement in,
       # capture to bill, match, card, cash on a partida, overtime hours,
       # variation joining the economics, and the quarter leaving as a ZIP that

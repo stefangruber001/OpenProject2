@@ -648,7 +648,7 @@ window.CANEI_DICT = {
     ["La cuenta necesita un nombre", "The account needs a name"],
     ["Cuenta creada", "Account created"],
     ["Liquidación de tarjeta", "Card settlement"],
-    ["⬆ Importar extracto (.xlsx)", "⬆ Import statement (.xlsx)"],
+    ["⬆ Importar extracto (.xlsx / .pdf)", "⬆ Import statement (.xlsx / .pdf)"],
     ["Importar extracto ·", "Import statement ·"],
     ["Importar extracto", "Import statement"],
     ["Extracto importado", "Statement imported"],
@@ -667,6 +667,10 @@ window.CANEI_DICT = {
     [
       "No he encontrado la cabecera del extracto (Fecha / Concepto / Importe). ¿Es el export de movimientos de BBVA?",
       "I could not find the statement header (Fecha / Concepto / Importe). Is this the BBVA movements export?",
+    ],
+    [
+      "No he encontrado ningún movimiento con fecha en el PDF. ¿Es un extracto de BBVA?",
+      "I could not find any dated movement in the PDF. Is this a BBVA statement?",
     ],
     ["Nueva factura de proveedor", "New supplier invoice"],
     ["Registrar documento como factura", "Register document as an invoice"],

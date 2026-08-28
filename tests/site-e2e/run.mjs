@@ -4795,6 +4795,93 @@ async function testBankAndCash(browser, base) {
       ok("1B: …and imports them as money: both payrolls kept, float noise exact to the cent");
     else bad("1B: real-layout import", JSON.stringify(realOut));
 
+    // ── 1B·PDF (PK7-F): item 107 — the OTHER shape BBVA exports, read through
+    //    the vendored pdf.js this page actually loads (ErpOcr.loadPdfjs → the
+    //    same door OCR uses), not the Node-side pdfjs-dist the parser's own
+    //    unit test reads with. A fresh account, so the .xlsx fixtures already
+    //    imported above cannot mask a PDF row the parser silently dropped.
+    await pg.click("#bkNew");
+    await pg.waitForTimeout(300);
+    await pg.evaluate(() => {
+      document.getElementById("na_name").value = "BBVA PDF E2E";
+      document.getElementById("na_kind").value = "bank";
+    });
+    await pg.click("#na_go");
+    await pg.waitForTimeout(500);
+    const pdfAcc = await pg.evaluate(() => {
+      const a = erp.state.bankAccounts.find((a) => a.name === "BBVA PDF E2E");
+      return a ? a.id : null;
+    });
+    if (pdfAcc) ok("1B·PDF: a fresh account is created for the PDF-format statement");
+    else bad("1B·PDF: account created", "not found after drawer");
+    await pg.evaluate((id) => {
+      const sel = document.getElementById("bkSel");
+      sel.value = id;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    }, pdfAcc);
+    await pg.waitForTimeout(500);
+    await pg.setInputFiles("#bkFile", "tests/fixtures/bbva-extracto.pdf");
+    await pg.waitForTimeout(1500); // pdf.js + the fixture's three pages, lazily loaded
+    const pdfPv = await pg.evaluate(() => {
+      const go = document.getElementById("stGo");
+      if (!go) return null;
+      const t = go.closest(".card").textContent.replace(/\s+/g, " ");
+      return { disabled: go.disabled, text: t.slice(0, 600) };
+    });
+    if (pdfPv && !pdfPv.disabled && /Movimientos nuevos\s*16/.test(pdfPv.text))
+      ok("1B·PDF: the drawer previews all sixteen movements read off the PDF's text layer");
+    else bad("1B·PDF: preview drawer", JSON.stringify(pdfPv));
+    if (pdfPv && !/no cuadra/i.test(pdfPv.text))
+      ok("1B·PDF: the statement's own saldos join up — no refusal shown");
+    else bad("1B·PDF: statement closes", JSON.stringify(pdfPv));
+    await pg.click("#stGo");
+    await pg.waitForTimeout(700);
+    const pdfOut = await pg.evaluate(
+      (id) => ({
+        count: erp.state.movements.filter((m) => m.accountId === id).length,
+        balance: erp.accountBalanceCents(id),
+        wrapped: erp.state.movements.find(
+          (m) => m.accountId === id && /INMOBILIARIA DE PRUEBA/.test(m.concept),
+        ),
+      }),
+      pdfAcc,
+    );
+    if (pdfOut.count === 16)
+      ok("1B·PDF: sixteen movements land on the account, through the real file input");
+    else bad("1B·PDF: movements imported", JSON.stringify(pdfOut));
+    if (pdfOut.balance === 907727)
+      ok(
+        "1B·PDF: the account balance matches the PDF's own closing saldo, to the cent (9.077,27 €)",
+      );
+    else bad("1B·PDF: closing balance", pdfOut.balance);
+    if (
+      pdfOut.wrapped &&
+      pdfOut.wrapped.concept ===
+        "TRANSFERENCIA A FAVOR DE INMOBILIARIA DE PRUEBA SL FACTURA 20/26 CLIENTE DE PRUEBA"
+    )
+      ok(
+        "1B·PDF: a three-line wrapped concept reads correctly in the actual product, not just the parser test",
+      );
+    else bad("1B·PDF: wrapped concept", JSON.stringify(pdfOut.wrapped));
+
+    // The same PDF again: duplicates, nothing re-created — same contract as the .xlsx path.
+    await pg.setInputFiles("#bkFile", "tests/fixtures/bbva-extracto.pdf");
+    await pg.waitForTimeout(1500);
+    const pdfAgain = await pg.evaluate(() => {
+      const go = document.getElementById("stGo");
+      return go ? { disabled: go.disabled } : null;
+    });
+    if (pdfAgain && pdfAgain.disabled)
+      ok("1B·PDF: re-importing the same PDF finds nothing new — the button says so");
+    else bad("1B·PDF: duplicate PDF blocked", JSON.stringify(pdfAgain));
+    await pg.evaluate(() => closeDrawer());
+    const pdfFinal = await pg.evaluate(
+      (id) => erp.state.movements.filter((m) => m.accountId === id).length,
+      pdfAcc,
+    );
+    if (pdfFinal === 16) ok("1B·PDF: and nothing was imported twice");
+    else bad("1B·PDF: no duplicate import", String(pdfFinal));
+
     // ── 1C: a credit card is an ACCOUNT — created through the product, fed
     //    by the same importer, settled from the bank as an internal transfer.
     await pg.click("#bkNew");

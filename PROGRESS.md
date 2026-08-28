@@ -1779,7 +1779,16 @@ touching any bank or expense screen.
   to rows still open at the moment of the click. Verifying it exposed a
   two-press bug in PK7-D's own Deshacer for exactly the compound state this
   package creates; fixed and pinned with a negative control.
-- **PK7-F** — PDF bank statements.
+- **PK7-F — done (2026-08-28).** BBVA's other export shape — printed text
+  instead of a spreadsheet — read through the same `previewImport`/
+  `importMovements` path the .xlsx importer uses, so defect 111's opening/
+  closing assertion protects it with no exemption. New sibling module
+  `site/erp-import-pdf.js` reassembles pdf.js's per-run text items into
+  visual lines, then into rows split at wrapped concepts, resetting at every
+  page boundary (a bug the fixture's own three-page layout caught before any
+  real file could). Verified at three levels: a Node-side parser test, the
+  same fixture through the real file input in a real browser, and CI's new
+  step alongside the .xlsx one. This closes Package 7.
 
 Two constraints fixed by evidence, not preference: a real quarter is ~535
 movements, most of them small card purchases, so `gasto general` cannot be
