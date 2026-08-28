@@ -742,6 +742,23 @@ window.CANEI_DICT.ca = {
   "message/rfc822": "message/rfc822",
   "viendo solo": "veient només",
   "Línea con importe y sin descripción": "Línia amb import i sense descripció",
+  "Excede lo que este cliente debe por esta obra":
+    "Excedeix el que aquest client deu per aquesta obra",
+  "Contrato sin firmar": "Contracte sense signar",
+  "La primera factura de la obra necesita el contrato firmado.":
+    "La primera factura de l'obra necessita el contracte signat.",
+  "El abono no dice qué factura rectifica": "L'abonament no diu quina factura rectifica",
+  "Un abono siempre nombra la factura que corrige.":
+    "Un abonament sempre anomena la factura que corregeix.",
+  "Adicional sin aprobar": "Addicional sense aprovar",
+  "Sólo se factura un adicional que el cliente ya ha aprobado.":
+    "Només es factura un addicional que el client ja ha aprovat.",
+  "El adicional no existe": "L'addicional no existeix",
+  "Cantidad cero": "Quantitat zero",
+  "Precio cero (marque pendiente si procede)": "Preu zero (marqui pendent si escau)",
+  "Partida con margen negativo": "Partida amb marge negatiu",
+  "Línea pendiente de precio": "Línia pendent de preu",
+  "Coste superior al precio de venta": "Cost superior al preu de venda",
   "× ver todas": "× veure totes",
   "(IVA incl.)": "(IVA incl.)",
   "sobre el contratado (IVA incl.)": "sobre el contractat (IVA incl.)",

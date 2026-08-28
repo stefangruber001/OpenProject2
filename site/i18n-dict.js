@@ -2753,6 +2753,35 @@ window.CANEI_DICT = {
     // PK-C · the small visible fixes
     ["viendo solo", "showing only"],
     ["Línea con importe y sin descripción", "A line with an amount and no description"],
+    // A12 · the invoice gate and budget check labels the toggle was missing
+    [
+      "Excede lo que este cliente debe por esta obra",
+      "Exceeds what this customer owes for this job",
+    ],
+    ["Contrato sin firmar", "Contract not signed"],
+    [
+      "La primera factura de la obra necesita el contrato firmado.",
+      "The job's first invoice needs the signed contract.",
+    ],
+    [
+      "El abono no dice qué factura rectifica",
+      "The credit note does not name the invoice it corrects",
+    ],
+    [
+      "Un abono siempre nombra la factura que corrige.",
+      "A credit note always names the invoice it corrects.",
+    ],
+    ["Adicional sin aprobar", "Variation not approved"],
+    [
+      "Sólo se factura un adicional que el cliente ya ha aprobado.",
+      "Only a variation the customer has approved is invoiced.",
+    ],
+    ["El adicional no existe", "The variation does not exist"],
+    ["Cantidad cero", "Zero quantity"],
+    ["Precio cero (marque pendiente si procede)", "Zero price (mark it pending if applicable)"],
+    ["Partida con margen negativo", "Line item with a negative margin"],
+    ["Línea pendiente de precio", "Line awaiting a price"],
+    ["Coste superior al precio de venta", "Cost above the sale price"],
     ["× ver todas", "× show all"],
     ["(IVA incl.)", "(VAT incl.)"],
     ["sobre el contratado (IVA incl.)", "over the contracted amount (VAT incl.)"],

@@ -38,6 +38,11 @@ export const COMMANDS = {
   addParty: { method: "addParty", arity: 1, describes: "add a party" },
   updateParty: { method: "updateParty", arity: 2, describes: "update a party" },
   deactivateParty: { method: "deactivateParty", arity: 1, describes: "deactivate a party" },
+  // A15 · deletion is allowed THROUGH the engine, which refuses any party
+  // carrying economic documents — the same rule the screen enforces. Without
+  // this the test suite's own cleanup had no door to use, and every run left
+  // an «E2E …» row in the live register.
+  deleteParty: { method: "deleteParty", arity: 1, describes: "delete a party" },
 
   // --- money in --------------------------------------------------------
   recordCollection: { method: "recordCollection", arity: 1, describes: "record a collection" },

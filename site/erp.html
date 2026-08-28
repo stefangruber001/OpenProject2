@@ -15058,7 +15058,7 @@
       issues
         .map(
           (i) =>
-            `<div class="it"><span class="pill ${i.level === "block" ? "r" : "y"}">${i.level === "block" ? "Bloquea" : "Aviso"}</span> <span>${esc(i.line)} — ${esc(i.msg)}</span></div>`,
+            `<div class="it"><span class="pill ${i.level === "block" ? "r" : "y"}">${i.level === "block" ? "Bloquea" : "Aviso"}</span> <span><span translate="no">${esc(i.line)}</span> — <span>${esc(i.msg)}</span></span></div>`,
         )
         .join("") || '<div class="it">Nada que corregir. El presupuesto puede emitirse.</div>'
     }
@@ -15109,13 +15109,13 @@
    ${
      blocks.length
        ? `<div class="card"><div class="ch"><h3>Bloqueos</h3><span class="tag">${blocks.length}</span></div><div class="daylist">
-    ${blocks.map((i) => `<div class="it"><span class="pill r">Bloquea</span> <span>${esc(i.line)} — ${esc(i.msg)}</span></div>`).join("")}</div></div>`
+    ${blocks.map((i) => `<div class="it"><span class="pill r">Bloquea</span> <span><span translate="no">${esc(i.line)}</span> — <span>${esc(i.msg)}</span></span></div>`).join("")}</div></div>`
        : ""
    }
    ${
      warns.length
        ? `<div class="card"><div class="ch"><h3>Avisos</h3><span class="tag">${warns.length}</span></div><div class="daylist">
-    ${warns.map((i) => `<div class="it"><span class="pill y">Aviso</span> <span>${esc(i.line)} — ${esc(i.msg)}</span></div>`).join("")}</div></div>`
+    ${warns.map((i) => `<div class="it"><span class="pill y">Aviso</span> <span><span translate="no">${esc(i.line)}</span> — <span>${esc(i.msg)}</span></span></div>`).join("")}</div></div>`
        : ""
    }
    <div class="card"><div class="ch"><h3>Enviar</h3></div><div class="daylist" style="gap:9px">
@@ -15367,7 +15367,7 @@
          .map(
            (i) =>
              `<div class="it"><span class="pill ${i.level === "block" ? "r" : "y"}">${i.level === "block" ? "bloquea" : "aviso"}</span>
-        <span style="flex:1">Subpartida ${esc(i.line)} — ${esc(i.msg)}</span></div>`,
+        <span style="flex:1"><span>Subpartida</span> <span translate="no">${esc(i.line)}</span> — <span>${esc(i.msg)}</span></span></div>`,
          )
          .join("") ||
        '<div class="it">Nada que corregir: todas las subpartidas tienen cantidad, precio y coste coherentes.</div>'
@@ -22188,8 +22188,8 @@
           const c = comp || erp.partyCompleteness(p.partyId);
           const rows = pv.blocks
             .map(
-              (b) => `<div class="it"><span class="pill r">${esc(b.code)}</span>
-       <span style="flex:1;margin-left:8px">${esc(b.label)}${b.detail ? ` — ${esc(b.detail)}` : ""}</span></div>`,
+              (b) => `<div class="it"><span class="pill r" translate="no">${esc(b.code)}</span>
+       <span style="flex:1;margin-left:8px"><span>${esc(b.label)}</span>${b.detail ? ` — <span${b.data ? ' translate="no"' : ""}>${esc(b.detail)}</span>` : ""}</span></div>`,
             )
             .join("");
           const empty = pv.empty

@@ -5817,6 +5817,40 @@ async function testSmallFixes(browser, base) {
     if (a14.empty && a14.placeholder && !a14.described)
       ok("A14: a line with money and no words blocks the send — «...» included");
     else bad("A14: empty description block", JSON.stringify(a14));
+
+    // A12 · a blocker row is a translatable label beside frozen data — the
+    // code pill and any data detail carry translate="no", the label has a
+    // dictionary pair in both languages, so the toggle reaches it.
+    const a12 = await pg.evaluate(() => {
+      // A credit note that names no invoice blocks with AR-10 on ANY job —
+      // the one blocker the seed can always produce without being mutated.
+      const p = erp.state.projects.find((x) => x.status !== "archived");
+      if (!p) return { skip: true };
+      invOpen(p.id);
+      invWork.basis = "credit";
+      invWork.kind = "creditNote";
+      invWork.rectifies = null;
+      invSync();
+      return new Promise((res) =>
+        setTimeout(() => {
+          const rows = [...document.querySelectorAll("#invGates .daylist .it")];
+          const structured = rows.filter((r) => r.querySelector('.pill[translate="no"]'));
+          const labels = structured
+            .map((r) => r.querySelector("span[style] > span")?.textContent?.trim())
+            .filter(Boolean);
+          const D = window.CANEI_DICT;
+          const paired = labels.filter(
+            (l) => D.pairs.some((x) => x[0] === l) && typeof D.ca[l] === "string",
+          );
+          document.querySelector("#invBack")?.click();
+          res({ rows: rows.length, structured: structured.length, labels, paired: paired.length });
+        }, 600),
+      );
+    });
+    if (a12.skip) bad("A12: a job for the blocked draft", "none in the seed");
+    else if (a12.structured > 0 && a12.paired === a12.labels.length)
+      ok(`A12: ${a12.paired} blocker label(s) split from their data and paired in both languages`);
+    else bad("A12: blocker rows", JSON.stringify(a12));
   } catch (e) {
     bad("small fixes", String(e).slice(0, 160));
   } finally {

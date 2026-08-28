@@ -5762,3 +5762,23 @@ committed bundle was regenerated from the changed capability.
 with --lang=es-ES: the two native date inputs keep ISO values, and their
 display follows the browser locale — the operator's Spanish browser shows
 dd/mm/yyyy, and now the suite tests exactly that rendering.
+
+## S38 · PK-E — blockers translate; the suite cleans up after itself (2026-08-28)
+
+**A12 · a blocker is a label beside data, and only one of them translates.**
+Every gate and budget-check row now renders the code pill and any data
+detail (a field list, figures, an identifier) in `translate="no"` spans and
+the label in its own node; the engine marks which details are data
+(`data: true`), because a heuristic guessing from the text was fragile the
+day it was written. The gate and check labels the toggle was missing —
+AR-11, CON-11, AR-10, both CHG-04s, and the five validateBudget messages —
+now carry pairs in both dictionaries. The issued-invoice path never shows
+the engine's thrown concatenation: the button is disabled while blocks
+exist and the gates card is the visible, translated surface.
+
+**A15 · a test fixture in a live company file.** `deleteParty` joins the
+server command whitelist (the engine still refuses any party carrying
+economic documents — the same rule the screen enforces), and the server e2e
+now ends by deleting every «E2E …» party — its own and every older run's.
+The row the operator saw is removed by the next deploy run's suite; until
+then it can be deleted from Configuración › Clientes with the same button.

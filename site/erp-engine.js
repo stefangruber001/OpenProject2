@@ -4374,6 +4374,7 @@
             code: "MDM-10",
             label: "Datos fiscales del cliente incompletos",
             detail: comp.missing.join(", "),
+            data: true, // A12 · a field list is data — no translator touches it
           });
       }
       /* AR-11 — the guard the whole split rests on.
@@ -4406,6 +4407,7 @@
             code: "AR-11",
             label: "Excede lo que este cliente debe por esta obra",
             detail: `Pendiente ${(room / 100).toFixed(2)} €, factura ${(want / 100).toFixed(2)} €`,
+            data: true, // A12 · figures
           });
       }
       const contract = p.contractId
@@ -4441,7 +4443,12 @@
       if (draft.changeId) {
         const ch = this.state.changes.find((x) => x.id === draft.changeId);
         if (!ch)
-          out.push({ code: "CHG-04", label: "El adicional no existe", detail: draft.changeId });
+          out.push({
+            code: "CHG-04",
+            label: "El adicional no existe",
+            detail: draft.changeId,
+            data: true, // A12 · an identifier
+          });
         else if (!["approved", "executed"].includes(ch.status))
           out.push({
             code: "CHG-04",
