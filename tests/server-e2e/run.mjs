@@ -20,6 +20,35 @@ if (!BASE) {
   process.exit(0);
 }
 
+/* =============================================================================
+   THIS SUITE WRITES. IT MUST NEVER WRITE INTO SOMEBODY'S REAL TENANT.
+
+   It creates customers named «E2E <timestamp>» carrying generated tax
+   identifiers, and it is meant to run against a throwaway database — the
+   postgres service in the deploy workflow, or a local one. Pointed at a live
+   instance it leaves records that read to the operator as corrupted data: a
+   client whose name is a timestamp, anything later built on top of that
+   client (a quote, a contract) inheriting the name, and a generated tax
+   identifier that then blocks a real registration through the MDM-03
+   uniqueness rule. All three were reported from the tenant's own screens on
+   28/08, and the customer at the root of each was this suite's residue.
+
+   So the target is checked before a single write: the tenant must look like a
+   test tenant, or the operator must say out loud that they mean it. The
+   allow-list is deliberately about the TENANT, not the URL — an operator can
+   run a demo tenant on any host, and a production tenant on localhost.
+   ========================================================================== */
+const TEST_TENANTS = new Set(["reformas-demo", "e2e", "test"]);
+if (!TEST_TENANTS.has(TENANT) && process.env.ERP_ALLOW_WRITES_HERE !== "yes") {
+  console.error(
+    `server-e2e: refusing to write into tenant "${TENANT}".\n` +
+      `  This suite creates records that a person would have to clean up by hand.\n` +
+      `  Known test tenants: ${[...TEST_TENANTS].join(", ")}.\n` +
+      `  If you really mean this one, set ERP_ALLOW_WRITES_HERE=yes.`,
+  );
+  process.exit(1);
+}
+
 const results = [];
 const ok = (name, detail = "") => results.push({ name, pass: true, detail });
 const bad = (name, detail) => results.push({ name, pass: false, detail });
@@ -223,11 +252,18 @@ async function main() {
       expectedVersion: version,
     });
     const body = await json(res);
+    const msg = body.message ?? "";
     check(
       "a duplicate tax id is refused by the engine, in its own words",
-      res.status === 409 && /duplicate/i.test(body.message ?? ""),
-      `HTTP ${res.status} ${body.message}`,
+      res.status === 409 && /ya existe un registro activo/i.test(msg),
+      `HTTP ${res.status} ${msg}`,
     );
+    /* And it says WHICH record holds it. The refusal used to name only the
+       identifier the operator already knew — which sent them looking through
+       a register that does not list every role and does not search a tax id.
+       Naming the holder is the property that made the message usable, so it
+       is the property this asserts, not merely that something was refused. */
+    check("…and the refusal names the record that already holds it", msg.includes(unique), msg);
   }
 
   // --- moving an existing document onto the server ------------------------
@@ -277,12 +313,23 @@ async function main() {
       `parties=${(untouched.state?.parties ?? []).length}`,
     );
   }
+}
 
-  // --- A15 · the suite cleans up after itself ------------------------------
-  // Every earlier run left its «E2E …» customer in the register — a test
-  // fixture in a live company file. deleteParty is the engine's own door
-  // (it refuses a party with economic documents), newly whitelisted; using
-  // it here both removes THIS run's row and every one an older run left.
+/**
+ * A15 · the suite cleans up after itself.
+ *
+ * Every earlier run left its «E2E …» customer in the register — a test
+ * fixture in a live company file. deleteParty is the engine's own door (it
+ * refuses a party with economic documents), newly whitelisted; using it here
+ * both removes THIS run's row and every one an older run left.
+ *
+ * IT RUNS FROM A `finally`, which is the point of it being its own function.
+ * Cleanup that only happens when every check passed is cleanup that is absent
+ * exactly when it is needed most: the run that failed halfway is the one that
+ * leaves the register dirty, and a suite whose own failure is what stops it
+ * tidying up will accumulate residue for as long as it stays red.
+ */
+async function cleanUp() {
   {
     const st = await json(await api(`/api/${TENANT}/erp/state`));
     let v = st.version;
@@ -302,13 +349,37 @@ async function main() {
       `removed ${removed} of ${leftovers.length}`,
     );
   }
+}
 
+function report() {
   for (const r of results) {
     console.log(`${r.pass ? "✓" : "✗"} ${r.name}${r.detail ? "  — " + r.detail : ""}`);
   }
   const failed = results.filter((r) => !r.pass);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);
-  if (failed.length) process.exit(1);
+  return failed.length;
 }
 
-await main();
+/* The run that throws is the run that leaves records behind, so the tidy-up is
+   in a `finally` — one call site, reached whether the checks passed, failed or
+   blew up. Its own failure is recorded rather than allowed to replace the
+   original one: a cleanup error must not be the last thing printed when the
+   real news is why the suite crashed. */
+let crashed = null;
+try {
+  await main();
+} catch (err) {
+  crashed = err;
+} finally {
+  try {
+    await cleanUp();
+  } catch (tidyErr) {
+    bad("cleanup left records behind", String((tidyErr && tidyErr.message) || tidyErr));
+  }
+}
+const failedCount = report();
+if (crashed) {
+  console.error("\nserver-e2e crashed:", crashed);
+  process.exit(1);
+}
+if (failedCount) process.exit(1);

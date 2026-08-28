@@ -248,11 +248,25 @@ jobs:
       # to the exact figure would go red on the next layout commit, for a reason
       # it is not about — and a check that fails for the wrong reason teaches
       # you to edit the check.
+      #
+      # 2026-08-28: that is exactly what happened, and the slack had been eaten.
+      # The ceilings had ratcheted down onto the measurement itself — 47 and 108
+      # measured, 47 and 108 allowed, nothing left for the variance the previous
+      # paragraph describes. Adding a NIF to three register search placeholders
+      # moved which controls the bounded crawl reached and CI went red on a
+      # commit that added no untranslated string: both languages measure exactly
+      # at their ceiling locally (EN 47/47, CA 108/108, both exit 0) and the
+      # runner landed a string the other side of the line. Restored to the three
+      # strings of slack the paragraph above says this check needs. What it
+      # still catches is what it is for — a real regression, which arrives in
+      # tens, not in ones. Dictionary COMPLETENESS is pinned exactly and
+      # separately by `Translation completeness (dictionary)` above, which has
+      # no variance because it reads files rather than driving a browser.
       - name: Translation coverage (translator miss ledger)
         if: always()
         run: |
-          node tests/i18n/miss-crawl.mjs --lang en --max 47
-          node tests/i18n/miss-crawl.mjs --lang ca --max 108
+          node tests/i18n/miss-crawl.mjs --lang en --max 50
+          node tests/i18n/miss-crawl.mjs --lang ca --max 111
 
   bundle:
     name: Capability bundle (build, browser-safety, drift)
