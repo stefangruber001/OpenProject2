@@ -21254,7 +21254,13 @@
           const eml = CaneiEml.build({
             fromName: iss.tradeName || iss.legalName,
             fromEmail: iss.email || "",
-            toName: party ? party.name : "",
+            /* The name this message was ADDRESSED to, not whoever else happens
+               to share the address. One email can sit on several records — an
+               owner who is also a supplier contact, a family address on two
+               customers — and `find` returns the first, which addressed a
+               customer's quote to an unrelated company. The queue row already
+               carries the right name, recorded when the message was created. */
+            toName: (q.vars && q.vars.cliente) || (party ? party.name : ""),
             toEmail: q.to || "",
             subject,
             text: body,
