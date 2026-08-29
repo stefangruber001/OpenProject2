@@ -6654,3 +6654,72 @@ because the step runs both languages under `bash -e` and died on the first.
 Predicted the separator fix would finish it; it did, but broke source-audit in
 the same edit. Nothing here was reasoned to; all of it was measured, and every
 prediction that was not measured was wrong.
+
+### 202 · A payment milestone now names a percentage of the work (2026-08-29)
+
+«Al llegar a una fase» named no fase and no depth. The operator's objection was
+concrete: a milestone reached at 50 % of the work may release 20 % of the
+money, and the screen could not say so. The trigger and the amount are separate
+facts and stay separate — `atProgressPct` carries a `progressPct` of 10…90 in
+tens, and the row's own percentage box still says what is being paid.
+
+**The trigger list stopped being decoration.** `installmentTriggers` was
+declared in `config` and read by NOTHING: any string at all was accepted and
+the contract printed it raw at the customer. It is validated now, in
+`_validateContractTerms` rather than `_finishContract`, because that runs
+before `nextNumber` — a refusal after it leaves a permanent hole in a series
+ORG-04 requires to be gap-free, which is the rule the duration check already
+followed.
+
+`atStage` stays accepted. Contracts already signed carry it, and no migration
+is worth breaking a signed document over.
+
+**The date comes off the planned curve, never the actual one.** The bridge
+finds the first day the PLAN reaches the threshold, reusing `progressCurve`
+rather than computing "how much of this job is done by Tuesday" a second time.
+Deriving it from recorded progress would move a date the customer agreed to
+because the site had a slow week — so a check asserts that recording progress
+leaves the milestone dates untouched.
+
+**And it had no test at all.** `installmentDatesFromPlan` is money-chain item
+14 and no suite loaded the bridge. The property pinned is not one date: it is
+that a LATER threshold lands on a LATER day, which is what makes the
+derivation a reading of the plan rather than a plausible constant.
+
+**One select, two facts.** The threshold is encoded in the option value
+(`atProgressPct:50`) and split where a row is read. Giving it its own control
+would put a second, contradictable answer on screen — «al 50 %» beside a box
+reading 30 — and the nine labels are whole dictionary phrases rather than a
+sentence assembled from «Al», a number and «de avance», because a translator
+needs the whole phrase to put the number where that language puts it.
+
+### 203 · «Obra —»: the second contract could never claim the job (2026-08-29)
+
+The operator's contract showed no obra. The link lives on the PROJECT
+(`project.contractId`) and `createContract` writes it only for a project that
+has none — right as a default, and it leaves one hole: a SECOND contract drawn
+up on the same budget can never claim the job. Nothing in the interface could
+repair it, and everything downstream reads that link — the signature gates, the
+annex chain, the expected collections, the control tower's contracted amount —
+so such a contract sits outside all of them.
+
+Reproduced red-first in the sim (first contract owns the obra; second starts
+with none), then `linkContractToProject` and a «Vincular obra» button on the
+row that used to print «—».
+
+**Moving, not copying.** A project has one contract, so linking clears whatever
+pointed at it before. The caller is answering "which contract governs this
+job", and two answers to that is the state the method exists to leave behind —
+asserted, so a future change that starts duplicating the link goes red.
+
+### 204 · Terms are the caller's, but not all of them (2026-08-29)
+
+`createContract` merges the caller's terms wholesale, which is deliberate: it
+is what lets a drawer pass `externalRef` with no whitelist to keep in step. The
+cost is that the same door reaches fields the engine owns. Two matter —
+`number`, minted from a gap-free series, and `origin`, which decides whether
+the screen renders our document or the customer's signed file.
+
+Refused by NAME rather than by whitelisting everything else, so the open door
+stays open and the next `externalRef` needs no engine change. Red-first: both
+were accepted before.

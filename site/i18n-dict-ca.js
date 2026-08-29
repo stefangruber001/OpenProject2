@@ -1142,6 +1142,22 @@ window.CANEI_DICT.ca = {
   Modificación: "Modificació",
   Adenda: "Addenda",
   "Modificación ·": "Modificació ·",
+  "Al 10 % de avance": "Al 10 % d'avanç",
+  "Al 20 % de avance": "Al 20 % d'avanç",
+  "Al 30 % de avance": "Al 30 % d'avanç",
+  "Al 40 % de avance": "Al 40 % d'avanç",
+  "Al 50 % de avance": "Al 50 % d'avanç",
+  "Al 60 % de avance": "Al 60 % d'avanç",
+  "Al 70 % de avance": "Al 70 % d'avanç",
+  "Al 80 % de avance": "Al 80 % d'avanç",
+  "Al 90 % de avance": "Al 90 % d'avanç",
+  "Vincular obra": "Vincular obra",
+  Vincular: "Vincular",
+  "Obra vinculada": "Obra vinculada",
+  "El contrato pasa a gobernar esa obra: la firma, los anexos, los cobros previstos y el importe contratado de la torre de control leen este vínculo.":
+    "El contracte passa a governar aquesta obra: la signatura, els annexos, els cobraments previstos i l'import contractat de la torre de control llegeixen aquest vincle.",
+  "No hay obras abiertas sin contrato. Una obra ya vinculada conserva su contrato.":
+    "No hi ha obres obertes sense contracte. Una obra ja vinculada conserva el seu contracte.",
   "Sin aprobar: este trabajo todavía no es facturable.":
     "Sense aprovar: aquest treball encara no és facturable.",
   "Nuevo presupuesto de variación": "Nou pressupost de variació",

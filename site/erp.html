@@ -20512,11 +20512,21 @@
         const readHitos = () => {
           const rows = [...db.querySelectorAll("[data-hrow]")];
           if (!rows.length) return;
-          hitos = rows.map((r) => ({
-            trigger: r.querySelector("[data-htrig]").value,
-            pct: r.querySelector("[data-hpct]").value,
-            date: r.querySelector("[data-hdate]").value,
-          }));
+          hitos = rows.map((r) => {
+            /* One <select>, two facts. A progress milestone is a trigger AND a
+               threshold, and giving the threshold its own control would put a
+               second, contradictable answer on screen — «al 50 %» beside a box
+               reading 30. Encoded as `atProgressPct:50` in the option value and
+               split here, at the one place a row is read. */
+            const [trigger, threshold] = r.querySelector("[data-htrig]").value.split(":");
+            const h = {
+              trigger,
+              pct: r.querySelector("[data-hpct]").value,
+              date: r.querySelector("[data-hdate]").value,
+            };
+            if (threshold) h.progressPct = Number(threshold);
+            return h;
+          });
         };
         const paintHitos = () => {
           const host = $("#cn_hitos");
@@ -20525,12 +20535,10 @@
             hitos
               .map(
                 (h, i) => `<div class="it" data-hrow="${i}" style="gap:6px">
-      <select data-htrig style="flex:1 1 120px">${Object.entries(CON_TRIGGER)
-        .map(
-          ([k, l]) =>
-            `<option value="${k}"${h.trigger === k ? " selected" : ""}>${esc(l)}</option>`,
-        )
-        .join("")}</select>
+      <select data-htrig style="flex:1 1 120px">${TRIGGER_OPTIONS.map(
+        ([v, l]) =>
+          `<option value="${v}"${trigValue(h) === v ? " selected" : ""}>${esc(l)}</option>`,
+      ).join("")}</select>
       <input data-hpct type="number" min="0" max="100" step="1" placeholder="%" value="${esc(h.pct)}" style="width:64px">
       <input data-hdate type="date" value="${esc(h.date)}" style="width:140px">
       <button class="btn sm danger" data-rmh="${i}">✕</button></div>`,
@@ -22710,7 +22718,7 @@
           w.lines = m
             ? [
                 {
-                  desc: `Hito de contrato · ${CON_TRIGGER[m.trigger] || m.trigger || "sin motivo"}`,
+                  desc: `Hito de contrato · ${triggerLabel(m) || "sin motivo"}`,
                   // `baseCents`, not `amountCents`. The contract states its
                   // instalments WITH VAT, an invoice line is a base and the
                   // document adds VAT itself — using the stated figure here
@@ -22954,7 +22962,7 @@
         if (w.basis === "milestone")
           return bases.milestones.length
             ? `<select id="inv_pick"><option value="">— elige el hito —</option>
-       ${bases.milestones.map((m) => `<option value="${m.idx}"${w.installmentIdx === m.idx ? " selected" : ""}>${esc(CON_TRIGGER[m.trigger] || m.trigger || "hito")} · ${eur(m.amountCents)}${m.expectedDate ? " · " + fmtD(m.expectedDate) : ""}</option>`).join("")}
+       ${bases.milestones.map((m) => `<option value="${m.idx}"${w.installmentIdx === m.idx ? " selected" : ""}>${esc(triggerLabel(m) || "hito")} · ${eur(m.amountCents)}${m.expectedDate ? " · " + fmtD(m.expectedDate) : ""}</option>`).join("")}
       </select>`
             : '<div class="empty">Esta obra no tiene hitos de contrato pendientes.</div>';
         if (w.basis === "certification") {
@@ -23196,6 +23204,53 @@
         onCompletion: "A la finalización",
         fixedDate: "Fecha fija",
       };
+      /* «Al llegar a una fase» said nothing anybody could check — which fase,
+     and how far into it? The operator asked for thresholds instead. The label
+     carries the percentage, so it cannot come from CON_TRIGGER, which is keyed
+     by trigger alone; each threshold is its own dictionary entry rather than a
+     sentence assembled from fragments, because a translator needs the whole
+     phrase to move the number where that language puts it.
+
+     `atStage` keeps its label: contracts already signed carry it, and a row
+     that printed a raw engine word at a customer is the bug PK2 fixed. */
+      const CON_PROGRESS_LABEL = {
+        10: "Al 10 % de avance",
+        20: "Al 20 % de avance",
+        30: "Al 30 % de avance",
+        40: "Al 40 % de avance",
+        50: "Al 50 % de avance",
+        60: "Al 60 % de avance",
+        70: "Al 70 % de avance",
+        80: "Al 80 % de avance",
+        90: "Al 90 % de avance",
+      };
+      /** The trigger <select>'s options: the fixed triggers, with the nine
+     progress thresholds spliced in where they belong — after «al inicio de
+     obra» and before «a la finalización», which is the order the work happens
+     in. A milestone's value carries both facts, `atProgressPct:50`. */
+      const TRIGGER_OPTIONS = [
+        ["onSignature", CON_TRIGGER.onSignature],
+        ["atWorksStart", CON_TRIGGER.atWorksStart],
+        ...Object.entries(CON_PROGRESS_LABEL).map(([pct, lab]) => [
+          "atProgressPct:" + pct,
+          lab,
+        ]),
+        ["onCompletion", CON_TRIGGER.onCompletion],
+        ["fixedDate", CON_TRIGGER.fixedDate],
+        // Kept so a contract already carrying it can be edited without the
+        // row silently changing to whatever happens to be first in the list.
+        ["atStage", CON_TRIGGER.atStage],
+      ];
+      /** A milestone as the <select> spells it. */
+      const trigValue = (h) =>
+        h && h.trigger === "atProgressPct" && h.progressPct != null
+          ? "atProgressPct:" + h.progressPct
+          : (h && h.trigger) || "";
+      /** What a milestone's trigger is called, percentage included. */
+      const triggerLabel = (i) =>
+        i && i.trigger === "atProgressPct"
+          ? CON_PROGRESS_LABEL[i.progressPct] || `Al ${i.progressPct} % de avance`
+          : CON_TRIGGER[(i && i.trigger) || ""] || (i && i.trigger) || "";
       /* Package 2 slide 6, a real bug: `guaranteeCategories` is engine
      vocabulary (executionAndFinishes/installations/structural) and was being
      printed straight onto the customer's contract — CON_TRIGGER got this
@@ -23441,7 +23496,19 @@
           host.innerHTML = `<div class="daylist">
       <div class="it"><span>Estado</span><span style="flex:1"></span><b>${esc(CST[d.status] || d.status)}</b></div>
       <div class="it"><span>Cliente</span><span style="flex:1"></span><b>${esc(d.customer.name)}</b></div>
-      <div class="it"><span>Obra</span><span style="flex:1"></span><b>${esc(d.projectCode || "—")}</b></div>
+      <div class="it"><span>Obra</span><span style="flex:1"></span>${
+        /* «Vincular obra» when there is none. The link lives on the PROJECT,
+           and createContract writes it only for a project that has none —
+           right as a default, and it leaves one hole: a SECOND contract on the
+           same budget can never claim the job, so this row read «—» for good
+           and nothing in the interface could say otherwise. Everything
+           downstream reads that link (the signature gates, the annex chain,
+           the expected collections, the control tower's contracted amount), so
+           a contract without it is a contract outside all of them. */
+        d.projectCode
+          ? `<b>${esc(d.projectCode)}</b>`
+          : '<button class="btn sm" id="conLinkPrj">Vincular obra</button>'
+      }</div>
       <div class="it"><span>Presupuesto</span><span style="flex:1"></span><b>${
         d.origin === "external"
           ? '<span class="pill">firmado fuera</span>'
@@ -23468,8 +23535,41 @@
      </div>`;
           const seeSigned = $("#conSeeSigned");
           if (seeSigned) seeSigned.onclick = () => openPhotoViewer([d.signature.document], 0);
+          const linkPrj = $("#conLinkPrj");
+          if (linkPrj) linkPrj.onclick = () => linkProjectDrawer(conWork.id);
           return;
         }
+      /** Which obra this contract governs.
+     Offers the jobs that have none, and says so when there are none to offer
+     rather than showing an empty select. The engine moves the link rather than
+     copying it — one obra has one contract — and refuses a job that is not
+     there; this only asks the question. */
+      function linkProjectDrawer(contractId) {
+        const free = erp.state.projects.filter((p) => !p.closed && !p.contractId);
+        const db = openDrawer("Vincular obra");
+        db.innerHTML = `<div class="fgrid">
+   ${
+     free.length
+       ? `<div class="field full"><label>Obra *</label><select id="lp_prj">${free
+           .map(
+             (p) =>
+               `<option value="${p.id}">${esc(p.code)} — ${esc(erp.party(p.partyId).name)}</option>`,
+           )
+           .join("")}</select></div>
+    <div class="field full"><p style="font-size:12.5px;color:var(--body);margin:0">El contrato pasa a gobernar esa obra: la firma, los anexos, los cobros previstos y el importe contratado de la torre de control leen este vínculo.</p></div>
+    <div class="field full"><button class="btn primary" id="lp_save">Vincular</button></div>`
+       : '<div class="field full"><div class="empty">No hay obras abiertas sin contrato. Una obra ya vinculada conserva su contrato.</div></div>'
+   }
+  </div>`;
+        const b = $("#lp_save");
+        if (b)
+          b.onclick = () =>
+            mutate(() => {
+              erp.linkContractToProject(contractId, $("#lp_prj").value, "backoffice");
+              closeDrawer();
+            }, "Obra vinculada");
+      }
+
         /* Part 2 · item 11 — what was actually contracted, not just how much.
        The contract already stored `budgetId` + `acceptedVersionId` from the
        day it was created; no screen ever rendered them, so the one document
@@ -23608,7 +23708,7 @@
      d.installments
        .map(
          (i) => `<tr>
-     <td class="k">${esc(CON_TRIGGER[i.trigger] || i.trigger)}${i.pct != null ? ` <span style="color:var(--muted)">${i.pct}%</span>` : ""}</td>
+     <td class="k">${esc(triggerLabel(i))}${i.pct != null ? ` <span style="color:var(--muted)">${i.pct}%</span>` : ""}</td>
      <td class="num">${eur(i.amountCents)}</td>
      <td>${i.expectedDate ? fmtD(i.expectedDate) : "—"}
        ${i.expectedDateSource === "schedule" ? '<br><span class="pill b">de la planificación</span>' : ""}</td>

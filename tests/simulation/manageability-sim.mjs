@@ -6,6 +6,10 @@
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { ERP } = require("../../site/erp-engine.js");
+/* The bridge, for the one thing only it can answer: what date a payment
+   milestone falls on once the plan is known. That derivation — money-chain
+   item 14 — had no test of any kind, in any suite, until PK9-S3. */
+const Bridge = require("../../site/erp-bridge.js");
 
 const checks = [];
 const assert = (cond, name, detail) =>
@@ -285,6 +289,181 @@ assert(
   ).externalRef === "PROT-2026-99",
   "createContract carries the other party's reference onto the record",
 );
+
+/* ── PK9-S3 · a payment milestone at a percentage of PROGRESS ──────────────
+   «Al llegar a una fase» said nothing a customer could check: which fase, and
+   how far into it? The operator asked for thresholds instead — 10 % … 90 % of
+   the work done, plus «a la finalización». The trigger and the AMOUNT stay
+   independent, which is the whole point: a milestone reached at 50 % progress
+   may release a 20 % payment, and the screen has to be able to say so. */
+{
+  const mk = (installments) => {
+    const b = erp.createBudget({ partyId: cust.id, activityLine: "renovation" }, "bo");
+    const c = erp.addChapter(b.id, { name: "Obra" }, "bo");
+    erp.addLine(b.id, c.id, { desc: "T", unit: "ud", qtyMilli: 1000, priceCents: 100000 });
+    erp.issueVersion(b.id, { channel: "hand" }, "bo");
+    erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "ok" }, "bo");
+    return erp.createContract(b.id, { installments, duration: { estimatedDays: 10 } }, "bo");
+  };
+
+  const atHalf = mk([
+    { pct: 20, trigger: "atProgressPct", progressPct: 50 },
+    { pct: 80, trigger: "onCompletion" },
+  ]);
+  assert(
+    atHalf.installments[0].trigger === "atProgressPct" &&
+      atHalf.installments[0].progressPct === 50 &&
+      atHalf.installments[0].pct === 20,
+    "a milestone can fire at 50 % of progress and release 20 % of the money",
+    JSON.stringify(atHalf.installments[0]),
+  );
+
+  /* The trigger list stopped being decoration. It was declared in `config` and
+     read by nothing, so any string at all was accepted as a trigger and the
+     document printed it raw at the customer. */
+  throws(
+    () => mk([{ pct: 100, trigger: "cuandoSalgaElSol" }]),
+    "a trigger outside the configured list is refused",
+  );
+  throws(
+    () => mk([{ pct: 100, trigger: "atProgressPct", progressPct: 55 }]),
+    "…and a progress threshold off the ten-point scale is refused",
+  );
+  throws(
+    () => mk([{ pct: 100, trigger: "atProgressPct" }]),
+    "…and one with no threshold at all is refused",
+  );
+  assert(
+    mk([{ pct: 100, trigger: "atStage", stageRef: "task_1" }]).installments[0].trigger ===
+      "atStage",
+    "…while atStage still works, because contracts already signed carry it",
+  );
+}
+
+/* ── PK9-S3 · a second contract on one budget can still find its obra ──────
+   `createContract` writes the reverse link only when the project has none
+   («never overwrites»), so a second contract on the same budget was unlinked
+   for good, and its screen showed «Obra —» with no way to repair it. */
+{
+  const b = erp.createBudget({ partyId: cust.id, activityLine: "renovation" }, "bo");
+  const c = erp.addChapter(b.id, { name: "Obra" }, "bo");
+  erp.addLine(b.id, c.id, { desc: "T", unit: "ud", qtyMilli: 1000, priceCents: 50000 });
+  erp.issueVersion(b.id, { channel: "hand" }, "bo");
+  erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "ok" }, "bo");
+  const first = erp.createContract(b.id, { duration: { estimatedDays: 5 } }, "bo");
+  const prj = erp.createProjectFromAcceptance(b.id, "bo");
+  assert(prj.contractId === first.id, "the first contract owns the obra", String(prj.contractId));
+
+  const second = erp.createContract(b.id, { duration: { estimatedDays: 5 } }, "bo");
+  assert(
+    erp.contractsView().find((x) => x.id === second.id).projectCode === null,
+    "a second contract on the same budget starts with no obra — that is the bug",
+  );
+  erp.linkContractToProject(second.id, prj.id, "bo");
+  assert(
+    erp.contractsView().find((x) => x.id === second.id).projectCode === prj.code,
+    "…and «Vincular obra» repairs it",
+  );
+  assert(
+    erp.contractsView().find((x) => x.id === first.id).projectCode === null,
+    "…moving the link rather than duplicating it: one obra has one contract",
+  );
+  throws(
+    () => erp.linkContractToProject(second.id, "prj-does-not-exist", "bo"),
+    "linking to an obra that is not there is refused",
+  );
+}
+
+/* ── PK9-S3 · terms are the CALLER's, but not all of them ──────────────────
+   `createContract` merges the caller's terms object wholesale, which is what
+   lets a drawer pass `externalRef` with no whitelist to maintain. The cost is
+   that the same door reaches fields the engine owns: `number` comes from a
+   gap-free series ORG-04 requires, and `origin` decides whether the screen
+   renders our document or the customer's signed file. Neither is a term. */
+{
+  const mk = (terms) => {
+    const b = erp.createBudget({ partyId: cust.id, activityLine: "renovation" }, "bo");
+    const c = erp.addChapter(b.id, { name: "Obra" }, "bo");
+    erp.addLine(b.id, c.id, { desc: "T", unit: "ud", qtyMilli: 1000, priceCents: 1000 });
+    erp.issueVersion(b.id, { channel: "hand" }, "bo");
+    erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "ok" }, "bo");
+    return erp.createContract(b.id, Object.assign({ duration: { estimatedDays: 1 } }, terms), "bo");
+  };
+  throws(() => mk({ number: "CTR-1999-0001" }), "a contract cannot be handed its own number");
+  throws(() => mk({ origin: "external" }), "…nor its origin, which decides what document is shown");
+  assert(
+    mk({ externalRef: "PROT-1" }).externalRef === "PROT-1",
+    "…while the terms a caller IS meant to set still pass straight through",
+  );
+}
+
+/* ── PK9-S3 · what date a progress milestone actually falls on ─────────────
+   `installmentDatesFromPlan` is money-chain item 14 and had no test in any
+   suite. The property that matters is not one date — it is that a LATER
+   threshold lands on a LATER day, because that is what makes the derivation a
+   reading of the plan rather than a plausible constant. */
+{
+  const b = erp.createBudget({ partyId: cust.id, activityLine: "renovation" }, "bo");
+  ["Demolición", "Albañilería", "Pintura", "Limpieza"].forEach((name) => {
+    const c = erp.addChapter(b.id, { name }, "bo");
+    erp.addLine(b.id, c.id, { desc: name, unit: "m2", qtyMilli: 20000, priceCents: 5000 });
+  });
+  erp.issueVersion(b.id, { channel: "hand" }, "bo");
+  erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "ok" }, "bo");
+  const con = erp.createContract(
+    b.id,
+    {
+      installments: [
+        { pct: 25, trigger: "atProgressPct", progressPct: 20 },
+        { pct: 25, trigger: "atProgressPct", progressPct: 80 },
+        { pct: 50, trigger: "onCompletion" },
+      ],
+      duration: { estimatedDays: 30 },
+    },
+    "bo",
+  );
+  const prj = erp.createProjectFromAcceptance(b.id, "bo");
+  erp.linkContractToProject(con.id, prj.id, "bo");
+
+  const derived = Bridge.scheduling.plans.fromBudget(erp, prj.id, {});
+  Bridge.scheduling.plans.save(
+    erp.state,
+    prj.id,
+    Bridge.scheduling.plans.recalculate(derived.plan),
+  );
+
+  const dates = Bridge.scheduling.installmentDatesFromPlan(erp, prj.id);
+  assert(
+    !!dates[0] && !!dates[1] && !!dates[2],
+    "every milestone with a plan behind it gets an expected date",
+    JSON.stringify(dates),
+  );
+  assert(
+    dates[0] < dates[1],
+    "…the 20 % milestone lands before the 80 % one",
+    `${dates[0]} vs ${dates[1]}`,
+  );
+  assert(
+    dates[1] <= dates[2],
+    "…and both land on or before the finish the plan promises",
+    `${dates[1]} vs ${dates[2]}`,
+  );
+  /* PLANNED, never actual. Recording real progress must not move a date the
+     customer agreed to: an expected date is a forecast off the plan, and
+     deriving it from the site's week would reprice the calendar every time
+     somebody typed a percentage. */
+  const before = JSON.stringify(Bridge.scheduling.installmentDatesFromPlan(erp, prj.id));
+  const plan = Bridge.scheduling.plans.get(erp.state, prj.id);
+  Bridge.scheduling.plans.save(
+    erp.state,
+    prj.id,
+    Bridge.scheduling.plans.setProgress(plan, plan.tasks[0].id, 100, erp.today),
+  );
+  assert(
+    JSON.stringify(Bridge.scheduling.installmentDatesFromPlan(erp, prj.id)) === before,
+    "…and recording progress does not move them: the derivation reads the plan, not the site",
+  );
+}
 erp.markContractSent(con.id, "bo");
 assert(erp.state.contracts[0].status === "sent", "markContractSent");
 const con2status = erp.state.contracts[0];

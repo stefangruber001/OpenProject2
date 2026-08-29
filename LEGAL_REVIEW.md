@@ -92,7 +92,29 @@ date) → how it's implemented → gate.
   as scope rather than hidden inside one document.
   **legally_verified: false.**
 
-## 6. Still to research before production (tracked, not blocking P0/P1)
+## 6. Late-payment interest on the contract — Ley 3/2004 (morosidad)
+
+- **What the system asserts.** Every contract is drawn up carrying
+  `penalties.latePaymentInterestPctYear`, taken from tenant configuration and
+  defaulting to **8 % per year**, and prints it on the customer's contract as
+  «LATE PAYMENT · 8 % per year» beside the clause that interest accrues from
+  the due date.
+- **Why it needs review.** That is a legal assertion printed at a customer, and
+  nobody has checked it. Ley 3/2004 sets the statutory rate for commercial
+  transactions by reference to the ECB rate plus a margin, published twice a
+  year — so a hardcoded default is a figure that is right on the day it was
+  chosen and silently wrong afterwards. A B2C contract is a different regime
+  again, and tenant #1 sells to both.
+- **What is NOT asserted.** Nothing computes or charges interest anywhere in
+  the engine; the figure is printed as a contract term only. No invoice, no
+  ageing report and no dunning uses it.
+- **Open questions for the asesor:** whether the default should track the
+  published statutory rate rather than sit in config; whether a consumer
+  contract may carry it at all in this form; and what the contract must say
+  when the parties have not agreed a rate.
+  **legally_verified: false.**
+
+## 7. Still to research before production (tracked, not blocking P0/P1)
 
 Facturae 3.2.x + FACe for public-sector clients; B2B e-invoice under Ley Crea y
 Crece (development pending its reglamento); Modelo 303/390/347/111/115/190 data

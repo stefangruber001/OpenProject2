@@ -3289,6 +3289,31 @@ window.CANEI_DICT = {
        reads what openDrawer actually rendered (`Modificación` alone, in its
        own span). Drop either entry and one of them goes red. */
     ["Modificación ·", "Variation ·"],
+    /* PK9-S3 · payment milestones at a percentage of progress. Nine whole
+       phrases rather than a sentence assembled from «Al», the number and «de
+       avance»: a translator needs the whole phrase to put the number where
+       that language puts it, and fragments are how «Al 50 % de avance» becomes
+       three separate misses in the ledger. */
+    ["Al 10 % de avance", "At 10 % progress"],
+    ["Al 20 % de avance", "At 20 % progress"],
+    ["Al 30 % de avance", "At 30 % progress"],
+    ["Al 40 % de avance", "At 40 % progress"],
+    ["Al 50 % de avance", "At 50 % progress"],
+    ["Al 60 % de avance", "At 60 % progress"],
+    ["Al 70 % de avance", "At 70 % progress"],
+    ["Al 80 % de avance", "At 80 % progress"],
+    ["Al 90 % de avance", "At 90 % progress"],
+    ["Vincular obra", "Link a job"],
+    ["Vincular", "Link"],
+    ["Obra vinculada", "Job linked"],
+    [
+      "El contrato pasa a gobernar esa obra: la firma, los anexos, los cobros previstos y el importe contratado de la torre de control leen este vínculo.",
+      "The contract comes to govern that job: the signature, the annexes, the expected collections and the control tower's contracted amount all read this link.",
+    ],
+    [
+      "No hay obras abiertas sin contrato. Una obra ya vinculada conserva su contrato.",
+      "There are no open jobs without a contract. A job already linked keeps its contract.",
+    ],
     [
       "Sin aprobar: este trabajo todavía no es facturable.",
       "Unapproved: this work is not billable yet.",

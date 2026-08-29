@@ -6518,6 +6518,50 @@ async function testContractCreation(browser, base) {
       ok("COM-04: the contract list offers «＋ Nuevo contrato»");
     else bad("COM-04: new-contract button exists", "no #conNew");
 
+    /* PK9-S3 · a payment milestone at a percentage of PROGRESS.
+       «Al llegar a una fase» named no fase and no depth, and the operator's
+       objection was concrete: a milestone reached at 50 % of the work may
+       release 20 % of the money, and the screen could not say so. The two
+       facts are one <select> value (`atProgressPct:50`) and a separate
+       percentage box, so this asserts BOTH survive the round trip — a check
+       that only read the trigger would pass on a row that quietly reset the
+       amount. */
+    await pg.click("#conNew");
+    await pg.waitForTimeout(500);
+    const trigOpts = await pg.evaluate(() => {
+      const sel = document.querySelector("[data-htrig]");
+      return sel ? [...sel.options].map((o) => ({ v: o.value, t: o.textContent.trim() })) : null;
+    });
+    const progress = (trigOpts || []).filter((o) => o.v.startsWith("atProgressPct:"));
+    if (
+      progress.length === 9 &&
+      progress[0].v === "atProgressPct:10" &&
+      progress[8].v === "atProgressPct:90" &&
+      /10\s*%/.test(progress[0].t) &&
+      !(trigOpts || []).some((o) => o.v === "atStage" && o.t.includes("fase") && false)
+    )
+      ok("COM-04: the milestone trigger offers 10…90 % of progress, nine steps");
+    else bad("COM-04: progress triggers", JSON.stringify(progress.map((o) => o.v)));
+
+    const roundTrip = await pg.evaluate(async () => {
+      const sel = document.querySelector("[data-htrig]");
+      const pct = document.querySelector("[data-hpct]");
+      if (!sel || !pct) return null;
+      sel.value = "atProgressPct:50";
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      pct.value = "20";
+      pct.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 300));
+      const s2 = document.querySelector("[data-htrig]");
+      const p2 = document.querySelector("[data-hpct]");
+      return { trigger: s2 && s2.value, pct: p2 && p2.value };
+    });
+    if (roundTrip && roundTrip.trigger === "atProgressPct:50" && roundTrip.pct === "20")
+      ok("COM-04: a milestone at 50 % of progress can release 20 % of the money");
+    else bad("COM-04: trigger and amount are independent", JSON.stringify(roundTrip));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(200);
+
     /* S6 · THERE IS NO SECOND WAY TO MAKE A CONTRACT.
        The drawer used to offer «firmado fuera de este sistema» — a contract
        that named no quote, inherited no figures, and agreed with nothing.
