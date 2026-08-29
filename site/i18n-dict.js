@@ -3259,6 +3259,40 @@ window.CANEI_DICT = {
     ["extra", "extra"],
     ["extras", "extras"],
     ["Sin aprobar", "Unapproved"],
+    /* PRY-03 became a register in PK9-S2: the five counters are a stage filter
+       and one «sin aprobar» total, and the per-status actions moved into the
+       row's own drawer. These are that screen's words. */
+    [
+      "Extras y modificaciones de todas las obras. El trabajo no aprobado nunca es facturable — la barra ámbar lo dice desde lejos.",
+      "Extras and variations across every job. Work that has not been approved is never billable — the amber bar says so from across the room.",
+    ],
+    ["Todas", "All"],
+    ["Detectada", "Identified"],
+    ["Valorada", "Priced"],
+    ["Ejecutada", "Executed"],
+    ["Facturada", "Invoiced"],
+    ["Buscar por descripción, obra o partida", "Search by description, job or chapter"],
+    ["modificación", "variation"],
+    ["modificaciones", "variations"],
+    ["Ninguna modificación en esta etapa.", "No variation at this stage."],
+    ["Ninguna modificación coincide con la búsqueda.", "No variation matches the search."],
+    ["Modificación ·", "Variation ·"],
+    [
+      "Sin aprobar: este trabajo todavía no es facturable.",
+      "Unapproved: this work is not billable yet.",
+    ],
+    ["Nuevo presupuesto de variación", "New variation quote"],
+    ["Obra *", "Job *"],
+    [
+      "Se abre el presupuestador con una versión nueva sobre esa obra. Al aceptarse, sus partidas entran en la economía, el avance y la certificación.",
+      "The quote builder opens with a new version for that job. Once accepted, its chapters enter the economics, the progress and the valuations.",
+    ],
+    ["Crear y abrir", "Create and open"],
+    [
+      "No hay obras abiertas sobre las que crear un presupuesto de variación.",
+      "There are no open jobs to create a variation quote for.",
+    ],
+    ["La obra es obligatoria", "The job is required"],
     ["＋ Nueva modificación", "＋ New variation"],
     ["Modificaciones", "Variations"],
     ["no facturable sin aprobación", "not billable without approval"],

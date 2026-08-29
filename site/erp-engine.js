@@ -3885,9 +3885,22 @@
       this._log(user, "approveChange", changeId);
       return c;
     }
+    /**
+     * The extras of one obra — or, with no argument, of every obra.
+     *
+     * PRY-03 is a register now rather than a per-project panel, so the figure
+     * it shows is about the whole workspace. That total belongs here for the
+     * same reason the per-project one does: a sum added up in the view is a
+     * business rule living in neither a capability nor a pack, and a second
+     * implementation of "what counts as unapproved" is the one that drifts
+     * from CHG-04. One method, one definition, two scopes.
+     */
     extrasRegister(projectId) {
       // CHG-05/07
-      const list = this.state.changes.filter((c) => c.projectId === projectId);
+      const list =
+        projectId == null
+          ? this.state.changes.slice()
+          : this.state.changes.filter((c) => c.projectId === projectId);
       return {
         items: list,
         identified: list.filter((c) => c.status === "identified").length,

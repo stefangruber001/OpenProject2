@@ -1647,6 +1647,40 @@ assert(
     erp.changeStage(erp.state.changes.find((c) => c.id === rejected.id)) === "",
     "…and changeStage says so rather than inventing a stage for it",
   );
+
+  /* The register lists every obra's extras at once, so the «sin aprobar» total
+     it shows is a figure about the whole workspace — and it belongs here, not
+     summed in the view. A total added up in the host would be a business rule
+     living in neither a capability nor a pack, and the second implementation
+     of a sum is the one that goes wrong. Called with no project, the same
+     method answers for all of them. */
+  // An extra nobody has approved, with a price on it — otherwise both sides of
+  // the «sin aprobar» comparison below are zero and it passes by agreeing
+  // about nothing.
+  const pending = erp.addChange(prj.id, { desc: "Sin aprobar S2" }, "ops");
+  erp.priceChange(pending.id, 77700, 40000, 0, "bo");
+
+  const all = erp.extrasRegister();
+  const perProject = erp.state.projects.map((p) => erp.extrasRegister(p.id));
+  assert(
+    all.unapprovedValueCents >= 77700,
+    "…the fixture really does carry unapproved value to compare",
+    String(all.unapprovedValueCents),
+  );
+  assert(
+    all.items.length === erp.state.changes.length,
+    "extrasRegister() with no project answers for every obra",
+    `${all.items.length} vs ${erp.state.changes.length}`,
+  );
+  assert(
+    all.unapprovedValueCents === perProject.reduce((s, r) => s + r.unapprovedValueCents, 0),
+    "…and its «sin aprobar» total is exactly the sum of the per-obra ones",
+    String(all.unapprovedValueCents),
+  );
+  assert(
+    all.approvedValueCents === perProject.reduce((s, r) => s + r.approvedValueCents, 0),
+    "…and so is its approved total",
+  );
 }
 
 /* ---- S10 · ADM-01's four counters, and what an invoice is billed against -- */

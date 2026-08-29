@@ -6479,6 +6479,7 @@ send says so instead of quietly producing nothing.
 the demonstration path is not a default. Anything the product needs in order
 to work has to be installed by the product, not by the fixture that makes it
 look good.
+
 ### 196 · Two renderers of one descriptor now agree, because nothing made them (2026-08-29)
 
 The operator reported that «Exclusiones» and «Supuestos» were missing from the
@@ -6554,3 +6555,68 @@ Both drawers now carry a `＋` button, and the button and the key call one
 function so neither is the special case. The placeholder stopped saying
 «Añadir y pulsar Enter», because it was instructions for the path that did not
 work.
+
+### 199 · Adicionales is a register, and the amber rule is what had to survive (2026-08-29)
+
+The operator asked that PRY-03 stop opening with a project selector and five
+money counters, and take the shape Clientes and Proveedores already have. It
+now does: one `renderMasterList` call, one row per modificación, every obra at
+once, search on description/obra/partida, and an export it never had.
+
+**What was deliberately kept.** CHG-04 — unapproved work is never billable —
+is the reason this screen was designed the way it was, and the amber rule down
+an unapproved row is how it says so to somebody walking past. `renderMasterList`
+could only style CELLS, so it gained one `rowClass(r)` option. That option
+should stay rare; it exists for this rule.
+
+**And the rule still nearly went missing.** The CSS selector was
+`tr.xrow.unapproved`, named after the old table's rows; the register's are
+`tr.click`, so the class went on being written, the pill went on printing, and
+the border silently stopped being drawn. The e2e caught it — `unapprovedRows: 1,
+matchesEngine: true, rule: "0px"` — and the selector is now keyed on the STATE
+(`tr.unapproved`) rather than on the screen that first showed it.
+
+**The counters became one number and a filter.** Five money cards were what the
+operator asked to stop seeing; a stage `<select>` keeps the filtering and one
+«Sin aprobar · N €» pill keeps CHG-04's headline figure. A six-tab tabstrip
+does not fit a phone, and Obras already uses a select for exactly this job.
+The `.counter` CSS stays: ADM-02 Compras uses the same markup.
+
+**The total comes from the engine.** `extrasRegister()` answers for every obra
+when called with no project, so the register reads one definition of "what
+counts as unapproved" rather than summing it again in the view. Red-first in
+the manageability sim, including a fixture carrying real unapproved value —
+the first version compared zero to zero and passed by agreeing about nothing.
+
+**Two decisions about scope.** The obra moved into the creation drawers rather
+than staying a page-level selector, and its list is built from
+`erp.state.projects` instead of `projectOptions()`: that helper obeys the
+project BAR's filter, so a bar left on «Cerrados» elsewhere would have emptied
+the picker with nothing on screen explaining why. Variation budgets get a
+create button and no list, because `budgetList` already shows them and the
+contract's Alcance tab lists the accepted ones.
+
+### 200 · The syntax gate did not read the biggest script in the project (2026-08-29)
+
+Rewriting the screen left the old `let chgStage` in place beside the new one.
+Two `let`s in one scope is a hard SyntaxError that voids the entire `<script>`
+tag — every screen gone, the same failure `tests/site-syntax` was written for
+after a stray backtick took out `erp-modal.js`.
+
+It reported `all 28 scripts in site/ parse`. True, and useless: it globbed
+`site/*.js` and never opened the ~23 000 lines of JavaScript written INSIDE
+`<script>` in `erp.html`. The one file the operator actually looks at was
+outside the net.
+
+Proved before fixing, by reintroducing the duplicate and watching the gate pass
+anyway. Inline blocks are now extracted — skipping `src`, modules and non-JS
+types — and checked with line numbers padded so a failure points at the page's
+own line: `site/erp.html (inline block from line 5103) — SyntaxError: Identifier
+'chgStage' has already been declared [site/erp.html:8073]`. A zero-inline-blocks
+result now fails too, so the extraction cannot quietly stop matching and narrow
+the gate back to what it used to cover.
+
+The failure was reachable another way — a parse error breaks every browser
+suite — but that is twelve minutes and a wall of red for something `node
+--check` answers in milliseconds, which is the argument the file already made
+for itself.

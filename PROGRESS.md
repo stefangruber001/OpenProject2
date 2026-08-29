@@ -1828,14 +1828,14 @@ Seven observations from the operator walking the live build on a phone. Plan:
 `/root/.claude/plans/witty-hatching-alpaca.md`. Any resume reads THIS table and
 continues with the first session not marked done.
 
-| Session | Scope                                                                                    | Status                                                                  |
-| ------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| S1      | quote PDF drops exclusiones/supuestos · S curve cannot move · ＋ on the conditions lists | **done** — 637/637 e2e, doc-pdf 43/43 (41/43 red first), tracking 61/61 |
-| S2      | Adicionales becomes a register: no project bar, no counter cards, CHG-04 marking kept    | pending                                                                 |
-| S3      | milestones at 10–90 % de avance · the «Obra —» link · LEGAL_REVIEW · terms whitelist     | pending                                                                 |
-| S4      | the contract sheet on a phone (`.sheet` is a fixed 210 mm page)                          | pending                                                                 |
-| S5      | the Gantt on a phone — read-and-record below ~700 px, desktop untouched                  | pending                                                                 |
-| S6      | sweep + the ENGLISH client report (28/08 and 29/08 observations)                         | pending                                                                 |
+| Session | Scope                                                                                    | Status                                                                                                     |
+| ------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| S1      | quote PDF drops exclusiones/supuestos · S curve cannot move · ＋ on the conditions lists | **done** — 637/637 e2e, doc-pdf 43/43 (41/43 red first), tracking 61/61                                    |
+| S2      | Adicionales becomes a register: no project bar, no counter cards, CHG-04 marking kept    | **done** — register + row drawer, engine-wide `extrasRegister()`, and site-syntax now reads inline scripts |
+| S3      | milestones at 10–90 % de avance · the «Obra —» link · LEGAL_REVIEW · terms whitelist     | pending                                                                                                    |
+| S4      | the contract sheet on a phone (`.sheet` is a fixed 210 mm page)                          | pending                                                                                                    |
+| S5      | the Gantt on a phone — read-and-record below ~700 px, desktop untouched                  | pending                                                                                                    |
+| S6      | sweep + the ENGLISH client report (28/08 and 29/08 observations)                         | pending                                                                                                    |
 
 Decided with the operator and NOT to be re-opened: Adicionales keeps its menu
 row (the relocation was designed, then cancelled to de-risk); milestone
