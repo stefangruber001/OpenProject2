@@ -5345,6 +5345,11 @@
         } catch (e) {}
         if (advanceClock()) persist();
 
+        // N2 · file into the company Drafts whatever was generated before the
+        // mailbox was connected, or failed to file last time. Fire-and-forget:
+        // boot never waits on a mail server.
+        sweepMailboxDrafts();
+
         const rawHash = location.hash.slice(1),
           hashKey = resolveRoute(rawHash);
         if (hashKey && SUBMAP[hashKey]) {
@@ -10663,10 +10668,13 @@
         );
         const q = $("#cmQueue");
         if (q)
-          q.onclick = () =>
+          q.onclick = () => {
             mutate(() => {
               pending.forEach((p) => erp.queueCommunication(p, "backoffice"));
             }, pending.length + " mensaje(s) en cola — ninguno se ha enviado");
+            // N2 · queued means a draft belongs in the mailbox, not only sent
+            sweepMailboxDrafts();
+          };
         if (comTab === "plantillas") wireTemplatesPanel(tpl);
         if (comTab === "reglas") wireRulesPanel();
         if (comTab === "cola") wireQueuePanel();
@@ -19171,6 +19179,19 @@
    <div class="card"><div class="ch"><h3>Contacto</h3></div>
     ${grid("phone", "email", "web")}</div>
 
+   <div class="card"><div class="ch"><h3>Correo de la empresa</h3>
+     <span class="tag" id="co_mailState">comprobando…</span></div>
+    <div class="daylist"><div class="it" style="color:var(--muted)">Desde este buzón se preparan los borradores de todo lo que genera el programa: presupuestos, facturas, recordatorios. El programa no envía nada — deja el borrador escrito y usted lo revisa y pulsa enviar.</div></div>
+    <div class="fgrid" style="padding:12px 16px">
+     <div class="field"><label>Correo de la empresa</label>
+      <input id="co_mailAddress" type="email" autocomplete="username" value="" placeholder="hola@empresa.com"></div>
+     <div class="field"><label>Contraseña del correo</label>
+      <input id="co_mailPassword" type="password" autocomplete="new-password" value="" placeholder="••••••••"></div>
+     <div class="field full"><button class="btn" id="co_mailSave">Conectar el buzón</button>
+      <span id="co_mailMsg" style="margin-left:10px;font-size:12.5px;color:var(--muted)"></span></div>
+    </div>
+    <div class="daylist"><div class="it" style="color:var(--muted)">La contraseña se guarda cifrada en el servidor y nunca en los datos de la empresa: no viaja a los móviles, no sale en las copias de seguridad y no se puede volver a leer desde esta pantalla. Antes de guardarla se prueba conectando de verdad al buzón.</div></div></div>
+
    <div class="card"><div class="ch"><h3>Banco</h3><span class="tag">AR-02</span></div>
     ${grid("iban", "bic", "bankName")}</div>
 
@@ -19214,6 +19235,17 @@
             companyLogo = r;
           },
         });
+        /* The company mailbox, entered where the operator looks for it.
+           THE PASSWORD NEVER ENTERS THE COMPANY DOCUMENT. Everything else on
+           this screen is saved into the ERP state, which syncs to every device
+           and is written to backups — exactly where a mail password must not
+           be. It goes to /api/mail-settings instead, which tests the
+           credential by filing a probe draft and only then stores it sealed on
+           the server. That endpoint is the same one Configuración › Email
+           already uses; this card is a second door to it, not a second
+           implementation. */
+        wireCompanyMailbox();
+
         const same = $("#co_same");
         const mirrored = ["street", "postalCode", "city", "province", "country"];
         const applySame = () => {
@@ -19247,6 +19279,109 @@
           }, "Datos de la empresa guardados");
         };
       };
+
+      /**
+       * The mailbox half of Configuración › Empresa.
+       *
+       * Kept out of `#co_save`: that button writes the company document, and a
+       * mail password must never travel in it. This one talks to the server
+       * directly and reports what the server says — connected, refused, or not
+       * reachable — because a screen that says "saved" over a password the
+       * mail provider rejected is the failure the whole feature exists to
+       * avoid. On success the drafts already recorded are swept into the
+       * mailbox immediately, so the operator sees the effect rather than being
+       * told about it.
+       */
+      function wireCompanyMailbox() {
+        const state = $("#co_mailState"),
+          msg = $("#co_mailMsg"),
+          save = $("#co_mailSave"),
+          addr = $("#co_mailAddress"),
+          pass = $("#co_mailPassword");
+        if (!state || !save) return;
+        const remote = typeof ErpStore !== "undefined" && ErpStore.isRemote();
+        if (!remote) {
+          // No server, no mailbox — and no pretending otherwise. The published
+          // read-only copies and a browser-only workspace land here.
+          state.textContent = "solo en el servidor";
+          msg.textContent = "Esta copia funciona sin servidor: el buzón se conecta en la instalación de la empresa.";
+          save.disabled = true;
+          addr.disabled = pass.disabled = true;
+          return;
+        }
+        const base = ErpStore.apiBase() || "";
+        fetch(base + "/api/~/erp/draft", { credentials: "same-origin" })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((info) => {
+            if (info && info.configured) {
+              state.textContent = "conectado";
+              if (info.from && !addr.value) addr.value = info.from;
+              // Label and address are separate nodes: one translates, the
+              // other is data and must not (A12's rule, same reason).
+              msg.innerHTML =
+                "Los borradores se archivan en: " +
+                `<span translate="no">${esc(info.from || "el buzón de la empresa")}</span>`;
+            } else {
+              state.textContent = "sin conectar";
+              msg.textContent = "Todavía no se archiva ningún borrador.";
+            }
+          })
+          .catch(() => {
+            state.textContent = "no se ha podido comprobar";
+          });
+        save.onclick = () => {
+          const address = addr.value.trim().toLowerCase(),
+            password = pass.value;
+          if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) {
+            toast("⚠ Escriba el correo de la empresa");
+            return;
+          }
+          if (!password) {
+            toast("⚠ Escriba la contraseña del correo");
+            return;
+          }
+          const body = new FormData();
+          body.append("address", address);
+          body.append("password", password);
+          // Left blank on purpose: the server finds the mail host from the
+          // domain's own MX records. Advanced settings live on the dedicated
+          // screen for the rare mailbox where that is not enough.
+          body.append("host", "");
+          body.append("drafts", "");
+          save.disabled = true;
+          msg.textContent = "Probando la conexión con el buzón…";
+          fetch(base + "/api/mail-settings", { method: "POST", credentials: "same-origin", body })
+            .then((r) => {
+              // The endpoint answers with a redirect carrying the outcome, so
+              // the answer is in the address we ended up on.
+              const q = new URLSearchParams((r.url.split("?")[1] || "").replace(/#.*$/, ""));
+              return { status: q.get("status") || (r.ok ? "ok" : "failed"), detail: q.get("detail") || "" };
+            })
+            .then((res) => {
+              save.disabled = false;
+              // The password is dropped from the screen either way: it is
+              // stored on the server or it was refused, and neither case is a
+              // reason to leave it sitting in a form field.
+              pass.value = "";
+              if (res.status === "ok") {
+                state.textContent = "conectado";
+                msg.innerHTML =
+                  "Buzón conectado. Hay un borrador de prueba esperando en: " +
+                  `<span translate="no">${esc(address)}</span>`;
+                toast("Buzón conectado");
+                sweepMailboxDrafts();
+              } else {
+                state.textContent = "sin conectar";
+                msg.textContent = res.detail || "El buzón no ha aceptado estos datos. No se ha guardado nada.";
+                toast("⚠ El buzón no ha aceptado estos datos");
+              }
+            })
+            .catch(() => {
+              save.disabled = false;
+              msg.textContent = "No se ha podido contactar con el servidor. No se ha guardado nada.";
+            });
+        };
+      }
 
       const UI_LANGS = [
         ["es", "Castellano", "Español"],
@@ -21059,10 +21194,14 @@
           return null; // a draft without its attachment still beats no draft
         }
       }
-      /** Called wherever a message is marked sent: build the .eml, file it,
-       *  record the outcome beside the queue row. Fire-and-forget — the send
-       *  itself never waits on the mailbox. */
-      function fileDraftForComm(q) {
+      /** Called wherever a message exists that should sit in the company
+       *  Drafts folder: build the .eml, file it, record the outcome beside
+       *  the queue row. Resolves to that outcome so the sweep below can wait
+       *  on it; callers that fire-and-forget lose nothing. Idempotent — a row
+       *  already in the mailbox is never filed twice, which is what lets the
+       *  send-time hooks and the sweep coexist without duplicate drafts. */
+      function fileDraftForComm(q, silent) {
+        if (!q || q.filed === "mailbox") return Promise.resolve("mailbox");
         try {
           const iss = erp._issuerBlock();
           const tpl = erp.commsTemplate(q.templateKey) || { subject: "", body: "" };
@@ -21083,16 +21222,65 @@
             html: draftEmailHtml(subject, body),
             attachments: att ? [att] : [],
           });
-          fileDraft(eml).then((outcome) => {
+          return fileDraft(eml).then((outcome) => {
             erp.recordCommunicationFiled(q.id, outcome, "backoffice");
             persist();
-            if (outcome === "mailbox") toast("Borrador archivado en el buzón");
+            if (outcome === "mailbox" && !silent) toast("Borrador archivado en el buzón");
+            return outcome;
           });
         } catch (e) {
           try {
             erp.recordCommunicationFiled(q.id, "error", "backoffice");
           } catch (_) {}
+          return Promise.resolve("error");
         }
+      }
+      /** N2 · the mailbox arrived AFTER months of messages. Everything already
+       *  recorded — and everything queued from now on — belongs in Drafts, not
+       *  only what is marked sent from this moment forward. So: ask the server
+       *  once whether a mailbox is connected, and if it is, file every queued
+       *  or recorded email whose draft is not there yet. Runs at boot and
+       *  after queueing; the per-row guard above makes re-runs harmless.
+       *  Sequential with a pause, because each draft is one IMAP login and the
+       *  provider throttles a burst of them. Cancelled and blocked rows stay
+       *  out: one was declined by a person, the other has no recipient. */
+      let sweepingDrafts = false;
+      function sweepMailboxDrafts() {
+        if (typeof ErpStore === "undefined" || !ErpStore.isRemote() || sweepingDrafts)
+          return Promise.resolve(0);
+        const rows = ((erp && erp.state.commsQueue) || []).filter(
+          (q) =>
+            ["draft", "approved", "sent"].includes(q.status) && q.to && q.filed !== "mailbox",
+        );
+        if (!rows.length) return Promise.resolve(0);
+        sweepingDrafts = true;
+        return fetch(ErpStore.apiBase() + "/api/~/erp/draft", { credentials: "same-origin" })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((info) => {
+            if (!info || !info.configured) return 0;
+            let filedNow = 0;
+            let chain = Promise.resolve();
+            rows.forEach((q) => {
+              chain = chain
+                .then(() => fileDraftForComm(q, true))
+                .then((outcome) => {
+                  if (outcome === "mailbox") filedNow += 1;
+                  return new Promise((res) => setTimeout(res, 250));
+                });
+            });
+            return chain.then(() => filedNow);
+          })
+          .then(
+            (n) => {
+              sweepingDrafts = false;
+              if (n) toast(n + " borrador(es) archivado(s) en el buzón");
+              return n;
+            },
+            () => {
+              sweepingDrafts = false;
+              return 0;
+            },
+          );
       }
       /** N1 · the operator's "standard drop-down at the bottom" — the same
        *  language control under every document panel. Frozen documents show

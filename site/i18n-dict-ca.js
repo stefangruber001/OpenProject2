@@ -738,6 +738,35 @@ window.CANEI_DICT.ca = {
   "Sin buzón configurado — el mensaje queda solo registrado":
     "Sense bústia configurada — el missatge queda només registrat",
   "Borrador archivado en el buzón": "Esborrany arxivat a la bústia",
+  "Correo de la empresa": "Correu de l'empresa",
+  "Los borradores se archivan en:": "Els esborranys s'arxiven a:",
+  "el buzón de la empresa": "la bústia de l'empresa",
+  "Buzón conectado. Hay un borrador de prueba esperando en:":
+    "Bústia connectada. Hi ha un esborrany de prova esperant a:",
+  "Contraseña del correo": "Contrasenya del correu",
+  "Conectar el buzón": "Connecta la bústia",
+  conectado: "connectada",
+  "sin conectar": "sense connectar",
+  "comprobando…": "comprovant…",
+  "solo en el servidor": "només al servidor",
+  "no se ha podido comprobar": "no s'ha pogut comprovar",
+  "Buzón conectado": "Bústia connectada",
+  "Todavía no se archiva ningún borrador.": "Encara no s'arxiva cap esborrany.",
+  "Probando la conexión con el buzón…": "Provant la connexió amb la bústia…",
+  "El buzón no ha aceptado estos datos. No se ha guardado nada.":
+    "La bústia no ha acceptat aquestes dades. No s'ha desat res.",
+  "No se ha podido contactar con el servidor. No se ha guardado nada.":
+    "No s'ha pogut contactar amb el servidor. No s'ha desat res.",
+  "Esta copia funciona sin servidor: el buzón se conecta en la instalación de la empresa.":
+    "Aquesta còpia funciona sense servidor: la bústia es connecta a la instal·lació de l'empresa.",
+  "Desde este buzón se preparan los borradores de todo lo que genera el programa: presupuestos, facturas, recordatorios. El programa no envía nada — deja el borrador escrito y usted lo revisa y pulsa enviar.":
+    "Des d'aquesta bústia es preparen els esborranys de tot el que genera el programa: pressupostos, factures, recordatoris. El programa no envia res — deixa l'esborrany escrit i vostè el revisa i prem enviar.",
+  "La contraseña se guarda cifrada en el servidor y nunca en los datos de la empresa: no viaja a los móviles, no sale en las copias de seguridad y no se puede volver a leer desde esta pantalla. Antes de guardarla se prueba conectando de verdad al buzón.":
+    "La contrasenya es desa xifrada al servidor i mai a les dades de l'empresa: no viatja als mòbils, no surt a les còpies de seguretat i no es pot tornar a llegir des d'aquesta pantalla. Abans de desar-la es prova connectant de veritat a la bústia.",
+  "⚠ Escriba el correo de la empresa": "⚠ Escrigui el correu de l'empresa",
+  "⚠ Escriba la contraseña del correo": "⚠ Escrigui la contrasenya del correu",
+  "⚠ El buzón no ha aceptado estos datos": "⚠ La bústia no ha acceptat aquestes dades",
+  "borrador(es) archivado(s) en el buzón": "esborrany(s) arxivat(s) a la bústia",
   "⚠ No se pudo archivar el borrador:": "⚠ No s'ha pogut arxivar l'esborrany:",
   "⚠ No se pudo contactar con el servidor para archivar el borrador":
     "⚠ No s'ha pogut contactar amb el servidor per arxivar l'esborrany",
@@ -4400,6 +4429,10 @@ window.CANEI_DICT.rxEs2Ca = [
   [
     new RegExp("^(\\d+) mensaje\\(s\\) en cola — ninguno se ha enviado$"),
     "$1 missatge(s) a la cua — cap no s'ha enviat",
+  ],
+  [
+    new RegExp("^(\\d+) borrador\\(es\\) archivado\\(s\\) en el buz\u00f3n$"),
+    "$1 esborrany(s) arxivat(s) a la b\u00fastia",
   ],
   [new RegExp("^Enviar (\\S+) · v([\\d.]+)$"), "Enviar $1 · v$2"],
   [new RegExp("^(.+) · (\\d+) d · (\\d+) visita$"), "$1 · $2 d · $3 visita"],

@@ -6358,3 +6358,58 @@ the screen admits it.
 **Red-first:** all four new checks fail against the previous tree — two mode
 radios still present, no `#bContract` on the quote, and the completeness block
 never offered on the budget path.
+
+## S39 · PK-J — the mailbox arrived after the messages (2026-08-29)
+
+The operator connected if@2iberia.com from Configuración › Email (the screen
+tests the credential by filing a probe draft, so their screenshot of a draft
+in the mailbox was real proof). Yet the ERP kept saying «sin buzón — solo
+registrado» on every row. Root cause, established before touching anything:
+drafts were filed only at the moment a message was _marked sent_, so every
+message generated before the mailbox existed — and every row still sitting
+queued — was never retried by anything. The server side was never broken.
+
+**Decision: sweep, at boot and after queueing.** `sweepMailboxDrafts()` asks
+the server once whether a mailbox is configured and, if so, files every
+queued or recorded email whose draft is not in the mailbox yet — statuses
+draft, approved and sent. Cancelled rows stay out (a person said no) and
+blocked rows stay out (no recipient to address the draft to). Filing is now
+idempotent (`filed === "mailbox"` is never refiled), which is what lets the
+send-time hooks and the sweep coexist without duplicate drafts. Sequential
+with a 250 ms pause per row: each draft is one IMAP login, and Hostinger
+throttles login bursts.
+
+**Accepted edge:** a row recorded «error» after an append that actually
+reached the mailbox would be filed again by the next sweep — a duplicate
+draft a person deletes in one gesture. The opposite failure (a draft the
+operator believes exists and does not) is the one this project refuses.
+
+## S40 · The mailbox is entered where the operator looks for it (2026-08-29)
+
+The operator asked for «Company Email» and «Company Email Password» on
+Configuración › Empresa, so that the admin enters them once and everything
+the ERP generates is written from that address. The card is there now,
+between Contacto and Banco.
+
+**The password does NOT go into the company record**, and that is the whole
+design of this card. Everything else on that screen is saved with `#co_save`
+into the ERP state document — which syncs to every phone and laptop the
+company uses and is written verbatim into every backup. A mail password in
+that blob would be a credential in a dozen places nobody is guarding. So the
+card posts to `/api/mail-settings` instead: the endpoint that already existed
+behind Configuración › Email, which TESTS the credential by filing a probe
+draft and only stores it — sealed with the server's key — if the mail server
+accepted it. A refusal is reported on the card and nothing is written.
+
+**One implementation, two doors.** The dedicated screen keeps the advanced
+settings (explicit IMAP host, an explicit Drafts folder); this card asks for
+the two things the operator named and lets the server find the mail host from
+the domain's MX records, which is how `imapCandidates()` already works. On
+success it runs the PK-J sweep immediately, so the messages already recorded
+appear in Drafts while the operator is still on the screen rather than at the
+next reload.
+
+Local copies (no server) disable the card and say why: a browser-only
+workspace has no mailbox to connect, and a form that pretends otherwise would
+be the "reported success while doing nothing" failure this project keeps
+meeting.

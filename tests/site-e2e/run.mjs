@@ -4381,6 +4381,38 @@ async function testFirstRun(browser, base) {
       ok("first run: the company record saves, and both addresses reach the documents");
     else bad("first run: company saved", JSON.stringify(saved));
 
+    /* PK-J · the mailbox is entered on this screen too, and the password is
+       NOT part of the company record. Both halves are asserted: the fields
+       exist and are usable, and «Guardar» does not carry the password into
+       the document that syncs to every device and lands in the backups. */
+    const mailbox = await pg.evaluate(() => {
+      const addr = document.querySelector("#co_mailAddress");
+      const pass = document.querySelector("#co_mailPassword");
+      const save = document.querySelector("#co_mailSave");
+      if (!addr || !pass || !save) return { missing: true };
+      addr.value = "buzon@e2e.example";
+      pass.value = "not-a-real-password";
+      document.querySelector("#co_save").click();
+      const c = erp.companyProfile();
+      const blob = JSON.stringify(erp.state);
+      return {
+        missing: false,
+        type: pass.type,
+        // The card is inert without a server, and says so rather than
+        // pretending a mailbox can be connected from a local copy.
+        disabledLocally: save.disabled,
+        leaked: blob.includes("not-a-real-password"),
+        addrLeaked: JSON.stringify(c).includes("buzon@e2e.example"),
+      };
+    });
+    await pg.waitForTimeout(400);
+    if (!mailbox.missing && mailbox.type === "password" && mailbox.disabledLocally)
+      ok("PK-J: the company screen asks for the mailbox address and password");
+    else bad("PK-J: company mailbox fields", JSON.stringify(mailbox));
+    if (!mailbox.leaked && !mailbox.addrLeaked)
+      ok("PK-J: the mail password never enters the company document");
+    else bad("PK-J: mail credential kept out of the state blob", JSON.stringify(mailbox));
+
     /* The point of the record: a default that used to be a literal in the
        engine now comes from here. Fifteen days, not thirty. */
     const stamped = await pg.evaluate(() => {
@@ -9905,6 +9937,99 @@ async function testSendAndVersions(browser, base) {
       if (/sin buzón — solo registrado/.test(queueShows))
         ok("N2: the queue screen shows where each draft ended up");
       else bad("N2: queue filed column", queueShows.replace(/\n/g, " ").slice(0, 160));
+
+      /* ===== PK-J: once a mailbox IS connected, everything already recorded
+         is swept into it, and a row already filed is never filed twice.
+         The server is stubbed in-page: GET says configured, POST accepts.
+         State is restored byte-identically afterwards — the suites share
+         one browser profile. */
+      const sweep = await pg.evaluate(async () => {
+        await new Promise((r) => setTimeout(r, 400)); // flush the debounced save
+        const realFetch = window.fetch;
+        const realIsRemote = ErpStore.isRemote;
+        const realApiBase = ErpStore.apiBase;
+        const posts = [];
+        ErpStore.isRemote = () => true;
+        ErpStore.apiBase = () => "";
+        window.fetch = (url, init) => {
+          if (/\/api\/~\/erp\/draft$/.test(String(url))) {
+            if (init && init.method === "POST") posts.push(String(init.body).slice(0, 100));
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: () =>
+                Promise.resolve(
+                  init && init.method === "POST"
+                    ? { delivered: true, folder: "INBOX.Drafts" }
+                    : { configured: true, from: "if@2iberia.com" },
+                ),
+            });
+          }
+          if (/\/api\/~\/erp\/state$/.test(String(url)))
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: () => Promise.resolve({ version: ErpStore.version() }),
+            });
+          return realFetch(url, init);
+        };
+        const before = erp.state.commsQueue.map((q) => ({
+          id: q.id,
+          had: "filed" in q,
+          filed: q.filed,
+          at: q.filedAt,
+        }));
+        const eligible = erp.state.commsQueue.filter(
+          (q) => ["draft", "approved", "sent"].includes(q.status) && q.to && q.filed !== "mailbox",
+        ).length;
+        let n = 0,
+          extra = null,
+          err = null;
+        try {
+          n = await sweepMailboxDrafts();
+          const q0 = erp.state.commsQueue.find((x) => x.filed === "mailbox");
+          const postsBefore = posts.length;
+          if (q0) await fileDraftForComm(q0, true); // already filed: must not refile
+          extra = posts.length - postsBefore;
+        } catch (e) {
+          err = String((e && e.message) || e);
+        }
+        const nowFiled = erp.state.commsQueue.filter((q) => q.filed === "mailbox").length;
+        before.forEach((b) => {
+          const q = erp.state.commsQueue.find((x) => x.id === b.id);
+          if (!q) return;
+          if (b.had) {
+            q.filed = b.filed;
+            q.filedAt = b.at;
+          } else {
+            delete q.filed;
+            delete q.filedAt;
+          }
+        });
+        window.fetch = realFetch;
+        ErpStore.isRemote = realIsRemote;
+        ErpStore.apiBase = realApiBase;
+        return { eligible, n, posts: posts.length, extra, nowFiled, err };
+      });
+      if (
+        !sweep.err &&
+        sweep.n >= 1 &&
+        sweep.n === sweep.eligible &&
+        sweep.posts === sweep.eligible
+      )
+        ok(`PK-J: the sweep files every recorded message once connected (${sweep.n} filed)`);
+      else bad("PK-J: sweep files recorded messages", JSON.stringify(sweep));
+      if (sweep.extra === 0) ok("PK-J: a row already in the mailbox is never filed twice");
+      else bad("PK-J: filing is idempotent", JSON.stringify(sweep));
+
+      // The wiring pin: the sweep must be CALLED — at boot and after queueing —
+      // not merely defined. Read from the source, because a local page cannot
+      // exercise the remote boot path.
+      const src = fs.readFileSync(new URL("../../site/erp.html", import.meta.url), "utf8");
+      const sweepCalls = (src.match(/sweepMailboxDrafts\(\)/g) || []).length;
+      if (sweepCalls >= 2)
+        ok(`PK-J: the sweep is wired to boot and to queueing (${sweepCalls} call sites)`);
+      else bad("PK-J: sweep call sites", `${sweepCalls} found, need boot + queue`);
     }
 
     // ---- send: "en mano", backdated -----------------------------------------

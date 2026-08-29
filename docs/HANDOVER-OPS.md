@@ -264,7 +264,18 @@ ALSO filed as a draft in the company mailbox's Drafts folder, so "sending"
 means opening the draft on any device and pressing send there. Nothing is
 ever sent by the server itself (mandate: no real sends).
 
-To connect the mailbox, run **on the server**, as the operator:
+**From the app (the normal way).** Configuración › Empresa has a «Correo de
+la empresa» card: the address and the password, then «Conectar el buzón». The
+server tests the credential by filing a probe draft and stores it — sealed
+with `SESSION_SECRET` — only if the mail server accepted it; a refusal is
+shown on the card and nothing is written. The password never enters the
+company document, so it is not in the state blob, not on the phones, and not
+in the backups. Connecting also sweeps whatever was already recorded into
+Drafts straight away. Configuración › Email is the same endpoint with the
+advanced settings (explicit IMAP host, explicit Drafts folder).
+
+**From the server (the recovery route).** Environment beats stored settings,
+which is what makes this the way to be certain what the server is using:
 
     ./ops/set-email.sh if@2iberia.com
 
