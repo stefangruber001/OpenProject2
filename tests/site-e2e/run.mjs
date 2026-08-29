@@ -9896,10 +9896,10 @@ async function testSendAndVersions(browser, base) {
          headers, the X-Unsent draft marker, and the quote's own PDF
          attached — a real %PDF, not a placeholder. */
       await pg.waitForTimeout(600);
-      const draft = await pg.evaluate((args) => {
+      const draft = await pg.evaluate(async (args) => {
         const b = erp.budget(args.id);
         const q = erp.state.commsQueue.find((x) => x.subjectRef === b.number);
-        const att = draftAttachmentFor(q);
+        const att = await draftAttachmentFor(q);
         const eml = CaneiEml.build({
           fromName: "Canei",
           fromEmail: "if@2iberia.com",
@@ -9919,6 +9919,18 @@ async function testSendAndVersions(browser, base) {
             eml.includes("multipart/alternative"),
           attName: att && att.name,
           attIsPdf: !!att && atob(att.b64.slice(0, 8)).startsWith("%PDF"),
+          // A mail client opens the whole file, not its first eight bytes:
+          // the attachment must carry a cross-reference table and a proper
+          // end marker, or it arrives as something nothing will render.
+          attWhole: (() => {
+            if (!att) return null;
+            const raw = atob(att.b64);
+            return {
+              bytes: raw.length,
+              xref: raw.includes("startxref") && raw.includes("\nxref"),
+              eof: raw.trimEnd().endsWith("%%EOF"),
+            };
+          })(),
         };
       }, em);
       if (draft.filed === "none")
@@ -9927,6 +9939,18 @@ async function testSendAndVersions(browser, base) {
       if (draft.emlOk && /\.pdf$/.test(draft.attName || "") && draft.attIsPdf)
         ok(`N2: the .eml draft carries the quote's own PDF (${draft.attName})`);
       else bad("N2: eml + attachment", JSON.stringify(draft));
+      // PK-M · the attached file must be a PDF a mail client can actually
+      // open. It used to be built by a synchronous path of its own — no
+      // annex, no resolved plates — while the download used another, and the
+      // customer received something their mail app would not render.
+      if (
+        draft.attWhole &&
+        draft.attWhole.xref &&
+        draft.attWhole.eof &&
+        draft.attWhole.bytes > 2000
+      )
+        ok(`PK-M: the attached PDF is complete — xref and %%EOF (${draft.attWhole.bytes} bytes)`);
+      else bad("PK-M: attached PDF is a whole document", JSON.stringify(draft.attWhole));
 
       const queueShows = await pg.evaluate(() => {
         go("messaging");

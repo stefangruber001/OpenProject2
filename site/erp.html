@@ -21185,18 +21185,20 @@
       /** The document behind a queued message, as a PDF attachment — the same
        *  facts and the same design the panes print. Nothing invented: a
        *  subjectRef this cannot resolve simply attaches nothing. */
-      function draftAttachmentFor(q) {
+      async function draftAttachmentFor(q) {
         try {
           let kind = null,
             refs = null,
             lang = "es";
           if (/^PRE-/.test(q.subjectRef || "")) {
             const b = erp.state.budgets.find((x) => x.number === q.subjectRef);
-            if (b) {
-              kind = b.acceptedVersionId ? "presupuestoAceptado" : "presupuesto";
-              refs = { budgetId: b.id };
-              lang = b.language || "es";
-            }
+            if (!b) return null;
+            // THE SAME FILE THE CUSTOMER WOULD DOWNLOAD, built by the same
+            // function: annex plates resolved, line text rendered in the
+            // document's own language. Anything else is a second document
+            // pretending to be this one.
+            const built = await budgetPdfString(b.id, b.acceptedVersionId || b.currentVersionId);
+            return { name: q.subjectRef + ".pdf", b64: btoa(built.pdf) };
           } else if (/^(FAC|ABO)-/.test(q.subjectRef || "")) {
             const inv = erp.state.invoices.find((x) => x.number === q.subjectRef);
             if (inv) {
@@ -21239,7 +21241,7 @@
        *  on it; callers that fire-and-forget lose nothing. Idempotent — a row
        *  already in the mailbox is never filed twice, which is what lets the
        *  send-time hooks and the sweep coexist without duplicate drafts. */
-      function fileDraftForComm(q, silent) {
+      async function fileDraftForComm(q, silent) {
         if (!q || q.filed === "mailbox") return Promise.resolve("mailbox");
         try {
           const iss = erp._issuerBlock();
@@ -21249,7 +21251,7 @@
             (C && tpl.subject ? C.render(tpl.subject, q.vars) : tpl.subject) ||
             q.event + " · " + (q.subjectRef || "");
           const body = C ? C.render(tpl.body, q.vars) : tpl.body;
-          const att = draftAttachmentFor(q);
+          const att = await draftAttachmentFor(q);
           const party = erp.state.parties.find((x) => x.email === q.to);
           const eml = CaneiEml.build({
             fromName: iss.tradeName || iss.legalName,
@@ -21520,7 +21522,19 @@
        * before the writer runs, because the writer is synchronous and a
        * photograph that is still loading is a blank frame.
        */
-      async function downloadBudgetPdf(id, versionId) {
+      /**
+       * The quote as PDF BYTES — one builder, so the file the customer
+       * downloads and the file attached to their email are the same file.
+       *
+       * It has to be async and it has to stay that way: the plates are
+       * resolved and re-encoded before the writer runs, because the writer is
+       * synchronous and a photograph still loading is a blank frame. The
+       * attachment path used to call a synchronous build of its own with no
+       * annex and no line-text resolver, which is precisely the divergence
+       * the note below warns about — and it shipped a file the mail client
+       * would not open.
+       */
+      async function budgetPdfString(id, versionId) {
         const b = erp.budget(id);
         const doc = erp.renderBudgetDoc(id, versionId);
         const annex =
@@ -21561,25 +21575,32 @@
           };
         }
         const iss = erp._issuerBlock();
-        const pdf = CaneiPdf.build(
-          descriptor,
-          {
-            wordmark: iss.tradeName,
-            legal: iss.legalName,
-            slogan: "",
-            cif: iss.taxId,
-            address: iss.address,
-            phone: iss.phone,
-            from: iss.email,
-            iban: iss.iban,
-          },
-          CaneiDocI18n.tr(lang),
-        );
-        const bytes = new Uint8Array(pdf.length);
-        for (let i = 0; i < pdf.length; i++) bytes[i] = pdf.charCodeAt(i) & 0xff;
+        return {
+          pdf: CaneiPdf.build(
+            descriptor,
+            {
+              wordmark: iss.tradeName,
+              legal: iss.legalName,
+              slogan: "",
+              cif: iss.taxId,
+              address: iss.address,
+              phone: iss.phone,
+              from: iss.email,
+              iban: iss.iban,
+            },
+            CaneiDocI18n.tr(lang),
+          ),
+          version: doc.version,
+          number: b.number,
+        };
+      }
+      async function downloadBudgetPdf(id, versionId) {
+        const built = await budgetPdfString(id, versionId);
+        const bytes = new Uint8Array(built.pdf.length);
+        for (let i = 0; i < built.pdf.length; i++) bytes[i] = built.pdf.charCodeAt(i) & 0xff;
         downloadBlob(
           new Blob([bytes], { type: "application/pdf" }),
-          `${b.number}-v${doc.version}.pdf`,
+          `${built.number}-v${built.version}.pdf`,
         );
       }
       /**
