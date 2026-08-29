@@ -6479,3 +6479,78 @@ send says so instead of quietly producing nothing.
 the demonstration path is not a default. Anything the product needs in order
 to work has to be installed by the product, not by the fixture that makes it
 look good.
+### 196 · Two renderers of one descriptor now agree, because nothing made them (2026-08-29)
+
+The operator reported that «Exclusiones» and «Supuestos» were missing from the
+downloaded quote. They were, and it was a regression of ours from the session
+before: S4 taught the HTML renderer (`erp-sheet.js`) to print the two blocks,
+and S5 then moved the quote's DOWNLOAD from that renderer to the PDF writer
+(`erp-pdf.js`), whose `blocks()` had never been taught. The descriptor carried
+both lists the whole time; the screen showed them; the file the customer
+receives did not.
+
+Nothing went red, and the reason is the part worth recording: there are TWO
+independent renderers of the same descriptor, each with its own fixtures, and
+neither fixture carried the fields. Each renderer's tests can be complete and
+green while the pair disagrees.
+
+**So the fix is not the concat.** `tests/doc-pdf` now renders ONE descriptor
+through BOTH renderers and asserts every terms block reaches both outputs.
+Add a block to one side and the gate names the side that is missing it. The
+two `.concat` lines in the writer are three minutes of work; the check is what
+stops the next divergence.
+
+**Measured before and after**, rather than reasoned about: 41/43 with the
+blocks absent from the PDF only (`payment` and `notes` passed on both sides,
+which is what proved the check itself sound), 43/43 after.
+
+### 197 · The S curve could not move when the plan had not started (2026-08-29)
+
+Reported as "I made some progress and the chart stayed the same". It was worse
+than that: the actual line was never drawn at all. `progressCurve` sampled from
+the plan's first working day forward and nulled every actual value dated after
+`asOf`; with today BEFORE the plan's start every sample qualified, so every
+actual value was null. The one rescue — a guaranteed sample at `asOf` — was
+guarded by `asOf >= schedule.start`, which is exactly the case that fails.
+
+Confirmed independently from the operator's own screenshot by counting pixels
+in the chart area: 0 green, 0 amber, 4144 grey. One dashed planned line and
+nothing else.
+
+**The window now begins at the earlier of today and the plan's start.** A job
+carrying recorded progress before its plan formally begins is ordinary — the
+dates come off the quote and nobody re-plans them the morning work starts —
+and the record of what was done exists whatever the plan says. One observation
+draws a dot rather than a line, which the view already knew how to do.
+
+**A second assertion, because the first bug hid behind agreement that was never
+checked:** the last drawn point of the actual line must equal the figure the
+header reports. They are computed from different sources on purpose (the header
+from the tasks, the line from the log) and nothing forced them to agree — which
+is how the card came to read «real 62,5 %» above a chart with no line on it.
+
+**A correction made while writing that test.** The first version failed, and
+the code was right: the fixture set a task to 50 % without a matching log
+entry, so the two figures differed legitimately. The assertion holds given a
+log that recorded what the tasks carry — which is what the write path produces
+— and the test now says so rather than implying an unconditional invariant.
+
+**Also, two smaller honesty repairs on the same card.** «+78,7 pts» against a
+plan at zero reads as being seventy-eight points ahead of schedule; it meant
+the plan had not started, so the drift is withheld and the card says which it
+is. And the legend advertised a «Proyectado» line on charts that have none — a
+pace needs two days of record and the capability withholds the projection
+until it has them, so the swatch now appears only when a line was drawn.
+
+### 198 · A key is not an affordance on a phone (2026-08-29)
+
+Exclusions and assumptions could only be added by pressing Enter in the field.
+On an on-screen keyboard that key does not reliably arrive as a keydown of
+"Enter", so the two lists could be typed into and never added to — on the
+device the operator was using. That is the likeliest reason the quote in the
+report carried zero of each.
+
+Both drawers now carry a `＋` button, and the button and the key call one
+function so neither is the special case. The placeholder stopped saying
+«Añadir y pulsar Enter», because it was instructions for the path that did not
+work.

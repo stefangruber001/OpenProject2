@@ -627,7 +627,17 @@
     const d = this.o.doc;
     const items = []
       .concat(d.payment && d.payment.length ? [["Condiciones de pago", d.payment]] : [])
-      .concat(d.notes && d.notes.length ? [["Notas", d.notes]] : []);
+      .concat(d.notes && d.notes.length ? [["Notas", d.notes]] : [])
+      /* The same two blocks, in the same order, as the HTML renderer prints
+         them (erp-sheet.js). They live in the descriptor and only the sheet
+         knew about them, so the day the quote's download moved from the sheet
+         to this writer they left the customer's copy without anything going
+         red. Both renderers are now pinned against one descriptor in
+         tests/doc-pdf — add a block here and there, or the drift starts over.
+         Absent when empty: a heading with nothing under it reads worse than
+         no heading at all. */
+      .concat(d.assumptions && d.assumptions.length ? [["Supuestos", d.assumptions]] : [])
+      .concat(d.exclusions && d.exclusions.length ? [["Exclusiones", d.exclusions]] : []);
     for (const [label, rows] of items) {
       const wrapped = [];
       for (const r of rows) wrapped.push(...this.wrap("- " + r, FONT.sans, 8, CONTENT_W - 20));

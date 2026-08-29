@@ -197,13 +197,25 @@ export function progressCurve(
       : addWorkingDays(cal, snapForward(cal, asOf), Math.round(remainingDays * stretch));
 
   const horizon = projectedFinish > schedule.finish ? projectedFinish : schedule.finish;
-  const span = Math.max(1, workingDaysInclusive(cal, schedule.start, horizon));
+  /**
+   * Where the drawn window BEGINS — the earlier of the plan's first day and
+   * today, not the plan's first day alone.
+   *
+   * A job can carry recorded progress before its plan formally starts: the
+   * dates come off the quote and nobody re-plans them the morning the work
+   * actually begins. Sampling from `schedule.start` in that situation put
+   * every point after `asOf`, so every actual value was null and the line was
+   * never drawn — the chart could not move however much progress was entered,
+   * while the summary went on reporting the figure the tasks carried.
+   */
+  const origin = asOf < schedule.start ? snapForward(cal, asOf) : schedule.start;
+  const span = Math.max(1, workingDaysInclusive(cal, origin, horizon));
   const samples = Math.max(2, Math.min(options.samples ?? 24, span));
   const step = Math.max(1, Math.ceil(span / samples));
 
   const points: CurvePoint[] = [];
   for (let d = 0; d < span; d += step) {
-    const date = addWorkingDays(cal, schedule.start, d);
+    const date = addWorkingDays(cal, origin, d);
     points.push({
       date,
       plannedPct: plannedAt(date),
@@ -229,7 +241,11 @@ export function progressCurve(
   // A sample exactly at `asOf`, always: the step lands where it lands, and a
   // curve whose actual line stops short of today — or whose projection takes
   // off from a date nobody is standing on — reads as a gap in the story.
-  if (asOf >= schedule.start && asOf <= horizon && !points.some((pt) => pt.date === asOf)) {
+  // Only the upper bound is a condition. Requiring `asOf` to be inside the
+  // plan's window as well excluded the one case that most needed rescuing —
+  // today before the plan's first day, where this is the ONLY point the
+  // actual line can have.
+  if (asOf <= horizon && !points.some((pt) => pt.date === asOf)) {
     points.push({
       date: asOf,
       plannedPct: plannedNow,

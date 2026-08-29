@@ -15487,7 +15487,7 @@
          )
          .join("") || '<div class="it" style="color:var(--muted)">Ninguna todavía.</div>'
      }
-     ${locked ? "" : `<div class="it"><input id="bc_${key}" placeholder="Añadir y pulsar Enter" style="flex:1"></div>`}
+     ${locked ? "" : `<div class="it"><input id="bc_${key}" placeholder="Escribe y añade" style="flex:1"><button class="btn sm primary" data-add="${key}">＋</button></div>`}
     </div></div>`;
         db.innerHTML = `
    <div class="card"><div class="ch"><h3>Resumen</h3><span class="tag">${cur.chapters.length} partidas</span></div>
@@ -15541,11 +15541,15 @@
             "Condiciones de pago actualizadas",
           ),
         );
+        /* The key was the only way in, and on a phone that is no way in at
+       all: the on-screen keyboard's «Intro» does not reliably arrive as a
+       keydown of "Enter", so a list could be typed into and never added to —
+       which is how a quote reached a customer with the two blocks empty. A
+       button and the key share one function; neither is the special case. */
         ["exclusions", "assumptions"].forEach((key) => {
           const inp = $("#bc_" + key);
           if (!inp) return;
-          inp.onkeydown = (e) => {
-            if (e.key !== "Enter") return;
+          const add = () => {
             const val = inp.value.trim();
             if (!val) return;
             mutate(() => {
@@ -15553,6 +15557,11 @@
               budgetNextStepDrawer(id, vsel);
             }, "Añadido");
           };
+          inp.onkeydown = (e) => {
+            if (e.key === "Enter") add();
+          };
+          const btn = db.querySelector(`[data-add="${key}"]`);
+          if (btn) btn.onclick = add;
         });
         db.querySelectorAll("[data-del]").forEach(
           (btn) =>
@@ -15592,7 +15601,7 @@
          )
          .join("") || '<div class="it" style="color:var(--muted)">Ninguna todavía.</div>'
      }
-     ${locked ? "" : `<div class="it"><input id="bc_${key}" placeholder="Añadir y pulsar Enter" style="flex:1"></div>`}
+     ${locked ? "" : `<div class="it"><input id="bc_${key}" placeholder="Escribe y añade" style="flex:1"><button class="btn sm primary" data-add="${key}">＋</button></div>`}
     </div></div>`;
         db.innerHTML =
           list(
@@ -15609,10 +15618,12 @@
             ? '<div class="card"><div class="daylist"><div class="it">La versión está congelada: sus condiciones se conservan tal como se enviaron.</div></div></div>'
             : "");
         if (locked) return;
+        // Same rule as the «Siguiente paso» drawer above: the button and the
+        // key are one function, because the key alone is unreachable on a phone.
         ["exclusions", "assumptions"].forEach((key) => {
           const inp = $("#bc_" + key);
-          inp.onkeydown = (e) => {
-            if (e.key !== "Enter") return;
+          if (!inp) return;
+          const add = () => {
             const val = inp.value.trim();
             if (!val) return;
             mutate(() => {
@@ -15620,6 +15631,11 @@
               budgetConditionsDrawer(id);
             }, "Añadido");
           };
+          inp.onkeydown = (e) => {
+            if (e.key === "Enter") add();
+          };
+          const btn = db.querySelector(`[data-add="${key}"]`);
+          if (btn) btn.onclick = add;
         });
         db.querySelectorAll("[data-del]").forEach(
           (btn) =>
@@ -17671,15 +17687,38 @@
 
    ${
      curve
-       ? `<div class="card"><div class="ch"><h3>Curva S</h3>
-     <span class="tag">planificado ${curve.plannedPct}% · real ${curve.actualPct}% · ${curve.driftPct >= 0 ? "+" : ""}${curve.driftPct} pts</span></div>
+       ? (() => {
+           /* Two things this card used to say that were not true.
+        «+78,7 pts» reads as seventy-eight points AHEAD of schedule. It was
+        not: the plan had not started, so the planned figure was zero and the
+        drift was the whole of the recorded progress measured against nothing.
+        A deviation needs a promise to deviate from, and there is none until
+        the first task is due — so say which it is instead of scoring it.
+        And the legend advertised a projected line on documents that have
+        none: a pace needs two days of record, and the capability withholds
+        the projection until it has them. A swatch with no line behind it
+        reads as a chart that failed to draw. */
+           /* Asked of the SCHEDULE, not of the curve's first point: since the
+        curve began drawing the record from today when today comes first,
+        `points[0]` is today on exactly the jobs this is about. */
+           const notStarted = !!(sch && erp.today < sch.start);
+           const projected = curve.points.some((p) => p.projectedPct != null);
+           return `<div class="card"><div class="ch"><h3>Curva S</h3>
+     <span class="tag">planificado ${curve.plannedPct}% · real ${curve.actualPct}%${
+       notStarted ? "" : ` · ${curve.driftPct >= 0 ? "+" : ""}${curve.driftPct} pts`
+     }</span></div>
      ${curveChart(curve)}
      <div class="glegend">
        <span><i style="background:var(--faint)"></i>Planificado</span>
        <span><i style="background:var(--green)"></i>Real registrado</span>
-       <span><i style="background:var(--spark)"></i>Proyectado al ritmo observado${curve.performanceIndex != null ? ` (×${curve.performanceIndex})` : ""}</span>
-       <span>Fin previsto ${fmtD(curve.plannedFinish)} → proyectado <b>${fmtD(curve.projectedFinish)}</b></span>
-     </div></div>`
+       ${projected ? `<span><i style="background:var(--spark)"></i>Proyectado al ritmo observado${curve.performanceIndex != null ? ` (×${curve.performanceIndex})` : ""}</span>` : ""}
+       ${
+         notStarted
+           ? `<span>Todavía no hay curva planificada contra la que medir: la obra empieza el <b>${fmtD(sch.start)}</b></span>`
+           : `<span>Fin previsto ${fmtD(curve.plannedFinish)} → proyectado <b>${fmtD(curve.projectedFinish)}</b></span>`
+       }
+     </div></div>`;
+         })()
        : ""
    }
 

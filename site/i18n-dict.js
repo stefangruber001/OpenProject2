@@ -2937,7 +2937,11 @@ window.CANEI_DICT = {
       "What was taken as true when pricing; if it changes, the price changes.",
     ],
     ["Ninguna todavía.", "None yet."],
-    ["Añadir y pulsar Enter", "Type and press Enter"],
+    ["Escribe y añade", "Type and add"],
+    [
+      "Todavía no hay curva planificada contra la que medir: la obra empieza el",
+      "There is no planned curve to measure against yet: the works begin on",
+    ],
     [
       "La versión está congelada: sus condiciones se conservan tal como se enviaron.",
       "The version is frozen: its conditions are kept exactly as they were sent.",

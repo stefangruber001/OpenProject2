@@ -1421,12 +1421,13 @@ var ErpFactory = (() => {
     const stretch = performanceIndex && performanceIndex > 0 ? 1 / performanceIndex : 1;
     const projectedFinish = !canProject || remainingDays === 0 ? schedule.finish : addWorkingDays(cal, snapForward(cal, asOf), Math.round(remainingDays * stretch));
     const horizon = projectedFinish > schedule.finish ? projectedFinish : schedule.finish;
-    const span = Math.max(1, workingDaysInclusive(cal, schedule.start, horizon));
+    const origin = asOf < schedule.start ? snapForward(cal, asOf) : schedule.start;
+    const span = Math.max(1, workingDaysInclusive(cal, origin, horizon));
     const samples = Math.max(2, Math.min(options.samples ?? 24, span));
     const step = Math.max(1, Math.ceil(span / samples));
     const points = [];
     for (let d = 0; d < span; d += step) {
-      const date = addWorkingDays(cal, schedule.start, d);
+      const date = addWorkingDays(cal, origin, d);
       points.push({
         date,
         plannedPct: plannedAt(date),
@@ -1446,7 +1447,7 @@ var ErpFactory = (() => {
         projectedPct: canProject && horizon > asOf ? 100 : null
       });
     }
-    if (asOf >= schedule.start && asOf <= horizon && !points.some((pt) => pt.date === asOf)) {
+    if (asOf <= horizon && !points.some((pt) => pt.date === asOf)) {
       points.push({
         date: asOf,
         plannedPct: plannedNow,

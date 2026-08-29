@@ -871,7 +871,9 @@ window.CANEI_DICT.ca = {
   "Aquello que se ha dado por cierto al valorar; si cambia, cambia el precio.":
     "Allò que s'ha donat per cert en valorar; si canvia, canvia el preu.",
   "Ninguna todavía.": "Cap encara.",
-  "Añadir y pulsar Enter": "Afegeix i prem Enter",
+  "Escribe y añade": "Escriu i afegeix",
+  "Todavía no hay curva planificada contra la que medir: la obra empieza el":
+    "Encara no hi ha corba planificada contra la qual mesurar: l'obra comença el",
   "La versión está congelada: sus condiciones se conservan tal como se enviaron.":
     "La versió està congelada: les seves condicions es conserven tal com es van enviar.",
   "Sin partidas todavía.": "Sense partides encara.",

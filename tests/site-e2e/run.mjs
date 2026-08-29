@@ -9486,6 +9486,28 @@ async function testPresupuestadorRework(browser, base) {
     if (/Siguiente paso/.test(ns.title) && wantCards.every((c) => ns.cards.includes(c)) && ns.send)
       ok("presupuestador: «Siguiente paso» carries terms, exclusions, the check and the send");
     else bad("presupuestador: siguiente paso contents", JSON.stringify(ns));
+
+    /* An exclusion could only be added by pressing Enter in the field, and on
+       a phone that key does not reliably arrive as one — so a quote went out
+       with both lists empty and no way, on the device it was being written on,
+       to fill them. Clicked, not keyed, because the click is the affordance
+       that was missing; the key path still works and is unchanged. */
+    const exclAdded = await pg.evaluate(async () => {
+      const inp = document.querySelector("#bc_exclusions");
+      const btn = document.querySelector('[data-add="exclusions"]');
+      if (!inp || !btn) return { ok: false, why: "no input or no button" };
+      inp.value = "No incluye el desvío de bajantes";
+      btn.click();
+      await new Promise((r) => setTimeout(r, 500));
+      return {
+        ok: true,
+        listed: /desvío de bajantes/.test(document.querySelector("#dbody")?.textContent || ""),
+      };
+    });
+    if (exclAdded.ok && exclAdded.listed)
+      ok("presupuestador: an exclusion can be added by tapping ＋, not only by pressing Enter");
+    else bad("presupuestador: ＋ adds an exclusion", JSON.stringify(exclAdded));
+
     await pg.evaluate(() => closeDrawer());
 
     if (errs.length) bad("presupuestador: no console errors", errs.slice(0, 2).join(" | "));

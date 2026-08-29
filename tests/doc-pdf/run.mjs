@@ -152,6 +152,19 @@ const doc = {
     "No incluye licencias municipales ni tasas de la comunidad.",
     "Garantía: 3 años en instalaciones y 1 año en acabados.",
   ],
+  /* The two blocks written for THIS job rather than for every quote, and the
+     two a dispute is usually about. They are in the fixture because they were
+     NOT: the HTML renderer learned to print them, the download later moved to
+     the PDF writer, and the writer had never been taught — so the blocks
+     vanished from the customer's copy while every check here still passed. */
+  assumptions: [
+    "Se dispone de agua y luz de obra en la propia finca durante toda la ejecución.",
+    "Los forjados admiten la carga de la solución propuesta sin refuerzo adicional.",
+  ],
+  exclusions: [
+    "No se incluye la licencia de obras ni las tasas municipales asociadas.",
+    "No se incluye el desvío de bajantes generales de la comunidad.",
+  ],
   signatures: ["Por Canei Subirats, S.L.", "Conforme — el cliente (firma y fecha)"],
 };
 
@@ -587,6 +600,59 @@ check(
   manyPage >= 12,
   `${manyPage} of ${DT.KINDS.length} documents ran past one page`,
 );
+
+/* ──── ONE DESCRIPTOR, BOTH RENDERERS ────────────────────────────────────────
+   There are two independent renderers of the same descriptor — `erp-sheet.js`
+   draws it as HTML for the screen, `erp-pdf.js` writes it as PDF for the file
+   the customer receives — and nothing forced them to agree. They drifted:
+   `blocks()` was taught about `assumptions`/`exclusions` on the HTML side, the
+   quote download then moved to the writer, and the two lists disappeared from
+   the customer's copy while both renderers' own tests stayed green, because
+   neither fixture carried the fields.
+
+   So the check is not "the PDF prints exclusions". It is "every terms block in
+   the descriptor reaches BOTH outputs" — the property whose absence let the
+   drift happen, asserted over one descriptor rendered twice. */
+const { createRequire } = await import("node:module");
+const requireCjs = createRequire(import.meta.url);
+const CaneiSheet = requireCjs(resolve(ROOT, "site/erp-sheet.js"));
+
+const sheetHtml = CaneiSheet.render(doc, BRAND, tr);
+const pdfText = spawnSync("pdftotext", ["-layout", file, "-"], { encoding: "utf8" }).stdout || "";
+// Both sides squeezed the same way: the writer wraps long lines and prints its
+// labels in capitals, the HTML side carries tags between words. Comparing raw
+// text would test the extractors, not the documents.
+const squeeze = (s) =>
+  String(s)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+const inPdf = squeeze(pdfText);
+const inSheet = squeeze(sheetHtml);
+
+for (const [label, key] of [
+  ["Condiciones de pago", "payment"],
+  ["Notas", "notes"],
+  ["Supuestos", "assumptions"],
+  ["Exclusiones", "exclusions"],
+]) {
+  // A representative line as well as the heading: a heading with nothing under
+  // it is exactly the failure a heading-only check would call a pass.
+  const first = doc[key][0];
+  const want = [label, first.slice(0, 40)];
+  const missPdf = want.filter((s) => !inPdf.includes(squeeze(tr(s))));
+  const missSheet = want.filter((s) => !inSheet.includes(squeeze(s)));
+  check(
+    `«${label}» reaches both renderers`,
+    missPdf.length === 0 && missSheet.length === 0,
+    [
+      missPdf.length ? "absent from the PDF: " + missPdf.join(" / ") : "",
+      missSheet.length ? "absent from the sheet: " + missSheet.join(" / ") : "",
+    ]
+      .filter(Boolean)
+      .join(" · ") || "both",
+  );
+}
 
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed → ${file}`);
