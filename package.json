@@ -28,6 +28,7 @@
     "test:ios-routes": "node tests/ios-routes/coverage.mjs",
     "test:pdf": "node tests/doc-pdf/run.mjs",
     "test:docs": "node tests/doc-print/run.mjs",
+    "test:docx": "node tests/doc-docx/run.mjs",
     "test:mailbox": "tsx tests/mailbox/run.mts"
   },
   "devDependencies": {

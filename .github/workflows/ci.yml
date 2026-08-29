@@ -84,6 +84,14 @@ jobs:
         if: always()
         run: pnpm test:pdf
 
+      # The same documents as Word files. A .docx is refused whole by Word when
+      # the schema's element ORDER is wrong or a table has no grid, naming
+      # nothing — so those rules are asserted here, together with the mirror
+      # itself: every fact in the descriptor has to reach the Word text.
+      - name: Word writer
+        if: always()
+        run: pnpm test:docx
+
       # Every approved template rendered and measured: no ink within 9.5mm of the
       # paper edge on any page. The redesign shipped with 0.8mm on continuation
       # pages, which no printer can reproduce.

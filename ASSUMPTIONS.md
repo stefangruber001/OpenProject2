@@ -6479,3 +6479,38 @@ send says so instead of quietly producing nothing.
 the demonstration path is not a default. Anything the product needs in order
 to work has to be installed by the product, not by the fixture that makes it
 look good.
+
+## S43 · PK-N — a Word file is the same document, not a second one (2026-08-29)
+
+The operator asked for every generated PDF to exist as a Word file too, an
+exact mirror. Two writers producing "the same" document from two descriptions
+of it drift within a month, so `site/erp-docx.js` reads **the same
+`CaneiDocTypes` descriptor** `erp-pdf.js` consumes and renders it as OOXML:
+same title, meta strip, parties, chapters, totals, terms, signatures and annex
+plates, in the same order. A document type added later gets both formats
+without being told, and a field that stops rendering fails the gate.
+
+**What «exact mirror» honestly means.** Every fact, label, row and figure is
+identical, with the same corporate identity. It is NOT identical pagination:
+Word reflows on the reader's machine with the fonts it has, and claiming
+otherwise would be claiming something the format does not permit anyone to
+control. Where the PDF draws a progress bar, the Word file draws the same
+percentage as a shaded cell of that width — the bar is a picture of a number,
+and the number is what has to survive.
+
+**Fonts.** A .docx cannot embed the house faces without shipping the font
+files in every document, so Georgia stands in for the serif and Arial for the
+sans — the pair the house style already falls back to on screen.
+
+**`site/erp-zip.js`.** The store-only ZIP writer moved out of erp.html so the
+spreadsheet, the Word file and the quarterly package share one implementation;
+the central-directory arithmetic is exactly the kind that would be wrong in
+only one of two copies.
+
+**What the gate had to learn.** Word does not repair a malformed file, it
+refuses it and names nothing — so `tests/doc-docx/run.mjs` asserts the
+schema's element ORDER inside pPr/rPr/tcPr/tblPr, a tblGrid on every table, no
+empty cell, and no cell ending on a nested table. It caught a real defect on
+its first run: plain-line documents (change order, visit report, work sheet)
+carry their text in `desc`, which the writer was not reading, so they rendered
+with every amount intact and every description blank.

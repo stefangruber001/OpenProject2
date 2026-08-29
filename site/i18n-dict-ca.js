@@ -739,6 +739,7 @@ window.CANEI_DICT.ca = {
     "Sense bústia configurada — el missatge queda només registrat",
   "Borrador archivado en el buzón": "Esborrany arxivat a la bústia",
   "Correo de la empresa": "Correu de l'empresa",
+  "⤓ Word": "⤓ Word",
   "⚠ Sin plantilla «Envío de presupuesto» — no se ha preparado ningún correo":
     "⚠ Sense plantilla «Enviament de pressupost» — no s'ha preparat cap correu",
   Reintentar: "Torna-ho a provar",

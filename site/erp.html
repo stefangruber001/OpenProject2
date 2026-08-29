@@ -5076,7 +5076,9 @@
      labels their three languages, erp-facts feeds live records in, and
      erp-sheet renders the same design as HTML for every pane and print.
      Pictograms must already be loaded — both writers draw the plates. -->
+    <script src="erp-zip.js"></script>
     <script src="erp-pdf.js"></script>
+    <script src="erp-docx.js"></script>
     <script src="erp-doctypes.js"></script>
     <script src="erp-doc-i18n.js"></script>
     <script src="erp-facts.js"></script>
@@ -15252,10 +15254,12 @@
       <input id="sbHandTime" type="time" value="${nowHHMM()}" style="margin-left:auto"></label></div>
     <div class="it"><span>Al enviar, esta versión queda congelada: el documento del cliente se podrá reproducir siempre tal cual salió. Para cambiar algo después hay que crear una versión nueva.</span></div>
     <div class="it"><button class="btn sm" id="sbDownload">⤓ Descargar</button>
+     <button class="btn sm" id="sbWord">⤓ Word</button>
      <button class="btn sm" id="sbXlsx">⤓ Excel</button><span style="flex:1"></span>
      <button class="btn primary" id="sbGo"${blocks.length ? " disabled" : ""}>${blocks.length ? "Corrija los bloqueos primero" : "Enviar y congelar la versión"}</button></div>
    </div></div>`;
         $("#sbDownload").onclick = () => downloadBudgetPdf(id, vsel);
+        $("#sbWord").onclick = () => downloadBudgetDocx(id, vsel);
         $("#sbXlsx").onclick = () => downloadBudgetXlsx(id, vsel);
         const chSel = $("#sbChannel");
         const go = $("#sbGo");
@@ -21534,7 +21538,7 @@
        * the note below warns about — and it shipped a file the mail client
        * would not open.
        */
-      async function budgetPdfString(id, versionId) {
+      async function budgetDescriptor(id, versionId) {
         const b = erp.budget(id);
         const doc = erp.renderBudgetDoc(id, versionId);
         const annex =
@@ -21574,25 +21578,62 @@
             itemWord: L.item,
           };
         }
+        return { descriptor, brand: brandBlock(), lang, version: doc.version, number: b.number };
+      }
+      /** The issuer, in the shape both writers ask for. */
+      function brandBlock() {
         const iss = erp._issuerBlock();
         return {
-          pdf: CaneiPdf.build(
-            descriptor,
-            {
-              wordmark: iss.tradeName,
-              legal: iss.legalName,
-              slogan: "",
-              cif: iss.taxId,
-              address: iss.address,
-              phone: iss.phone,
-              from: iss.email,
-              iban: iss.iban,
-            },
-            CaneiDocI18n.tr(lang),
-          ),
-          version: doc.version,
-          number: b.number,
+          wordmark: iss.tradeName,
+          legal: iss.legalName,
+          slogan: "",
+          cif: iss.taxId,
+          address: iss.address,
+          phone: iss.phone,
+          from: iss.email,
+          iban: iss.iban,
         };
+      }
+      /** The quote as PDF bytes — the descriptor above, through the PDF writer. */
+      async function budgetPdfString(id, versionId) {
+        const d = await budgetDescriptor(id, versionId);
+        return {
+          pdf: CaneiPdf.build(d.descriptor, d.brand, CaneiDocI18n.tr(d.lang)),
+          version: d.version,
+          number: d.number,
+        };
+      }
+      /**
+       * ANY document as a Word file — the SAME descriptor its PDF is written
+       * from, through the other writer. The operator asked for a Word mirror
+       * of every PDF; the way two formats stay identical is that neither one
+       * knows anything the other does not, so this takes the descriptor and
+       * changes nothing about it.
+       */
+      function docxBytes(descriptor, lang) {
+        return CaneiDocx.build(descriptor, brandBlock(), CaneiDocI18n.tr(lang || "es"));
+      }
+      function saveDocx(descriptor, lang, filename) {
+        downloadBlob(
+          new Blob([docxBytes(descriptor, lang)], {
+            type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          }),
+          filename,
+        );
+      }
+      /** The quote, as Word. Awaits the plates exactly as the PDF path does. */
+      async function downloadBudgetDocx(id, versionId) {
+        const d = await budgetDescriptor(id, versionId);
+        saveDocx(d.descriptor, d.lang, `${d.number}-v${d.version}.docx`);
+      }
+      /**
+       * Every other document, as Word: one call, given the kind and the same
+       * refs its own screen uses to print. Kept beside the PDF routes rather
+       * than inside them so a screen that gains a document gains both.
+       */
+      function downloadDocx(kind, refs, lang, filename) {
+        const descriptor = CaneiErpFacts.docFor(erp, kind, refs || {}, CaneiDocTypes);
+        saveDocx(descriptor, lang, filename);
       }
       async function downloadBudgetPdf(id, versionId) {
         const built = await budgetPdfString(id, versionId);
@@ -22967,9 +23008,19 @@
    }
    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn sm" id="iv_pdf">⤓ Descargar PDF</button>
+    <button class="btn sm" id="iv_word">⤓ Word</button>
     ${inv.kind !== "creditNote" ? '<button class="btn sm" id="iv_rect">Rectificar…</button>' : ""}
    </div>`;
         $("#iv_pdf").onclick = () => downloadInvoicePdf(inv.number);
+        $("#iv_word").onclick = () => {
+          const d = erp.renderInvoiceDoc(inv.number);
+          downloadDocx(
+            d.docType === "FACTURA RECTIFICATIVA" ? "rectificativa" : "factura",
+            { invoiceId: inv.number },
+            d.language,
+            inv.number + ".docx",
+          );
+        };
 
         /* Part 2 · item 16 — the rectificativa was unfindable. The whole flow
      existed and `invOpen` even took a `rectifies` option, but NOTHING passed
@@ -23089,7 +23140,7 @@
           and the contract could not. External contracts keep their own
           download — the signed file — inside the pane. */
        d.origin !== "external"
-         ? '<button class="btn sm" id="conDl">⤓ Descargar PDF</button>'
+         ? '<button class="btn sm" id="conDl">⤓ Descargar PDF</button> <button class="btn sm" id="conDlWord">⤓ Word</button>'
          : ""
      }
      <span class="tag">${esc(LANG_NAME[d.language] || LANG_NAME.es)}</span></div>
@@ -23110,6 +23161,17 @@
         };
         const dl = $("#conDl");
         if (dl) dl.onclick = () => downloadContractPdf(conWork.id);
+        const dlw = $("#conDlWord");
+        if (dlw)
+          dlw.onclick = () => {
+            const d = erp.renderContractDoc(conWork.id);
+            downloadDocx(
+              "contrato",
+              { contractId: conWork.id, lineText: (l) => lineDesc(l, d.language) },
+              d.language,
+              (d.number || "contrato") + ".docx",
+            );
+          };
         const sign = $("#conSign");
         if (sign) sign.onclick = () => signContractDrawer(conWork.id);
         v.querySelectorAll("[data-contab]").forEach(

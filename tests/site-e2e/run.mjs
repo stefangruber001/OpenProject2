@@ -9939,6 +9939,39 @@ async function testSendAndVersions(browser, base) {
       if (draft.emlOk && /\.pdf$/.test(draft.attName || "") && draft.attIsPdf)
         ok(`N2: the .eml draft carries the quote's own PDF (${draft.attName})`);
       else bad("N2: eml + attachment", JSON.stringify(draft));
+      /* PK-N · the Word mirror. The operator asked for a Word version of
+         every PDF; the point is that it is the SAME document, so the check
+         builds both from the same quote and compares what they say rather
+         than admiring the file extension. */
+      const word = await pg.evaluate(async (args) => {
+        const built = await budgetDescriptor(args.id, erp.budget(args.id).currentVersionId);
+        const bytes = docxBytes(built.descriptor, built.lang);
+        const s = Array.from(bytes.subarray(0, 4))
+          .map((b) => String.fromCharCode(b))
+          .join("");
+        // The parts live in the zip as stored (uncompressed) bytes, so the
+        // document text is readable straight out of it.
+        const all = Array.from(bytes)
+          .map((b) => String.fromCharCode(b))
+          .join("");
+        const pdf = CaneiPdf.build(built.descriptor, built.brand, CaneiDocI18n.tr(built.lang));
+        const number = built.number;
+        return {
+          zip: s === "PK\u0003\u0004",
+          bytes: bytes.length,
+          hasDocument: all.includes("word/document.xml"),
+          hasStyles: all.includes("word/styles.xml"),
+          carriesNumber: all.includes(number),
+          pdfCarriesNumber: pdf.includes(number),
+        };
+      }, em);
+      if (word.zip && word.hasDocument && word.hasStyles && word.bytes > 3000)
+        ok(`PK-N: the quote also comes out as a Word file (${word.bytes} bytes)`);
+      else bad("PK-N: docx is a real Word package", JSON.stringify(word));
+      if (word.carriesNumber && word.pdfCarriesNumber)
+        ok("PK-N: the Word file and the PDF carry the same document number");
+      else bad("PK-N: word/pdf mirror", JSON.stringify(word));
+
       // PK-M · the attached file must be a PDF a mail client can actually
       // open. It used to be built by a synchronous path of its own — no
       // annex, no resolved plates — while the download used another, and the
