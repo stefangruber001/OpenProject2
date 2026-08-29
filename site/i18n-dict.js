@@ -3276,6 +3276,18 @@ window.CANEI_DICT = {
     ["modificaciones", "variations"],
     ["Ninguna modificación en esta etapa.", "No variation at this stage."],
     ["Ninguna modificación coincide con la búsqueda.", "No variation matches the search."],
+    /* The word alone, not «Modificación ·». The drawer title is built as
+       `"Modificación · " + c.desc`, and the translator sees the fragment
+       before the separator — so a key carrying the «·» never matched anything
+       and the miss ledger counted it. Same for «Adenda», which is built the
+       same way from its document number. */
+    ["Modificación", "Variation"],
+    ["Adenda", "Addendum"],
+    /* And the same two WITH the separator, because two gates read two
+       different things and both are right: source-audit scans the literal as
+       written at the call site (`"Modificación · "`), while the miss ledger
+       reads what openDrawer actually rendered (`Modificación` alone, in its
+       own span). Drop either entry and one of them goes red. */
     ["Modificación ·", "Variation ·"],
     [
       "Sin aprobar: este trabajo todavía no es facturable.",

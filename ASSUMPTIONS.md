@@ -6620,3 +6620,37 @@ The failure was reachable another way — a parse error breaks every browser
 suite — but that is twelve minutes and a wall of red for something `node
 --check` answers in milliseconds, which is the argument the file already made
 for itself.
+
+### 201 · The slow gate is the one that catches a screen rewrite (2026-08-29)
+
+S2 pushed `main` red. Three of four workflows were green; CI's translator miss
+ledger was 48 against a ceiling of 46. After S2 the fast i18n gates were re-run
+— coverage, source-audit, workspace-audit — and miss-crawl was not, because it
+drives 68 pages in two viewports and takes about nine minutes each way.
+
+It is also the only one of the four that reads RENDERED text. A rewritten
+screen is exactly what moves it. Skipping it because it is slow inverts the
+reason it exists, and the rule is now: **any session that touches
+user-visible strings runs miss-crawl before pushing**, whatever it costs.
+
+**Two gates, two different readings of the same string, both right.**
+`openDrawer` splits a title on « · », putting the label in its own span and
+marking the record's name `translate="no"` — so `source-audit` scans the
+literal as written at the call site (`"Modificación · "`) while the miss ledger
+reads what the browser rendered (`Modificación`, alone). Both keys are needed.
+Deleting either turns one of the two gates red, which is what happened when the
+first repair removed the separator key: the ledger went green and source-audit
+went 207 → 208 in the same edit.
+
+**«Adenda» was the second miss, and the fix was the house idiom rather than a
+dictionary entry.** `openDrawer("Adenda" + " " + doc.number)` produced ONE text
+node carrying a contract reference, which no entry can ever match. Built with
+« · » instead, the label is translatable and the number is marked as data —
+which is what that separator is for, as openDrawer's own comment says.
+
+**Three measurements, three corrections.** Predicted 46 after two entries;
+measured 47 EN and 107 CA — and Catalan had been over as well, invisible in CI
+because the step runs both languages under `bash -e` and died on the first.
+Predicted the separator fix would finish it; it did, but broke source-audit in
+the same edit. Nothing here was reasoned to; all of it was measured, and every
+prediction that was not measured was wrong.

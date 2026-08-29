@@ -1139,6 +1139,8 @@ window.CANEI_DICT.ca = {
   modificaciones: "modificacions",
   "Ninguna modificación en esta etapa.": "Cap modificació en aquesta etapa.",
   "Ninguna modificación coincide con la búsqueda.": "Cap modificació coincideix amb la cerca.",
+  Modificación: "Modificació",
+  Adenda: "Addenda",
   "Modificación ·": "Modificació ·",
   "Sin aprobar: este trabajo todavía no es facturable.":
     "Sense aprovar: aquest treball encara no és facturable.",

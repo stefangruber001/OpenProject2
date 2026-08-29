@@ -8518,7 +8518,12 @@
       }
       function changeDocDrawer(id) {
         const doc = erp.renderChangeDoc(id);
-        const db = openDrawer("Adenda" + (doc.number ? " " + doc.number : ""));
+        /* « · » rather than a space, which is what makes the label
+       translatable: openDrawer splits on that separator and marks the record's
+       own number translate="no". Joined by a space it was one text node
+       carrying a contract reference, so no dictionary entry could ever match
+       it and «Adenda» stayed Spanish in English and Catalan. */
+        const db = openDrawer("Adenda" + (doc.number ? " · " + doc.number : ""));
         db.innerHTML =
           sheetDocHtml("ordenCambio", { changeId: id }, doc.language) +
           changeLangFootHtml(id, doc);
