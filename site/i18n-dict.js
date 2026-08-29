@@ -1128,6 +1128,10 @@ window.CANEI_DICT = {
     ["Dirección", "Address"],
     ["Banco", "Bank"],
     ["Correo de la empresa", "Company email"],
+    [
+      "⚠ Sin plantilla «Envío de presupuesto» — no se ha preparado ningún correo",
+      "⚠ No «Quote send» template — no email was prepared",
+    ],
     ["Reintentar", "Try again"],
     ["Archivando…", "Filing…"],
     ["Sin servidor", "No server"],

@@ -15320,7 +15320,14 @@
               // the operator's own "Envío de presupuesto" template in
               // Configuración → Comunicaciones, exactly as slide 1 asked.
               if (ch === "email" || ch === "whatsapp") {
+                // Never null on a company that has ever asked: the engine
+                // installs its standard library on demand. The guard stays,
+                // but it no longer ENDS here — a send that produces no
+                // message has to say so, because "nothing happened and
+                // nothing was said" is precisely how a working mailbox
+                // looked broken for a day.
                 const tpl = erp.commsTemplate("quote-send");
+                if (!tpl) toast("⚠ Sin plantilla «Envío de presupuesto» — no se ha preparado ningún correo");
                 if (tpl) {
                   const vars = { number: b.number, cliente: party.name };
                   const C = commsApi();

@@ -1258,57 +1258,11 @@
        — the shipped default — so the queue fills with things awaiting a
        person, which is the behaviour §5.7 asks for and the mandate requires
        (nothing is ever sent from here). */
-    [
-      {
-        // Package 2 slide 1: sending a presupuesto by email or WhatsApp reads
-        // this template — it is the covering message, not the document
-        // itself — so the wording is owner-editable here rather than fixed
-        // in the send drawer's own code.
-        key: "quote-send",
-        label: "Envío de presupuesto",
-        family: "comercial",
-        subject: "Su presupuesto {{number}}",
-        body: "Hola {{cliente}},\n\nAdjuntamos el presupuesto {{number}}. Quedamos a su disposición para cualquier duda.\n\nUn saludo,\nCanei Subirats",
-        attach: "budget",
-      },
-      {
-        key: "quote-followup",
-        label: "Seguimiento de presupuesto",
-        family: "comercial",
-        subject: "Su presupuesto {{number}}",
-        body: "Hola {{cliente}},\n\n¿Ha podido revisar el presupuesto {{number}}? Quedamos a su disposición para cualquier ajuste.\n\nUn saludo,\nCanei Subirats",
-        attach: "budget",
-      },
-      {
-        key: "invoice-reminder",
-        label: "Recordatorio de factura vencida",
-        family: "cobros",
-        subject: "Factura {{number}} pendiente",
-        body: "Hola {{cliente}},\n\nLa factura {{number}}, por importe de {{importe}} €, figura pendiente en nuestros registros. Si ya la ha abonado, indíquenoslo y la conciliamos.\n\nGracias,\nCanei Subirats",
-        attach: "invoice",
-      },
-      {
-        key: "works-start",
-        label: "Aviso de inicio de obra",
-        family: "obra",
-        subject: "Comenzamos su obra el {{fecha}}",
-        body: "Hola {{cliente}},\n\nConfirmamos el inicio de los trabajos. El equipo llegará a primera hora y le informaremos del avance semanalmente.\n\nUn saludo,\nCanei Subirats",
-      },
-      {
-        key: "docs-expired",
-        label: "Documentación caducada",
-        family: "proveedores",
-        subject: "Documentación pendiente — {{number}}",
-        body: "Buenos días,\n\nLa documentación asociada a {{number}} ({{oficio}}) figura caducada. Sin ella no es posible el acceso a obra.\n\nGracias,\nCanei Subirats",
-      },
-      {
-        key: "warranty-followup",
-        label: "Seguimiento posventa",
-        family: "posventa",
-        subject: "¿Todo correcto tras la obra?",
-        body: "Hola {{cliente}},\n\nHa pasado un tiempo desde que terminamos. ¿Está todo a su gusto? Cualquier detalle en garantía lo revisamos sin coste.\n\nUn saludo,\nCanei Subirats",
-      },
-    ].forEach((t) => erp.addCommsTemplate(t, "seed"));
+    /* The standard six, from the engine's own library rather than a copy
+       here: a real company installs exactly these on demand
+       (ensureCommsTemplates), and two definitions of the same default drift
+       without anything saying so. */
+    erp.ensureCommsTemplates("seed");
     [
       {
         label: "Seguir presupuesto a los 5 días",

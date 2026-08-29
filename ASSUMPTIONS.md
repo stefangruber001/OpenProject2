@@ -6442,3 +6442,40 @@ server-side path is green against the IMAP stub (55/55) and the GET that
 reports «connected» works from the same page, so the fault is between the
 POST and the live mailbox, and only the server can say which. This change is
 what makes it tell us — and what lets the operator recover once it does.
+
+## S42 · The default that only the demo had (2026-08-29)
+
+**Root cause of the live mailbox silence, found at last.** The six standard
+message templates were created by `erp-seed.js` and nowhere else, and a real
+company's document is deliberately never seeded — seeding demonstration data
+into a live register is the worse failure, and `remoteLoadState` says so in
+as many words. So on the tenant, `commsTemplate("quote-send")` returned null.
+The send path reads:
+
+    if (channel is email or whatsapp) {
+      const tpl = erp.commsTemplate("quote-send");
+      if (tpl) { …queue the message; file the draft… }
+    }
+
+With no template that block was skipped in its entirety: the quote issued and
+froze correctly, no queued message was created, no draft was attempted, and
+nothing was reported — because nothing had failed. The queue screen was empty,
+which is exactly what the operator saw, and it is why the two previous fixes
+(the sweep, and keeping the server's reason) could not help: there was no row
+for either of them to act on.
+
+**The fix is the pattern this engine already uses for alert rules.** The
+library moves to `STANDARD_COMMS_TEMPLATES` in the engine, `ensureCommsTemplates()`
+installs any that are missing, and `commsTemplate()` calls it when a standard
+key misses — so a company that never ran the seeder answers the same as one
+that did. Existing templates are never touched, so an operator's own edits and
+their retired versions survive. The seeder now delegates to the same list
+rather than holding a second copy of it.
+
+**And the silent skip is gone**: if a template is somehow still absent, the
+send says so instead of quietly producing nothing.
+
+**The general lesson, worth more than the fix:** a default that exists only in
+the demonstration path is not a default. Anything the product needs in order
+to work has to be installed by the product, not by the fixture that makes it
+look good.

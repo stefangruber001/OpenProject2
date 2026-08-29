@@ -9938,6 +9938,29 @@ async function testSendAndVersions(browser, base) {
         ok("N2: the queue screen shows where each draft ended up");
       else bad("N2: queue filed column", queueShows.replace(/\n/g, " ").slice(0, 160));
 
+      /* PK-L · THE ROOT CAUSE OF THE LIVE SILENCE. The standard templates
+         were created by the demonstration seeder and nowhere else, and a real
+         company's document is deliberately never seeded — so on the live
+         tenant commsTemplate("quote-send") was null, the send path's
+         `if (template)` skipped the whole block, and sending a quote froze
+         the version while creating no queued message and filing no draft,
+         saying nothing. A company with an empty library must behave exactly
+         like one with a full one. */
+      const bare = await pg.evaluate(() => {
+        const kept = erp.state.commsTemplates;
+        erp.state.commsTemplates = []; // a real company, never seeded
+        const tpl = erp.commsTemplate("quote-send");
+        const installed = erp.state.commsTemplates.length;
+        // asking twice must not install twice
+        erp.commsTemplate("quote-send");
+        const afterSecond = erp.state.commsTemplates.length;
+        erp.state.commsTemplates = kept;
+        return { found: !!tpl, key: tpl && tpl.key, installed, afterSecond };
+      });
+      if (bare.found && bare.key === "quote-send" && bare.installed === 6 && bare.afterSecond === 6)
+        ok("PK-L: a company with no template library installs the standard one on demand");
+      else bad("PK-L: standard templates self-install", JSON.stringify(bare));
+
       /* PK-K · a draft that did not arrive says WHY, and can be filed again.
          The reason is the mail server's own words and it is kept on the row:
          a toast is gone the moment the send navigates away, which is how a

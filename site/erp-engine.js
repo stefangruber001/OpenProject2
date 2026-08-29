@@ -768,6 +768,66 @@
   }
 
   /* =============================================================================
+     The standard message library.
+
+     One definition, used by both the demonstration seeder and any company that
+     has none — see ensureCommsTemplates(). It lived only in the seeder, which
+     meant a real company had an empty library and the send path's
+     `if (template)` quietly did nothing.
+
+     Wording, not law: every one of these is editable on the Comunicaciones
+     screen, and editing makes a new version rather than overwriting, so a
+     message already sent stays reproducible.
+     ========================================================================== */
+  const STANDARD_COMMS_TEMPLATES = [
+    {
+      key: "quote-send",
+      label: "Envío de presupuesto",
+      family: "comercial",
+      subject: "Su presupuesto {{number}}",
+      body: "Hola {{cliente}},\n\nAdjuntamos el presupuesto {{number}}. Quedamos a su disposición para cualquier duda.\n\nUn saludo,",
+      attach: "budget",
+    },
+    {
+      key: "quote-followup",
+      label: "Seguimiento de presupuesto",
+      family: "comercial",
+      subject: "Su presupuesto {{number}}",
+      body: "Hola {{cliente}},\n\n¿Ha podido revisar el presupuesto {{number}}? Quedamos a su disposición para cualquier ajuste.\n\nUn saludo,",
+      attach: "budget",
+    },
+    {
+      key: "invoice-reminder",
+      label: "Recordatorio de factura vencida",
+      family: "cobros",
+      subject: "Factura {{number}} pendiente",
+      body: "Hola {{cliente}},\n\nLa factura {{number}}, por importe de {{importe}} €, figura pendiente en nuestros registros. Si ya la ha abonado, indíquenoslo y la conciliamos.\n\nGracias,",
+      attach: "invoice",
+    },
+    {
+      key: "works-start",
+      label: "Aviso de inicio de obra",
+      family: "obra",
+      subject: "Comenzamos su obra el {{fecha}}",
+      body: "Hola {{cliente}},\n\nConfirmamos el inicio de los trabajos. El equipo llegará a primera hora y le informaremos del avance semanalmente.\n\nUn saludo,",
+    },
+    {
+      key: "docs-expired",
+      label: "Documentación caducada",
+      family: "proveedores",
+      subject: "Documentación pendiente — {{number}}",
+      body: "Buenos días,\n\nLa documentación asociada a {{number}} ({{oficio}}) figura caducada. Sin ella no es posible el acceso a obra.\n\nGracias,",
+    },
+    {
+      key: "warranty-followup",
+      label: "Seguimiento posventa",
+      family: "posventa",
+      subject: "¿Todo correcto tras la obra?",
+      body: "Hola {{cliente}},\n\nHa pasado un tiempo desde que terminamos. ¿Está todo a su gusto? Cualquier detalle en garantía lo revisamos sin coste.\n\nUn saludo,",
+    },
+  ];
+
+  /* =============================================================================
      ERP — the aggregate. `state` is plain JSON (persist/restore friendly).
      ========================================================================== */
   class ERP {
@@ -8359,10 +8419,43 @@
       this._log(user, "updateCommsTemplate", next.key + " v" + next.version);
       return next;
     }
+    /**
+     * The standard library, installed on demand.
+     *
+     * WHY THIS EXISTS. These six used to be created by the demonstration
+     * seeder and nowhere else — and a real company's document is deliberately
+     * NOT seeded, because writing demonstration data into a live register is
+     * the worse failure. The result was a company whose template library was
+     * empty, and a send path written as `if (template) { queue it; file the
+     * draft }`: with no template the whole block was skipped, so sending a
+     * quote froze the version, created no queued message, filed no draft, and
+     * reported nothing at all. Silence produced by a missing default is still
+     * silence, and it cost a day of looking at a mailbox that was working.
+     *
+     * Same shape as ensureAlertRules(): missing ones are created, existing
+     * ones are never touched, so an operator's own edits and their retired
+     * versions survive untouched.
+     */
+    ensureCommsTemplates(user) {
+      for (const t of STANDARD_COMMS_TEMPLATES) {
+        if (this.state.commsTemplates.some((x) => x.key === t.key)) continue;
+        this.addCommsTemplate(Object.assign({}, t), user || "system");
+      }
+      return this.state.commsTemplates;
+    }
     commsTemplate(key, lang) {
-      const all = this.state.commsTemplates.filter(
-        (t) => t.key === key && t.active && (!lang || t.lang === lang),
-      );
+      const pick = () =>
+        this.state.commsTemplates.filter(
+          (t) => t.key === key && t.active && (!lang || t.lang === lang),
+        );
+      let all = pick();
+      // Asked for one of the standard messages and it is not there: install
+      // the library and answer, rather than returning null to a caller whose
+      // only reaction is to do nothing quietly.
+      if (!all.length && STANDARD_COMMS_TEMPLATES.some((t) => t.key === key)) {
+        this.ensureCommsTemplates("system");
+        all = pick();
+      }
       return all[all.length - 1] || null;
     }
     addCommsRule(r, user) {
@@ -10408,6 +10501,7 @@
 
   return {
     ERP,
+    STANDARD_COMMS_TEMPLATES,
     LISTS,
     LIST_DEFAULTS,
     LIST_KINDS,
