@@ -1298,6 +1298,84 @@ async function testMobile(browser, base) {
       ok("mobile: two taps land on today's hours sheet with the control in reach");
     else bad("mobile: three-tap site action", JSON.stringify(landed));
 
+    /* A DOCUMENT'S FIRST CHARACTERS ARE REACHABLE ON A PHONE.
+       Reported with photographs: the contract read «to —.» and «e requires a
+       signed change order.» — sentence TAILS. Not a document that is merely
+       small, one whose beginnings cannot be reached at all. The sheet is a
+       fixed 210mm page inside `.cnsheet{overflow-x:auto}`, and the cage also
+       carried `.sheet{margin:0 auto}`: centring a child wider than its box
+       puts the left overflow at a negative scroll offset, where no scrollbar
+       goes.
+
+       Measured as GEOMETRY, the way the builder-header overlap above is, and
+       for the same reason — `margin:0 auto` is an ordinary declaration and a
+       style assertion would have passed against the broken CSS. Two
+       properties: the sheet's left edge is not left of its cage (nothing is
+       unreachable), and the cage has no overflow left to scroll (it fits).
+       Checked on the contract AND the quote, because the fix is in the one
+       stylesheet every sheet-rendered document shares. */
+    for (const [what, open] of [
+      [
+        "contrato",
+        () => {
+          const c = erp.state.contracts.find((x) => x.origin !== "external");
+          if (!c) return false;
+          location.hash = "contracts";
+          conWork = { id: c.id, tab: "datos" };
+          render();
+          return true;
+        },
+      ],
+      [
+        // A drawer rather than a pane: the same stylesheet in a second kind of
+        // container, so a fix that only works in the contract's pane is caught.
+        "adenda",
+        () => {
+          const c = erp.state.changes.find((x) =>
+            ["approved", "executed", "invoiced"].includes(x.status),
+          );
+          if (!c) return false;
+          location.hash = "variations";
+          render();
+          changeDocDrawer(c.id);
+          return true;
+        },
+      ],
+    ]) {
+      const opened = await pg.evaluate(open);
+      await pg.waitForTimeout(900);
+      const fit = await pg.evaluate(() => {
+        const cage = document.querySelector(".cnsheet");
+        const sheet = cage && cage.querySelector(".sheet");
+        if (!sheet) return null;
+        const c = cage.getBoundingClientRect();
+        const s = sheet.getBoundingClientRect();
+        return {
+          clippedLeftBy: Math.round(c.left - s.left),
+          overflow: cage.scrollWidth - cage.clientWidth,
+          sheetW: Math.round(s.width),
+          cageW: Math.round(c.width),
+          pageW: document.documentElement.scrollWidth,
+          viewport: window.innerWidth,
+          // The property a reader feels: is the whole document on screen?
+          rightOfViewport: Math.round(s.right - window.innerWidth),
+        };
+      });
+      if (!opened || !fit) {
+        // Not every fixture reaches a sheet; say so rather than pass quietly.
+        bad(
+          `mobile: the ${what} sheet renders at 390px`,
+          opened ? "no .cnsheet .sheet" : "no record",
+        );
+      } else if (fit.clippedLeftBy <= 1 && fit.rightOfViewport <= 1) {
+        ok(
+          `mobile: the whole ${what} is on screen — ${fit.sheetW}px in a ${fit.viewport}px viewport`,
+        );
+      } else {
+        bad(`mobile: the ${what} on a phone`, JSON.stringify(fit));
+      }
+    }
+
     if (errs.length === 0) ok("mobile: no console errors at 390px");
     else bad("mobile: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
@@ -6202,6 +6280,19 @@ async function testContract(browser, base) {
         docText.slice(0, 200),
       );
     else ok("COM-04: guarantee categories are translated, not raw engine keys");
+
+    /* …and the phone treatment stops at its breakpoint. The sheet is the
+       approved design at its approved size on a desktop, and a media query
+       that leaked upward would quietly reformat every document the operator
+       prints. Measured here because this suite runs at 1600px. */
+    const deskSheet = await pg.evaluate(() => {
+      const el = document.querySelector(".cnsheet .sheet");
+      return el ? Math.round(el.getBoundingClientRect().width) : null;
+    });
+    // 210mm ≈ 794px at 96dpi; a few pixels of slack for rounding and zoom.
+    if (deskSheet && Math.abs(deskSheet - 794) <= 4)
+      ok(`COM-04: the sheet keeps its A4 width on a desktop (${deskSheet}px)`);
+    else bad("COM-04: desktop sheet width", `${deskSheet}px, expected ~794`);
 
     // Hitos de pago: the sum against the contracted amount, and S8's source.
     await pg.locator('[data-contab="hitos"]').click();

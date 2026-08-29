@@ -6723,3 +6723,47 @@ the screen renders our document or the customer's signed file.
 Refused by NAME rather than by whitelisting everything else, so the open door
 stays open and the next `externalRef` needs no engine change. Red-first: both
 were accepted before.
+
+### 205 · The document on a phone, and a diagnosis the measurement overturned (2026-08-29)
+
+The operator photographed the contract on a phone: text cut off, unreadable.
+The plan named the cause as `.cnsheet .sheet{margin:0 auto}` — centring a child
+wider than its box, which puts the left overflow at a negative scroll offset
+where no scrollbar reaches. That reading came from the screenshot, where the
+visible line fragments looked like sentence TAILS.
+
+**It was wrong, and measuring said so before any of it was built.** At 390 px:
+
+```
+contrato (pane)    cage 794  sheet 794  cageOverflow 0    page 390  clippedLeftBy 0
+adenda  (drawer)   cage 331  sheet 794  cageOverflow 463  page 390  clippedLeftBy 0
+```
+
+The left edge is exactly where it belongs. One cause — a width fixed in
+millimetres — failing two different ways in the two containers a sheet appears
+in: in the contract's pane the cage grows to the sheet and an ancestor clips
+the right half away with nothing to scroll, and in a drawer the cage stays put
+and a line is read by panning sideways. The second surface is what exposed
+that; the contract alone told a simpler and less true story.
+
+**Fluid below 700 px**, and only below it. After: 364 px and 331 px, both
+whole on screen. The desktop keeps the approved design at its approved size,
+guarded at 1600 px so a media query cannot leak upward and quietly reformat
+every document the operator prints.
+
+**Print and the downloaded file cannot regress, and that is structural rather
+than lucky.** The print block already forces `width:auto!important`, and the
+download is written by `erp-pdf.js`, which shares no CSS with the sheet — so
+`tests/doc-pdf` (43/43) and the print gate (21 documents searchable, 8 of 8
+extracted) prove the customer's file untouched.
+
+`.kvgrid` and `.sig` needed `!important` and nothing else did: their
+`grid-template-columns` is an inline style written per instance, which no
+external rule can otherwise reach.
+
+**And a bug in the check itself, worth recording.** The first version read
+`fit.rightOfViewport` on an object that never carried it — an edit had aborted
+before writing the field — so it failed regardless of the code. Harmless in
+that direction; the mirror image is the one that ships, a check that passes
+because the property it reads is undefined. The assertion now names figures
+that appear in its own success message, so a missing field cannot be silent.

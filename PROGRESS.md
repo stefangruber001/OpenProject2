@@ -1833,7 +1833,7 @@ continues with the first session not marked done.
 | S1      | quote PDF drops exclusiones/supuestos · S curve cannot move · ＋ on the conditions lists | **done** — 637/637 e2e, doc-pdf 43/43 (41/43 red first), tracking 61/61                                    |
 | S2      | Adicionales becomes a register: no project bar, no counter cards, CHG-04 marking kept    | **done** — register + row drawer, engine-wide `extrasRegister()`, and site-syntax now reads inline scripts |
 | S3      | milestones at 10–90 % de avance · the «Obra —» link · LEGAL_REVIEW · terms whitelist     | **done** — atProgressPct + validation, linkContractToProject, Ley 3/2004 entry, terms guarded              |
-| S4      | the contract sheet on a phone (`.sheet` is a fixed 210 mm page)                          | pending                                                                                                    |
+| S4      | the contract sheet on a phone (`.sheet` is a fixed 210 mm page)                          | **done** — fluid below 700px; 794→364px, desktop guarded at A4, print and PDF proven untouched             |
 | S5      | the Gantt on a phone — read-and-record below ~700 px, desktop untouched                  | pending                                                                                                    |
 | S6      | sweep + the ENGLISH client report (28/08 and 29/08 observations)                         | pending                                                                                                    |
 
