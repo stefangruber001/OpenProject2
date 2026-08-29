@@ -6413,3 +6413,32 @@ Local copies (no server) disable the card and say why: a browser-only
 workspace has no mailbox to connect, and a form that pretends otherwise would
 be the "reported success while doing nothing" failure this project keeps
 meeting.
+
+## S41 · A draft that never arrived must say why (2026-08-29)
+
+The operator sent a quote to a real customer with a real address, the mailbox
+card said «connected», and no draft appeared. Nothing on any screen explained
+it. That is the shape of the failure this project keeps meeting, one layer
+further out: the filing outcome WAS recorded («no archivado»), but the
+server's account of why lived in a toast — and the send navigates to the quote
+register immediately (A13), so the toast was gone before it could be read.
+
+**The reason is now a fact on the message.** `recordCommunicationFiled` takes
+a fourth argument and stores `filedReason` (additive; cleared when a later
+attempt succeeds). `fileDraft` resolves `{ outcome, reason }` carrying the
+server's own words — the 503 reason, the endpoint's message, or the network
+error — and the queue's «Borrador» column prints it beside the pill, inside
+`translate="no"` because it is a server's text and not our label.
+
+**And it can be filed again without re-sending anything.** Re-issuing a quote
+to retry a mail problem would freeze a second version of a document the
+customer already has, so «Reintentar» acts on the queue row alone: same
+message, same attachment, filed again. It appears whenever a row with a
+recipient is not in the mailbox, which covers all three ways it can fail —
+server unreachable, mailbox not connected yet, append refused.
+
+**What this does NOT do** is claim to know why the live append failed. The
+server-side path is green against the IMAP stub (55/55) and the GET that
+reports «connected» works from the same page, so the fault is between the
+POST and the live mailbox, and only the server can say which. This change is
+what makes it tell us — and what lets the operator recover once it does.

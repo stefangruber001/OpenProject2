@@ -1815,6 +1815,7 @@ THIS ledger and continues with the first package not marked done.
 | PK-E    | A12 blocker translation split + dicts · A15 test party cleanup + server-e2e hygiene                               | **done** — 602/602 e2e, A12 red-first, deleteParty whitelisted                              |
 | PK-I    | UAT V3 + final consolidated report                                                                                | **done** — V3 sent (17 phases · 150 checks), report delivered                               |
 | PK-J    | emails live: mailbox sweep at boot + after queueing, idempotent filing, mailbox fields on Configuración › Empresa | **done** — root cause found (filed only on mark-sent), 5 checks incl. credential-leak guard |
+| PK-K    | a refused draft keeps the server's reason, and «Reintentar» files it again without re-issuing the quote           | **done** — 634/634 e2e, both checks red-first, filedReason additive                         |
 
 Parked (never blocking): A3 Safari PDF crash (needs the operator's console
 line) · IBAN + logo in Configuración › Empresa (operator). The

@@ -9938,6 +9938,57 @@ async function testSendAndVersions(browser, base) {
         ok("N2: the queue screen shows where each draft ended up");
       else bad("N2: queue filed column", queueShows.replace(/\n/g, " ").slice(0, 160));
 
+      /* PK-K · a draft that did not arrive says WHY, and can be filed again.
+         The reason is the mail server's own words and it is kept on the row:
+         a toast is gone the moment the send navigates away, which is how a
+         real failure looked exactly like silence. */
+      const failed = await pg.evaluate(async () => {
+        const realFetch = window.fetch;
+        const realIsRemote = ErpStore.isRemote;
+        ErpStore.isRemote = () => true;
+        window.fetch = (url, init) => {
+          if (/\/api\/~\/erp\/draft$/.test(String(url)))
+            return Promise.resolve({
+              ok: false,
+              status: 500,
+              json: () => Promise.resolve({ message: "IMAP APPEND refused: over quota" }),
+            });
+          if (/\/api\/~\/erp\/state$/.test(String(url)))
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: () => Promise.resolve({ version: ErpStore.version() }),
+            });
+          return realFetch(url, init);
+        };
+        const q = erp.state.commsQueue.find((x) => x.status === "sent" && x.to);
+        const before = { filed: q.filed, reason: q.filedReason };
+        await fileDraftForComm(q, true);
+        go("messaging");
+        comTab = "cola";
+        render();
+        const row = document.querySelector("#view").innerText;
+        const canRetry = !!document.querySelector("[data-refile-msg]");
+        const kept = { filed: q.filed, reason: q.filedReason };
+        q.filed = before.filed;
+        q.filedReason = before.reason;
+        window.fetch = realFetch;
+        ErpStore.isRemote = realIsRemote;
+        render();
+        return {
+          kept,
+          canRetry,
+          shows: /over quota/.test(row),
+          retryLabel: /Reintentar/.test(row),
+        };
+      });
+      if (failed.kept.filed === "error" && /over quota/.test(failed.kept.reason || ""))
+        ok("PK-K: a refused draft keeps the server's own reason on the message");
+      else bad("PK-K: filing reason kept", JSON.stringify(failed));
+      if (failed.shows && failed.canRetry && failed.retryLabel)
+        ok("PK-K: the queue shows that reason and offers to file it again");
+      else bad("PK-K: reason + retry on the queue row", JSON.stringify(failed));
+
       /* ===== PK-J: once a mailbox IS connected, everything already recorded
          is swept into it, and a row already filed is never filed twice.
          The server is stubbed in-page: GET says configured, POST accepts.

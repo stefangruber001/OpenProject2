@@ -8547,13 +8547,20 @@
      * beside it: "mailbox" (filed in the company Drafts), "none" (no mailbox
      * connected, recorded only), "error" (tried and failed, said out loud).
      */
-    recordCommunicationFiled(id, outcome, user) {
+    recordCommunicationFiled(id, outcome, user, reason) {
       const q = this.state.commsQueue.find((x) => x.id === id);
       if (!q) throw new Error("Queued message not found");
       if (!["mailbox", "none", "error"].includes(outcome))
         throw new Error("Unknown filing outcome: " + outcome);
       q.filed = outcome;
       q.filedAt = this.state.today;
+      // WHY THE REASON IS KEPT AND NOT JUST SHOWN ONCE. A filing that fails
+      // does so on the mail server, and the only account of it is the line
+      // the server sent back. That line used to live in a toast — which the
+      // send then navigated away from, so the operator saw «enviado» and an
+      // empty Drafts folder with nothing anywhere explaining the gap. It is
+      // a fact about this message, so it is kept beside the message.
+      q.filedReason = outcome === "mailbox" ? null : reason || null;
       this._log(user, "recordCommunicationFiled", q.key + " " + outcome);
       return q;
     }

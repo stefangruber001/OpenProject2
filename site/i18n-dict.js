@@ -1128,6 +1128,10 @@ window.CANEI_DICT = {
     ["Dirección", "Address"],
     ["Banco", "Bank"],
     ["Correo de la empresa", "Company email"],
+    ["Reintentar", "Try again"],
+    ["Archivando…", "Filing…"],
+    ["Sin servidor", "No server"],
+    ["Sin buzón configurado", "No mailbox configured"],
     ["Los borradores se archivan en:", "Drafts are filed in:"],
     ["el buzón de la empresa", "the company mailbox"],
     [

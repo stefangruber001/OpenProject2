@@ -10923,14 +10923,24 @@
          const st = ST[q.status] || [q.status, ""];
          // N2 · where this message's draft ended up — a fact beside the
          // status, never a status of its own.
+         // The reason travels with the row: it is the mail server's own
+         // account of why nothing arrived, and it is the only one there is.
+         // translate="no" because it is a server's words, not our label.
+         const why = q.filedReason
+           ? ` <span class="tag" translate="no" style="text-transform:none">${esc(String(q.filedReason).slice(0, 120))}</span>`
+           : "";
+         const retry =
+           q.filed !== "mailbox" && q.to && ["draft", "approved", "sent"].includes(q.status)
+             ? ` <button class="btn sm" data-refile-msg="${q.id}">Reintentar</button>`
+             : "";
          const filed =
            q.filed === "mailbox"
              ? '<span class="pill g">en el buzón</span>'
              : q.filed === "none"
-               ? '<span class="pill y">sin buzón — solo registrado</span>'
+               ? '<span class="pill y">sin buzón — solo registrado</span>' + why + retry
                : q.filed === "error"
-                 ? '<span class="pill r">no archivado</span>'
-                 : "—";
+                 ? '<span class="pill r">no archivado</span>' + why + retry
+                 : "—" + retry;
          return `<tr><td>${fmtD(q.dueDate)}</td><td class="k">${esc(q.subjectRef)}</td><td>${esc(q.templateKey)}</td>
       <td>${esc(q.to || "—")}</td><td>${esc(q.channel)}</td><td><span class="pill ${st[1]}">${st[0]}</span></td>
       <td>${filed}</td>
@@ -10979,6 +10989,24 @@
                   fileDraftForComm(q); // N2 · the draft goes to the mailbox
                 }, "Registrado como enviado")),
           );
+        /* Filing again, without re-sending anything. A draft that did not
+           reach the mailbox — the server was down, the mailbox was not
+           connected yet, the append was refused — is a message the operator
+           still needs. Re-issuing the quote to get one would freeze a second
+           version for a mail problem, so the retry acts on the queue row
+           alone: same message, same document, filed again. */
+        document.querySelectorAll("[data-refile-msg]").forEach((b) => {
+          b.onclick = () => {
+            const q = (erp.state.commsQueue || []).find((x) => x.id === b.dataset.refileMsg);
+            if (!q) return;
+            b.disabled = true;
+            b.textContent = "Archivando…";
+            Promise.resolve(fileDraftForComm(q)).then((outcome) => {
+              if (outcome === "mailbox") toast("Borrador archivado en el buzón");
+              render();
+            });
+          };
+        });
       }
 
       /* ===================== Torre de Control (spec §2.1) =================================
@@ -21087,9 +21115,12 @@
          opening the draft on a phone and pressing send there. Every outcome
          is recorded beside the queue row; silence is not one of the options. */
       let mailboxNoticed = false;
+      /** Resolves to `{ outcome, reason }`. The reason is the server's own
+       *  words and is KEPT — a toast is gone the moment the send navigates,
+       *  and then a draft that never arrived has no explanation anywhere. */
       function fileDraft(eml) {
         if (typeof ErpStore === "undefined" || !ErpStore.isRemote())
-          return Promise.resolve("none");
+          return Promise.resolve({ outcome: "none", reason: "Sin servidor" });
         return fetch(ErpStore.apiBase() + "/api/~/erp/draft", {
           method: "POST",
           credentials: "same-origin",
@@ -21103,21 +21134,22 @@
               .catch(() => ({ ok: r.ok, status: r.status, b: {} })),
           )
           .then(({ ok, status, b }) => {
-            if (ok && b.delivered) return "mailbox";
+            if (ok && b.delivered) return { outcome: "mailbox", reason: null };
             if (status === 503) {
               // Not connected yet. Said once per session, not on every draft.
               if (!mailboxNoticed) {
                 mailboxNoticed = true;
                 toast("Sin buzón configurado — el mensaje queda solo registrado");
               }
-              return "none";
+              return { outcome: "none", reason: (b && b.reason) || "Sin buzón configurado" };
             }
-            toast("⚠ No se pudo archivar el borrador: " + ((b && b.message) || "HTTP " + status));
-            return "error";
+            const why = (b && (b.message || b.reason)) || "HTTP " + status;
+            toast("⚠ No se pudo archivar el borrador: " + why);
+            return { outcome: "error", reason: why };
           })
-          .catch(() => {
+          .catch((e) => {
             toast("⚠ No se pudo contactar con el servidor para archivar el borrador");
-            return "error";
+            return { outcome: "error", reason: String((e && e.message) || e).slice(0, 200) };
           });
       }
       /** The message body in the approved email design — lockup, the
@@ -21222,15 +21254,23 @@
             html: draftEmailHtml(subject, body),
             attachments: att ? [att] : [],
           });
-          return fileDraft(eml).then((outcome) => {
-            erp.recordCommunicationFiled(q.id, outcome, "backoffice");
+          return fileDraft(eml).then((res) => {
+            erp.recordCommunicationFiled(q.id, res.outcome, "backoffice", res.reason);
             persist();
-            if (outcome === "mailbox" && !silent) toast("Borrador archivado en el buzón");
-            return outcome;
+            if (res.outcome === "mailbox" && !silent) toast("Borrador archivado en el buzón");
+            return res.outcome;
           });
         } catch (e) {
           try {
-            erp.recordCommunicationFiled(q.id, "error", "backoffice");
+            // The draft could not even be BUILT — a broken template, a
+            // document this cannot render. Same treatment: kept, named,
+            // retryable, never a silent nothing.
+            erp.recordCommunicationFiled(
+              q.id,
+              "error",
+              "backoffice",
+              String((e && e.message) || e).slice(0, 200),
+            );
           } catch (_) {}
           return Promise.resolve("error");
         }

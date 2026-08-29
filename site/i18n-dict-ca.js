@@ -739,6 +739,10 @@ window.CANEI_DICT.ca = {
     "Sense bústia configurada — el missatge queda només registrat",
   "Borrador archivado en el buzón": "Esborrany arxivat a la bústia",
   "Correo de la empresa": "Correu de l'empresa",
+  Reintentar: "Torna-ho a provar",
+  "Archivando…": "Arxivant…",
+  "Sin servidor": "Sense servidor",
+  "Sin buzón configurado": "Sense bústia configurada",
   "Los borradores se archivan en:": "Els esborranys s'arxiven a:",
   "el buzón de la empresa": "la bústia de l'empresa",
   "Buzón conectado. Hay un borrador de prueba esperando en:":
