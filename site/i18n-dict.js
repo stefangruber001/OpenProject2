@@ -2957,7 +2957,11 @@ window.CANEI_DICT = {
       "What was taken as true when pricing; if it changes, the price changes.",
     ],
     ["Ninguna todavía.", "None yet."],
-    ["Añadir y pulsar Enter", "Type and press Enter"],
+    ["Escribe y añade", "Type and add"],
+    [
+      "Todavía no hay curva planificada contra la que medir: la obra empieza el",
+      "There is no planned curve to measure against yet: the works begin on",
+    ],
     [
       "La versión está congelada: sus condiciones se conservan tal como se enviaron.",
       "The version is frozen: its conditions are kept exactly as they were sent.",
@@ -3275,6 +3279,77 @@ window.CANEI_DICT = {
     ["extra", "extra"],
     ["extras", "extras"],
     ["Sin aprobar", "Unapproved"],
+    /* PRY-03 became a register in PK9-S2: the five counters are a stage filter
+       and one «sin aprobar» total, and the per-status actions moved into the
+       row's own drawer. These are that screen's words. */
+    [
+      "Extras y modificaciones de todas las obras. El trabajo no aprobado nunca es facturable — la barra ámbar lo dice desde lejos.",
+      "Extras and variations across every job. Work that has not been approved is never billable — the amber bar says so from across the room.",
+    ],
+    ["Todas", "All"],
+    ["Detectada", "Identified"],
+    ["Valorada", "Priced"],
+    ["Ejecutada", "Executed"],
+    ["Facturada", "Invoiced"],
+    ["Buscar por descripción, obra o partida", "Search by description, job or chapter"],
+    ["modificación", "variation"],
+    ["modificaciones", "variations"],
+    ["Ninguna modificación en esta etapa.", "No variation at this stage."],
+    ["Ninguna modificación coincide con la búsqueda.", "No variation matches the search."],
+    /* The word alone, not «Modificación ·». The drawer title is built as
+       `"Modificación · " + c.desc`, and the translator sees the fragment
+       before the separator — so a key carrying the «·» never matched anything
+       and the miss ledger counted it. Same for «Adenda», which is built the
+       same way from its document number. */
+    ["Modificación", "Variation"],
+    ["Adenda", "Addendum"],
+    /* And the same two WITH the separator, because two gates read two
+       different things and both are right: source-audit scans the literal as
+       written at the call site (`"Modificación · "`), while the miss ledger
+       reads what openDrawer actually rendered (`Modificación` alone, in its
+       own span). Drop either entry and one of them goes red. */
+    ["Modificación ·", "Variation ·"],
+    /* PK9-S3 · payment milestones at a percentage of progress. Nine whole
+       phrases rather than a sentence assembled from «Al», the number and «de
+       avance»: a translator needs the whole phrase to put the number where
+       that language puts it, and fragments are how «Al 50 % de avance» becomes
+       three separate misses in the ledger. */
+    ["Al 10 % de avance", "At 10 % progress"],
+    ["Al 20 % de avance", "At 20 % progress"],
+    ["Al 30 % de avance", "At 30 % progress"],
+    ["Al 40 % de avance", "At 40 % progress"],
+    ["Al 50 % de avance", "At 50 % progress"],
+    ["Al 60 % de avance", "At 60 % progress"],
+    ["Al 70 % de avance", "At 70 % progress"],
+    ["Al 80 % de avance", "At 80 % progress"],
+    ["Al 90 % de avance", "At 90 % progress"],
+    ["Vincular obra", "Link a job"],
+    ["Vincular", "Link"],
+    ["Obra vinculada", "Job linked"],
+    [
+      "El contrato pasa a gobernar esa obra: la firma, los anexos, los cobros previstos y el importe contratado de la torre de control leen este vínculo.",
+      "The contract comes to govern that job: the signature, the annexes, the expected collections and the control tower's contracted amount all read this link.",
+    ],
+    [
+      "No hay obras abiertas sin contrato. Una obra ya vinculada conserva su contrato.",
+      "There are no open jobs without a contract. A job already linked keeps its contract.",
+    ],
+    [
+      "Sin aprobar: este trabajo todavía no es facturable.",
+      "Unapproved: this work is not billable yet.",
+    ],
+    ["Nuevo presupuesto de variación", "New variation quote"],
+    ["Obra *", "Job *"],
+    [
+      "Se abre el presupuestador con una versión nueva sobre esa obra. Al aceptarse, sus partidas entran en la economía, el avance y la certificación.",
+      "The quote builder opens with a new version for that job. Once accepted, its chapters enter the economics, the progress and the valuations.",
+    ],
+    ["Crear y abrir", "Create and open"],
+    [
+      "No hay obras abiertas sobre las que crear un presupuesto de variación.",
+      "There are no open jobs to create a variation quote for.",
+    ],
+    ["La obra es obligatoria", "The job is required"],
     ["＋ Nueva modificación", "＋ New variation"],
     ["Modificaciones", "Variations"],
     ["no facturable sin aprobación", "not billable without approval"],

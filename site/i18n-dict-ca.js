@@ -887,7 +887,9 @@ window.CANEI_DICT.ca = {
   "Aquello que se ha dado por cierto al valorar; si cambia, cambia el precio.":
     "Allò que s'ha donat per cert en valorar; si canvia, canvia el preu.",
   "Ninguna todavía.": "Cap encara.",
-  "Añadir y pulsar Enter": "Afegeix i prem Enter",
+  "Escribe y añade": "Escriu i afegeix",
+  "Todavía no hay curva planificada contra la que medir: la obra empieza el":
+    "Encara no hi ha corba planificada contra la qual mesurar: l'obra comença el",
   "La versión está congelada: sus condiciones se conservan tal como se enviaron.":
     "La versió està congelada: les seves condicions es conserven tal com es van enviar.",
   "Sin partidas todavía.": "Sense partides encara.",
@@ -1141,6 +1143,47 @@ window.CANEI_DICT.ca = {
   extra: "extra",
   extras: "extres",
   "Sin aprobar": "Sense aprovar",
+  "Extras y modificaciones de todas las obras. El trabajo no aprobado nunca es facturable — la barra ámbar lo dice desde lejos.":
+    "Extres i modificacions de totes les obres. El treball no aprovat mai és facturable — la barra ambre ho diu des de lluny.",
+  Todas: "Totes",
+  Detectada: "Detectada",
+  Valorada: "Valorada",
+  Ejecutada: "Executada",
+  Facturada: "Facturada",
+  "Buscar por descripción, obra o partida": "Cerca per descripció, obra o partida",
+  modificación: "modificació",
+  modificaciones: "modificacions",
+  "Ninguna modificación en esta etapa.": "Cap modificació en aquesta etapa.",
+  "Ninguna modificación coincide con la búsqueda.": "Cap modificació coincideix amb la cerca.",
+  Modificación: "Modificació",
+  Adenda: "Addenda",
+  "Modificación ·": "Modificació ·",
+  "Al 10 % de avance": "Al 10 % d'avanç",
+  "Al 20 % de avance": "Al 20 % d'avanç",
+  "Al 30 % de avance": "Al 30 % d'avanç",
+  "Al 40 % de avance": "Al 40 % d'avanç",
+  "Al 50 % de avance": "Al 50 % d'avanç",
+  "Al 60 % de avance": "Al 60 % d'avanç",
+  "Al 70 % de avance": "Al 70 % d'avanç",
+  "Al 80 % de avance": "Al 80 % d'avanç",
+  "Al 90 % de avance": "Al 90 % d'avanç",
+  "Vincular obra": "Vincular obra",
+  Vincular: "Vincular",
+  "Obra vinculada": "Obra vinculada",
+  "El contrato pasa a gobernar esa obra: la firma, los anexos, los cobros previstos y el importe contratado de la torre de control leen este vínculo.":
+    "El contracte passa a governar aquesta obra: la signatura, els annexos, els cobraments previstos i l'import contractat de la torre de control llegeixen aquest vincle.",
+  "No hay obras abiertas sin contrato. Una obra ya vinculada conserva su contrato.":
+    "No hi ha obres obertes sense contracte. Una obra ja vinculada conserva el seu contracte.",
+  "Sin aprobar: este trabajo todavía no es facturable.":
+    "Sense aprovar: aquest treball encara no és facturable.",
+  "Nuevo presupuesto de variación": "Nou pressupost de variació",
+  "Obra *": "Obra *",
+  "Se abre el presupuestador con una versión nueva sobre esa obra. Al aceptarse, sus partidas entran en la economía, el avance y la certificación.":
+    "S'obre el pressupostador amb una versió nova sobre aquesta obra. En acceptar-se, les seves partides entren a l'economia, l'avanç i la certificació.",
+  "Crear y abrir": "Crear i obrir",
+  "No hay obras abiertas sobre las que crear un presupuesto de variación.":
+    "No hi ha obres obertes sobre les quals crear un pressupost de variació.",
+  "La obra es obligatoria": "L'obra és obligatòria",
   "＋ Nueva modificación": "＋ Nova modificació",
   Modificaciones: "Modificacions",
   "no facturable sin aprobación": "no facturable sense aprovació",

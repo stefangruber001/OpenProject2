@@ -6480,6 +6480,294 @@ the demonstration path is not a default. Anything the product needs in order
 to work has to be installed by the product, not by the fixture that makes it
 look good.
 
+### 196 · Two renderers of one descriptor now agree, because nothing made them (2026-08-29)
+
+The operator reported that «Exclusiones» and «Supuestos» were missing from the
+downloaded quote. They were, and it was a regression of ours from the session
+before: S4 taught the HTML renderer (`erp-sheet.js`) to print the two blocks,
+and S5 then moved the quote's DOWNLOAD from that renderer to the PDF writer
+(`erp-pdf.js`), whose `blocks()` had never been taught. The descriptor carried
+both lists the whole time; the screen showed them; the file the customer
+receives did not.
+
+Nothing went red, and the reason is the part worth recording: there are TWO
+independent renderers of the same descriptor, each with its own fixtures, and
+neither fixture carried the fields. Each renderer's tests can be complete and
+green while the pair disagrees.
+
+**So the fix is not the concat.** `tests/doc-pdf` now renders ONE descriptor
+through BOTH renderers and asserts every terms block reaches both outputs.
+Add a block to one side and the gate names the side that is missing it. The
+two `.concat` lines in the writer are three minutes of work; the check is what
+stops the next divergence.
+
+**Measured before and after**, rather than reasoned about: 41/43 with the
+blocks absent from the PDF only (`payment` and `notes` passed on both sides,
+which is what proved the check itself sound), 43/43 after.
+
+### 197 · The S curve could not move when the plan had not started (2026-08-29)
+
+Reported as "I made some progress and the chart stayed the same". It was worse
+than that: the actual line was never drawn at all. `progressCurve` sampled from
+the plan's first working day forward and nulled every actual value dated after
+`asOf`; with today BEFORE the plan's start every sample qualified, so every
+actual value was null. The one rescue — a guaranteed sample at `asOf` — was
+guarded by `asOf >= schedule.start`, which is exactly the case that fails.
+
+Confirmed independently from the operator's own screenshot by counting pixels
+in the chart area: 0 green, 0 amber, 4144 grey. One dashed planned line and
+nothing else.
+
+**The window now begins at the earlier of today and the plan's start.** A job
+carrying recorded progress before its plan formally begins is ordinary — the
+dates come off the quote and nobody re-plans them the morning work starts —
+and the record of what was done exists whatever the plan says. One observation
+draws a dot rather than a line, which the view already knew how to do.
+
+**A second assertion, because the first bug hid behind agreement that was never
+checked:** the last drawn point of the actual line must equal the figure the
+header reports. They are computed from different sources on purpose (the header
+from the tasks, the line from the log) and nothing forced them to agree — which
+is how the card came to read «real 62,5 %» above a chart with no line on it.
+
+**A correction made while writing that test.** The first version failed, and
+the code was right: the fixture set a task to 50 % without a matching log
+entry, so the two figures differed legitimately. The assertion holds given a
+log that recorded what the tasks carry — which is what the write path produces
+— and the test now says so rather than implying an unconditional invariant.
+
+**Also, two smaller honesty repairs on the same card.** «+78,7 pts» against a
+plan at zero reads as being seventy-eight points ahead of schedule; it meant
+the plan had not started, so the drift is withheld and the card says which it
+is. And the legend advertised a «Proyectado» line on charts that have none — a
+pace needs two days of record and the capability withholds the projection
+until it has them, so the swatch now appears only when a line was drawn.
+
+### 198 · A key is not an affordance on a phone (2026-08-29)
+
+Exclusions and assumptions could only be added by pressing Enter in the field.
+On an on-screen keyboard that key does not reliably arrive as a keydown of
+"Enter", so the two lists could be typed into and never added to — on the
+device the operator was using. That is the likeliest reason the quote in the
+report carried zero of each.
+
+Both drawers now carry a `＋` button, and the button and the key call one
+function so neither is the special case. The placeholder stopped saying
+«Añadir y pulsar Enter», because it was instructions for the path that did not
+work.
+
+### 199 · Adicionales is a register, and the amber rule is what had to survive (2026-08-29)
+
+The operator asked that PRY-03 stop opening with a project selector and five
+money counters, and take the shape Clientes and Proveedores already have. It
+now does: one `renderMasterList` call, one row per modificación, every obra at
+once, search on description/obra/partida, and an export it never had.
+
+**What was deliberately kept.** CHG-04 — unapproved work is never billable —
+is the reason this screen was designed the way it was, and the amber rule down
+an unapproved row is how it says so to somebody walking past. `renderMasterList`
+could only style CELLS, so it gained one `rowClass(r)` option. That option
+should stay rare; it exists for this rule.
+
+**And the rule still nearly went missing.** The CSS selector was
+`tr.xrow.unapproved`, named after the old table's rows; the register's are
+`tr.click`, so the class went on being written, the pill went on printing, and
+the border silently stopped being drawn. The e2e caught it — `unapprovedRows: 1,
+matchesEngine: true, rule: "0px"` — and the selector is now keyed on the STATE
+(`tr.unapproved`) rather than on the screen that first showed it.
+
+**The counters became one number and a filter.** Five money cards were what the
+operator asked to stop seeing; a stage `<select>` keeps the filtering and one
+«Sin aprobar · N €» pill keeps CHG-04's headline figure. A six-tab tabstrip
+does not fit a phone, and Obras already uses a select for exactly this job.
+The `.counter` CSS stays: ADM-02 Compras uses the same markup.
+
+**The total comes from the engine.** `extrasRegister()` answers for every obra
+when called with no project, so the register reads one definition of "what
+counts as unapproved" rather than summing it again in the view. Red-first in
+the manageability sim, including a fixture carrying real unapproved value —
+the first version compared zero to zero and passed by agreeing about nothing.
+
+**Two decisions about scope.** The obra moved into the creation drawers rather
+than staying a page-level selector, and its list is built from
+`erp.state.projects` instead of `projectOptions()`: that helper obeys the
+project BAR's filter, so a bar left on «Cerrados» elsewhere would have emptied
+the picker with nothing on screen explaining why. Variation budgets get a
+create button and no list, because `budgetList` already shows them and the
+contract's Alcance tab lists the accepted ones.
+
+### 200 · The syntax gate did not read the biggest script in the project (2026-08-29)
+
+Rewriting the screen left the old `let chgStage` in place beside the new one.
+Two `let`s in one scope is a hard SyntaxError that voids the entire `<script>`
+tag — every screen gone, the same failure `tests/site-syntax` was written for
+after a stray backtick took out `erp-modal.js`.
+
+It reported `all 28 scripts in site/ parse`. True, and useless: it globbed
+`site/*.js` and never opened the ~23 000 lines of JavaScript written INSIDE
+`<script>` in `erp.html`. The one file the operator actually looks at was
+outside the net.
+
+Proved before fixing, by reintroducing the duplicate and watching the gate pass
+anyway. Inline blocks are now extracted — skipping `src`, modules and non-JS
+types — and checked with line numbers padded so a failure points at the page's
+own line: `site/erp.html (inline block from line 5103) — SyntaxError: Identifier
+'chgStage' has already been declared [site/erp.html:8073]`. A zero-inline-blocks
+result now fails too, so the extraction cannot quietly stop matching and narrow
+the gate back to what it used to cover.
+
+The failure was reachable another way — a parse error breaks every browser
+suite — but that is twelve minutes and a wall of red for something `node
+--check` answers in milliseconds, which is the argument the file already made
+for itself.
+
+### 201 · The slow gate is the one that catches a screen rewrite (2026-08-29)
+
+S2 pushed `main` red. Three of four workflows were green; CI's translator miss
+ledger was 48 against a ceiling of 46. After S2 the fast i18n gates were re-run
+— coverage, source-audit, workspace-audit — and miss-crawl was not, because it
+drives 68 pages in two viewports and takes about nine minutes each way.
+
+It is also the only one of the four that reads RENDERED text. A rewritten
+screen is exactly what moves it. Skipping it because it is slow inverts the
+reason it exists, and the rule is now: **any session that touches
+user-visible strings runs miss-crawl before pushing**, whatever it costs.
+
+**Two gates, two different readings of the same string, both right.**
+`openDrawer` splits a title on « · », putting the label in its own span and
+marking the record's name `translate="no"` — so `source-audit` scans the
+literal as written at the call site (`"Modificación · "`) while the miss ledger
+reads what the browser rendered (`Modificación`, alone). Both keys are needed.
+Deleting either turns one of the two gates red, which is what happened when the
+first repair removed the separator key: the ledger went green and source-audit
+went 207 → 208 in the same edit.
+
+**«Adenda» was the second miss, and the fix was the house idiom rather than a
+dictionary entry.** `openDrawer("Adenda" + " " + doc.number)` produced ONE text
+node carrying a contract reference, which no entry can ever match. Built with
+« · » instead, the label is translatable and the number is marked as data —
+which is what that separator is for, as openDrawer's own comment says.
+
+**Three measurements, three corrections.** Predicted 46 after two entries;
+measured 47 EN and 107 CA — and Catalan had been over as well, invisible in CI
+because the step runs both languages under `bash -e` and died on the first.
+Predicted the separator fix would finish it; it did, but broke source-audit in
+the same edit. Nothing here was reasoned to; all of it was measured, and every
+prediction that was not measured was wrong.
+
+### 202 · A payment milestone now names a percentage of the work (2026-08-29)
+
+«Al llegar a una fase» named no fase and no depth. The operator's objection was
+concrete: a milestone reached at 50 % of the work may release 20 % of the
+money, and the screen could not say so. The trigger and the amount are separate
+facts and stay separate — `atProgressPct` carries a `progressPct` of 10…90 in
+tens, and the row's own percentage box still says what is being paid.
+
+**The trigger list stopped being decoration.** `installmentTriggers` was
+declared in `config` and read by NOTHING: any string at all was accepted and
+the contract printed it raw at the customer. It is validated now, in
+`_validateContractTerms` rather than `_finishContract`, because that runs
+before `nextNumber` — a refusal after it leaves a permanent hole in a series
+ORG-04 requires to be gap-free, which is the rule the duration check already
+followed.
+
+`atStage` stays accepted. Contracts already signed carry it, and no migration
+is worth breaking a signed document over.
+
+**The date comes off the planned curve, never the actual one.** The bridge
+finds the first day the PLAN reaches the threshold, reusing `progressCurve`
+rather than computing "how much of this job is done by Tuesday" a second time.
+Deriving it from recorded progress would move a date the customer agreed to
+because the site had a slow week — so a check asserts that recording progress
+leaves the milestone dates untouched.
+
+**And it had no test at all.** `installmentDatesFromPlan` is money-chain item
+14 and no suite loaded the bridge. The property pinned is not one date: it is
+that a LATER threshold lands on a LATER day, which is what makes the
+derivation a reading of the plan rather than a plausible constant.
+
+**One select, two facts.** The threshold is encoded in the option value
+(`atProgressPct:50`) and split where a row is read. Giving it its own control
+would put a second, contradictable answer on screen — «al 50 %» beside a box
+reading 30 — and the nine labels are whole dictionary phrases rather than a
+sentence assembled from «Al», a number and «de avance», because a translator
+needs the whole phrase to put the number where that language puts it.
+
+### 203 · «Obra —»: the second contract could never claim the job (2026-08-29)
+
+The operator's contract showed no obra. The link lives on the PROJECT
+(`project.contractId`) and `createContract` writes it only for a project that
+has none — right as a default, and it leaves one hole: a SECOND contract drawn
+up on the same budget can never claim the job. Nothing in the interface could
+repair it, and everything downstream reads that link — the signature gates, the
+annex chain, the expected collections, the control tower's contracted amount —
+so such a contract sits outside all of them.
+
+Reproduced red-first in the sim (first contract owns the obra; second starts
+with none), then `linkContractToProject` and a «Vincular obra» button on the
+row that used to print «—».
+
+**Moving, not copying.** A project has one contract, so linking clears whatever
+pointed at it before. The caller is answering "which contract governs this
+job", and two answers to that is the state the method exists to leave behind —
+asserted, so a future change that starts duplicating the link goes red.
+
+### 204 · Terms are the caller's, but not all of them (2026-08-29)
+
+`createContract` merges the caller's terms wholesale, which is deliberate: it
+is what lets a drawer pass `externalRef` with no whitelist to keep in step. The
+cost is that the same door reaches fields the engine owns. Two matter —
+`number`, minted from a gap-free series, and `origin`, which decides whether
+the screen renders our document or the customer's signed file.
+
+Refused by NAME rather than by whitelisting everything else, so the open door
+stays open and the next `externalRef` needs no engine change. Red-first: both
+were accepted before.
+
+### 205 · The document on a phone, and a diagnosis the measurement overturned (2026-08-29)
+
+The operator photographed the contract on a phone: text cut off, unreadable.
+The plan named the cause as `.cnsheet .sheet{margin:0 auto}` — centring a child
+wider than its box, which puts the left overflow at a negative scroll offset
+where no scrollbar reaches. That reading came from the screenshot, where the
+visible line fragments looked like sentence TAILS.
+
+**It was wrong, and measuring said so before any of it was built.** At 390 px:
+
+```
+contrato (pane)    cage 794  sheet 794  cageOverflow 0    page 390  clippedLeftBy 0
+adenda  (drawer)   cage 331  sheet 794  cageOverflow 463  page 390  clippedLeftBy 0
+```
+
+The left edge is exactly where it belongs. One cause — a width fixed in
+millimetres — failing two different ways in the two containers a sheet appears
+in: in the contract's pane the cage grows to the sheet and an ancestor clips
+the right half away with nothing to scroll, and in a drawer the cage stays put
+and a line is read by panning sideways. The second surface is what exposed
+that; the contract alone told a simpler and less true story.
+
+**Fluid below 700 px**, and only below it. After: 364 px and 331 px, both
+whole on screen. The desktop keeps the approved design at its approved size,
+guarded at 1600 px so a media query cannot leak upward and quietly reformat
+every document the operator prints.
+
+**Print and the downloaded file cannot regress, and that is structural rather
+than lucky.** The print block already forces `width:auto!important`, and the
+download is written by `erp-pdf.js`, which shares no CSS with the sheet — so
+`tests/doc-pdf` (43/43) and the print gate (21 documents searchable, 8 of 8
+extracted) prove the customer's file untouched.
+
+`.kvgrid` and `.sig` needed `!important` and nothing else did: their
+`grid-template-columns` is an inline style written per instance, which no
+external rule can otherwise reach.
+
+**And a bug in the check itself, worth recording.** The first version read
+`fit.rightOfViewport` on an object that never carried it — an edit had aborted
+before writing the field — so it failed regardless of the code. Harmless in
+that direction; the mirror image is the one that ships, a check that passes
+because the property it reads is undefined. The assertion now names figures
+that appear in its own success message, so a missing field cannot be silent.
+
 ## S43 · PK-N — a Word file is the same document, not a second one (2026-08-29)
 
 The operator asked for every generated PDF to exist as a Word file too, an

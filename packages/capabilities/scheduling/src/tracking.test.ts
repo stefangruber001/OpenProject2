@@ -164,6 +164,67 @@ describe("progress curve", () => {
     expect(future.every((p) => p.projectedPct! <= p.plannedPct + 0.1)).toBe(true);
   });
 
+  /* Progress recorded before the plan's first day.
+     Reported from the field: percentages were entered, the header read «real
+     78.7 %», and the chart did not move — because it could not. Every sample
+     was taken from the plan's start forward, every one of them was after
+     `asOf`, so every actual value was null and the line was never drawn at
+     all. The guaranteed sample at `asOf` did not rescue it either: its guard
+     required `asOf` to be inside the plan's window, which is exactly the case
+     that fails. A job whose plan has not formally started is an ordinary
+     situation on a site; the record of what was done still exists. */
+  it("draws the record even when today is before the plan starts", () => {
+    const base = planFromWorkBreakdown(
+      ["1", "2", "3", "4"].map((n) => ({
+        ref: n,
+        groupNum: n,
+        groupName: `G${n}`,
+        title: `G${n}`,
+        durationDays: 5,
+      })),
+      { from: "2026-08-31", calendar: fiveDay },
+    ).plan;
+    // The log carries an entry for every task that shows progress. It has to:
+    // the header counts the TASKS and the line reads the LOG, so a task whose
+    // percentage was never logged makes the two differ legitimately, and an
+    // assertion that they agree would then be testing the fixture.
+    const plan = withProgress(base, [100, 100, 50, 0], [
+      { taskId: base.tasks[0]!.id, date: "2026-08-27", pct: 100 },
+      { taskId: base.tasks[1]!.id, date: "2026-08-28", pct: 100 },
+      { taskId: base.tasks[2]!.id, date: "2026-08-28", pct: 50 },
+    ] as ProgressEntry[]);
+    const c = progressCurve(plan, computeSchedule(plan, { from: "2026-08-31" }), {
+      asOf: "2026-08-28",
+    });
+    const drawn = c.points.filter((p) => p.actualPct !== null);
+    expect(drawn.length).toBeGreaterThan(0);
+    expect(c.points.some((p) => p.date === "2026-08-28")).toBe(true);
+    // And it is the right figure: half the work is recorded done, so the one
+    // point the line can have says so rather than sitting at zero.
+    expect(drawn[drawn.length - 1]!.actualPct).toBe(c.actualPct);
+    expect(c.actualPct).toBeGreaterThan(0);
+  });
+
+  /* The header and the chart are computed from different sources on purpose —
+     `actualPct` from the tasks, the line from the log — and nothing forced
+     them to agree. They did not: the card read «real 62.5 %» above a chart
+     with no actual line on it. Whatever the sources, the last point of the
+     drawn line is what the header claims — GIVEN a log that recorded what the
+     tasks carry, which is what the write path produces. Where a percentage was
+     set without ever being logged the two differ on purpose, and that is a
+     different property from this one. */
+  it("ends its actual line on the figure the header reports", () => {
+    const base = fourWeeks();
+    const plan = withProgress(base, [100, 100, 0, 0], [
+      { taskId: base.tasks[0]!.id, date: "2026-09-09", pct: 100 },
+      { taskId: base.tasks[1]!.id, date: "2026-09-11", pct: 100 },
+    ] as ProgressEntry[]);
+    const c = progressCurve(plan, sched(plan), { asOf: "2026-09-11", samples: 60 });
+    const drawn = c.points.filter((p) => p.actualPct !== null);
+    expect(drawn.length).toBeGreaterThan(0);
+    expect(drawn[drawn.length - 1]!.actualPct).toBe(c.actualPct);
+  });
+
   it("ends the curve on the later of the planned and projected finishes", () => {
     const base = fourWeeks();
     const plan = withProgress(

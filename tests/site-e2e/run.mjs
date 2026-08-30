@@ -1298,6 +1298,84 @@ async function testMobile(browser, base) {
       ok("mobile: two taps land on today's hours sheet with the control in reach");
     else bad("mobile: three-tap site action", JSON.stringify(landed));
 
+    /* A DOCUMENT'S FIRST CHARACTERS ARE REACHABLE ON A PHONE.
+       Reported with photographs: the contract read «to —.» and «e requires a
+       signed change order.» — sentence TAILS. Not a document that is merely
+       small, one whose beginnings cannot be reached at all. The sheet is a
+       fixed 210mm page inside `.cnsheet{overflow-x:auto}`, and the cage also
+       carried `.sheet{margin:0 auto}`: centring a child wider than its box
+       puts the left overflow at a negative scroll offset, where no scrollbar
+       goes.
+
+       Measured as GEOMETRY, the way the builder-header overlap above is, and
+       for the same reason — `margin:0 auto` is an ordinary declaration and a
+       style assertion would have passed against the broken CSS. Two
+       properties: the sheet's left edge is not left of its cage (nothing is
+       unreachable), and the cage has no overflow left to scroll (it fits).
+       Checked on the contract AND the quote, because the fix is in the one
+       stylesheet every sheet-rendered document shares. */
+    for (const [what, open] of [
+      [
+        "contrato",
+        () => {
+          const c = erp.state.contracts.find((x) => x.origin !== "external");
+          if (!c) return false;
+          location.hash = "contracts";
+          conWork = { id: c.id, tab: "datos" };
+          render();
+          return true;
+        },
+      ],
+      [
+        // A drawer rather than a pane: the same stylesheet in a second kind of
+        // container, so a fix that only works in the contract's pane is caught.
+        "adenda",
+        () => {
+          const c = erp.state.changes.find((x) =>
+            ["approved", "executed", "invoiced"].includes(x.status),
+          );
+          if (!c) return false;
+          location.hash = "variations";
+          render();
+          changeDocDrawer(c.id);
+          return true;
+        },
+      ],
+    ]) {
+      const opened = await pg.evaluate(open);
+      await pg.waitForTimeout(900);
+      const fit = await pg.evaluate(() => {
+        const cage = document.querySelector(".cnsheet");
+        const sheet = cage && cage.querySelector(".sheet");
+        if (!sheet) return null;
+        const c = cage.getBoundingClientRect();
+        const s = sheet.getBoundingClientRect();
+        return {
+          clippedLeftBy: Math.round(c.left - s.left),
+          overflow: cage.scrollWidth - cage.clientWidth,
+          sheetW: Math.round(s.width),
+          cageW: Math.round(c.width),
+          pageW: document.documentElement.scrollWidth,
+          viewport: window.innerWidth,
+          // The property a reader feels: is the whole document on screen?
+          rightOfViewport: Math.round(s.right - window.innerWidth),
+        };
+      });
+      if (!opened || !fit) {
+        // Not every fixture reaches a sheet; say so rather than pass quietly.
+        bad(
+          `mobile: the ${what} sheet renders at 390px`,
+          opened ? "no .cnsheet .sheet" : "no record",
+        );
+      } else if (fit.clippedLeftBy <= 1 && fit.rightOfViewport <= 1) {
+        ok(
+          `mobile: the whole ${what} is on screen — ${fit.sheetW}px in a ${fit.viewport}px viewport`,
+        );
+      } else {
+        bad(`mobile: the ${what} on a phone`, JSON.stringify(fit));
+      }
+    }
+
     if (errs.length === 0) ok("mobile: no console errors at 390px");
     else bad("mobile: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
@@ -2690,6 +2768,10 @@ async function testVariationBudget(browser, base) {
     await pg.goto(`${base}/erp.html#variations`, { waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(800);
+    /* PK9-S2: the screen is a register over every obra, so it no longer has a
+       project bar to set — the job is chosen in the creation drawer instead.
+       The suite therefore picks the job it wants and selects it THERE, which
+       is also the path a person now takes. */
     const pid = await pg.evaluate(() => {
       const p = erp.state.projects.find(
         (x) =>
@@ -2698,12 +2780,8 @@ async function testVariationBudget(browser, base) {
           !x.closed &&
           erp.version(x.budgetId, x.acceptedVersionId).chapters.some((c) => c.lines.length),
       );
-      if (!p) return null;
-      gProject = p.id;
-      render();
-      return p.id;
+      return p ? p.id : null;
     });
-    await pg.waitForTimeout(600);
     if (!pid) {
       bad("5-6: a project to vary", "none with an accepted budget");
       return;
@@ -2718,6 +2796,15 @@ async function testVariationBudget(browser, base) {
     else bad("5-6: creator button", JSON.stringify(btn));
 
     await pg.click("#vbNew");
+    await pg.waitForTimeout(400);
+    const picked = await pg.evaluate((projectId) => {
+      const sel = document.querySelector("#vb_prj");
+      if (!sel) return false;
+      sel.value = projectId;
+      return sel.value === projectId;
+    }, pid);
+    if (!picked) bad("5-6: the drawer offers the obra", "no #vb_prj, or the job is not listed");
+    await pg.click("#vb_save");
     await pg.waitForTimeout(800);
     const inBuilder = await pg.evaluate((projectId) => {
       const b = erp.state.budgets.find((x) => x.variationOf === projectId);
@@ -3612,10 +3699,13 @@ async function testProjectTracking(browser, base) {
       ok("PRY-02: the list stands alone too — no PROYECTO bar, no centre panel");
     else bad("PRY-02: list screen", JSON.stringify(ecoListScreen));
 
-    // The bar itself is checked on a screen that still has one — variations,
-    // purchasing and labour keep it, each being a single screen that needs to
-    // be told which job it is about.
-    await pg.evaluate(() => (location.hash = "variations"));
+    /* The bar itself is checked on a screen that still has one. PK9-S2 took it
+       off `variations`, which used to be this suite's witness: that screen is
+       now a register over every obra and naming one job above it would choose
+       something the screen does not use. `purchasing` and `labour` keep the
+       bar, each being a single screen that has to be told which job it is
+       about, so the check moves to one of those rather than being dropped. */
+    await pg.evaluate(() => (location.hash = "labour"));
     await pg.waitForTimeout(600);
     // PK5-B: the bar is a CHOOSER and nothing else. It used to carry a second
     // row of twelve summary figures — client, address, status, progress,
@@ -3749,21 +3839,23 @@ async function testProjectTracking(browser, base) {
     await pg.waitForTimeout(300);
     if (await pg.locator("#drawer.on").count()) await pg.locator("#dClose").click();
 
-    // The context must survive a change of subsection — that is what makes it
-    // a section context rather than one screen's dropdown. PK4-A/PK4-B:
-    // neither PRY-01 nor PRY-02 has a dropdown to read any more, so the job
-    // opened on PRY-01 is the reading, and PRY-03 — which still has a bar —
-    // is what has to agree with it.
+    /* The context must survive a change of subsection — that is what makes it
+       a section context rather than one screen's dropdown. PK4-A/PK4-B left
+       neither PRY-01 nor PRY-02 with a dropdown to read, so the job opened on
+       PRY-01 is the reading; PK9-S2 then took the bar off PRY-03 as well, that
+       screen having become a register over every obra. ADM-04 Horas is the
+       nearest surviving bar, and it is a better witness anyway — a different
+       SECTION, so agreeing with it proves the context is not one section's. */
     const chosen = await pg.evaluate(() => gProject);
     if (await pg.locator("#gBack").count()) {
       await pg.locator("#gBack").click();
       await pg.waitForTimeout(500);
     }
-    await pg.evaluate(() => (location.hash = "variations"));
+    await pg.evaluate(() => (location.hash = "labour"));
     await pg.waitForTimeout(600);
     const stillChosen = await pg.locator("#psel").inputValue();
     if (stillChosen === chosen)
-      ok("project context survives a subsection change (opened on PRY-01, selected on PRY-03)");
+      ok("project context survives a subsection change (opened on PRY-01, read on ADM-04)");
     else bad("project context persists", `${chosen} → ${stillChosen}`);
 
     // ---- PRY-02 (S8 · PK4-B): the job's own full-screen surface ----
@@ -6230,6 +6322,19 @@ async function testContract(browser, base) {
       );
     else ok("COM-04: guarantee categories are translated, not raw engine keys");
 
+    /* …and the phone treatment stops at its breakpoint. The sheet is the
+       approved design at its approved size on a desktop, and a media query
+       that leaked upward would quietly reformat every document the operator
+       prints. Measured here because this suite runs at 1600px. */
+    const deskSheet = await pg.evaluate(() => {
+      const el = document.querySelector(".cnsheet .sheet");
+      return el ? Math.round(el.getBoundingClientRect().width) : null;
+    });
+    // 210mm ≈ 794px at 96dpi; a few pixels of slack for rounding and zoom.
+    if (deskSheet && Math.abs(deskSheet - 794) <= 4)
+      ok(`COM-04: the sheet keeps its A4 width on a desktop (${deskSheet}px)`);
+    else bad("COM-04: desktop sheet width", `${deskSheet}px, expected ~794`);
+
     // Hitos de pago: the sum against the contracted amount, and S8's source.
     await pg.locator('[data-contab="hitos"]').click();
     await pg.waitForTimeout(400);
@@ -6544,6 +6649,50 @@ async function testContractCreation(browser, base) {
     if (await pg.evaluate(() => !!document.querySelector("#conNew")))
       ok("COM-04: the contract list offers «＋ Nuevo contrato»");
     else bad("COM-04: new-contract button exists", "no #conNew");
+
+    /* PK9-S3 · a payment milestone at a percentage of PROGRESS.
+       «Al llegar a una fase» named no fase and no depth, and the operator's
+       objection was concrete: a milestone reached at 50 % of the work may
+       release 20 % of the money, and the screen could not say so. The two
+       facts are one <select> value (`atProgressPct:50`) and a separate
+       percentage box, so this asserts BOTH survive the round trip — a check
+       that only read the trigger would pass on a row that quietly reset the
+       amount. */
+    await pg.click("#conNew");
+    await pg.waitForTimeout(500);
+    const trigOpts = await pg.evaluate(() => {
+      const sel = document.querySelector("[data-htrig]");
+      return sel ? [...sel.options].map((o) => ({ v: o.value, t: o.textContent.trim() })) : null;
+    });
+    const progress = (trigOpts || []).filter((o) => o.v.startsWith("atProgressPct:"));
+    if (
+      progress.length === 9 &&
+      progress[0].v === "atProgressPct:10" &&
+      progress[8].v === "atProgressPct:90" &&
+      /10\s*%/.test(progress[0].t) &&
+      !(trigOpts || []).some((o) => o.v === "atStage" && o.t.includes("fase") && false)
+    )
+      ok("COM-04: the milestone trigger offers 10…90 % of progress, nine steps");
+    else bad("COM-04: progress triggers", JSON.stringify(progress.map((o) => o.v)));
+
+    const roundTrip = await pg.evaluate(async () => {
+      const sel = document.querySelector("[data-htrig]");
+      const pct = document.querySelector("[data-hpct]");
+      if (!sel || !pct) return null;
+      sel.value = "atProgressPct:50";
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      pct.value = "20";
+      pct.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 300));
+      const s2 = document.querySelector("[data-htrig]");
+      const p2 = document.querySelector("[data-hpct]");
+      return { trigger: s2 && s2.value, pct: p2 && p2.value };
+    });
+    if (roundTrip && roundTrip.trigger === "atProgressPct:50" && roundTrip.pct === "20")
+      ok("COM-04: a milestone at 50 % of progress can release 20 % of the money");
+    else bad("COM-04: trigger and amount are independent", JSON.stringify(roundTrip));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(200);
 
     /* S6 · THERE IS NO SECOND WAY TO MAKE A CONTRACT.
        The drawer used to offer «firmado fuera de este sistema» — a contract
@@ -7134,122 +7283,171 @@ async function testProcurement(browser, base) {
       ok("subcontratos: the retired route redirects to the DMT-03 fichero");
     else bad("subcontratos: retired route", `${subHash} · ${subText.slice(0, 70)}`);
 
-    // ---- PRY-03 (S9): five counters, 56 px rows, the amber rule ----
+    /* ---- PRY-03 (PK9-S2): a register, and CHG-04 survives it ----
+
+       The screen used to be five money counters over a per-project table, and
+       this suite measured that: 216 px counters, 56 px rows, a 40x40 photo.
+       It is now a register over EVERY obra, like Clientes — so the shape
+       assertions are rewritten rather than deleted, because the one they
+       existed to protect is still the point: an unapproved extra is marked,
+       and what is marked agrees with the engine. CHG-04 says unapproved work
+       is never billable; a screen that forgets to say so is the bug. */
     await pg.evaluate(() => (location.hash = "variations"));
     await pg.waitForTimeout(700);
-    const counters = await pg.locator("#view .counter .lab").allInnerTexts();
-    const counterWidth = await pg.evaluate(() =>
-      Math.round(document.querySelector("#view .counter").getBoundingClientRect().width),
-    );
-    if (
-      counters.length === 5 &&
-      /Identificado/i.test(counters[0]) &&
-      /Facturado/i.test(counters[4]) &&
-      counterWidth === 216
-    )
-      ok(`PRY-03: five 216 px counters, identificado → facturado`);
-    else bad("PRY-03: counter strip", `${counters.join("/")} @${counterWidth}px`);
 
-    // A row is 56 tall because it carries a photograph, and an unapproved one
-    // is marked twice — the pill and a 3 px amber rule down its left edge.
-    //
-    // The unapproved row is SEEDED here rather than hoped for. The sample's
-    // extras are all approved, so measuring "the first unapproved row" measured
-    // nothing at all and reported a passing shape — the same trap S8 hit by
-    // clicking the first row of a list.
+    const landing = await pg.evaluate(() => ({
+      // The two things the operator asked to stop seeing first.
+      counters: document.querySelectorAll("#view .counter").length,
+      projectBar: !!document.querySelector("#projbar .psel, #projbar select"),
+      // …and the register that replaced them.
+      rows: document.querySelectorAll("#view table.mlist tr.click").length,
+      search: !!document.querySelector("#chgQ"),
+      stageFilter: !!document.querySelector("#chgStage"),
+      unapprovedPill: /Sin aprobar/.test(document.querySelector("#chgHead")?.textContent || ""),
+    }));
+    if (
+      landing.counters === 0 &&
+      !landing.projectBar &&
+      landing.rows > 0 &&
+      landing.search &&
+      landing.stageFilter &&
+      landing.unapprovedPill
+    )
+      ok(
+        `PRY-03: opens as a register over every obra — no counters, no project bar (${landing.rows} rows)`,
+      );
+    else bad("PRY-03: register landing", JSON.stringify(landing));
+
+    /* The unapproved row is SEEDED rather than hoped for. The sample's extras
+       are all approved, so measuring "the first unapproved row" measured
+       nothing and reported a passing shape — the same trap S8 hit by clicking
+       the first row of a list. */
     await pg.evaluate(() => {
-      erp.addChange(gProject, { desc: "Extra sin aprobar E2E" }, "ops");
+      const p = erp.state.projects.find((x) => !x.closed);
+      erp.addChange(p.id, { desc: "Extra sin aprobar E2E" }, "ops");
       persist();
       render();
     });
     await pg.waitForTimeout(400);
-    const rowShape = await pg.evaluate(() => {
-      const tr = document.querySelector("#view tr.xrow");
-      if (!tr) return null;
-      const td = tr.querySelector("td");
-      const un = document.querySelector("#view tr.xrow.unapproved");
+    const marking = await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("#view table.mlist tr.click")];
+      const un = document.querySelector("#view table.mlist tr.click.unapproved");
       return {
-        unapprovedRows: document.querySelectorAll("#view tr.xrow.unapproved").length,
-        height: Math.round(td.getBoundingClientRect().height),
-        thumb: !!tr.querySelector(".xthumb"),
-        thumbBox: (() => {
-          const t = tr.querySelector(".xthumb");
-          const r = t.getBoundingClientRect();
-          return `${Math.round(r.width)}x${Math.round(r.height)}`;
-        })(),
-        rule: un ? getComputedStyle(un.querySelector("td")).borderLeftWidth : "0px",
-        unapprovedMatchesEngine: [...document.querySelectorAll("#view tr.xrow")].every((r) => {
-          const marked = r.classList.contains("unapproved");
-          const pill = /Sin aprobar/i.test(r.innerText);
-          return marked === pill;
-        }),
+        unapprovedRows: rows.filter((r) => r.classList.contains("unapproved")).length,
+        rule: un ? getComputedStyle(un.querySelector("td")).borderLeftWidth : null,
+        // The class and the pill are two renderings of ONE engine fact; a row
+        // carrying the rule but not the words, or the reverse, is a screen
+        // that half-remembers CHG-04.
+        matchesEngine: rows.every(
+          (r) => r.classList.contains("unapproved") === /Sin aprobar/.test(r.innerText),
+        ),
       };
     });
-    if (
-      rowShape &&
-      rowShape.unapprovedRows > 0 &&
-      rowShape.height === 56 &&
-      rowShape.thumbBox === "40x40" &&
-      rowShape.rule === "3px" &&
-      rowShape.unapprovedMatchesEngine
-    )
-      ok(`PRY-03: 56 px rows, 40×40 photo, and the amber rule on every unapproved one`);
-    else bad("PRY-03: row treatment", JSON.stringify(rowShape));
+    if (marking.unapprovedRows > 0 && marking.rule === "3px" && marking.matchesEngine)
+      ok(`PRY-03: the amber rule and the pill agree with the engine on every row`);
+    else bad("PRY-03: unapproved marking", JSON.stringify(marking));
 
-    // Pressing a counter filters, pressing it again clears.
-    const allRows = await pg.locator("#view tr.xrow").count();
-    await pg.locator('#view [data-cstage="approved"]').click();
+    // The stage filter narrows to exactly its own stage, and clears again.
+    const allRows = await pg.locator("#view table.mlist tr.click").count();
+    await pg.selectOption("#chgStage", "approved");
     await pg.waitForTimeout(400);
-    const approvedRows = await pg.locator("#view tr.xrow").count();
-    const engineApproved = await pg.evaluate(() => erp.changeStageSummary(gProject).approved.count);
-    await pg.locator("#view .counter.on").first().click();
+    const approvedRows = await pg.locator("#view table.mlist tr.click").count();
+    const engineApproved = await pg.evaluate(
+      () => erp.extrasRegister().items.filter((c) => erp.changeStage(c) === "approved").length,
+    );
+    await pg.selectOption("#chgStage", "");
     await pg.waitForTimeout(400);
-    const clearedRows = await pg.locator("#view tr.xrow").count();
-    if (approvedRows === engineApproved && clearedRows === allRows)
-      ok(`PRY-03: a counter filters to exactly its own stage (${approvedRows} aprobados)`);
+    const clearedRows = await pg.locator("#view table.mlist tr.click").count();
+    if (approvedRows === engineApproved && clearedRows === allRows && approvedRows < allRows)
+      ok(`PRY-03: the stage filter narrows to exactly its own stage (${approvedRows} aceptadas)`);
     else
-      bad(
-        "PRY-03: counter filter",
-        `${allRows}/${approvedRows}/${clearedRows} vs ${engineApproved}`,
-      );
+      bad("PRY-03: stage filter", `${allRows}/${approvedRows}/${clearedRows} vs ${engineApproved}`);
 
-    // ---- Modificaciones: detect → value → send → approve → adenda ----
+    /* ---- Modificaciones: detect → value → send → approve → adenda ----
+
+       Same lifecycle, one step longer to reach: the per-status actions moved
+       out of the row's last cell and into the row's own drawer, because a
+       register row carries a single click handler and buttons inside it fight
+       for the click. So the suite opens the row before acting on it, which is
+       what a person now does too. The figure that must move on approval is the
+       «sin aprobar» total, the counters having become one pill. */
     await pg.evaluate(() => (location.hash = "variations"));
     await pg.waitForTimeout(700);
-    // S9 replaced this screen's three KPIs with the doc's five counters, so
-    // the figure that must move on approval is the aprobado counter.
-    const kpisBefore = await pg.locator("#view .counter .val").allInnerTexts();
+    /* Read as cents, not as the formatted string: the point is that the figure
+       MOVES in the right direction at the right moment, and «0 €» compared to
+       «0 €» is two readings that agree about nothing — which is exactly what
+       the first version of this check did. */
+    const unapproved = () => pg.evaluate(() => erp.extrasRegister().unapprovedValueCents);
+    const unapprovedBefore = await unapproved();
+
     await pg.click("#mNew");
     await pg.waitForTimeout(300);
     await pg.fill("#c_desc", "Extra E2E");
+    // No project bar any more: the obra is a field in this drawer. Left at its
+    // first option, which is a real open job.
     await pg.click("#c_save");
     await pg.waitForTimeout(500);
-    await pg.locator("[data-price]").first().click();
+
+    /** Open the extra we just created, wherever the register has put it. */
+    const openExtra = async () => {
+      await pg.evaluate(() => {
+        const row = [...document.querySelectorAll("#view table.mlist tr.click")].find((r) =>
+          /Extra E2E/.test(r.innerText),
+        );
+        if (row) row.click();
+      });
+      await pg.waitForTimeout(350);
+    };
+
+    await openExtra();
+    const priceBtn = pg.locator(".drawer [data-price]").first();
+    if ((await priceBtn.count()) === 0)
+      bad("modificaciones: the row drawer offers Valorar", "no [data-price] in the drawer");
+    await priceBtn.click();
     await pg.waitForTimeout(300);
     await pg.fill("#c_price", "500");
     await pg.fill("#c_cost", "300");
     await pg.fill("#c_days", "2");
     await pg.click("#c_psave");
     await pg.waitForTimeout(500);
-    const sendBtn = pg.locator("[data-send]").first();
+    // Priced but not approved: the moment the total must be at its highest,
+    // and the reading the first version of this check never took.
+    const unapprovedPriced = await unapproved();
+
+    await openExtra();
+    const sendBtn = pg.locator(".drawer [data-send]").first();
     if ((await sendBtn.count()) === 0)
       bad("modificaciones: priced extra offers Enviar", "no [data-send]");
     await sendBtn.click();
     await pg.waitForTimeout(400);
-    // Package 2 slide 8 (PK2-C): "Aprobar" opens a drawer for the real backup
-    // document now, rather than firing the approval on the one click —
-    // evidence is optional here, so confirming without attaching anything
-    // still approves.
-    await pg.locator("[data-approve]").first().click();
+
+    /* Package 2 slide 8 (PK2-C): "Aprobar" opens a drawer for the real backup
+       document now, rather than firing the approval on the one click —
+       evidence is optional here, so confirming without attaching anything
+       still approves. */
+    await openExtra();
+    await pg.locator(".drawer [data-approve]").first().click();
     await pg.waitForTimeout(400);
     await pg.click("#apOk");
     await pg.waitForTimeout(500);
-    const kpisAfter = await pg.locator("#view .counter .val").allInnerTexts();
-    if (JSON.stringify(kpisAfter) !== JSON.stringify(kpisBefore))
-      ok("modificaciones: approving an extra moves the stage counters");
-    else bad("modificaciones: counters update on approval", kpisAfter.join(" | "));
+    const unapprovedAfter = await unapproved();
+    const pillNow = await pg.locator("#chgHead .pill b").innerText();
+    if (
+      unapprovedPriced > unapprovedBefore &&
+      unapprovedAfter < unapprovedPriced &&
+      /€/.test(pillNow)
+    )
+      ok(
+        `modificaciones: the «sin aprobar» total rises when an extra is priced and falls when it is approved (${unapprovedBefore} → ${unapprovedPriced} → ${unapprovedAfter} cents)`,
+      );
+    else
+      bad(
+        "modificaciones: unapproved total tracks the lifecycle",
+        `${unapprovedBefore} → ${unapprovedPriced} → ${unapprovedAfter}, pill «${pillNow}»`,
+      );
 
-    await pg.locator("[data-doc]").first().click();
+    await openExtra();
+    await pg.locator(".drawer [data-doc]").first().click();
     await pg.waitForTimeout(300);
     const adenda = await pg.locator(".drawer .cnsheet").innerText();
     if (
@@ -9537,6 +9735,28 @@ async function testPresupuestadorRework(browser, base) {
     if (/Siguiente paso/.test(ns.title) && wantCards.every((c) => ns.cards.includes(c)) && ns.send)
       ok("presupuestador: «Siguiente paso» carries terms, exclusions, the check and the send");
     else bad("presupuestador: siguiente paso contents", JSON.stringify(ns));
+
+    /* An exclusion could only be added by pressing Enter in the field, and on
+       a phone that key does not reliably arrive as one — so a quote went out
+       with both lists empty and no way, on the device it was being written on,
+       to fill them. Clicked, not keyed, because the click is the affordance
+       that was missing; the key path still works and is unchanged. */
+    const exclAdded = await pg.evaluate(async () => {
+      const inp = document.querySelector("#bc_exclusions");
+      const btn = document.querySelector('[data-add="exclusions"]');
+      if (!inp || !btn) return { ok: false, why: "no input or no button" };
+      inp.value = "No incluye el desvío de bajantes";
+      btn.click();
+      await new Promise((r) => setTimeout(r, 500));
+      return {
+        ok: true,
+        listed: /desvío de bajantes/.test(document.querySelector("#dbody")?.textContent || ""),
+      };
+    });
+    if (exclAdded.ok && exclAdded.listed)
+      ok("presupuestador: an exclusion can be added by tapping ＋, not only by pressing Enter");
+    else bad("presupuestador: ＋ adds an exclusion", JSON.stringify(exclAdded));
+
     await pg.evaluate(() => closeDrawer());
 
     if (errs.length) bad("presupuestador: no console errors", errs.slice(0, 2).join(" | "));
@@ -11899,11 +12119,14 @@ async function testI18n(browser, base) {
     await pg.waitForTimeout(700);
     const chgCaText = await pg.locator("#view").innerText();
     if (
-      /Identificat/i.test(chgCaText) &&
-      /Modificacions/i.test(chgCaText) &&
+      // PK9-S2: the counters are a stage filter and one total, so the words to
+      // find are the register's — its stages, its search and its columns.
+      /Detectada|Valorada/i.test(chgCaText) &&
+      /modificacions/i.test(chgCaText) &&
+      /Sense aprovar/i.test(chgCaText) &&
       !/Sin aprobar/.test(chgCaText)
     )
-      ok("i18n: CA translates the PRY-03 counters and rows");
+      ok("i18n: CA translates the PRY-03 register, its stages and its total");
     else bad("i18n: CA PRY-03", chgCaText.replace(/\n/g, " ").slice(0, 160));
 
     await pg.evaluate(() => (location.hash = "petty-cash"));
@@ -12077,11 +12300,12 @@ async function testI18n(browser, base) {
     await pg.waitForTimeout(700);
     const chgEnText = await pg.locator("#view").innerText();
     if (
-      /Identified/i.test(chgEnText) &&
+      /Identified|Priced/i.test(chgEnText) &&
+      /variations/i.test(chgEnText) &&
       /Unapproved/i.test(chgEnText) &&
       !/Sin aprobar/.test(chgEnText)
     )
-      ok("i18n: EN translates the PRY-03 counters and rows");
+      ok("i18n: EN translates the PRY-03 register, its stages and its total");
     else bad("i18n: EN PRY-03", chgEnText.replace(/\n/g, " ").slice(0, 160));
 
     await pg.evaluate(() => (location.hash = "petty-cash"));

@@ -3171,14 +3171,17 @@
      going to lean in and read a word. */
       /* 56 exactly: the cells' own padding would otherwise push a row carrying a
      40 px thumbnail to 59, and §3.2's numbers are the point of this screen. */
-      tr.xrow td {
-        height: 56px;
-        padding-top: 4px;
-        padding-bottom: 4px;
-      }
-      /* A border, not a box-shadow: the table is border-collapse:collapse, where a
-     shadow on a cell is not painted at all in Chromium. */
-      tr.xrow.unapproved td:first-child {
+      /* CHG-04's mark, on whatever row carries it.
+     It used to be `tr.xrow.unapproved`, matching the 56 px photo rows of the
+     old PRY-03 table. That table is a register now and its rows are
+     `tr.click`, so the old selector matched nothing — the class was still
+     written, the pill still printed, and the rule down the edge silently
+     stopped being drawn. Keyed on the state, not on the screen that happened
+     to show it first.
+
+     A border, not a box-shadow: the table is border-collapse:collapse, where
+     a shadow on a cell is not painted at all in Chromium. */
+      tr.unapproved td:first-child {
         border-left: 3px solid var(--amber);
       }
       .xthumb {
@@ -8053,112 +8056,188 @@
       }
 
       /* ---------- Modificaciones contractuales (§4.5) ---------- */
-      /* ---------- PRY-03 Adicionales (S9) ----------
-   §3.2 is unusually precise about this screen, and the precision is the
-   point: five 216 counters that filter, rows 56 tall so a photograph fits in
-   them, and an unapproved extra marked twice — an amber pill AND a 3 px amber
-   rule down the left of its row. The rule is not decoration. CHG-04 says
-   unapproved work is never billable, and the person who needs to know that is
-   walking past a screen in a site office, not reading a column.
+      /* PRY-03 is a REGISTER, like Clientes and Proveedores.
 
-   The counters are the doc's five stages, derived in the engine from the
-   record's eight statuses; a rejected or cancelled extra is counted in none
-   of them. */
+   It used to open with a project selector, a variation-budget card and five
+   money counters — three things to get past before a single record was
+   visible, and a screen that could only ever show one obra at a time. The
+   operator asked for the shape the party registers already have: search, one
+   row per record, click a row to work on it.
+
+   What survives the change, because it is the point of the screen: CHG-04's
+   amber marking. Unapproved work is never billable and the person who needs
+   to know that is walking past a screen in a site office, so an unapproved
+   extra still carries a pill AND a 3 px amber rule down its row.
+
+   What moved rather than died: the five counters are one «Sin aprobar» pill
+   and a stage filter, and the per-status actions are in the row's drawer
+   instead of its last cell — which is also what makes the row clickable at
+   all, since a register row has one handler and buttons inside it would fight
+   for the click. */
       let chgStage = "";
+      const CHG_STAGES = [
+        ["identified", "Detectada"],
+        ["priced", "Valorada"],
+        ["approved", "Aceptada"],
+        ["executed", "Ejecutada"],
+        ["invoiced", "Facturada"],
+      ];
       function modificaciones(v) {
         $("#sub").textContent =
-          "Extras y modificaciones: detectados, valorados, aprobados, ejecutados y facturados. El trabajo no aprobado nunca es facturable — la barra ámbar lo dice desde lejos.";
+          "Extras y modificaciones de todas las obras. El trabajo no aprobado nunca es facturable — la barra ámbar lo dice desde lejos.";
         if (!erp.state.projects.length) return noProjectsCard(v);
-        const pid = gProject;
-        const reg = erp.extrasRegister(pid);
-        const sum = erp.changeStageSummary(pid);
-        const STAGES = [
-          ["identified", "Identificado"],
-          ["priced", "Valorado"],
-          ["approved", "Aprobado"],
-          ["executed", "Ejecutado"],
-          ["invoiced", "Facturado"],
-        ];
-        const shown = chgStage
-          ? reg.items.filter((c) => erp.changeStage(c) === chgStage)
-          : reg.items;
+        // Both figures are the engine's: the stage of a row and the total of
+        // what nobody has approved. See extrasRegister() — the view sums
+        // nothing.
+        const reg = erp.extrasRegister();
+        const codeOf = {};
+        erp.state.projects.forEach((p) => (codeOf[p.id] = p.code));
+        const rows = (chgStage ? reg.items.filter((c) => erp.changeStage(c) === chgStage) : reg.items)
+          .slice()
+          .reverse();
 
-        const vbs = erp.state.budgets.filter((b) => b.variationOf === pid);
-        v.innerHTML = `
-   <div class="card"><div class="ch"><h3>Presupuestos de variación</h3>
-     <span style="flex:1"></span>
-     <button class="btn primary sm" id="vbNew">＋ Presupuesto de variación</button></div>
-    <div class="daylist">
-    ${
-      vbs
-        .map((b) => {
-          const t = erp.budgetTotals(b.id, b.acceptedVersionId || b.currentVersionId);
-          const st = b.acceptedVersionId
-            ? '<span class="pill g">Aceptado</span>'
-            : (erp.currentVersion(b.id) || {}).issued
-              ? '<span class="pill b">Emitido</span>'
-              : '<span class="pill y">Borrador</span>';
-          return `<div class="it click" data-vb="${b.id}"><span class="k">${esc(b.number)}</span>
-        <span>${esc(b.internalRef || "")}</span><span style="flex:1"></span>
-        <b>${eur(t.taxableCents)}</b> ${st}</div>`;
-        })
-        .join("") ||
-      '<div class="it" style="color:var(--muted)">Sin presupuestos de variación. El botón crea uno sobre esta obra; se construye y se acepta como cualquier presupuesto, y al aceptarse sus partidas entran en la economía, el avance y la certificación.</div>'
-    }
-    </div></div>
-   <div class="counters" style="--cw:216px">
-    ${STAGES.map(
-      ([k, l]) => `<button class="counter${chgStage === k ? " on" : ""}" data-cstage="${k}">
-      <div class="lab">${esc(l)}</div>
-      <div class="val">${eur0(sum[k].amountCents)}</div>
-      <div class="sub"><span>${sum[k].count}</span> <span>${sum[k].count === 1 ? "extra" : "extras"}</span></div>
-     </button>`,
-    ).join("")}
-   </div>
-   <div class="stepbar"><button class="btn primary sm" id="mNew">＋ Nueva modificación</button>
-     <span style="flex:1"></span>
-     <span class="tag"><span>Sin aprobar</span> <b>${eur0(reg.unapprovedValueCents)}</b></span></div>
-   <div class="card"><div class="ch"><h3>Modificaciones</h3><span class="tag">no facturable sin aprobación</span></div>
-    <div class="scroll"><table><thead><tr><th></th><th>Descripción</th><th>Partida</th><th class="num">Venta</th><th class="num">Coste</th><th>Plazo</th><th>Fecha</th><th>Estado</th><th></th></tr></thead><tbody>
-    ${
-      shown
-        .slice()
-        .reverse()
-        .map((c) => {
-          const lab = CHANGE_STATUS_LABEL[c.status] || [c.status, ""];
-          const unapproved = ["identified", "priced", "sent"].includes(c.status);
-          return `<tr class="xrow${unapproved ? " unapproved" : ""}">
-      <td><span class="xthumb" data-photo="${esc(c.photoRef || "")}">📷</span></td>
-      <td class="k">${esc(c.desc)}</td><td>${c.chapterNum || "—"}</td>
-      <td class="num">${eur(c.priceCents)}</td><td class="num">${eur(c.costCents)}</td>
-      <td class="num">${c.scheduleImpactDays ? (c.scheduleImpactDays > 0 ? "+" : "") + c.scheduleImpactDays + " d" : "—"}</td>
-      <td>${fmtD(c.date)}</td>
-      <td><span class="pill ${lab[1]}">${lab[0]}</span>${unapproved ? ' <span class="pill y">Sin aprobar</span>' : ""}</td>
-      <td>${changeActionsHtml(c)}</td></tr>`;
-        })
-        .join("") ||
-      `<tr><td colspan="9"><div class="empty">${chgStage ? "Ningún extra en esta etapa." : "Sin modificaciones."}</div></td></tr>`
-    }
-    </tbody></table></div></div>`;
-        v.querySelectorAll("[data-cstage]").forEach(
-          (b) =>
-            (b.onclick = () => {
-              chgStage = chgStage === b.dataset.cstage ? "" : b.dataset.cstage;
-              render();
-            }),
-        );
-        $("#mNew").onclick = () => changeFormDrawer(pid);
-        if ($("#vbNew"))
-          $("#vbNew").onclick = () =>
+        v.innerHTML = `<div id="chgHead" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+    <label style="font-size:12px;color:var(--dim)"><span>Etapa</span>
+     <select id="chgStage" style="font:inherit;font-size:12px;margin-left:6px;padding:5px 7px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink)">
+      <option value="">Todas</option>
+      ${CHG_STAGES.map(([k, l]) => `<option value="${k}"${chgStage === k ? " selected" : ""}>${l}</option>`).join("")}
+     </select></label>
+    <button class="btn sm" id="vbNew">＋ Presupuesto de variación</button>
+    <span style="flex:1"></span>
+    <span class="pill${reg.unapprovedValueCents ? " y" : ""}"><span>Sin aprobar</span> <b>${eur0(reg.unapprovedValueCents)}</b></span>
+   </div><div id="chgList"></div>`;
+
+        $("#chgStage").onchange = (e) => {
+          chgStage = e.target.value;
+          render();
+        };
+        /* A variation budget is a QUOTE — it is built and accepted like any
+       other, and it already appears in Presupuestos and on the contract's
+       Alcance tab. What this screen owes it is a way to start one, which is
+       why the button is here and no list is. */
+        $("#vbNew").onclick = () => variationBudgetDrawer();
+
+        renderMasterList($("#chgList"), {
+          id: "variations-" + (chgStage || "all"),
+          ids: {
+            q: "chgQ",
+            size: "chgSize",
+            prev: "chgPrev",
+            next: "chgNext",
+            newBtn: "mNew",
+            exp: "chgExp",
+            expMenu: "chgExpMenu",
+            expXlsx: "chgExpXlsx",
+            expCsv: "chgExpCsv",
+          },
+          newLabel: "＋ Nueva modificación",
+          onNew: () => changeFormDrawer(null),
+          searchPlaceholder: "Buscar por descripción, obra o partida",
+          nounSingular: "modificación",
+          nounPlural: "modificaciones",
+          baseRows: rows,
+          matches: (c, q) =>
+            [c.desc, codeOf[c.projectId] || "", c.chapterNum || ""]
+              .join(" ")
+              .toLowerCase()
+              .includes(q),
+          // CHG-04, carried through the register: the engine decides which
+          // statuses are unapproved, exactly as the pill below does.
+          rowClass: (c) =>
+            ["identified", "priced", "sent"].includes(c.status) ? "unapproved" : "",
+          columns: [
+            { label: "Descripción", primary: true, get: (c) => c.desc },
+            { label: "Obra", get: (c) => codeOf[c.projectId] || "—" },
+            { label: "Partida", get: (c) => c.chapterNum || "—" },
+            { label: "Venta", html: (c) => eur(c.priceCents) },
+            { label: "Coste", html: (c) => eur(c.costCents) },
+            {
+              label: "Plazo",
+              get: (c) =>
+                c.scheduleImpactDays
+                  ? (c.scheduleImpactDays > 0 ? "+" : "") + c.scheduleImpactDays + " d"
+                  : "—",
+            },
+            { label: "Fecha", get: (c) => fmtD(c.date) },
+            {
+              label: "Estado",
+              html: (c) => {
+                const lab = CHANGE_STATUS_LABEL[c.status] || [c.status, ""];
+                const unapproved = ["identified", "priced", "sent"].includes(c.status);
+                return `<span class="pill ${lab[1]}">${esc(lab[0])}</span>${unapproved ? ' <span class="pill y">Sin aprobar</span>' : ""}`;
+              },
+            },
+          ],
+          onRowClick: (id) => changeDrawer(id),
+          exportFile: "adicionales",
+          exportSheetName: "Adicionales",
+          emptyText: chgStage
+            ? "Ninguna modificación en esta etapa."
+            : "Ninguna modificación coincide con la búsqueda.",
+        });
+      }
+
+      /** Which obra the new variation budget is for, now that the screen does
+     not name one. Same shape as the extra's own obra field, and it goes
+     straight to the presupuestador afterwards — the quote is built there. */
+      function variationBudgetDrawer() {
+        const open = erp.state.projects.filter((p) => !p.closed);
+        const db = openDrawer("Nuevo presupuesto de variación");
+        db.innerHTML = `<div class="fgrid">
+   ${
+     open.length
+       ? `<div class="field full"><label>Obra *</label><select id="vb_prj">${open
+           .slice()
+           .sort((a, b) => (a.code < b.code ? 1 : -1))
+           .map(
+             (p) =>
+               `<option value="${p.id}">${esc(p.code)} — ${esc(erp.party(p.partyId).name)}</option>`,
+           )
+           .join("")}</select></div>
+    <div class="field full"><p style="font-size:12.5px;color:var(--body);margin:0">Se abre el presupuestador con una versión nueva sobre esa obra. Al aceptarse, sus partidas entran en la economía, el avance y la certificación.</p></div>
+    <div class="field full"><button class="btn primary" id="vb_save">Crear y abrir</button></div>`
+       : '<div class="field full"><div class="empty">No hay obras abiertas sobre las que crear un presupuesto de variación.</div></div>'
+   }
+  </div>`;
+        const b = $("#vb_save");
+        if (b)
+          b.onclick = () =>
             mutate(() => {
-              const b = erp.createVariationBudget(pid, {}, "backoffice");
-              go("quotes", b.id);
+              const rec = erp.createVariationBudget($("#vb_prj").value, {}, "backoffice");
+              closeDrawer();
+              go("quotes", rec.id);
             }, "Presupuesto de variación creado");
-        v.querySelectorAll("[data-vb]").forEach(
-          (b) => (b.onclick = () => go("quotes", b.dataset.vb)),
-        );
-        changeThumbs(v);
-        wireChangeActions(pid);
+      }
+
+      /** One extra, with its photograph, its reason and whatever it can do next.
+
+     The stage actions live here rather than in the row because a register row
+     carries a single click handler; buttons inside it would swallow the click
+     that opens this. It is also where they belong — the same place Clientes
+     puts everything about one party. */
+      function changeDrawer(id) {
+        const c = erp.state.changes.find((x) => x.id === id);
+        if (!c) return;
+        const db = openDrawer("Modificación · " + c.desc);
+        const lab = CHANGE_STATUS_LABEL[c.status] || [c.status, ""];
+        const project = erp.state.projects.find((p) => p.id === c.projectId);
+        const unapproved = ["identified", "priced", "sent"].includes(c.status);
+        db.innerHTML = `<div class="card"><div class="ch"><h3>${esc(c.desc)}</h3>
+     <span class="pill ${lab[1]}">${esc(lab[0])}</span></div>
+    <div class="daylist">
+     ${c.reason ? `<div class="it" style="color:var(--muted)">${esc(c.reason)}</div>` : ""}
+     <div class="it"><span>Obra</span><span style="flex:1"></span><b>${esc(project ? project.code : "—")}</b></div>
+     <div class="it"><span>Partida</span><span style="flex:1"></span><b>${esc(c.chapterNum || "—")}</b></div>
+     <div class="it"><span>Venta</span><span style="flex:1"></span><b>${eur(c.priceCents)}</b></div>
+     <div class="it"><span>Coste</span><span style="flex:1"></span><b>${eur(c.costCents)}</b></div>
+     <div class="it"><span>Plazo</span><span style="flex:1"></span><b>${c.scheduleImpactDays ? (c.scheduleImpactDays > 0 ? "+" : "") + c.scheduleImpactDays + " d" : "—"}</b></div>
+     <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${fmtD(c.date)}</b></div>
+     ${c.photoRef ? `<div class="it"><span>Foto</span><span style="flex:1"></span><span class="xthumb" data-photo="${esc(c.photoRef)}">📷</span></div>` : ""}
+    </div></div>
+   ${unapproved ? '<div class="card"><div class="daylist"><div class="it">Sin aprobar: este trabajo todavía no es facturable.</div></div></div>' : ""}
+   <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${changeActionsHtml(c)}</div>`;
+        changeThumbs(db);
+        wireChangeActions(c.projectId);
       }
 
       /* The 40 × 40 photograph. Same cache and same fallback as ADM-03's inbox
@@ -8293,12 +8372,33 @@
             }),
         );
       }
+      /* `pid` may be null now that PRY-03 is a register with no project bar:
+     the obra becomes a field in this form instead of a choice made on the
+     screen behind it. Passed a project — from a job's own screen — the field
+     is not offered at all, because the answer is not in doubt there. */
       function changeFormDrawer(pid) {
         const db = openDrawer("Nueva modificación / extra");
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Descripción *</label><input id="c_desc" placeholder="Suelo radiante en baño"></div>
    <div class="field full"><label>Motivo</label><input id="c_reason" placeholder="Petición del cliente"></div>
-   <div class="field"><label>Partida</label><select id="c_ch"><option value="">—</option>${chapterOptions(pid)}</select></div>
+   ${
+     pid
+       ? ""
+       : /* Built here rather than from `projectOptions()`: that helper is the
+            project BAR's list and obeys its filter state, so a bar left on
+            «Cerrados» on another screen would empty this picker with nothing
+            on this screen explaining why. */
+         `<div class="field"><label>Obra *</label><select id="c_prj">${erp.state.projects
+           .filter((p) => !p.closed)
+           .slice()
+           .sort((a, b) => (a.code < b.code ? 1 : -1))
+           .map(
+             (p) =>
+               `<option value="${p.id}">${esc(p.code)} — ${esc(erp.party(p.partyId).name)}</option>`,
+           )
+           .join("")}</select></div>`
+   }
+   <div class="field"><label>Partida</label><select id="c_ch"><option value="">—</option>${pid ? chapterOptions(pid) : ""}</select></div>
    <div class="field full"><label>Foto</label>
      <div style="display:flex;gap:8px;align-items:center">
        <span class="xthumb" id="c_thumb">📷</span>
@@ -8341,12 +8441,24 @@
               if (l) l.textContent = "No se ha podido guardar la foto";
             });
         };
+        /* The partidas follow the obra. Chosen here rather than left stale:
+       a chapter number from the previous obra is not merely wrong, it points
+       the extra's cost at a partida of a different job. */
+        const prjSel = $("#c_prj");
+        if (prjSel)
+          prjSel.onchange = () => {
+            $("#c_ch").innerHTML = '<option value="">—</option>' + chapterOptions(prjSel.value);
+          };
+        if (prjSel && prjSel.value) prjSel.onchange();
+
         $("#c_save").onclick = () =>
           mutate(() => {
             const desc = $("#c_desc").value.trim();
             if (!desc) throw new Error("La descripción es obligatoria");
+            const project = pid || (prjSel && prjSel.value);
+            if (!project) throw new Error("La obra es obligatoria");
             erp.addChange(
-              pid,
+              project,
               {
                 desc,
                 reason: $("#c_reason").value,
@@ -8408,7 +8520,12 @@
       }
       function changeDocDrawer(id) {
         const doc = erp.renderChangeDoc(id);
-        const db = openDrawer("Adenda" + (doc.number ? " " + doc.number : ""));
+        /* « · » rather than a space, which is what makes the label
+       translatable: openDrawer splits on that separator and marks the record's
+       own number translate="no". Joined by a space it was one text node
+       carrying a contract reference, so no dictionary entry could ever match
+       it and «Adenda» stayed Spanish in English and Catalan. */
+        const db = openDrawer("Adenda" + (doc.number ? " · " + doc.number : ""));
         db.innerHTML =
           sheetDocHtml("ordenCambio", { changeId: id }, doc.language) +
           changeLangFootHtml(id, doc);
@@ -11738,7 +11855,11 @@
    it is the kind that gets discovered when a cost lands on the wrong job. */
       /* The subsections a project context applies to. Subcontratos is absent because
    its screen retired; the rest moved to their v4 names. */
-      const PROJECT_SUBS = ["progress", "economics", "variations", "purchasing", "labour"];
+      /* `variations` left this list when PRY-03 became a register: it shows
+   every obra's extras at once, so a bar naming ONE job above it would be
+   choosing something the screen does not use. The obra is a column, a search
+   term and a field in the creation drawer instead. */
+      const PROJECT_SUBS = ["progress", "economics", "purchasing", "labour"];
       let projFilter = "",
         projStatus = "open";
       /**
@@ -11925,7 +12046,12 @@
      page
        .map(
          (r) =>
-           `<tr class="click" data-id="${r.id}">${cols
+           /* `rowClass` exists for one rule and should stay rare: CHG-04 says
+              unapproved work is never billable, and PRY-03 marks it with an
+              amber rule down the row as well as a pill, because the person who
+              needs to know is walking past a screen rather than reading a
+              column. A register that can only style CELLS cannot say that. */
+           `<tr class="click${cfg.rowClass ? " " + cfg.rowClass(r) : ""}" data-id="${r.id}">${cols
              .map(
                (c) =>
                  `<td data-th="${esc(c.label)}"${c.primary ? ' class="k"' : ""}>${c.html ? c.html(r) : esc(String((c.get ? c.get(r) : "") ?? ""))}</td>`,
@@ -15513,7 +15639,7 @@
          )
          .join("") || '<div class="it" style="color:var(--muted)">Ninguna todavía.</div>'
      }
-     ${locked ? "" : `<div class="it"><input id="bc_${key}" placeholder="Añadir y pulsar Enter" style="flex:1"></div>`}
+     ${locked ? "" : `<div class="it"><input id="bc_${key}" placeholder="Escribe y añade" style="flex:1"><button class="btn sm primary" data-add="${key}">＋</button></div>`}
     </div></div>`;
         db.innerHTML = `
    <div class="card"><div class="ch"><h3>Resumen</h3><span class="tag">${cur.chapters.length} partidas</span></div>
@@ -15567,11 +15693,15 @@
             "Condiciones de pago actualizadas",
           ),
         );
+        /* The key was the only way in, and on a phone that is no way in at
+       all: the on-screen keyboard's «Intro» does not reliably arrive as a
+       keydown of "Enter", so a list could be typed into and never added to —
+       which is how a quote reached a customer with the two blocks empty. A
+       button and the key share one function; neither is the special case. */
         ["exclusions", "assumptions"].forEach((key) => {
           const inp = $("#bc_" + key);
           if (!inp) return;
-          inp.onkeydown = (e) => {
-            if (e.key !== "Enter") return;
+          const add = () => {
             const val = inp.value.trim();
             if (!val) return;
             mutate(() => {
@@ -15579,6 +15709,11 @@
               budgetNextStepDrawer(id, vsel);
             }, "Añadido");
           };
+          inp.onkeydown = (e) => {
+            if (e.key === "Enter") add();
+          };
+          const btn = db.querySelector(`[data-add="${key}"]`);
+          if (btn) btn.onclick = add;
         });
         db.querySelectorAll("[data-del]").forEach(
           (btn) =>
@@ -15618,7 +15753,7 @@
          )
          .join("") || '<div class="it" style="color:var(--muted)">Ninguna todavía.</div>'
      }
-     ${locked ? "" : `<div class="it"><input id="bc_${key}" placeholder="Añadir y pulsar Enter" style="flex:1"></div>`}
+     ${locked ? "" : `<div class="it"><input id="bc_${key}" placeholder="Escribe y añade" style="flex:1"><button class="btn sm primary" data-add="${key}">＋</button></div>`}
     </div></div>`;
         db.innerHTML =
           list(
@@ -15635,10 +15770,12 @@
             ? '<div class="card"><div class="daylist"><div class="it">La versión está congelada: sus condiciones se conservan tal como se enviaron.</div></div></div>'
             : "");
         if (locked) return;
+        // Same rule as the «Siguiente paso» drawer above: the button and the
+        // key are one function, because the key alone is unreachable on a phone.
         ["exclusions", "assumptions"].forEach((key) => {
           const inp = $("#bc_" + key);
-          inp.onkeydown = (e) => {
-            if (e.key !== "Enter") return;
+          if (!inp) return;
+          const add = () => {
             const val = inp.value.trim();
             if (!val) return;
             mutate(() => {
@@ -15646,6 +15783,11 @@
               budgetConditionsDrawer(id);
             }, "Añadido");
           };
+          inp.onkeydown = (e) => {
+            if (e.key === "Enter") add();
+          };
+          const btn = db.querySelector(`[data-add="${key}"]`);
+          if (btn) btn.onclick = add;
         });
         db.querySelectorAll("[data-del]").forEach(
           (btn) =>
@@ -17697,15 +17839,38 @@
 
    ${
      curve
-       ? `<div class="card"><div class="ch"><h3>Curva S</h3>
-     <span class="tag">planificado ${curve.plannedPct}% · real ${curve.actualPct}% · ${curve.driftPct >= 0 ? "+" : ""}${curve.driftPct} pts</span></div>
+       ? (() => {
+           /* Two things this card used to say that were not true.
+        «+78,7 pts» reads as seventy-eight points AHEAD of schedule. It was
+        not: the plan had not started, so the planned figure was zero and the
+        drift was the whole of the recorded progress measured against nothing.
+        A deviation needs a promise to deviate from, and there is none until
+        the first task is due — so say which it is instead of scoring it.
+        And the legend advertised a projected line on documents that have
+        none: a pace needs two days of record, and the capability withholds
+        the projection until it has them. A swatch with no line behind it
+        reads as a chart that failed to draw. */
+           /* Asked of the SCHEDULE, not of the curve's first point: since the
+        curve began drawing the record from today when today comes first,
+        `points[0]` is today on exactly the jobs this is about. */
+           const notStarted = !!(sch && erp.today < sch.start);
+           const projected = curve.points.some((p) => p.projectedPct != null);
+           return `<div class="card"><div class="ch"><h3>Curva S</h3>
+     <span class="tag">planificado ${curve.plannedPct}% · real ${curve.actualPct}%${
+       notStarted ? "" : ` · ${curve.driftPct >= 0 ? "+" : ""}${curve.driftPct} pts`
+     }</span></div>
      ${curveChart(curve)}
      <div class="glegend">
        <span><i style="background:var(--faint)"></i>Planificado</span>
        <span><i style="background:var(--green)"></i>Real registrado</span>
-       <span><i style="background:var(--spark)"></i>Proyectado al ritmo observado${curve.performanceIndex != null ? ` (×${curve.performanceIndex})` : ""}</span>
-       <span>Fin previsto ${fmtD(curve.plannedFinish)} → proyectado <b>${fmtD(curve.projectedFinish)}</b></span>
-     </div></div>`
+       ${projected ? `<span><i style="background:var(--spark)"></i>Proyectado al ritmo observado${curve.performanceIndex != null ? ` (×${curve.performanceIndex})` : ""}</span>` : ""}
+       ${
+         notStarted
+           ? `<span>Todavía no hay curva planificada contra la que medir: la obra empieza el <b>${fmtD(sch.start)}</b></span>`
+           : `<span>Fin previsto ${fmtD(curve.plannedFinish)} → proyectado <b>${fmtD(curve.projectedFinish)}</b></span>`
+       }
+     </div></div>`;
+         })()
        : ""
    }
 
@@ -20559,11 +20724,21 @@
         const readHitos = () => {
           const rows = [...db.querySelectorAll("[data-hrow]")];
           if (!rows.length) return;
-          hitos = rows.map((r) => ({
-            trigger: r.querySelector("[data-htrig]").value,
-            pct: r.querySelector("[data-hpct]").value,
-            date: r.querySelector("[data-hdate]").value,
-          }));
+          hitos = rows.map((r) => {
+            /* One <select>, two facts. A progress milestone is a trigger AND a
+               threshold, and giving the threshold its own control would put a
+               second, contradictable answer on screen — «al 50 %» beside a box
+               reading 30. Encoded as `atProgressPct:50` in the option value and
+               split here, at the one place a row is read. */
+            const [trigger, threshold] = r.querySelector("[data-htrig]").value.split(":");
+            const h = {
+              trigger,
+              pct: r.querySelector("[data-hpct]").value,
+              date: r.querySelector("[data-hdate]").value,
+            };
+            if (threshold) h.progressPct = Number(threshold);
+            return h;
+          });
         };
         const paintHitos = () => {
           const host = $("#cn_hitos");
@@ -20572,12 +20747,10 @@
             hitos
               .map(
                 (h, i) => `<div class="it" data-hrow="${i}" style="gap:6px">
-      <select data-htrig style="flex:1 1 120px">${Object.entries(CON_TRIGGER)
-        .map(
-          ([k, l]) =>
-            `<option value="${k}"${h.trigger === k ? " selected" : ""}>${esc(l)}</option>`,
-        )
-        .join("")}</select>
+      <select data-htrig style="flex:1 1 120px">${TRIGGER_OPTIONS.map(
+        ([v, l]) =>
+          `<option value="${v}"${trigValue(h) === v ? " selected" : ""}>${esc(l)}</option>`,
+      ).join("")}</select>
       <input data-hpct type="number" min="0" max="100" step="1" placeholder="%" value="${esc(h.pct)}" style="width:64px">
       <input data-hdate type="date" value="${esc(h.date)}" style="width:140px">
       <button class="btn sm danger" data-rmh="${i}">✕</button></div>`,
@@ -22799,7 +22972,7 @@
           w.lines = m
             ? [
                 {
-                  desc: `Hito de contrato · ${CON_TRIGGER[m.trigger] || m.trigger || "sin motivo"}`,
+                  desc: `Hito de contrato · ${triggerLabel(m) || "sin motivo"}`,
                   // `baseCents`, not `amountCents`. The contract states its
                   // instalments WITH VAT, an invoice line is a base and the
                   // document adds VAT itself — using the stated figure here
@@ -23043,7 +23216,7 @@
         if (w.basis === "milestone")
           return bases.milestones.length
             ? `<select id="inv_pick"><option value="">— elige el hito —</option>
-       ${bases.milestones.map((m) => `<option value="${m.idx}"${w.installmentIdx === m.idx ? " selected" : ""}>${esc(CON_TRIGGER[m.trigger] || m.trigger || "hito")} · ${eur(m.amountCents)}${m.expectedDate ? " · " + fmtD(m.expectedDate) : ""}</option>`).join("")}
+       ${bases.milestones.map((m) => `<option value="${m.idx}"${w.installmentIdx === m.idx ? " selected" : ""}>${esc(triggerLabel(m) || "hito")} · ${eur(m.amountCents)}${m.expectedDate ? " · " + fmtD(m.expectedDate) : ""}</option>`).join("")}
       </select>`
             : '<div class="empty">Esta obra no tiene hitos de contrato pendientes.</div>';
         if (w.basis === "certification") {
@@ -23295,6 +23468,53 @@
         onCompletion: "A la finalización",
         fixedDate: "Fecha fija",
       };
+      /* «Al llegar a una fase» said nothing anybody could check — which fase,
+     and how far into it? The operator asked for thresholds instead. The label
+     carries the percentage, so it cannot come from CON_TRIGGER, which is keyed
+     by trigger alone; each threshold is its own dictionary entry rather than a
+     sentence assembled from fragments, because a translator needs the whole
+     phrase to move the number where that language puts it.
+
+     `atStage` keeps its label: contracts already signed carry it, and a row
+     that printed a raw engine word at a customer is the bug PK2 fixed. */
+      const CON_PROGRESS_LABEL = {
+        10: "Al 10 % de avance",
+        20: "Al 20 % de avance",
+        30: "Al 30 % de avance",
+        40: "Al 40 % de avance",
+        50: "Al 50 % de avance",
+        60: "Al 60 % de avance",
+        70: "Al 70 % de avance",
+        80: "Al 80 % de avance",
+        90: "Al 90 % de avance",
+      };
+      /** The trigger <select>'s options: the fixed triggers, with the nine
+     progress thresholds spliced in where they belong — after «al inicio de
+     obra» and before «a la finalización», which is the order the work happens
+     in. A milestone's value carries both facts, `atProgressPct:50`. */
+      const TRIGGER_OPTIONS = [
+        ["onSignature", CON_TRIGGER.onSignature],
+        ["atWorksStart", CON_TRIGGER.atWorksStart],
+        ...Object.entries(CON_PROGRESS_LABEL).map(([pct, lab]) => [
+          "atProgressPct:" + pct,
+          lab,
+        ]),
+        ["onCompletion", CON_TRIGGER.onCompletion],
+        ["fixedDate", CON_TRIGGER.fixedDate],
+        // Kept so a contract already carrying it can be edited without the
+        // row silently changing to whatever happens to be first in the list.
+        ["atStage", CON_TRIGGER.atStage],
+      ];
+      /** A milestone as the <select> spells it. */
+      const trigValue = (h) =>
+        h && h.trigger === "atProgressPct" && h.progressPct != null
+          ? "atProgressPct:" + h.progressPct
+          : (h && h.trigger) || "";
+      /** What a milestone's trigger is called, percentage included. */
+      const triggerLabel = (i) =>
+        i && i.trigger === "atProgressPct"
+          ? CON_PROGRESS_LABEL[i.progressPct] || `Al ${i.progressPct} % de avance`
+          : CON_TRIGGER[(i && i.trigger) || ""] || (i && i.trigger) || "";
       /* Package 2 slide 6, a real bug: `guaranteeCategories` is engine
      vocabulary (executionAndFinishes/installations/structural) and was being
      printed straight onto the customer's contract — CON_TRIGGER got this
@@ -23551,7 +23771,19 @@
           host.innerHTML = `<div class="daylist">
       <div class="it"><span>Estado</span><span style="flex:1"></span><b>${esc(CST[d.status] || d.status)}</b></div>
       <div class="it"><span>Cliente</span><span style="flex:1"></span><b>${esc(d.customer.name)}</b></div>
-      <div class="it"><span>Obra</span><span style="flex:1"></span><b>${esc(d.projectCode || "—")}</b></div>
+      <div class="it"><span>Obra</span><span style="flex:1"></span>${
+        /* «Vincular obra» when there is none. The link lives on the PROJECT,
+           and createContract writes it only for a project that has none —
+           right as a default, and it leaves one hole: a SECOND contract on the
+           same budget can never claim the job, so this row read «—» for good
+           and nothing in the interface could say otherwise. Everything
+           downstream reads that link (the signature gates, the annex chain,
+           the expected collections, the control tower's contracted amount), so
+           a contract without it is a contract outside all of them. */
+        d.projectCode
+          ? `<b>${esc(d.projectCode)}</b>`
+          : '<button class="btn sm" id="conLinkPrj">Vincular obra</button>'
+      }</div>
       <div class="it"><span>Presupuesto</span><span style="flex:1"></span><b>${
         d.origin === "external"
           ? '<span class="pill">firmado fuera</span>'
@@ -23578,8 +23810,41 @@
      </div>`;
           const seeSigned = $("#conSeeSigned");
           if (seeSigned) seeSigned.onclick = () => openPhotoViewer([d.signature.document], 0);
+          const linkPrj = $("#conLinkPrj");
+          if (linkPrj) linkPrj.onclick = () => linkProjectDrawer(conWork.id);
           return;
         }
+      /** Which obra this contract governs.
+     Offers the jobs that have none, and says so when there are none to offer
+     rather than showing an empty select. The engine moves the link rather than
+     copying it — one obra has one contract — and refuses a job that is not
+     there; this only asks the question. */
+      function linkProjectDrawer(contractId) {
+        const free = erp.state.projects.filter((p) => !p.closed && !p.contractId);
+        const db = openDrawer("Vincular obra");
+        db.innerHTML = `<div class="fgrid">
+   ${
+     free.length
+       ? `<div class="field full"><label>Obra *</label><select id="lp_prj">${free
+           .map(
+             (p) =>
+               `<option value="${p.id}">${esc(p.code)} — ${esc(erp.party(p.partyId).name)}</option>`,
+           )
+           .join("")}</select></div>
+    <div class="field full"><p style="font-size:12.5px;color:var(--body);margin:0">El contrato pasa a gobernar esa obra: la firma, los anexos, los cobros previstos y el importe contratado de la torre de control leen este vínculo.</p></div>
+    <div class="field full"><button class="btn primary" id="lp_save">Vincular</button></div>`
+       : '<div class="field full"><div class="empty">No hay obras abiertas sin contrato. Una obra ya vinculada conserva su contrato.</div></div>'
+   }
+  </div>`;
+        const b = $("#lp_save");
+        if (b)
+          b.onclick = () =>
+            mutate(() => {
+              erp.linkContractToProject(contractId, $("#lp_prj").value, "backoffice");
+              closeDrawer();
+            }, "Obra vinculada");
+      }
+
         /* Part 2 · item 11 — what was actually contracted, not just how much.
        The contract already stored `budgetId` + `acceptedVersionId` from the
        day it was created; no screen ever rendered them, so the one document
@@ -23718,7 +23983,7 @@
      d.installments
        .map(
          (i) => `<tr>
-     <td class="k">${esc(CON_TRIGGER[i.trigger] || i.trigger)}${i.pct != null ? ` <span style="color:var(--muted)">${i.pct}%</span>` : ""}</td>
+     <td class="k">${esc(triggerLabel(i))}${i.pct != null ? ` <span style="color:var(--muted)">${i.pct}%</span>` : ""}</td>
      <td class="num">${eur(i.amountCents)}</td>
      <td>${i.expectedDate ? fmtD(i.expectedDate) : "—"}
        ${i.expectedDateSource === "schedule" ? '<br><span class="pill b">de la planificación</span>' : ""}</td>

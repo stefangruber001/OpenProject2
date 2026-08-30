@@ -165,6 +165,35 @@
     '.site{text-align:right;font-family:"Roboto Serif",Georgia,serif;color:#48733C;flex:none}',
     ".site .url{font-weight:700;font-size:8.6pt}",
     ".site .loc{font-weight:200;font-variation-settings:'wght' 200;font-size:6.8pt;margin-top:2px}",
+
+    /* A SHEET ON A PHONE IS STILL A DOCUMENT, NOT AN A4 PAGE SEEN THROUGH A
+       LETTERBOX. Measured at 390px before this existed: the sheet rendered at
+       its full 794px in both containers it appears in, and failed differently
+       in each — in the contract's pane the cage grew to 794 and an ancestor
+       clipped the right half away with nothing to scroll, and in a drawer the
+       cage stayed at 331 with 463px of sideways panning to read one line. Two
+       failures, one cause: a width fixed in millimetres.
+
+       Fluid below 700px, and only below it — the desktop sheet is the approved
+       design at its approved size. Print is untouched by construction: the
+       print block already forces width:auto!important, and the DOWNLOADED
+       document is written by erp-pdf.js, which shares no CSS with this file.
+
+       `.kvgrid` and `.sig` need !important, and only they do: their
+       grid-template-columns is written as an inline style per instance (see
+       kv() and signatures() below), which no external rule can otherwise
+       reach. */
+    "@media (max-width:700px){" +
+      ".sheet{width:auto;max-width:100%;min-height:0;margin:0;padding:9mm 7mm;box-shadow:none}" +
+      ".inner{min-height:0}" +
+      ".meta{grid-auto-flow:row}" +
+      ".parties{grid-template-columns:1fr;gap:5mm}" +
+      ".hdr{flex-wrap:wrap;gap:5mm}" +
+      ".band{flex-wrap:wrap;gap:2mm}" +
+      ".facts{gap:4mm}" +
+      ".kvgrid{grid-template-columns:1fr!important}" +
+      ".sig{grid-template-columns:1fr!important;gap:9mm}" +
+      "}",
   ].join("\n");
 
   /* Print discipline — the templates' own, including the kerning-off block

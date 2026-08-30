@@ -261,7 +261,23 @@
     // §4.2: mandatory documentation before a trade enters the site.
     subcontractDocTypes: ["insurance", "prl", "socialSecurity"],
     docStatuses: ["captured", "extracted", "validated", "allocated", "sentToAccounting", "paid"], // CAP-09
-    installmentTriggers: ["onSignature", "atWorksStart", "atStage", "onCompletion", "fixedDate"], // CON-04
+    /* CON-04. `atProgressPct` carries a `progressPct` on the milestone — 10…90
+       in tens — and replaces «al llegar a una fase» as the thing a customer can
+       actually check: which fase, and how far into it, had no answer. `atStage`
+       stays because contracts already signed carry it. The TRIGGER and the
+       AMOUNT remain independent: a milestone reached at 50 % of the work may
+       release 20 % of the money, which is the ordinary case. */
+    installmentTriggers: [
+      "onSignature",
+      "atWorksStart",
+      "atStage",
+      "atProgressPct",
+      "onCompletion",
+      "fixedDate",
+    ],
+    /** The thresholds offered for `atProgressPct` — tens, so the list is short
+     *  enough to choose from and precise enough to mean something. */
+    progressTriggerSteps: [10, 20, 30, 40, 50, 60, 70, 80, 90],
     contractStatuses: ["draft", "sent", "signed", "inForce", "completed", "cancelled"], // CON-13
     guaranteeCategories: ["executionAndFinishes", "installations", "structural"], // CON-08
     invoiceKinds: ["deposit", "progress", "final", "extra", "creditNote"], // AR-04
@@ -3025,6 +3041,63 @@
     _validateContractTerms(terms) {
       const d = (terms || {}).duration || {};
       if (!d.estimatedDays) throw new Error("Execution duration is mandatory (CON-06)");
+      /* The terms object is merged wholesale, which is deliberate — it is what
+         lets a drawer pass `externalRef` with no whitelist to keep in step. The
+         cost is that the same door reaches fields the ENGINE owns, and two of
+         them matter: `number` is minted from a series ORG-04 requires to be
+         gap-free, and `origin` decides whether the screen renders our document
+         or the customer's signed file. Refused by name rather than by
+         whitelisting everything else, so the open door stays open. */
+      for (const owned of ["number", "origin", "id"])
+        if (terms && Object.prototype.hasOwnProperty.call(terms, owned))
+          throw new Error("A contract's " + owned + " is the engine's, not a term");
+      /* The trigger list was declared in `config` and read by nothing, so any
+         string at all was accepted and the contract printed it raw at the
+         customer. Checked HERE rather than in `_finishContract` for the reason
+         the duration is: this runs before `nextNumber`, and a refusal after it
+         leaves a permanent hole in a series ORG-04 requires to be gap-free. */
+      for (const i of (terms || {}).installments || []) {
+        if (!i.trigger) continue; // a milestone with no trigger is a date-only one
+        if (!LISTS.installmentTriggers.includes(i.trigger))
+          throw new Error("Unknown payment milestone trigger: " + i.trigger + " (CON-04)");
+        if (i.trigger !== "atProgressPct") continue;
+        if (!LISTS.progressTriggerSteps.includes(i.progressPct))
+          throw new Error(
+            "A progress milestone needs one of " +
+              LISTS.progressTriggerSteps.join(", ") +
+              " per cent (CON-04)",
+          );
+      }
+    }
+    /**
+     * Point a contract at the obra it governs — the repair for «Obra —».
+     *
+     * The link lives on the PROJECT (`project.contractId`), and `createContract`
+     * writes it only when the project has none, never overwriting. That is the
+     * right default and it has one hole: a SECOND contract drawn up on the same
+     * budget can never claim the job, so its own screen shows no obra and
+     * nothing in the interface could say otherwise. Everything downstream reads
+     * this link — the signature gates, the annex chain, the expected
+     * collections, the control tower's contracted amount — so a contract
+     * without it is a contract outside all of them.
+     *
+     * Moving, not copying: a project has ONE contract, so linking here clears
+     * whatever pointed at it before. The caller is telling us which contract
+     * governs the job, and two answers to that question is the state this
+     * method exists to leave behind.
+     */
+    linkContractToProject(contractId, projectId, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const p = this.state.projects.find((x) => x.id === projectId);
+      if (!p) throw new Error("Project not found");
+      if (p.contractId === contractId) return p;
+      this.state.projects.forEach((x) => {
+        if (x.contractId === contractId) x.contractId = null;
+      });
+      p.contractId = contractId;
+      this._log(user, "linkContractToProject", c.number + " → " + p.code);
+      return p;
     }
     _finishContract(rec, user, logAs) {
       if (!rec.duration.estimatedDays) throw new Error("Execution duration is mandatory (CON-06)");
@@ -3885,9 +3958,22 @@
       this._log(user, "approveChange", changeId);
       return c;
     }
+    /**
+     * The extras of one obra — or, with no argument, of every obra.
+     *
+     * PRY-03 is a register now rather than a per-project panel, so the figure
+     * it shows is about the whole workspace. That total belongs here for the
+     * same reason the per-project one does: a sum added up in the view is a
+     * business rule living in neither a capability nor a pack, and a second
+     * implementation of "what counts as unapproved" is the one that drifts
+     * from CHG-04. One method, one definition, two scopes.
+     */
     extrasRegister(projectId) {
       // CHG-05/07
-      const list = this.state.changes.filter((c) => c.projectId === projectId);
+      const list =
+        projectId == null
+          ? this.state.changes.slice()
+          : this.state.changes.filter((c) => c.projectId === projectId);
       return {
         items: list,
         identified: list.filter((c) => c.status === "identified").length,

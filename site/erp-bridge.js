@@ -554,6 +554,8 @@
             .filter(Boolean)
             .sort();
           var start = starts[0] || null;
+          // Built once, and only if a progress milestone actually asks for it.
+          var curve = null;
           contract.installments.forEach(function (i, idx) {
             if (i.trigger === "atWorksStart" && start) out[idx] = start;
             else if (i.trigger === "onCompletion" && sch.finish) out[idx] = sch.finish;
@@ -563,6 +565,28 @@
               });
               var end = t && ((byId[t.id] && byId[t.id].plannedEnd) || t.plannedEnd);
               if (end) out[idx] = end;
+            } else if (i.trigger === "atProgressPct" && i.progressPct != null) {
+              /* The first day the PLAN says the job reaches that percentage.
+                 Read off the same planned curve the S-curve draws rather than
+                 computed again here: two implementations of "how much of this
+                 job is done by Tuesday" is one of them being wrong, and this
+                 one would be the one nobody looks at. Planned, never actual —
+                 an expected date is a forecast, and deriving it from recorded
+                 progress would move a customer's payment date because the site
+                 had a slow week. */
+              if (!curve)
+                curve = scheduling.service.progressCurve(plan, {
+                  asOf: erp.today,
+                  samples: 120,
+                });
+              var reached = null;
+              for (var pi = 0; pi < curve.points.length; pi++) {
+                if (curve.points[pi].plannedPct >= i.progressPct) {
+                  reached = curve.points[pi].date;
+                  break;
+                }
+              }
+              if (reached) out[idx] = reached;
             }
           });
         } catch (e) {
