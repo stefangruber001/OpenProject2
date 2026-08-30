@@ -5847,6 +5847,47 @@ async function testSmallFixes(browser, base) {
     if (r.a8 === "none") ok("A8: [hidden] means hidden, whatever the class says");
     else bad("A8: hidden normalize", r.a8);
 
+    /* PK-P · the client's own documents, reachable from their record. The
+       counts in «Historial» used to be a summary and nothing else: a client
+       plainly had three contracts and there was no way to open one. */
+    const hist = await pg.evaluate(async () => {
+      // A party with something behind it — any party the seed gave documents.
+      const withDocs = erp.state.parties.find((x) => {
+        const h = erp.partyHistory(x.id);
+        return h.budgets.length && h.invoices.length;
+      });
+      if (!withDocs) return { none: true };
+      partyDrawer(withDocs.id);
+      await new Promise((r) => setTimeout(r, 300));
+      const buttons = [...document.querySelectorAll("[data-hist]")].map((b) => b.dataset.hist);
+      const quotes = document.querySelector('[data-hist="budgets"]');
+      if (!quotes) return { buttons, noQuotes: true };
+      quotes.click();
+      await new Promise((r) => setTimeout(r, 300));
+      const modal = document.querySelector(".mscrim.on .modal");
+      const formats = modal
+        ? [...modal.querySelectorAll("[data-dl]")].map((b) => b.dataset.dl)
+        : [];
+      const rows = modal ? modal.querySelectorAll("[data-row]").length : 0;
+      // The supplier's own invoice must NOT offer to be generated here.
+      const billsBtn = document.querySelector('[data-hist="bills"]');
+      modal && modal.querySelector("[data-close]").click();
+      return {
+        buttons,
+        rows,
+        pdf: formats.includes("pdf"),
+        docx: formats.includes("docx"),
+        xlsx: formats.includes("xlsx"),
+        hasBills: !!billsBtn,
+      };
+    });
+    if (hist.buttons && hist.buttons.includes("budgets") && hist.buttons.includes("contracts"))
+      ok(`PK-P: every kind in Historial is a way in (${(hist.buttons || []).length} kinds)`);
+    else bad("PK-P: history counts open", JSON.stringify(hist));
+    if (hist.rows > 0 && hist.pdf && hist.docx && hist.xlsx)
+      ok(`PK-P: each document offers PDF, Word and Excel side by side (${hist.rows} rows)`);
+    else bad("PK-P: three formats per row", JSON.stringify(hist));
+
     // A9 · the hours drawer's action sits in the pinned footer, the customer
     // drawer's save/delete too, and the slot never leaks between drawers.
     const a9 = await pg.evaluate(() => {
@@ -8246,18 +8287,28 @@ async function testAdmin(browser, base) {
       if (!names.includes("conciliacion.xlsx")) return { fail: "no conciliacion.xlsx", names };
       const sheet = await ErpImport.zip.readEntry(bytes, dir["conciliacion.xlsx"]);
       const rows = await ErpImport.parseXlsxRows(sheet.buffer ? sheet : new Uint8Array(sheet));
-      const header = rows[0] || [];
+      // The workbook opens with the company's identity now (PK-O), so the
+      // column titles are not row 1 any more. Found by what it CONTAINS
+      // rather than by its position, which is also what makes this check
+      // survive the next thing that gets added above the table.
+      const headerRow = rows.findIndex((r) => (r || []).includes("Justificante"));
+      const header = rows[headerRow] || [];
       const docCol = header.indexOf("Justificante");
-      const named = rows
-        .slice(1)
-        .map((r) => r[docCol])
-        .filter(Boolean);
+      // The table is the run of rows under the header up to the first blank
+      // one — below that sits the company's legal foot, which is identity and
+      // not a movement. Counting to the end of the file would count it.
+      const body = [];
+      for (const r of rows.slice(headerRow + 1)) {
+        if (!(r || []).some((c) => String(c || "").trim())) break;
+        body.push(r);
+      }
+      const named = body.map((r) => r[docCol]).filter(Boolean);
       const missingInArchive = named.filter((n) => !names.includes(n));
       const emptyEntries = names.filter((n) => n.startsWith("docs/") && dir[n].csize === 0);
       return {
         q,
         entries: names.length,
-        rows: rows.length - 1,
+        rows: body.length,
         movements: pkg.bankMovements.length,
         header: header.slice(0, 4).join("|"),
         named: named.length,
@@ -10297,11 +10348,37 @@ async function testSendAndVersions(browser, base) {
       HTMLAnchorElement.prototype.click = origClick;
       if (!caught) return null;
       const head = new Uint8Array(await caught.slice(0, 2).arrayBuffer());
-      return { size: caught.size, zip: head[0] === 0x50 && head[1] === 0x4b };
+      // The parts are stored, not deflated, so the workbook's own XML is
+      // readable straight out of the archive — which is how this can check
+      // that the identity actually reached the file rather than that a file
+      // of about the right size was produced.
+      const raw = new Uint8Array(await caught.arrayBuffer());
+      let text = "";
+      for (let i = 0; i < raw.length; i++) text += String.fromCharCode(raw[i]);
+      const iss = erp._issuerBlock();
+      return {
+        size: caught.size,
+        zip: head[0] === 0x50 && head[1] === 0x4b,
+        styled: text.includes("xl/styles.xml") && text.includes("FF48733C"),
+        serif: text.includes("Georgia"),
+        frozen: text.includes('state="frozen"'),
+        widths: text.includes("customWidth"),
+        issuer: !!(iss.tradeName || iss.legalName) && text.includes(iss.tradeName || iss.legalName),
+      };
     });
     if (xlsx && xlsx.zip && xlsx.size > 500)
       ok(`send: «⤓ Excel» writes a real workbook (${xlsx.size} bytes)`);
     else bad("send: quote to Excel", JSON.stringify(xlsx));
+    /* PK-O · and it leaves in the house identity. A spreadsheet is the one
+       document that used to go out looking like a database dump: no brand, no
+       column widths, and a header row indistinguishable from the data under
+       it. */
+    if (xlsx && xlsx.styled && xlsx.serif && xlsx.issuer)
+      ok("PK-O: the workbook carries the corporate identity — brand green, serif title, issuer");
+    else bad("PK-O: workbook identity", JSON.stringify(xlsx));
+    if (xlsx && xlsx.frozen && xlsx.widths)
+      ok("PK-O: the header row stays put and the columns are sized to their content");
+    else bad("PK-O: workbook usability", JSON.stringify(xlsx));
 
     /* S4 · A CHANNEL SAYS WHAT IT DOES, AND REFUSES WHAT IT CANNOT DO.
        Email with no address used to proceed, filing a draft addressed to

@@ -6514,3 +6514,35 @@ empty cell, and no cell ending on a nested table. It caught a real defect on
 its first run: plain-line documents (change order, visit report, work sheet)
 carry their text in `desc`, which the writer was not reading, so they rendered
 with every amount intact and every description blank.
+
+## S44 · PK-O — a spreadsheet that leaves this company looks like it (2026-08-29)
+
+The exports were correct and anonymous: no brand, no column widths, a header
+row indistinguishable from the data under it. They now open with the company's
+name in the serif, the document they belong to beneath it, a header row in the
+brand green with white type, ruled and banded rows, columns sized to their
+content, a frozen header and the legal foot every printed document carries.
+
+**Cells stay inline strings**, which is the older decision and still right:
+postal codes, client codes and invoice numbers are text, and letting Excel
+guess turns «08960» into 8960. The amounts were formatted by the engine in
+cents long before the file existed.
+
+**The ZIP writer moved out of erp.html** into `site/erp-zip.js` — the
+spreadsheet, the Word file and the quarterly package now store their parts
+through one implementation.
+
+## S45 · PK-P — the History card is a way in, not a summary (2026-08-29)
+
+«Historial» showed that a client had three contracts and offered no way to
+open one. Each count is now a button: it lists the records behind it, and
+every row offers the same document as PDF, as Word, and — for a quote, whose
+document is a table worth working in — as Excel.
+
+**Nothing is generated twice.** Every format is written from the descriptor
+its own screen prints from, so the file the customer was sent and the file
+the operator opens here are the same document.
+
+**A supplier's invoice is not offered.** It is THEIR document; this system
+files it, it does not print it, and a button to generate one would be
+inventing a document somebody else issued. The row says so instead.

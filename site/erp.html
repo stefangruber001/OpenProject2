@@ -11298,91 +11298,15 @@
    turns "08960" into 8960 and eats the leading zero. No dependency — the
    whole writer is ~60 lines and the alternative was shipping a library into
    a page that has to work from a bare static host. */
-      const CRC_T = (() => {
-        let c,
-          t = [];
-        for (let n = 0; n < 256; n++) {
-          c = n;
-          for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-          t[n] = c >>> 0;
-        }
-        return t;
-      })();
-      function crc32(b) {
-        let c = 0xffffffff;
-        for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 0xff] ^ (c >>> 8);
-        return (c ^ 0xffffffff) >>> 0;
-      }
-      function zipStore(files) {
-        const enc = new TextEncoder(),
-          parts = [],
-          central = [];
-        let off = 0;
-        const u16 = (a, o, v) => {
-          a[o] = v & 255;
-          a[o + 1] = (v >>> 8) & 255;
-        };
-        const u32 = (a, o, v) => {
-          a[o] = v & 255;
-          a[o + 1] = (v >>> 8) & 255;
-          a[o + 2] = (v >>> 16) & 255;
-          a[o + 3] = (v >>> 24) & 255;
-        };
-        for (const f of files) {
-          const name = enc.encode(f.path),
-            data = f.bytes,
-            crc = crc32(data);
-          const lh = new Uint8Array(30 + name.length);
-          u32(lh, 0, 0x04034b50);
-          u16(lh, 4, 20);
-          u16(lh, 6, 0);
-          u16(lh, 8, 0);
-          u16(lh, 10, 0);
-          u16(lh, 12, 0);
-          u32(lh, 14, crc);
-          u32(lh, 18, data.length);
-          u32(lh, 22, data.length);
-          u16(lh, 26, name.length);
-          u16(lh, 28, 0);
-          lh.set(name, 30);
-          parts.push(lh, data);
-          const ch = new Uint8Array(46 + name.length);
-          u32(ch, 0, 0x02014b50);
-          u16(ch, 4, 20);
-          u16(ch, 6, 20);
-          u16(ch, 8, 0);
-          u16(ch, 10, 0);
-          u16(ch, 12, 0);
-          u16(ch, 14, 0);
-          u32(ch, 16, crc);
-          u32(ch, 20, data.length);
-          u32(ch, 24, data.length);
-          u16(ch, 28, name.length);
-          u16(ch, 30, 0);
-          u16(ch, 32, 0);
-          u16(ch, 34, 0);
-          u16(ch, 36, 0);
-          u32(ch, 38, 0);
-          u32(ch, 42, off);
-          ch.set(name, 46);
-          central.push(ch);
-          off += lh.length + data.length;
-        }
-        let cs = 0;
-        central.forEach((c) => (cs += c.length));
-        const end = new Uint8Array(22);
-        u32(end, 0, 0x06054b50);
-        u16(end, 4, 0);
-        u16(end, 6, 0);
-        u16(end, 8, files.length);
-        u16(end, 10, files.length);
-        u32(end, 12, cs);
-        u32(end, 16, off);
-        u16(end, 20, 0);
-        return new Blob([...parts, ...central, end], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-      }
+      /* The ZIP writer lives in erp-zip.js now: the spreadsheet, the Word
+         file and the quarterly package all store parts the same way, and one
+         copy of the central-directory arithmetic is one place for it to be
+         wrong. */
+      const zipStore = (files) =>
+        CaneiZip.blob(
+          files,
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        );
       const xmlEsc = (v) =>
         String(v ?? "").replace(
           /[&<>"']/g,
@@ -11397,21 +11321,115 @@
         } while (n >= 0);
         return s;
       };
-      function xlsxBlob(sheetName, rows) {
+      /* ===================== the workbook, in the house identity ==============
+         Asked for on 29/08: a spreadsheet that leaves this company should look
+         like it came from it. So the sheet opens with the company's own name
+         in the serif, the document it belongs to underneath, and a header row
+         in the brand green with white type — then the rows, ruled and banded,
+         and the legal foot every printed document already carries.
+
+         Every cell stays an INLINE STRING, which is the older decision and
+         still the right one: postal codes, client codes and invoice numbers
+         are text, and letting Excel guess turns «08960» into 8960 and eats
+         the leading zero. Amounts are already formatted by the engine — the
+         arithmetic happened in cents, long before this file. */
+      const XLSX_STYLES =
+        '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+        "<fonts count=\"6\">" +
+        '<font><sz val="10"/><name val="Arial"/><color rgb="FF3D3D3D"/></font>' +
+        '<font><b/><sz val="16"/><name val="Georgia"/><color rgb="FF14160F"/></font>' +
+        '<font><sz val="9"/><name val="Arial"/><color rgb="FF6B7063"/></font>' +
+        '<font><b/><sz val="9"/><name val="Arial"/><color rgb="FFFFFFFF"/></font>' +
+        '<font><b/><sz val="10"/><name val="Arial"/><color rgb="FF14160F"/></font>' +
+        '<font><sz val="7.5"/><name val="Arial"/><color rgb="FF6B7063"/></font>' +
+        "</fonts>" +
+        // Excel requires these first two fills, in this order, and refuses the
+        // workbook without them.
+        '<fills count="4"><fill><patternFill patternType="none"/></fill>' +
+        '<fill><patternFill patternType="gray125"/></fill>' +
+        '<fill><patternFill patternType="solid"><fgColor rgb="FF48733C"/><bgColor indexed="64"/></patternFill></fill>' +
+        '<fill><patternFill patternType="solid"><fgColor rgb="FFF1F4EE"/><bgColor indexed="64"/></patternFill></fill>' +
+        "</fills>" +
+        '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>' +
+        '<border><left/><right/><top/><bottom style="thin"><color rgb="FFD8DCD2"/></bottom><diagonal/></border>' +
+        "</borders>" +
+        '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+        '<cellXfs count="7">' +
+        '<xf xfId="0" numFmtId="0" fontId="0" fillId="0" borderId="0" applyFont="1"/>' +
+        '<xf xfId="0" numFmtId="0" fontId="1" fillId="0" borderId="0" applyFont="1"/>' +
+        '<xf xfId="0" numFmtId="0" fontId="2" fillId="0" borderId="0" applyFont="1"/>' +
+        '<xf xfId="0" numFmtId="0" fontId="3" fillId="2" borderId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>' +
+        '<xf xfId="0" numFmtId="0" fontId="0" fillId="0" borderId="1" applyFont="1" applyBorder="1"/>' +
+        '<xf xfId="0" numFmtId="0" fontId="0" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1"/>' +
+        '<xf xfId="0" numFmtId="0" fontId="5" fillId="0" borderId="0" applyFont="1"/>' +
+        "</cellXfs>" +
+        '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+        "</styleSheet>";
+
+      /**
+       * `opts` = { title, subtitle, foot } — the identity block above the
+       * table. Omitted, the sheet is still ruled and banded and its header row
+       * still carries the brand: a plain export is not a reason to hand over
+       * something that looks like a database dump.
+       */
+      function xlsxBlob(sheetName, rows, opts) {
+        opts = opts || {};
         const enc = new TextEncoder();
-        const sheet = rows
-          .map(
-            (r, ri) =>
-              `<row r="${ri + 1}">` +
-              r
-                .map(
-                  (c, ci) =>
-                    `<c r="${colRef(ci)}${ri + 1}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(c)}</t></is></c>`,
-                )
-                .join("") +
-              `</row>`,
-          )
-          .join("");
+        const iss = typeof erp !== "undefined" && erp._issuerBlock ? erp._issuerBlock() : {};
+        const title = opts.title || iss.tradeName || iss.legalName || "";
+        const subtitle = opts.subtitle || "";
+        const foot =
+          opts.foot ||
+          [iss.legalName, iss.taxId, iss.registeredAddress || iss.address, iss.email]
+            .filter(Boolean)
+            .join("  ·  ");
+
+        const head = [];
+        if (title) head.push([{ v: title, s: 1 }]);
+        if (subtitle) head.push([{ v: subtitle, s: 2 }]);
+        if (head.length) head.push([{ v: "", s: 0 }]);
+        const headerRowIndex = head.length; // 0-based row of the column titles
+
+        const body = rows.map((r, i) =>
+          r.map((c) => ({ v: c, s: i === 0 ? 3 : (i % 2 ? 5 : 4) })),
+        );
+        const all = head.concat(body);
+        if (foot) all.push([{ v: "", s: 0 }], [{ v: foot, s: 6 }]);
+
+        // Assembled through named parts rather than template literals butted
+        // against .join(""): the i18n source audit reads that shape as a
+        // visible string and reports XML markup as an untranslated label.
+        const rowXml = (r, ri) => {
+          const cells = r.map(
+            (c, ci) =>
+              `<c r="${colRef(ci)}${ri + 1}" s="${c.s}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(c.v)}</t></is></c>`,
+          );
+          const tall = ri === headerRowIndex ? ' ht="22" customHeight="1"' : "";
+          return `<row r="${ri + 1}"${tall}>${cells.join("")}</row>`;
+        };
+        const sheet = all.map(rowXml).join("");
+
+        // Column widths from the content, so nothing arrives as ####. Capped:
+        // a note field can be a paragraph and a 300-character column is worse
+        // than a wrapped one.
+        const widest = [];
+        for (const r of rows)
+          r.forEach((c, i) => {
+            widest[i] = Math.max(widest[i] || 8, Math.min(52, String(c ?? "").length + 3));
+          });
+        const cols = widest.length
+          ? "<cols>" +
+            widest.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("") +
+            "</cols>"
+          : "";
+        // The header row stays on screen while the operator scrolls; on a
+        // hundred-row export that is the difference between a table and a
+        // wall of numbers.
+        const freeze =
+          `<sheetViews><sheetView workbookViewId="0" showGridLines="0">` +
+          `<pane ySplit="${headerRowIndex + 1}" topLeftCell="A${headerRowIndex + 2}" activePane="bottomLeft" state="frozen"/>` +
+          "</sheetView></sheetViews>";
+
         const f = (path, xml) => ({
           path,
           bytes: enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + xml),
@@ -11419,7 +11437,7 @@
         return zipStore([
           f(
             "[Content_Types].xml",
-            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
           ),
           f(
             "_rels/.rels",
@@ -11431,11 +11449,12 @@
           ),
           f(
             "xl/_rels/workbook.xml.rels",
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
           ),
+          f("xl/styles.xml", XLSX_STYLES),
           f(
             "xl/worksheets/sheet1.xml",
-            `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${sheet}</sheetData></worksheet>`,
+            `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${freeze}${cols}<sheetData>${sheet}</sheetData></worksheet>`,
           ),
         ]);
       }
@@ -11988,7 +12007,10 @@
           exportSheet = cfg.exportSheetName || plur;
         $("#" + ids.expXlsx).onclick = () => {
           closeMenu();
-          downloadBlob(xlsxBlob(exportSheet, sheet()), `${exportFile}-${erp.today}.xlsx`);
+          downloadBlob(
+            xlsxBlob(exportSheet, sheet(), { subtitle: `${exportSheet} · ${fmtD(erp.today)}` }),
+            `${exportFile}-${erp.today}.xlsx`,
+          );
           toast("Exportado a Excel");
         };
         $("#" + ids.expCsv).onclick = () => {
@@ -16648,7 +16670,7 @@
             ownDoc || matchedBillDoc,
           ]);
         }
-        const xlsx = xlsxBlob("Conciliacion " + quarter, rows);
+        const xlsx = xlsxBlob("Conciliacion " + quarter, rows, { subtitle: "Conciliación " + quarter });
         files.unshift({
           path: "conciliacion.xlsx",
           bytes: new Uint8Array(await xlsx.arrayBuffer()),
@@ -19690,6 +19712,180 @@
         closeDrawer();
       });
 
+      /* ============ the client's own documents, in every format =============
+         Asked for on 29/08: the counts in «Historial» were a summary and
+         nothing more — the operator could see that a client had three
+         contracts and had no way to reach one of them. Each count is now the
+         way in: it opens the records behind it, and every row offers the same
+         document as PDF, as Word and, where a document is a table worth
+         working in, as Excel.
+
+         Nothing here generates a second version of anything. Every format is
+         written from the SAME descriptor the screen prints from, so the file
+         a client is sent and the file the operator opens from this list are
+         the same document. */
+      const HIST_KINDS = {
+        budgets: { label: "presupuestos", empty: "Sin presupuestos todavía." },
+        contracts: { label: "contratos", empty: "Sin contratos todavía." },
+        projects: { label: "proyectos", empty: "Sin proyectos todavía." },
+        invoices: { label: "facturas", empty: "Sin facturas todavía." },
+        receipts: { label: "recibos", empty: "Sin recibos todavía." },
+        bills: { label: "facturas recibidas", empty: "Sin facturas recibidas." },
+      };
+      /** One count in the Historial card — a button when there is something
+       *  behind it, plain text when there is not. */
+      function histBtn(kind, n, label) {
+        // ONE text node, «3 presupuestos», because that is the shape the
+        // dictionary's counted-string rules match — the same idiom as
+        // «N industriales». Split across a <b> and a text node, the label
+        // arrives at the translator alone and comes back as the navigation
+        // menu's word for it: «3 quoting».
+        if (!n) return `<span class="tag">0 ${label}</span>`;
+        return `<button class="btn sm" data-hist="${kind}">${n} ${label}</button>`;
+      }
+      /** What each record is called, and which document kind prints it. */
+      function histRows(erpParty, kind) {
+        const h = erp.partyHistory(erpParty);
+        switch (kind) {
+          case "budgets":
+            return h.budgets.map((b) => ({
+              id: b.id,
+              ref: b.number,
+              when: b.createdAt,
+              note: erp.budgetStage ? erp.budgetStage(b) : "",
+              doc: "presupuesto",
+              budgetId: b.id,
+              excel: true,
+            }));
+          case "contracts":
+            return h.contracts.map((c) => ({
+              id: c.id,
+              ref: c.number,
+              when: c.signedAt || c.createdAt,
+              note: c.origin === "external" ? "externo" : "",
+              doc: c.origin === "external" ? null : "contrato",
+              contractId: c.id,
+            }));
+          case "projects":
+            return h.projects.map((p) => ({
+              id: p.id,
+              ref: p.code,
+              when: p.startDate || p.createdAt,
+              note: p.name || "",
+              doc: "fichaProyecto",
+              projectId: p.id,
+            }));
+          case "invoices":
+            return h.invoices.map((i) => ({
+              id: i.id,
+              ref: i.number,
+              when: i.issueDate || i.createdAt,
+              note: money(i.totalCents || 0),
+              doc: i.kind === "creditNote" ? "rectificativa" : "factura",
+              invoiceId: i.number,
+            }));
+          case "receipts":
+            return h.receipts.map((r) => ({
+              id: r.id,
+              ref: r.number || r.id,
+              when: r.date,
+              note: money(r.amountCents || 0),
+              doc: "recibo",
+              receiptId: r.id,
+            }));
+          case "bills":
+            return h.bills.map((b) => ({
+              id: b.id,
+              ref: b.number || b.id,
+              when: b.issueDate || b.date,
+              note: money(b.totalCents || 0),
+              // A supplier's own invoice is THEIR document, not ours: this
+              // system files it, it does not print it. Offering to generate
+              // one would be inventing a document somebody else issued.
+              doc: null,
+            }));
+          default:
+            return [];
+        }
+      }
+      function partyDocsModal(partyId, kind) {
+        if (typeof ErpModal !== "undefined" && ErpModal.ensureStyle) ErpModal.ensureStyle();
+        const meta = HIST_KINDS[kind] || { label: kind, empty: "Sin documentos." };
+        const rows = histRows(partyId, kind);
+        const node = el("div", "mscrim on");
+        const box = el("div", "modal wide");
+        box.innerHTML = `<div class="mh"><h3>${esc(erp.party(partyId).name)} · ${meta.label}</h3>
+    <p>El mismo documento en los tres formatos. Se genera al pedirlo, siempre desde los datos de hoy.</p></div>
+   <div class="mb"><div class="daylist">
+    ${
+      rows
+        .map(
+          (r) => `<div class="it" style="flex-wrap:wrap;gap:6px">
+       <span class="k" style="min-width:9rem">${esc(r.ref)}</span>
+       <span style="flex:1;color:var(--muted);font-size:12.5px">${r.when ? fmtD(r.when) : ""}${r.note ? " · " + esc(r.note) : ""}</span>
+       ${
+         r.doc
+           ? `<button class="btn sm" data-dl="pdf" data-row="${r.id}">⤓ PDF</button>
+          <button class="btn sm" data-dl="docx" data-row="${r.id}">⤓ Word</button>`
+           : `<span class="tag">documento del proveedor</span>`
+       }
+       ${r.excel ? `<button class="btn sm" data-dl="xlsx" data-row="${r.id}">⤓ Excel</button>` : ""}
+      </div>`,
+        )
+        .join("") || `<div class="it">${meta.empty}</div>`
+    }
+   </div></div>
+   <div class="ma"><span class="sp"></span><button class="btn" data-close="1">Cerrar</button></div>`;
+        node.appendChild(box);
+        document.body.appendChild(node);
+        const close = () => node.remove();
+        node.onclick = (ev) => {
+          if (ev.target === node) close();
+        };
+        box.querySelector("[data-close]").onclick = close;
+        box.querySelectorAll("[data-dl]").forEach((btn) => {
+          btn.onclick = async () => {
+            const row = rows.find((x) => x.id === btn.dataset.row);
+            if (!row) return;
+            btn.disabled = true;
+            try {
+              await downloadHistoryDoc(row, btn.dataset.dl);
+            } catch (e) {
+              toast("⚠ No se pudo generar el documento: " + ((e && e.message) || e));
+            }
+            btn.disabled = false;
+          };
+        });
+      }
+      /** One row, one format. The quote goes through the budget builder so it
+       *  arrives with its graphic annex; everything else is its descriptor. */
+      async function downloadHistoryDoc(row, format) {
+        if (row.budgetId) {
+          const b = erp.budget(row.budgetId);
+          const vId = b.acceptedVersionId || b.currentVersionId;
+          if (format === "pdf") return downloadBudgetPdf(row.budgetId, vId);
+          if (format === "docx") return downloadBudgetDocx(row.budgetId, vId);
+          return downloadBudgetXlsx(row.budgetId, vId);
+        }
+        const refs = {};
+        let lang = "es";
+        if (row.contractId) {
+          refs.contractId = row.contractId;
+          const d = erp.renderContractDoc(row.contractId);
+          lang = d.language || "es";
+          refs.lineText = (l) => lineDesc(l, lang);
+        } else if (row.invoiceId) {
+          refs.invoiceId = row.invoiceId;
+          lang = (erp.renderInvoiceDoc(row.invoiceId) || {}).language || "es";
+        } else if (row.projectId) refs.projectId = row.projectId;
+        else if (row.receiptId) refs.receiptId = row.receiptId;
+
+        if (format === "docx") return downloadDocx(row.doc, refs, lang, row.ref + ".docx");
+        // PDF: the same sheet every screen prints, so this is the document
+        // the customer already has rather than a second rendering of it.
+        return printSheetHtml(sheetDocHtml(row.doc, refs, lang));
+      }
+
       function partyDrawer(id) {
         const p = erp.party(id),
           c = erp.partyCompleteness(id),
@@ -19708,9 +19904,18 @@
      <div class="it">IRPF: ${p.irpfApplies ? `aplica ${p.irpfRateBp / 100}%` : "no aplica"} <span class="pill y" title="La retención depende del perfil del proveedor (profesional / empresarial / módulos). Pendiente de confirmar con la gestoría — ver LEGAL_REVIEW.md §3.">A revisar</span></div>
      <div class="it">Origen: ${p.leadSource ? esc(erp.listLabel("leadSources", p.leadSource)) : "—"} · Alta: ${p.createdAt ? fmtD(p.createdAt) : "—"}</div>
     </div></div>
-   <div class="card"><div class="ch"><h3>Historial</h3></div><div class="daylist">
-     <div class="it"><b>${h.budgets.length}</b> presupuestos · <b>${h.contracts.length}</b> contratos · <b>${h.projects.length}</b> proyectos</div>
-     <div class="it"><b>${h.invoices.length}</b> facturas · <b>${h.receipts.length}</b> recibos · <b>${h.bills.length}</b> facturas recibidas</div>
+   <div class="card"><div class="ch"><h3>Historial</h3>
+     <span class="tag">abra cualquiera para descargar PDF, Word o Excel</span></div><div class="daylist">
+     <div class="it" style="flex-wrap:wrap;gap:6px">
+      ${histBtn("budgets", h.budgets.length, "presupuestos")}
+      ${histBtn("contracts", h.contracts.length, "contratos")}
+      ${histBtn("projects", h.projects.length, "proyectos")}
+     </div>
+     <div class="it" style="flex-wrap:wrap;gap:6px">
+      ${histBtn("invoices", h.invoices.length, "facturas")}
+      ${histBtn("receipts", h.receipts.length, "recibos")}
+      ${histBtn("bills", h.bills.length, "facturas recibidas")}
+     </div>
    </div></div>
    <div class="card"><div class="ch"><h3>Inmuebles</h3><button class="btn sm" id="p_propnew">＋ Añadir</button></div><div class="daylist">
      ${
@@ -19727,6 +19932,9 @@
      <button class="btn primary" id="p_edit">✏️ Editar datos</button>
      <button class="btn" id="p_act">${p.active ? "Desactivar" : "Reactivar"}</button>
    </div>`;
+        db.querySelectorAll("[data-hist]").forEach((b) => {
+          b.onclick = () => partyDocsModal(id, b.dataset.hist);
+        });
         $("#p_edit").onclick = () => editPartyDrawer(id);
         $("#p_propnew").onclick = () =>
           propertyDrawer(null, { partyId: id, back: () => partyDrawer(id), onSaved: () => partyDrawer(id) });
@@ -21703,7 +21911,12 @@
         if (doc.totals.irpfCents)
           rows.push(["", "", "Retención", "", "", "", money(-Math.abs(doc.totals.irpfCents))]);
         rows.push(["", "", "Total", "", "", "", money(doc.totals.grandCents)]);
-        downloadBlob(xlsxBlob(b.number, rows), `${b.number}-v${doc.version}.xlsx`);
+        downloadBlob(
+          xlsxBlob(b.number, rows, {
+            subtitle: `${b.number} · v${doc.version} · ${erp.party(b.partyId) ? erp.party(b.partyId).name : ""}`,
+          }),
+          `${b.number}-v${doc.version}.xlsx`,
+        );
       }
       function budgetDrawer(id, versionId) {
         const b = erp.budget(id);
