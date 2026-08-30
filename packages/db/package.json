@@ -23,18 +23,18 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.3.0",
+    "@prisma/client": "^7.10.0",
     "@repo/kernel": "workspace:*"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "@types/node": "^22.15.3",
-    "dotenv-cli": "^7.4.4",
-    "eslint": "^9.39.1",
-    "prisma": "^6.3.0",
-    "tsx": "^4.19.2",
-    "typescript": "5.9.2",
-    "vitest": "^3.0.5"
+    "@types/node": "^26.4.0",
+    "dotenv-cli": "^11.0.0",
+    "eslint": "^10.9.1",
+    "prisma": "^7.10.0",
+    "tsx": "^4.23.12",
+    "typescript": "7.0.2",
+    "vitest": "^4.1.11"
   }
 }
