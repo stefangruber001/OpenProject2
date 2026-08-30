@@ -6836,6 +6836,46 @@ parser.
 Both gates finished exactly at their ceilings — 207 source, 43 EN / 103 CA
 rendered — measured with the process's own exit code, not a pipeline's.
 
+### 208 · The client report says which half of it is quoted and which is reconstructed (2026-08-30)
+
+Package 9 closes with the English report the operator has been owed since
+Package 8 — every observation from both sittings mapped to fixed, explained or
+deferred. Two decisions in it are worth keeping, because both were the choice
+between a tidier document and a true one.
+
+**The 28/08 column is written from the delivery record, and says so.** The
+eleven packages are described from `PROGRESS.md`'s ledger and the matching
+S31–S38 entries here. The operator's own wording was given in a session whose
+transcript no longer exists, so the report describes what each package CHANGED
+rather than restating what was asked, and a paragraph on the evidence page
+states plainly that this half is reconstructed and offers to map their notes
+line by line if they still have them. A report that paraphrases somebody's words
+while looking like it quotes them is worse than one that says which it is doing
+— and the packages are unaffected either way, so nothing was gained by blurring
+it.
+
+**The sweep is local, and says that too.** The plan called for a re-walk against
+the deployed build. This container cannot reach it: the proxy answers
+`CONNECT tunnel failed, 403` for the published address. So the seven items were
+re-checked against `site/` served from disk, which is byte-for-byte what
+`pages.yml` copies to the web — a strong check, and not the same as somebody
+opening the live URL. The report carries that distinction in a box rather than
+letting "verified" imply more than was done.
+
+**Every figure in the report is a gate's own output.** 652/652 browser checks,
+43/43 document PDF checks, 712 simulation invariants, 94 bank-import checks,
+132 unit tests, the four translation gates at their ceilings. Nothing is
+asserted that a run does not print, and no completion percentage appears at all
+— a percentage of "done" against a scope nobody has fixed is a number that
+cannot be wrong, which is exactly why it should not be published.
+
+**And the two repairs are in the report.** Two of this package's seven commits
+fixed breakages introduced during the work — one ours (the translation crawl
+skipped before a push because it is slow), one from a parallel session's change
+to the spreadsheet export. Both are named on the evidence page. A delivery
+report that shows only clean progress is an advertisement, and the operator has
+been reading these closely enough to notice the difference.
+
 ## S43 · PK-N — a Word file is the same document, not a second one (2026-08-29)
 
 The operator asked for every generated PDF to exist as a Word file too, an

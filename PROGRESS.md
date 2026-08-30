@@ -1828,16 +1828,29 @@ Seven observations from the operator walking the live build on a phone. Plan:
 `/root/.claude/plans/witty-hatching-alpaca.md`. Any resume reads THIS table and
 continues with the first session not marked done.
 
-| Session | Scope                                                                                    | Status                                                                                                     |
-| ------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| S1      | quote PDF drops exclusiones/supuestos · S curve cannot move · ＋ on the conditions lists | **done** — 637/637 e2e, doc-pdf 43/43 (41/43 red first), tracking 61/61                                    |
-| S2      | Adicionales becomes a register: no project bar, no counter cards, CHG-04 marking kept    | **done** — register + row drawer, engine-wide `extrasRegister()`, and site-syntax now reads inline scripts |
-| S3      | milestones at 10–90 % de avance · the «Obra —» link · LEGAL_REVIEW · terms whitelist     | **done** — atProgressPct + validation, linkContractToProject, Ley 3/2004 entry, terms guarded              |
-| S4      | the contract sheet on a phone (`.sheet` is a fixed 210 mm page)                          | **done** — fluid below 700px; 794→364px, desktop guarded at A4, print and PDF proven untouched             |
-| S5      | the Gantt on a phone — a timeline list below 700 px, desktop untouched                   | **done** — `ganttList` beside the chart, CSS chooses; 652/652 e2e, both i18n ceilings met exactly          |
-| S6      | sweep + the ENGLISH client report (28/08 and 29/08 observations)                         | pending                                                                                                    |
+| Session | Scope                                                                                    | Status                                                                                                                    |
+| ------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| S1      | quote PDF drops exclusiones/supuestos · S curve cannot move · ＋ on the conditions lists | **done** — 637/637 e2e, doc-pdf 43/43 (41/43 red first), tracking 61/61                                                   |
+| S2      | Adicionales becomes a register: no project bar, no counter cards, CHG-04 marking kept    | **done** — register + row drawer, engine-wide `extrasRegister()`, and site-syntax now reads inline scripts                |
+| S3      | milestones at 10–90 % de avance · the «Obra —» link · LEGAL_REVIEW · terms whitelist     | **done** — atProgressPct + validation, linkContractToProject, Ley 3/2004 entry, terms guarded                             |
+| S4      | the contract sheet on a phone (`.sheet` is a fixed 210 mm page)                          | **done** — fluid below 700px; 794→364px, desktop guarded at A4, print and PDF proven untouched                            |
+| S5      | the Gantt on a phone — a timeline list below 700 px, desktop untouched                   | **done** — `ganttList` beside the chart, CSS chooses; 652/652 e2e, both i18n ceilings met exactly                         |
+| S6      | sweep + the ENGLISH client report (28/08 and 29/08 observations)                         | **done** — seven items re-walked on the final tree; report at `docs/clients/canei-subirats/informe-revision-2026-08.html` |
 
 Decided with the operator and NOT to be re-opened: Adicionales keeps its menu
 row (the relocation was designed, then cancelled to de-risk); milestone
 triggers become concrete progress percentages; the 8 %/year late-payment
 interest stands as explained.
+
+**Package 9 is closed (2026-08-30).** Seven commits — `120724d` `2e9d26d`
+`03975a2` `70efb17` `9223f62` `879ce4b` `56e98d0` — each green on all four
+workflows. Final sweep on `56e98d0`: 652/652 site-e2e, 43/43 doc-pdf, 712
+simulation invariants, 94 bank-import checks, 132 unit tests, source-audit
+207/207, workspace-audit 0, miss-crawl 43 EN / 103 CA — every gate exactly at
+its ceiling. The client report covering BOTH review sittings is committed at
+`docs/clients/canei-subirats/informe-revision-2026-08.html` (English, five A4
+pages, prints from the browser). Carried forward, named in the report and not
+built here: re-basing a plan whose work started before its first task; extras
+attached directly to a contract; the contract's Anexos tab as anything more
+than a read-only mirror. Blocked on the operator: the Safari PDF crash (needs a
+console line) and IBAN + logo in Configuración › Empresa.

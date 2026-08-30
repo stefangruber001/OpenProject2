@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Canei Subirats — Review report, August 2026</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --ink: #1d2118;
+        --mute: #6d7466;
+        --line: #d8ded1;
+        --green: #31532a;
+        --green2: #48733c;
+        --paper: #fff;
+        --wash: #f4f6f1;
+        --red: #b3261e;
+        --amber: #b26a00;
+        --ok: #2f6b34;
+      }
+      html {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      body {
+        font:
+          9pt/1.4 "Helvetica Neue",
+          Helvetica,
+          Arial,
+          sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+      }
+      .page {
+        width: 210mm;
+        height: 297mm;
+        padding: 12mm 12mm 10mm;
+        display: flex;
+        flex-direction: column;
+        page-break-after: always;
+        overflow: hidden;
+      }
+      .page:last-child {
+        page-break-after: auto;
+      }
+
+      /* ---------- header ---------- */
+      header {
+        display: flex;
+        align-items: flex-end;
+        gap: 8mm;
+        border-bottom: 2.4pt solid var(--green);
+        padding-bottom: 2.5mm;
+        margin-bottom: 4mm;
+      }
+      header .t {
+        flex: 1;
+      }
+      h1 {
+        font-size: 17pt;
+        letter-spacing: -0.4pt;
+        color: var(--green);
+        line-height: 1.05;
+      }
+      h1 small {
+        display: block;
+        font-size: 8.5pt;
+        font-weight: 400;
+        color: var(--mute);
+        letter-spacing: 0;
+        margin-top: 1.2mm;
+      }
+      .stamp {
+        text-align: right;
+        font-size: 7.2pt;
+        color: var(--mute);
+        line-height: 1.5;
+        white-space: nowrap;
+      }
+      .stamp b {
+        color: var(--ink);
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+      }
+
+      h2 {
+        font-size: 9.5pt;
+        text-transform: uppercase;
+        letter-spacing: 1.1pt;
+        color: var(--green);
+        margin: 4mm 0 2mm;
+        display: flex;
+        align-items: center;
+        gap: 2.5mm;
+      }
+      h2::after {
+        content: "";
+        flex: 1;
+        height: 0.6pt;
+        background: var(--line);
+      }
+      h2:first-of-type {
+        margin-top: 0;
+      }
+
+      /* ---------- metrics ---------- */
+      .mets {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 2.5mm;
+      }
+      .met {
+        border: 0.8pt solid var(--line);
+        border-radius: 2mm;
+        padding: 2mm;
+        text-align: center;
+      }
+      .met .v {
+        font-size: 14pt;
+        font-weight: 700;
+        color: var(--green);
+        line-height: 1;
+      }
+      .met .k {
+        font-size: 6.4pt;
+        color: var(--mute);
+        text-transform: uppercase;
+        letter-spacing: 0.5pt;
+        margin-top: 1mm;
+        line-height: 1.25;
+      }
+      .met.warn .v {
+        color: var(--amber);
+      }
+      .met.grey .v {
+        color: var(--mute);
+      }
+
+      /* ---------- table ---------- */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 7.4pt;
+      }
+      th {
+        text-align: left;
+        font-size: 6.6pt;
+        letter-spacing: 0.6pt;
+        text-transform: uppercase;
+        color: var(--mute);
+        border-bottom: 0.8pt solid var(--line);
+        padding: 0 1.6mm 1mm 0;
+      }
+      td {
+        padding: 1.1mm 1.6mm 1.1mm 0;
+        border-bottom: 0.4pt solid #edf0e9;
+        vertical-align: top;
+      }
+      td.mono,
+      .mono {
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        font-size: 6.8pt;
+      }
+      td.n {
+        color: var(--mute);
+        width: 7mm;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 6.2pt;
+        font-weight: 700;
+        letter-spacing: 0.4pt;
+        padding: 0.5mm 1.4mm;
+        border-radius: 1mm;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .tag.fixed {
+        background: #e3efdd;
+        color: var(--ok);
+      }
+      .tag.expl {
+        background: #dfeaf6;
+        color: #1c4f80;
+      }
+      .tag.defer {
+        background: #f8eeda;
+        color: var(--amber);
+      }
+      .tag.you {
+        background: #f6e4e2;
+        color: var(--red);
+      }
+
+      /* ---------- item entries ---------- */
+      .items {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3mm 4mm;
+      }
+      .item {
+        border-left: 1.6pt solid var(--green2);
+        padding-left: 2.6mm;
+      }
+      .item.wide {
+        grid-column: 1 / -1;
+      }
+      .item h3 {
+        font-size: 8.2pt;
+        margin-bottom: 0.8mm;
+        display: flex;
+        gap: 2mm;
+        align-items: baseline;
+      }
+      .item h3 em {
+        font-style: normal;
+        color: var(--mute);
+        font-weight: 400;
+        font-size: 6.6pt;
+        letter-spacing: 0.5pt;
+        text-transform: uppercase;
+      }
+      .item p {
+        font-size: 7pt;
+        color: #4a5044;
+        line-height: 1.42;
+        margin-bottom: 0.9mm;
+      }
+      .item p b {
+        color: var(--ink);
+      }
+      .item .ev {
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        font-size: 6.2pt;
+        color: var(--green2);
+        background: var(--wash);
+        border-radius: 1mm;
+        padding: 0.8mm 1.4mm;
+        display: block;
+        line-height: 1.35;
+      }
+
+      .note {
+        font-size: 7pt;
+        color: #4a5044;
+        line-height: 1.45;
+      }
+      .note b {
+        color: var(--ink);
+      }
+      .keepbox {
+        border-left: 1.6pt solid var(--ok);
+        padding-left: 2.6mm;
+        font-size: 7.2pt;
+        line-height: 1.45;
+        color: #4a5044;
+      }
+      .warnbox {
+        border-left: 1.6pt solid var(--amber);
+        padding-left: 2.6mm;
+        font-size: 7.2pt;
+        line-height: 1.45;
+        color: #4a5044;
+      }
+      .cols2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4mm;
+      }
+
+      footer {
+        margin-top: auto;
+        padding-top: 2.5mm;
+        border-top: 0.6pt solid var(--line);
+        font-size: 6.6pt;
+        color: var(--mute);
+        display: flex;
+        justify-content: space-between;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═════════════════ PAGE 1 — WHAT WAS ASKED, WHAT HAPPENED ═════════════════ -->
+    <section class="page">
+      <header>
+        <div class="t">
+          <h1>
+            What you asked for, and what happened to it
+            <small
+              >Every observation from the 28 August demo review and the 29 August walk of the
+              deployed build</small
+            >
+          </h1>
+        </div>
+        <div class="stamp">
+          30 Aug 2026<br />
+          <code>main</code> = <b>56e98d0</b><br />
+          652/652 browser checks
+        </div>
+      </header>
+
+      <h2>The two sittings</h2>
+      <div class="note" style="margin-bottom: 3mm">
+        You reviewed the system twice in three days. On <b>28 August</b> you walked the demo and
+        returned a list of defects and gaps; that list was answered by eleven work packages between
+        27 and 29 August. On <b>29 August</b> you walked the build on a phone and returned seven
+        more observations; those were answered by seven commits, five of which appear on page 3 and
+        two of which were repairs to breakages the checks caught along the way. This report exists
+        because until now the record of what happened to each item lived only in the engineering
+        files — where
+        <b>an item deliberately not built looks exactly like one that was forgotten</b>. Every line
+        below is one or the other, and says which.
+      </div>
+
+      <div class="mets">
+        <div class="met">
+          <div class="v">18</div>
+          <div class="k">observations answered</div>
+        </div>
+        <div class="met">
+          <div class="v">11</div>
+          <div class="k">packages<br />28 Aug list</div>
+        </div>
+        <div class="met">
+          <div class="v">7</div>
+          <div class="k">commits<br />29 Aug list</div>
+        </div>
+        <div class="met warn">
+          <div class="v">4</div>
+          <div class="k">deferred, named<br />on page 5</div>
+        </div>
+        <div class="met" style="border-color: var(--red)">
+          <div class="v" style="color: var(--red)">2</div>
+          <div class="k">waiting on you</div>
+        </div>
+        <div class="met">
+          <div class="v">652</div>
+          <div class="k">browser checks<br />green on main</div>
+        </div>
+      </div>
+
+      <h2>The 29 August review — seven observations</h2>
+      <table>
+        <tr>
+          <th>#</th>
+          <th style="width: 74mm">What you reported</th>
+          <th style="width: 22mm">Outcome</th>
+          <th style="width: 30mm">Where it landed</th>
+          <th>Commit</th>
+        </tr>
+        <tr>
+          <td class="n">1</td>
+          <td>“The contract section on mobile is horrible.”</td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td>Every document is readable on a phone</td>
+          <td class="mono">9223f62</td>
+        </tr>
+        <tr>
+          <td class="n">2</td>
+          <td>The Gantt chart is unusable on a phone.</td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td>The schedule reads as a list below 700 px</td>
+          <td class="mono">56e98d0</td>
+        </tr>
+        <tr>
+          <td class="n">3</td>
+          <td>
+            “A milestone at 50 % but a payment of 20 %” — «Al llegar a una fase» says nothing.
+          </td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td>Milestones now name 10 %…90 % of progress</td>
+          <td class="mono">70efb17</td>
+        </tr>
+        <tr>
+          <td class="n">4</td>
+          <td>“8 % per year — what is this? Where is it configured?”</td>
+          <td><span class="tag expl">Explained</span></td>
+          <td>Answered; logged for your asesor to confirm</td>
+          <td class="mono">70efb17</td>
+        </tr>
+        <tr>
+          <td class="n">5</td>
+          <td>“Exclusiones and Supuestos are still not in the PDF budget.”</td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td>Both blocks print; the two renderers are pinned together</td>
+          <td class="mono">120724d</td>
+        </tr>
+        <tr>
+          <td class="n">6</td>
+          <td>“I made some progress and the chart stayed the same.”</td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td>The S-curve draws the record from today</td>
+          <td class="mono">120724d</td>
+        </tr>
+        <tr>
+          <td class="n">7</td>
+          <td>“The contract annex can be managed in contract, not as a separate menu.”</td>
+          <td><span class="tag defer">Your call</span></td>
+          <td>Move cancelled by you; the screen was rebuilt instead</td>
+          <td class="mono">2e9d26d</td>
+        </tr>
+      </table>
+
+      <footer>
+        <span>Canei Subirats, S.L. — delivery report</span>
+        <span>Page 1 of 5 · the 29 August list</span>
+      </footer>
+    </section>
+
+    <!-- ═════════════════ PAGE 2 — THE 28 AUGUST PROGRAMME ═════════════════ -->
+    <section class="page">
+      <header>
+        <div class="t">
+          <h1>
+            The 28 August programme
+            <small>Eleven packages, delivered between 27 and 29 August</small>
+          </h1>
+        </div>
+        <div class="stamp">
+          reconstructed from<br />
+          the delivery record<br />
+          <b>see page 4</b>
+        </div>
+      </header>
+
+      <h2>Eleven packages</h2>
+      <table>
+        <tr>
+          <th style="width: 12mm">Package</th>
+          <th style="width: 96mm">What was wrong, and what was done</th>
+          <th style="width: 20mm">Outcome</th>
+          <th>Commit</th>
+        </tr>
+        <tr>
+          <td class="mono">PK-A</td>
+          <td>
+            A job created before its contract was never linked back to it, so approved variations
+            produced no annex and two contract gates went silent. Fixed at the one place both
+            contract paths end, plus a repair migration for existing records.
+          </td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td class="mono">5db7788</td>
+        </tr>
+        <tr>
+          <td class="mono">PK-B</td>
+          <td>
+            The forecast ignored variation chapters, so a job looked cheaper than it was; and the
+            screen said “the table above agrees with the project” without ever checking. It is now
+            measured to the cent and says “No cuadra” with both figures when it does not.
+          </td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td class="mono">9123fc8</td>
+        </tr>
+        <tr>
+          <td class="mono">PK-F</td>
+          <td>
+            Every generated document now renders the approved design from one renderer, rather than
+            each screen printing its own version.
+          </td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td class="mono">8e38b06</td>
+        </tr>
+        <tr>
+          <td class="mono">PK-G</td>
+          <td>
+            A document is written in the customer’s language, not the operator’s, and freezes with
+            the signature — a signed contract keeps the words that were signed.
+          </td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td class="mono">5893499</td>
+        </tr>
+        <tr>
+          <td class="mono">PK-H</td>
+          <td>
+            Every generated email is filed as a draft in the company mailbox, with its PDF attached.
+            Nothing is ever sent by the system; “sending” means opening the draft and pressing send.
+          </td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td class="mono">8acc5f6</td>
+        </tr>
+        <tr>
+          <td class="mono">PK-C</td>
+          <td>
+            Seven small screens that misled: a filtered list that did not say it was filtered, a
+            disabled button that looked enabled, drawer actions the scroller could swallow, a send
+            that landed on the wrong screen, a money line with no description allowed through — and
+            a permanent red “over contract” pill caused by comparing a gross figure with a net one.
+          </td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td class="mono">22d2d0f</td>
+        </tr>
+        <tr>
+          <td class="mono">PK-D</td>
+          <td>
+            The S-curve drew no actual line before the first record and extrapolated a forecast from
+            a single day. It now starts at zero, withholds the projection until there are two days
+            of evidence, and always reaches today.
+          </td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td class="mono">312de53</td>
+        </tr>
+        <tr>
+          <td class="mono">PK-E</td>
+          <td>
+            Blocking messages stayed in Spanish for an English reader because label and data shared
+            one line; they are now separated. A test record left in the live company file is removed
+            by every run.
+          </td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td class="mono">9a310e6</td>
+        </tr>
+        <tr>
+          <td class="mono">PK-I</td>
+          <td>Acceptance script V3 — 17 phases, 150 checks — issued for your walkthrough.</td>
+          <td><span class="tag fixed">Delivered</span></td>
+          <td class="mono">97dbb07</td>
+        </tr>
+        <tr>
+          <td class="mono">PK-J</td>
+          <td>
+            Drafts were only filed at the moment a message was marked sent, so everything generated
+            before you connected the mailbox was never retried. A sweep now files them at start-up
+            and after each queueing, without ever creating a duplicate.
+          </td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td class="mono">9b586b6</td>
+        </tr>
+        <tr>
+          <td class="mono">PK-K</td>
+          <td>
+            A draft that never arrived said nothing. The server’s reason is now kept on the row, and
+            “Reintentar” files it again without re-issuing the quote.
+          </td>
+          <td><span class="tag fixed">Fixed</span></td>
+          <td class="mono">14c3f12</td>
+        </tr>
+      </table>
+
+      <footer>
+        <span>Canei Subirats, S.L. — delivery report</span>
+        <span>Page 2 of 5 · the 28 August list</span>
+      </footer>
+    </section>
+
+    <!-- ═════════════════ PAGE 3 — THE 29 AUGUST REVIEW, ITEM BY ITEM ═════════════════ -->
+    <section class="page">
+      <header>
+        <div class="t">
+          <h1>
+            The 29 August review, item by item
+            <small
+              >What you saw · what was actually wrong · what changed · the check that holds
+              it</small
+            >
+          </h1>
+        </div>
+        <div class="stamp">
+          seven observations<br />
+          seven commits · five here<br />
+          <b>29–30 Aug 2026</b>
+        </div>
+      </header>
+
+      <div class="items">
+        <div class="item">
+          <h3>1 · The contract on a phone <em>fixed · 9223f62</em></h3>
+          <p>
+            <b>What you saw.</b> Text cut off, the document unreadable on the screen you actually
+            carry to a site.
+          </p>
+          <p>
+            <b>What was wrong.</b> Every generated document is drawn as a 210 mm sheet — a sheet of
+            A4, at A4’s width, whatever the screen. Our first reading of your screenshots was that
+            the sheet was centred and its left edge unreachable. <b>Measurement said otherwise:</b>
+            the left edge was exactly where it belonged. One cause — a width fixed in millimetres —
+            failing two different ways depending on which panel the document opened in.
+          </p>
+          <p>
+            <b>What changed.</b> Below 700 px the sheet becomes fluid: one column, reduced margins,
+            signature blocks stacked. Above it, nothing moves — the desktop keeps the approved
+            design at its approved size. <b>Printing and the downloaded PDF cannot be affected:</b>
+            print already forces its own width, and the file your customer receives is written by a
+            different component that shares no styling with the screen at all.
+          </p>
+          <p class="ev">
+            ✓ mobile: the whole contrato is on screen — 364px in a 390px viewport<br />
+            ✓ mobile: the whole adenda is on screen — 331px in a 390px viewport<br />
+            ✓ COM-04: the sheet keeps its A4 width on a desktop (794px)
+          </p>
+        </div>
+
+        <div class="item">
+          <h3>2 · The Gantt on a phone <em>fixed · 56e98d0</em></h3>
+          <p><b>What you saw.</b> The planning chart unusable on a phone.</p>
+          <p>
+            <b>What was wrong.</b> Not the touch handling — the drag gestures were written for touch
+            from the start. The chart spends 190 px on task names and leaves roughly 200 px for the
+            timeline: about eight days of a job that runs twenty to sixty. There was nothing legible
+            to aim a finger at.
+          </p>
+          <p>
+            <b>What changed.</b> Below 700 px the chart is replaced by a schedule read as a list —
+            one row per task in date order with its dates, duration, progress, whether it is
+            critical, and whether it is late or running today; the contract’s payment milestones sit
+            in the same list, on their dates, because money falling due is one of the things that
+            happens on a day. Tapping a row opens the same task panel the desktop opens, so the
+            phone loses the dragging, not the editing. The desktop chart is untouched.
+          </p>
+          <p class="ev">
+            ✓ mobile: the schedule reads as a list — 5 rows for 5 tasks, 360px in 390px<br />
+            ✓ mobile: every schedule row carries the schedule’s own dates — 5 rows checked<br />
+            ✓ gantt: the desktop keeps the chart, its name column and its tools
+          </p>
+        </div>
+
+        <div class="item">
+          <h3>3 · Payment milestones <em>fixed · 70efb17</em></h3>
+          <p>
+            <b>What you said.</b> “You can establish a milestone at 50 % but the payment can be 20
+            %” — and the old trigger, «Al llegar a una fase», never said which phase.
+          </p>
+          <p>
+            <b>What changed.</b> A milestone now names a percentage of the work:
+            <b>at 10 %…90 % of progress</b>, in nine steps, alongside on signature, at works start,
+            on completion and a fixed date. Trigger and amount stay independent — that was always
+            true and is now visible — so a milestone at 50 % of progress releasing 20 % of the money
+            is expressible and prints correctly in all three languages. The date is derived from the
+            plan’s <b>planned</b> curve, never from recorded progress, so a payment date cannot move
+            because somebody logged work.
+          </p>
+          <p class="ev">
+            ✓ COM-04: the milestone trigger offers 10…90 % of progress, nine steps<br />
+            ✓ COM-04: a milestone at 50 % of progress can release 20 % of the money
+          </p>
+        </div>
+
+        <div class="item">
+          <h3>4 · “8 % per year — what is this?” <em>explained</em></h3>
+          <p>
+            <b>The answer.</b> It is a contract term, not a calculation. Every contract is drawn up
+            carrying a late-payment interest rate — 8 % per year by default, from your company
+            configuration — and prints it beside the clause saying interest accrues from the due
+            date. <b>Nothing in the system computes or charges it.</b> No invoice, no ageing report
+            and no reminder uses the figure.
+          </p>
+          <p>
+            <b>Why we have not simply left it.</b> A rate printed at a customer is a legal
+            assertion. Ley 3/2004 sets the statutory rate for commercial transactions by reference
+            to the ECB rate, published twice a year — so a fixed default is right on the day it is
+            chosen and quietly wrong afterwards, and a consumer contract is a different regime
+            again. It is now written up for your asesor with the open questions named, and marked
+            unverified until they answer.
+            <b>No product change was made, because you did not ask for one.</b>
+          </p>
+        </div>
+
+        <div class="item">
+          <h3>5 · Exclusiones and Supuestos <em>fixed · 120724d</em></h3>
+          <p>
+            <b>What you saw.</b> Both blocks visible on screen and missing from the downloaded PDF.
+          </p>
+          <p>
+            <b>What was wrong.</b> The quote is drawn twice by two independent components — one for
+            the screen, one for the file. The screen renderer was taught about the two blocks; the
+            PDF writer never was, and no check compared them.
+          </p>
+          <p>
+            <b>What changed.</b> The PDF writer prints both. More importantly, a check now feeds
+            <b>one document to both renderers</b> and fails if any block reaches one and not the
+            other — the two drifting apart is what happened, so that is what is pinned.
+          </p>
+          <p class="ev">
+            ✓ «Supuestos» reaches both renderers — both<br />
+            ✓ «Exclusiones» reaches both renderers — both
+          </p>
+        </div>
+
+        <div class="item">
+          <h3>6 · The progress chart did not move <em>fixed · 120724d</em></h3>
+          <p><b>What you saw.</b> Progress recorded, the chart unchanged.</p>
+          <p>
+            <b>What was wrong, measured.</b> The curve sampled forward from the plan’s start date
+            and discarded every reading after today. Your plan started on 31 August; the day you
+            looked was 29 August. So every sample sat in the future of your “today”, every actual
+            value was discarded, and the chart drew <b>zero</b> of twenty points while the header
+            above it correctly said 62.5 %. Confirmed independently from your screenshot: no green
+            and no amber pixels in the chart, only the dashed planned line.
+          </p>
+          <p>
+            <b>What changed.</b> When today falls before the plan starts, the curve samples from
+            today instead, and there is always a point at today. The header and the line are now
+            required by test to agree — they may not disagree again without a check going red.
+          </p>
+          <p class="ev">✓ tracking: S curve draws planned, actual and projected</p>
+        </div>
+
+        <div class="item wide">
+          <h3>7 · Adicionales — annex or menu? <em>your call · 2e9d26d</em></h3>
+          <p>
+            <b>What you asked.</b> Whether the contract annex could be managed inside the contract
+            rather than as its own menu entry. We designed the move, explained it in detail at your
+            request — and <b>you cancelled it to de-risk</b>, asking instead that the screen stop
+            leading with a project selector and five money counters, and look like Clientes and
+            Proveedores.
+          </p>
+          <p>
+            <b>What changed.</b> Adicionales keeps its menu row and is now a register: one row per
+            modification across every job, searchable by job, filterable by stage, with the whole
+            lifecycle — price, send, approve, see the annex, apply to the plan — inside the row’s
+            panel. Two things were protected deliberately: the
+            <b>amber marking on unapproved work</b>, which exists to be readable from across a site
+            office, and the fact that the unapproved total comes from the engine rather than a sum
+            in the screen, so it cannot disagree with the rest of the system. The contract’s Anexos
+            tab stays a read-only mirror for now — see page 5.
+          </p>
+          <p class="ev">
+            ✓ PRY-03: opens as a register over every obra — no counters, no project bar (8 rows)<br />
+            ✓ PRY-03: the amber rule and the pill agree with the engine on every row<br />
+            ✓ modificaciones: the «sin aprobar» total rises when an extra is priced and falls when
+            it is approved (0 → 50000 → 0 cents)
+          </p>
+        </div>
+      </div>
+
+      <footer>
+        <span>Canei Subirats, S.L. — delivery report</span>
+        <span>Page 3 of 5 · the 29 August review</span>
+      </footer>
+    </section>
+
+    <!-- ═════════════════ PAGE 4 — HOW WE KNOW ═════════════════ -->
+    <section class="page">
+      <header>
+        <div class="t">
+          <h1>
+            How we know it is true
+            <small>What was re-checked, on what, and where the numbers on page 1 come from</small>
+          </h1>
+        </div>
+        <div class="stamp">
+          measured 30 Aug 2026<br />
+          on <code>main</code> = <b>56e98d0</b>
+        </div>
+      </header>
+
+      <h2>Every figure in this report is a test result, not an opinion</h2>
+      <p class="note" style="margin-bottom: 3mm">
+        Each of the seven observations was re-walked on the finished system rather than declared
+        done. The re-walk uses the checks that already run on every change, so
+        <b>this report cannot quietly drift away from the product</b>: if any line below stopped
+        being true, a build would go red before anyone published anything. Nothing here is a
+        screenshot, and no number appears that is not printed by one of these runs.
+      </p>
+
+      <table style="margin-bottom: 3mm">
+        <tr>
+          <th style="width: 52mm">What was run</th>
+          <th style="width: 20mm">Result</th>
+          <th>What it covers</th>
+        </tr>
+        <tr>
+          <td>Browser suite, full run</td>
+          <td><b>652 / 652</b></td>
+          <td>
+            39 areas of the product driven in a real browser, desktop and 390 px phone, including
+            every one of the seven items above
+          </td>
+        </tr>
+        <tr>
+          <td>Document PDF checks</td>
+          <td><b>43 / 43</b></td>
+          <td>
+            Every generated document written and read back; both renderers compared against one
+            document
+          </td>
+        </tr>
+        <tr>
+          <td>Business simulations</td>
+          <td><b>712 / 712</b></td>
+          <td>
+            A full year of trading, data migrations, imports, scheduling and the manageability rules
+            replayed against the engine
+          </td>
+        </tr>
+        <tr>
+          <td>Bank import checks</td>
+          <td><b>94 / 94</b></td>
+          <td>Statement files and PDF statements read, matched and reconciled</td>
+        </tr>
+        <tr>
+          <td>Engine unit tests</td>
+          <td><b>132 / 132</b></td>
+          <td>Includes 61 scheduling tests — the curve from item 6 among them</td>
+        </tr>
+        <tr>
+          <td>Translation gates ×4</td>
+          <td><b>at ceiling</b></td>
+          <td>
+            Dictionary completeness, source text, the booted workspace, and 68 pages crawled in two
+            viewports in each language
+          </td>
+        </tr>
+        <tr>
+          <td>Code quality gates ×5</td>
+          <td><b>pass</b></td>
+          <td>Formatting, architecture boundaries, types, build, and script parsing</td>
+        </tr>
+      </table>
+
+      <h2>Two things worth saying plainly</h2>
+      <div class="cols2">
+        <div class="warnbox">
+          <b
+            >The re-walk was run against the same files the site publishes, not against the live
+            address.</b
+          ><br />
+          The build machine used for this work cannot reach the published web address — the network
+          it sits behind refuses it. So the seven items were re-checked against the site files
+          exactly as they stand in the repository, which is byte-for-byte what the publishing job
+          copies to the web. That is a strong check, but it is not the same as somebody opening the
+          live URL, and we would rather say so than let the distinction pass.
+        </div>
+        <div class="keepbox">
+          <b>Two of the seven had a plausible wrong diagnosis, caught by measuring.</b><br />
+          The contract-on-a-phone fault looked, from the screenshots, like a centring problem that
+          put the left edge of the page out of reach. It was not; measuring showed the left edge
+          exactly where it belonged and a different cause underneath. The progress chart looked like
+          a drawing bug and turned out to be a date-window bug that only appears when today falls
+          before the plan starts. In both cases the fix that shipped is the one the measurement
+          justified, not the one the screenshot suggested.
+        </div>
+      </div>
+
+      <h2>The 28 August column is reconstructed, not quoted</h2>
+      <p class="note">
+        The eleven-package table on page 2 is written from our own delivery record — the package
+        ledger and the decision log kept in the repository — and describes, in our words, what each
+        package changed. <b>It is not a quotation of your original list.</b> That list was given
+        verbally and in a working session whose transcript is no longer available to us, and a
+        report that paraphrases somebody’s words while looking like it is quoting them is worse than
+        one that says which it is doing. If you still have your 28 August notes, send them and we
+        will map them line by line; the packages themselves are unaffected either way.
+      </p>
+
+      <h2>Two of this package’s seven commits were repairs</h2>
+      <p class="note">
+        Every commit goes through the full set of checks above and through four independent build
+        jobs on GitHub’s own machines before it becomes part of the live system. Two of the seven
+        commits answering your 29 August list were repairs to breakages introduced during the work
+        itself: one ours — a translation check we skipped before pushing because it takes nine
+        minutes, which is exactly the reason it exists — and one from a parallel change to the
+        spreadsheet export that moved a header row a second reader was still looking for. Both were
+        caught by the checks rather than by you, and both were fixed the same day. We mention them
+        because a delivery report that shows only clean progress is not a record, it is an
+        advertisement.
+      </p>
+
+      <footer>
+        <span>Canei Subirats, S.L. — delivery report</span>
+        <span>Page 4 of 5 · evidence</span>
+      </footer>
+    </section>
+
+    <!-- ═════════════════ PAGE 5 — DEFERRED, AND WHY ═════════════════ -->
+    <section class="page">
+      <header>
+        <div class="t">
+          <h1>
+            What was not built, and why
+            <small
+              >Named deferrals, what each one costs while it waits, and what we need from you</small
+            >
+          </h1>
+        </div>
+        <div class="stamp">
+          4 deferred<br />
+          2 waiting on you<br />
+          <b>30 Aug 2026</b>
+        </div>
+      </header>
+
+      <h2>Deferred by decision</h2>
+      <table style="margin-bottom: 3mm">
+        <tr>
+          <th style="width: 54mm">Item</th>
+          <th style="width: 20mm">Why</th>
+          <th>What it costs while it waits</th>
+        </tr>
+        <tr>
+          <td>
+            <b>Re-basing a plan whose work started before its first task</b><br />
+            “The job has already started — do I move the planning?”
+          </td>
+          <td><span class="tag defer">Scope</span></td>
+          <td>
+            This is real, and it is the reason your deviation figures are measured against a promise
+            nobody made: if the work began before the plan’s first task, everything after it reads
+            as late. It is a scheduling feature rather than a review fix, so it was logged rather
+            than squeezed into a correction package.
+            <b
+              >Until it exists, treat the deviation panel on a job that started early as indicative,
+              not as a measurement.</b
+            >
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <b>Adicionales inside the contract</b><br />
+            The contract’s Anexos tab stays a read-only mirror.
+          </td>
+          <td><span class="tag defer">Your call</span></td>
+          <td>
+            Designed and then cancelled by you, to de-risk. Nothing is lost: every annex action is
+            reachable from the rebuilt Adicionales register. The right moment to revisit is after
+            you have walked the new register on the live build — if it does the job, the move may
+            never be worth making.
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <b>Attaching extras directly to a contract</b>
+          </td>
+          <td><span class="tag defer">Scope</span></td>
+          <td>
+            A change to how the data itself is shaped, not a screen fix. Out of scope for a review
+            package; it would need its own, with a migration.
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <b>Late-payment interest — the 8 % default</b>
+          </td>
+          <td><span class="tag expl">Legal</span></td>
+          <td>
+            Explained on page 3, no product change requested. It is now recorded as an unverified
+            legal assertion awaiting your asesor: whether the default should track the published
+            statutory rate rather than sit in configuration, whether a consumer contract may carry
+            it in this form, and what the contract should say when no rate was agreed.
+          </td>
+        </tr>
+      </table>
+
+      <h2>Waiting on you — two items, both blocked on information only you have</h2>
+      <div class="cols2" style="margin-bottom: 3mm">
+        <div class="warnbox">
+          <b>The Safari PDF crash — we need a console line.</b> Reported on 28 August and never
+          reproduced on a machine we control. We cannot fix what we cannot reproduce, and we will
+          not ship a guess into the component that writes your customers’ documents.
+          <b>What we need:</b>
+          the browser console output from Safari at the moment it fails — or simply the device and
+          the Safari version, which may be enough for us to reproduce it here. This is the only
+          defect from either sitting that is still open and not deliberately deferred.
+        </div>
+        <div class="warnbox">
+          <b>Your IBAN and your logo.</b> Configuración › Empresa is built and waiting for them.
+          Until they are entered, every document the system generates carries the company details it
+          does have and no bank line — which is correct behaviour, but it means the documents are
+          not yet the ones you would send.
+        </div>
+      </div>
+
+      <h2>Where things stand</h2>
+      <p class="note" style="margin-bottom: 3mm">
+        Both review lists are closed. Eighteen observations answered across eleven packages and
+        seven commits, four named deferrals, and two items waiting on information only you have. The
+        system on <code class="mono">main</code> is green on every check we run and on all four
+        independent build jobs.
+      </p>
+      <div class="keepbox" style="margin-bottom: 3mm">
+        <b>What we suggest next.</b> Walk the deployed build once more, on the phone, with three
+        things specifically in mind: the rebuilt <b>Adicionales</b> register (does it replace what
+        the annex tab would have given you?), the <b>schedule list</b> on a job with more than five
+        tasks (is the ordering the one you read a programme in?), and a <b>contract document</b> on
+        the phone you actually carry. Those three are the changes most likely to look different in
+        your hands than in a test, and the ones where your reaction should shape what comes next.
+      </div>
+      <p class="note">
+        Anything you find, send it the way you sent these — a screenshot and a sentence is enough.
+        Every item on this report started that way.
+      </p>
+
+      <footer>
+        <span>Canei Subirats, S.L. — delivery report</span>
+        <span>Page 5 of 5 · deferrals and next steps</span>
+      </footer>
+    </section>
+  </body>
+</html>
