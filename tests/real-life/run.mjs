@@ -273,8 +273,20 @@ const zip = await pg.evaluate(async () => {
   const dir = ErpImport.zip.centralDirectory(bytes);
   const sheet = await ErpImport.zip.readEntry(bytes, dir["conciliacion.xlsx"]);
   const rows = await ErpImport.parseXlsxRows(sheet);
-  const body = rows.slice(1);
-  const head = rows[0];
+  /* The workbook opens with the company's identity now (PK-O), so the column
+     titles are not row 1 any more, and below the table sits the legal foot.
+     Found by what the header CONTAINS and counted to the first blank line —
+     the same reading tests/site-e2e uses on this file, deliberately copied
+     rather than invented a second time. Reading it the old way counted five
+     rows of branding as movements and looked up every column in the wrong
+     row, which is how this went red on a workbook that was perfectly correct. */
+  const headerRow = rows.findIndex((r) => (r || []).includes("Nº documento"));
+  const head = rows[headerRow] || [];
+  const body = [];
+  for (const r of rows.slice(headerRow + 1)) {
+    if (!(r || []).some((c) => String(c || "").trim())) break;
+    body.push(r);
+  }
   const col = (n) => head.indexOf(n);
   const docEntries = Object.keys(dir).filter((n) => n.startsWith("docs/"));
   return {
