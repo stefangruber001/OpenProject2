@@ -836,6 +836,60 @@
       }
 
       /* ---------- Gantt (spec §3.3 · §4.3) ---------- */
+      /* One schedule, two surfaces. 700px is where S4 put the document
+         boundary and the reasoning is the same: below it the screen is a phone
+         and a fixed-width instrument stops being readable. The chart keeps
+         everything it has above the line — this rule is the entire extent of
+         the change. */
+      .gmob {
+        display: none;
+      }
+      .gmob .gmrow {
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--hair);
+      }
+      .gmob .gmrow.late {
+        border-left: 3px solid var(--danger);
+      }
+      .gmob .gmrow.now {
+        border-left: 3px solid var(--green);
+      }
+      .gmob .gmtop {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .gmob .gmt {
+        flex: 1;
+        font: 600 13px var(--sans);
+        color: var(--ink);
+      }
+      .gmob .gmt .dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--danger);
+        margin-right: 6px;
+      }
+      .gmob .gmpct {
+        font: 600 12px var(--sans);
+        color: var(--muted);
+      }
+      .gmob .gmsub {
+        margin-top: 4px;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+      .gmob .gmsub b.late {
+        color: var(--danger);
+      }
+      .gmob .bar {
+        margin-top: 6px;
+      }
+      .gmob .gmrow.pay .gmt {
+        color: var(--blue);
+      }
       .gwrap {
         display: flex;
         align-items: flex-start;
@@ -1025,6 +1079,20 @@
         border-radius: 2px;
         margin-right: 4px;
         vertical-align: -1px;
+      }
+      /* AFTER .gwrap/.gtools/.glegend, deliberately: they are declared above
+         at the same specificity, and the later rule wins. Placed before them
+         this query rendered the chart AND the list at once — the same failure
+         the builder's phone tab bar had the first time it shipped. */
+      @media (max-width: 700px) {
+        .gwrap,
+        .gtools,
+        .glegend {
+          display: none;
+        }
+        .gmob {
+          display: block;
+        }
       }
 
       /* ---------- Project context: selector + fixed header (spec §4) ----------
@@ -6592,6 +6660,101 @@
         }, msg);
       }
 
+      /* ---------- The same schedule, on a phone ----------
+
+     The chart is a 190px name column beside an SVG of `nDays × gZoom` pixels.
+     At 24px a day on a 390px screen that is half the width spent on labels and
+     a ~200px window on the rest — about eight days of a job that runs twenty to
+     sixty. The gestures were always touch-aware (ganttWire says so); there was
+     nothing legible to aim them at.
+
+     So below the breakpoint the same schedule is read as a list: what happens,
+     when, how far along it is, and what is late. Both are rendered and CSS
+     chooses, rather than a width test at render time — a phone that rotates
+     would otherwise keep whichever surface it booted with.
+
+     Every figure comes from the SAME `sch` the SVG draws from, so the two
+     cannot disagree about a date. Nothing is recomputed for the phone.
+
+     Payment milestones are interleaved by date rather than listed apart: a
+     schedule is read forwards, and money falling due is one of the things that
+     happens on a day. */
+      function ganttList(plan, sch, pays) {
+        const S = {};
+        if (sch) sch.tasks.forEach((t) => (S[t.taskId] = t));
+        const pos = (t) =>
+          S[t.id] || {
+            start: t.plannedStart,
+            finish: t.plannedEnd,
+            critical: false,
+            durationDays: 0,
+          };
+
+        const items = plan.tasks.map((t) => {
+          const p = pos(t);
+          const pct = Math.max(0, Math.min(100, t.progressPct || 0));
+          const done = pct >= 100;
+          return {
+            kind: "task",
+            id: t.id,
+            date: p.start,
+            title: t.title,
+            milestone: !!t.milestone,
+            critical: !!p.critical,
+            start: p.start,
+            finish: p.finish,
+            days: p.durationDays,
+            pct,
+            // Late is a fact about the plan and the clock, not a status
+            // somebody set: finished in the past and not reported done.
+            overdue: !done && p.finish < erp.today,
+            running: !done && p.start <= erp.today && erp.today <= p.finish,
+          };
+        });
+        pays.forEach((p) =>
+          items.push({
+            kind: "pay",
+            date: p.date,
+            number: p.number,
+            seq: p.seq,
+            amountCents: p.amountCents,
+            invoiced: p.invoiced,
+          }),
+        );
+        items.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+        /* EVERY WORD ITS OWN ELEMENT, and the record wrapped so nobody asks.
+           The translator walks TEXT NODES, so a row rendered as one string
+           hands it the dates, the duration and the words as a single key no
+           dictionary can hold — fifteen of them, straight into the miss
+           ledger. Split into elements, each word arrives on its own and the
+           separators between them are punctuation the ledger ignores; a
+           record — a contract number, a sequence — goes in a `translate="no"`
+           span, which is what that attribute is for. Same lesson as S2b, one
+           layer down: the audit reads the source, the ledger reads the DOM. */
+        const SEP = " · ";
+        const row = (i) => {
+          if (i.kind === "pay")
+            return `<div class="gmrow pay"><div class="gmtop">
+       <span class="gmt"><span translate="no">◆ ${esc(i.number)}</span> · <span>hito</span> <span translate="no">${i.seq}</span></span>
+       <span class="pill ${i.invoiced ? "g" : "b"}">${eur0(i.amountCents)}</span></div>
+      <div class="gmsub"><span translate="no">${fmtD(i.date)}</span>${SEP}<span>${i.invoiced ? "facturado" : "previsto"}</span></div></div>`;
+          const sub = [`<span translate="no">${fmtD(i.start)} → ${fmtD(i.finish)}</span>`];
+          if (!i.milestone) sub.push(`<span translate="no">${i.days} d</span>`);
+          if (i.overdue) sub.push('<b class="late">vencida</b>');
+          else if (i.running) sub.push("<span>en curso</span>");
+          if (i.critical) sub.push("<span>crítica</span>");
+          return `<div class="gmrow${i.overdue ? " late" : ""}${i.running ? " now" : ""}" data-mrow="${esc(i.id)}">
+      <div class="gmtop">
+       <span class="gmt">${i.critical ? '<span class="dot"></span>' : ""}${i.milestone ? "◆ " : ""}${esc(i.title)}</span>
+       <span class="gmpct">${i.pct}%</span></div>
+      <div class="bar"><i style="width:${i.pct}%"></i></div>
+      <div class="gmsub">${sub.join(SEP)}</div></div>`;
+        };
+
+        return `<div class="gmob">${items.map(row).join("")}</div>`;
+      }
+
       function ganttChart(plan, sch, cmp, pays) {
         const B = ganttApi(),
           cal = plan.calendar || B.defaultCalendar(),
@@ -6774,6 +6937,16 @@
           n.onclick = () => {
             gSel = n.dataset.task;
             ganttTaskDrawer(pid, n.dataset.task);
+          };
+        });
+        // The phone's schedule rows open the same drawer the chart's name
+        // column does — dates, duration, progress and the pinned start are all
+        // editable there, so nothing the chart could do is out of reach; it is
+        // one tap further in.
+        v.querySelectorAll(".gmob [data-mrow]").forEach((n) => {
+          n.onclick = () => {
+            gSel = n.dataset.mrow;
+            ganttTaskDrawer(pid, n.dataset.mrow);
           };
         });
 
@@ -8092,7 +8265,9 @@
         const reg = erp.extrasRegister();
         const codeOf = {};
         erp.state.projects.forEach((p) => (codeOf[p.id] = p.code));
-        const rows = (chgStage ? reg.items.filter((c) => erp.changeStage(c) === chgStage) : reg.items)
+        const rows = (
+          chgStage ? reg.items.filter((c) => erp.changeStage(c) === chgStage) : reg.items
+        )
           .slice()
           .reverse();
 
@@ -8527,8 +8702,7 @@
        it and «Adenda» stayed Spanish in English and Catalan. */
         const db = openDrawer("Adenda" + (doc.number ? " · " + doc.number : ""));
         db.innerHTML =
-          sheetDocHtml("ordenCambio", { changeId: id }, doc.language) +
-          changeLangFootHtml(id, doc);
+          sheetDocHtml("ordenCambio", { changeId: id }, doc.language) + changeLangFootHtml(id, doc);
         wireChangeLangFoot(id);
         paintImages(db);
       }
@@ -11098,16 +11272,14 @@
                   "Cancelado",
                 )),
           );
-        document
-          .querySelectorAll("[data-sent-msg]")
-          .forEach(
-            (b) =>
-              (b.onclick = () =>
-                mutate(() => {
-                  const q = erp.recordCommunicationSent(b.dataset.sentMsg, "backoffice");
-                  fileDraftForComm(q); // N2 · the draft goes to the mailbox
-                }, "Registrado como enviado")),
-          );
+        document.querySelectorAll("[data-sent-msg]").forEach(
+          (b) =>
+            (b.onclick = () =>
+              mutate(() => {
+                const q = erp.recordCommunicationSent(b.dataset.sentMsg, "backoffice");
+                fileDraftForComm(q); // N2 · the draft goes to the mailbox
+              }, "Registrado como enviado")),
+        );
         /* Filing again, without re-sending anything. A draft that did not
            reach the mailbox — the server was down, the mailbox was not
            connected yet, the append was refused — is a message the operator
@@ -11420,10 +11592,7 @@
          copy of the central-directory arithmetic is one place for it to be
          wrong. */
       const zipStore = (files) =>
-        CaneiZip.blob(
-          files,
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        );
+        CaneiZip.blob(files, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       const xmlEsc = (v) =>
         String(v ?? "").replace(
           /[&<>"']/g,
@@ -11452,7 +11621,7 @@
          arithmetic happened in cents, long before this file. */
       const XLSX_STYLES =
         '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-        "<fonts count=\"6\">" +
+        '<fonts count="6">' +
         '<font><sz val="10"/><name val="Arial"/><color rgb="FF3D3D3D"/></font>' +
         '<font><b/><sz val="16"/><name val="Georgia"/><color rgb="FF14160F"/></font>' +
         '<font><sz val="9"/><name val="Arial"/><color rgb="FF6B7063"/></font>' +
@@ -11507,9 +11676,7 @@
         if (head.length) head.push([{ v: "", s: 0 }]);
         const headerRowIndex = head.length; // 0-based row of the column titles
 
-        const body = rows.map((r, i) =>
-          r.map((c) => ({ v: c, s: i === 0 ? 3 : (i % 2 ? 5 : 4) })),
-        );
+        const body = rows.map((r, i) => r.map((c) => ({ v: c, s: i === 0 ? 3 : i % 2 ? 5 : 4 })));
         const all = head.concat(body);
         if (foot) all.push([{ v: "", s: 0 }], [{ v: foot, s: 6 }]);
 
@@ -11536,7 +11703,9 @@
           });
         const cols = widest.length
           ? "<cols>" +
-            widest.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("") +
+            widest
+              .map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`)
+              .join("") +
             "</cols>"
           : "";
         // The header row stays on screen while the operator scrolls; on a
@@ -15424,7 +15593,8 @@
            channel whose behaviour has to be guessed is a channel that gets
            picked wrongly. */
         const CH_HINT = {
-          email: "Se prepara un borrador en el buzón de la empresa. No se envía nada al cliente todavía.",
+          email:
+            "Se prepara un borrador en el buzón de la empresa. No se envía nada al cliente todavía.",
           whatsapp: "Se abre WhatsApp con el mensaje escrito. Usted decide cuándo enviarlo.",
           hand: "Queda registrado como entregado en mano en la fecha y hora que indique.",
         };
@@ -15479,7 +15649,10 @@
                 // nothing was said" is precisely how a working mailbox
                 // looked broken for a day.
                 const tpl = erp.commsTemplate("quote-send");
-                if (!tpl) toast("⚠ Sin plantilla «Envío de presupuesto» — no se ha preparado ningún correo");
+                if (!tpl)
+                  toast(
+                    "⚠ Sin plantilla «Envío de presupuesto» — no se ha preparado ningún correo",
+                  );
                 if (tpl) {
                   const vars = { number: b.number, cliente: party.name };
                   const C = commsApi();
@@ -16812,7 +16985,9 @@
             ownDoc || matchedBillDoc,
           ]);
         }
-        const xlsx = xlsxBlob("Conciliacion " + quarter, rows, { subtitle: "Conciliación " + quarter });
+        const xlsx = xlsxBlob("Conciliacion " + quarter, rows, {
+          subtitle: "Conciliación " + quarter,
+        });
         files.unshift({
           path: "conciliacion.xlsx",
           bytes: new Uint8Array(await xlsx.arrayBuffer()),
@@ -17816,7 +17991,7 @@
    </div>
    ${
      plan.tasks.length
-       ? ganttChart(plan, sch, cmp, pays)
+       ? ganttChart(plan, sch, cmp, pays) + ganttList(plan, sch, pays)
        : derivable
          ? `<div class="empty">Sin planificación. «Derivar del presupuesto» la construye a partir de las partidas y subpartidas aceptadas: la duración de cada partida sale de sus cantidades y del rendimiento diario del oficio.</div>`
          : `<div class="empty">Esta obra todavía no tiene un presupuesto aceptado, así que no hay partidas ni subpartidas que planificar ni sobre los que registrar avance.
@@ -19530,7 +19705,8 @@
           // No server, no mailbox — and no pretending otherwise. The published
           // read-only copies and a browser-only workspace land here.
           state.textContent = "solo en el servidor";
-          msg.textContent = "Esta copia funciona sin servidor: el buzón se conecta en la instalación de la empresa.";
+          msg.textContent =
+            "Esta copia funciona sin servidor: el buzón se conecta en la instalación de la empresa.";
           save.disabled = true;
           addr.disabled = pass.disabled = true;
           return;
@@ -19581,7 +19757,10 @@
               // The endpoint answers with a redirect carrying the outcome, so
               // the answer is in the address we ended up on.
               const q = new URLSearchParams((r.url.split("?")[1] || "").replace(/#.*$/, ""));
-              return { status: q.get("status") || (r.ok ? "ok" : "failed"), detail: q.get("detail") || "" };
+              return {
+                status: q.get("status") || (r.ok ? "ok" : "failed"),
+                detail: q.get("detail") || "",
+              };
             })
             .then((res) => {
               save.disabled = false;
@@ -19598,13 +19777,15 @@
                 sweepMailboxDrafts();
               } else {
                 state.textContent = "sin conectar";
-                msg.textContent = res.detail || "El buzón no ha aceptado estos datos. No se ha guardado nada.";
+                msg.textContent =
+                  res.detail || "El buzón no ha aceptado estos datos. No se ha guardado nada.";
                 toast("⚠ El buzón no ha aceptado estos datos");
               }
             })
             .catch(() => {
               save.disabled = false;
-              msg.textContent = "No se ha podido contactar con el servidor. No se ha guardado nada.";
+              msg.textContent =
+                "No se ha podido contactar con el servidor. No se ha guardado nada.";
             });
         };
       }
@@ -20102,7 +20283,11 @@
         });
         $("#p_edit").onclick = () => editPartyDrawer(id);
         $("#p_propnew").onclick = () =>
-          propertyDrawer(null, { partyId: id, back: () => partyDrawer(id), onSaved: () => partyDrawer(id) });
+          propertyDrawer(null, {
+            partyId: id,
+            back: () => partyDrawer(id),
+            onSaved: () => partyDrawer(id),
+          });
         db.querySelectorAll("[data-prop]").forEach(
           (btn) =>
             (btn.onclick = () =>
@@ -20579,22 +20764,25 @@
    <div class="field full" style="margin-top:8px${back ? ";flex-direction:row;gap:8px" : ""}"><button class="btn primary" id="pr_save"${back ? ` style="flex:1"` : ""}>${pr ? "Guardar cambios" : "Crear inmueble"}</button>${back ? `<button class="btn" id="pr_back">Cancelar</button>` : ""}</div></div>`;
         if (back) $("#pr_back").onclick = closeDrawer;
         $("#pr_save").onclick = () =>
-          mutate(() => {
-            const street = $("#pr_street").value.trim();
-            if (!street) throw new Error("La dirección es obligatoria");
-            const patch = {
-              street,
-              postalCode: $("#pr_cp").value.trim(),
-              city: $("#pr_city").value.trim(),
-              part: $("#pr_part").value,
-              surfaceM2: Math.round(+$("#pr_m2").value || 0),
-            };
-            const rec = pr
-              ? erp.updateProperty(id, patch, "backoffice")
-              : erp.addProperty(Object.assign({ partyId }, patch), "backoffice");
-            closeDrawer();
-            if (onSaved) onSaved(rec);
-          }, pr ? "Inmueble actualizado" : "Inmueble creado");
+          mutate(
+            () => {
+              const street = $("#pr_street").value.trim();
+              if (!street) throw new Error("La dirección es obligatoria");
+              const patch = {
+                street,
+                postalCode: $("#pr_cp").value.trim(),
+                city: $("#pr_city").value.trim(),
+                part: $("#pr_part").value,
+                surfaceM2: Math.round(+$("#pr_m2").value || 0),
+              };
+              const rec = pr
+                ? erp.updateProperty(id, patch, "backoffice")
+                : erp.addProperty(Object.assign({ partyId }, patch), "backoffice");
+              closeDrawer();
+              if (onSaved) onSaved(rec);
+            },
+            pr ? "Inmueble actualizado" : "Inmueble creado",
+          );
       }
       /* ---------- COM-04 · creating a contract (Package 2, slide 4) ----------
    "No hay opción de crear/subir nuevo contrato" — and it was more literal
@@ -21689,8 +21877,7 @@
         if (typeof ErpStore === "undefined" || !ErpStore.isRemote() || sweepingDrafts)
           return Promise.resolve(0);
         const rows = ((erp && erp.state.commsQueue) || []).filter(
-          (q) =>
-            ["draft", "approved", "sent"].includes(q.status) && q.to && q.filed !== "mailbox",
+          (q) => ["draft", "approved", "sent"].includes(q.status) && q.to && q.filed !== "mailbox",
         );
         if (!rows.length) return Promise.resolve(0);
         sweepingDrafts = true;
@@ -22045,9 +22232,7 @@
         const b = erp.budget(id);
         const doc = erp.renderBudgetDoc(id, versionId);
         const money = (c) => eur(c).replace(/ ?€/, "").trim();
-        const rows = [
-          ["Nº", "Código", "Descripción", "Ud.", "Cantidad", "Precio ud.", "Importe"],
-        ];
+        const rows = [["Nº", "Código", "Descripción", "Ud.", "Cantidad", "Precio ud.", "Importe"]];
         for (const c of doc.chapters) {
           // The chapter as its own banner row, so the file reads in the same
           // order and the same groups as the paper does.
@@ -23127,7 +23312,10 @@
         ["ca", "Català"],
         ["en", "English"],
       ]
-        .map(([v, l]) => `<option value="${v}"${(w.language || "") === v ? " selected" : ""}>${l}</option>`)
+        .map(
+          ([v, l]) =>
+            `<option value="${v}"${(w.language || "") === v ? " selected" : ""}>${l}</option>`,
+        )
         .join("")}
      </select></div>
     </div>
@@ -23495,10 +23683,7 @@
       const TRIGGER_OPTIONS = [
         ["onSignature", CON_TRIGGER.onSignature],
         ["atWorksStart", CON_TRIGGER.atWorksStart],
-        ...Object.entries(CON_PROGRESS_LABEL).map(([pct, lab]) => [
-          "atProgressPct:" + pct,
-          lab,
-        ]),
+        ...Object.entries(CON_PROGRESS_LABEL).map(([pct, lab]) => ["atProgressPct:" + pct, lab]),
         ["onCompletion", CON_TRIGGER.onCompletion],
         ["fixedDate", CON_TRIGGER.fixedDate],
         // Kept so a contract already carrying it can be edited without the
@@ -23686,12 +23871,7 @@
             { contractId: rec && rec.id, lineText: (l) => lineDesc(l, d.language) },
             d.language,
           ) +
-          docLangFootHtml(
-            "conLang",
-            d.language,
-            signed,
-            "El contrato firmado conserva su idioma",
-          );
+          docLangFootHtml("conLang", d.language, signed, "El contrato firmado conserva su idioma");
         const langSel = $("#conLang");
         if (langSel && !langSel.disabled)
           langSel.onchange = () =>
@@ -23814,15 +23994,15 @@
           if (linkPrj) linkPrj.onclick = () => linkProjectDrawer(conWork.id);
           return;
         }
-      /** Which obra this contract governs.
+        /** Which obra this contract governs.
      Offers the jobs that have none, and says so when there are none to offer
      rather than showing an empty select. The engine moves the link rather than
      copying it — one obra has one contract — and refuses a job that is not
      there; this only asks the question. */
-      function linkProjectDrawer(contractId) {
-        const free = erp.state.projects.filter((p) => !p.closed && !p.contractId);
-        const db = openDrawer("Vincular obra");
-        db.innerHTML = `<div class="fgrid">
+        function linkProjectDrawer(contractId) {
+          const free = erp.state.projects.filter((p) => !p.closed && !p.contractId);
+          const db = openDrawer("Vincular obra");
+          db.innerHTML = `<div class="fgrid">
    ${
      free.length
        ? `<div class="field full"><label>Obra *</label><select id="lp_prj">${free
@@ -23836,14 +24016,14 @@
        : '<div class="field full"><div class="empty">No hay obras abiertas sin contrato. Una obra ya vinculada conserva su contrato.</div></div>'
    }
   </div>`;
-        const b = $("#lp_save");
-        if (b)
-          b.onclick = () =>
-            mutate(() => {
-              erp.linkContractToProject(contractId, $("#lp_prj").value, "backoffice");
-              closeDrawer();
-            }, "Obra vinculada");
-      }
+          const b = $("#lp_save");
+          if (b)
+            b.onclick = () =>
+              mutate(() => {
+                erp.linkContractToProject(contractId, $("#lp_prj").value, "backoffice");
+                closeDrawer();
+              }, "Obra vinculada");
+        }
 
         /* Part 2 · item 11 — what was actually contracted, not just how much.
        The contract already stored `budgetId` + `acceptedVersionId` from the

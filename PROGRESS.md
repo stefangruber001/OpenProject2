@@ -1834,7 +1834,7 @@ continues with the first session not marked done.
 | S2      | Adicionales becomes a register: no project bar, no counter cards, CHG-04 marking kept    | **done** — register + row drawer, engine-wide `extrasRegister()`, and site-syntax now reads inline scripts |
 | S3      | milestones at 10–90 % de avance · the «Obra —» link · LEGAL_REVIEW · terms whitelist     | **done** — atProgressPct + validation, linkContractToProject, Ley 3/2004 entry, terms guarded              |
 | S4      | the contract sheet on a phone (`.sheet` is a fixed 210 mm page)                          | **done** — fluid below 700px; 794→364px, desktop guarded at A4, print and PDF proven untouched             |
-| S5      | the Gantt on a phone — read-and-record below ~700 px, desktop untouched                  | pending                                                                                                    |
+| S5      | the Gantt on a phone — a timeline list below 700 px, desktop untouched                   | **done** — `ganttList` beside the chart, CSS chooses; 652/652 e2e, both i18n ceilings met exactly          |
 | S6      | sweep + the ENGLISH client report (28/08 and 29/08 observations)                         | pending                                                                                                    |
 
 Decided with the operator and NOT to be re-opened: Adicionales keeps its menu

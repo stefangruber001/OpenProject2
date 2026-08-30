@@ -6768,6 +6768,74 @@ that direction; the mirror image is the one that ships, a check that passes
 because the property it reads is undefined. The assertion now names figures
 that appear in its own success message, so a missing field cannot be silent.
 
+### 206 · The schedule on a phone is a list, not a smaller chart (2026-08-30)
+
+The Gantt is a 190 px name column beside an SVG of `nDays × gZoom` pixels. On a
+390 px screen that is half the width spent on labels and a ~200 px window on the
+rest — about eight days of a job that runs twenty to sixty. The gestures were
+always touch-aware; `ganttWire` says so in its own comment. There was nothing
+legible to aim them at.
+
+**The first proposal was a «read-and-record» surface, and it was one control too
+many.** The same screen already renders `progressControl` below the chart, which
+is where progress is recorded, by partida, and it already works on a phone. What
+the phone lacked was a readable SCHEDULE: what happens, when, how far along, and
+what is late. So below 700 px `.gwrap` is replaced by a list of exactly that,
+and tapping a row opens the task drawer the desktop's name column opens — the
+phone loses the dragging, not the editing.
+
+**Both surfaces are rendered and CSS chooses**, rather than a width test at
+render time: a phone that rotates would otherwise keep whichever surface it
+booted with. Every figure comes from the same `sch` the SVG draws from, and the
+e2e now asserts that — each row's two dates are the schedule's own, checked
+against the schedule rather than against the chart's pixels. A list that
+recomputed its own would be a second answer to a question that has one.
+
+**Payment milestones are interleaved by date rather than listed apart.** A
+schedule is read forwards, and money falling due is one of the things that
+happens on a day.
+
+**The media query lost to the rule above it, twice in one package.** `.gwrap`
+is `display:flex`; a `@media` block written before it at equal specificity is
+overridden by document order, so both surfaces rendered. It now sits after
+`.glegend i`. Same failure as the CSS ordering bug earlier in this package —
+at equal specificity the later rule wins, and a media query buys no priority.
+
+### 207 · The source audit reads the literal, the miss ledger reads the DOM (2026-08-30)
+
+One screen's new rows moved both i18n gates, in opposite directions, for
+opposite reasons — and the lesson is the same one S2b learned one layer up.
+
+**The source audit reads what is written.** A row's sub-line was built by
+gluing the separator to the front of each word, so the audit saw four strings
+that no dictionary could ever hold, and the count went 207 → 211 against a
+ceiling of 207. It also caught a fragment out of the sort comparator, because
+`=> (a.date < b.date` looks exactly like markup to a regex that reads between
+`>` and `<`. Both fixed by restructuring the source — the words are joined by a
+separator held in one place, and the comparator uses `localeCompare` — never by
+moving the ceiling. **And the comment written to explain the fix quoted the
+offending fragment, which put it straight back in the count:** the audit reads
+comments too, which is stated in CLAUDE.md and was still worth learning twice.
+
+**The miss ledger reads what the browser rendered.** With the source clean, the
+crawl went 15 over: the translator walks TEXT NODES, so a row rendered as one
+string hands it the dates, the duration and the words as a single key. Splitting
+each word into its own element fixes it — the separators between elements are
+punctuation the ledger ignores, and `tr()`'s decoration pass already handles a
+word arriving with punctuation around it. The records — a contract number, a
+milestone's sequence — go in `translate="no"` spans, which is what the attribute
+is for.
+
+**So the bridge's payment-milestone projection now carries `number` and `seq`
+beside `label`.** The label is one string for the chart's tooltip; the two facts
+kept apart are what a caller needs to put the record in one span and the word in
+another. Splitting a formatted string back apart in the view would have been the
+alternative, and re-parsing your own formatting is how a display becomes a
+parser.
+
+Both gates finished exactly at their ceilings — 207 source, 43 EN / 103 CA
+rendered — measured with the process's own exit code, not a pipeline's.
+
 ## S43 · PK-N — a Word file is the same document, not a second one (2026-08-29)
 
 The operator asked for every generated PDF to exist as a Word file too, an

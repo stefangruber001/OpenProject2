@@ -498,7 +498,13 @@
             })
             .map(function (i, idx) {
               return {
+                // `label` is one string for the chart's tooltip; `number` and
+                // `seq` are the same two facts kept apart, so a caller that
+                // renders them as text can put the record in a span the
+                // translator leaves alone and the word in one it does not.
                 label: contract.number + " · hito " + (idx + 1),
+                number: contract.number,
+                seq: idx + 1,
                 date: i.expectedDate,
                 amountCents: i.amountCents,
                 invoiced: i.status === "invoiced",

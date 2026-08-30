@@ -3323,6 +3323,12 @@ window.CANEI_DICT = {
     ["Al 70 % de avance", "At 70 % progress"],
     ["Al 80 % de avance", "At 80 % progress"],
     ["Al 90 % de avance", "At 90 % progress"],
+    /* PK9-S5 · the phone's schedule rows. Lower-case because they are read
+       inside a sentence — «12/05/2026 → 18/05/2026 · 5 d · vencida» — and the
+       dictionary matches the string as rendered. */
+    ["vencida", "overdue"],
+    ["en curso", "in progress"],
+    ["previsto", "expected"],
     ["Vincular obra", "Link a job"],
     ["Vincular", "Link"],
     ["Obra vinculada", "Job linked"],

@@ -1376,6 +1376,110 @@ async function testMobile(browser, base) {
       }
     }
 
+    /* THE SCHEDULE IS READABLE ON A PHONE.
+       The operator sent a video of the Gantt on mobile. Measured: the chart is
+       a fixed 190px name column beside a `nDays × gZoom` SVG at 24px/day, so a
+       390px screen spends half itself on labels and shows the rest of the job
+       through a ~200px slit — about eight days of a twenty-to-sixty-day plan.
+       The gestures were always touch-aware (see ganttWire); there was simply
+       nothing legible to aim them at.
+
+       Asserted on what a reader gets, not on which element exists: the
+       schedule surface fits the viewport, no 190px column eats half of it, and
+       every task in the plan is present as a row. */
+    await pg.evaluate(() => {
+      const p = erp.state.projects.find((x) => !x.closed);
+      location.hash = "progress";
+      ganttFull = true;
+      gProject = p.id;
+      render();
+    });
+    await pg.waitForTimeout(1200);
+    const sched = await pg.evaluate(() => {
+      const B = typeof ganttApi === "function" ? ganttApi() : null;
+      const plan = B && B.get(erp.state, gProject);
+      const names = document.querySelector(".gnames");
+      const list = document.querySelector(".gmob");
+      const seen = (el) => el && el.getBoundingClientRect().width > 0;
+      const host = list || document.querySelector(".gwrap");
+      return {
+        tasks: plan ? plan.tasks.length : 0,
+        rows: document.querySelectorAll(".gmob [data-mrow]").length,
+        nameColumnVisible: seen(names),
+        listVisible: seen(list),
+        surfaceW: host ? Math.round(host.getBoundingClientRect().width) : null,
+        viewport: window.innerWidth,
+        pageW: document.documentElement.scrollWidth,
+      };
+    });
+    if (
+      sched.tasks > 0 &&
+      sched.listVisible &&
+      !sched.nameColumnVisible &&
+      sched.rows >= sched.tasks &&
+      sched.surfaceW <= sched.viewport + 1 &&
+      sched.pageW <= sched.viewport + 1
+    )
+      ok(
+        `mobile: the schedule reads as a list — ${sched.rows} rows for ${sched.tasks} tasks, ${sched.surfaceW}px in ${sched.viewport}px`,
+      );
+    else bad("mobile: the Gantt on a phone", JSON.stringify(sched));
+
+    /* THE LIST AND THE CHART READ ONE SCHEDULE. Both surfaces are drawn from
+       the same `sch`, and the point of that is that they cannot disagree about
+       a date — so the check is against the schedule itself, not against the
+       chart's pixels. Every task row's two dates must be the ones the schedule
+       holds for that task, formatted the way the rest of the workspace formats
+       a date. A list that quietly recomputed its own would be a second answer
+       to a question that has one. */
+    const dates = await pg.evaluate(() => {
+      const B = typeof ganttApi === "function" ? ganttApi() : null;
+      const sch = B && B.schedule(B.get(erp.state, gProject));
+      if (!sch) return { err: "no schedule" };
+      const by = {};
+      sch.tasks.forEach((t) => (by[t.taskId] = t));
+      let checked = 0;
+      const wrong = [];
+      document.querySelectorAll(".gmob [data-mrow]").forEach((n) => {
+        const t = by[n.dataset.mrow];
+        const sub = n.querySelector(".gmsub");
+        if (!t || !sub) return;
+        checked++;
+        const txt = sub.textContent || "";
+        [t.start, t.finish].forEach((d) => {
+          const p = String(d).split("-");
+          const want = p[2] + "/" + p[1] + "/" + p[0];
+          if (txt.indexOf(want) < 0) wrong.push(n.dataset.mrow + " wants " + want + " got " + txt);
+        });
+      });
+      return { checked, wrong: wrong.slice(0, 3) };
+    });
+    if (dates.checked > 0 && dates.wrong && dates.wrong.length === 0)
+      ok(
+        `mobile: every schedule row carries the schedule's own dates — ${dates.checked} rows checked`,
+      );
+    else bad("mobile: the list agrees with the schedule", JSON.stringify(dates));
+
+    /* …and a row still reaches everything the chart could do. The drawer it
+       opens is the one the desktop's name column opens, where the dates, the
+       duration, the percentage and the pinned start all live — so the phone
+       loses the dragging, not the editing. */
+    const tapped = await pg.evaluate(async () => {
+      const row = document.querySelector(".gmob [data-mrow]");
+      if (!row) return { err: "no row" };
+      row.click();
+      await new Promise((r) => setTimeout(r, 400));
+      return {
+        open: !!document.querySelector("#drawer.on"),
+        fields: ["t_title", "t_pct", "t_pin"].filter((id) => !!document.getElementById(id)),
+      };
+    });
+    if (tapped.open && tapped.fields.length === 3)
+      ok("mobile: tapping a schedule row opens the task, dates and progress included");
+    else bad("mobile: schedule row opens the task", JSON.stringify(tapped));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(200);
+
     if (errs.length === 0) ok("mobile: no console errors at 390px");
     else bad("mobile: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
@@ -1858,6 +1962,31 @@ async function testGantt(browser, base) {
   const finishChip = () => pg.locator(".gtools .chip").first().innerText();
   try {
     await openGantt(pg, base);
+
+    /* PK9-S5 put a schedule LIST behind a 700px breakpoint. Above it nothing
+       may move: the chart, its tools and its legend are what a planner uses,
+       and a media query that leaked upward would replace a working instrument
+       with a phone's summary. Asserted on visibility rather than on the rule,
+       because the failure mode is a rule losing to a later one at equal
+       specificity — which is exactly how the first attempt rendered both. */
+    const desk = await pg.evaluate(() => {
+      const vis = (s) => {
+        const el = document.querySelector(s);
+        return !!el && el.getBoundingClientRect().width > 0;
+      };
+      return {
+        chart: vis(".gwrap"),
+        names: vis(".gnames"),
+        svg: vis("#gSvg"),
+        tools: vis(".gtools"),
+        list: vis(".gmob"),
+      };
+    });
+    if (desk.chart && desk.names && desk.svg && desk.tools && !desk.list)
+      ok(
+        "gantt: the desktop keeps the chart, its name column and its tools — the list stays on the phone",
+      );
+    else bad("gantt: desktop unchanged by the phone breakpoint", JSON.stringify(desk));
 
     // Empty plan → derive it from the project's accepted budget. Over a plan
     // that already exists the derivation asks first (PK3-C); say yes.
