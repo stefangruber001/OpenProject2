@@ -4617,15 +4617,123 @@
       this._log(user, "captureDocument", rec.id);
       return rec;
     }
+    /**
+     * CAP-05 · IS THIS THE SAME DOCUMENT, FILED TWICE?
+     *
+     * The rule used to be `issuerTaxId === issuerTaxId && docNumber ===
+     * docNumber`, which failed the operator the first time it was needed: they
+     * filed one supplier invoice twice, and the two copies sat in the register
+     * side by side with no warning, because the READER had changed in between
+     * and given the two copies different tax ids. Identity that depends on
+     * every field being read the same way is identity that stops working the
+     * day the reader improves.
+     *
+     * Worse in the other direction: two documents nobody had confirmed yet
+     * both carried an empty tax id and an empty number, and `"" === ""` made
+     * every blank document a duplicate of every other one.
+     *
+     * So: a number identifies a document, and an issuer identifies who wrote
+     * it — but the issuer may be known by a tax id OR by a name, and either
+     * will do. Failing a number entirely, the same issuer billing the same
+     * amount on the same day is the same document; nobody sends two.
+     * Empty never matches empty, in any clause.
+     */
+    _dupKeys(confirmed) {
+      if (!confirmed) return null;
+      const squash = (v) =>
+        String(v || "")
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "");
+      // Same folding `findDuplicateParty` uses for a name — accents off, case
+      // off, runs of space collapsed. Two people typing one supplier will not
+      // agree about «Vallès», and the archive should not care.
+      const name = String(confirmed.issuerName || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      return {
+        number: squash(confirmed.docNumber),
+        taxId: squash(confirmed.issuerTaxId),
+        name,
+        date: String(confirmed.date || ""),
+        total: Math.round(confirmed.totalCents || 0),
+      };
+    }
+
+    _sameDocument(a, b) {
+      if (!a || !b) return false;
+      const sameIssuer = (!!a.taxId && a.taxId === b.taxId) || (!!a.name && a.name === b.name);
+      if (!sameIssuer) return false;
+      if (a.number && b.number) return a.number === b.number;
+      // No number to go on: the same issuer, the same day, the same money.
+      return (
+        !a.number &&
+        !b.number &&
+        !!a.date &&
+        a.date === b.date &&
+        a.total > 0 &&
+        a.total === b.total
+      );
+    }
+
+    /**
+     * Every filed document that looks like another one — computed, not stamped.
+     *
+     * `confirmCapture` stamps `duplicateSuspect` at the moment of confirming,
+     * which means a pair that only becomes recognisable LATER — because the
+     * reader improved, or because somebody corrected a tax id by hand — stays
+     * unflagged for ever, and the two documents the operator was looking at
+     * were exactly that pair. Deriving it on read costs one pass and cannot go
+     * stale.
+     */
+    duplicateCaptureMap() {
+      const out = {};
+      const seen = [];
+      for (const c of this.state.captured) {
+        const keys = this._dupKeys(c.confirmed);
+        if (!keys) continue;
+        const hit = seen.find((s) => this._sameDocument(s.keys, keys));
+        if (hit) out[c.id] = hit.id;
+        seen.push({ id: c.id, keys });
+      }
+      return out;
+    }
+
+    /**
+     * Remove a filed document. The one thing the archive could not do.
+     *
+     * A capture is a photograph plus what a person confirmed about it, and
+     * both are undoable facts until the moment it becomes a BILL — at which
+     * point it is an accounting record with a supplier, a due date and a place
+     * in the payables ledger, and deleting the photograph behind it would
+     * leave that record describing a document nobody can produce. So the one
+     * refusal is exactly that, and it says what to do instead.
+     */
+    deleteCapture(capId, user) {
+      const i = this.state.captured.findIndex((x) => x.id === capId);
+      if (i < 0) throw new Error("Captured document not found: " + capId);
+      const c = this.state.captured[i];
+      if (c.billId) {
+        const bill = this.state.bills.find((b) => b.id === c.billId);
+        throw new Error(
+          "No se puede eliminar: ya está registrado como factura " +
+            ((bill && bill.number) || c.billId) +
+            ". Anula primero la factura.",
+        );
+      }
+      this.state.captured.splice(i, 1);
+      this._log(user, "deleteCapture", c.stdName || c.id);
+      return c;
+    }
+
     confirmCapture(capId, confirmed, user) {
       // CAP-04 human confirmation; CAP-05 duplicates
       const c = this.state.captured.find((x) => x.id === capId);
+      const keys = this._dupKeys(confirmed);
       const dup = this.state.captured.find(
-        (x) =>
-          x.id !== capId &&
-          x.confirmed &&
-          x.confirmed.issuerTaxId === confirmed.issuerTaxId &&
-          x.confirmed.docNumber === confirmed.docNumber,
+        (x) => x.id !== capId && this._sameDocument(this._dupKeys(x.confirmed), keys),
       );
       c.duplicateSuspect = dup ? dup.id : null;
       c.confirmed = clone(confirmed);

@@ -4409,6 +4409,127 @@ assert(
   );
 }
 
+/* ── PK10-S6 · the same document, filed twice, and no way to remove either ──
+   The operator filed one supplier invoice twice and the register showed them
+   side by side with no warning: CAP-05 compared `issuerTaxId AND docNumber`,
+   and the READER had changed between the two captures, so the two copies
+   carried different tax ids. Identity that needs every field read the same way
+   stops working the day the reader improves. And once filed, nothing could
+   delete either one. */
+{
+  const cap = (n) =>
+    erp.captureDocument({ docType: "supplierInvoice", imageRef: "img-" + n }, "bo");
+  const confirm = (id, over) =>
+    erp.confirmCapture(
+      id,
+      Object.assign(
+        {
+          // Its own number: the PK10-S3 block above files a document with the
+          // operator's real one, and this rule would correctly call that a
+          // duplicate of this — which is the rule working, and would make this
+          // block's assertions depend on the order the file happens to run in.
+          issuerName: "SUMINISTROS CERDA MATERIALS, S.L.",
+          issuerTaxId: "B62889417",
+          docNumber: "F-2026/8801",
+          date: "2026-09-18",
+          baseCents: 248380,
+          vatCents: 52160,
+          totalCents: 300540,
+          iban: "",
+        },
+        over || {},
+      ),
+      "bo",
+    );
+
+  // The operator's own pair: same issuer and number, tax ids read differently.
+  const first = cap("dup-a");
+  confirm(first.id, {});
+  const second = cap("dup-b");
+  confirm(second.id, { issuerTaxId: "B66123456" });
+  assert(
+    erp.duplicateCaptureMap()[second.id] === first.id,
+    "the same invoice filed twice is flagged even when the two readings disagree about the tax id",
+    JSON.stringify(erp.duplicateCaptureMap()),
+  );
+
+  // Two documents nobody has confirmed yet are not duplicates of each other.
+  const blankA = cap("blank-a");
+  const blankB = cap("blank-b");
+  confirm(blankA.id, { issuerName: "", issuerTaxId: "", docNumber: "", date: "", totalCents: 0 });
+  confirm(blankB.id, { issuerName: "", issuerTaxId: "", docNumber: "", date: "", totalCents: 0 });
+  assert(
+    !erp.duplicateCaptureMap()[blankB.id],
+    "…and two documents with nothing read on them are not duplicates of each other",
+  );
+
+  // No number anywhere: the same issuer, the same day and the same money is
+  // the same document — nobody sends two.
+  const tA = cap("tick-a");
+  const tB = cap("tick-b");
+  confirm(tA.id, {
+    issuerName: "Materials Vallès S.L.",
+    issuerTaxId: "",
+    docNumber: "",
+    totalCents: 58080,
+    date: "2026-08-27",
+  });
+  confirm(tB.id, {
+    issuerName: "Materials Valles S.L.",
+    issuerTaxId: "",
+    docNumber: "",
+    totalCents: 58080,
+    date: "2026-08-27",
+  });
+  assert(
+    erp.duplicateCaptureMap()[tB.id] === tA.id,
+    "…and an unnumbered ticket is matched on issuer, day and amount, accents aside",
+  );
+
+  // A different number is a different document, however alike the rest is.
+  const other = cap("dup-c");
+  confirm(other.id, { docNumber: "F-2026/8802" });
+  assert(
+    !erp.duplicateCaptureMap()[other.id],
+    "a different document number is a different document",
+  );
+
+  // Deleting the copy: the archive's missing gesture.
+  const before = erp.state.captured.length;
+  erp.deleteCapture(second.id, "bo");
+  assert(
+    erp.state.captured.length === before - 1 && !erp.state.captured.some((x) => x.id === second.id),
+    "a filed document can be deleted",
+  );
+  assert(
+    !erp.duplicateCaptureMap()[first.id],
+    "…and the one that is left stops being flagged as a duplicate",
+  );
+  assert(
+    erp.state.audit.some((a) => a.action === "deleteCapture"),
+    "…and the deletion is written to the audit log",
+  );
+  throws(
+    () => erp.deleteCapture("cap-does-not-exist", "bo"),
+    "deleting a document that is not there is refused",
+  );
+
+  // Once it is a bill it is an accounting record, and the photograph behind it
+  // may not vanish from under it.
+  const billed = cap("dup-billed");
+  confirm(billed.id, { docNumber: "F-2026/9999" });
+  erp.allocateCapture(
+    billed.id,
+    [{ overheadCategory: "office", kind: "material", amountCents: 248380 }],
+    "bo",
+  );
+  erp.billFromCapture(billed.id, { supplierId: sup.id }, "bo");
+  throws(
+    () => erp.deleteCapture(billed.id, "bo"),
+    "a document already registered as a bill is refused, and says to void the bill first",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

@@ -3028,6 +3028,29 @@ window.CANEI_DICT = {
       "⚠ The document could not be read: fill it in by hand",
     ],
     ["Sin lectura — escríbalo a mano", "Not read — type it in"],
+    /* PK10-S6 · the archive can remove a document, and says when one looks
+       like another. */
+    ["Ver el otro", "See the other one"],
+    ["Eliminar documento", "Delete document"],
+    ["Eliminar el documento", "Delete the document"],
+    ["Documento eliminado", "Document deleted"],
+    [
+      "Ya hay otro documento de este emisor con el mismo número",
+      "There is already another document from this issuer with the same number",
+    ],
+    ["Registrado como factura: elimínala primero", "Registered as a bill: delete that first"],
+    [
+      "Se borra el documento y su imagen. No afecta a ninguna factura",
+      "The document and its image are deleted. No bill is affected",
+    ],
+    [
+      "Se borra el documento archivado y su imagen. No se puede deshacer.",
+      "The filed document and its image are deleted. This cannot be undone.",
+    ],
+    [
+      "Se borra el documento archivado, su imagen y su asignación a la obra. No se puede deshacer.",
+      "The filed document, its image and its allocation to the job are deleted. This cannot be undone.",
+    ],
     /* PK10-S3 · an allocation distributes the COST, so it foots against the
        taxable base. The figures live in their own elements beside these. */
     ["⚠ El reparto debe sumar la base imponible", "⚠ The split must total the taxable base"],

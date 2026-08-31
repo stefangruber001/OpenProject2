@@ -14843,6 +14843,12 @@
         const c = erp.state.captured.find((x) => x.id === id);
         if (!c) return;
         const cf = c.confirmed;
+        /* Derived, not read off the record — see `duplicateCaptureMap`. The
+           pair the operator found had been filed before the flag could
+           recognise them, so a stamp made at confirm time would never light. */
+        const dupMap = erp.duplicateCaptureMap();
+        const dupId = dupMap[c.id] || c.duplicateSuspect || null;
+        const dupOther = dupId ? erp.state.captured.find((x) => x.id === dupId) : null;
         /* THE BASE, NOT THE TOTAL. What is being split is the cost, and the
            tax is not one — the bill drawer three hundred lines down has always
            passed `readBase()` here, and this one passed the VAT-inclusive
@@ -14886,7 +14892,13 @@
      <div class="it"><span>Nº documento</span><span style="flex:1"></span><b>${cf ? esc(cf.docNumber || "—") : "—"}</b></div>
      <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${cf && cf.date ? fmtD(cf.date) : "—"}</b></div>
      <div class="it"><span>Total</span><span style="flex:1"></span><b>${cf ? eur(cf.totalCents) : "—"}</b></div>
-     ${c.duplicateSuspect ? '<div class="it"><span class="pill r">Posible duplicado</span><span>ya hay un documento con el mismo NIF y número</span></div>' : ""}
+     ${
+       dupOther
+         ? `<div class="it"><span class="pill r">Posible duplicado</span>
+       <span style="flex:1;margin-left:8px"><span>Ya hay otro documento de este emisor con el mismo número</span> <b translate="no">${esc(dupOther.stdName || dupOther.id)}</b></span>
+       <button class="btn sm" id="cd_seeDup">Ver el otro</button></div>`
+         : ""
+     }
     </div></div>
    <div class="card"><div class="ch"><h3>Archivo</h3><span class="tag">de dónde viene y con qué se relaciona</span></div>
     <div class="fgrid" style="padding:10px 12px 12px">
@@ -14894,6 +14906,14 @@
      <div class="field full"><label>Ruta de origen</label><input id="cd_path" value="${esc(c.sourcePath || "")}" placeholder="Carpeta o archivo del que procede"></div>
      <div class="field full"><label>Notas</label><input id="cd_notes" value="${esc(c.notes || "")}" placeholder="Lo que la siguiente persona necesita saber"></div>
      <div class="field full"><button class="btn" id="cd_save">Guardar datos de archivo</button></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 12px 12px">
+     <span style="flex:1;font-size:12px;color:var(--muted)">${
+       c.billId
+         ? "<span>Registrado como factura: elimínala primero</span>"
+         : "<span>Se borra el documento y su imagen. No afecta a ninguna factura</span>"
+     }</span>
+     <button class="btn sm danger" id="cd_del"${c.billId ? " disabled" : ""}>Eliminar documento</button>
     </div></div>
    <div class="card"><div class="ch"><h3>Asignación</h3><span class="tag" id="cd_rest"></span></div>
     ${
@@ -14921,6 +14941,30 @@
               "backoffice",
             );
           }, "Datos de archivo guardados");
+        /* «Ver el otro» — the duplicate is only useful if you can look at it.
+           Reopening the drawer on the other document is the whole gesture:
+           compare the two, then delete whichever one is the copy. */
+        if ($("#cd_seeDup") && dupOther) $("#cd_seeDup").onclick = () => captureDrawer(dupOther.id);
+        if ($("#cd_del"))
+          $("#cd_del").onclick = async () => {
+            /* Two WHOLE sentences, chosen — not one sentence assembled from
+               three pieces. A modal body is a single text node, so a string
+               built by concatenation is a key no dictionary can hold; the same
+               lesson the toast learned one session ago. */
+            const yes = await askConfirm("Eliminar el documento", {
+              body:
+                c.allocations && c.allocations.length
+                  ? "Se borra el documento archivado, su imagen y su asignación a la obra. No se puede deshacer."
+                  : "Se borra el documento archivado y su imagen. No se puede deshacer.",
+              okLabel: "Eliminar",
+              danger: true,
+            });
+            if (!yes) return;
+            mutate(() => {
+              erp.deleteCapture(id, "backoffice");
+              closeDrawer();
+            }, "Documento eliminado");
+          };
         $("#cd_add").onclick = () => {
           capAlloc.push({
             projectId: "",
@@ -18339,6 +18383,7 @@
   </div>
   <div class="card"><div class="daylist"><div class="it">Un PDF con texto se lee al instante y sin descargar nada. Una foto o un escaneado necesitan el lector de imágenes: unos 7 MB que se descargan la primera vez que hagan falta. Prepárelo con wifi si va a trabajar en una obra sin cobertura.</div></div></div>`;
 
+          const capDup = erp.duplicateCaptureMap();
           renderMasterList($("#capReg"), {
             id: "captured",
             noNew: true,
@@ -18357,7 +18402,17 @@
             nounPlural: "documentos",
             searchPlaceholder: "Buscar por emisor, número o referencia…",
             emptyText: "Ningún documento coincide con la búsqueda.",
-            baseRows: erp.state.captured.slice().reverse(),
+            /* The duplicate flag is DERIVED here, not read off the record.
+               `confirmCapture` stamps `duplicateSuspect` at the moment of
+               confirming, so a pair that only becomes recognisable later —
+               because the reader improved, or somebody corrected a tax id —
+               stayed unflagged for ever. That is precisely the pair the
+               operator was looking at: one supplier invoice, filed twice, side
+               by side in this register with no warning on either. */
+            baseRows: erp.state.captured
+              .slice()
+              .reverse()
+              .map((c) => ({ ...c, dupOf: capDup[c.id] || null })),
             matches: (c, q) =>
               [
                 c.stdName,
@@ -18390,7 +18445,7 @@
               {
                 label: "Estado",
                 html: (c) =>
-                  `<span class="pill ${CAP_STATUS[c.status] ? CAP_STATUS[c.status][1] : ""}">${esc(CAP_STATUS[c.status] ? CAP_STATUS[c.status][0] : c.status)}</span>${c.duplicateSuspect ? ' <span class="pill r">¿Duplicado?</span>' : ""}`,
+                  `<span class="pill ${CAP_STATUS[c.status] ? CAP_STATUS[c.status][1] : ""}">${esc(CAP_STATUS[c.status] ? CAP_STATUS[c.status][0] : c.status)}</span>${c.dupOf || c.duplicateSuspect ? ' <span class="pill r">¿Duplicado?</span>' : ""}`,
               },
             ],
             onRowClick: (id) => captureDrawer(id),

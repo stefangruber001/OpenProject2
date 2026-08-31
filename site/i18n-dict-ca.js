@@ -937,6 +937,19 @@ window.CANEI_DICT.ca = {
   "⚠ No se ha podido leer el documento: rellénelo a mano":
     "⚠ No s'ha pogut llegir el document: ompliu-ho a mà",
   "Sin lectura — escríbalo a mano": "Sense lectura — escriviu-ho a mà",
+  "Ver el otro": "Veure l'altre",
+  "Eliminar documento": "Eliminar document",
+  "Eliminar el documento": "Eliminar el document",
+  "Documento eliminado": "Document eliminat",
+  "Ya hay otro documento de este emisor con el mismo número":
+    "Ja hi ha un altre document d'aquest emissor amb el mateix número",
+  "Registrado como factura: elimínala primero": "Registrat com a factura: elimina-la primer",
+  "Se borra el documento y su imagen. No afecta a ninguna factura":
+    "S'esborra el document i la seva imatge. No afecta cap factura",
+  "Se borra el documento archivado y su imagen. No se puede deshacer.":
+    "S'esborra el document arxivat i la seva imatge. No es pot desfer.",
+  "Se borra el documento archivado, su imagen y su asignación a la obra. No se puede deshacer.":
+    "S'esborra el document arxivat, la seva imatge i l'assignació a l'obra. No es pot desfer.",
   "⚠ El reparto debe sumar la base imponible": "⚠ El repartiment ha de sumar la base imposable",
   "Se reparte la base imponible": "Es reparteix la base imposable",
   "El IVA no se reparte: es IVA soportado, no coste de obra":

@@ -3470,6 +3470,65 @@ async function testCapture(browser, base) {
       ok("ADM-03: an allocated document leaves the inbox for the register");
     else bad("ADM-03: allocated document moves side", JSON.stringify(gone));
 
+    /* PK10-S6 · THE SAME DOCUMENT, FILED TWICE. The operator did it and the
+       register showed the pair side by side with no warning: CAP-05 compared
+       the tax id AND the number, and the reader had changed between the two
+       captures, so the copies disagreed about the tax id. The flag is derived
+       on read now, so a pair that only becomes recognisable later still
+       lights — and the archive finally has a way to remove one. */
+    const dup = await pg.evaluate(() => {
+      const src = erp.state.captured.find((c) => c.confirmed);
+      if (!src) return { skip: "no confirmed document to copy" };
+      const copy = erp.captureDocument(
+        { docType: src.docType, imageRef: "copy-e2e" },
+        "backoffice",
+      );
+      // The same document as the reader would have had it on a worse day: the
+      // number and the issuer agree, the tax id does not.
+      erp.confirmCapture(copy.id, { ...src.confirmed, issuerTaxId: "B00000000" }, "backoffice");
+      render();
+      return { id: copy.id, of: src.id };
+    });
+    await pg.waitForTimeout(600);
+    if (dup.skip) {
+      bad("ADM-03: a document to copy", dup.skip);
+    } else {
+      const flagged = await pg.evaluate((id) => {
+        const row = [...document.querySelectorAll("#capReg table.mlist tr.click")].find(
+          (tr) => tr.dataset.id === id,
+        );
+        return { found: !!row, text: row ? row.textContent.replace(/\s+/g, " ") : "" };
+      }, dup.id);
+      if (flagged.found && /duplicado/i.test(flagged.text))
+        ok("ADM-03: a second copy of a filed document is flagged as a possible duplicate");
+      else bad("ADM-03: duplicate flagged in the register", JSON.stringify(flagged));
+
+      const removed = await pg.evaluate(async (id) => {
+        captureDrawer(id);
+        await new Promise((r) => setTimeout(r, 400));
+        const btn = document.querySelector("#cd_del");
+        const seeOther = !!document.querySelector("#cd_seeDup");
+        if (!btn) return { err: "no delete button" };
+        btn.click();
+        await new Promise((r) => setTimeout(r, 300));
+        // The confirmation is the app's own modal, not the browser's.
+        const ok2 = [...document.querySelectorAll("button")].find((b) =>
+          /^eliminar$/i.test(b.textContent.trim()),
+        );
+        if (!ok2) return { err: "no confirmation offered", seeOther };
+        ok2.click();
+        await new Promise((r) => setTimeout(r, 500));
+        return {
+          seeOther,
+          gone: !erp.state.captured.some((c) => c.id === id),
+          logged: erp.state.audit.some((a) => a.action === "deleteCapture"),
+        };
+      }, dup.id);
+      if (removed.gone && removed.logged && removed.seeOther)
+        ok("ADM-03: …the drawer offers the other copy, and deletes this one behind a confirmation");
+      else bad("ADM-03: delete a filed document", JSON.stringify(removed));
+    }
+
     if (errs.length === 0) ok("ADM-03: no console errors");
     else bad("ADM-03: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

@@ -1870,6 +1870,17 @@ with the first session not marked done.
 | S4      | the reader reads — tax-id shape, the issuer, the document's own vocabulary, derived amounts      | **done** — 4 blank fields filled and the label residue replaced by the contract number; 662/662 e2e                                              |
 | S5      | Facturación on a phone · the untranslated invoice placeholder · Obras by name                    | **done** — drawer 134px→0, preview −91px→whole with no cell cut, the note translates, Proyectos names Obras                                      |
 
+**PK10-S6 (2026-08-31, after the package was closed).** The operator filed one
+supplier invoice twice and found the archive had no delete and no duplicate
+warning. CAP-05 existed but compared the tax id AND the number, and PK10-S4 had
+changed how the tax id is read between the two captures — so the rule failed on
+the first occasion it was needed, and would have gone on failing because the
+flag was stamped at confirm time and neither document would be confirmed again.
+The rule now identifies a document by its number plus EITHER the issuer's tax id
+or its name, falls back to issuer + date + amount when there is no number, never
+matches empty against empty, and is derived on read. `deleteCapture` refuses
+only once the document has become a bill.
+
 **Package 10 is closed (2026-08-31).** Five commits — `0b3bcb4` `487e376`
 `1687f07` `df0aab8` and this one — each green on the full battery. Final state:
 668/668 site-e2e, 438/438 manageability, 104/104 migration checks, 43/43

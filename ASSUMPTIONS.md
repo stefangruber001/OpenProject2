@@ -7173,6 +7173,58 @@ manifest's strict regex — a hazard written in that very file, three lines
 above, by whoever hit it last. It is now outside the object like its neighbour,
 and says so.
 
+### 215 · The archive could not remove anything, and its duplicate check did not fire (2026-08-31)
+
+The operator filed one supplier invoice twice — once as an image, once as a PDF
+— and the register showed the two side by side with no warning and no way to
+remove either.
+
+**CAP-05 existed and was too brittle to fire.** The rule was
+`issuerTaxId === issuerTaxId && docNumber === docNumber`. The READER had changed
+between the two captures (PK10-S4 landed in between), so the copies disagreed
+about the tax id and the rule failed on the first occasion it was needed.
+Identity that requires every field to have been read the same way stops working
+the day the reader improves — which, in a product whose reader is being
+improved, is a matter of time.
+
+**And it was wrong in the other direction too.** Two documents nobody had
+confirmed both carried an empty tax id and an empty number, and `"" === ""`
+made every blank document a duplicate of every other one.
+
+**The rule now says what identity actually is.** A number identifies a
+document; an issuer identifies who wrote it, and may be known by a tax id OR by
+a name — either will do. Failing a number on both, the same issuer billing the
+same amount on the same day is the same document; nobody sends two. Empty never
+matches empty, in any clause. Names are folded the way `findDuplicateParty`
+already folds them, because two people typing «Vallès» will not agree.
+
+**Derived on read, not stamped at confirm.** `confirmCapture` stamped the flag
+at the moment of confirming, so a pair that only becomes recognisable LATER —
+because the reader improved, or somebody corrected a tax id by hand — stayed
+unflagged for ever. That is exactly the pair on the operator's screen: no
+migration would have helped, because neither document was ever going to be
+confirmed again. One pass over the register costs nothing and cannot go stale.
+
+**`deleteCapture` is new, and has one refusal.** A capture is a photograph plus
+what somebody confirmed about it, and both are undoable until it becomes a
+BILL — at which point it is an accounting record with a supplier, a due date
+and a place in the payables ledger, and deleting the photograph would leave that
+record describing a document nobody can produce. So: refused, naming the bill
+number and saying to void it first. Everything else can go, including an
+allocated one, because deleting a duplicate is precisely when you need to.
+
+**Deliberately NOT added to `apps/web/lib/erp-commands.ts`.** The workspace
+saves through a whole-document PUT, so the screen does not need the command
+API — and that file's own header says adding a command should be a deliberate
+edit, not a side effect. An unused remote deletion door is surface for no
+current need.
+
+**The split-sentence trap, a third time.** The confirmation body was assembled
+from three pieces so it could mention the allocation only when there was one —
+and a modal body is one text node, so the audit reported the fragments. Two
+whole sentences, chosen. It is written down twice already; the pattern to
+watch for is any user-visible string built with `+`.
+
 ## S43 · PK-N — a Word file is the same document, not a second one (2026-08-29)
 
 The operator asked for every generated PDF to exist as a Word file too, an
