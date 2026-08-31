@@ -3214,6 +3214,22 @@
          minimum and the pair is allowed to wrap, so the sheet fits the phone
          instead of scrolling sideways inside its own box. */
       @media (max-width: 700px) {
+        /* THE SHEET-RENDERED DOCUMENTS, which arrived after this block was
+           written for `.cdoc` and were never given the same treatment.
+           `.condoc` is a centring flex container, so `#invDoc` floored at the
+           document's own min-content — 573 px — and centring an over-wide
+           child puts its left edge at a negative offset no scrollbar can
+           reach: the invoice preview sat at x = −91 in a 390 px viewport,
+           clipped on BOTH sides. Left-aligned and allowed to shrink, so
+           whatever remains is at least reachable. */
+        .condoc {
+          justify-content: flex-start;
+          padding: 10px 10px 32px;
+        }
+        .condoc > * {
+          min-width: 0;
+          width: 100%;
+        }
         .cdoc {
           min-width: 0;
           padding: 22px 18px;
@@ -4129,6 +4145,18 @@
         display: flex;
         flex-direction: column;
         gap: 4px;
+        /* A GRID ITEM FLOORS AT ITS CONTENT unless told otherwise, and a
+           `<select>`'s content is its longest option — «P-2026-0009 · Ignacio
+           Fernández · Carrer Francesca…». So one obra picker made the whole
+           «Nueva factura» drawer 134 px wider than the phone, dragging its
+           paragraph and its button off the right edge. `min-width:0` lets the
+           column shrink; the control then needs telling it may not exceed it. */
+        min-width: 0;
+      }
+      .field input,
+      .field select,
+      .field textarea {
+        max-width: 100%;
       }
       .field.full {
         grid-column: 1/-1;
@@ -5580,13 +5608,23 @@
         // before anyone builds it, so it belongs beside the contract it
         // amends. Its route key and code are unchanged, and PROJECT_SUBS
         // still lists it so the project-context bar survives the move.
+        // PK10-S5 · «Obras», not «Avance físico». Both children of this section
+        // were named after what you DO to a job, so a person looking for their
+        // jobs found two verbs and no noun — the operator asked where the obras
+        // were, on a phone, with the register of them one tap away. PRY-01 IS
+        // that register until a row is opened; its own subtitle says so. The
+        // code is unchanged, because the code is what the specification names
+        // and the label is what a person reads. (Comment sits OUTSIDE the
+        // object for the same reason the Administración one does: the manifest
+        // generator parses this block by a strict regex and a comment inside
+        // the run breaks it — which is exactly what happened writing this.)
         {
           k: "projects",
           ic: "🏗️",
           lab: "Proyectos",
           short: "Proyectos",
           subs: [
-            { k: "progress", lab: "Avance físico", code: "PRY-01" },
+            { k: "progress", lab: "Obras", code: "PRY-01" },
             { k: "economics", lab: "Avance económico", code: "PRY-02" },
           ],
         },
@@ -21804,8 +21842,9 @@
         document.head.appendChild(st);
       }
       function sheetDocHtml(kind, refs, lang) {
-        const doc = CaneiErpFacts.docFor(erp, kind, refs, CaneiDocTypes);
-        return `<div class="cnsheet">${CaneiSheet.render(doc, erp._issuerBlock(), CaneiDocI18n.tr(lang || "es"), { pict: typeof ErpPictograms !== "undefined" ? ErpPictograms : null })}</div>`;
+        const T = CaneiDocI18n.tr(lang || "es");
+        const doc = CaneiErpFacts.docFor(erp, kind, refs, CaneiDocTypes, T);
+        return `<div class="cnsheet">${CaneiSheet.render(doc, erp._issuerBlock(), T, { pict: typeof ErpPictograms !== "undefined" ? ErpPictograms : null })}</div>`;
       }
       /* ==================== N2 · every email becomes a draft ====================
          The engine's comms queue stays log-only (the mandate: no real sends).
@@ -21910,7 +21949,13 @@
             }
           }
           if (!kind) return null;
-          const doc = CaneiErpFacts.docFor(erp, kind, refs, CaneiDocTypes);
+          const doc = CaneiErpFacts.docFor(
+            erp,
+            kind,
+            refs,
+            CaneiDocTypes,
+            CaneiDocI18n.tr(lang || "es"),
+          );
           const iss = erp._issuerBlock();
           const brand = {
             wordmark: iss.tradeName,
@@ -22247,6 +22292,7 @@
             marked: new Set(annex.markedItems),
           },
           CaneiDocTypes,
+          CaneiDocI18n.tr(lang),
         );
         if (annex.enabled && annex.pages && annex.pages.length) {
           const pages = [];
@@ -22320,7 +22366,13 @@
        * than inside them so a screen that gains a document gains both.
        */
       function downloadDocx(kind, refs, lang, filename) {
-        const descriptor = CaneiErpFacts.docFor(erp, kind, refs || {}, CaneiDocTypes);
+        const descriptor = CaneiErpFacts.docFor(
+          erp,
+          kind,
+          refs || {},
+          CaneiDocTypes,
+          CaneiDocI18n.tr(lang || "es"),
+        );
         saveDocx(descriptor, lang, filename);
       }
       async function downloadBudgetPdf(id, versionId) {

@@ -99,6 +99,7 @@ async function main() {
     testChangeApprovalEvidence,
     testContractCreation,
     testContractObraLink,
+    testFacturacionPhone,
     testBudgetCreation,
     testProcurement,
     testAdmin,
@@ -1841,8 +1842,13 @@ async function testShell(browser, base) {
       buildSubs("sales");
       return rows;
     });
-    if (projSubs.join(" · ") === "Avance físico · Avance económico")
-      ok("shell: Proyectos keeps physical and financial progress");
+    /* PK10-S5 · «Obras», not «Avance físico». Renamed deliberately: both
+       children were named after what you DO to a job, so a person looking for
+       their jobs found two verbs and no noun. PRY-01 IS the register of them
+       until a row is opened. The code is unchanged; only the word a person
+       reads has moved. */
+    if (projSubs.join(" · ") === "Obras · Avance económico")
+      ok("shell: Proyectos names the jobs, then their financial progress");
     else bad("shell: projects subs", projSubs.join(" · "));
 
     // Choosing a subsection routes and collapses the panel again.
@@ -3690,6 +3696,150 @@ async function testContractObraLink(browser, base) {
     else bad("CON-11: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("contract↔obra link (PK10-S2)", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/**
+ * PK10-S5 · THE FACTURACIÓN SCREENS ON THE PHONE THE OPERATOR CARRIES.
+ *
+ * Three separate failures, all measured at 390 px before they were fixed:
+ * a drawer 134 px wider than the viewport because a `<select>` floored at its
+ * longest option; an invoice preview sitting at x = −91, clipped on BOTH sides,
+ * because a centring flex container will not shrink a child below its
+ * min-content; and — once that was released — a line-items table still cut off
+ * inside the sheet, taking the amounts column with it.
+ *
+ * The last one is the reason the first two are checked together: fixing the
+ * container alone trades an unreachable left margin for an unreadable right
+ * column, which is not an improvement.
+ */
+async function testFacturacionPhone(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#invoicing`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(1200);
+
+    // ── the «Nueva factura» drawer
+    await pg.evaluate(() => newInvoiceDrawer());
+    await pg.waitForTimeout(500);
+    const drawer = await pg.evaluate(() => {
+      const body = document.querySelector("#dbody");
+      const sel = document.querySelector("#nf_p");
+      const go = document.querySelector("#nf_go");
+      const r = (e) => (e ? Math.round(e.getBoundingClientRect().right) : null);
+      return {
+        overflow: body ? body.scrollWidth - body.clientWidth : null,
+        selectRight: r(sel),
+        buttonRight: r(go),
+        vw: window.innerWidth,
+        page: document.documentElement.scrollWidth,
+      };
+    });
+    if (
+      drawer.overflow <= 1 &&
+      drawer.selectRight <= drawer.vw &&
+      drawer.buttonRight <= drawer.vw &&
+      drawer.page <= drawer.vw
+    )
+      ok(
+        `ADM-01: the «Nueva factura» drawer fits the phone (${drawer.selectRight}px in ${drawer.vw})`,
+      );
+    else bad("ADM-01: drawer fits", JSON.stringify(drawer));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
+
+    // ── the invoice preview, and what is inside it
+    const sheet = await pg.evaluate(async () => {
+      const p = erp.state.projects.find((x) => x.contractId);
+      if (!p) return { skip: "no job with a contract" };
+      invOpen(p.id);
+      await new Promise((r) => setTimeout(r, 1200));
+      const cage = document.querySelector(".condoc");
+      const sh = document.querySelector("#invDoc .sheet");
+      if (!cage || !sh) return { skip: "no preview rendered" };
+      const cb = cage.getBoundingClientRect();
+      const sb = sh.getBoundingClientRect();
+      // Every table cell that carries an amount must be inside the page.
+      const cells = [...sh.querySelectorAll("td, th")];
+      const cut = cells.filter((c) => c.getBoundingClientRect().right > sb.right + 1).length;
+      return {
+        clippedLeftBy: Math.round(cb.x - sb.x),
+        rightOfViewport: Math.round(sb.right - window.innerWidth),
+        sheetW: Math.round(sb.width),
+        cells: cells.length,
+        cut,
+        page: document.documentElement.scrollWidth,
+        vw: window.innerWidth,
+      };
+    });
+    if (sheet.skip) {
+      bad("ADM-01: an invoice preview to measure", sheet.skip);
+    } else {
+      if (sheet.clippedLeftBy <= 0 && sheet.rightOfViewport <= 1 && sheet.page <= sheet.vw)
+        ok(
+          `ADM-01: the invoice preview is whole on the phone — ${sheet.sheetW}px in ${sheet.vw}px`,
+        );
+      else bad("ADM-01: preview fits the viewport", JSON.stringify(sheet));
+      if (sheet.cells > 0 && sheet.cut === 0)
+        ok(`ADM-01: …and no cell is cut off inside it — ${sheet.cells} checked, amounts included`);
+      else bad("ADM-01: no cell cut inside the sheet", JSON.stringify(sheet));
+    }
+
+    /* PK10-S5 · a Spanish sentence on an English invoice. The unnumbered
+       preview says so on the document itself, and that sentence was written
+       into the facts adapter in Spanish — so an English invoice read «Invoice ·
+       Sin numerar». No gate could see it: a document is `translate="no"` by
+       design, so the crawler skips it, and the facts file is not one the source
+       audit reads. It goes through the document's own label layer now. */
+    const placeholder = await pg.evaluate(async () => {
+      const p = erp.state.projects.find((x) => x.contractId);
+      if (!p) return { skip: "no job" };
+      invOpen(p.id);
+      invWork.language = "en";
+      invSync();
+      await new Promise((r) => setTimeout(r, 700));
+      const es = (document.querySelector("#invDoc") || {}).textContent || "";
+      invWork.language = "es";
+      invSync();
+      await new Promise((r) => setTimeout(r, 500));
+      const back = (document.querySelector("#invDoc") || {}).textContent || "";
+      document.querySelector("#invBack")?.click();
+      return { en: es, esAgain: back };
+    });
+    if (placeholder.skip) bad("N1: an invoice to preview", placeholder.skip);
+    else if (
+      /not yet numbered/i.test(placeholder.en) &&
+      !/sin numerar/i.test(placeholder.en) &&
+      /sin numerar/i.test(placeholder.esAgain)
+    )
+      ok("N1: the unnumbered note speaks the document's language, not the code's");
+    else
+      bad(
+        "N1: unnumbered placeholder translates",
+        JSON.stringify({
+          en: placeholder.en.replace(/\s+/g, " ").slice(0, 90),
+          es: placeholder.esAgain.replace(/\s+/g, " ").slice(0, 60),
+        }),
+      );
+
+    // PK10-S5 · the jobs are findable by name, not only by what you do to them.
+    const nav = await pg.evaluate(() => {
+      const proj = SECTIONS.find((x) => x.k === "projects");
+      return { subs: proj ? proj.subs.map((sub) => sub.lab) : [] };
+    });
+    if (nav.subs.includes("Obras"))
+      ok(`Proyectos names the register of jobs (${nav.subs.join(" · ")})`);
+    else bad("Proyectos names Obras", JSON.stringify(nav));
+
+    if (errs.length === 0) ok("ADM-01: no console errors at 390px");
+    else bad("ADM-01: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("Facturación on a phone (PK10-S5)", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }

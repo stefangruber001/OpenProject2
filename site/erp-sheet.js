@@ -193,6 +193,32 @@
       ".facts{gap:4mm}" +
       ".kvgrid{grid-template-columns:1fr!important}" +
       ".sig{grid-template-columns:1fr!important;gap:9mm}" +
+      /* THE TABLES, which the first phone treatment left alone and which are
+         what actually holds a document wide. A line-items table floors at the
+         longest unbreakable thing in it — a code, a description, an IBAN — so
+         the sheet could be told to be fluid and still refuse to go below about
+         520px. Fixed layout makes the columns share what there is; breaking
+         anywhere lets the long values wrap instead of setting the floor. This
+         matters more than it looks: the sheet clips rather than scrolls, so a
+         table wider than its page loses its right-hand column, and the
+         right-hand column of an invoice is the amounts. */
+      /* `.inner` is a FLEX container, so the page table inside it floors at its
+         own min-content — 520px — however fluid the sheet around it is told to
+         be. Exactly the trap PK6-A recorded for the old document class and one
+         level deeper, in the renderer that replaced it: the sheet obediently
+         became 370px wide and went on clipping its right-hand column, which on
+         an invoice is the amounts. Releasing the floor is what lets fixed
+         layout do anything at all. */
+      ".inner>*{min-width:0}" +
+      "table{table-layout:fixed;max-width:100%}" +
+      /* EVERYTHING, not only the cells. The first attempt targeted `td`/`th`
+         and moved nothing, because what was holding the page open was an
+         unbreakable account number inside a list item in the payment terms —
+         one 24-character token setting the minimum width of the whole
+         document. `anywhere` is the value that lowers min-content; `break-word`
+         does not. Below the breakpoint only, where the alternative is a
+         document with its amounts cut off. */
+      ".sheet,.sheet *{overflow-wrap:anywhere}" +
       "}",
   ].join("\n");
 

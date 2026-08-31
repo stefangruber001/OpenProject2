@@ -1868,7 +1868,24 @@ with the first session not marked done.
 | S2      | the obra follows the signature — the right contract, at creation and at signing; CON-11 names it | **done** — `_bestContractForBudget`, signing claims the job, CON-11 carries a `ref`, migration 20; 660/660 e2e, 6 sim checks red first           |
 | S3      | an allocation is a COST — the base imponible, both doors, tickets, migration 20                  | **done** — basis is the taxable base, percentages with it, migration 21 restates filed splits; 662/662 e2e, 438 sim                              |
 | S4      | the reader reads — tax-id shape, the issuer, the document's own vocabulary, derived amounts      | **done** — 4 blank fields filled and the label residue replaced by the contract number; 662/662 e2e                                              |
-| S5      | Facturación on a phone · the untranslated invoice placeholder · Obras by name                    | pending                                                                                                                                          |
+| S5      | Facturación on a phone · the untranslated invoice placeholder · Obras by name                    | **done** — drawer 134px→0, preview −91px→whole with no cell cut, the note translates, Proyectos names Obras                                      |
+
+**Package 10 is closed (2026-08-31).** Five commits — `0b3bcb4` `487e376`
+`1687f07` `df0aab8` and this one — each green on the full battery. Final state:
+668/668 site-e2e, 438/438 manageability, 104/104 migration checks, 43/43
+doc-pdf, 94 bank-import checks, source-audit 207/207, workspace-audit 0,
+miss-crawl 43 EN / 103 CA — every gate at its ceiling. Two schema steps landed:
+20 (the job points at the contract that was signed) and 21 (a document's split
+is restated against the taxable base), both of which repair live data and both
+of which refuse to touch a record that has already been invoiced.
+
+Carried forward, unbuilt and named: re-basing a plan whose work started before
+its first task; extras attached directly to a contract; the contract's Anexos
+tab as anything more than a read-only mirror; and a corpus of real supplier
+invoices with expected fields, which is what would turn extraction accuracy
+into a number CI can hold rather than four fixtures. Blocked on the operator:
+IBAN and logo in Configuración › Empresa. The Safari PDF crash is CLOSED — it
+was `Promise.withResolvers`, and S1 fixed it.
 
 ### The seven, and what was measured
 

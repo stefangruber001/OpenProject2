@@ -138,6 +138,15 @@
     Validez: ["Validez", "Validesa", "Validity"],
     "Total contratado": ["Total contratado", "Total contractat", "Contract total"],
     "Base imponible": ["Base imponible", "Base imposable", "Taxable base"],
+    /* PK10-S5 · the preview's own note about itself. The system speaking on
+       the document, not anything the document says — so it belongs here with
+       the labels rather than in the facts, where it was written in Spanish and
+       printed «Invoice · Sin numerar» on an English invoice. */
+    "Sin numerar — el número se asigna al emitir": [
+      "Sin numerar — el número se asigna al emitir",
+      "Sense numerar — el número s'assigna en emetre",
+      "Not yet numbered — the number is assigned on issue",
+    ],
     "Entrega prevista": ["Entrega prevista", "Lliurament previst", "Expected delivery"],
     "Entrega real": ["Entrega real", "Lliurament real", "Actual delivery"],
     "Importe del cambio": ["Importe del cambio", "Import del canvi", "Change amount"],

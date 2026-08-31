@@ -7120,6 +7120,59 @@ docNumber        —                   F-2026/4471
 orderRef         "/ REFERENCIA"      CTR-2026-0004
 ```
 
+### 214 · Facturación on a phone, and the jobs nobody could find (2026-08-31)
+
+Four small things, three of them measured at 390 px before anything was
+changed.
+
+**A drawer 134 px wider than the phone, because of one `<select>`.** A grid
+item floors at its content, and a select's content is its longest option —
+«P-2026-0009 · Ignacio Fernández · Carrer Francesca…». So the obra picker set
+the width of the whole «Nueva factura» drawer and dragged its paragraph and its
+button off the right edge. `min-width:0` on `.field`, `max-width:100%` on the
+controls.
+
+**An invoice preview at x = −91, clipped on BOTH sides.** `.condoc` centres,
+and centring a child wider than its box puts the left overflow at a negative
+scroll position no scrollbar reaches. This is the failure PK9-S4 first
+hypothesised for the contract pane and measurement disproved there — it was
+real here, on a screen nobody had measured, and the reason the contract fits
+while the invoice does not is the line-items table's 573 px min-content.
+
+**And the trap in fixing it.** Releasing the container alone shrank the sheet
+to 370 px and left the table at 520 inside it — `.sheet` clips rather than
+scrolls, so the right-hand column went off the page, and on an invoice the
+right-hand column is the amounts. That would have traded an unreachable margin
+for an unreadable figure. It took three attempts to find the real floor:
+`table-layout:fixed` did nothing, `overflow-wrap` on cells did nothing, and the
+measurement that mattered was the ancestor chain — `.inner` is a FLEX container
+and the page table inside it floored at `min-width:520px`. Exactly the trap
+PK6-A recorded for the document class that this renderer replaced, one level
+deeper and never re-applied. The check now walks every cell and asserts none is
+cut, not merely that the sheet fits.
+
+**«Invoice · Sin numerar».** The unnumbered preview's note about itself was
+written in Spanish straight into the facts adapter, so it printed Spanish on an
+English document. No gate could see it and none was at fault: a document is
+`translate="no"` on purpose, so the rendered-text crawler skips it, and
+`erp-facts.js` is not one of the four files the source audit reads. The fix is
+architectural rather than a dictionary entry — the phrase is the SYSTEM
+speaking on the document, not anything the document says, so it belongs in the
+document label layer, and `docFor` now receives that layer. Everything else in
+that file is data and still must never be translated.
+
+**«Obras», not «Avance físico».** Both children of Proyectos were named after
+what you DO to a job, so a person looking for their jobs found two verbs and no
+noun — which is what the operator asked about. PRY-01 IS the register of obras
+until a row is opened; its own subtitle says so. The code is unchanged, because
+the code is what the specification names and the label is what a person reads.
+
+**And the documented trap, walked into anyway.** The comment explaining that
+rename went between `subs:` and its first entry, which breaks the navigation
+manifest's strict regex — a hazard written in that very file, three lines
+above, by whoever hit it last. It is now outside the object like its neighbour,
+and says so.
+
 ## S43 · PK-N — a Word file is the same document, not a second one (2026-08-29)
 
 The operator asked for every generated PDF to exist as a Word file too, an
