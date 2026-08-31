@@ -1950,12 +1950,12 @@ an obra showed a different supplier than the document it came from, and could th
 bank and card movements be cleared to run a test. Both causes below were read out
 of running code before this table was written.
 
-| Session | Scope                                                                                             | Status                                                                                                  |
-| ------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| S1      | the supplier picker must not choose — an empty default, a refusal, and a way to create the issuer | **done** — 3 e2e blocks were encoding the defect and now choose; 19/19 in the suite, 4 checks red first |
-| S2      | a way back — `reassignBill`, `deleteBill`, and the capture it releases                            | in progress                                                                                             |
-| S3      | a cost row quotes the invoice, never the party file                                               | in progress                                                                                             |
-| S4      | emptying an account for a trial run, distinct from undoing an import                              | in progress                                                                                             |
+| Session | Scope                                                                                             | Status                                                                                                                             |
+| ------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| S1      | the supplier picker must not choose — an empty default, a refusal, and a way to create the issuer | **done** — 3 e2e blocks were encoding the defect and now choose; 19/19 in the suite, 4 checks red first                            |
+| S2      | a way back — `reassignBill`, `deleteBill`, and the capture it releases                            | **done** — a mis-filed bill can be re-filed or removed, and `deleteBill` releases the document `deleteCapture` was holding shut    |
+| S3      | a cost row quotes the invoice, never the party file                                               | **done** — `projectCostRows` reads the stamped issuer for `party` too, the one field still reaching for the live party file        |
+| S4      | emptying an account for a trial run, distinct from undoing an import                              | **done** — `resetAccountMovements` unwinds reconciliations instead of skipping them; one account, refusing only on a closed period |
 
 **What was measured.**
 
@@ -1988,3 +1988,18 @@ of running code before this table was written.
    not exist is the case actually asked for: `_discardableMovement` KEEPS
    everything anyone has touched, and the movements a trial most wants gone are
    the ones it spent the trial reconciling.
+
+**Package 11 is closed (2026-08-31).** One commit, `6c23be5`, green on the full
+battery: 678/678 site-e2e unfiltered, 471/471 manageability with the
+`reassignBill`, `deleteBill` and `resetAccountMovements` checks red first,
+104/104 migrations, 43/43 doc-pdf, 94 bank-import, source-audit 207/207 in both
+languages, workspace-audit 0. The rendered-text crawl came DOWN — 41 EN and 101
+CA against ceilings of 43 and 103 — because the dictionary entries this package
+added covered two strings each language was already rendering untranslated, so
+the CI ceilings were ratcheted to 41 and 101 rather than left with slack in them.
+
+No schema step. Nothing here restates stored data: the mis-filed bills on the
+operator's workspace are repaired by hand, through the screen the package adds,
+because only a person can say whether a given invoice is real-and-mis-attributed
+(reassign) or should never have been filed at all (delete). A migration that
+guessed between those two would be inventing accounting records.
