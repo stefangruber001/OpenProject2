@@ -934,6 +934,9 @@ window.CANEI_DICT.ca = {
   "⚠ El lector de documentos no está disponible — introdúzcalo a mano":
     "⚠ El lector de documents no està disponible — introduïu-ho a mà",
   "⚠ No se ha podido leer nada: rellénelo a mano": "⚠ No s'ha pogut llegir res: ompliu-ho a mà",
+  "⚠ No se ha podido leer el documento: rellénelo a mano":
+    "⚠ No s'ha pogut llegir el document: ompliu-ho a mà",
+  "Sin lectura — escríbalo a mano": "Sense lectura — escriviu-ho a mà",
   "Nº documento": "Núm. document",
   Retención: "Retenció",
   "Factura de proveedor": "Factura de proveïdor",

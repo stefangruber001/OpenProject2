@@ -6876,6 +6876,73 @@ to the spreadsheet export. Both are named on the evidence page. A delivery
 report that shows only clean progress is an advertisement, and the operator has
 been reading these closely enough to notice the difference.
 
+### 209 · The reader needed one method the operator's phone did not have (2026-08-31)
+
+Every PDF the operator handed the workspace died on their iPhone with «undefined
+is not a function (near '…t of e…')». The file was fine — their own invoice
+reads in 190 ms here, 1,571 characters, extraction and all. `pdfjs-dist@6`
+calls `Promise.withResolvers()`, which arrived in Safari 17.4 (March 2024), and
+WebKit words a missing method exactly that way while quoting minified source
+near the call.
+
+**Found by experiment, not by reading release notes.** Each candidate API was
+deleted in turn and the operator's own PDF pushed through the real pipeline:
+
+```
+none (control)          ✓ read via text layer
+Promise.withResolvers   ✗ THE ONLY ONE that breaks it
+Object.hasOwn           ✓        structuredClone   ✓
+Array.findLast          ✓        Array.at          ✓
+withResolvers + shim    ✓ read via text layer
+```
+
+Four lines restore it. This is the «A3 Safari PDF crash» parked on 28/08 for
+want of a console line; the operator's screenshot was the console line.
+
+**The shim goes at the single door to pdf.js**, not beside a caller, because
+everything that reads a PDF goes through `ErpOcr.loadPdfjs()` — supplier-invoice
+capture, bank-statement import, the document preview, the thumbnailer. All four
+died together on that phone while photographs kept working, because tesseract
+does not use the method.
+
+**The worker is a second realm and needs its own copy.** `pdf.worker.min.mjs`
+calls it too, and a shim installed on the page cannot reach a worker. It is
+started through `site/pdfjs-worker-shim.mjs`, which installs the method and then
+`await import`s the real worker — dynamic, because a static import is hoisted
+and would run the worker before the shim. The vendored file stays untouched:
+its MANIFEST says it is generated, so a polyfill written into it would be erased
+by the next vendoring run, and erased silently. Verified in a browser: the
+worker spawns from the shim, requests `pdf.worker.min.mjs`, and parses.
+
+### 210 · «Escriba los datos a mano», on a panel with nothing to write in (2026-08-31)
+
+Chasing the Safari fault turned up a worse one underneath it. `captureStart`
+caught a failed reading, put the engine's own message in a toast — in English,
+on a Spanish screen — and **dropped the file**. The operator is left holding a
+document they now have to find again. Two lines above, the case where the reader
+RAN and found nothing keeps the file «never a dead end», written there on
+purpose; the case where the reader could not run got the opposite.
+
+**And that neighbour was not honest either.** With no reading, the panel printed
+one sentence telling the operator to type the data by hand and then rendered no
+inputs at all. The instruction was advice the screen made impossible to follow.
+The extraction capability refuses an empty document deliberately and its refusal
+says what should happen instead — offer manual entry with the image attached —
+so the host was simply not doing what it had been told. It now renders the same
+eleven rows, blank, every dot amber because nothing checked anything, and the
+save reads them.
+
+**The badge grew a third state**, because there are three: read from the PDF's
+text, read from a picture, and not read at all. A reader that never ran used to
+fall into the second and claim an image had been read — an empty panel under a
+badge saying otherwise, which is the kind of small lie that costs ten minutes.
+
+**Twice in two packages, the same trap:** the comment written to explain a fix
+quoted the Spanish phrase it was about, and the source audit reads comments, so
+the count went up by exactly that quotation. It is written in CLAUDE.md. The
+comment now says so out loud beside the rewording, since stating it once has
+demonstrably not been enough.
+
 ## S43 · PK-N — a Word file is the same document, not a second one (2026-08-29)
 
 The operator asked for every generated PDF to exist as a Word file too, an

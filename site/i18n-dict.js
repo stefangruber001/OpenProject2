@@ -3020,6 +3020,14 @@ window.CANEI_DICT = {
       "⚠ No se ha podido leer nada: rellénelo a mano",
       "⚠ Nothing could be read: fill it in by hand",
     ],
+    /* PK10-S1 · the reader itself failed to run — an older phone without
+       `Promise.withResolvers`, a corrupt file, no memory. Distinct from the
+       line above, which means the reader ran and found nothing. */
+    [
+      "⚠ No se ha podido leer el documento: rellénelo a mano",
+      "⚠ The document could not be read: fill it in by hand",
+    ],
+    ["Sin lectura — escríbalo a mano", "Not read — type it in"],
     ["Nº documento", "Document no."],
     ["Retención", "Withholding"],
     ["Factura de proveedor", "Supplier invoice"],

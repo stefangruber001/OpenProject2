@@ -84,6 +84,7 @@ async function main() {
     testBudgetBuilder,
     testPresupuestador,
     testCapture,
+    testOlderPhone,
     testSupplierBillEntry,
     testVariationBudget,
     testProjectTracking,
@@ -3113,38 +3114,17 @@ async function testVariationBudget(browser, base) {
 //    every field carries a dot that a validator earned rather than a
 //    confidence score; a typed correction is re-checked; and the record is
 //    written only when a person presses the button.
-async function testCapture(browser, base) {
-  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
-  const errs = [];
-  attachConsole(pg, errs);
-  try {
-    await pg.goto(`${base}/erp.html#supplier-invoices`, { waitUntil: "networkidle" });
-    await bootedShell(pg);
-    await pg.waitForTimeout(900);
-
-    const wired = await pg.evaluate(() => ({
-      ocr: typeof window.ErpOcr,
-      extraction: typeof (window.ErpBridge && window.ErpBridge.extraction),
-      surface: window.ErpBridge && window.ErpBridge.surfaceVersion,
-      capture: !!document.getElementById("capFile"),
-    }));
-    if (wired.ocr === "object" && wired.extraction === "object" && wired.capture)
-      ok(`ADM-03: the capture pipeline is wired (bundle surface v${wired.surface})`);
-    else bad("ADM-03: pipeline wired", JSON.stringify(wired));
-
-    // Nothing of the OCR runtime may load merely because the screen is open.
-    const idle = await pg.evaluate(() => ({
-      tesseract: typeof window.Tesseract,
-      vendorRequests: performance
-        .getEntriesByType("resource")
-        .filter((r) => /vendor\//.test(r.name)).length,
-    }));
-    if (idle.tesseract === "undefined" && idle.vendorRequests === 0)
-      ok("ADM-03: opening the inbox loads none of the 7 MB reader");
-    else bad("ADM-03: nothing loads at rest", JSON.stringify(idle));
-
-    // Hand it a genuine PDF with a text layer, built in the page.
-    await pg.evaluate(() => {
+/**
+ * A genuine one-page PDF with a real text layer, built inside the page.
+ *
+ * Installed as `window.__makeTextPdf()` rather than returned, because a `File`
+ * cannot cross the evaluate boundary — so both the capture suite and the
+ * older-phone suite reach for the same builder in their own page context
+ * instead of each carrying a copy of forty lines of PDF syntax.
+ */
+async function installPdfBuilder(pg) {
+  await pg.evaluate(() => {
+    window.__makeTextPdf = (name) => {
       const lines = [
         "DISTRIBUCIONES CERYGRES, S.A.",
         "NIF: A08932907",
@@ -3180,8 +3160,46 @@ async function testCapture(browser, base) {
       const blob = new Blob([new Uint8Array([...pdf].map((c) => c.charCodeAt(0)))], {
         type: "application/pdf",
       });
+      return new File([blob], name || "factura.pdf", { type: "application/pdf" });
+    };
+  });
+}
+
+async function testCapture(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#supplier-invoices`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+
+    const wired = await pg.evaluate(() => ({
+      ocr: typeof window.ErpOcr,
+      extraction: typeof (window.ErpBridge && window.ErpBridge.extraction),
+      surface: window.ErpBridge && window.ErpBridge.surfaceVersion,
+      capture: !!document.getElementById("capFile"),
+    }));
+    if (wired.ocr === "object" && wired.extraction === "object" && wired.capture)
+      ok(`ADM-03: the capture pipeline is wired (bundle surface v${wired.surface})`);
+    else bad("ADM-03: pipeline wired", JSON.stringify(wired));
+
+    // Nothing of the OCR runtime may load merely because the screen is open.
+    const idle = await pg.evaluate(() => ({
+      tesseract: typeof window.Tesseract,
+      vendorRequests: performance
+        .getEntriesByType("resource")
+        .filter((r) => /vendor\//.test(r.name)).length,
+    }));
+    if (idle.tesseract === "undefined" && idle.vendorRequests === 0)
+      ok("ADM-03: opening the inbox loads none of the 7 MB reader");
+    else bad("ADM-03: nothing loads at rest", JSON.stringify(idle));
+
+    // Hand it a genuine PDF with a text layer, built in the page.
+    await installPdfBuilder(pg);
+    await pg.evaluate(() => {
       const dt = new DataTransfer();
-      dt.items.add(new File([blob], "factura.pdf", { type: "application/pdf" }));
+      dt.items.add(window.__makeTextPdf());
       const inp = document.getElementById("capFile");
       inp.files = dt.files;
       inp.dispatchEvent(new Event("change", { bubbles: true }));
@@ -3423,6 +3441,113 @@ async function testCapture(browser, base) {
     else bad("ADM-03: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("document capture", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/**
+ * THE OPERATOR'S OWN PHONE, which is older than the reader assumes.
+ *
+ * `pdfjs-dist@6` calls `Promise.withResolvers()`. It arrived in Safari 17.4,
+ * Chrome 119 and Firefox 121 — so on an iPhone a little behind, the method is
+ * undefined and every PDF the workspace is handed dies, with WebKit's wording
+ * for a missing method: "undefined is not a function". Supplier-invoice
+ * capture, bank-statement import, the document preview and the thumbnailer all
+ * go through the same door and all died together, while photographs kept
+ * working because tesseract does not use it.
+ *
+ * Deleting the method is a fair simulation and a precise one: it was found by
+ * deleting each candidate API in turn and running a real invoice through the
+ * pipeline, and this is the only one that breaks it.
+ *
+ * The second check is the one that matters even when the first is fixed: a
+ * reader that fails for ANY reason — a corrupt file, no memory, a browser
+ * older still — must not take the document with it. The panel opens, empty,
+ * ready to be typed.
+ */
+async function testOlderPhone(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.addInitScript(() => {
+      delete Promise.withResolvers;
+    });
+    await pg.goto(`${base}/erp.html#supplier-invoices`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+
+    const gone = await pg.evaluate(() => typeof Promise.withResolvers);
+    if (gone === "undefined")
+      ok("older phone: the browser under test has no Promise.withResolvers");
+    else bad("older phone: the simulation applied", `withResolvers is ${gone}`);
+
+    await installPdfBuilder(pg);
+    const read = await pg.evaluate(async () => {
+      try {
+        const rec = await ErpOcr.recognise(window.__makeTextPdf(), {});
+        const text = (
+          Array.isArray(rec.text) ? rec.text.join("\n") : String(rec.text || "")
+        ).trim();
+        return { ok: true, engine: rec.engine, chars: text.length, hasNif: /A08932907/.test(text) };
+      } catch (e) {
+        return { ok: false, message: String((e && e.message) || e).slice(0, 120) };
+      }
+    });
+    if (read.ok && read.engine === "pdf-text" && read.hasNif)
+      ok(`older phone: a PDF still reads through its text layer (${read.chars} characters)`);
+    else bad("older phone: the reader survives a missing withResolvers", JSON.stringify(read));
+
+    // …and the whole capture path, not just the reader in isolation.
+    await pg.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.items.add(window.__makeTextPdf());
+      const inp = document.getElementById("capFile");
+      inp.files = dt.files;
+      inp.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(2500);
+    const panel = await pg.evaluate(() => ({
+      open: document.body.classList.contains("fs"),
+      badge: (document.querySelector(".pbbar .pill") || {}).textContent || "",
+      nif: (document.querySelector('[data-f="issuerTaxId"] input') || {}).value || "",
+    }));
+    if (panel.open && /PDF/i.test(panel.badge) && panel.nif.includes("A08932907"))
+      ok("older phone: capture opens the validation screen with the document read");
+    else bad("older phone: capture on an old browser", JSON.stringify(panel));
+
+    /* A READER THAT CANNOT RUN AT ALL still may not lose the document. Broken
+       here at the last possible moment — the recogniser itself — so the check
+       is about what the SCREEN does with a failure, not about any one cause. */
+    await pg.evaluate(() => {
+      captureClose();
+      ErpOcr.recognise = () => Promise.reject(new Error("simulated reader failure"));
+    });
+    await pg.waitForTimeout(300);
+    await pg.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.items.add(window.__makeTextPdf("rota.pdf"));
+      const inp = document.getElementById("capFile");
+      inp.files = dt.files;
+      inp.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(900);
+    const kept = await pg.evaluate(() => ({
+      open: document.body.classList.contains("fs"),
+      name: (document.querySelector(".pbbar .who span") || {}).textContent || "",
+      badge: (document.querySelector(".pbbar .pill") || {}).textContent || "",
+      fields: document.querySelectorAll(".capf").length,
+      typeable: !!document.querySelector('[data-f="issuerName"] input'),
+    }));
+    if (kept.open && kept.name === "rota.pdf" && kept.fields > 0 && kept.typeable)
+      ok(`older phone: a reader that fails keeps the document — ${kept.fields} fields to type`);
+    else bad("older phone: a failed read is not a dead end", JSON.stringify(kept));
+    if (/sin lectura|not read|sense lectura/i.test(kept.badge))
+      ok("older phone: …and the badge says nothing was read, rather than claiming an image");
+    else bad("older phone: honest badge after a failed read", JSON.stringify(kept.badge));
+  } catch (e) {
+    bad("older phone (PK10-S1)", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }

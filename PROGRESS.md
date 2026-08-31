@@ -1854,3 +1854,63 @@ built here: re-basing a plan whose work started before its first task; extras
 attached directly to a contract; the contract's Anexos tab as anything more
 than a read-only mirror. Blocked on the operator: the Safari PDF crash (needs a
 console line) and IBAN + logo in Configuración › Empresa.
+
+## Package 10 — the 31/08 live-build review (started 2026-08-31)
+
+Seven observations from the operator working the LIVE server on an iPhone.
+Every cause below was measured against running code before this table was
+written — reproduced, not inferred. Any resume reads THIS ledger and continues
+with the first session not marked done.
+
+| Session | Scope                                                                                            | Status                                                                                                                                           |
+| ------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| S1      | the document reader on an older Safari — `Promise.withResolvers`; and a capture that never dies  | **done** — polyfill at the one door to pdf.js plus a worker shim; a failed read now keeps the document; 657/657 e2e, 4 of 5 new checks red first |
+| S2      | the obra follows the signature — the right contract, at creation and at signing; CON-11 names it | pending                                                                                                                                          |
+| S3      | an allocation is a COST — the base imponible, both doors, tickets, migration 20                  | pending                                                                                                                                          |
+| S4      | the reader reads — tax-id shape, the issuer, the document's own vocabulary, derived amounts      | pending                                                                                                                                          |
+| S5      | Facturación on a phone · the untranslated invoice placeholder · Obras by name                    | pending                                                                                                                                          |
+
+### The seven, and what was measured
+
+1. **PDF upload dies on the phone.** `pdfjs-dist@6.2.108` calls
+   `Promise.withResolvers()` — iOS Safari 17.4+, Chrome 119+, Firefox 121+.
+   Older Safari words the miss as «undefined is not a function (near '…t of
+   e…')», which is what the operator photographed. **Proved by experiment:**
+   deleting each candidate API in turn, only `withResolvers` breaks the path,
+   and a four-line polyfill restores it. The same fault kills bank-statement
+   PDF import, the document preview and the thumbnailer. Tesseract does not use
+   it, which is why photographs still work. This is the parked «A3 Safari PDF
+   crash» from 28/08 — the console line it was waiting for.
+2. **A signed contract cannot invoice its obra.**
+   `createProjectFromAcceptance` takes `contracts.find(c => c.budgetId === …)`
+   — the FIRST contract on the budget, draft or cancelled or superseded — and
+   `signContract` never touches the link. So the obra points at a draft, CON-11
+   reads that draft, and signing the real contract changes nothing. CON-11's
+   message never names the record it read.
+3. **The allocation split is checked in the wrong units.** `allocateCapture`
+   demands the split total `confirmed.totalCents` (GROSS); `registerBill`
+   demands `baseCents` (NET) — and `billDrawer` seeds the bill from the
+   capture's own rows, so satisfying the first guarantees the second refuses.
+   A catch-22 with no way through. `projectCostRows` sums both into one figure,
+   and a `ticket` capture is counted directly — at gross, VAT included.
+4. **Extraction misses fields a perfect text layer contains.** Measured on the
+   PDF text layer, not OCR: issuerName, issuerTaxId and docNumber all null, and
+   orderRef returns the label residue `/ REFERENCIA`. The tax-id pattern cannot
+   match `B-62889417` (no separator allowed after the leading letter); the
+   issuer is never labelled on a real invoice; `FACTURA` and `N.o F-2026/4471`
+   sit on different lines; `Contrato:` and `Presupuesto:` — the references that
+   would link the invoice to a job — are not in the vocabulary at all.
+5. **Two Facturación surfaces do not fit a phone.** The «Nueva factura» drawer
+   overflows 134 px because `.field` floors at the longest `<option>`; the
+   invoice preview sits at x = −91 in a 390 px viewport because `.condoc`
+   centres a child that floors at the document's 573 px min-content. Fixing the
+   container alone silently CUTS the 520 px line-items table, so the sheet's own
+   table needs its phone treatment in the same commit.
+6. **A Spanish string on an English invoice.** `erp-facts.js:674` hardcodes
+   «Sin numerar — el numero se asigna al emitir» (accent missing too). No gate
+   sees it: documents are `translate="no"` by design and `erp-facts.js` is not
+   in the source audit's file list.
+7. **Obras has no name.** `SECTIONS` gives Proyectos two children, both named
+   after verbs. The register of jobs is the landing state of «Avance físico»
+   and again of «Avance económico», and nothing on a phone says the jobs are
+   there.

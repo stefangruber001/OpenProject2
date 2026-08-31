@@ -63,12 +63,52 @@
    * Loading, lazily and once
    * ------------------------------------------------------------------ */
 
+  /**
+   * `Promise.withResolvers`, WHICH THE READER NEEDS AND AN OLDER PHONE LACKS.
+   *
+   * pdfjs-dist 6 calls it. It landed in Safari 17.4 (March 2024), Chrome 119
+   * and Firefox 121 — so on an iPhone a year or two behind, `withResolvers` is
+   * undefined and the whole reader dies at the first PDF with WebKit's own
+   * wording for a missing method: "undefined is not a function". The operator
+   * photographed exactly that, and it is the "Safari PDF crash" that sat
+   * unreproduced on the parked list for three days.
+   *
+   * Established by experiment rather than by reading release notes: with each
+   * candidate API deleted in turn, only this one breaks the path, and adding
+   * these four lines back restores it. Everything downstream of pdf.js goes
+   * with it — supplier-invoice capture, bank-statement import, the document
+   * preview and the thumbnailer — which is why the shim lives at the single
+   * door to pdf.js rather than beside any one caller.
+   *
+   * Native first, always: this only defines what is missing.
+   */
+  function ensureWithResolvers(scope) {
+    if (typeof scope.Promise.withResolvers === "function") return;
+    scope.Promise.withResolvers = function withResolvers() {
+      var resolve, reject;
+      var promise = new scope.Promise(function (res, rej) {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise: promise, resolve: resolve, reject: reject };
+    };
+  }
+
   function loadPdfjs() {
-    if (!pdfjsP)
+    if (!pdfjsP) {
+      ensureWithResolvers(root);
       pdfjsP = import(V + "pdfjs/pdf.min.mjs").then(function (m) {
-        m.GlobalWorkerOptions.workerSrc = V + "pdfjs/pdf.worker.min.mjs";
+        /* The WORKER is a second JavaScript realm and gets no polyfill from
+           here — `pdf.worker.min.mjs` calls `withResolvers` too, and a shim
+           installed on the page cannot reach it. So the worker is started
+           through a wrapper of ours that installs the shim and then imports
+           the real worker, which keeps the vendored file untouched (its
+           MANIFEST says it is generated; hand-editing it would be undone by
+           the next `tools/vendor-ocr.mjs` run and the drift would be silent). */
+        m.GlobalWorkerOptions.workerSrc = HERE + "pdfjs-worker-shim.mjs";
         return m;
       });
+    }
     return pdfjsP;
   }
 

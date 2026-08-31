@@ -15181,7 +15181,31 @@
             };
             render();
           })
-          .catch((e) => toast("⚠ " + (e.message || "No se ha podido leer el documento")));
+          .catch((e) => {
+            /* THE READER FAILED, AND THE DOCUMENT SURVIVES IT.
+               Two lines above, a photograph with nothing readable on it keeps
+               the file so it can be typed — "never a dead end", written there
+               on purpose. A reader that could not RUN got the opposite: the
+               engine's own message in a toast, in English, and the file
+               dropped. That is the worse failure of the two, because the
+               operator is standing in front of a document they now have to
+               find again; it is how an older phone lost every PDF it was
+               handed. The panel opens with nothing read and every field
+               empty, which is exactly the state a blank photograph produces
+               and a state this screen already knows how to be in. */
+            console.warn("capture: the reader failed", e);
+            toast("⚠ No se ha podido leer el documento: rellénelo a mano");
+            capWork = {
+              file,
+              url: URL.createObjectURL(file),
+              kind: /pdf$/i.test(file.type) ? "pdf" : "image",
+              recognised: { text: [], pages: [], pageCount: 0, engine: "none", warnings: [] },
+              result: null,
+              docType: "supplierInvoice",
+              focusKey: null,
+            };
+            render();
+          });
       }
 
       function captureClose() {
@@ -15201,10 +15225,18 @@
           r = w.result;
         document.body.classList.add("fs");
         const rec = w.recognised;
+        /* Three states, because there are three. The badge used to have two —
+           read from the PDF's text, or read from a picture — and a reader that
+           never ran fell into the second and claimed an image had been read.
+           An empty panel under a badge saying something was read is the kind
+           of small lie that costs an operator ten minutes hunting for the
+           fields it supposedly found. */
         const engine =
           rec.engine === "pdf-text"
             ? '<span class="pill g">Leído del texto del PDF</span>'
-            : `<span class="pill y">Leído de una imagen${rec.confidence != null ? " · " + rec.confidence + "% de confianza" : ""}</span>`;
+            : rec.engine === "none"
+              ? '<span class="pill r">Sin lectura — escríbalo a mano</span>'
+              : `<span class="pill y">Leído de una imagen${rec.confidence != null ? " · " + rec.confidence + "% de confianza" : ""}</span>`;
         const amber = r ? r.fields.filter((f) => f.verdict === "amber").length : CAP_FIELDS.length;
 
         v.innerHTML = `<div class="pb">
@@ -15328,9 +15360,55 @@
         if (!capWork) return;
         const r = capWork.result;
         const host = $("#capForm");
+        /* NOTHING WAS READ, SO EVERY FIELD IS BLANK — and blank is not the same
+           as absent. This branch used to print one sentence telling the
+           operator to write the data by hand, and then offer nowhere to write
+           it: the panel had no inputs at all, so the instruction was advice
+           the screen itself made impossible to follow. (That sentence is not
+           quoted here on purpose — the source audit reads comments, and a
+           quoted example counts as a string nobody translated.) The extraction
+           capability refuses an empty document on purpose and says what should
+           happen instead — "offer manual entry with the image attached" — and
+           this is that offer. The same rows, the same order, every dot amber,
+           because nothing checked anything. Typed values live on `capWork.manual`
+           rather than going through `recheck`, which needs a reading to re-check. */
         if (!r) {
-          host.innerHTML = `<div class="pbh">Datos</div><div class="pbbody">
-      <div class="empty">No se ha leído nada del documento. Escriba los datos a mano; la imagen queda adjunta igualmente.</div></div>`;
+          capWork.manual = capWork.manual || {};
+          host.innerHTML = `<div class="pbh">Datos</div>
+   <div class="pbbody"><div class="it" style="color:var(--muted)">No se ha leído nada del documento. Escriba los datos a mano; la imagen queda adjunta igualmente.</div></div>
+   ${CAP_FIELDS.map(([key, label]) => {
+     const held = capWork.manual[key];
+     const shown =
+       held === null || held === undefined
+         ? ""
+         : CAP_AMOUNTS.has(key)
+           ? (held / 100).toFixed(2)
+           : String(held);
+     return `<div class="capf${capWork.focusKey === key ? " on" : ""}" data-f="${key}">
+       <span class="dot amber" title="Sin comprobar — revíselo"></span>
+       <label for="cap_${key}">${label}</label>
+       <input id="cap_${key}" data-key="${key}" value="${esc(shown)}"
+         ${CAP_AMOUNTS.has(key) ? 'inputmode="decimal"' : ""}>
+      </div>`;
+   }).join("")}`;
+          host.querySelectorAll("input[data-key]").forEach((inp) => {
+            inp.onchange = () => {
+              if (!capWork) return;
+              const key = inp.dataset.key;
+              const raw = inp.value.trim();
+              const value =
+                raw === ""
+                  ? null
+                  : CAP_AMOUNTS.has(key)
+                    ? Math.round(Number(raw.replace(",", ".")) * 100)
+                    : raw;
+              capWork.manual[key] = Number.isNaN(value) ? null : value;
+            };
+          });
+          if (capWork.focusKey) {
+            const i = document.getElementById("cap_" + capWork.focusKey);
+            if (i) i.focus();
+          }
           return;
         }
         const badChecks = r.checks.filter((c) => c.status === "mismatch");
@@ -15411,7 +15489,10 @@
           r = w.result;
         const val = (k) => {
           const f = r && r.fields.find((x) => x.key === k);
-          return f ? f.value : null;
+          if (f) return f.value;
+          // Typed by hand, because nothing was read. Same keys, same units.
+          const m = w.manual || {};
+          return m[k] === undefined ? null : m[k];
         };
         const key = "cap_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
         /* A REFERENCE IS ONLY WRITTEN IF THE BYTES LANDED.
