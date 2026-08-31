@@ -111,6 +111,15 @@ export interface ExtractedField {
   reasons: string[];
   /** A validator vouched for this value. See `Candidate.validated`. */
   validated: boolean;
+  /**
+   * This value was COMPUTED from the others, not read off the document.
+   *
+   * It exists so the arithmetic cannot vouch for itself: a tax amount derived
+   * as total − base will satisfy the totals check every time, and a green dot
+   * earned that way says only that subtraction works. A derived field stays
+   * amber and stays on the review list.
+   */
+  derived?: boolean;
   /** What colour the dot is. See `FieldVerdict`. */
   verdict: FieldVerdict;
 }

@@ -3336,13 +3336,16 @@ async function testCapture(browser, base) {
     // The document just saved is on the LEFT, because nobody has said who
     // pays for it yet. That is the whole reason the column exists.
     const cardText = await pg.locator("#view .icard").first().innerText();
-    // The issuer NAME is the one field the reader routinely cannot find — no
-    // keyword introduces it and no validator can vouch for it, so it comes
-    // back null on this fixture exactly as it did in the S0b spike. The card
-    // says so rather than showing a blank line: same discipline as the amber
-    // dot, one screen later.
-    if (/2\.037,59/.test(cardText) && /confirmar/i.test(cardText))
-      ok("ADM-03: a card carries the detected amount, and says when the issuer was not detected");
+    /* PK10-S4 · this check used to assert that the issuer came back NULL — no
+       keyword introduces a supplier's own name, so a label-driven reader could
+       never find it, and the card said «sin confirmar» rather than showing a
+       blank line. The rule that reads it is new: the head of the document, not
+       the party being billed, joined across the line it wrapped onto. So the
+       assertion is inverted deliberately. The card's «sin confirmar» fallback
+       is still there for a document that genuinely states no issuer; what
+       changed is that this one does state it. */
+    if (/2\.037,59/.test(cardText) && /CERYGRES/i.test(cardText))
+      ok("ADM-03: a card carries the detected amount and the issuer the reader now finds");
     else bad("ADM-03: card content", cardText.replace(/\n/g, " · ").slice(0, 90));
 
     // …and a document whose issuer WAS confirmed shows it, so the line above

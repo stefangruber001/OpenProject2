@@ -1867,7 +1867,7 @@ with the first session not marked done.
 | S1      | the document reader on an older Safari — `Promise.withResolvers`; and a capture that never dies  | **done** — polyfill at the one door to pdf.js plus a worker shim; a failed read now keeps the document; 657/657 e2e, 4 of 5 new checks red first |
 | S2      | the obra follows the signature — the right contract, at creation and at signing; CON-11 names it | **done** — `_bestContractForBudget`, signing claims the job, CON-11 carries a `ref`, migration 20; 660/660 e2e, 6 sim checks red first           |
 | S3      | an allocation is a COST — the base imponible, both doors, tickets, migration 20                  | **done** — basis is the taxable base, percentages with it, migration 21 restates filed splits; 662/662 e2e, 438 sim                              |
-| S4      | the reader reads — tax-id shape, the issuer, the document's own vocabulary, derived amounts      | pending                                                                                                                                          |
+| S4      | the reader reads — tax-id shape, the issuer, the document's own vocabulary, derived amounts      | **done** — 4 blank fields filled and the label residue replaced by the contract number; 662/662 e2e                                              |
 | S5      | Facturación on a phone · the untranslated invoice placeholder · Obras by name                    | pending                                                                                                                                          |
 
 ### The seven, and what was measured

@@ -31,6 +31,30 @@ export interface ExtractionProfile {
   /** Words that announce a field, lower-cased and already de-accented. */
   keywords: Partial<Record<FieldKey, string[]>>;
 
+  /**
+   * How a company's legal name ends in this locale, lower-cased.
+   *
+   * The issuer of a document is almost never labelled — it is simply the
+   * largest text at the top — and it frequently wraps onto a second line. The
+   * capability needs to know that two consecutive head lines are one name
+   * rather than two, and cannot know it without being told what the end of a
+   * name looks like here. It reads these as markers and nothing else: no
+   * meaning is attached to any of them.
+   */
+  issuerSuffixes?: string[];
+
+  /**
+   * Labels that introduce the party being BILLED, in this locale.
+   *
+   * Every invoice names two companies, and both a name and a tax id look
+   * identical whichever one they belong to. What separates them is layout: the
+   * issuer is at the head, and the recipient arrives under a heading that says
+   * so — «FACTURAR A», «CLIENTE», «DESTINATARIO». Everything from that heading
+   * onwards is the other company, and the capability uses these markers as a
+   * boundary without knowing what any of them mean.
+   */
+  recipientMarkers?: string[];
+
   /** Money, in this locale's notation. Null when it is not an amount. */
   parseAmountCents(raw: string): Cents | null;
 

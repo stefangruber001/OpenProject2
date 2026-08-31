@@ -27,6 +27,18 @@ export interface ExtractInput {
    * profile which tax rates were law then. The extracted date wins once found.
    */
   assumeIssueDate?: string;
+  /**
+   * WHO WE ARE, so the reader cannot mistake us for the issuer.
+   *
+   * Every invoice names two companies, and one of them is always the reader.
+   * The operator's own supplier invoice carries two tax ids — the supplier's
+   * at the head and ours under «FACTURAR A» — and nothing in the shape of
+   * either says which is which. This is the one fact that settles it, and the
+   * caller has it: the issuer is the party that is not us.
+   *
+   * A hint, never a rule: an empty list simply removes the help.
+   */
+  exclude?: { names?: string[]; taxIds?: string[] };
 }
 
 /** Which token kinds each field is built from. */
@@ -75,9 +87,38 @@ export class ExtractionService {
     }
     const folded = lines.map(fold);
 
+    const exclude = {
+      names: new Set((input.exclude?.names ?? []).map(fold).filter(Boolean)),
+      taxIds: new Set(
+        (input.exclude?.taxIds ?? [])
+          .map((t) => t.toUpperCase().replace(/[^A-Z0-9]/g, ""))
+          .filter(Boolean),
+      ),
+    };
+
+    /* WHERE THE OTHER COMPANY STARTS. Below «FACTURAR A» the name and the tax
+       id belong to whoever is being billed, and on the operator's own invoice
+       that customer's CIF is the one that validates while the issuer's — a
+       made-up number on a simulated document — does not, so the reader
+       confidently returned the wrong company. Position settles it where the
+       shape of the value cannot. */
+    const recipientAt = this.recipientBoundary(folded, profile);
+
     const perField = new Map<FieldKey, Candidate[]>();
     for (const key of FIELD_KEYS) {
-      perField.set(key, this.candidatesFor(key, lines, folded, pageOf, profile));
+      perField.set(key, this.candidatesFor(key, lines, folded, pageOf, profile, exclude));
+    }
+    for (const key of ["issuerName", "issuerTaxId"] as const) {
+      const all = perField.get(key) ?? [];
+      const above = all.filter((c) => c.source.line < recipientAt);
+      // Only when something survives: a document with no such heading, or one
+      // that names the issuer below it, keeps whatever was found.
+      if (above.length && above.length < all.length) perField.set(key, above);
+    }
+    // The issuer is not labelled on real documents; see `unlabelledIssuer`.
+    if (!perField.get("issuerName")?.length) {
+      const guessed = this.unlabelledIssuer(lines, folded, pageOf, profile, exclude, recipientAt);
+      if (guessed) perField.set("issuerName", [guessed]);
     }
 
     // The issue date, once found, decides which rates were law — so it is
@@ -87,6 +128,7 @@ export class ExtractionService {
 
     const taxBreakdown = this.taxBreakdown(lines, pageOf, profile);
     const fields = FIELD_KEYS.map((key) => this.toField(key, perField.get(key) ?? []));
+    this.deriveMissingAmount(fields);
     const checks = this.check(fields, taxBreakdown, issueDate, profile);
 
     // A contradiction is not a reason to hide a number; it is a reason to make
@@ -209,14 +251,31 @@ export class ExtractionService {
     folded: string[],
     pageOf: number[],
     profile: ExtractionProfile,
+    exclude: { names: Set<string>; taxIds: Set<string> },
   ): Candidate[] {
     const kind = FIELD_TOKEN[key];
     const keywords = (profile.keywords[key] ?? []).map(fold);
     const out: Candidate[] = [];
 
     lines.forEach((line, i) => {
-      const spans = this.tokens(kind, line, i, pageOf[i], profile, key);
+      const spans = this.tokens(kind, line, i, pageOf[i], profile, key, lines);
       for (const { span, value } of spans) {
+        /* NOT US. Every invoice names two companies and one of them is the
+           reader; nothing in the shape of a tax id says which. Dropped before
+           scoring rather than after, so a runner-up is never our own record
+           offered as an alternative. */
+        if (typeof value === "string") {
+          if (kind === "taxId" && exclude.taxIds.has(value.toUpperCase().replace(/[^A-Z0-9]/g, "")))
+            continue;
+          if (kind === "text" && exclude.names.has(fold(value))) continue;
+        }
+        /* LABEL RESIDUE IS NOT A VALUE. «OBRA / REFERENCIA» is a heading, and
+           taking everything after «obra» yielded «/ REFERENCIA» — a field
+           filled with the rest of its own label. A value that is nothing but
+           punctuation and other keywords is discarded, and the line below is
+           tried instead (see `tokens`). */
+        if (kind === "text" && typeof value === "string" && this.isLabelResidue(value, profile))
+          continue;
         const reasons: string[] = [];
         let score = 0;
         let failedCheckDigit = false;
@@ -311,6 +370,7 @@ export class ExtractionService {
     page: number | undefined,
     profile: ExtractionProfile,
     key: FieldKey,
+    allLines?: string[],
   ): { span: SourceSpan; value: string | number | null }[] {
     const mk = (m: RegExpExecArray, value: string | number | null) => ({
       span: {
@@ -331,15 +391,35 @@ export class ExtractionService {
       for (const k of keywords) {
         const at = f.indexOf(k);
         if (at === -1) continue;
-        const after = line.slice(at + k.length).replace(/^[\s:.#-]+/, "");
-        if (!after) continue;
-        const start = line.length - after.length;
-        return [
-          {
-            span: { line: lineIndex, text: after, start, end: line.length, page },
-            value: after,
-          },
-        ];
+        const after = line.slice(at + k.length).replace(/^[\s:.#/–—-]+/, "");
+        if (after && !this.isLabelResidue(after, profile)) {
+          const start = line.length - after.length;
+          return [
+            {
+              span: { line: lineIndex, text: after, start, end: line.length, page },
+              value: after,
+            },
+          ];
+        }
+        /* THE VALUE IS ON THE NEXT LINE, which is how documents are actually
+           laid out: a heading, then the thing it heads. «OBRA / REFERENCIA»
+           over «Reforma de aseos — local comercial», «FACTURA» over «N.o
+           F-2026/4471». Taking the rest of the heading's own line gave a field
+           filled with the remainder of its label, and taking nothing gave an
+           empty field on a document that states the answer plainly. */
+        /* …and only when this line is a HEADING — nothing on it but label
+           words and punctuation. Without that gate the rule reached past a
+           line that did carry its value and took whatever came next, which on
+           a real invoice is the line-items table header. */
+        const below = allLines?.[lineIndex + 1]?.trim();
+        if (below && this.isLabelResidue(line, profile) && !this.isLabelResidue(below, profile)) {
+          return [
+            {
+              span: { line: lineIndex + 1, text: below, start: 0, end: below.length, page },
+              value: below,
+            },
+          ];
+        }
       }
       return [];
     }
@@ -377,6 +457,161 @@ export class ExtractionService {
       found.push(mk(m, value));
     }
     return found;
+  }
+
+  /**
+   * Is this "value" just the rest of its own label?
+   *
+   * «OBRA / REFERENCIA» is a heading. Cutting at «obra» left «/ REFERENCIA»,
+   * and the reader offered it as the job reference — a field filled with the
+   * remainder of the words that announced it. So: strip every keyword this
+   * profile knows, and if what survives has no word left in it, there was
+   * never a value there.
+   *
+   * Every keyword, not just the field's own: a heading pairs words from
+   * different fields («OBRA / REFERENCIA», «Fecha / Vencimiento»), and a rule
+   * that only knew its own would keep the other half.
+   *
+   * What survives has to be alphanumeric, not a WORD. The first version asked
+   * for three consecutive letters and threw away «OB-2026-014» and
+   * «F-2026/0417» — real references, mostly digits, exactly the shape these
+   * fields carry. A reference is not prose and must not be tested as though it
+   * were.
+   */
+  private isLabelResidue(text: string, profile: ExtractionProfile): boolean {
+    let rest = fold(text);
+    for (const list of Object.values(profile.keywords)) {
+      for (const k of list ?? []) {
+        const folded = fold(k);
+        if (folded.length >= 3) rest = rest.split(folded).join(" ");
+      }
+    }
+    return !/[\p{L}\p{N}]/u.test(rest);
+  }
+
+  /**
+   * THE ISSUER, WHICH NO DOCUMENT LABELS.
+   *
+   * `keywords.issuerName` lists «razón social», «emisor», «proveedor» — words
+   * that appear on almost no real invoice. A supplier's name is simply the
+   * largest text at the top, announced by nothing, so a label-driven reader
+   * could never find it and returned "not found" on documents that shout it in
+   * 24-point bold.
+   *
+   * What IS true of it: it sits in the head of the document, it is not us, and
+   * it is not a date, an amount, a tax id or an address. That is enough to
+   * offer one — never to be sure of one, so the confidence stays low and the
+   * dot stays amber, which is the honest posture for a guess about a name
+   * nothing can check.
+   *
+   * A name that wrapped onto a second line is one name: «SUMINISTROS CERDA» /
+   * «MATERIALS, S.L.» — joined when the line below ends in one of the legal
+   * suffixes the profile names, because knowing what the end of a company name
+   * looks like here is jurisdiction knowledge and does not belong in this file.
+   */
+  private unlabelledIssuer(
+    lines: string[],
+    folded: string[],
+    pageOf: number[],
+    profile: ExtractionProfile,
+    exclude: { names: Set<string>; taxIds: Set<string> },
+    recipientAt: number,
+  ): Candidate | null {
+    const suffixes = (profile.issuerSuffixes ?? []).map(fold);
+    const head = Math.min(lines.length, 8, recipientAt);
+    for (let i = 0; i < head; i++) {
+      const line = lines[i]!.trim();
+      if (line.length < 3 || line.length > 80) continue;
+      if (!/\p{Lu}/u.test(line)) continue; // a name carries a capital
+      if (this.isLabelResidue(line, profile)) continue;
+      if (exclude.names.has(fold(line))) continue;
+      // Not a date, an amount, a tax id, or a line that is mostly digits.
+      if (profile.parseDate(line) || profile.parseAmountCents(line)) continue;
+      const letters = (line.match(/\p{L}/gu) ?? []).length;
+      const digits = (line.match(/\d/gu) ?? []).length;
+      if (digits >= letters) continue;
+
+      let text = line;
+      let end = i;
+      const next = lines[i + 1]?.trim();
+      if (next && next.length <= 40 && suffixes.some((sfx) => fold(next).includes(sfx))) {
+        text = `${line} ${next}`;
+        end = i + 1;
+      }
+      if (exclude.names.has(fold(text))) continue;
+      return {
+        value: text,
+        raw: text,
+        confidence: 0.35,
+        source: { line: i, text, start: 0, end: lines[end]!.length, page: pageOf[i] },
+        reasons: ["at the head of the document, and not this company"],
+        labelled: false,
+        validated: false,
+      };
+    }
+    return null;
+  }
+
+  /**
+   * The line at which the document stops talking about the issuer.
+   *
+   * A heading, so the marker has to START the line — «FACTURAR A» does;
+   * «Indíquese el número de factura al cliente» does not, and treating the
+   * word wherever it fell would cut the document at a sentence in the payment
+   * terms. Returns the line count when there is no such heading, which means
+   * "no boundary" and leaves every candidate in play.
+   */
+  private recipientBoundary(folded: string[], profile: ExtractionProfile): number {
+    const markers = (profile.recipientMarkers ?? []).map(fold).filter(Boolean);
+    if (!markers.length) return folded.length;
+    for (let i = 0; i < folded.length; i++) {
+      const line = folded[i]!.trim();
+      if (markers.some((m) => line.startsWith(m))) return i;
+    }
+    return folded.length;
+  }
+
+  /**
+   * THE THIRD AMOUNT IS ARITHMETIC, NOT A GUESS.
+   *
+   * A photograph loses a table row: a real document came back with the net and
+   * the total read cleanly and the tax missing, because the recogniser kept the
+   * figure and lost the words that named it. But net + tax = total — with two
+   * of the three present the third is not a guess, it is subtraction.
+   *
+   * Filled only when exactly one is missing and the others were actually read,
+   * marked as derived rather than read, and left amber: nothing checked it,
+   * and the totals check that runs immediately afterwards will contradict it
+   * if the two it came from disagree with the rest of the document. A value
+   * that arrives by arithmetic must never wear a green dot for it.
+   */
+  private deriveMissingAmount(fields: ExtractedField[]): void {
+    const get = (key: FieldKey) => fields.find((f) => f.key === key);
+    const net = get("netAmount");
+    const tax = get("taxAmount");
+    const total = get("totalAmount");
+    if (!net || !tax || !total) return;
+    const wh = get("withholdingAmount");
+    const whValue = typeof wh?.value === "number" ? wh.value : 0;
+    const num = (f: ExtractedField) => (typeof f.value === "number" ? f.value : null);
+    const n = num(net);
+    const t = num(tax);
+    const g = num(total);
+
+    const fill = (f: ExtractedField, value: number, from: string) => {
+      f.value = round(value);
+      f.confidence = 0.4;
+      f.validated = false;
+      f.verdict = "amber";
+      f.derived = true;
+      f.reasons = [`derived from ${from}, not read`];
+    };
+    if (n !== null && t !== null && g === null)
+      fill(total, n + t - whValue, "the base and the tax");
+    else if (n !== null && g !== null && t === null)
+      fill(tax, g - n + whValue, "the base and the total");
+    else if (t !== null && g !== null && n === null)
+      fill(net, g - t + whValue, "the tax and the total");
   }
 
   /** Rows of a document that states several rates (spec §5.2). */
@@ -572,7 +807,12 @@ export class ExtractionService {
       // takes part in — and if that arithmetic could not be done at all, the
       // amount has not been checked by anything.
       if (isAmountField(f.key)) {
-        const ok = totals?.status === "ok";
+        /* A DERIVED AMOUNT CANNOT BE VOUCHED FOR BY THE SUM IT WAS DERIVED
+           FROM. Tax computed as total − base satisfies the totals check
+           every time; going green on that says subtraction works, not that
+           the figure is what the document says. It stays amber, and stays on
+           the list of things a person looks at. */
+        const ok = totals?.status === "ok" && !f.derived;
         f.validated = ok;
         f.verdict = ok ? "green" : "amber";
         continue;

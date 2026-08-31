@@ -7045,6 +7045,81 @@ allocated before this change and an untested safety net is not one.
 file silently handed it somebody else's document. The new block moved to the
 end rather than re-key an assertion that is not what is under test.
 
+### 213 · The reader was not misreading — it was not looking (2026-08-31)
+
+The operator photographed a supplier invoice and four fields came back empty.
+The diagnosis that matters came from running the PDF's own TEXT LAYER through
+the same pipeline: perfect input, and issuerName, issuerTaxId and docNumber
+were still null while orderRef returned «/ REFERENCIA». Better photographs
+would have fixed none of it. The rules were the problem.
+
+**The tax-id pattern could not see a hyphen.** `\b[A-Z]?\d{7,8}…` requires the
+letter to touch the digits, so «C.I.F. B-62889417» matched at the digits,
+dropped the B, failed its own shape test and returned nothing. One character
+class. That notation is how a great many Spanish suppliers write a CIF.
+
+**The issuer is never labelled, and never will be.** The keywords were «razón
+social», «emisor», «proveedor» — words that appear on almost no real invoice.
+A supplier's name is the largest text at the top, announced by nothing. It is
+now found by what IS true of it: in the head, not a date or an amount or an
+address, and joined across the line it wrapped onto — «SUMINISTROS CERDA» /
+«MATERIALS, S.L.» — using legal suffixes the PROFILE supplies, because knowing
+where a company name ends here is jurisdiction knowledge. Confidence stays low
+and the dot stays amber: it is a guess about a name nothing can check.
+
+**Every document names two companies, and both look alike.** Position settles
+it: below «FACTURAR A» the name and the tax id belong to whoever is billed.
+The profile supplies those markers; the capability uses them as a boundary and
+knows nothing about the words. This mattered more than expected — on the
+operator's document the CUSTOMER's CIF validates and the issuer's does not (it
+is a simulated number), so the reader was confidently returning the wrong
+company and scoring it well. A tenant-level `exclude` hint carries our own name
+and tax id as a second line of defence.
+
+**The heading and its contents are different lines.** A text field could only
+ever take what followed its label ON that line, so «FACTURA» over «N.o
+F-2026/4471» yielded nothing, and «OBRA / REFERENCIA» yielded the rest of its
+own heading. Now: label residue is discarded, and when the line is nothing but
+label the line below is read instead. Gated on the line being a heading —
+without that gate the rule reached past a line that did carry its value and
+took the line-items table header, which the pack's own fixture caught.
+
+**And `contrato`, `presupuesto` and `albarán` were not in the vocabulary at
+all.** The operator's invoice states «Contrato: CTR-2026-0004» and
+«Presupuesto: PRE-2026-0009» — the two references that tie a supplier's
+document to our job, our contract and our accepted quote — and the reader was
+throwing them away. `orderRef` now returns the contract number.
+
+**A derived amount may not vouch for itself.** When the recogniser keeps a
+figure and loses the words naming it, two of {net, tax, total} give the third
+by subtraction. But the totals check would then pass by construction, and the
+field would go green on the strength of arithmetic it was built to satisfy. So
+`derived` is a field of its own on the model, and `applyVerdicts` refuses to
+validate a derived amount. It stays amber and stays on the review list.
+
+**Two mistakes of mine, both caught by existing tests.** The residue rule first
+demanded three consecutive letters and threw away «OB-2026-014» and
+«F-2026/0417» — real references, mostly digits; a reference is not prose and
+must not be tested as though it were. And the comment explaining the derivation
+quoted the jurisdiction's own words for the tax inside a CAPABILITY, which the
+boundary linter refused, exactly as CLAUDE.md says it will.
+
+**One existing check asserted the defect as the specification.** It said the
+issuer «is the one field the reader routinely cannot find» and asserted the
+card showed «sin confirmar». It now asserts the name. The fallback still exists
+for a document that genuinely states no issuer; what changed is that this one
+states it.
+
+**Measured, on the operator's own document, text layer, no OCR:**
+
+```
+                 before              after
+issuerName       —                   SUMINISTROS CERDA MATERIALS, S.L.
+issuerTaxId      —                   B62889417   (amber: invented number, fails its check)
+docNumber        —                   F-2026/4471
+orderRef         "/ REFERENCIA"      CTR-2026-0004
+```
+
 ## S43 · PK-N — a Word file is the same document, not a second one (2026-08-29)
 
 The operator asked for every generated PDF to exist as a Word file too, an

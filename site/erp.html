@@ -15190,7 +15190,19 @@
           .then((rec) => {
             let result;
             try {
-              result = ErpBridge.extraction.read(rec.text);
+              /* WHO WE ARE, so the reader cannot hand back our own record as
+                 the issuer's. Every supplier invoice names two companies —
+                 theirs at the head, ours under «FACTURAR A» — and nothing in
+                 the shape of a name or a tax id says which is which. The
+                 document's own layout settles it most of the time; this is the
+                 fact that settles the rest, and only the host has it. */
+              const me = erp.state.config || {};
+              result = ErpBridge.extraction.read(rec.text, {
+                exclude: {
+                  names: [me.legalName, me.tradeName].filter(Boolean),
+                  taxIds: [me.taxId].filter(Boolean),
+                },
+              });
             } catch (e) {
               // A photograph with nothing readable on it. The document is still
               // worth keeping — it just has to be typed. Never a dead end.
