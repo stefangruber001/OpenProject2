@@ -678,6 +678,173 @@ assert(r2.applied.length === 0, "a current blob applies no further migrations");
   m19.up({});
 }
 
+/* ---- step 20 in isolation: the job points at the contract that was SIGNED --
+   Step 19 linked the jobs that had no contract; this repairs the ones holding
+   the wrong one. Both writers used `find()` — the first record filed for that
+   budget — and signing never moved the link, so an operator with three
+   contracts on one quote had their job pointing at the first while the third
+   carried the signature. */
+{
+  const m20 = M.MIGRATIONS.find((m) => m.to === 20);
+  const sig = { customerSignedAt: "2026-08-20" };
+
+  // The reported case: the job holds a draft, a later contract is signed.
+  const moved = m20.up({
+    projects: [{ id: "prj_a", budgetId: "bud_1", contractId: "con_1" }],
+    contracts: [
+      {
+        id: "con_1",
+        budgetId: "bud_1",
+        status: "draft",
+        number: "CTR-2026-0003",
+        date: "2026-08-01",
+      },
+      {
+        id: "con_3",
+        budgetId: "bud_1",
+        status: "signed",
+        number: "CTR-2026-0005",
+        date: "2026-08-20",
+        signature: sig,
+      },
+    ],
+  });
+  assert(
+    moved.projects[0].contractId === "con_3",
+    "m20: a job holding a draft moves to the contract that was signed",
+  );
+
+  // A signed holder is the answer, whoever wrote it. Never reassigned.
+  const keptSigned = m20.up({
+    projects: [{ id: "prj_b", budgetId: "bud_2", contractId: "con_first" }],
+    contracts: [
+      {
+        id: "con_first",
+        budgetId: "bud_2",
+        status: "signed",
+        number: "CTR-1",
+        date: "2026-08-01",
+        signature: sig,
+      },
+      {
+        id: "con_later",
+        budgetId: "bud_2",
+        status: "signed",
+        number: "CTR-2",
+        date: "2026-08-09",
+        signature: sig,
+      },
+    ],
+  });
+  assert(
+    keptSigned.projects[0].contractId === "con_first",
+    "m20: a job already held by a SIGNED contract is never moved",
+  );
+
+  // Money already points at the holder's installments: leave it alone.
+  const keptInvoiced = m20.up({
+    projects: [{ id: "prj_c", budgetId: "bud_3", contractId: "con_billed" }],
+    contracts: [
+      {
+        id: "con_billed",
+        budgetId: "bud_3",
+        status: "draft",
+        number: "CTR-3",
+        date: "2026-08-01",
+        installments: [{ idx: 0, invoicedInvoiceId: "inv_9" }],
+      },
+      {
+        id: "con_signed",
+        budgetId: "bud_3",
+        status: "signed",
+        number: "CTR-4",
+        date: "2026-08-10",
+        signature: sig,
+      },
+    ],
+  });
+  assert(
+    keptInvoiced.projects[0].contractId === "con_billed",
+    "m20: a job whose contract has an invoiced milestone is never moved",
+  );
+
+  // Two signatures on one budget: the newest wins, deterministically.
+  const newest = m20.up({
+    projects: [{ id: "prj_d", budgetId: "bud_4", contractId: "con_draft" }],
+    contracts: [
+      { id: "con_draft", budgetId: "bud_4", status: "draft", number: "CTR-5", date: "2026-08-01" },
+      {
+        id: "con_old",
+        budgetId: "bud_4",
+        status: "signed",
+        number: "CTR-6",
+        date: "2026-08-05",
+        signature: sig,
+      },
+      {
+        id: "con_new",
+        budgetId: "bud_4",
+        status: "signed",
+        number: "CTR-7",
+        date: "2026-08-15",
+        signature: sig,
+      },
+    ],
+  });
+  assert(newest.projects[0].contractId === "con_new", "m20: the newest signature wins");
+
+  // A cancelled holder with nothing to replace it is released, not kept.
+  const released = m20.up({
+    projects: [{ id: "prj_e", budgetId: "bud_5", contractId: "con_dead" }],
+    contracts: [
+      {
+        id: "con_dead",
+        budgetId: "bud_5",
+        status: "cancelled",
+        number: "CTR-8",
+        date: "2026-08-01",
+      },
+    ],
+  });
+  assert(
+    released.projects[0].contractId === null,
+    "m20: a cancelled contract stops gating the job it no longer governs",
+  );
+
+  // Nothing signed anywhere: the draft that was there stays there.
+  const untouched = m20.up({
+    projects: [{ id: "prj_f", budgetId: "bud_6", contractId: "con_only" }],
+    contracts: [
+      { id: "con_only", budgetId: "bud_6", status: "draft", number: "CTR-9", date: "2026-08-01" },
+    ],
+  });
+  assert(
+    untouched.projects[0].contractId === "con_only",
+    "m20: with nothing signed, the link is left where it was",
+  );
+
+  // A quick job has no budget to match on.
+  const quick = m20.up({
+    projects: [{ id: "prj_g", budgetId: null, contractId: null }],
+    contracts: [
+      {
+        id: "con_g",
+        budgetId: null,
+        status: "signed",
+        number: "CTR-10",
+        date: "2026-08-01",
+        signature: sig,
+      },
+    ],
+  });
+  assert(quick.projects[0].contractId === null, "m20: a quick job (no budget) is untouched");
+
+  // Idempotent, and tolerant of the arrays being absent entirely.
+  const again = m20.up(JSON.parse(JSON.stringify(moved)));
+  assert(JSON.stringify(again) === JSON.stringify(moved), "m20: re-running changes nothing");
+  m20.up({});
+}
+
 // ---- the dangerous direction is refused ------------------------------------
 throws(
   () => M.migrate({ ...v1, schemaVersion: M.CURRENT_VERSION + 1 }),

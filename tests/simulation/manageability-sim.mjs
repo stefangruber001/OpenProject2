@@ -374,6 +374,118 @@ assert(
   );
 }
 
+/* ── PK10-S2 · the obra follows the SIGNATURE, not the filing order ────────
+   `createProjectFromAcceptance` took `contracts.find(c => c.budgetId === …)`
+   — whatever was pushed first, draft or cancelled or superseded — and
+   `signContract` never touched the link at all. So the operator drew up three
+   contracts on one accepted quote, signed the third, and the job had been
+   pointing at the first since the day it was created: CON-11 refused the first
+   invoice on the strength of a draft nobody had signed. */
+{
+  const signed = { storageKey: "sig-e2e", name: "firmado.pdf" };
+  const budget = () => {
+    const b = erp.createBudget({ partyId: cust.id, activityLine: "renovation" }, "bo");
+    const c = erp.addChapter(b.id, { name: "Obra" }, "bo");
+    erp.addLine(b.id, c.id, { desc: "T", unit: "ud", qtyMilli: 1000, priceCents: 50000 });
+    erp.issueVersion(b.id, { channel: "hand" }, "bo");
+    erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "ok" }, "bo");
+    return b;
+  };
+  const terms = { duration: { estimatedDays: 5 } };
+
+  // A · the job is created AFTER the contracts, and takes the signed one.
+  {
+    const b = budget();
+    const one = erp.createContract(b.id, terms, "bo");
+    erp.createContract(b.id, terms, "bo");
+    const three = erp.createContract(b.id, terms, "bo");
+    erp.signContract(three.id, { evidence: signed }, "bo");
+    const prj = erp.createProjectFromAcceptance(b.id, "bo");
+    assert(
+      prj.contractId === three.id,
+      "a new obra takes the SIGNED contract, not the first one filed",
+      `${prj.contractId} (signed ${three.id}, first ${one.id})`,
+    );
+  }
+
+  // B · the job exists first, a draft holds it, and signing moves the link.
+  {
+    const b = budget();
+    const draft = erp.createContract(b.id, terms, "bo");
+    const prj = erp.createProjectFromAcceptance(b.id, "bo");
+    assert(prj.contractId === draft.id, "…the draft holds it while nothing is signed");
+    const real = erp.createContract(b.id, terms, "bo");
+    erp.signContract(real.id, { evidence: signed }, "bo");
+    assert(
+      erp.project(prj.id).contractId === real.id,
+      "signing a contract claims the obra a draft was holding",
+      String(erp.project(prj.id).contractId),
+    );
+    assert(
+      erp.contractsView().find((x) => x.id === draft.id).projectCode === null,
+      "…and the draft lets go: one obra, one contract",
+    );
+  }
+
+  // C · a job already held by a SIGNED contract is left alone.
+  {
+    const b = budget();
+    const first = erp.createContract(b.id, terms, "bo");
+    erp.signContract(first.id, { evidence: signed }, "bo");
+    const prj = erp.createProjectFromAcceptance(b.id, "bo");
+    assert(prj.contractId === first.id, "…the signed contract owns the obra");
+    const second = erp.createContract(b.id, terms, "bo");
+    erp.signContract(second.id, { evidence: signed }, "bo");
+    assert(
+      erp.project(prj.id).contractId === first.id,
+      "a second signature does NOT steal an obra from a signed contract — that is a question for a person",
+      String(erp.project(prj.id).contractId),
+    );
+  }
+
+  // D · a cancelled contract is never the answer.
+  {
+    const b = budget();
+    const dead = erp.createContract(b.id, terms, "bo");
+    erp.cancelContract(dead.id, "rehecho", "bo");
+    const live = erp.createContract(b.id, terms, "bo");
+    const prj = erp.createProjectFromAcceptance(b.id, "bo");
+    assert(
+      prj.contractId === live.id,
+      "a cancelled contract is never chosen for a new obra",
+      String(prj.contractId),
+    );
+  }
+
+  // E · CON-11 names the record it read, and says where the signature is.
+  {
+    const b = budget();
+    const draft = erp.createContract(b.id, terms, "bo");
+    const prj = erp.createProjectFromAcceptance(b.id, "bo");
+    const alone = erp
+      .previewInvoice({ projectId: prj.id, kind: "progress", baseCents: 1000, lines: [] })
+      .blocks.find((x) => x.code === "CON-11");
+    assert(
+      alone && alone.ref === draft.number,
+      "CON-11 names the contract the obra is actually pointing at",
+      JSON.stringify(alone && alone.ref),
+    );
+    const other = erp.createContract(b.id, terms, "bo");
+    // Signing would normally claim the obra; hold the link back to reproduce
+    // the operator's own state — a signed contract beside an unsigned holder.
+    erp.signContract(other.id, { evidence: signed }, "bo");
+    erp.linkContractToProject(draft.id, prj.id, "bo");
+    const both = erp
+      .previewInvoice({ projectId: prj.id, kind: "progress", baseCents: 1000, lines: [] })
+      .blocks.find((x) => x.code === "CON-11");
+    assert(
+      both && both.ref === draft.number + " → " + other.number,
+      "…and points at the signed one when there is one",
+      JSON.stringify(both && both.ref),
+    );
+  }
+}
+
 /* ── PK9-S3 · terms are the CALLER's, but not all of them ──────────────────
    `createContract` merges the caller's terms object wholesale, which is what
    lets a drawer pass `externalRef` with no whitelist to maintain. The cost is

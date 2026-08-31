@@ -23546,7 +23546,7 @@
           const rows = pv.blocks
             .map(
               (b) => `<div class="it"><span class="pill r" translate="no">${esc(b.code)}</span>
-       <span style="flex:1;margin-left:8px"><span>${esc(b.label)}</span>${b.detail ? ` — <span${b.data ? ' translate="no"' : ""}>${esc(b.detail)}</span>` : ""}</span></div>`,
+       <span style="flex:1;margin-left:8px"><span>${esc(b.label)}</span>${b.detail ? ` — <span${b.data ? ' translate="no"' : ""}>${esc(b.detail)}</span>` : ""}${b.ref ? ` <b translate="no">${esc(b.ref)}</b>` : ""}</span></div>`,
             )
             .join("");
           const empty = pv.empty

@@ -3086,6 +3086,44 @@
      * governs the job, and two answers to that question is the state this
      * method exists to leave behind.
      */
+    /**
+     * WHICH CONTRACT A BUDGET'S JOB BELONGS TO — asked in one place, because
+     * three places used to answer it and two of them answered "the first one".
+     *
+     * `contracts.find(c => c.budgetId === id)` returns whatever was pushed
+     * first, which on a live workspace is the oldest draft. The operator drew
+     * up three contracts on one accepted quote, signed the third, and the job
+     * had been pointing at the first since the day it was created — so CON-11
+     * refused the first invoice on the strength of a draft nobody had signed,
+     * while a signed contract for the same work sat two rows above it on the
+     * same screen.
+     *
+     * The order below is the order a person would read it in: a signature
+     * settles the question, and among signatures the most recent one does; if
+     * nothing is signed, the newest live draft; and a cancelled contract is
+     * never the answer, which `cancelContract` already says in its own way by
+     * releasing the job.
+     */
+    _bestContractForBudget(budgetId, { exclude } = {}) {
+      if (!budgetId) return null;
+      const live = this.state.contracts.filter(
+        (c) => c.budgetId === budgetId && c.status !== "cancelled" && c.id !== exclude,
+      );
+      if (!live.length) return null;
+      // Date first, then the number, which breaks a same-day tie the way the
+      // series itself orders them.
+      const key = (c) => String(c.date || "") + "\u0000" + String(c.number || "");
+      const newest = (list) =>
+        list.reduce((best, c) => (best === null || key(c) > key(best) ? c : best), null);
+      const signed = live.filter((c) => c.signature && c.signature.customerSignedAt);
+      return signed.length ? newest(signed) : newest(live);
+    }
+
+    /** Has this contract already been invoiced through one of its milestones? */
+    _contractHasInvoicedInstallment(contract) {
+      return (contract.installments || []).some((i) => !!i.invoicedInvoiceId);
+    }
+
     linkContractToProject(contractId, projectId, user) {
       const c = this.state.contracts.find((x) => x.id === contractId);
       if (!c) throw new Error("Contract not found");
@@ -3299,6 +3337,32 @@
       c.guarantees.forEach((g) => {
         g.startDate = null;
       }); // set at completion
+      /* THE SIGNATURE CLAIMS THE JOB, because that is what the operator means
+         by signing it. `createContract` writes the reverse link only for a job
+         that has none — right as a default, and it leaves the second contract
+         on a budget unable to claim its job for good. So the moment that
+         should obviously settle the question did nothing at all: they signed
+         the real contract and CON-11 went on refusing the first invoice on the
+         strength of the draft still holding the link.
+         Two refusals, both about not overwriting a fact with a default:
+         a job held by another SIGNED contract is left alone — two signatures
+         on one budget is a question for a person, and «Vincular obra» is where
+         they answer it; and a job whose contract has already been INVOICED
+         through one of its milestones is left alone too, because those
+         invoices point at that contract's installments and re-pointing the job
+         would leave the money describing a document it no longer belongs to. */
+      const holder = this.state.projects.find((p) => p.budgetId === c.budgetId && c.budgetId);
+      if (holder && holder.contractId !== c.id) {
+        const current = holder.contractId
+          ? this.state.contracts.find((x) => x.id === holder.contractId)
+          : null;
+        const heldBySigned = !!(current && current.signature && current.signature.customerSignedAt);
+        const heldByInvoiced = !!(current && this._contractHasInvoicedInstallment(current));
+        if (!heldBySigned && !heldByInvoiced) {
+          holder.contractId = c.id;
+          this._log(user, "signContract:claimObra", c.number + " → " + holder.code);
+        }
+      }
       this._log(user, "signContract", c.number);
       return c;
     }
@@ -3539,7 +3603,7 @@
       const b = this.budget(budgetId);
       if (!b.acceptedVersionId) throw new Error("Acceptance required before project creation");
       const t = this.budgetTotals(budgetId, b.acceptedVersionId);
-      const contract = this.state.contracts.find((c) => c.budgetId === budgetId);
+      const contract = this._bestContractForBudget(budgetId);
       const rec = {
         id: this._id("prj"),
         code: "P-" + b.number.replace("PRE-", ""),
@@ -4744,12 +4808,31 @@
         contractParty === billTo &&
         firstForPayer &&
         !contract.signature.customerSignedAt
-      )
+      ) {
+        /* NAME THE CONTRACT IT READ. The blocker used to say only that the
+           contract was unsigned — while the operator was looking at a signed
+           contract for the same customer, on the same screen, and had no way
+           to learn that the job was pointing at a different record. Naming it
+           turns "this is wrong" into "this is which", and when a signed
+           contract exists on the same budget the sentence says so and where to
+           go. The number rides in `ref` rather than inside `detail` so the
+           sentence still translates and the record still does not. */
+        const signedElsewhere = this._bestContractForBudget(contract.budgetId, {
+          exclude: contract.id,
+        });
+        const other =
+          signedElsewhere && signedElsewhere.signature && signedElsewhere.signature.customerSignedAt
+            ? signedElsewhere
+            : null;
         out.push({
           code: "CON-11",
           label: "Contrato sin firmar",
-          detail: "La primera factura de la obra necesita el contrato firmado.",
+          detail: other
+            ? "La obra está vinculada a un contrato sin firmar, y hay otro ya firmado para este presupuesto: vincúlelo a la obra desde el contrato."
+            : "La primera factura de la obra necesita el contrato firmado.",
+          ref: other ? contract.number + " → " + other.number : contract.number,
         });
+      }
       if (draft.kind === "creditNote" && !draft.rectifies)
         out.push({
           code: "AR-10",

@@ -98,6 +98,7 @@ async function main() {
     testSmallFixes,
     testChangeApprovalEvidence,
     testContractCreation,
+    testContractObraLink,
     testBudgetCreation,
     testProcurement,
     testAdmin,
@@ -3548,6 +3549,121 @@ async function testOlderPhone(browser, base) {
     else bad("older phone: honest badge after a failed read", JSON.stringify(kept.badge));
   } catch (e) {
     bad("older phone (PK10-S1)", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/**
+ * PK10-S2 · CON-11 SAYS WHICH CONTRACT, because "unsigned" was not enough.
+ *
+ * The operator had three contracts on one accepted quote and signed the third.
+ * The job had pointed at the first since the day it was created, so the blocker
+ * refused the first invoice on the strength of a draft — while a signed
+ * contract for the same customer sat two rows above it on the same screen, and
+ * nothing anywhere said the two were different records.
+ *
+ * State is BUILT and then put back, rather than hunted for: a check that skips
+ * because the seed happens not to hold the case proves nothing. The second
+ * contract is fabricated in place rather than created through the engine, so
+ * the contract series is not advanced by a test.
+ */
+async function testContractObraLink(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#invoicing`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+
+    const shown = await pg.evaluate(async () => {
+      /* Cloned, not created: driving the engine here would advance the contract
+         series, and a test that consumes a document number leaves a gap ORG-04
+         requires not to exist. A clone carries every field the preview reads
+         and a fresh id no invoice points at, which is exactly the state the
+         operator was in — a job whose first invoice has not been issued. */
+      const src = erp.state.projects.find((p) => p.contractId);
+      if (!src) return { skip: "no job with a contract in the seed" };
+      const heldSrc = erp.state.contracts.find((c) => c.id === src.contractId);
+      if (!heldSrc) return { skip: "the job's contract is missing" };
+
+      const prj = JSON.parse(JSON.stringify(src));
+      prj.id = "prj_ghost_e2e";
+      prj.code = "P-GHOST";
+      const draft = JSON.parse(JSON.stringify(heldSrc));
+      draft.id = "con_ghost_draft";
+      draft.number = "CTR-GHOST-0";
+      draft.status = "draft";
+      draft.signature = {
+        customerSignedAt: null,
+        companySignedAt: null,
+        method: null,
+        document: null,
+      };
+      draft.document = null;
+      (draft.installments || []).forEach((i) => {
+        i.invoicedInvoiceId = null;
+        i.status = "planned";
+      });
+      const signed = JSON.parse(JSON.stringify(draft));
+      signed.id = "con_ghost_signed";
+      signed.number = "CTR-GHOST-1";
+      signed.date = erp.today;
+      signed.status = "signed";
+      signed.signature = {
+        customerSignedAt: erp.today,
+        companySignedAt: erp.today,
+        method: "physical",
+        document: { storageKey: "ghost", name: "firmado.pdf" },
+      };
+      prj.contractId = draft.id;
+      erp.state.projects.push(prj);
+      erp.state.contracts.push(draft, signed);
+
+      invOpen(prj.id);
+      invSync();
+      await new Promise((r) => setTimeout(r, 600));
+      const row = [...document.querySelectorAll("#invGates .daylist .it")].find((r) =>
+        /CON-11/.test(r.textContent),
+      );
+      const out = {
+        found: !!row,
+        text: row ? row.textContent.replace(/\s+/g, " ").trim() : "",
+        refInNoTranslate: row
+          ? [...row.querySelectorAll('[translate="no"]')].map((e) => e.textContent.trim())
+          : [],
+        held: draft.number,
+      };
+      document.querySelector("#invBack")?.click();
+      // Put the workspace back exactly as it was found.
+      erp.state.projects = erp.state.projects.filter((p) => p.id !== "prj_ghost_e2e");
+      erp.state.contracts = erp.state.contracts.filter(
+        (c) => c.id !== "con_ghost_draft" && c.id !== "con_ghost_signed",
+      );
+      return out;
+    });
+
+    if (shown.skip) {
+      bad("CON-11: a job to block", shown.skip);
+    } else {
+      const ref = shown.held + " → CTR-GHOST-1";
+      if (shown.found && shown.refInNoTranslate.includes(ref))
+        ok(
+          `CON-11: the blocker names the contract the job reads and the one that is signed (${ref})`,
+        );
+      else bad("CON-11: names both contracts", JSON.stringify(shown));
+      if (/firmado|signed|signat/i.test(shown.text) && !shown.text.includes("undefined"))
+        ok(
+          "CON-11: …in a sentence that translates, with the numbers beside it rather than inside it",
+        );
+      else bad("CON-11: sentence and numbers kept apart", JSON.stringify(shown.text));
+    }
+
+    if (errs.length === 0) ok("CON-11: no console errors");
+    else bad("CON-11: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("contract↔obra link (PK10-S2)", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }

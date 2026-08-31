@@ -816,6 +816,72 @@
         return s;
       },
     },
+    {
+      to: 20,
+      name: "the job points at the contract that was signed",
+      /*
+       * STEP 19 LINKED THE JOBS THAT HAD NO CONTRACT. This one repairs the
+       * jobs that have the WRONG one.
+       *
+       * Both writers picked a contract with `find()` — the first record filed
+       * for that budget, draft or superseded — and `signContract` never
+       * touched the link at all. So an operator who drew up three contracts on
+       * one accepted quote and signed the third had a job pointing at the
+       * first since the day it was created, and CON-11 went on refusing the
+       * first invoice on the strength of a draft nobody had signed. The engine
+       * now chooses by signature and claims the job when a contract is signed;
+       * this repairs what was written before it did.
+       *
+       * Rules, in order, and every one of them is about not overwriting a fact
+       * with a default:
+       *   · a job whose contract is SIGNED is never touched — that is the
+       *     answer, whoever wrote it;
+       *   · a job whose contract has an INVOICED milestone is never touched:
+       *     those invoices point at that contract's installments, and moving
+       *     the job would leave the money describing another document;
+       *   · otherwise, if a signed contract exists for the same budget, the
+       *     job moves to it — the newest, if somebody signed more than one;
+       *   · a cancelled contract is released rather than kept, which is what
+       *     `cancelContract` does when it is used;
+       *   · a quick job (no budgetId) is untouched.
+       *
+       * Deliberately NOT rescaled or re-annexed: this moves a pointer and
+       * nothing else. Amounts, annexes and invoices stay exactly as they are.
+       */
+      up: function (s) {
+        var projects = Array.isArray(s.projects) ? s.projects : [];
+        var contracts = Array.isArray(s.contracts) ? s.contracts : [];
+        var byId = {};
+        for (var k = 0; k < contracts.length; k++) byId[contracts[k].id] = contracts[k];
+        var isSigned = function (c) {
+          return !!(c && c.signature && c.signature.customerSignedAt);
+        };
+        var wasInvoiced = function (c) {
+          var ins = (c && c.installments) || [];
+          for (var n = 0; n < ins.length; n++) if (ins[n].invoicedInvoiceId) return true;
+          return false;
+        };
+        var sortKey = function (c) {
+          return String(c.date || "") + "\u0000" + String(c.number || "");
+        };
+        for (var i = 0; i < projects.length; i++) {
+          var p = projects[i];
+          if (!p.budgetId) continue;
+          var held = p.contractId ? byId[p.contractId] : null;
+          if (isSigned(held) || wasInvoiced(held)) continue;
+          var best = null;
+          for (var c2 = 0; c2 < contracts.length; c2++) {
+            var cand = contracts[c2];
+            if (cand.budgetId !== p.budgetId || cand.status === "cancelled") continue;
+            if (!isSigned(cand)) continue;
+            if (best === null || sortKey(cand) > sortKey(best)) best = cand;
+          }
+          if (best) p.contractId = best.id;
+          else if (held && held.status === "cancelled") p.contractId = null;
+        }
+        return s;
+      },
+    },
   ];
 
   /**

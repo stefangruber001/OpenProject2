@@ -6943,6 +6943,50 @@ the count went up by exactly that quotation. It is written in CLAUDE.md. The
 comment now says so out loud beside the rewording, since stating it once has
 demonstrably not been enough.
 
+### 211 · The obra follows the signature, not the filing order (2026-08-31)
+
+The operator drew up three contracts on one accepted quote, signed the third,
+and could not invoice. CON-11 was right about the record it was reading and
+useless about which record that was: the job had been pointing at the FIRST
+contract since the day it was created, and signing the third changed nothing.
+
+**Two writers, both answering "which contract?" with `find()`.**
+`createProjectFromAcceptance` took `contracts.find(c => c.budgetId === …)` —
+whatever was pushed first, draft or cancelled or superseded — and
+`signContract` never touched the link at all. The question is now asked in one
+place, `_bestContractForBudget`, and answered the way a person would: a
+signature settles it, and among signatures the most recent; failing that the
+newest live draft; and a cancelled contract is never the answer, which
+`cancelContract` already said in its own way by releasing the job.
+
+**Signing claims the job**, because that is what an operator means by signing
+it. Two refusals, both about not overwriting a fact with a default: a job held
+by another SIGNED contract is left alone — two signatures on one budget is a
+question for a person, and «Vincular obra» is where they answer it — and a job
+whose contract has an INVOICED milestone is left alone, because those invoices
+point at that contract's installments and re-pointing the job would leave the
+money describing a document it no longer belongs to.
+
+**The blocker names the record it read.** «Contrato sin firmar» was true and
+unusable while a signed contract for the same customer sat on the same screen.
+It now carries the number, and when a signed contract exists for the same
+budget it says so and where to go. The numbers ride in a `ref` field rendered
+in its own `translate="no"` element rather than inside `detail`, so the
+sentence still translates and the record still does not — A12's rule, applied
+to a new blocker rather than rediscovered later.
+
+**Migration 20 repairs what was written before.** Step 19 linked the jobs that
+had NO contract; this moves the jobs holding the wrong one. It never touches a
+job whose contract is signed, and never one whose contract has been invoiced —
+a pointer moves, nothing else. Proven by gutting the step: three checks go red,
+and the six refusal checks correctly stay green, because they assert that
+nothing moves.
+
+**One check earns its keep only after the fix.** «A second signature does not
+steal an obra from a signed contract» passed red-first too — of course it did,
+nothing moved before. It is not a regression test for the bug; it is the guard
+against the fix going too far, which is a different job and worth having.
+
 ## S43 · PK-N — a Word file is the same document, not a second one (2026-08-29)
 
 The operator asked for every generated PDF to exist as a Word file too, an

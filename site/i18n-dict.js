@@ -3028,6 +3028,12 @@ window.CANEI_DICT = {
       "⚠ The document could not be read: fill it in by hand",
     ],
     ["Sin lectura — escríbalo a mano", "Not read — type it in"],
+    /* PK10-S2 · CON-11 when the job is pointing at the wrong contract. The
+       numbers ride beside this sentence in their own span, not inside it. */
+    [
+      "La obra está vinculada a un contrato sin firmar, y hay otro ya firmado para este presupuesto: vincúlelo a la obra desde el contrato.",
+      "The job is linked to an unsigned contract, and another one for this quote is already signed: link it to the job from the contract.",
+    ],
     ["Nº documento", "Document no."],
     ["Retención", "Withholding"],
     ["Factura de proveedor", "Supplier invoice"],
