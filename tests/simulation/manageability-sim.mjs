@@ -4530,6 +4530,270 @@ assert(
   );
 }
 
+/* ── PK11 · a bill filed against the wrong company, and no way back ────────
+   The supplier picker had no empty option, so a document whose tax id matched
+   nobody was filed against whichever supplier happened to be FIRST in the
+   list. It happened: an invoice from SUMINISTROS CERDA landed on Leroy Merlin
+   and every screen downstream then correctly reported the wrong company.
+
+   The picker is fixed in the screen. This block is about the other half —
+   what the operator can do about the ones already filed — because a mistake
+   with no way back is worse than the mistake. Three doors were shut at once:
+   `correctBill` allows the numbers on the page and not the issuer, nothing
+   deleted a bill, and `deleteCapture` refused precisely BECAUSE a bill
+   pointed at the document. */
+{
+  const e = new ERP("2026-09-20");
+  const wrong = e.addParty(
+    { roles: ["supplier"], name: "Leroy Merlin 11", taxId: "B12345674" },
+    "bo",
+  );
+  const right = e.addParty(
+    {
+      roles: ["subcontractor"],
+      name: "SUMINISTROS CERDA 11, S.L.",
+      taxId: "B62889415",
+      irpfApplies: true,
+      irpfRateBp: 1500,
+    },
+    "bo",
+  );
+  const c = e.captureDocument({ docType: "supplierInvoice", imageRef: "img-11" }, "bo");
+  e.confirmCapture(
+    c.id,
+    {
+      issuerName: "SUMINISTROS CERDA 11, S.L.",
+      issuerTaxId: "B62889415",
+      docNumber: "F-2026/4471",
+      date: "2026-09-18",
+      baseCents: 248380,
+      vatCents: 52160,
+      totalCents: 300540,
+    },
+    "bo",
+  );
+  const bill = e.billFromCapture(c.id, { supplierId: wrong.id }, "bo");
+  assert(
+    bill.supplierName === "Leroy Merlin 11",
+    "the wrong choice is filed faithfully — the record says what it was told",
+    bill.supplierName,
+  );
+
+  // A bill with no supplier at all is not a bill, and the rule is stated where
+  // the record is made rather than only in the screen above it.
+  throws(
+    () => e.registerBill({ number: "X-1", baseCents: 1000 }, "bo"),
+    "a bill with no supplier is refused by the engine, not only by the form",
+  );
+
+  // ── the correction ──
+  e.reassignBill(bill.id, right.id, "bo");
+  assert(
+    bill.supplierId === right.id &&
+      bill.supplierName === "SUMINISTROS CERDA 11, S.L." &&
+      bill.supplierTaxId === "B62889415",
+    "a bill can be re-filed against the company that actually issued it",
+    JSON.stringify({ name: bill.supplierName, taxId: bill.supplierTaxId }),
+  );
+  assert(
+    bill.irpfBp === 1500 && bill.irpfCents === 37257 && bill.totalCents === 263283,
+    "…and the withholding follows the new issuer's profile, so the total is theirs",
+    JSON.stringify({ bp: bill.irpfBp, irpf: bill.irpfCents, total: bill.totalCents }),
+  );
+  assert(
+    e.state.audit.some((a) => a.action === "reassignBill" && /Leroy Merlin 11/.test(a.ref)),
+    "…and the audit line names both companies, so the change is legible",
+  );
+  throws(() => e.reassignBill(bill.id, "", "bo"), "reassigning to nobody is refused");
+
+  // ── the removal ──
+  assert(e.billDeleteBlock(bill.id) === null, "nothing yet points at the bill, so it may go");
+  const del = e.deleteBill(bill.id, "bo");
+  assert(
+    !e.state.bills.some((x) => x.id === bill.id) && del.releasedCapture === c.id,
+    "a bill nobody has touched can be removed, and it names the document it released",
+    JSON.stringify(del),
+  );
+  assert(
+    e.state.captured.find((x) => x.id === c.id).billId === null,
+    "…and the captured document goes back to being registrable, not orphaned",
+  );
+  // The door `deleteCapture` was holding shut is now openable from the inside.
+  e.deleteCapture(c.id, "bo");
+  assert(
+    !e.state.captured.some((x) => x.id === c.id),
+    "…so the document that only ever existed by mistake can finally be deleted too",
+  );
+
+  // ── and what may NOT go ──
+  const paid = e.registerBill(
+    { supplierId: wrong.id, number: "PAID-11", baseCents: 10000, vatBp: 2100 },
+    "bo",
+  );
+  e.payBills(
+    {
+      amountCents: e.billOutstandingCents(paid.id),
+      method: "transfer",
+      billAllocations: [{ billId: paid.id, amountCents: e.billOutstandingCents(paid.id) }],
+    },
+    "bo",
+  );
+  assert(e.billDeleteBlock(paid.id) === "paid", "a paid bill names its blocker rather than a wall");
+  throws(() => e.deleteBill(paid.id, "bo"), "…and removing it is refused");
+  throws(() => e.reassignBill(paid.id, right.id, "bo"), "…as is re-filing it against anyone else");
+
+  const credited = e.registerBill(
+    { supplierId: wrong.id, number: "CRED-11", baseCents: 5000, vatBp: 2100 },
+    "bo",
+  );
+  e.registerBill(
+    {
+      supplierId: wrong.id,
+      number: "AB-11",
+      baseCents: 5000,
+      vatBp: 2100,
+      creditNoteFor: credited.id,
+    },
+    "bo",
+  );
+  assert(
+    e.billDeleteBlock(credited.id) === "credited",
+    "a bill with a credit note against it says so",
+    e.billDeleteBlock(credited.id),
+  );
+}
+
+/* ── PK11 · a cost row quotes the invoice, never the party file ───────────
+   `billSupplier` exists so that a filing stands on its own, and its own
+   comment says every reader goes through it. `projectCostRows` was the
+   exception: renaming a supplier would have quietly rewritten who issued a
+   cost booked years earlier, and deactivating one would have thrown inside a
+   report. */
+{
+  const e = new ERP("2026-09-20");
+  const sup = e.addParty({ roles: ["supplier"], name: "Nombre Antiguo", taxId: "B12345674" }, "bo");
+  const cust = e.addParty({ roles: ["customer"], name: "Cliente 11", taxId: "B62889415" }, "bo");
+  const bud = e.createBudget({ partyId: cust.id, activityLine: "renovation" }, "bo");
+  const ch = e.addChapter(bud.id, { name: "Capitulo 11" }, "bo");
+  e.addLine(
+    bud.id,
+    ch.id,
+    { desc: "Linea", unit: "ud", qtyMilli: 1000, priceCents: 100000, costCents: 60000 },
+    "bo",
+  );
+  e.issueVersion(bud.id, { channel: "hand" }, "bo");
+  e.acceptVersion(bud.id, e.currentVersion(bud.id).id, { evidenceRef: "ok" }, "bo");
+  const proj = e.createProjectFromAcceptance(bud.id, "bo");
+  e.registerBill(
+    {
+      supplierId: sup.id,
+      number: "COST-11",
+      baseCents: 10000,
+      vatBp: 2100,
+      allocations: [{ projectId: proj.id, chapterNum: "1", kind: "material", amountCents: 10000 }],
+    },
+    "bo",
+  );
+  e.updateParty(sup.id, { name: "Nombre Nuevo" }, "bo");
+  const row = e.projectCostRows(proj.id).find((r) => r.ref === "COST-11");
+  assert(
+    row && row.party === "Nombre Antiguo" && row.desc === "Nombre Antiguo",
+    "a cost row names the issuer the invoice named, not whatever the party is called today",
+    JSON.stringify(row && { party: row.party, desc: row.desc }),
+  );
+}
+
+/* ── PK11 · emptying an account to run a test ─────────────────────────────
+   `discardMovements` keeps everything anyone has touched, which is right for
+   a statement loaded onto the wrong account and wrong for starting a trial
+   over: the movements somebody most wants gone afterwards are the ones they
+   spent the trial reconciling, and undoing those one at a time is not a
+   thing anyone does four hundred times. */
+{
+  const e = new ERP("2026-09-20");
+  const sup = e.addParty({ roles: ["supplier"], name: "Prov 11R", taxId: "B12345674" }, "bo");
+  const bank = e.addBankAccount({ name: "Banco 11R", kind: "bank" }, "bo");
+  const card = e.addBankAccount({ name: "Visa 11R", kind: "card" }, "bo");
+  e.importMovements(
+    bank.id,
+    [
+      { accountingDate: "2026-09-01", concept: "PAGO PROVEEDOR", amountCents: -12100 },
+      { accountingDate: "2026-09-02", concept: "SIN IDENTIFICAR", amountCents: -3000 },
+    ],
+    "bo",
+  );
+  e.importMovements(
+    card.id,
+    [{ accountingDate: "2026-09-03", concept: "FERRETERIA", amountCents: -5000 }],
+    "bo",
+  );
+  const movs = e.state.movements.filter((m) => m.accountId === bank.id);
+  const bill = e.registerBill(
+    { supplierId: sup.id, number: "R-11", baseCents: 10000, vatBp: 2100 },
+    "bo",
+  );
+  e.matchMovement(movs[0].id, { billId: bill.id }, "bo");
+
+  const pv = e.discardPreview(bank.id);
+  assert(
+    pv.deletable === 1 && pv.byReason.matched === 1,
+    "the import undo keeps the reconciled one — which is right, and not what a test reset needs",
+    JSON.stringify(pv),
+  );
+  const rv = e.resetAccountPreview(bank.id);
+  assert(
+    rv.total === 2 && rv.reconciled === 1,
+    "the reset preview counts what would have to be UNDONE, not what may be skipped",
+    JSON.stringify(rv),
+  );
+
+  const r = e.resetAccountMovements(bank.id, "bo");
+  assert(
+    r.deleted === 2 && r.unwound === 1,
+    "emptying the account removes every movement on it, reconciled ones included",
+    JSON.stringify(r),
+  );
+  assert(
+    !e.state.movements.some((m) => m.accountId === bank.id),
+    "…and nothing of that account is left behind",
+  );
+  assert(
+    e.billOutstandingCents(bill.id) === bill.totalCents,
+    "…and the payment the reconciliation created is voided, so the bill owes again",
+    e.billOutstandingCents(bill.id),
+  );
+  assert(
+    e.state.movements.filter((m) => m.accountId === card.id).length === 1,
+    "…and the card next to it is untouched: one account at a time, on purpose",
+  );
+  assert(
+    !(e.state.importBatches || []).some((b) => b.accountId === bank.id),
+    "…and its imports go with it, rather than leaving a menu of dead undo buttons",
+  );
+
+  // The one refusal, and it is not about lost work: a closed period is a line
+  // somebody drew, and a test reset is not a reason to cross it.
+  const e2 = new ERP("2026-09-20");
+  const acc2 = e2.addBankAccount({ name: "Banco 11C", kind: "bank" }, "bo");
+  e2.importMovements(
+    acc2.id,
+    [{ accountingDate: "2026-09-01", concept: "CERRADO", amountCents: -1000 }],
+    "bo",
+  );
+  const m2 = e2.state.movements[0];
+  e2.markMovementUnbacked(m2.id, "comision", "bo");
+  e2.closeBankPeriod("2026-09-01", "2026-09-30", "bo");
+  throws(
+    () => e2.resetAccountMovements(acc2.id, "bo"),
+    "a closed period refuses the reset, and says to reopen it first",
+  );
+  e2.reopenBankPeriod("2026-09-01", "prueba", "bo");
+  assert(
+    e2.resetAccountMovements(acc2.id, "bo").deleted === 1,
+    "…and once the period is reopened, in the open, the reset goes through",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

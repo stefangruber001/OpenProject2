@@ -582,6 +582,52 @@ window.CANEI_DICT.ca = {
   "La factura necesita una base imponible": "La factura necessita una base imposable",
   "El reparto debe sumar la base imponible": "El repartiment ha de sumar la base imposable",
   "Factura registrada": "Factura registrada",
+  Corregir: "Corregir",
+  "Corregir la factura": "Corregir la factura",
+  "Al cambiar de proveedor se recalcula la retención según su perfil fiscal.":
+    "En canviar de proveïdor es recalcula la retenció segons el seu perfil fiscal.",
+  "Cambiar el proveedor": "Canviar el proveïdor",
+  "Proveedor cambiado": "Proveïdor canviat",
+  "Eliminar la factura": "Eliminar la factura",
+  "Factura eliminada": "Factura eliminada",
+  "Nadie ha tocado todavía esta factura. Al eliminarla, el documento archivado vuelve a quedar libre.":
+    "Ningú no ha tocat encara aquesta factura. En eliminar-la, el document arxivat torna a quedar lliure.",
+  "Se borra la factura registrada y el documento archivado vuelve a quedar sin registrar. No se puede deshacer.":
+    "S'esborra la factura registrada i el document arxivat torna a quedar sense registrar. No es pot desfer.",
+  "Se borra la factura registrada y su asignación a las obras. No se puede deshacer.":
+    "S'esborra la factura registrada i la seva assignació a les obres. No es pot desfer.",
+  "Ya tiene un pago registrado. Anule primero el pago.":
+    "Ja té un pagament registrat. Anul·leu primer el pagament.",
+  "Su trimestre ya se ha enviado al asesor. Registre un abono en su lugar.":
+    "El seu trimestre ja s'ha enviat a l'assessor. Registreu un abonament al seu lloc.",
+  "Está casada con un movimiento bancario. Deshaga primero la conciliación.":
+    "Està casada amb un moviment bancari. Desfeu primer la conciliació.",
+  "Tiene un abono que la referencia. Elimine primero el abono.":
+    "Té un abonament que la referencia. Elimineu primer l'abonament.",
+  "Vaciar la cuenta": "Buidar el compte",
+  "Vaciar la cuenta entera": "Buidar el compte sencer",
+  Vaciar: "Buidar",
+  "Cuenta vaciada": "Compte buidat",
+  "Se deshacen conciliaciones": "Es desfan conciliacions",
+  "Pierden su reparto": "Perden el seu repartiment",
+  "Hay movimientos dentro de un periodo cerrado. Reabra el periodo en Conciliación para poder vaciar la cuenta.":
+    "Hi ha moviments dins d'un període tancat. Reobriu el període a Conciliació per poder buidar el compte.",
+  "Para volver a empezar una prueba: borra TODOS los movimientos de esta cuenta, incluidos los ya conciliados.":
+    "Per tornar a començar una prova: esborra TOTS els moviments d'aquest compte, inclosos els ja conciliats.",
+  "Se borran todos los movimientos de esta cuenta y se deshacen sus conciliaciones, con los pagos y cobros que crearon. No se puede deshacer.":
+    "S'esborren tots els moviments d'aquest compte i es desfan les seves conciliacions, amb els pagaments i cobraments que van crear. No es pot desfer.",
+  "— Elija el proveedor —": "— Trieu el proveïdor —",
+  "El emisor del documento no está dado de alta como proveedor":
+    "L'emissor del document no està donat d'alta com a proveïdor",
+  "Nombre del emisor": "Nom de l'emissor",
+  "NIF/CIF del emisor": "NIF/CIF de l'emissor",
+  "Dar de alta este proveedor": "Donar d'alta aquest proveïdor",
+  "Elija el proveedor al que pertenece la factura": "Trieu el proveïdor a qui pertany la factura",
+  "⚠ Elija el proveedor al que pertenece la factura":
+    "⚠ Trieu el proveïdor a qui pertany la factura",
+  "El proveedor necesita un nombre": "El proveïdor necessita un nom",
+  "⚠ El proveedor necesita un nombre": "⚠ El proveïdor necessita un nom",
+  "Proveedor dado de alta": "Proveïdor donat d'alta",
   "Opcionales (aparte)": "Opcionals (a part)",
   "Total por m²": "Total per m²",
   "⚠ Líneas pendientes de precio (no incluidas)": "⚠ Línies pendents de preu (no incloses)",

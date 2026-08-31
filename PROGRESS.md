@@ -1942,3 +1942,49 @@ was `Promise.withResolvers`, and S1 fixed it.
    after verbs. The register of jobs is the landing state of «Avance físico»
    and again of «Avance económico», and nothing on a phone says the jobs are
    there.
+
+## Package 11 — the invoice filed against the wrong company (started 2026-08-31)
+
+Two questions from the operator, working the live server: an invoice assigned to
+an obra showed a different supplier than the document it came from, and could the
+bank and card movements be cleared to run a test. Both causes below were read out
+of running code before this table was written.
+
+| Session | Scope                                                                                             | Status                                                                                                  |
+| ------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| S1      | the supplier picker must not choose — an empty default, a refusal, and a way to create the issuer | **done** — 3 e2e blocks were encoding the defect and now choose; 19/19 in the suite, 4 checks red first |
+| S2      | a way back — `reassignBill`, `deleteBill`, and the capture it releases                            | in progress                                                                                             |
+| S3      | a cost row quotes the invoice, never the party file                                               | in progress                                                                                             |
+| S4      | emptying an account for a trial run, distinct from undoing an import                              | in progress                                                                                             |
+
+**What was measured.**
+
+1. **The supplier picker answered for the operator.** `billDrawer`'s `#bd_sup`
+   had no empty option, so when the tax id read off the page matched no party
+   the browser selected the FIRST supplier in the list. `billFromCapture`'s
+   `if (!o.supplierId) throw` has always existed and can never fire, because a
+   `<select>` with options always has a value. The warning pill was there and
+   refused nothing.
+2. **The reader mis-read a digit of the tax id.** `B62889417` is not a valid
+   identifier — the check character does not match the seven digits before it;
+   the arithmetic gives `5`. So the issuer could not have been matched even if
+   it HAD been on file, and a create-supplier button that filed what it was
+   handed would have been refused by the party file.
+3. **Nothing downstream was wrong.** `registerBill` stamps `supplierName` onto
+   the record and `billSupplier` reads the stamp, so the cost rows were quoting
+   what was filed. The report was honest about a bill that was not.
+4. **And the mistake had no exit.** `correctBill`'s allow-list has no
+   `supplierId`; there is no `deleteBill`; and `deleteCapture` refuses while
+   `c.billId` is set — so the document was held shut by the record that should
+   never have existed.
+5. **`projectCostRows` read the party file for one field.** `party:` took
+   `this.party(b.supplierId).name` while `desc:` used the stamped
+   `billSupplier` — in a method whose other three sources all quote the
+   document. Latent here, and a silent rewrite of history the day a supplier is
+   renamed.
+6. **The movement cleanup mostly existed.** Bancos → the account → «Deshacer»
+   offers per-import undo and discards the untouched, and a credit card is a
+   `bankAccount` with `kind: "card"`, so one door already served both. What did
+   not exist is the case actually asked for: `_discardableMovement` KEEPS
+   everything anyone has touched, and the movements a trial most wants gone are
+   the ones it spent the trial reconciling.

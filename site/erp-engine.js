@@ -5694,6 +5694,10 @@
     /* =========================== AP — supplier bills & payments =========================== */
     registerBill(b, user) {
       // AP-01/02/03/07
+      // Stated here, at the bottom, and not only in the screen above it: a bill
+      // with no supplier is not a bill, and "Party not found" is what `party()`
+      // would have said instead — true, and unhelpful about which party.
+      if (!b.supplierId) throw new Error("A bill must name the supplier it belongs to");
       const supplier = this.party(b.supplierId);
       const dup = this.state.bills.find(
         (x) => x.supplierId === b.supplierId && x.number === b.number,
@@ -6574,6 +6578,76 @@
       if (after && !kept.length) after();
       this._log(user, "discardMovements", doomed.size + " movs");
       return { deleted: doomed.size, kept: kept.length, keptDetail: kept.slice(0, 20) };
+    }
+    /**
+     * What emptying an account would cost, before anybody empties it.
+     *
+     * `discardPreview` answers the neighbouring question — how much of this is
+     * still untouched — and its answer is deliberately conservative. This one
+     * counts what would have to be UNDONE, because that is the number a person
+     * needs in front of them before agreeing to it.
+     */
+    resetAccountPreview(accountId) {
+      const here = this.state.movements.filter((m) => m.accountId === accountId);
+      return {
+        total: here.length,
+        closed: here.filter((m) => this.bankPeriodClosed(m.accountingDate)).length,
+        reconciled: here.filter((m) => m.matched).length,
+        allocated: here.filter((m) => !m.matched && (m.allocations || []).length).length,
+      };
+    }
+    /**
+     * Empty ONE account of its movements — the reset a trial run needs.
+     *
+     * Deliberately not `discardMovements`. That method keeps everything anyone
+     * has touched, which is exactly right for a statement loaded onto the
+     * wrong account and exactly wrong for starting a test over: the movements
+     * a person most wants gone afterwards are the ones they spent the trial
+     * reconciling. Undoing them one at a time was the only way, and nobody
+     * does that four hundred times.
+     *
+     * So this one unwinds rather than skips — `unmatchMovement` first, which
+     * voids the payment or collection the reconciliation created, so nothing
+     * is left claiming a bill was paid by a movement that no longer exists.
+     *
+     * ONE refusal, and it is not negotiable: a closed period. That is not a
+     * precaution about lost work, it is an accounting boundary somebody
+     * deliberately drew, and a reset is not a reason to cross it. The period
+     * is reopened first, in the open, or the movements stay.
+     *
+     * Scoped to a single account on purpose. "Clear the movements" is a
+     * sentence about a database; every real version of it is about one
+     * statement, one card, one till, and an account at a time is a mistake
+     * that can be re-imported rather than one that cannot.
+     */
+    resetAccountMovements(accountId, user) {
+      const acc = this.state.bankAccounts.find((a) => a.id === accountId);
+      if (!acc) throw new Error("Account not found");
+      const here = this.state.movements.filter((m) => m.accountId === accountId);
+      const closed = here.filter((m) => this.bankPeriodClosed(m.accountingDate));
+      /* The count is NOT in the message, by `closeBankPeriod`'s own rule three
+         methods up: one distinct string per number the queue can hold is a set
+         no dictionary can translate. The screen shows the number, next to the
+         button, before anybody presses it. */
+      if (closed.length)
+        throw new Error(
+          "The account has movements in a closed period — reopen it before emptying the account",
+        );
+      let unwound = 0;
+      for (const m of here)
+        if (m.matched) {
+          this.unmatchMovement(m.id, user);
+          unwound++;
+        }
+      const ids = new Set(here.map((m) => m.id));
+      this.state.movements = this.state.movements.filter((m) => !ids.has(m.id));
+      // The batches described movements that are gone; a list of imports whose
+      // rows no longer exist is a menu of dead undo buttons.
+      this.state.importBatches = (this.state.importBatches || []).filter(
+        (b) => b.accountId !== accountId,
+      );
+      this._log(user, "resetAccountMovements", acc.name + " · " + here.length + " movs");
+      return { deleted: here.length, unwound };
     }
     allocateMovementToProject(movId, ref, kind, user) {
       // BNK-02: enter a budget/project number → cost lands on the project
@@ -7887,8 +7961,15 @@
             source: "bill",
             id: "bill:" + b.id + ":" + i,
             ref: b.number,
-            party: b.supplierId ? this.party(b.supplierId).name : "",
-            desc: b.supplierId ? this.billSupplier(b).name : "",
+            /* Both from the BILL, not from the party file. `billSupplier`'s own
+               comment says every reader goes through it rather than reaching
+               for `party(id).name`, and this line was the exception that
+               proved nothing: renaming a supplier would have quietly rewritten
+               who issued a cost booked years earlier, and deactivating one
+               would have thrown inside a report. What the invoice said on the
+               day it was filed is the answer a cost row wants. */
+            party: this.billSupplier(b).name,
+            desc: this.billSupplier(b).name,
             date: b.date,
             chapterNum: chap(a.chapterNum),
             lineId: a.lineId || null,
@@ -10577,6 +10658,105 @@
       };
       this._log(user, "attachBillDoc", b.number);
       return b;
+    }
+    /**
+     * File a bill against the company that actually issued it.
+     *
+     * `correctBill` deliberately allows only the numbers on the page — base,
+     * rate, number, dates — because those are transcription. The issuer is not
+     * transcription, it is identity, and until now it was the one thing a bill
+     * could be wrong about with no way back: nothing changed it, nothing
+     * deleted the bill, and the captured document behind it was held shut by
+     * `deleteCapture` precisely BECAUSE a bill pointed at it. Three closed
+     * doors around a mistake the supplier picker used to make on its own.
+     *
+     * The withholding is RE-DERIVED, not carried across. Its rate is a
+     * property of who issued the document, so keeping the previous party's
+     * would leave the total describing neither company. This lands the record
+     * where it would have been had the right supplier been chosen at the
+     * start, and the audit line names both so the change is legible.
+     */
+    reassignBill(id, supplierId, user) {
+      const b = this.state.bills.find((x) => x.id === id);
+      if (!b) throw new Error("Bill not found");
+      if (!supplierId) throw new Error("A bill must name the supplier it belongs to");
+      const lock = this._billLocked(b);
+      if (lock)
+        throw new Error("Bill is locked (" + lock + ") — register a supplier credit note instead");
+      const was = this.billSupplier(b).name || b.supplierId;
+      const supplier = this.party(supplierId);
+      b.supplierId = supplier.id;
+      b.supplierName = supplier.name || "";
+      b.supplierTaxId = supplier.taxId || "";
+      b.irpfBp = supplier.irpfApplies ? supplier.irpfRateBp : 0;
+      b.irpfCents = pctOf(b.baseCents, b.irpfBp);
+      b.totalCents = b.baseCents + b.vatCents - b.irpfCents;
+      /* What makes two bills the same bill is the pair (issuer, number), and
+         the issuer just changed — so the standing verdict is about a document
+         that no longer exists and is re-derived rather than left to age. */
+      const dup = this.state.bills.find(
+        (x) => x.id !== b.id && x.supplierId === b.supplierId && x.number === b.number,
+      );
+      b.duplicateSuspect = dup ? dup.id : null;
+      this._log(user, "reassignBill", b.number + ": " + was + " → " + supplier.name);
+      return b;
+    }
+    /**
+     * What still points at a bill, and therefore what must be undone first.
+     *
+     * A CODE, not a sentence, and returned rather than thrown — so a screen
+     * can disable the button and say why in the reader's own language before
+     * anybody presses it. `_discardableMovement` answers the same shape for
+     * the same reason.
+     */
+    billDeleteBlock(id) {
+      const b = this.state.bills.find((x) => x.id === id);
+      if (!b) throw new Error("Bill not found");
+      const lock = this._billLocked(b);
+      if (lock) return lock;
+      if (this.state.payments.some((p) => (p.billAllocations || []).some((a) => a.billId === b.id)))
+        return "paid";
+      if (
+        this.state.movements.some(
+          (m) =>
+            m.matched &&
+            (m.matched.billId === b.id ||
+              (m.matched.documents || []).some((d) => d.billId === b.id)),
+        )
+      )
+        return "reconciled";
+      if (this.state.bills.some((x) => x.creditNoteFor === b.id)) return "credited";
+      return null;
+    }
+    /**
+     * Remove a bill that should never have been filed at all.
+     *
+     * Not a correction and not a credit note — those are for a document that
+     * is real and wrong. This is for one that is not a document: an invoice
+     * registered against the wrong company, or twice, or from a reading nobody
+     * meant to keep. So it is refused the moment anything downstream has
+     * treated it as real, and `billDeleteBlock` names which thing.
+     *
+     * The two forward pointers are RELEASED rather than left dangling. The
+     * captured document goes back to being a validated capture that can be
+     * registered again — or now deleted — which is the state it was in a
+     * moment earlier; the purchase order goes back to delivered-and-not-yet-
+     * invoiced, which is what it once more is. A record pointing at an id that
+     * no longer exists is the failure this method exists to avoid.
+     */
+    deleteBill(id, user) {
+      const i = this.state.bills.findIndex((x) => x.id === id);
+      if (i < 0) throw new Error("Bill not found");
+      const b = this.state.bills[i];
+      const block = this.billDeleteBlock(id);
+      if (block) throw new Error("This invoice cannot be removed: " + block);
+      this.state.bills.splice(i, 1);
+      const cap = b.capId ? this.state.captured.find((c) => c.id === b.capId) : null;
+      if (cap) cap.billId = null;
+      for (const pu of this.state.purchases.filter((x) => x.status.invoicedBillId === id))
+        pu.status.invoicedBillId = null;
+      this._log(user, "deleteBill", b.number + " · " + this.billSupplier(b).name);
+      return { bill: b, releasedCapture: cap ? cap.id : null };
     }
     allocateBill(id, allocations, user) {
       const b = this.state.bills.find((x) => x.id === id);

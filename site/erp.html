@@ -15153,7 +15153,7 @@
    document being promoted — because they are the same form with different
    starting values. Two drawers would be two places to forget the tax id. */
       let billAlloc = [];
-      function billDrawer(capId) {
+      function billDrawer(capId, preselectSupplierId) {
         const cap = capId ? erp.state.captured.find((x) => x.id === capId) : null;
         const cf = (cap && cap.confirmed) || null;
         const suppliers = erp.state.parties.filter(
@@ -15163,12 +15163,26 @@
           say("No hay ningún proveedor dado de alta todavía.");
           return;
         }
-        // Proposed, never decided: a tax id can be read off a page, but binding a
-        // cost to the wrong company is not a choice a screen should make alone.
+        /* Proposed, never decided: a tax id can be read off a page, but binding a
+           cost to the wrong company is not a choice a screen should make alone.
+           That sentence was true of the INTENT and false of the code. A <select>
+           with no empty option is never unanswered — the browser answers it, by
+           choosing the first entry — so a document whose tax id matched nobody
+           was filed against whichever supplier happened to be first in the list.
+           It happened on the operator's own workspace: an invoice from a company
+           that had never been created as a party landed on an unrelated one, and
+           every screen downstream then correctly reported the wrong thing.
+           So the empty choice exists and is the default, and `#bd_go` refuses
+           on it. `preselectSupplierId` is how the choice survives creating the
+           supplier without making the operator find it again. */
         const guess =
-          cf && cf.issuerTaxId
+          suppliers.find((p) => p.id === preselectSupplierId) ||
+          (cf && cf.issuerTaxId
             ? suppliers.find((p) => (p.taxId || "").toUpperCase() === cf.issuerTaxId.toUpperCase())
-            : null;
+            : null);
+        // The issuer is on the page and not in the file: offer to put it there,
+        // here, rather than sending the operator to the party screen and back.
+        const stranger = !!(cf && !guess && (cf.issuerName || cf.issuerTaxId));
         const base = cf ? cf.baseCents || 0 : 0;
         billAlloc =
           cap && cap.allocations && cap.allocations.length
@@ -15187,9 +15201,17 @@
         );
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Proveedor *</label><select id="bd_sup">
+     <option value=""${guess ? "" : " selected"}>— Elija el proveedor —</option>
      ${suppliers.map((p) => `<option value="${p.id}"${guess && guess.id === p.id ? " selected" : ""}>${esc(p.name)}${p.taxId ? " · " + esc(p.taxId) : ""}</option>`).join("")}
     </select></div>
-   ${cf && !guess && cf.issuerTaxId ? `<div class="field full"><span class="pill y">El NIF leído no coincide con ningún proveedor</span></div>` : ""}
+   ${
+     stranger
+       ? `<div class="field full"><span class="pill y">El emisor del documento no está dado de alta como proveedor</span></div>
+   <div class="field"><label>Nombre del emisor</label><input id="bd_supName" value="${esc(cf.issuerName || "")}"></div>
+   <div class="field"><label>NIF/CIF del emisor</label><input id="bd_supTax" value="${esc(cf.issuerTaxId || "")}"></div>
+   <div class="field full"><button class="btn sm" id="bd_mkSup">Dar de alta este proveedor</button></div>`
+       : ""
+   }
    <div class="field"><label>Nº factura *</label><input id="bd_num" value="${esc(cf ? cf.docNumber || "" : "")}"></div>
    <div class="field"><label>Fecha</label><input id="bd_date" type="date" value="${esc(cf && cf.date ? cf.date : erp.state.today)}"></div>
    <div class="field"><label>Vencimiento</label><input id="bd_due" type="date" value="${esc(cf && cf.dueDate ? cf.dueDate : "")}"></div>
@@ -15217,8 +15239,33 @@
           billAlloc.push(blankAlloc(0));
           draw();
         };
+        /* Both fields are editable on purpose. The reader is good and not
+           perfect, and a mis-read digit in a tax id would otherwise be a dead
+           end: the party file refuses an invalid one, and the operator is
+           looking at the paper that has the right one on it. */
+        const mkSup = $("#bd_mkSup");
+        if (mkSup)
+          mkSup.onclick = () =>
+            mutate(() => {
+              const name = $("#bd_supName").value.trim();
+              if (!name) throw new Error("El proveedor necesita un nombre");
+              const made = erp.addParty(
+                {
+                  name,
+                  taxId: $("#bd_supTax").value.trim().toUpperCase(),
+                  roles: ["supplier"],
+                  partyType: "company",
+                },
+                "backoffice",
+              );
+              billDrawer(capId, made.id);
+            }, "Proveedor dado de alta");
         $("#bd_go").onclick = () =>
           mutate(() => {
+            // Refused HERE, in the operator's language. `billFromCapture` has
+            // always guarded this, but a select that is never empty can never
+            // reach it — the engine's rule was unreachable rather than absent.
+            if (!$("#bd_sup").value) throw new Error("Elija el proveedor al que pertenece la factura");
             const number = $("#bd_num").value.trim();
             if (!number) throw new Error("La factura necesita un número");
             const baseCents = readBase();
@@ -15255,6 +15302,95 @@
             closeDrawer();
           }, "Factura registrada");
         draw();
+      }
+
+      /* Why a bill cannot be removed, in the reader's language. The engine
+         returns a CODE for the same reason `discardPreview` does — a screen
+         that must disable a button needs the reason before anybody presses
+         it, and the sentence explaining it belongs where the sentences live. */
+      const BILL_BLOCK = {
+        paid: "Ya tiene un pago registrado. Anule primero el pago.",
+        "quarter-sent": "Su trimestre ya se ha enviado al asesor. Registre un abono en su lugar.",
+        reconciled: "Está casada con un movimiento bancario. Deshaga primero la conciliación.",
+        credited: "Tiene un abono que la referencia. Elimine primero el abono.",
+      };
+
+      /**
+       * The two things a registered invoice could never be until now: filed
+       * against the wrong company, or filed by mistake.
+       *
+       * It happened, on the operator's own workspace, and it was a dead end.
+       * `correctBill` allows the numbers on the page and not the issuer;
+       * nothing deleted a bill; and the photographed document behind it was
+       * held shut by `deleteCapture` precisely because a bill pointed at it.
+       * A mistake with no way back is worse than the mistake.
+       *
+       * Correcting and removing sit in ONE drawer because they answer the same
+       * question — this invoice is wrong — and the right answer depends on
+       * something the operator knows and the screen does not: whether the
+       * document is real. A real invoice from the wrong company is reassigned.
+       * One that should never have been filed is removed, and its document
+       * goes back to the archive rather than down with it.
+       */
+      function billFixDrawer(billId) {
+        const b = erp.state.bills.find((x) => x.id === billId);
+        if (!b) return;
+        const suppliers = erp.state.parties.filter(
+          (p) => p.active !== false && (p.roles || []).some((r) => SUPPLIER_ROLES.includes(r)),
+        );
+        const block = erp.billDeleteBlock(billId);
+        /* The bill's OWN supplier belongs in the list even when the party file
+           would not offer it — deactivated since, or no longer carrying a
+           supplier role. A picker that silently omits the current value is the
+           very defect this drawer exists to repair: nothing would be selected,
+           the browser would answer with whoever came first, and the operator
+           would never see what the bill actually says. When the party is gone
+           entirely there is nothing honest to preselect, so the drawer asks. */
+        const current = erp.state.parties.find((p) => p.id === b.supplierId);
+        const choices =
+          current && !suppliers.some((p) => p.id === b.supplierId)
+            ? [current, ...suppliers]
+            : suppliers;
+        const hasCurrent = choices.some((p) => p.id === b.supplierId);
+        const db = openDrawer("Corregir la factura");
+        db.innerHTML = `<div class="fgrid">
+   <div class="field full"><label>Proveedor</label><select id="bf_sup">
+     ${hasCurrent ? "" : `<option value="" selected>— Elija el proveedor —</option>`}
+     ${choices.map((p) => `<option value="${p.id}"${p.id === b.supplierId ? " selected" : ""}>${esc(p.name)}${p.taxId ? " · " + esc(p.taxId) : ""}</option>`).join("")}
+    </select></div>
+   <div class="field full"><span class="pill y">Al cambiar de proveedor se recalcula la retención según su perfil fiscal.</span></div>
+   <div class="field full"><button class="btn primary sm" id="bf_go">Cambiar el proveedor</button></div>
+  </div>
+  <div class="card" style="margin-top:10px"><div class="ch"><h3>Eliminar</h3></div>
+   <div style="padding:8px 12px 12px">
+    <div class="sub" style="margin-bottom:8px">${block ? esc(BILL_BLOCK[block] || block) : "Nadie ha tocado todavía esta factura. Al eliminarla, el documento archivado vuelve a quedar libre."}</div>
+    <button class="btn sm danger" id="bf_del"${block ? " disabled" : ""}>Eliminar la factura</button>
+   </div></div>`;
+        $("#bf_go").onclick = () =>
+          mutate(() => {
+            if (!$("#bf_sup").value)
+              throw new Error("Elija el proveedor al que pertenece la factura");
+            erp.reassignBill(billId, $("#bf_sup").value, "backoffice");
+            closeDrawer();
+          }, "Proveedor cambiado");
+        const del = $("#bf_del");
+        if (del && !block)
+          del.onclick = async () => {
+            // One whole sentence each, never assembled — a modal body is a
+            // single text node and a concatenated one is untranslatable.
+            const yes = await askConfirm("Eliminar la factura", {
+              body: b.capId
+                ? "Se borra la factura registrada y el documento archivado vuelve a quedar sin registrar. No se puede deshacer."
+                : "Se borra la factura registrada y su asignación a las obras. No se puede deshacer.",
+              okLabel: "Eliminar",
+              danger: true,
+            });
+            if (!yes) return;
+            mutate(() => {
+              erp.deleteBill(billId, "backoffice");
+              closeDrawer();
+            }, "Factura eliminada");
+          };
       }
 
       /** Read a chosen file and open the validation screen on the result. */
@@ -16833,6 +16969,14 @@
           .slice()
           .reverse();
         const pv = erp.discardPreview(accountId);
+        /* The neighbouring question, and deliberately a different one: `pv`
+           counts what may be discarded without undoing anything, `rv` counts
+           what emptying the account would have to undo first. A trial run
+           needs the second — the movements somebody most wants gone afterwards
+           are the ones they spent the trial reconciling — and the two numbers
+           are shown apart because agreeing to one is not agreeing to the
+           other. */
+        const rv = erp.resetAccountPreview(accountId);
         const here = { length: pv.total };
         const free = pv.deletable;
         const db = openDrawer("Deshacer importación · " + (acc ? acc.name : ""));
@@ -16860,7 +17004,21 @@
     <div style="padding:0 12px 10px"><span class="pill y">Sólo se borra lo que nadie ha tocado: un movimiento casado, asignado o marcado sin factura se conserva.</span></div>
     <div style="display:flex;gap:8px;padding:0 12px 12px"><span style="flex:1"></span>
      <button class="btn" id="uiAll"${free ? "" : " disabled"}>Borrar los ${free} sin conciliar</button>
-    </div></div>`;
+    </div></div>
+   ${
+     rv.closed
+       ? `<div class="card"><div class="ch"><h3>Vaciar la cuenta</h3></div>
+    <div style="padding:8px 12px 12px"><div class="sub">Hay movimientos dentro de un periodo cerrado. Reabra el periodo en Conciliación para poder vaciar la cuenta.</div></div></div>`
+       : `<div class="card"><div class="ch"><h3>Vaciar la cuenta</h3><span class="tag" translate="no">${rv.total}</span></div>
+    <div class="daylist">
+     <div class="it"><span>Se deshacen conciliaciones</span><span style="flex:1"></span><b translate="no">${rv.reconciled}</b></div>
+     <div class="it"><span>Pierden su reparto</span><span style="flex:1"></span><b translate="no">${rv.allocated}</b></div>
+    </div>
+    <div style="padding:8px 12px 10px"><span class="pill r">Para volver a empezar una prueba: borra TODOS los movimientos de esta cuenta, incluidos los ya conciliados.</span></div>
+    <div style="display:flex;gap:8px;padding:0 12px 12px"><span style="flex:1"></span>
+     <button class="btn danger" id="uiReset"${rv.total ? "" : " disabled"}>Vaciar la cuenta entera</button>
+    </div></div>`
+   }`;
         db.querySelectorAll("[data-undoimp]").forEach(
           (b) =>
             (b.onclick = () =>
@@ -16878,6 +17036,21 @@
               closeDrawer();
               say(`${r.deleted} movimientos borrados, ${r.kept} conservados`);
             }, "Movimientos borrados");
+        const reset = $("#uiReset");
+        if (reset)
+          reset.onclick = async () => {
+            const yes = await askConfirm("Vaciar la cuenta entera", {
+              body: "Se borran todos los movimientos de esta cuenta y se deshacen sus conciliaciones, con los pagos y cobros que crearon. No se puede deshacer.",
+              okLabel: "Vaciar",
+              danger: true,
+            });
+            if (!yes) return;
+            mutate(() => {
+              const r = erp.resetAccountMovements(accountId, "backoffice");
+              closeDrawer();
+              say(`${r.deleted} movimientos borrados, ${r.unwound} conciliaciones deshechas`);
+            }, "Cuenta vaciada");
+          };
       }
 
       /**
@@ -18958,11 +19131,15 @@
      <td class="num k">${r.outstandingCents > 0 ? eur(r.outstandingCents) : "—"}</td><td>${fmtD(r.dueDate)}</td>
      <td>${r.unallocated ? '<span class="pill r">Sin asignar</span>' : '<span class="pill g">Asignada</span>'}</td><td>${st}</td>
      <td>${r.outstandingCents > 0 ? `<button class="btn sm" data-pay="${r.id}">Pagar</button>` : ""}
+      <button class="btn sm" data-billfix="${r.id}">Corregir</button>
       ${billDocCell(r.id)}</td></tr>`;
      })
      .join("")}
    </tbody></table></div></div>`;
           $("#sb_new").onclick = () => billDrawer(null);
+          v.querySelectorAll("[data-billfix]").forEach(
+            (b) => (b.onclick = () => billFixDrawer(b.dataset.billfix)),
+          );
           v.querySelectorAll("[data-billdoc]").forEach(
             (b) => (b.onclick = () => billDocDrawer(b.dataset.billdoc)),
           );

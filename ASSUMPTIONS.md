@@ -7225,6 +7225,108 @@ and a modal body is one text node, so the audit reported the fragments. Two
 whole sentences, chosen. It is written down twice already; the pattern to
 watch for is any user-visible string built with `+`.
 
+### 216 · The supplier picker answered a question nobody asked it (2026-08-31)
+
+The operator photographed an invoice from SUMINISTROS CERDA MATERIALS, assigned
+it to an obra, and the cost rows named a different company entirely. The
+document was right, the screens were right, and the bill between them was wrong.
+
+**A `<select>` with no empty option is never unanswered.** The drawer proposed
+a supplier when the tax id on the page matched one in the party file, and when
+it matched nobody it proposed nothing — so the browser proposed the FIRST
+supplier in the list, which is not a proposal, it is an answer. The comment
+three lines above described the intent exactly: «a tax id can be read off a
+page, but binding a cost to the wrong company is not a choice a screen should
+make alone». The intent was right and unimplemented. There was a warning pill,
+and a warning that nothing refuses is decoration.
+
+**The engine's guard was unreachable, not absent.** `billFromCapture` has
+always refused a missing `supplierId`; a control that always has a value can
+never deliver one. The empty option now exists and is the default, the form
+refuses on it in the operator's language, and `registerBill` states the same
+rule at the bottom so the next screen to be written cannot get there either.
+
+**The way out is on the same screen as the problem.** The issuer was not in the
+party file because it had never been created — the honest state, and the
+operator was looking at a form that refused to accept the answer they were
+holding. There is now a name field, a tax-id field, both filled in from the
+document, and a button that creates the supplier and selects it.
+
+**Both fields are editable, and that is what found the second bug.** The reader
+returned `B62889417` from the operator's real invoice, and it is not a valid
+identifier: the check character does not match the seven digits before it, so a
+digit was mis-read (the arithmetic gives `5`). The party file is right to refuse
+it. A button that filed whatever it was handed would have been a dead end at the
+exact moment the operator has the paper with the correct number on it.
+
+**The tests were encoding the defect.** Three e2e blocks opened the drawer,
+filled in a number and a base, and pressed Registrar without ever touching the
+supplier — passing only because of the silent default. They now choose one, and
+a new block walks the whole unknown-issuer path: refused, corrected, created,
+filed.
+
+### 217 · A bill could be wrong about the one thing it could not change (2026-08-31)
+
+Three doors were shut around the same mistake. `correctBill` allows the numbers
+on the page — base, rate, number, dates — and not the issuer, which is right for
+transcription and wrong for identity. Nothing deleted a bill. And `deleteCapture`
+refused precisely BECAUSE a bill pointed at the document, so the photograph was
+held shut by the record that should never have existed. Entry 215 above ends by
+telling the operator to «void the bill first»; there was no such door.
+
+**`reassignBill` re-derives the withholding rather than carrying it across.**
+The rate is a property of who issued the document, so keeping the previous
+party's would leave the total describing neither company. The audit line names
+both, because a supplier that changes silently is a worse record than one that
+is wrong.
+
+**`deleteBill` releases rather than dangles.** The captured document goes back
+to being a validated capture — the state it was in a moment earlier — and the
+purchase order goes back to delivered-and-not-yet-invoiced, which is what it
+once more is. A record pointing at an id that no longer exists is the failure
+the method exists to avoid.
+
+**It refuses on a CODE, not a sentence.** `billDeleteBlock` returns `paid`,
+`quarter-sent`, `reconciled` or `credited` and the screen writes the sentence,
+the same shape `_discardableMovement` already had — because a screen that must
+disable a button needs the reason before anybody presses it, and «no» with no
+reason is a wall.
+
+**And one line that had quietly opted out of the rule.** `projectCostRows` read
+`party(b.supplierId).name` for its `party` field while using the stamped
+`billSupplier` for `desc` — in a method whose neighbours all quote the document.
+Renaming a supplier would have rewritten who issued a cost booked years earlier;
+deactivating one would have thrown inside a report. It quotes the invoice now.
+
+### 218 · Emptying an account is a different act from undoing an import (2026-08-31)
+
+The operator asked whether the bank and card movements could be cleared to run a
+test. Most of it existed: **Bancos → the account → Deshacer** undoes an import
+or discards what nobody has touched, and a credit card is a `bankAccount` with
+`kind: "card"`, so one door already served both.
+
+**What did not exist was the case they were actually asking about.**
+`_discardableMovement` keeps everything anyone has touched — matched, allocated,
+marked as needing no invoice — which is exactly right for a statement loaded
+onto the wrong account and exactly wrong for starting a trial over, because the
+movements you most want gone afterwards are the ones you spent the trial
+reconciling. Undoing those meant `unmatchMovement` one at a time, and nobody
+does that four hundred times.
+
+**So `resetAccountMovements` unwinds instead of skipping**, voiding the payments
+and collections the reconciliations created so nothing is left claiming a bill
+was paid by a movement that no longer exists. It is shown in its own card, with
+its own count of what would have to be undone, because agreeing to discard the
+untouched ones is not agreeing to this.
+
+**One refusal, and it is not about lost work.** A closed period is a boundary
+somebody deliberately drew, and a test reset is not a reason to cross it. It is
+reopened first, in the open, with a reason — or the movements stay.
+
+**Scoped to one account.** «Clear the movements» is a sentence about a database;
+every real version of it is about one statement, one card, one till. An account
+at a time is a mistake that can be re-imported rather than one that cannot.
+
 ## S43 · PK-N — a Word file is the same document, not a second one (2026-08-29)
 
 The operator asked for every generated PDF to exist as a Word file too, an

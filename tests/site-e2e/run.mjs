@@ -2688,12 +2688,41 @@ async function testSupplierBillEntry(browser, base) {
     if (formed) ok("AP-01: it opens a form with a supplier and a taxable base");
     else bad("AP-01: bill drawer opens", "no #bd_sup/#bd_base");
 
+    /* PK11 · THE PICKER MUST NOT CHOOSE. This block used to fill in the number
+       and the base and press Registrar without ever touching #bd_sup — which
+       passed only because a <select> with no placeholder silently selects its
+       FIRST option. That is the defect that filed a SUMINISTROS CERDA invoice
+       against Leroy Merlin on the operator's workspace, and the test was
+       encoding it. Now the empty choice is the default and the form refuses. */
+    const unchosen = await pg.evaluate(() => ({
+      value: document.getElementById("bd_sup").value,
+      placeholder: !!document.querySelector('#bd_sup option[value=""]'),
+    }));
+    if (unchosen.placeholder && unchosen.value === "")
+      ok("AP-01: a new invoice starts with no supplier chosen, rather than the first in the list");
+    else bad("AP-01: supplier starts unchosen", JSON.stringify(unchosen));
+
     await pg.evaluate(() => {
       document.getElementById("bd_num").value = "E2E-001";
       document.getElementById("bd_base").value = "1000";
       document.getElementById("bd_base").dispatchEvent(new Event("input", { bubbles: true }));
     });
     await pg.waitForTimeout(200);
+    const refusedCount = await pg.evaluate(() => erp.state.bills.length);
+    await pg.click("#bd_go");
+    await pg.waitForTimeout(500);
+    const refused = await pg.evaluate(
+      (n) => ({ grew: erp.state.bills.length !== n, open: !!document.getElementById("bd_sup") }),
+      refusedCount,
+    );
+    if (!refused.grew && refused.open)
+      ok("AP-01: registering with no supplier chosen is refused, and the form stays open");
+    else bad("AP-01: refuses an unchosen supplier", JSON.stringify(refused));
+
+    await pg.evaluate(() => {
+      const sel = document.getElementById("bd_sup");
+      sel.value = [...sel.options].find((o) => o.value)?.value || "";
+    });
     await pg.click("#bd_go");
     await pg.waitForTimeout(700);
 
@@ -2774,12 +2803,116 @@ async function testSupplierBillEntry(browser, base) {
       ok("AP-01: the document and the invoice end up pointing at each other");
     else bad("AP-01: capture → bill link", JSON.stringify(linked));
 
+    /* ── PK11 · a document from a company nobody has on file ──────────────
+       The operator photographed an invoice from SUMINISTROS CERDA MATERIALS,
+       a supplier that had never been created as a party. The reader got the
+       NIF right; the picker matched nothing; the form defaulted to the first
+       supplier in the list and the cost landed on Leroy Merlin. So: when the
+       NIF matches nobody the picker must stay EMPTY, and the way out — create
+       the supplier from what the document already says — must be on the same
+       screen, because the operator is looking at the answer while the form
+       refuses to accept it. */
+    const strangerCap = await pg.evaluate(() => {
+      const c = erp.captureDocument({ docType: "supplierInvoice", imageRef: "e2e_blob2" }, "bo");
+      erp.confirmCapture(
+        c.id,
+        {
+          issuerName: "SUMINISTROS E2E MATERIALS, S.L.",
+          issuerTaxId: "B62889417",
+          docNumber: "E2E-STRANGER-1",
+          date: erp.state.today,
+          baseCents: 30000,
+          vatCents: 6300,
+          totalCents: 36300,
+        },
+        "bo",
+      );
+      return c.id;
+    });
+    await pg.evaluate((id) => billDrawer(id), strangerCap);
+    await pg.waitForTimeout(400);
+    const stranger = await pg.evaluate(() => ({
+      sup: document.getElementById("bd_sup").value,
+      warn: /no está dado de alta/i.test(document.body.innerText),
+      create: !!document.getElementById("bd_mkSup"),
+      name: document.getElementById("bd_supName")
+        ? document.getElementById("bd_supName").value
+        : null,
+      taxId: document.getElementById("bd_supTax")
+        ? document.getElementById("bd_supTax").value
+        : null,
+    }));
+    if (stranger.sup === "")
+      ok("AP-01: an unknown issuer leaves the supplier unchosen instead of picking one");
+    else bad("AP-01: unknown issuer leaves supplier empty", JSON.stringify(stranger));
+    if (stranger.warn && stranger.create && stranger.name && stranger.taxId)
+      ok("AP-01: and the form offers to create that supplier from what the document says");
+    else bad("AP-01: create-supplier offered", JSON.stringify(stranger));
+
+    /* B62889417 is what the reader returned from the operator's real invoice
+       and it is NOT a valid tax identifier — the check character does not
+       match the seven digits before it, so a digit was mis-read. That is why
+       both fields are editable rather than a button that files what it was
+       handed: the party file is right to refuse, and the operator is holding
+       the paper with the correct one on it. First the refusal, then the fix. */
+    const beforeParties = await pg.evaluate(() => erp.state.parties.length);
+    await pg.click("#bd_mkSup");
+    await pg.waitForTimeout(500);
+    const refusedParty = await pg.evaluate(
+      (n) => ({
+        grew: erp.state.parties.length !== n,
+        stillOffered: !!document.getElementById("bd_mkSup"),
+      }),
+      beforeParties,
+    );
+    if (!refusedParty.grew && refusedParty.stillOffered)
+      ok("AP-01: a mis-read tax id is refused, and the form stays put so it can be corrected");
+    else bad("AP-01: invalid tax id refused", JSON.stringify(refusedParty));
+
+    await pg.evaluate(() => {
+      document.getElementById("bd_supTax").value = "B62889415";
+    });
+    await pg.click("#bd_mkSup");
+    await pg.waitForTimeout(600);
+    const created = await pg.evaluate((n) => {
+      const p = erp.state.parties.find((x) => (x.taxId || "").toUpperCase() === "B62889415");
+      return {
+        grew: erp.state.parties.length === n + 1,
+        name: p ? p.name : null,
+        roles: p ? p.roles : null,
+        chosen: document.getElementById("bd_sup") ? document.getElementById("bd_sup").value : null,
+        picked:
+          p && document.getElementById("bd_sup")
+            ? document.getElementById("bd_sup").value === p.id
+            : false,
+      };
+    }, beforeParties);
+    if (created.grew && created.name === "SUMINISTROS E2E MATERIALS, S.L." && created.picked)
+      ok(`AP-01: it creates the supplier and selects it (${created.name})`);
+    else bad("AP-01: supplier created from the document", JSON.stringify(created));
+    if (created.roles && created.roles.includes("supplier"))
+      ok("AP-01: created as a supplier, so it is there the next time");
+    else bad("AP-01: created with the supplier role", JSON.stringify(created));
+
+    await pg.click("#bd_go");
+    await pg.waitForTimeout(700);
+    const strangerBill = await pg.evaluate(() => {
+      const b = erp.state.bills.find((x) => x.number === "E2E-STRANGER-1");
+      return b ? { name: b.supplierName, taxId: b.supplierTaxId } : null;
+    });
+    if (strangerBill && strangerBill.taxId === "B62889415")
+      ok(`AP-01: the invoice is filed against the company that issued it (${strangerBill.name})`);
+    else bad("AP-01: stranger bill filed correctly", JSON.stringify(strangerBill));
+
     // ── Block 4: a split typed as PERCENTAGES lands as exact cents ─────────
     const pctSplit = await pg.evaluate(async () => {
       const projects = erp.state.projects.filter((p) => !p.closed).slice(0, 2);
       if (projects.length < 2) return { skip: "needs two open projects" };
       document.getElementById("sb_new").click();
       await new Promise((r) => setTimeout(r, 300));
+      // Chosen, not defaulted — the picker no longer answers for the operator.
+      const sel4 = document.getElementById("bd_sup");
+      sel4.value = [...sel4.options].find((o) => o.value).value;
       document.getElementById("bd_num").value = "E2E-PCT";
       document.getElementById("bd_base").value = "1000";
       document.getElementById("bd_base").dispatchEvent(new Event("input", { bubbles: true }));
@@ -2829,6 +2962,8 @@ async function testSupplierBillEntry(browser, base) {
       await pg.click("#sb_new");
       await pg.waitForTimeout(300);
       await pg.evaluate((id) => {
+        const sel5 = document.getElementById("bd_sup");
+        sel5.value = [...sel5.options].find((o) => o.value).value;
         document.getElementById("bd_num").value = "E2E-1F";
         document.getElementById("bd_base").value = "250";
         document.getElementById("bd_base").dispatchEvent(new Event("input", { bubbles: true }));
