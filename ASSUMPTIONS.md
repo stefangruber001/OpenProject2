@@ -6987,6 +6987,64 @@ steal an obra from a signed contract» passed red-first too — of course it did
 nothing moved before. It is not a regression test for the bug; it is the guard
 against the fix going too far, which is a different job and worth having.
 
+### 212 · An allocation distributes the cost, so it foots against the base (2026-08-31)
+
+The operator's supplier invoice — 2.483,80 base, 521,60 IVA, 3.005,40 total —
+was distributed across two partidas and one row with no partida, footing to the
+base, and the screen refused it. It was asking for the VAT-inclusive total and
+showing every percentage as a share of it, so a correct distribution read as
+four fifths of itself.
+
+**Two doors, two units, one cost figure.** `registerBill` and `allocateBill`
+have always said «Bill allocations must total the taxable base»;
+`allocateCapture` demanded `confirmed.totalCents`. `projectCostRows` adds both
+into `actualCostCents`. Input VAT is recoverable and is not a job cost, so the
+base is the right unit and the capture door was the wrong one.
+
+**A correction to what this session first claimed.** I described a catch-22 —
+that a split accepted by the capture screen could never be registered as a
+bill. It is not that: `billFromCapture` rescales what it is handed, so the
+promotion produced a correct bill. What it actually cost was the split being
+entered TWICE against two different numbers, because the bill drawer refuses
+the capture's rows and makes you retype them. The real silent error was
+elsewhere: a `ticket` capture never becomes a bill, so nothing ever restated
+it, and `projectCostRows` charged its job the tax along with the cost.
+
+**The basis is reconstructed rather than assumed** when the base is not stated:
+total − tax, which is exact — a document stating no tax has a base equal to its
+total. Zero means nothing is known, and the check asserts nothing rather than
+asserting against a figure it invented, which is the rule the unconfirmed case
+already followed.
+
+**The refusal moved to the screen.** The engine keeps the invariant as its
+backstop, but it throws in English and says nothing about how far off you are.
+The capture card now refuses first, in the operator's language — and the figure
+is NOT in that sentence: a toast is one text node, so a number inside it makes
+a key no dictionary can hold. The gap is already on the card as «Sin repartir»
+beside its own amount in its own element, which is where a person is looking.
+
+**Migration 21 restates what was filed under the old rule**, and only that: the
+document must be confirmed, state a base and a different total, and its rows
+must currently add up to that total. A split already footing to the base is
+left alone; one matching neither figure is left alone and not guessed at,
+because somebody edited it by hand. The proportions are the operator's and are
+preserved to the cent — their own three figures round-trip exactly, which is
+what the migration check asserts rather than a tolerance. Every restatement is
+written to the audit log.
+
+**Three existing tests encoded the old unit and were restated deliberately**,
+not nudged: the capture block's refusals now use the amount that would
+otherwise have been accepted, so each fires for the reason it names; the
+promotion block enters the base and asserts the figures survive unchanged; and
+the rescale that used to be exercised incidentally is now exercised on purpose,
+with a legacy gross split, because it is still the safety net for documents
+allocated before this change and an untested safety net is not one.
+
+**And a fragility surfaced rather than caused:** an older block reaches for
+`erp.state.bills[0]` by index, so registering a bill anywhere earlier in the
+file silently handed it somebody else's document. The new block moved to the
+end rather than re-key an assertion that is not what is under test.
+
 ## S43 · PK-N — a Word file is the same document, not a second one (2026-08-29)
 
 The operator asked for every generated PDF to exist as a Word file too, an

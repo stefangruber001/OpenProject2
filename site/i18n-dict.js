@@ -3028,6 +3028,14 @@ window.CANEI_DICT = {
       "⚠ The document could not be read: fill it in by hand",
     ],
     ["Sin lectura — escríbalo a mano", "Not read — type it in"],
+    /* PK10-S3 · an allocation distributes the COST, so it foots against the
+       taxable base. The figures live in their own elements beside these. */
+    ["⚠ El reparto debe sumar la base imponible", "⚠ The split must total the taxable base"],
+    ["Se reparte la base imponible", "The taxable base is what is split"],
+    [
+      "El IVA no se reparte: es IVA soportado, no coste de obra",
+      "VAT is not split: it is recoverable input VAT, not a job cost",
+    ],
     /* PK10-S2 · CON-11 when the job is pointing at the wrong contract. The
        numbers ride beside this sentence in their own span, not inside it. */
     [

@@ -14805,7 +14805,13 @@
         const c = erp.state.captured.find((x) => x.id === id);
         if (!c) return;
         const cf = c.confirmed;
-        const total = cf ? cf.totalCents : 0;
+        /* THE BASE, NOT THE TOTAL. What is being split is the cost, and the
+           tax is not one — the bill drawer three hundred lines down has always
+           passed `readBase()` here, and this one passed the VAT-inclusive
+           total, which is what made a split accepted here impossible to
+           register as a bill. */
+        const total = erp.captureBasisCents(cf);
+        const vatAside = cf ? Math.max(0, (cf.totalCents || 0) - total) : 0;
         const db = openDrawer(c.stdName || CAP_TYPE_LABEL[c.docType] || "Documento");
         let billBlock = "";
         if (cf && !c.billId)
@@ -14852,6 +14858,11 @@
      <div class="field full"><button class="btn" id="cd_save">Guardar datos de archivo</button></div>
     </div></div>
    <div class="card"><div class="ch"><h3>Asignación</h3><span class="tag" id="cd_rest"></span></div>
+    ${
+      vatAside
+        ? `<div class="it" style="padding:8px 12px 0;color:var(--muted);font-size:12px"><span>Se reparte la base imponible</span> <b translate="no">${eur(total)}</b>. <span>El IVA no se reparte: es IVA soportado, no coste de obra</span> <b translate="no">${eur(vatAside)}</b>.</div>`
+        : ""
+    }
     <div id="cd_rows" style="padding:6px 12px 12px"></div>
     <div style="display:flex;gap:8px;padding:0 12px 12px;flex-wrap:wrap">
      <button class="btn sm" id="cd_add">＋ Repartir</button>
@@ -14883,7 +14894,22 @@
           capAllocRows(id, total);
         };
         if ($("#cd_bill")) $("#cd_bill").onclick = () => billDrawer(id);
-        $("#cd_alloc").onclick = () =>
+        $("#cd_alloc").onclick = () => {
+          /* Refused HERE, with the figure, rather than by the engine's own
+             invariant — which is right about the rule and says it in English
+             to a Spanish operator, and says nothing about how far off they
+             are. The engine keeps the rule as its backstop; this is the
+             sentence a person can act on. */
+          const assigned = capAlloc.reduce((s2, a) => s2 + (a.amountCents || 0), 0);
+          if (total > 0 && Math.abs(assigned - total) > 1) {
+            /* The FIGURE is not in this sentence, deliberately. A toast is one
+               text node, so a number inside it makes a string no dictionary
+               can hold — the lesson S5 learned the hard way. The gap is
+               already on the card above, as «Sin repartir» beside its own
+               amount in its own element, which is where a person is looking. */
+            toast("⚠ El reparto debe sumar la base imponible");
+            return;
+          }
           mutate(() => {
             erp.allocateCapture(
               id,
@@ -14899,6 +14925,7 @@
             );
             closeDrawer();
           }, "Documento asignado");
+        };
         capAllocRows(id, total);
       }
 

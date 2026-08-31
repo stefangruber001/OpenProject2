@@ -1617,42 +1617,51 @@ assert(
     },
     "bo",
   );
+  /* PK10-S3 · these amounts changed from 12100 to 10000 DELIBERATELY. The
+     document is 10.000 base + 2.100 IVA = 12.100 total, and a split now foots
+     against the base, because an allocation distributes the cost and the tax
+     is not one. Each refusal below is meant to fire for the reason it names,
+     so its amount is the one that would otherwise have been accepted. */
   throws(() => erp.allocateCapture(cap.id, [], "bo"), "a document must be allocated to something");
   throws(
     () =>
       erp.allocateCapture(
         cap.id,
-        [{ projectId: prj.id, overheadCategory: "office", amountCents: 12100 }],
+        [{ projectId: prj.id, overheadCategory: "office", amountCents: 10000 }],
         "bo",
       ),
     "a line naming both a project and an overhead category is refused",
   );
   throws(
-    () => erp.allocateCapture(cap.id, [{ amountCents: 12100 }], "bo"),
+    () => erp.allocateCapture(cap.id, [{ amountCents: 10000 }], "bo"),
     "a line naming neither is refused too",
   );
   throws(
-    () => erp.allocateCapture(cap.id, [{ overheadCategory: "biscuits", amountCents: 12100 }], "bo"),
+    () => erp.allocateCapture(cap.id, [{ overheadCategory: "biscuits", amountCents: 10000 }], "bo"),
     "an overhead category the engine does not know is refused",
   );
   throws(
     () =>
-      erp.allocateCapture(cap.id, [{ projectId: prj.id, kind: "vibes", amountCents: 12100 }], "bo"),
+      erp.allocateCapture(cap.id, [{ projectId: prj.id, kind: "vibes", amountCents: 10000 }], "bo"),
     "a cost kind the engine does not know is refused",
   );
   throws(
-    () => erp.allocateCapture(cap.id, [{ projectId: "prj-gone", amountCents: 12100 }], "bo"),
+    () => erp.allocateCapture(cap.id, [{ projectId: "prj-gone", amountCents: 10000 }], "bo"),
     "a project that is not there is refused, by the accessor that names it",
   );
   throws(
     () => erp.allocateCapture(cap.id, [{ projectId: prj.id, amountCents: 9000 }], "bo"),
-    "a split that does not total the confirmed document is refused",
+    "a split that does not total the taxable base is refused",
+  );
+  throws(
+    () => erp.allocateCapture(cap.id, [{ projectId: prj.id, amountCents: 12100 }], "bo"),
+    "…and neither does one that totals the VAT-inclusive amount",
   );
   const split = erp.allocateCapture(
     cap.id,
     [
       { projectId: prj.id, chapterNum: "1", kind: "material", amountCents: 8000 },
-      { overheadCategory: "office", amountCents: 4100 },
+      { overheadCategory: "office", amountCents: 2000 },
     ],
     "bo",
   );
@@ -2741,12 +2750,16 @@ assert(
     "billFromCapture refuses to guess which company issued the document",
   );
 
-  // A split across the document's TOTAL, which is not the bill's base.
+  /* PK10-S3 · the split is made against the BASE now, in both doors. It used
+     to be entered here against the document total — 121.000 rather than
+     100.000 — which is what forced the operator to enter it twice in two
+     different units: once to satisfy the capture screen, once to satisfy the
+     bill drawer, which has always demanded the base. */
   e.allocateCapture(
     cap.id,
     [
-      { projectId: job.id, kind: "material", amountCents: 90750 },
-      { overheadCategory: "office", kind: "other", amountCents: 30250 },
+      { projectId: job.id, kind: "material", amountCents: 75000 },
+      { overheadCategory: "office", kind: "other", amountCents: 25000 },
     ],
     "bo",
   );
@@ -2765,8 +2778,12 @@ assert(
   const allocSum = promoted.allocations.reduce((s, a) => s + a.amountCents, 0);
   assert(
     allocSum === promoted.baseCents,
-    "…the split is rescaled from the document total to the taxable base, exactly",
+    "…the split arrives at the bill footing to the taxable base, unchanged",
     allocSum + " vs " + promoted.baseCents,
+  );
+  assert(
+    promoted.allocations[0].amountCents === 75000 && promoted.allocations[1].amountCents === 25000,
+    "…and it is the operator's own figures, not a rescale of them",
   );
   assert(
     promoted.allocations.length === 2 &&
@@ -3009,7 +3026,8 @@ assert(
     );
   }
 
-  // Promotion keeps the partida through the rescale.
+  // Promotion keeps the partida — and, since PK10-S3, keeps the amount too:
+  // both doors foot against the base, so there is nothing left to rescale.
   const cap = e.captureDocument({ docType: "supplierInvoice", imageRef: "b1f" }, "bo");
   e.confirmCapture(
     cap.id,
@@ -3026,15 +3044,48 @@ assert(
   );
   e.allocateCapture(
     cap.id,
-    [{ projectId: pj.id, lineId: l1.id, kind: "material", amountCents: 12100 }],
+    [{ projectId: pj.id, lineId: l1.id, kind: "material", amountCents: 10000 }],
     "bo",
   );
   const promoted1f = e.billFromCapture(cap.id, { supplierId: sup.id }, "bo");
   assert(
     promoted1f.allocations[0].lineId === l1.id &&
       promoted1f.allocations[0].amountCents === promoted1f.baseCents,
-    "capture → bill promotion keeps the partida through the rescale",
+    "capture → bill promotion keeps the partida and the amount",
     JSON.stringify(promoted1f.allocations[0]),
+  );
+
+  /* THE RESCALE IS STILL THERE, and still needed: a document allocated before
+     the units were fixed carries rows summing to the VAT-inclusive total, and
+     `billFromCapture` restates them rather than refusing a filing somebody
+     already did. Exercised directly, because no screen produces this shape any
+     more and an untested safety net is not one. */
+  const legacyCap = e.captureDocument({ docType: "supplierInvoice", imageRef: "legacy" }, "bo");
+  e.confirmCapture(
+    legacyCap.id,
+    {
+      issuerName: "Prov 1F",
+      issuerTaxId: "B12345674",
+      docNumber: "1F-LEGACY",
+      date: e.state.today,
+      baseCents: 10000,
+      vatCents: 2100,
+      totalCents: 12100,
+    },
+    "bo",
+  );
+  const restated = e.billFromCapture(
+    legacyCap.id,
+    {
+      supplierId: sup.id,
+      allocations: [{ projectId: pj.id, kind: "material", amountCents: 12100 }],
+    },
+    "bo",
+  );
+  assert(
+    restated.allocations[0].amountCents === 10000,
+    "a split still carrying the old gross figure is restated to the base on promotion",
+    JSON.stringify(restated.allocations[0]),
   );
 }
 
@@ -4251,6 +4302,110 @@ assert(
     petty.status === "unallocated" && !petty.class,
     "a movement outside the selection is not touched by the bulk action",
     JSON.stringify({ status: petty.status, class: petty.class }),
+  );
+}
+
+/* Placed LAST on purpose. It registers a bill, and an older block reaches for
+   `erp.state.bills[0]` by index — so inserting this earlier silently handed
+   that block somebody else's document. The index is the fragile thing, not
+   this block, but moving one file is cheaper than re-keying an assertion that
+   is not what is under test here. */
+/* ── PK10-S3 · a split distributes the COST, so it foots against the base ───
+   `allocateCapture` demanded the VAT-inclusive total while `registerBill`
+   demanded the taxable base — and `billDrawer` seeds a bill from the capture's
+   own rows, so a split accepted by the first door was guaranteed to be refused
+   by the second. The operator's own invoice is the fixture: 2.483,80 base,
+   521,60 IVA, 3.005,40 total, distributed across two partidas and one row with
+   no partida at all. */
+{
+  // Its own job and its own supplier: this block asserts about money, and
+  // borrowing another block's records would make the figures depend on the
+  // order the file happens to run in.
+  const b = erp.createBudget({ partyId: cust.id, activityLine: "renovation" }, "bo");
+  const ch1 = erp.addChapter(b.id, { name: "Tabiquería y trasdosados" }, "bo");
+  const ch2 = erp.addChapter(b.id, { name: "Fontanería" }, "bo");
+  erp.addLine(b.id, ch1.id, { desc: "Cabinas", unit: "ud", qtyMilli: 3000, priceCents: 80000 });
+  erp.addLine(b.id, ch2.id, { desc: "Ramal", unit: "ud", qtyMilli: 1000, priceCents: 60000 });
+  erp.issueVersion(b.id, { channel: "hand" }, "bo");
+  erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "ok" }, "bo");
+  const prj = erp.createProjectFromAcceptance(b.id, "bo");
+  const supplier = sup;
+
+  const cap = erp.captureDocument({ docType: "supplierInvoice", imageRef: "img-pk10" }, "bo");
+  erp.confirmCapture(
+    cap.id,
+    {
+      issuerName: "SUMINISTROS CERDA MATERIALS, S.L.",
+      issuerTaxId: "B62889417",
+      docNumber: "F-2026/4471",
+      date: erp.today,
+      baseCents: 248380,
+      vatCents: 52160,
+      totalCents: 300540,
+      iban: "",
+    },
+    "bo",
+  );
+  assert(
+    erp.captureBasisCents(erp.state.captured.find((x) => x.id === cap.id).confirmed) === 248380,
+    "the basis of a split is the taxable base, not the total",
+  );
+
+  const split = (a, b, c) => [
+    { projectId: prj.id, chapterNum: "1", kind: "material", amountCents: a },
+    { projectId: prj.id, chapterNum: "2", kind: "material", amountCents: b },
+    // «Sin partida»: a real cost on the job that no budgeted chapter covers.
+    { projectId: prj.id, chapterNum: null, kind: "material", amountCents: c },
+  ];
+
+  throws(
+    () => erp.allocateCapture(cap.id, split(197614, 32966, 17800 + 52160), "bo"),
+    "a split that totals the VAT-inclusive amount is refused",
+  );
+  const ok2 = erp.allocateCapture(cap.id, split(197614, 32966, 17800), "bo");
+  assert(
+    ok2.allocations.reduce((t, a) => t + a.amountCents, 0) === 248380,
+    "…and the operator's own distribution, footing to the base, is accepted",
+  );
+  assert(
+    ok2.allocations[2].chapterNum === null,
+    "…including a row with no partida, which the engine has always allowed",
+  );
+
+  /* THE CATCH-22, stated as a test: the very rows this door accepted must be
+     the rows the bill door accepts, because the bill drawer copies them. */
+  const bill = erp.registerBill(
+    {
+      supplierId: supplier.id,
+      number: "F-2026/4471",
+      date: erp.today,
+      baseCents: 248380,
+      vatCents: 52160,
+      capId: cap.id,
+      allocations: ok2.allocations.map((a) => ({
+        projectId: a.projectId,
+        chapterNum: a.chapterNum,
+        kind: a.kind,
+        amountCents: a.amountCents,
+      })),
+    },
+    "bo",
+  );
+  assert(
+    bill.allocations.reduce((t, a) => t + a.amountCents, 0) === 248380,
+    "the split accepted by the capture is the split the bill accepts — one door, one unit",
+  );
+
+  // Nothing known yet: assert nothing rather than assert against an invention.
+  const blind = erp.captureDocument({ docType: "ticket", imageRef: "img-blind" }, "bo");
+  const filed = erp.allocateCapture(
+    blind.id,
+    [{ overheadCategory: "office", kind: "material", amountCents: 1234 }],
+    "bo",
+  );
+  assert(
+    filed.allocations[0].amountCents === 1234,
+    "an unconfirmed document can still be filed — there is nothing to check against",
   );
 }
 

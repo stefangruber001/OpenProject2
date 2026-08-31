@@ -882,6 +882,70 @@
         return s;
       },
     },
+    {
+      to: 21,
+      name: "a document's split is restated against the taxable base",
+      /*
+       * TWO DOORS, TWO UNITS, ONE COST FIGURE.
+       *
+       * `allocateCapture` demanded that a split total the VAT-INCLUSIVE amount
+       * while `registerBill` demanded the taxable base, and `projectCostRows`
+       * adds both into one number — so a ticket allocated through the capture
+       * screen charged its job the tax as well as the cost, quietly, by the
+       * rate. (A supplier invoice was spared the wrong figure, because promoting
+       * it to a bill rescales the rows to the base; what it cost instead was
+       * the split being entered twice, once per unit. A ticket never becomes a
+       * bill, so nothing ever restated it.)
+       *
+       * The proportions are the OPERATOR'S and are preserved exactly: they
+       * decided which partida bears what, and only the units were wrong. Each
+       * row is scaled by base ÷ total and the rounding remainder lands on the
+       * largest row, so the split still foots to the cent.
+       *
+       * Restated only where the old rule is unmistakably what produced it:
+       *   · the document is confirmed and states a base AND a different total;
+       *   · its rows currently add up to that TOTAL, within a cent.
+       * A split that already foots to the base is left alone (a re-run, or one
+       * made after the fix). A split that matches neither is left alone too and
+       * NOT guessed at — somebody edited it by hand, and a migration that
+       * rescales a figure it does not understand is worse than one that skips.
+       *
+       * Every restatement is written to the audit log, because this moves
+       * money between the columns a job is measured by and a silent rescale of
+       * somebody's numbers is not something to discover later.
+       */
+      up: function (s) {
+        var caps = Array.isArray(s.captured) ? s.captured : [];
+        if (!Array.isArray(s.audit)) s.audit = [];
+        for (var i = 0; i < caps.length; i++) {
+          var c = caps[i];
+          var cf = c && c.confirmed;
+          var rows = (c && c.allocations) || [];
+          if (!cf || !rows.length) continue;
+          var base = Math.round(cf.baseCents || 0);
+          var total = Math.round(cf.totalCents || 0);
+          if (!(base > 0) || !(total > 0) || base === total) continue;
+          var sum = 0;
+          for (var r = 0; r < rows.length; r++) sum += Math.round(rows[r].amountCents || 0);
+          if (Math.abs(sum - total) > 1) continue; // already the base, or hand-edited
+          var scaled = 0;
+          var biggest = 0;
+          for (var q = 0; q < rows.length; q++) {
+            rows[q].amountCents = Math.round((Math.round(rows[q].amountCents || 0) * base) / total);
+            scaled += rows[q].amountCents;
+            if (Math.abs(rows[q].amountCents) > Math.abs(rows[biggest].amountCents)) biggest = q;
+          }
+          rows[biggest].amountCents += base - scaled; // the rounding remainder
+          s.audit.push({
+            ts: s.today || "",
+            user: "system",
+            action: "m21:splitRestatedToTaxableBase",
+            ref: (c.stdName || c.id) + " " + total + "c → " + base + "c",
+          });
+        }
+        return s;
+      },
+    },
   ];
 
   /**

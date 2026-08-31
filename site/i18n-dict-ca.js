@@ -937,6 +937,10 @@ window.CANEI_DICT.ca = {
   "⚠ No se ha podido leer el documento: rellénelo a mano":
     "⚠ No s'ha pogut llegir el document: ompliu-ho a mà",
   "Sin lectura — escríbalo a mano": "Sense lectura — escriviu-ho a mà",
+  "⚠ El reparto debe sumar la base imponible": "⚠ El repartiment ha de sumar la base imposable",
+  "Se reparte la base imponible": "Es reparteix la base imposable",
+  "El IVA no se reparte: es IVA soportado, no coste de obra":
+    "L'IVA no es reparteix: és IVA suportat, no cost d'obra",
   "La obra está vinculada a un contrato sin firmar, y hay otro ya firmado para este presupuesto: vincúlelo a la obra desde el contrato.":
     "L'obra està vinculada a un contracte sense signar, i n'hi ha un altre ja signat per a aquest pressupost: vinculeu-lo a l'obra des del contracte.",
   "Nº documento": "Núm. document",

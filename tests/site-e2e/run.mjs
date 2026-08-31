@@ -3394,7 +3394,11 @@ async function testCapture(browser, base) {
       ok("ADM-03: a split that does not total the document is refused, panel still open");
     else bad("ADM-03: short split refused", JSON.stringify(refused));
 
-    // Now split it properly: part to a project, the rest to an overhead.
+    /* Now split it properly: part to a project, the rest to an overhead.
+       PK10-S3 · the figures foot to the TAXABLE BASE (1.683,96), not to the
+       VAT-inclusive total the document also states. An allocation distributes
+       the cost, and input VAT is not one — the same rule `registerBill` has
+       always applied, so the split entered here is the split the bill takes. */
     await pg.locator('#cd_rows input[data-k="amountCents"]').first().fill("1000.00");
     await pg.locator('#cd_rows input[data-k="amountCents"]').first().dispatchEvent("change");
     await pg.waitForTimeout(300);
@@ -3402,9 +3406,28 @@ async function testCapture(browser, base) {
     await pg.waitForTimeout(300);
     await pg.locator('#cd_rows select[data-k="dest"]').nth(1).selectOption("o:office");
     await pg.waitForTimeout(300);
-    await pg.locator('#cd_rows input[data-k="amountCents"]').nth(1).fill("1037.59");
+    await pg.locator('#cd_rows input[data-k="amountCents"]').nth(1).fill("683.96");
     await pg.locator('#cd_rows input[data-k="amountCents"]').nth(1).dispatchEvent("change");
     await pg.waitForTimeout(300);
+
+    /* The operator's own complaint, measured: the percentages were shares of
+       the VAT-inclusive total, so a distribution that footed correctly read as
+       four-fifths of itself and would not go in. 1.000,00 of a 1.683,96 base
+       is 59,4 %; of the 2.037,59 total it was 49,1 %. */
+    const basis = await pg.evaluate(() => ({
+      pct: [...document.querySelectorAll('#cd_rows input[data-k="pct"]')].map((i) => i.value),
+      rest: (document.querySelector("#cd_rest") || {}).textContent || "",
+      saysBase: /base imponible|taxable base|base imposable/i.test(
+        document.querySelector("#cd_alloc")?.closest(".card")?.textContent || "",
+      ),
+    }));
+    if (basis.pct[0] === "59.4" && basis.pct[1] === "40.6")
+      ok(`ADM-03: the split reads as a share of the taxable base (${basis.pct.join(" · ")} %)`);
+    else bad("ADM-03: percentages against the base", JSON.stringify(basis));
+    if (basis.saysBase && /cuadra|balances|quadra/i.test(basis.rest))
+      ok("ADM-03: …the card says the base is what is being split, and that it foots");
+    else bad("ADM-03: the card names its basis", JSON.stringify(basis));
+
     await pg.click("#cd_alloc");
     await pg.waitForTimeout(700);
     const allocated = await pg.evaluate(() => {
@@ -3421,7 +3444,7 @@ async function testCapture(browser, base) {
       allocated.n === 2 &&
       allocated.status === "allocated" &&
       allocated.onlyOneDest &&
-      allocated.sum === 203759
+      allocated.sum === 168396
     )
       ok("ADM-03: a document splits between a project and an overhead, and adds up");
     else bad("ADM-03: split allocation", JSON.stringify(allocated));

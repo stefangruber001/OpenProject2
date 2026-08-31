@@ -4657,6 +4657,43 @@
       this._log(user, "updateCapture", capId);
       return c;
     }
+    /**
+     * WHAT A SPLIT MUST ADD UP TO — the taxable base, never the total.
+     *
+     * An allocation distributes a COST across the jobs and overheads that bear
+     * it, and input VAT is not a cost: it is recoverable, handled on the tax
+     * side, and charging it to a partida overstates that job by the rate.
+     * `registerBill` and `allocateBill` have always said so — «Bill
+     * allocations must total the taxable base» — while this door demanded the
+     * VAT-inclusive total, and `projectCostRows` adds both into one figure.
+     * Two doors, two units, one number.
+     *
+     * And it made the operator do the work twice, in two units. `billDrawer`
+     * seeds a bill from the capture's own rows and then refuses them, because
+     * it has always footed against the base — so a split entered here had to
+     * be entered again there, against a different number, for the same
+     * document. (`billFromCapture` rescales what it is handed, which is why
+     * the promotion still produced a correct bill; the second entry was the
+     * cost, not a wrong figure.) The screen's own refusal there — «El reparto
+     * debe sumar la base imponible» — was the system saying which unit it
+     * meant, in the one place that already knew.
+     *
+     * The base is taken from the record when it is there, and reconstructed
+     * from total − tax when it is not, which is exact rather than a guess: a
+     * document that states no tax has a base equal to its total, and one that
+     * states tax has a base equal to the difference. Zero means nothing is
+     * known yet, and the caller asserts nothing rather than asserting against
+     * a figure it invented.
+     */
+    captureBasisCents(confirmed) {
+      if (!confirmed) return 0;
+      const base = cents(confirmed.baseCents || 0);
+      if (base > 0) return base;
+      const total = cents(confirmed.totalCents || 0);
+      const vat = cents(confirmed.vatCents || 0);
+      return Math.max(0, total - vat);
+    }
+
     allocateCapture(capId, allocations, user) {
       // CAP-03/07: one project, split, or overhead
       const c = this.state.captured.find((x) => x.id === capId);
@@ -4677,14 +4714,16 @@
           throw new Error("Unknown cost kind: " + a.kind);
         if (!(Math.round(a.amountCents) > 0)) throw new Error("Every line needs a positive amount");
       });
-      // A confirmed document has a total to check the split against. An
+      // A confirmed document has a base to check the split against. An
       // unconfirmed one does not, and inventing one from the split itself
       // would make the check agree with whatever it was handed — so the
       // arithmetic is only asserted where there is something to assert it
-      // against, and filing an unread photograph stays possible.
-      const total = c.confirmed ? c.confirmed.totalCents : sum(rows, (a) => a.amountCents);
-      if (Math.abs(sum(rows, (a) => a.amountCents) - total) > 1)
-        throw new Error("Split must total the document amount"); // 7.4
+      // against, and filing an unread photograph stays possible. A confirmed
+      // document with no usable figure is the same case: nothing to assert.
+      const basis = this.captureBasisCents(c.confirmed);
+      const target = basis > 0 ? basis : sum(rows, (a) => a.amountCents);
+      if (Math.abs(sum(rows, (a) => a.amountCents) - target) > 1)
+        throw new Error("Split must total the taxable base"); // 7.4
       c.allocations = rows.map((a) =>
         // Gap 13: the account is resolved at the moment the cost is filed, so
         // a later report never has to guess what somebody meant.
