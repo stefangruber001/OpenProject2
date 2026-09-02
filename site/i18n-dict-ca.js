@@ -582,6 +582,7 @@ window.CANEI_DICT.ca = {
   "La factura necesita una base imponible": "La factura necessita una base imposable",
   "El reparto debe sumar la base imponible": "El repartiment ha de sumar la base imposable",
   "Factura registrada": "Factura registrada",
+  "Ir a la factura": "Anar a la factura",
   Corregir: "Corregir",
   "Corregir la factura": "Corregir la factura",
   "Al cambiar de proveedor se recalcula la retención según su perfil fiscal.":

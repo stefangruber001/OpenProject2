@@ -3664,6 +3664,85 @@ async function testCapture(browser, base) {
       else bad("ADM-03: delete a filed document", JSON.stringify(removed));
     }
 
+    /* ── the refused delete has to name the place, not just the step ──────
+       The operator opened a filed document, found «Eliminar documento»
+       disabled with «Registrado como factura: elimínala primero», and asked
+       why it could not be deleted. The refusal is correct — the bill is an
+       accounting record and the photograph may not vanish from under it — and
+       the sentence was a dead end: «primero» is another screen and it did not
+       say which. So the drawer offers the way there, and the way there is the
+       drawer that can actually remove the bill. */
+    const routed = await pg.evaluate(async () => {
+      const sup = erp.state.parties.find((p) =>
+        (p.roles || []).some((r) => ["supplier", "subcontractor", "selfEmployed"].includes(r)),
+      );
+      const c = erp.captureDocument({ docType: "supplierInvoice", imageRef: "e2e_route" }, "bo");
+      erp.confirmCapture(
+        c.id,
+        {
+          issuerName: sup.name,
+          issuerTaxId: sup.taxId,
+          docNumber: "E2E-ROUTE-1",
+          date: erp.state.today,
+          baseCents: 20000,
+          vatCents: 4200,
+          totalCents: 24200,
+        },
+        "bo",
+      );
+      erp.billFromCapture(c.id, { supplierId: sup.id }, "bo");
+      captureDrawer(c.id);
+      await new Promise((r) => setTimeout(r, 400));
+      const del = document.querySelector("#cd_del");
+      const go = document.querySelector("#cd_gobill");
+      if (!go) return { err: "no route to the bill offered", disabled: del && del.disabled };
+      const r1 = go.getBoundingClientRect();
+      go.click();
+      await new Promise((r) => setTimeout(r, 400));
+      const onBill = !!document.querySelector("#bf_del");
+      const canDelete = onBill && !document.querySelector("#bf_del").disabled;
+      return {
+        disabled: !!(del && del.disabled),
+        reachable: r1.width > 40 && r1.height >= 20,
+        onBill,
+        canDelete,
+        capId: c.id,
+      };
+    });
+    if (routed.disabled && routed.reachable)
+      ok("ADM-03: a document behind a bill refuses deletion and offers the way to the bill");
+    else bad("ADM-03: route to the bill offered", JSON.stringify(routed));
+    if (routed.onBill && routed.canDelete)
+      ok("ADM-03: …and that way lands on the drawer that can actually remove it");
+    else bad("ADM-03: the route lands somewhere useful", JSON.stringify(routed));
+
+    // And the whole way out, end to end: remove the bill, then the document.
+    const freed = await pg.evaluate(async (capId) => {
+      document.querySelector("#bf_del").click();
+      await new Promise((r) => setTimeout(r, 300));
+      const yes = [...document.querySelectorAll("button")].find((b) =>
+        /^eliminar$/i.test(b.textContent.trim()),
+      );
+      if (!yes) return { err: "no confirmation offered" };
+      yes.click();
+      await new Promise((r) => setTimeout(r, 500));
+      const cap = erp.state.captured.find((c) => c.id === capId);
+      const released = !!cap && cap.billId === null;
+      if (!released)
+        return { released, billGone: !erp.state.bills.some((b) => b.number === "E2E-ROUTE-1") };
+      captureDrawer(capId);
+      await new Promise((r) => setTimeout(r, 400));
+      const del = document.querySelector("#cd_del");
+      return {
+        released,
+        billGone: !erp.state.bills.some((b) => b.number === "E2E-ROUTE-1"),
+        nowEnabled: !!del && !del.disabled,
+      };
+    }, routed.capId);
+    if (freed.billGone && freed.released && freed.nowEnabled)
+      ok("ADM-03: removing the bill releases the document, which can then be deleted");
+    else bad("ADM-03: the way out works end to end", JSON.stringify(freed));
+
     if (errs.length === 0) ok("ADM-03: no console errors");
     else bad("ADM-03: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

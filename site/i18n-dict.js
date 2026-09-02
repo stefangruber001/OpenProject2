@@ -688,6 +688,7 @@ window.CANEI_DICT = {
     ["La factura necesita una base imponible", "The invoice needs a taxable base"],
     ["El reparto debe sumar la base imponible", "The split must total the taxable base"],
     ["Factura registrada", "Invoice registered"],
+    ["Ir a la factura", "Go to the invoice"],
     ["Corregir", "Fix"],
     ["Corregir la factura", "Fix the invoice"],
     [

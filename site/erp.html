@@ -14907,12 +14907,21 @@
      <div class="field full"><label>Notas</label><input id="cd_notes" value="${esc(c.notes || "")}" placeholder="Lo que la siguiente persona necesita saber"></div>
      <div class="field full"><button class="btn" id="cd_save">Guardar datos de archivo</button></div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;padding:0 12px 12px">
+    <div style="display:flex;align-items:center;gap:8px;padding:0 12px 12px;flex-wrap:wrap">
      <span style="flex:1;font-size:12px;color:var(--muted)">${
        c.billId
          ? "<span>Registrado como factura: elimínala primero</span>"
          : "<span>Se borra el documento y su imagen. No afecta a ninguna factura</span>"
      }</span>
+     ${
+       /* The sentence named the step and not the PLACE. The operator hit the
+          disabled button, read «elimínala primero», and asked why the document
+          could not be deleted — which is the message failing, not the person.
+          «Primero» is another screen, and a instruction that does not say which
+          one is a dead end with a full stop on it. The way there is now one
+          press from where the refusal is read. */
+       c.billId ? `<button class="btn sm" id="cd_gobill">Ir a la factura</button>` : ""
+     }
      <button class="btn sm danger" id="cd_del"${c.billId ? " disabled" : ""}>Eliminar documento</button>
     </div></div>
    <div class="card"><div class="ch"><h3>Asignación</h3><span class="tag" id="cd_rest"></span></div>
@@ -14945,6 +14954,7 @@
            Reopening the drawer on the other document is the whole gesture:
            compare the two, then delete whichever one is the copy. */
         if ($("#cd_seeDup") && dupOther) $("#cd_seeDup").onclick = () => captureDrawer(dupOther.id);
+        if ($("#cd_gobill")) $("#cd_gobill").onclick = () => billFixDrawer(c.billId);
         if ($("#cd_del"))
           $("#cd_del").onclick = async () => {
             /* Two WHOLE sentences, chosen — not one sentence assembled from
