@@ -3700,59 +3700,6 @@
         font: 600 13px var(--sans);
         margin: 0;
       }
-      .inboxl {
-        max-height: 640px;
-        overflow: auto;
-      }
-      .icard {
-        display: grid;
-        grid-template-columns: 72px minmax(0, 1fr);
-        gap: 10px;
-        align-items: center;
-        height: 96px;
-        padding: 0 12px;
-        border-bottom: 1px solid var(--hair);
-        cursor: pointer;
-      }
-      .icard:hover {
-        background: var(--hair);
-      }
-      .icard .thumb {
-        width: 72px;
-        height: 72px;
-        border-radius: 8px;
-        border: 1px solid var(--line);
-        background: var(--hair);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        font-size: 22px;
-        color: var(--faint);
-      }
-      .icard .thumb img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
-      .icard .who {
-        font: 600 12.5px var(--sans);
-        color: var(--ink);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .icard .amt {
-        font: 700 15px var(--sans);
-        color: var(--ink);
-      }
-      .icard .meta {
-        font-size: 11.5px;
-        color: var(--muted);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
       @media (max-width: 1180px) {
         .inbox2 {
           grid-template-columns: minmax(0, 1fr);
@@ -12232,6 +12179,12 @@
         const sing = cfg.nounSingular || "registro",
           plur = cfg.nounPlural || "registros";
         v.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+    ${/* Controls that belong to the SCREEN rather than to the list — Gastos
+          puts its capture buttons here. A slot rather than a second toolbar
+          above: two rows of controls read as two unrelated groups, and the
+          question «where do I upload a document» should not be answered in a
+          different place from «where do I find one». Wiring is the caller's,
+          because these are the caller's buttons. */ cfg.leading || ""}
     ${cfg.noNew ? "" : `<button class="btn primary sm" id="${ids.newBtn}">${cfg.newLabel || "＋ Nuevo"}</button>`}
     <input id="${ids.q}" placeholder="${esc(cfg.searchPlaceholder || "Buscar…")}" value="${esc(st.q)}"
       style="flex:0 1 280px;min-width:190px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)">
@@ -14712,6 +14665,13 @@
    data, and the moment it does belong there it stops being a reading and
    becomes a captured document. */
       let capWork = null; // {file, url, kind, recognised, result, blobKey, docType, focusKey}
+      /* Whether the register is showing only what still needs a person. This
+         replaces the Bandeja — a second panel that held the SAME documents the
+         register already listed, so an unassigned document appeared twice on
+         one screen and the counts «1» and «1 documento» were the same one.
+         A filter says what the panel was trying to say and cannot disagree
+         with the list it filters. */
+      let capPendingOnly = false;
 
       const CAP_FIELDS = [
         ["issuerName", "Emisor"],
@@ -14786,59 +14746,6 @@
         );
       }
 
-      /* Thumbnails for the inbox cards.
-   Cached per blob key for the life of the page: a card list re-renders on
-   every keystroke elsewhere on the screen, and minting a fresh object URL
-   each time would hold every picture ever shown in memory until the tab is
-   closed. A PDF has no thumbnail an <img> can draw, so the icon stays — found
-   by letting the load fail rather than by guessing from the file name, which
-   is the only test that works for both the local and the served path. */
-      const capThumbUrls = {};
-      function capThumbs(root) {
-        root.querySelectorAll(".thumb[data-blob]").forEach((box) => {
-          const key = box.dataset.blob;
-          if (!key) return;
-          const show = (url) => {
-            if (!url) return;
-            const img = new Image();
-            img.onload = () => {
-              box.innerHTML = "";
-              box.appendChild(img);
-            };
-            img.onerror = () => {}; // stays the 📄 icon: a PDF, or a blob that has gone
-            img.alt = "";
-            img.src = url;
-          };
-          if (capThumbUrls[key] !== undefined) {
-            show(capThumbUrls[key]);
-            return;
-          }
-          const direct = ErpStore.blobUrl(key);
-          if (direct) {
-            capThumbUrls[key] = direct;
-            show(direct);
-            return;
-          }
-          capThumbUrls[key] = null; // claim the key so a re-render does not fetch twice
-          ErpStore.getBlob(key)
-            .then((b) => {
-              if (!b) return;
-              capThumbUrls[key] = URL.createObjectURL(b);
-              show(capThumbUrls[key]);
-            })
-            .catch(() => {});
-        });
-      }
-
-      /* ---------- The document's own panel (ADM-03, S7) ----------
-   Everything a filed document needs a person for, in the 480 side panel the
-   specification makes the universal edit surface: where the cost lands, the
-   two archive fields the workbook has columns for, and the note.
-
-   Allocation is deliberately the last block rather than the first. The order
-   on screen is the order of the questions — what is this, where did it come
-   from, then who pays for it — and the amount you are splitting is stated
-   above the split rather than remembered from the row you clicked. */
       function captureDrawer(id) {
         const c = erp.state.captured.find((x) => x.id === id);
         if (!c) return;
@@ -18520,12 +18427,22 @@
           ganttWire(v, pid, plan, sch);
         },
 
-        /* ---------- Captura (CAP) · ADM-03, two zones (S7) ----------
-    The specification's shape: a 372 column of 96 px cards on the left, the
-    register on the right. What decides which side a document is on is not
-    its status name but whether it still needs a person — an unallocated
-    document is work, an allocated one is history — because that is the only
-    question the person opening this screen is actually asking.
+        /* ---------- Captura (CAP) · ADM-03, one register ----------
+    This screen used to be two zones: a 372 column of 96 px cards on the left,
+    the register on the right. The comment above them said what decides which
+    SIDE a document is on — «an unallocated document is work, an allocated one
+    is history» — and the code never implemented it. The tray held everything
+    unallocated; the register held everything, full stop. So a document that
+    was validated and not yet assigned sat in both, and the screen showed the
+    operator «Bandeja 1» beside «1 documento», which was the same document
+    counted twice. Reported exactly that way, with an arrow drawn between the
+    two panels.
+
+    One list now, and the tray's question survives as a filter on it: «Sin
+    asignar» with its count, which cannot disagree with the register the way a
+    second panel could. The capture buttons moved into the register's own bar
+    through `leading`, because «where do I upload a document» and «where do I
+    find one» should not be two places.
 
     The register keeps the shared list primitive (S2) rather than a hand-built
     table, so it paginates 10/25/50 like the other twenty-eight screens. */
@@ -18533,37 +18450,8 @@
           if (capWork) return captureValidate(v);
           $("#sub").textContent =
             "Fotografía o sube una factura, albarán o ticket y asígnalo a un proyecto o a gastos generales. Nada se valida sin confirmación humana.";
-          // Newest first. The document somebody has just photographed is the one they
-          // are about to file, and a worklist that appends to the bottom asks them to
-          // scroll past everything they have already dealt with to reach it.
-          const pending = erp.state.captured.filter((c) => !c.allocations.length).reverse();
-          v.innerHTML = `<div class="inbox2">
-   <div class="inbox">
-    <div class="ih"><h3>Bandeja</h3><span style="flex:1"></span><span class="tag" id="capPend">${pending.length}</span></div>
-    <div class="inboxl" id="capCards">
-     ${
-       pending
-         .map((c) => {
-           const cf = c.confirmed;
-           return `<div class="icard" data-cap="${c.id}">
-      <div class="thumb" data-blob="${esc(c.imageRef || "")}">📄</div>
-      <div style="min-width:0">
-       <div class="who">${cf && cf.issuerName ? esc(cf.issuerName) : "Emisor por confirmar"}</div>
-       <div class="amt">${cf && cf.totalCents ? eur(cf.totalCents) : "—"}</div>
-       <div class="meta"><span>${esc(CAP_TYPE_LABEL[c.docType] || c.docType)}</span> · <span>${fmtD(c.capturedAt)}</span></div>
-      </div></div>`;
-         })
-         .join("") || '<div class="empty">Nada pendiente de asignar.</div>'
-     }
-    </div>
-    <div style="display:flex;gap:8px;padding:10px 12px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line)">
-     <label class="btn primary sm">＋ Capturar documento<input type="file" id="capFile" accept="image/*,application/pdf" hidden></label>
-     <label class="btn sm">Cámara<input type="file" id="capCam" accept="image/*" capture="environment" hidden></label>
-     <button class="btn sm" id="capPrep">Preparar para trabajar sin cobertura</button>
-    </div>
-   </div>
-   <div id="capReg"></div>
-  </div>
+          const pendingCount = erp.state.captured.filter((c) => !c.allocations.length).length;
+          v.innerHTML = `<div id="capReg"></div>
   <div class="card"><div class="daylist"><div class="it">Un PDF con texto se lee al instante y sin descargar nada. Una foto o un escaneado necesitan el lector de imágenes: unos 7 MB que se descargan la primera vez que hagan falta. Prepárelo con wifi si va a trabajar en una obra sin cobertura.</div></div></div>`;
 
           const capDup = erp.duplicateCaptureMap();
@@ -18585,6 +18473,16 @@
             nounPlural: "documentos",
             searchPlaceholder: "Buscar por emisor, número o referencia…",
             emptyText: "Ningún documento coincide con la búsqueda.",
+            /* The count is its own element and never concatenated into the
+               label. A string built with `+` around a number is one text node
+               per number the register can hold — an unbounded set no
+               dictionary can carry, and the third time that trap has been
+               walked into on this codebase. */
+            leading:
+              `<label class="btn primary sm">＋ Capturar documento<input type="file" id="capFile" accept="image/*,application/pdf" hidden></label>` +
+              `<label class="btn sm">Cámara<input type="file" id="capCam" accept="image/*" capture="environment" hidden></label>` +
+              `<button class="btn sm" id="capPrep">Preparar para trabajar sin cobertura</button>` +
+              `<button class="btn sm${capPendingOnly ? " primary" : ""}" id="capPend" aria-pressed="${capPendingOnly}"><span>Sin asignar</span> <b translate="no">${pendingCount}</b></button>`,
             /* The duplicate flag is DERIVED here, not read off the record.
                `confirmCapture` stamps `duplicateSuspect` at the moment of
                confirming, so a pair that only becomes recognisable later —
@@ -18592,9 +18490,14 @@
                stayed unflagged for ever. That is precisely the pair the
                operator was looking at: one supplier invoice, filed twice, side
                by side in this register with no warning on either. */
+            /* Newest first. The document somebody has just photographed is the
+               one they are about to file, and a register that appends to the
+               bottom asks them to scroll past everything already dealt with
+               to reach it. */
             baseRows: erp.state.captured
               .slice()
               .reverse()
+              .filter((c) => !capPendingOnly || !c.allocations.length)
               .map((c) => ({ ...c, dupOf: capDup[c.id] || null })),
             matches: (c, q) =>
               [
@@ -18634,10 +18537,11 @@
             onRowClick: (id) => captureDrawer(id),
           });
 
-          v.querySelectorAll("[data-cap]").forEach(
-            (card) => (card.onclick = () => captureDrawer(card.dataset.cap)),
-          );
-          capThumbs(v);
+          $("#capPend").onclick = () => {
+            capPendingOnly = !capPendingOnly;
+            getListState("captured").page = 1;
+            render();
+          };
           const take = (el) => {
             if (el)
               el.onchange = () => {

@@ -3457,50 +3457,91 @@ async function testCapture(browser, base) {
       ok("ADM-03: the machine's reading is kept beside it, and never marked confirmed by itself");
     else bad("ADM-03: reading kept unconfirmed", JSON.stringify(saved));
 
-    // ---- S7: the two zones, and the half of ADM-03 that was not built -----
+    /* ---- ONE register, not a tray beside it -----------------------------
+       This screen used to be two zones, and the left one held the same
+       documents the register already listed — so an unassigned document
+       appeared twice and the screen read «Bandeja 1» beside «1 documento»
+       about a single document. The operator sent it back with an arrow drawn
+       between the two panels. The tray's question survives as a filter that
+       cannot disagree with the list it filters, and the capture buttons moved
+       into the register's own bar. */
     await pg.waitForTimeout(400);
     const zones = await pg.evaluate(() => {
-      const wrap = document.querySelector("#view .inbox2");
-      const card = document.querySelector("#view .icard");
+      const reg = document.querySelector("#view table.mlist");
+      const view = document.querySelector("#view");
       return {
-        two: !!wrap,
-        cols: wrap ? getComputedStyle(wrap).gridTemplateColumns : "",
-        cards: document.querySelectorAll("#view .icard").length,
-        cardHeight: card ? Math.round(card.getBoundingClientRect().height) : 0,
+        trayGone:
+          !document.querySelector("#view .inbox2") && !document.querySelector("#view .icard"),
         register: document.querySelectorAll("#view table.mlist").length,
+        capture: !!document.getElementById("capFile"),
+        camera: !!document.getElementById("capCam"),
+        offline: !!document.getElementById("capPrep"),
+        filter: !!document.getElementById("capPend"),
+        // Full width: the register spans the view rather than a 1fr column
+        // beside a 372px one.
+        fills:
+          reg && view
+            ? reg.closest(".card").getBoundingClientRect().width /
+              view.getBoundingClientRect().width
+            : 0,
       };
     });
-    if (zones.two && zones.cards >= 1 && zones.cardHeight === 96 && zones.register === 1)
-      ok(`ADM-03: the inbox is 96 px cards beside the register (${zones.cols})`);
-    else bad("ADM-03: two zones", JSON.stringify(zones));
+    if (zones.trayGone && zones.register === 1 && zones.fills > 0.9)
+      ok(
+        `ADM-03: one register, spanning the screen (${Math.round(zones.fills * 100)}% of the view)`,
+      );
+    else bad("ADM-03: one full-width register", JSON.stringify(zones));
+    if (zones.capture && zones.camera && zones.offline && zones.filter)
+      ok("ADM-03: the capture buttons and the pending filter sit on the register's own bar");
+    else bad("ADM-03: buttons moved onto the register", JSON.stringify(zones));
 
-    // The document just saved is on the LEFT, because nobody has said who
-    // pays for it yet. That is the whole reason the column exists.
-    const cardText = await pg.locator("#view .icard").first().innerText();
-    /* PK10-S4 · this check used to assert that the issuer came back NULL — no
-       keyword introduces a supplier's own name, so a label-driven reader could
-       never find it, and the card said «sin confirmar» rather than showing a
-       blank line. The rule that reads it is new: the head of the document, not
-       the party being billed, joined across the line it wrapped onto. So the
-       assertion is inverted deliberately. The card's «sin confirmar» fallback
-       is still there for a document that genuinely states no issuer; what
-       changed is that this one does state it. */
-    if (/2\.037,59/.test(cardText) && /CERYGRES/i.test(cardText))
-      ok("ADM-03: a card carries the detected amount and the issuer the reader now finds");
-    else bad("ADM-03: card content", cardText.replace(/\n/g, " · ").slice(0, 90));
+    /* The register row carries what the card used to. PK10-S4 · the issuer
+       assertion here is deliberately positive: no keyword introduces a
+       supplier's own name, so a label-driven reader could never find it, and
+       the rule that reads it — the head of the document, joined across the
+       line it wrapped onto — is what makes this pass. */
+    const rowText = await pg.evaluate(() => {
+      const tr = [...document.querySelectorAll("#view table.mlist tr.click")].find((t) =>
+        /CERYGRES/i.test(t.textContent),
+      );
+      return tr ? tr.innerText.replace(/\s+/g, " ") : "";
+    });
+    if (/2\.037,59/.test(rowText) && /CERYGRES/i.test(rowText))
+      ok("ADM-03: a register row carries the detected amount and the issuer the reader finds");
+    else bad("ADM-03: row content", rowText.slice(0, 90));
 
-    // …and a document whose issuer WAS confirmed shows it, so the line above
-    // is about this document rather than about the card never rendering a name.
-    const named = await pg.evaluate(() =>
-      [...document.querySelectorAll("#view .icard")].some((c) =>
-        /Vall/.test(c.querySelector(".who").textContent),
-      ),
-    );
-    if (named) ok("ADM-03: a card whose issuer is known shows the issuer");
-    else bad("ADM-03: named card", "no card carried a confirmed issuer name");
+    // The filter answers what the tray's count answered, and agrees with the
+    // register because it IS the register.
+    const filtered = await pg.evaluate(async () => {
+      const chip = document.getElementById("capPend");
+      const claimed = Number(chip.querySelector("b").textContent);
+      chip.click();
+      await new Promise((r) => setTimeout(r, 500));
+      const shown = document.querySelectorAll("#view table.mlist tr.click").length;
+      const truth = erp.state.captured.filter((c) => !c.allocations.length).length;
+      document.getElementById("capPend").click();
+      await new Promise((r) => setTimeout(r, 500));
+      return {
+        claimed,
+        shown,
+        truth,
+        restored: document.querySelectorAll("#view table.mlist tr.click").length,
+      };
+    });
+    if (filtered.claimed === filtered.truth && filtered.shown === filtered.truth)
+      ok(`ADM-03: «Sin asignar» counts and filters the same ${filtered.truth} documents`);
+    else bad("ADM-03: pending filter agrees with the register", JSON.stringify(filtered));
+    if (filtered.restored > filtered.shown || filtered.truth === filtered.restored)
+      ok("ADM-03: …and pressing it again gives the whole register back");
+    else bad("ADM-03: filter toggles off", JSON.stringify(filtered));
 
     // ---- allocation: the half S6 left for this session --------------------
-    await pg.locator("#view .icard").first().click();
+    await pg.evaluate(() => {
+      const tr = [...document.querySelectorAll("#view table.mlist tr.click")].find((t) =>
+        /CERYGRES/i.test(t.textContent),
+      );
+      (tr || document.querySelector("#view table.mlist tr.click")).click();
+    });
     await pg.waitForTimeout(400);
     await pg.fill("#cd_ref", "PED-E2E-77");
     await pg.fill("#cd_notes", "reforma baño");
@@ -3581,7 +3622,6 @@ async function testCapture(browser, base) {
         status: c.status,
         onlyOneDest: c.allocations.every((a) => !!a.projectId !== !!a.overheadCategory),
         sum: c.allocations.reduce((s, a) => s + a.amountCents, 0),
-        stillPending: document.querySelectorAll("#view .icard").length,
       };
     });
     if (
@@ -3592,18 +3632,27 @@ async function testCapture(browser, base) {
     )
       ok("ADM-03: a document splits between a project and an overhead, and adds up");
     else bad("ADM-03: split allocation", JSON.stringify(allocated));
-    const gone = await pg.evaluate(() => {
+    /* Allocated is HISTORY, and the filter is what says so now. The old
+       assertion was that the document left the tray for the register; there is
+       no tray, so the same fact is that it stays in the register and drops out
+       of «Sin asignar». One list, two answers, no way for them to disagree. */
+    const gone = await pg.evaluate(async () => {
       const id = erp.state.captured[erp.state.captured.length - 1].id;
-      return {
-        inInbox: !!document.querySelector(`#view .icard[data-cap="${id}"]`),
-        inRegister: [...document.querySelectorAll("#view table.mlist tr.click")].some(
+      const inList = () =>
+        [...document.querySelectorAll("#view table.mlist tr.click")].some(
           (tr) => tr.dataset.id === id,
-        ),
-      };
+        );
+      const inRegister = inList();
+      document.getElementById("capPend").click();
+      await new Promise((r) => setTimeout(r, 500));
+      const inPending = inList();
+      document.getElementById("capPend").click();
+      await new Promise((r) => setTimeout(r, 500));
+      return { inRegister, inPending };
     });
-    if (!gone.inInbox && gone.inRegister)
-      ok("ADM-03: an allocated document leaves the inbox for the register");
-    else bad("ADM-03: allocated document moves side", JSON.stringify(gone));
+    if (gone.inRegister && !gone.inPending)
+      ok("ADM-03: an allocated document stays in the register and leaves «Sin asignar»");
+    else bad("ADM-03: allocated document leaves the pending filter", JSON.stringify(gone));
 
     /* PK10-S6 · THE SAME DOCUMENT, FILED TWICE. The operator did it and the
        register showed the pair side by side with no warning: CAP-05 compared
@@ -12876,13 +12925,19 @@ async function testI18n(browser, base) {
     await pg.evaluate(() => (location.hash = "supplier-invoices"));
     await pg.waitForTimeout(700);
     const capCaText = await pg.locator("body").innerText();
+    /* «Safata» and «Emisor por confirmar» were the Bandeja's, and the Bandeja
+       is gone — one panel holding the same documents the register already
+       listed. The strings this screen introduced in its place are the filter
+       and the offline button, so those are what has to reach the translator
+       now. The negative clauses stay negative: an untranslated Spanish string
+       is the failure this check exists for, whichever screen shows it. */
     if (
-      /Safata/i.test(capCaText) &&
+      /Sense assignar/i.test(capCaText) &&
       /Documents/i.test(capCaText) &&
-      !/\bBandeja\b/i.test(capCaText) &&
-      !/Emisor por confirmar/i.test(capCaText)
+      !/\bSin asignar\b/i.test(capCaText) &&
+      /sense cobertura/i.test(capCaText)
     )
-      ok("i18n: CA translates the ADM-03 inbox and register");
+      ok("i18n: CA translates the ADM-03 register, its filter and its buttons");
     else bad("i18n: CA ADM-03", capCaText.replace(/\n/g, " ").slice(0, 160));
 
     await pg.evaluate(() => (location.hash = "purchasing"));
@@ -13063,13 +13118,14 @@ async function testI18n(browser, base) {
     await pg.evaluate(() => (location.hash = "supplier-invoices"));
     await pg.waitForTimeout(700);
     const capEnText = await pg.locator("body").innerText();
+    // Same restatement as the Catalan block above, for the same reason.
     if (
-      /Inbox/i.test(capEnText) &&
+      /Unallocated/i.test(capEnText) &&
       /Allocation/i.test(capEnText) &&
-      !/\bBandeja\b/i.test(capEnText) &&
+      !/\bSin asignar\b/i.test(capEnText) &&
       !/Asignación/i.test(capEnText)
     )
-      ok("i18n: EN translates the ADM-03 inbox and register");
+      ok("i18n: EN translates the ADM-03 register, its filter and its buttons");
     else bad("i18n: EN ADM-03", capEnText.replace(/\n/g, " ").slice(0, 160));
 
     await pg.evaluate(() => (location.hash = "purchasing"));
