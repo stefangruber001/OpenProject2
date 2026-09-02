@@ -6029,11 +6029,76 @@
         { id: this._id("bank"), name: "", kind: "bank", iban: "", openingCents: 0 },
         a,
       );
+      /* `till` is on its way out — schema v22 converts the stored ones, and
+         the screens stop offering it in the same session that replaces what it
+         was for (a cash box is a bank withdrawal awaiting its receipts, not a
+         ledger of its own). The door stays open here until that replacement
+         exists, because narrowing it first is what turns a rename into a
+         half-migrated tree: the engine refusing what the seed still builds. */
       if (!["bank", "till", "card"].includes(rec.kind))
         throw new Error("Unknown account kind: " + rec.kind);
       this.state.bankAccounts.push(rec);
       this._log(user, "addBankAccount", rec.name);
       return rec;
+    }
+    /**
+     * Why an account cannot simply be removed, or null when it can.
+     *
+     * A code rather than a sentence, and returned rather than thrown, for the
+     * reason `_discardableMovement` and `billDeleteBlock` return codes: a
+     * screen that must disable a button needs the reason before anybody
+     * presses it, and «no» with nothing after it is a wall.
+     */
+    bankAccountDeleteBlock(id) {
+      const a = this.state.bankAccounts.find((x) => x.id === id);
+      if (!a) throw new Error("Account not found");
+      if (this.state.movements.some((m) => m.accountId === id)) return "has-movements";
+      if ((this.state.importBatches || []).some((b) => b.accountId === id)) return "has-imports";
+      if (this.state.movements.some((m) => m.cardSettlement && m.cardSettlement.accountId === id))
+        return "settled";
+      return null;
+    }
+    /**
+     * Remove an account that never held anything.
+     *
+     * The same rule the party file already applies to a company: deletion is
+     * for a record that was created by mistake, not for one with history
+     * behind it. An account carrying movements is not deleted — it is
+     * DEACTIVATED, because its movements are reconciled against real
+     * documents and removing the account they name would orphan every one of
+     * them silently. So the two verbs are separate and the screen offers
+     * whichever is honest.
+     *
+     * Until now there was neither: `addBankAccount` existed and nothing
+     * removed, so a workspace that had been demonstrated on carried its demo
+     * accounts for ever with no way to be rid of them.
+     */
+    deleteBankAccount(id, user) {
+      const i = this.state.bankAccounts.findIndex((x) => x.id === id);
+      if (i < 0) throw new Error("Account not found");
+      const block = this.bankAccountDeleteBlock(id);
+      if (block) throw new Error("This account cannot be removed: " + block);
+      const [gone] = this.state.bankAccounts.splice(i, 1);
+      this._log(user, "deleteBankAccount", gone.name);
+      return gone;
+    }
+    /**
+     * Keep the history, lose the account from the pickers.
+     *
+     * `active !== false` is the test everywhere, so an account that predates
+     * this field is active — the same convention the party file uses, and the
+     * reason neither needed a migration to introduce it.
+     */
+    setBankAccountActive(id, active, user) {
+      const a = this.state.bankAccounts.find((x) => x.id === id);
+      if (!a) throw new Error("Account not found");
+      a.active = !!active;
+      this._log(user, active ? "activateBankAccount" : "deactivateBankAccount", a.name);
+      return a;
+    }
+    /** The accounts a picker should offer: everything still in use. */
+    activeBankAccounts() {
+      return this.state.bankAccounts.filter((a) => a.active !== false);
     }
     /**
      * The bank line that pays a card off, tied to the card it settles.

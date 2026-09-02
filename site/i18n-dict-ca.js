@@ -582,6 +582,22 @@ window.CANEI_DICT.ca = {
   "La factura necesita una base imponible": "La factura necessita una base imposable",
   "El reparto debe sumar la base imponible": "El repartiment ha de sumar la base imposable",
   "Factura registrada": "Factura registrada",
+  "Cuentas y tarjetas": "Comptes i targetes",
+  "Ir a Configuración › Empresa": "Anar a Configuració › Empresa",
+  "Las cuentas y las tarjetas se crean en Configuración › Empresa.":
+    "Els comptes i les targetes es creen a Configuració › Empresa.",
+  "Aquí se crean y se retiran. La cuenta se borra sólo mientras no tenga movimientos; con historial detrás se desactiva, que la quita de las listas y conserva lo conciliado.":
+    "Aquí es creen i es retiren. El compte s'esborra només mentre no tingui moviments; amb historial al darrere es desactiva, cosa que el treu de les llistes i conserva el que s'ha conciliat.",
+  Desactivar: "Desactivar",
+  Reactivar: "Reactivar",
+  Desactivada: "Desactivada",
+  "Borrar la cuenta": "Esborrar el compte",
+  "Se borra la cuenta. Sólo es posible mientras no tenga ningún movimiento, así que no hay nada conciliado que se pierda.":
+    "S'esborra el compte. Només és possible mentre no tingui cap moviment, així que no es perd res conciliat.",
+  "Cuenta borrada": "Compte esborrat",
+  "Cuenta desactivada": "Compte desactivat",
+  "Cuenta reactivada": "Compte reactivat",
+  "No hay ninguna cuenta todavía.": "Encara no hi ha cap compte.",
   "Anular registro": "Anul·lar registre",
   "Anular el registro": "Anul·lar el registre",
   Anular: "Anul·lar",

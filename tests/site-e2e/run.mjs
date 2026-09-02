@@ -5216,19 +5216,39 @@ async function testFirstRun(browser, base) {
     await emptyRegister();
     await pg.waitForTimeout(400);
 
-    if (await pg.locator("#bkNew").isVisible())
-      ok("first run: with no accounts, the bank screen still offers ＋ Cuenta");
-    else bad("first run: bank screen", "no #bkNew — the empty state is a dead end");
+    /* The door still belongs above the emptiness — that was learnt here and
+       has not changed. What changed is where it LEADS: accounts belong to the
+       company and are configured with the rest of it, so this screen points at
+       that one instead of owning a second way to create the same thing. An
+       empty state with nothing to press is still the failure being guarded
+       against; a signpost is not nothing. */
+    if (await pg.locator("#bkToCfg").isVisible())
+      ok("first run: with no accounts, the bank screen still offers a way forward");
+    else bad("first run: bank screen", "no #bkToCfg — the empty state is a dead end");
 
-    await pg.locator("#bkNew").click();
+    await pg.locator("#bkToCfg").click();
+    await pg.waitForTimeout(500);
+    const landed = await pg.evaluate(() => ({
+      onCompany: /Cuentas y tarjetas/i.test(document.querySelector("#view").innerText),
+      canAdd: !!document.getElementById("co_accNew"),
+    }));
+    if (landed.onCompany && landed.canAdd)
+      ok("first run: …and it lands on the screen that does create them");
+    else bad("first run: the signpost leads somewhere", JSON.stringify(landed));
+
+    await pg.locator("#co_accNew").click();
     await pg.waitForTimeout(400);
     await pg.fill("#na_name", "BBVA primera cuenta");
     await pg.selectOption("#na_kind", "bank");
     await pg.locator("#na_go").click();
     await pg.waitForTimeout(600);
     const madeBank = await pg.evaluate(() => erp.state.bankAccounts.length);
-    if (madeBank === 1) ok("first run: the first bank account is created from that button");
+    if (madeBank === 1) ok("first run: the first bank account is created there");
     else bad("first run: create account", `accounts=${madeBank}`);
+
+    await pg.goto(`${base}/erp.html#banking`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(500);
 
     // …and once one exists, the statement importer is on the same screen.
     const importable = await pg.evaluate(() => !!document.querySelector("#bkImport"));
@@ -5344,6 +5364,81 @@ async function testFirstRun(browser, base) {
       ok("first run: the company record saves, and both addresses reach the documents");
     else bad("first run: company saved", JSON.stringify(saved));
 
+    /* PK12-S6 · ACCOUNTS BELONG TO THE COMPANY, and until now nothing could
+       remove one. `addBankAccount` existed and no method undid it, so a
+       workspace that had been demonstrated on carried its demo accounts for
+       ever — the operator's, with six of them, asked where they go. They are
+       created and retired here now, and Consolidación bancaria stops owning a
+       second door into the same decision. */
+    const accCard = await pg.evaluate(() => ({
+      card: /Cuentas y tarjetas/i.test(document.querySelector("#view").innerText),
+      add: !!document.getElementById("co_accNew"),
+      rows: document.querySelectorAll("#view [data-accdel]").length,
+      accounts: erp.state.bankAccounts.length,
+    }));
+    if (accCard.card && accCard.add && accCard.rows === accCard.accounts)
+      ok(`first run: the company screen lists and creates accounts (${accCard.rows})`);
+    else bad("first run: accounts on the company screen", JSON.stringify(accCard));
+
+    // Delete is offered only where it is honest: an account with movements
+    // behind it is deactivated instead, because removing it would orphan
+    // every reconciliation that names it.
+    const accRules = await pg.evaluate(async () => {
+      const made = erp.addBankAccount({ name: "E2E cuenta vacía", kind: "bank" }, "bo");
+      /* The condition is BUILT, not looked for: this suite deliberately starts
+         from an empty register, so an account with movements does not exist
+         unless the check makes one. Finding none and passing would have been
+         the check quietly testing nothing. */
+      const used = erp.addBankAccount({ name: "E2E cuenta usada", kind: "bank" }, "bo");
+      erp.importMovements(
+        used.id,
+        [{ accountingDate: erp.state.today, concept: "E2E MOV", amountCents: -1234 }],
+        "bo",
+      );
+      render();
+      await new Promise((r) => setTimeout(r, 400));
+      const btn = (id) => document.querySelector(`[data-accdel="${id}"]`);
+      const out = {
+        emptyDeletable: !!btn(made.id) && !btn(made.id).disabled,
+        usedBlocked: used ? !!btn(used.id) && btn(used.id).disabled : null,
+        usedReason: used ? erp.bankAccountDeleteBlock(used.id) : null,
+      };
+      // Deactivating keeps the history and takes it out of the pickers.
+      if (used) {
+        document.querySelector(`[data-accoff="${used.id}"]`).click();
+        await new Promise((r) => setTimeout(r, 400));
+        out.deactivated = erp.state.bankAccounts.find((a) => a.id === used.id).active === false;
+        out.hidden = !erp.activeBankAccounts().some((a) => a.id === used.id);
+        out.movementsKept = erp.state.movements.some((m) => m.accountId === used.id);
+        document.querySelector(`[data-accoff="${used.id}"]`).click();
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      erp.deleteBankAccount(made.id, "bo");
+      out.emptyGone = !erp.state.bankAccounts.some((a) => a.id === made.id);
+      out.usedStays = erp.state.bankAccounts.some((a) => a.id === used.id);
+      return out;
+    });
+    if (accRules.emptyDeletable && accRules.usedBlocked && accRules.usedReason === "has-movements")
+      ok("first run: an empty account can be borrada, one with movements cannot, and it says why");
+    else bad("first run: delete offered only when honest", JSON.stringify(accRules));
+    if (
+      accRules.deactivated &&
+      accRules.hidden &&
+      accRules.movementsKept &&
+      accRules.emptyGone &&
+      accRules.usedStays
+    )
+      ok("first run: …deactivating hides it from the pickers and keeps every movement");
+    else bad("first run: deactivate keeps history", JSON.stringify(accRules));
+
+    // And the screen that used to create them sends you here instead.
+    const bankDoor = await pg.evaluate(() => {
+      const html = document.documentElement.innerHTML;
+      return { gone: !html.includes('id="bkNew"') };
+    });
+    if (bankDoor.gone) ok("first run: Consolidación bancaria no longer owns a second way in");
+    else bad("first run: + Cuenta removed from banking", JSON.stringify(bankDoor));
+
     /* PK-J · the mailbox is entered on this screen too, and the password is
        NOT part of the company record. Both halves are asserted: the fields
        exist and are usable, and «Guardar» does not carry the password into
@@ -5406,6 +5501,32 @@ async function testFirstRun(browser, base) {
 
 // ── ADM-05 Consolidación bancaria and ADM-06 Caja chica (§3.2), plus gap 13 —
 //    the last structural break in the money chain, closed in S11.
+/**
+ * Create an account through the product, from the screen that owns them.
+ *
+ * Accounts moved to Configuración › Empresa, so a suite that merely NEEDS one
+ * to exist goes there and returns rather than reaching into the engine — the
+ * point of driving the product is that a door nobody can open is a failure,
+ * and a setup step that bypasses the door would not notice.
+ */
+async function makeAccount(pg, name, kind) {
+  await pg.evaluate(() => go("company"));
+  await pg.waitForTimeout(500);
+  await pg.click("#co_accNew");
+  await pg.waitForTimeout(300);
+  await pg.evaluate(
+    ([n, k]) => {
+      document.getElementById("na_name").value = n;
+      document.getElementById("na_kind").value = k;
+    },
+    [name, kind],
+  );
+  await pg.click("#na_go");
+  await pg.waitForTimeout(500);
+  await pg.evaluate(() => go("banking"));
+  await pg.waitForTimeout(600);
+}
+
 async function testBankAndCash(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
   const errs = [];
@@ -5863,14 +5984,11 @@ async function testBankAndCash(browser, base) {
     //    same door OCR uses), not the Node-side pdfjs-dist the parser's own
     //    unit test reads with. A fresh account, so the .xlsx fixtures already
     //    imported above cannot mask a PDF row the parser silently dropped.
-    await pg.click("#bkNew");
-    await pg.waitForTimeout(300);
-    await pg.evaluate(() => {
-      document.getElementById("na_name").value = "BBVA PDF E2E";
-      document.getElementById("na_kind").value = "bank";
-    });
-    await pg.click("#na_go");
-    await pg.waitForTimeout(500);
+    /* Accounts are created in Configuración › Empresa now — Consolidación
+       bancaria stopped owning a second door to the same decision. This block
+       is about the PDF importer, not about where accounts come from, so it
+       goes the way a person would and comes straight back. */
+    await makeAccount(pg, "BBVA PDF E2E", "bank");
     const pdfAcc = await pg.evaluate(() => {
       const a = erp.state.bankAccounts.find((a) => a.name === "BBVA PDF E2E");
       return a ? a.id : null;
@@ -5947,14 +6065,7 @@ async function testBankAndCash(browser, base) {
 
     // ── 1C: a credit card is an ACCOUNT — created through the product, fed
     //    by the same importer, settled from the bank as an internal transfer.
-    await pg.click("#bkNew");
-    await pg.waitForTimeout(300);
-    await pg.evaluate(() => {
-      document.getElementById("na_name").value = "Visa E2E";
-      document.getElementById("na_kind").value = "card";
-    });
-    await pg.click("#na_go");
-    await pg.waitForTimeout(500);
+    await makeAccount(pg, "Visa E2E", "card");
     const cardAcc = await pg.evaluate(() => {
       const c = erp.state.bankAccounts.find((a) => a.kind === "card" && a.name === "Visa E2E");
       return c ? c.id : null;

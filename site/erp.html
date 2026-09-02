@@ -19084,9 +19084,15 @@
              the bank work unreachable precisely on first use: a sentence, and
              nothing to press. The door belongs above the emptiness. */
           if (!accs.length) {
-            v.innerHTML = `<div class="stepbar"><button class="btn primary sm" id="bkNew">＋ Cuenta</button></div>
-   <div class="card"><div class="empty">No hay cuentas configuradas.<br>Crea la primera cuenta para empezar: banco, tarjeta o caja.</div></div>`;
-            $("#bkNew").onclick = () => newAccountDrawer();
+            /* The door belongs above the emptiness — that much was already
+               learnt here. What changed is WHERE the door leads: accounts
+               belong to the company and are configured with the rest of it,
+               so this screen points at that one rather than owning a second
+               way in. Two places to create an account is two places to look
+               for the one you cannot find. */
+            v.innerHTML = `<div class="stepbar"><button class="btn primary sm" id="bkToCfg">Ir a Configuración › Empresa</button></div>
+   <div class="card"><div class="empty">No hay cuentas configuradas.<br>Las cuentas y las tarjetas se crean en Configuración › Empresa.</div></div>`;
+            $("#bkToCfg").onclick = () => go("company");
             return;
           }
           if (bankAcc && !accs.some((a) => a.id === bankAcc)) bankAcc = "";
@@ -19108,7 +19114,7 @@
        <option value="">Todas las cuentas</option>
        ${accs.map((a) => `<option value="${a.id}"${a.id === bankAcc ? " selected" : ""}>${esc(a.name)}${a.kind === "card" ? " · tarjeta" : a.kind === "till" ? " · caja" : ""}</option>`).join("")}
      </select>
-     <button class="btn sm" id="bkNew">＋ Cuenta</button>
+     
      <span style="flex:1"></span>
      <button class="btn sm" id="bkImport">⬆ Importar extracto (.xlsx / .pdf)</button>
      <button class="btn sm" id="bkUndo">↩ Deshacer importación</button>
@@ -19147,7 +19153,6 @@
           );
           $("#bToRec").onclick = () => goTab("banking", "_reconcile");
           if ($("#bkToRec2")) $("#bkToRec2").onclick = () => goTab("banking", "_reconcile");
-          $("#bkNew").onclick = () => newAccountDrawer();
           /* The statement lands on ONE account — importing into "all accounts"
              would have to guess, and a guess about which bank a movement
              belongs to is a reconciliation that starts wrong. */
@@ -19802,6 +19807,12 @@
         const MISS_LAB = COMPANY_MISSING_LABELS;
         const grid = (...keys) =>
           `<div class="fgrid" style="padding:12px 16px">${keys.map((k) => companyField(c, k)).join("")}</div>`;
+        /* Accounts belong to the COMPANY, so they are configured with the rest
+           of it. They used to be created from Consolidación bancaria — a
+           screen for reading balances and getting a statement in — and could
+           not be removed from anywhere at all, so a workspace that had been
+           demonstrated on carried its demo accounts for ever. */
+        const accounts = erp.state.bankAccounts.slice();
         v.innerHTML = `
    ${
      missing.length
@@ -19867,6 +19878,26 @@
     )}
     <div class="daylist"><div class="it" style="color:var(--muted)">Estos valores eran fijos dentro del programa y ahora se leen de aquí. Un presupuesto o un contrato que ya existe conserva los suyos.</div></div></div>
 
+   <div class="card"><div class="ch"><h3>Cuentas y tarjetas</h3>
+     <span class="tag" translate="no">${accounts.length}</span>
+     <span style="flex:1"></span>
+     <button class="btn sm" id="co_accNew">＋ Cuenta</button></div>
+    <div class="daylist"><div class="it" style="color:var(--muted)">Aquí se crean y se retiran. La cuenta se borra sólo mientras no tenga movimientos; con historial detrás se desactiva, que la quita de las listas y conserva lo conciliado.</div></div>
+    ${
+      accounts
+        .map((a) => {
+          const block = erp.bankAccountDeleteBlock(a.id);
+          const off = a.active === false;
+          return `<div class="it"><span class="k" style="flex:1">${esc(a.name)}</span>
+      <span class="pill${off ? "" : " b"}">${esc(ACCOUNT_KINDS[a.kind] || a.kind)}</span>
+      ${off ? '<span class="pill y">Desactivada</span>' : ""}
+      <button class="btn sm" data-accoff="${a.id}">${off ? "Reactivar" : "Desactivar"}</button>
+      <button class="btn sm danger" data-accdel="${a.id}"${block ? " disabled" : ""}>Borrar</button></div>`;
+        })
+        .join("") || '<div class="it"><div class="empty">No hay ninguna cuenta todavía.</div></div>'
+    }
+   </div>
+
    <div class="card"><div class="ch"><h3>Pie legal</h3></div>
     <div class="fgrid" style="padding:12px 16px">
      <div class="field full"><label>Texto que se imprime al pie de cada documento</label>
@@ -19874,6 +19905,33 @@
     </div></div>
 
    <div style="margin:12px 0 24px"><button class="btn primary" id="co_save">Guardar</button></div>`;
+
+        $("#co_accNew").onclick = () => newAccountDrawer();
+        v.querySelectorAll("[data-accoff]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              const a = erp.state.bankAccounts.find((x) => x.id === b.dataset.accoff);
+              mutate(
+                () => erp.setBankAccountActive(a.id, a.active === false, "backoffice"),
+                a.active === false ? "Cuenta reactivada" : "Cuenta desactivada",
+              );
+            }),
+        );
+        v.querySelectorAll("[data-accdel]").forEach(
+          (b) =>
+            (b.onclick = async () => {
+              const a = erp.state.bankAccounts.find((x) => x.id === b.dataset.accdel);
+              // One whole sentence: a modal body is a single text node, and a
+              // concatenated one is a key no dictionary can hold.
+              const yes = await askConfirm("Borrar la cuenta", {
+                body: "Se borra la cuenta. Sólo es posible mientras no tenga ningún movimiento, así que no hay nada conciliado que se pierda.",
+                okLabel: "Borrar",
+                danger: true,
+              });
+              if (!yes) return;
+              mutate(() => erp.deleteBankAccount(a.id, "backoffice"), "Cuenta borrada");
+            }),
+        );
 
         /* The logo is a file, not a name. `logoRef` — the field this replaces —
            was never read by anything that draws. */
