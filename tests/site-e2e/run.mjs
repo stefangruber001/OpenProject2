@@ -2679,6 +2679,20 @@ async function testSupplierBillEntry(browser, base) {
       ok(`AP-01: the payables screen offers a way to record an invoice (${btn.w}×${btn.h})`);
     else bad("AP-01: new-invoice button reachable", JSON.stringify(btn));
 
+    /* PK12-S6b · A BILL WITH NO DOCUMENT SAYS SO. The operator asked why
+       «＋ Nueva factura» exists at all when every invoice arrives scanned or
+       uploaded. It exists for the ones that do not — a supplier who bills in
+       the body of an email, a cost accrued before the paper turns up — so it
+       stays, demoted, and what it produces is marked: a paperclip is an offer
+       to attach and reads as optional, and the gap it stands for is not. */
+    const manualDoor = await pg.evaluate(() => {
+      const b = document.getElementById("sb_new");
+      return { present: !!b, primary: b ? b.className.includes("primary") : null };
+    });
+    if (manualDoor.present && manualDoor.primary === false)
+      ok("AP-01: manual entry is still offered, and no longer the primary action");
+    else bad("AP-01: manual entry demoted", JSON.stringify(manualDoor));
+
     const before = await pg.evaluate(() => erp.state.bills.length);
     await pg.click("#sb_new");
     await pg.waitForTimeout(400);
@@ -2741,6 +2755,20 @@ async function testSupplierBillEntry(browser, base) {
     if (made.name && made.taxId)
       ok(`AP-01: the bill carries its issuer's name and tax id (${made.name} · ${made.taxId})`);
     else bad("AP-01: issuer stamped on the bill", JSON.stringify(made));
+
+    const noDoc = await pg.evaluate(() => {
+      const b = erp.state.bills.find((x) => x.number === "E2E-001");
+      const tr = [...document.querySelectorAll("#view table tr")].find((t) =>
+        /E2E-001/.test(t.textContent),
+      );
+      return {
+        hasCap: !!(b && (b.capId || b.supportingDoc)),
+        says: tr ? /sin documento/i.test(tr.textContent) : null,
+      };
+    });
+    if (noDoc.hasCap === false && noDoc.says)
+      ok("AP-01: …and a bill typed in by hand is marked «sin documento» in the register");
+    else bad("AP-01: documentless bill flagged", JSON.stringify(noDoc));
 
     // ── a photographed document becomes that invoice ──
     const capId = await pg.evaluate(() => {
@@ -5679,7 +5707,12 @@ async function testBankAndCash(browser, base) {
       accounts: document.querySelectorAll("#view [data-acct]").length,
       hasImport: !!document.getElementById("bkImport"),
       hasUndo: !!document.getElementById("bkUndo"),
+      /* «Ir a Conciliación →» is gone, and its absence is now the assertion.
+         Conciliación is a TAB of this screen, sitting in the strip a
+         centimetre above — a button that selects the tab beside it is the same
+         two-doors-into-one-decision the operator called out on «＋ Cuenta». */
       toReconcile: !!document.getElementById("bToRec"),
+      recTab: document.querySelectorAll('.tabstrip [data-tab="_reconcile"]').length,
     }));
     if (readonly.classSelects === 0 && readonly.destSelects === 0)
       ok("ADM-05: no movement is classified or assigned from Cuentas y saldos");
@@ -5689,7 +5722,8 @@ async function testBankAndCash(browser, base) {
       readonly.recent > 0 &&
       readonly.hasImport &&
       readonly.hasUndo &&
-      readonly.toReconcile
+      !readonly.toReconcile &&
+      readonly.recTab === 1
     )
       ok(
         `ADM-05: it keeps balances, import, undo and the last movements read-only (${readonly.accounts} accounts)`,
@@ -9423,12 +9457,14 @@ async function testAdmin(browser, base) {
     if (oldInputs === 0 && rowSelects === 0)
       ok("ADM-05: the balances screen decides nothing — no field, no row select");
     else bad("banco: row assignment", `old=${oldInputs} selects=${rowSelects}`);
-    await pg.click("#bToRec");
+    /* The hand-over is the TAB, and only the tab. There used to be a button
+       beside it doing the same thing; the operator circled it, along with two
+       others that navigate to a sibling tab already on screen. What is asserted
+       now is that the tab does the job on its own. */
+    await pg.click('.tabstrip [data-tab="_reconcile"]');
     await pg.waitForTimeout(600);
-    // The two are tabs of ADM-05 now, so handing over means selecting the
-    // sibling tab rather than navigating somewhere else.
     const onRec = await pg.locator('.tabstrip [data-tab="_reconcile"].on').count();
-    if (onRec === 1) ok("banco: the screen hands over to Conciliación explicitly");
+    if (onRec === 1) ok("banco: Conciliación is reached by its own tab, with no button beside it");
     else bad("banco: link to reconciliation", `active tab not _reconcile (${pg.url()})`);
 
     // ── 1G: the accountant package is a FILE, opened and READ BACK ────────

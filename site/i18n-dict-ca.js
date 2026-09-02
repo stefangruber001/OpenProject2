@@ -582,6 +582,8 @@ window.CANEI_DICT.ca = {
   "La factura necesita una base imponible": "La factura necessita una base imposable",
   "El reparto debe sumar la base imponible": "El repartiment ha de sumar la base imposable",
   "Factura registrada": "Factura registrada",
+  "Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos":
+    "Per a una factura que no arriba com a document — la majoria es pugen o es fotografien a Documents",
   "Cuentas y tarjetas": "Comptes i targetes",
   "Ir a Configuración › Empresa": "Anar a Configuració › Empresa",
   "Las cuentas y las tarjetas se crean en Configuración › Empresa.":

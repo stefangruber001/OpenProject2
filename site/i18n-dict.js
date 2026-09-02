@@ -688,6 +688,10 @@ window.CANEI_DICT = {
     ["La factura necesita una base imponible", "The invoice needs a taxable base"],
     ["El reparto debe sumar la base imponible", "The split must total the taxable base"],
     ["Factura registrada", "Invoice registered"],
+    [
+      "Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos",
+      "For an invoice that does not arrive as a document — most are uploaded or photographed in Documents",
+    ],
     ["Cuentas y tarjetas", "Accounts and cards"],
     ["Ir a Configuración › Empresa", "Go to Settings › Company"],
     [

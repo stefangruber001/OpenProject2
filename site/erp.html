@@ -10038,7 +10038,6 @@
    <div class="card"><div class="queuebar">
      <span class="n">${open.length}</span><span>movimientos sin conciliar en el periodo</span>
      <span style="flex:1"></span>
-     <button class="btn sm" id="rcToDone">Conciliados →</button>
      <button class="btn sm" id="rcClose" title="Bloquea el periodo; exige cero movimientos sin conciliar">🔒 Cerrar periodo</button>
    </div></div>
    ${transferCard(transfers)}
@@ -10130,7 +10129,6 @@
 
         $("#rcClose").onclick = () =>
           mutate(() => erp.closeBankPeriod(r.from, r.to, "backoffice"), "Periodo cerrado");
-        $("#rcToDone").onclick = () => goTab("banking", "_reconciled");
         /* One pair at a time, through the method that writes the LINK. The old
            bulk button called `classifyMovement` on each leg separately, which
            left two movements that happened to be classified the same way and
@@ -17088,12 +17086,18 @@
 
       /* What the payables row shows about the bill's document: the captured
          file it came from, the attached paper, or the offer to attach one. */
+      /* An invoice with nothing behind it SAYS so. A paperclip is an offer to
+         attach and reads as an option; the gap it stands for is not optional.
+         Almost every document arrives photographed or uploaded, so a bill with
+         no document is either one typed in by hand — the case «＋ Nueva
+         factura» exists for, and which the accountant will still ask about —
+         or a filing somebody started and left. Both are worth chasing, and
+         neither is visible while the only sign is an unpressed button. */
       function billDocCell(billId) {
         const b = erp.state.bills.find((x) => x.id === billId);
         if (!b) return "";
-        if (b.capId) return ' <span class="pill g">doc</span>';
-        if (b.supportingDoc) return ' <span class="pill g">doc</span>';
-        return ` <button class="btn sm" data-billdoc="${billId}">📎</button>`;
+        if (b.capId || b.supportingDoc) return ' <span class="pill g">doc</span>';
+        return ` <span class="pill y">sin documento</span> <button class="btn sm" data-billdoc="${billId}">📎</button>`;
       }
       function billDocDrawer(billId) {
         const b = erp.state.bills.find((x) => x.id === billId);
@@ -19000,7 +19004,8 @@
             "Facturas de proveedor con base, IVA y retención IRPF según el perfil fiscal. Pagos parciales y un pago para varias facturas.";
           const rows = erp.payables();
           v.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-    <button class="btn primary sm" id="sb_new">＋ Nueva factura</button></div>
+    <span style="flex:1"></span>
+    <button class="btn sm" id="sb_new" title="Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos">＋ Nueva factura</button></div>
    <div class="card"><div class="ch"><h3>Facturas de proveedor</h3><span class="tag">pendiente ${eur0(rows.reduce((s, r) => s + Math.max(0, r.outstandingCents), 0))}</span></div>
    <div class="scroll"><table><thead><tr><th>Proveedor</th><th>Nº factura</th><th class="num">Total</th><th class="num">Pendiente</th><th>Vence</th><th>Asignación</th><th>Estado</th><th></th></tr></thead><tbody>
    ${rows
@@ -19119,7 +19124,6 @@
      <button class="btn sm" id="bkImport">⬆ Importar extracto (.xlsx / .pdf)</button>
      <button class="btn sm" id="bkUndo">↩ Deshacer importación</button>
      <input type="file" id="bkFile" accept=".xlsx,.pdf" style="display:none">
-     <button class="btn sm primary" id="bToRec">Ir a Conciliación →</button>
    </div>
    ${accountLines(accs)}
    <div class="card"><div class="ch"><h3>Últimos movimientos</h3><span class="tag">${recent.length}</span></div>
@@ -19135,7 +19139,7 @@
        )
        .join("") || '<div class="it">Sin movimientos todavía.</div>'
    }
-   ${openAll ? `<div class="it" style="border-top:1px solid var(--hair)"><span style="flex:1">Movimientos por explicar</span><span class="pill y">${openAll}</span><button class="btn sm" id="bkToRec2">Conciliar →</button></div>` : ""}
+   ${openAll ? `<div class="it" style="border-top:1px solid var(--hair)"><span style="flex:1">Movimientos por explicar</span><span class="pill y">${openAll}</span></div>` : ""}
    </div></div>`;
 
           $("#bkSel").onchange = (e) => {
@@ -19151,8 +19155,6 @@
                 render();
               }),
           );
-          $("#bToRec").onclick = () => goTab("banking", "_reconcile");
-          if ($("#bkToRec2")) $("#bkToRec2").onclick = () => goTab("banking", "_reconcile");
           /* The statement lands on ONE account — importing into "all accounts"
              would have to guess, and a guess about which bank a movement
              belongs to is a reconciliation that starts wrong. */
