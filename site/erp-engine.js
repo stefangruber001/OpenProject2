@@ -6053,13 +6053,34 @@
      * screen that must disable a button needs the reason before anybody
      * presses it, and «no» with nothing after it is a wall.
      */
-    bankAccountDeleteBlock(id) {
+    bankAccountDeleteBlock(id, opts) {
       const a = this.state.bankAccounts.find((x) => x.id === id);
       if (!a) throw new Error("Account not found");
-      if (this.state.movements.some((m) => m.accountId === id)) return "has-movements";
-      if ((this.state.importBatches || []).some((b) => b.accountId === id)) return "has-imports";
+      /* Checked FIRST because it is the one refusal that no confirmation can
+         buy off. A line on another account is classified an internal transfer
+         BECAUSE it names this card as what it settles; remove the card and
+         that line silently becomes a cost again, double-counting every
+         purchase already on it. That is a change to the accounts, not a
+         cleanup, so it stays a wall whatever the operator asks for. */
       if (this.state.movements.some((m) => m.cardSettlement && m.cardSettlement.accountId === id))
         return "settled";
+      /* Taking the movements too is a DIFFERENT act, and it is offered rather
+         than assumed. "This account has history behind it" is the right answer
+         to a stray click and the wrong answer to a demonstration workspace
+         somebody now wants rid of — which is the case the operator actually
+         hit: accounts deactivated because they could not be deleted, and then
+         still on the screen, because deactivating was never what was wanted. */
+      if (opts && opts.withMovements) {
+        if (
+          this.state.movements.some(
+            (m) => m.accountId === id && this.bankPeriodClosed(m.accountingDate),
+          )
+        )
+          return "closed-period";
+        return null;
+      }
+      if (this.state.movements.some((m) => m.accountId === id)) return "has-movements";
+      if ((this.state.importBatches || []).some((b) => b.accountId === id)) return "has-imports";
       return null;
     }
     /**
@@ -6077,13 +6098,30 @@
      * removed, so a workspace that had been demonstrated on carried its demo
      * accounts for ever with no way to be rid of them.
      */
-    deleteBankAccount(id, user) {
-      const i = this.state.bankAccounts.findIndex((x) => x.id === id);
-      if (i < 0) throw new Error("Account not found");
-      const block = this.bankAccountDeleteBlock(id);
+    deleteBankAccount(id, user, opts) {
+      if (!this.state.bankAccounts.some((x) => x.id === id)) throw new Error("Account not found");
+      const block = this.bankAccountDeleteBlock(id, opts);
       if (block) throw new Error("This account cannot be removed: " + block);
+      /* The movements go through `resetAccountMovements`, not through a filter
+         written here. That method already unwinds each reconciliation before
+         dropping the row — so nothing is left claiming a bill was paid by a
+         movement that no longer exists — and already clears the import
+         batches that described them. Deleting the rows directly would leave
+         both of those behind, which is the same orphaning this refused to do
+         in the first place. The index is re-read afterwards: the reset does
+         not touch this array today, and a delete that depends on that staying
+         true is a delete that removes the wrong account the day it changes. */
+      let movementsRemoved = 0;
+      if (opts && opts.withMovements)
+        movementsRemoved = this.resetAccountMovements(id, user).deleted;
+      const i = this.state.bankAccounts.findIndex((x) => x.id === id);
       const [gone] = this.state.bankAccounts.splice(i, 1);
       this._log(user, "deleteBankAccount", gone.name);
+      /* The account itself is returned, as before — callers pass it straight
+         to a toast. What it also carries now is how much went with it, so a
+         screen can say so without counting the rows again after they are
+         gone. */
+      gone.movementsRemoved = movementsRemoved;
       return gone;
     }
     /**

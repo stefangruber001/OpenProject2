@@ -5519,10 +5519,21 @@ async function testFirstRun(browser, base) {
     await bootedShell(pg);
     await pg.waitForTimeout(500);
 
-    // …and once one exists, the statement importer is on the same screen.
-    const importable = await pg.evaluate(() => !!document.querySelector("#bkImport"));
-    if (importable) ok("first run: the statement importer appears with the first account");
-    else bad("first run: importer", "no #bkImport after creating an account");
+    /* …and once one exists, the statement importer is on the same screen.
+       Looked for as the INPUT, not as the button that used to script a click
+       on it: on iOS a hidden input opened by `.click()` never produces a file
+       dialog, so «Importar extracto» did nothing at all on the operator's
+       phone. It is a <label> wrapping the input now, the way every other file
+       control in this file already was, and what has to exist is that pair. */
+    const importable = await pg.evaluate(() => {
+      const input = document.querySelector("#bkFile");
+      return { input: !!input, insideLabel: !!(input && input.closest("label")) };
+    });
+    if (importable.input && importable.insideLabel)
+      ok(
+        "first run: the statement importer appears with the first account, as a label iOS can open",
+      );
+    else bad("first run: importer", JSON.stringify(importable));
 
     // ---- petty cash: the till is created from the screen named after it ----
     await pg.goto(`${base}/erp.html#petty-cash`, { waitUntil: "networkidle" });
@@ -5669,8 +5680,19 @@ async function testFirstRun(browser, base) {
       const btn = (id) => document.querySelector(`[data-accdel="${id}"]`);
       const out = {
         emptyDeletable: !!btn(made.id) && !btn(made.id).disabled,
-        usedBlocked: used ? !!btn(used.id) && btn(used.id).disabled : null,
-        usedReason: used ? erp.bankAccountDeleteBlock(used.id) : null,
+        /* An account with history is now DELETABLE — with its movements, and
+           only after a confirmation that says so. The old shape of this check
+           asserted the opposite (the button disabled, the reason
+           "has-movements") and it was right about the engine and wrong about
+           the operator, who had a permanently greyed control and no way to be
+           rid of a demonstration account. What must still be true is that the
+           refusal it replaces is REPORTED rather than mute: a blocked button
+           now carries the reason in its title. */
+        usedDeletable: used ? !!btn(used.id) && !btn(used.id).disabled : null,
+        usedPlainReason: used ? erp.bankAccountDeleteBlock(used.id) : null,
+        usedCascadeReason: used
+          ? erp.bankAccountDeleteBlock(used.id, { withMovements: true })
+          : null,
       };
       // Deactivating keeps the history and takes it out of the pickers.
       if (used) {
@@ -5684,21 +5706,71 @@ async function testFirstRun(browser, base) {
       }
       erp.deleteBankAccount(made.id, "bo");
       out.emptyGone = !erp.state.bankAccounts.some((a) => a.id === made.id);
-      out.usedStays = erp.state.bankAccounts.some((a) => a.id === used.id);
+      // …and the one with history goes too, movements and all.
+      const before = erp.state.movements.filter((m) => m.accountId === used.id).length;
+      erp.deleteBankAccount(used.id, "bo", { withMovements: true });
+      out.usedGone = !erp.state.bankAccounts.some((a) => a.id === used.id);
+      out.movementsWentToo =
+        before > 0 && !erp.state.movements.some((m) => m.accountId === used.id);
       return out;
     });
-    if (accRules.emptyDeletable && accRules.usedBlocked && accRules.usedReason === "has-movements")
-      ok("first run: an empty account can be borrada, one with movements cannot, and it says why");
+    if (
+      accRules.emptyDeletable &&
+      accRules.usedDeletable &&
+      accRules.usedPlainReason === "has-movements" &&
+      accRules.usedCascadeReason === null
+    )
+      ok("first run: an account with movements can be borrada — with them, and only on purpose");
     else bad("first run: delete offered only when honest", JSON.stringify(accRules));
     if (
       accRules.deactivated &&
       accRules.hidden &&
       accRules.movementsKept &&
       accRules.emptyGone &&
-      accRules.usedStays
+      accRules.usedGone &&
+      accRules.movementsWentToo
     )
       ok("first run: …deactivating hides it from the pickers and keeps every movement");
     else bad("first run: deactivate keeps history", JSON.stringify(accRules));
+
+    /* THE CHECK THAT WAS MISSING, and its absence is the whole defect.
+       `out.hidden` above asks `activeBankAccounts()` whether it omits a
+       deactivated account, and it always did — the method was correct from the
+       day it was written. What nothing asked is whether any SCREEN called it,
+       and none did: it had zero callers in the whole of site/, so the operator
+       switched accounts off and watched them stay exactly where they were.
+
+       So this asks the screen. A test that questions the engine about a
+       screen's behaviour is a test that passes while the screen is broken. */
+    const offScreen = await pg.evaluate(async () => {
+      const a = erp.addBankAccount({ name: "E2E cuenta apagada", kind: "bank" }, "bo");
+      const listed = () => {
+        location.hash = "banking";
+        render();
+        const v = document.querySelector("#view");
+        return (v ? v.innerText : "").includes("E2E cuenta apagada");
+      };
+      const whileOn = listed();
+      erp.setBankAccountActive(a.id, false, "bo");
+      await new Promise((r) => setTimeout(r, 250));
+      const whileOff = listed();
+      // The picker it replaced is gone too — the account rows are the picker.
+      const selGone = !document.querySelector("#bkSel");
+      erp.deleteBankAccount(a.id, "bo");
+      /* Put the screen back. This check has to LEAVE the company screen to do
+         its job, and the checks after it read the company screen's own fields
+         — PK-J went looking for the mailbox inputs and found the bank. A test
+         that changes the view owes the next one the view it borrowed. */
+      location.hash = "company";
+      render();
+      await new Promise((r) => setTimeout(r, 250));
+      return { whileOn, whileOff, selGone };
+    });
+    if (offScreen.whileOn && !offScreen.whileOff && offScreen.selGone)
+      ok(
+        "first run: switching an account off takes it off the banking screen, not just out of a method",
+      );
+    else bad("first run: deactivate reaches a screen", JSON.stringify(offScreen));
 
     // And the screen that used to create them sends you here instead.
     const bankDoor = await pg.evaluate(() => {
@@ -5946,7 +6018,7 @@ async function testBankAndCash(browser, base) {
       destSelects: document.querySelectorAll("[data-bkdest]").length,
       recent: document.querySelectorAll("#view .daylist .it").length,
       accounts: document.querySelectorAll("#view [data-acct]").length,
-      hasImport: !!document.getElementById("bkImport"),
+      hasImport: !!document.getElementById("bkFile"),
       hasUndo: !!document.getElementById("bkUndo"),
       /* «Ir a Conciliación →» is gone, and its absence is now the assertion.
          Conciliación is a TAB of this screen, sitting in the strip a
@@ -6120,7 +6192,8 @@ async function testBankAndCash(browser, base) {
     else bad("ADM-05: project assignment removed from the queue", JSON.stringify(noAssign));
     /* Back to the accounts tab EXPLICITLY. The tab choice is remembered, so
        navigating to #banking after visiting Conciliación reopens Conciliación
-       — and everything downstream that reaches for #bkSel finds nothing. */
+       — and everything downstream that reaches for an account row finds
+       nothing. */
     await openTab(pg, "banking", "_bankAccounts");
 
     // ---- Gap 13: a cost that lands on an account, not a project ----
@@ -6154,15 +6227,22 @@ async function testBankAndCash(browser, base) {
     //    fixture is the same file the Node gate reads.
     await pg.evaluate(() => (location.hash = "banking"));
     await pg.waitForTimeout(600);
+    /* The account is chosen by CLICKING ITS ROW. The select above the card is
+       gone — it repeated a choice the rows already offered, and the operator
+       asked for it to go. The rows were always clickable; they say «Elegida»
+       now so that the choice is legible without it. */
     await pg.evaluate(() => {
-      const sel = document.getElementById("bkSel");
-      const first = [...sel.options].find((o) => o.value);
-      sel.value = first.value;
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      /* Clicking a row TOGGLES it, so a blind click on an account that was
+         already chosen deselects it and the import then refuses for want of an
+         account. Choose only when it is not already chosen. */
+      const row = document.querySelector("#view [data-acct]");
+      if (row && bankAcc !== row.dataset.acct) row.click();
     });
     await pg.waitForTimeout(500);
     const impBtn = await pg.evaluate(() => {
-      const b = document.getElementById("bkImport");
+      // The label wrapping the input, which is what a finger lands on.
+      const input = document.getElementById("bkFile");
+      const b = input && input.closest("label");
       if (!b) return null;
       const r = b.getBoundingClientRect();
       return { w: Math.round(r.width), h: Math.round(r.height) };
@@ -6271,9 +6351,11 @@ async function testBankAndCash(browser, base) {
     if (pdfAcc) ok("1B·PDF: a fresh account is created for the PDF-format statement");
     else bad("1B·PDF: account created", "not found after drawer");
     await pg.evaluate((id) => {
-      const sel = document.getElementById("bkSel");
-      sel.value = id;
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      // The row IS the picker since the select above the card went, and
+      // clicking it toggles — so only click when it is not already chosen.
+      if (bankAcc === id) return;
+      const row = document.querySelector(`#view [data-acct="${id}"]`);
+      if (row) row.click();
     }, pdfAcc);
     await pg.waitForTimeout(500);
     await pg.setInputFiles("#bkFile", "tests/fixtures/bbva-extracto.pdf");
@@ -6350,9 +6432,11 @@ async function testBankAndCash(browser, base) {
 
     // The card statement, into the card account, through the same file input.
     await pg.evaluate((id) => {
-      const sel = document.getElementById("bkSel");
-      sel.value = id;
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      // The row IS the picker since the select above the card went, and
+      // clicking it toggles — so only click when it is not already chosen.
+      if (bankAcc === id) return;
+      const row = document.querySelector(`#view [data-acct="${id}"]`);
+      if (row) row.click();
     }, cardAcc);
     await pg.waitForTimeout(500);
     await pg.setInputFiles("#bkFile", "tests/fixtures/bbva-movimientos.xlsx");
@@ -6373,9 +6457,9 @@ async function testBankAndCash(browser, base) {
        the other answers to that question rather than on the balances screen. */
     await pg.evaluate(() => {
       const bank = erp.state.bankAccounts.find((a) => a.kind === "bank");
-      const sel = document.getElementById("bkSel");
-      sel.value = bank.id;
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      if (bankAcc === bank.id) return;
+      const row = document.querySelector(`#view [data-acct="${bank.id}"]`);
+      if (row) row.click();
     });
     await pg.waitForTimeout(500);
     const settled = await pg.evaluate(async (cardId) => {

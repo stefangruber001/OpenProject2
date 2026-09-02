@@ -16872,7 +16872,11 @@
       function cardSettleGroup(m) {
         const acc = erp.state.bankAccounts.find((a) => a.id === m.accountId);
         if (!acc || acc.kind === "card" || m.amountCents >= 0) return "";
-        const cards = erp.state.bankAccounts.filter((a) => a.kind === "card");
+        /* activeBankAccounts(), not the raw array. A deactivated card must not
+           be offerable as the thing a bank line settles — that is the whole
+           point of deactivating it, and for a while it was the whole point of
+           a method nothing called. */
+        const cards = erp.activeBankAccounts().filter((a) => a.kind === "card");
         if (!cards.length) return "";
         const opts = cards.map((c) => `<option value="c:${c.id}">${esc(c.name)}</option>`).join("");
         return `<optgroup label="Liquidación de tarjeta">${opts}</optgroup>`;
@@ -17084,6 +17088,16 @@
       }
 
       const ACCOUNT_KINDS = { bank: "Banco", card: "Tarjeta", till: "Caja" };
+      /* Why a Borrar is greyed, in the operator's words rather than the
+         engine's code. A disabled button with no explanation is the state the
+         operator hit and reported as simply not being able to delete anything:
+         the reason existed, it was returned, and no screen ever said it. */
+      const ACCOUNT_BLOCK = {
+        settled: "Hay movimientos de otra cuenta que dicen liquidar esta tarjeta",
+        "closed-period": "Tiene movimientos en un periodo cerrado — ábralo primero",
+        "has-movements": "Tiene movimientos detrás",
+        "has-imports": "Tiene extractos importados detrás",
+      };
       /**
        * One line per account, then the sum — not the sum alone.
        *
@@ -17108,10 +17122,25 @@
             const pill = open
               ? `<span class="pill y"><span>${open}</span> <span>sin casar</span></span>`
               : '<span class="pill g">Todo casado</span>';
+            /* The row IS the picker now — the select above the card is gone,
+               so choosing has to be legible from the row itself rather than
+               from a control that repeated it. «Elegida» says which one the
+               import will land on; the row was already clickable and already
+               tinted, and a tint alone is not a label. */
+            const chosen = a.id === bankAcc;
+            const off = a.active === false;
             return (
-              `<div class="it" data-acct="${a.id}" style="cursor:pointer${a.id === bankAcc ? ";background:var(--greenSoft)" : ""}">` +
+              `<div class="it" data-acct="${a.id}" style="cursor:pointer${chosen ? ";background:var(--greenSoft)" : ""}">` +
               `<span class="k">${esc(a.name)}</span>` +
-              `<span class="pill b">${esc(ACCOUNT_KINDS[a.kind] || a.kind)}</span>` +
+              /* Folded into the template rather than joined onto it with `+`.
+                 A single-quoted fragment sitting between two concatenations
+                 makes the source audit pair the wrong quotes and report the
+                 CODE between them as a user-visible string — it reported two,
+                 and both were JavaScript. The other trap this file records
+                 about `+` is a reader's: a string built that way becomes one
+                 text node and stops being translatable. Same operator, two
+                 different gates, one answer. */
+              `<span class="pill b">${esc(ACCOUNT_KINDS[a.kind] || a.kind)}</span>${off ? `<span class="pill y">Desactivada</span>` : ""}${chosen ? `<span class="pill g">Elegida</span>` : ""}` +
               `<span style="flex:1"></span>${pill}` +
               `<b>${eur0(erp.accountBalanceCents(a.id))}</b></div>`
             );
@@ -19231,7 +19260,20 @@
         _bankAccounts(v) {
           $("#sub").textContent =
             "Cuántas cuentas hay y cuánto hay en cada una. Los movimientos se explican en Conciliación; el coste de obra se asigna en Gastos.";
-          const accs = erp.state.bankAccounts;
+          /* THE POINT OF DEACTIVATING. `activeBankAccounts()` was written for
+             this screen and called by nothing, so an account switched off here
+             stayed exactly where it was — which is what the operator reported,
+             and it was not a subtle bug: the method had zero callers in the
+             whole of site/.
+
+             A switched-off account that still HOLDS something is a different
+             case and is still listed, marked, because the card below prints a
+             consolidated total: hiding a balance while still counting it is a
+             screen that does not add up, and that is worse than a row somebody
+             wanted gone. Empty and switched off, it goes. */
+          const accs = erp.state.bankAccounts.filter(
+            (a) => a.active !== false || erp.accountBalanceCents(a.id) !== 0,
+          );
           /* A register with no account yet is where a real tenant starts — the
              demo seed ships two, so this branch only ever runs on the one day
              it matters. The buttons that create an account and import a
@@ -19265,15 +19307,11 @@
 
           v.innerHTML = `
    <div class="stepbar">
-     <select class="inline" id="bkSel">
-       <option value="">Todas las cuentas</option>
-       ${accs.map((a) => `<option value="${a.id}"${a.id === bankAcc ? " selected" : ""}>${esc(a.name)}${a.kind === "card" ? " · tarjeta" : a.kind === "till" ? " · caja" : ""}</option>`).join("")}
-     </select>
-     
+     <span class="k">${bankAcc ? esc((accs.find((a) => a.id === bankAcc) || {}).name || "") : "Todas las cuentas"}</span>
+     <span style="color:var(--muted)">${bankAcc ? "el extracto se importa aquí" : "elija una cuenta abajo para importar"}</span>
      <span style="flex:1"></span>
-     <button class="btn sm" id="bkImport">⬆ Importar extracto (.xlsx / .pdf)</button>
+     <label class="btn sm">⬆ Importar extracto (.xlsx / .pdf)<input type="file" id="bkFile" accept=".xlsx,.pdf" hidden></label>
      <button class="btn sm" id="bkUndo">↩ Deshacer importación</button>
-     <input type="file" id="bkFile" accept=".xlsx,.pdf" style="display:none">
    </div>
    ${accountLines(accs)}
    <div class="card"><div class="ch"><h3>Últimos movimientos</h3><span class="tag">${recent.length}</span></div>
@@ -19292,10 +19330,6 @@
    ${openAll ? `<div class="it" style="border-top:1px solid var(--hair)"><span style="flex:1">Movimientos por explicar</span><span class="pill y">${openAll}</span></div>` : ""}
    </div></div>`;
 
-          $("#bkSel").onchange = (e) => {
-            bankAcc = e.target.value;
-            render();
-          };
           // Clicking the account's own line is the same act as choosing it in
           // the picker — a second way in, not a second piece of state.
           v.querySelectorAll("[data-acct]").forEach(
@@ -19315,17 +19349,22 @@
             }
             undoImportDrawer(bankAcc);
           };
-          $("#bkImport").onclick = () => {
-            if (!bankAcc) {
-              say("Elige primero la cuenta a la que pertenece el extracto.");
-              return;
-            }
-            $("#bkFile").click();
-          };
           $("#bkFile").onchange = async (ev) => {
             const file = ev.target.files && ev.target.files[0];
             ev.target.value = "";
             if (!file) return;
+            /* THE GUARD MOVED HERE, and it had to. It used to sit on a button
+               that called `bkFile.click()` — and a scripted click on a hidden
+               input is precisely what iOS Safari will not turn into a file
+               dialog, which is why the operator's phone did nothing at all.
+               The button is a <label> now, the way every other file control in
+               this file already was, so the picker is opened by the tap
+               itself. Nothing runs before it any more, so the question it
+               asked is asked after the file comes back instead. */
+            if (!bankAcc) {
+              say("Elige primero la cuenta a la que pertenece el extracto.");
+              return;
+            }
             let parsed;
             try {
               if (/\.pdf$/i.test(file.name)) {
@@ -20034,20 +20073,34 @@
      <span class="tag" translate="no">${accounts.length}</span>
      <span style="flex:1"></span>
      <button class="btn sm" id="co_accNew">＋ Cuenta</button></div>
-    <div class="daylist"><div class="it" style="color:var(--muted)">Aquí se crean y se retiran. La cuenta se borra sólo mientras no tenga movimientos; con historial detrás se desactiva, que la quita de las listas y conserva lo conciliado.</div></div>
+    <div class="daylist"><div class="it" style="color:var(--muted)">Desactivar una cuenta la retira de las listas y conserva lo conciliado. Borrar la quita del todo: si tiene movimientos detrás, se avisa de cuántos y se van con ella.</div></div>
+    <div class="scroll"><table data-nocards><thead><tr>
+      <th>Cuenta</th><th>Tipo</th><th class="num">Saldo</th><th class="num">Movimientos</th>
+      <th>Estado</th><th></th></tr></thead><tbody>
     ${
       accounts
         .map((a) => {
-          const block = erp.bankAccountDeleteBlock(a.id);
           const off = a.active === false;
-          return `<div class="it"><span class="k" style="flex:1">${esc(a.name)}</span>
-      <span class="pill${off ? "" : " b"}">${esc(ACCOUNT_KINDS[a.kind] || a.kind)}</span>
-      ${off ? '<span class="pill y">Desactivada</span>' : ""}
-      <button class="btn sm" data-accoff="${a.id}">${off ? "Reactivar" : "Desactivar"}</button>
-      <button class="btn sm danger" data-accdel="${a.id}"${block ? " disabled" : ""}>Borrar</button></div>`;
+          const movs = erp.state.movements.filter((m) => m.accountId === a.id).length;
+          /* Asked WITH the cascade, because that is the button being drawn.
+             Asked without it, every account carrying history came back
+             "has-movements" and the control was rendered permanently disabled
+             with nothing saying why — which is exactly what the operator ran
+             into and described as not being able to delete them at all. */
+          const block = erp.bankAccountDeleteBlock(a.id, { withMovements: true });
+          return `<tr><td class="k">${esc(a.name)}</td>
+      <td>${esc(ACCOUNT_KINDS[a.kind] || a.kind)}</td>
+      <td class="num">${eur0(erp.accountBalanceCents(a.id))}</td>
+      <td class="num" translate="no">${movs}</td>
+      <td>${off ? '<span class="pill y">Desactivada</span>' : '<span class="pill g">Activa</span>'}</td>
+      <td class="num" style="white-space:nowrap">
+       <button class="btn sm" data-accoff="${a.id}">${off ? "Reactivar" : "Desactivar"}</button>
+       <button class="btn sm danger" data-accdel="${a.id}"${block ? ` disabled title="${esc(ACCOUNT_BLOCK[block] || block)}"` : ""}>Borrar</button></td></tr>`;
         })
-        .join("") || '<div class="it"><div class="empty">No hay ninguna cuenta todavía.</div></div>'
+        .join("") ||
+      '<tr><td colspan="6"><div class="empty">No hay ninguna cuenta todavía.</div></td></tr>'
     }
+    </tbody></table></div>
    </div>
 
    <div class="card"><div class="ch"><h3>Pie legal</h3></div>
@@ -20073,15 +20126,29 @@
           (b) =>
             (b.onclick = async () => {
               const a = erp.state.bankAccounts.find((x) => x.id === b.dataset.accdel);
-              // One whole sentence: a modal body is a single text node, and a
-              // concatenated one is a key no dictionary can hold.
-              const yes = await askConfirm("Borrar la cuenta", {
-                body: "Se borra la cuenta. Sólo es posible mientras no tenga ningún movimiento, así que no hay nada conciliado que se pierda.",
-                okLabel: "Borrar",
-                danger: true,
-              });
+              const n = erp.state.movements.filter((m) => m.accountId === a.id).length;
+              /* Two bodies, and the number is in NEITHER. A sentence carrying
+                 a count is a different string for every value it can hold,
+                 which no dictionary can follow — the rule
+                 `resetAccountMovements` states about its own refusal. The
+                 count is on the row the operator just pressed, in its own
+                 Movimientos column, which is where it was read before the
+                 button was reached. */
+              const yes = await askConfirm(
+                n ? "Borrar la cuenta y sus movimientos" : "Borrar la cuenta",
+                {
+                  body: n
+                    ? "Se borra la cuenta y todos los movimientos que tiene detrás. Las conciliaciones se deshacen primero, así que ninguna factura queda diciendo que la pagó un movimiento que ya no existe. No se puede deshacer."
+                    : "Se borra la cuenta. No tiene ningún movimiento detrás, así que no se pierde nada conciliado.",
+                  okLabel: "Borrar",
+                  danger: true,
+                },
+              );
               if (!yes) return;
-              mutate(() => erp.deleteBankAccount(a.id, "backoffice"), "Cuenta borrada");
+              mutate(
+                () => erp.deleteBankAccount(a.id, "backoffice", { withMovements: true }),
+                "Cuenta borrada",
+              );
             }),
         );
 
@@ -21896,7 +21963,7 @@
       <div class="daylist"><div class="it">
        <label class="btn sm">Desde el ordenador<input type="file" id="cv_file" accept="image/*" multiple hidden></label>
        <button class="btn sm" id="cv_cam">Cámara</button>
-       <input type="file" id="cv_camfb" accept="image/*" capture="environment" hidden>
+       <label class="btn sm" id="cv_camfbL" hidden>Elegir la foto<input type="file" id="cv_camfb" accept="image/*" capture="environment" hidden></label>
       </div></div></div>
      ${
        comp.ok
@@ -21961,9 +22028,15 @@
               const file = await capturePhoto();
               if (file) await addPhotos([file]);
             } catch (e) {
-              // Say what went wrong, then offer the only thing left that works.
+              /* Say what went wrong, then REVEAL the only thing left that
+                 works rather than pressing it. This used to call .click() on a
+                 hidden input from inside a catch block — off the end of the
+                 user gesture, on an input iOS Safari will not open that way,
+                 so the fallback for a failed camera was itself silent on the
+                 device most likely to need it. A control the operator can see
+                 and tap is one they can also tap twice. */
               toast("⚠ " + e.message);
-              $("#cv_camfb").click();
+              $("#cv_camfbL").hidden = false;
             }
           };
           const fix = $("#cv_fixparty");

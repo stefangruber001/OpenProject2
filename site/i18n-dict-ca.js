@@ -618,14 +618,28 @@ window.CANEI_DICT.ca = {
   "Ir a Configuración › Empresa": "Anar a Configuració › Empresa",
   "Las cuentas y las tarjetas se crean en Configuración › Empresa.":
     "Els comptes i les targetes es creen a Configuració › Empresa.",
-  "Aquí se crean y se retiran. La cuenta se borra sólo mientras no tenga movimientos; con historial detrás se desactiva, que la quita de las listas y conserva lo conciliado.":
-    "Aquí es creen i es retiren. El compte s'esborra només mentre no tingui moviments; amb historial al darrere es desactiva, cosa que el treu de les llistes i conserva el que s'ha conciliat.",
   Desactivar: "Desactivar",
   Reactivar: "Reactivar",
   Desactivada: "Desactivada",
   "Borrar la cuenta": "Esborrar el compte",
-  "Se borra la cuenta. Sólo es posible mientras no tenga ningún movimiento, así que no hay nada conciliado que se pierda.":
-    "S'esborra el compte. Només és possible mentre no tingui cap moviment, així que no es perd res conciliat.",
+  "Desactivar una cuenta la retira de las listas y conserva lo conciliado. Borrar la quita del todo: si tiene movimientos detrás, se avisa de cuántos y se van con ella.":
+    "Desactivar un compte el retira de les llistes i conserva el conciliat. Esborrar-lo el treu del tot: si té moviments al darrere, s'avisa de quants i se'n van amb ell.",
+  Borrar: "Esborrar",
+  "Hay movimientos de otra cuenta que dicen liquidar esta tarjeta":
+    "Hi ha moviments d'un altre compte que diuen liquidar aquesta targeta",
+  "Tiene movimientos en un periodo cerrado — ábralo primero":
+    "Té moviments en un període tancat — obri'l primer",
+  "Tiene movimientos detrás": "Té moviments al darrere",
+  "Tiene extractos importados detrás": "Té extractes importats al darrere",
+  "Borrar la cuenta y sus movimientos": "Esborrar el compte i els seus moviments",
+  "Se borra la cuenta y todos los movimientos que tiene detrás. Las conciliaciones se deshacen primero, así que ninguna factura queda diciendo que la pagó un movimiento que ya no existe. No se puede deshacer.":
+    "S'esborra el compte i tots els moviments que té al darrere. Les conciliacions es desfan primer, així que cap factura queda dient que la va pagar un moviment que ja no existeix. No es pot desfer.",
+  "Se borra la cuenta. No tiene ningún movimiento detrás, así que no se pierde nada conciliado.":
+    "S'esborra el compte. No té cap moviment al darrere, així que no es perd res conciliat.",
+  Elegida: "Triada",
+  "el extracto se importa aquí": "l'extracte s'importa aquí",
+  "elija una cuenta abajo para importar": "triï un compte a sota per importar",
+  "Elegir la foto": "Triar la foto",
   "Cuenta borrada": "Compte esborrat",
   "Cuenta desactivada": "Compte desactivat",
   "Cuenta reactivada": "Compte reactivat",
