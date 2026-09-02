@@ -582,6 +582,10 @@ window.CANEI_DICT.ca = {
   "La factura necesita una base imponible": "La factura necessita una base imposable",
   "El reparto debe sumar la base imponible": "El repartiment ha de sumar la base imposable",
   "Factura registrada": "Factura registrada",
+  "proyección ajustada": "projecció ajustada",
+  "Acumulado real": "Acumulat real",
+  "Las cifras de arriba son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. «Ajustar» abre la proyección a fin de obra de esa partida, que se calcula aparte a partir del coste real y del avance registrado.":
+    "Les xifres de dalt són les reals: el pressupostat, el gastat i la diferència entre tots dos. «Ajustar» obre la projecció a fi d'obra d'aquesta partida, que es calcula a part a partir del cost real i de l'avanç registrat.",
   "Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos":
     "Per a una factura que no arriba com a document — la majoria es pugen o es fotografien a Documents",
   "Cuentas y tarjetas": "Comptes i targetes",

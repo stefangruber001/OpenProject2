@@ -688,6 +688,12 @@ window.CANEI_DICT = {
     ["La factura necesita una base imponible", "The invoice needs a taxable base"],
     ["El reparto debe sumar la base imponible", "The split must total the taxable base"],
     ["Factura registrada", "Invoice registered"],
+    ["proyección ajustada", "adjusted projection"],
+    ["Acumulado real", "Actual to date"],
+    [
+      "Las cifras de arriba son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. «Ajustar» abre la proyección a fin de obra de esa partida, que se calcula aparte a partir del coste real y del avance registrado.",
+      "The figures above are the real ones: budgeted, spent, and the difference between them. «Ajustar» opens that line item's cost-at-completion projection, which is worked out separately from the real cost and the recorded progress.",
+    ],
     [
       "Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos",
       "For an invoice that does not arrive as a document — most are uploaded or photographed in Documents",

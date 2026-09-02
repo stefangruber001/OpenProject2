@@ -22775,35 +22775,52 @@
           ? Math.round((marginCents / e.currentRevenueCents) * 1000) / 10
           : 0;
         const SRC = { bill: "Factura", labour: "Horas", capture: "Documento" };
-        /* The rows the table will render, built HERE so their sum can be
-           checked against the project's own total before the screen claims
-           they agree. */
-        const tableRows = (() => {
-          const rows = f
-            ? f.byChapter.slice()
-            : erp.chapterEconomics(id).map((c) => ({
-                chapter: c.num,
-                budgetCents: c.budgetCostCents,
-                actualCents: c.actualCents,
-                varianceCents: c.actualCents - c.budgetCostCents,
-                varianceBp: 0,
-              }));
-          /* The factory forecast reads baseline + change orders and knows
-             nothing of variation budgets — so their chapters are merged in
-             from chapterEconomics, which does. Without this the forecast
-             bridge being loaded HID every variation from the table. */
-          if (f)
-            for (const c of erp.chapterEconomics(id))
-              if (c.variation && !rows.some((r) => String(r.chapter) === String(c.num)))
-                rows.push({
-                  chapter: c.num,
-                  budgetCents: c.budgetCostCents,
-                  actualCents: c.actualCents,
-                  varianceCents: c.actualCents - c.budgetCostCents,
-                  varianceBp: 0,
-                });
-          return rows;
-        })();
+        /* THE ROWS, AND WHAT THEIR NUMBERS MEAN.
+           Built HERE so their sum can be checked against the project's own
+           total before the screen claims they agree — and, since PK12, built
+           from `chapterEconomics` ALONE rather than from the forecast bridge.
+
+           The deviation column used to be `proyectado − presupuestado`, where
+           the projection is `coste real ÷ avance registrado` and appeared in
+           no column of the table. So the operator read «531 presupuestado,
+           507 acumulado, desviación +483» and could not make it add up,
+           because it does not: the number was correct arithmetic on a figure
+           that was not on screen. Worse, the fallback below computed the
+           LITERAL difference, so the same column meant one thing with the
+           capability bundle loaded and another without it.
+
+           It is now the subtraction it looks like, in the operator's own
+           words: «Budget, Acumulated Real, Deviation, % (Acumulated
+           Real/Budget), Margin (Price-Acumulated Real) and Margin %». The
+           projection keeps its home behind «Ajustar», where presupuestado,
+           real, avance and the calculated figure are shown together and it can
+           be read. */
+        const tableRows = erp.chapterEconomics(id).map((c) => {
+          /* An adjustment has to be VISIBLE from the table, or «Ajustar» is a
+             control that writes something no screen shows. The projection
+             itself is not a column — the operator asked for six and none of
+             them is a forecast — so the row says an adjustment exists and the
+             drawer behind it shows the figure with the three inputs it was
+             derived from. */
+          const adjusted = !!(p.forecastOverrides || {})[c.num];
+          const budgetCents = c.budgetCostCents;
+          const actualCents = c.actualCents;
+          const saleCents = c.saleCents || 0;
+          const marginCents2 = saleCents - actualCents;
+          return {
+            chapter: c.num,
+            budgetCents,
+            actualCents,
+            saleCents,
+            varianceCents: actualCents - budgetCents,
+            // A share of nothing is not zero per cent, it is not a share —
+            // so an unbudgeted chapter shows a dash rather than a division.
+            spentBp: budgetCents ? Math.round((actualCents / budgetCents) * 10000) : null,
+            marginCents: marginCents2,
+            marginBp: saleCents ? Math.round((marginCents2 / saleCents) * 10000) : null,
+            adjusted,
+          };
+        });
         /* «Cuadra» is a claim, not a pleasantry — measured before it is
            printed. The operator's UAT caught this screen saying «la tabla de
            arriba cuadra con el proyecto» while the table sat 45 € short of
@@ -22831,27 +22848,26 @@
 
     <div class="card" style="margin-top:12px"><div class="ch"><h3>Por partida</h3></div>
      <div class="scroll"><table><thead><tr>
-       <th>Partida</th><th class="num">Presupuestado</th><th class="num">Acumulado</th>
-       <th class="num">Desviación</th><th class="num">%</th><th class="num">Margen</th><th></th></tr></thead><tbody>
+       <th>Partida</th><th class="num">Presupuestado</th><th class="num">Acumulado real</th>
+       <th class="num">Desviación</th><th class="num">%</th>
+       <th class="num">Margen</th><th class="num">Margen %</th><th></th></tr></thead><tbody>
      ${
        tableRows
-         .map((c) => {
-           const base =
-             (p.baseline.chapters || []).find((x) => String(x.num) === String(c.chapter)) || {};
-           const mg = (base.saleCents || 0) - (c.actualCents || 0);
-           return `<tr class="click" data-chcosts="${c.chapter}"><td class="k">${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>
+         .map(
+           (c) => `<tr class="click" data-chcosts="${c.chapter}"><td class="k">${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>
         <td class="num">${eur0(c.budgetCents)}</td>
         <td class="num">${eur0(c.actualCents)}</td>
         <td class="num ${c.varianceCents > 0 ? "warn" : ""}">${c.varianceCents > 0 ? "+" : ""}${eur0(c.varianceCents)}</td>
-        <td class="num">${((c.varianceBp || 0) / 100).toFixed(1)}%</td>
-        <td class="num" style="color:${mg < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(mg)}</td>
-        <td>${f ? `<button class="btn sm" data-adj="${c.chapter}">Ajustar</button>` : ""}</td></tr>`;
-         })
+        <td class="num">${c.spentBp === null ? "—" : (c.spentBp / 100).toFixed(1) + "%"}</td>
+        <td class="num" style="color:${c.marginCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(c.marginCents)}</td>
+        <td class="num" style="color:${c.marginCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${c.marginBp === null ? "—" : (c.marginBp / 100).toFixed(1) + "%"}</td>
+        <td>${c.adjusted ? '<span class="pill b">proyección ajustada</span> ' : ""}${f ? `<button class="btn sm" data-adj="${c.chapter}">Ajustar</button>` : ""}</td></tr>`,
+         )
          .join("") ||
-       '<tr><td colspan="7"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>'
+       '<tr><td colspan="8"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>'
      }
      </tbody></table></div>
-     ${f ? `<div class="daylist"><div class="it" style="color:var(--muted)">La proyección de cada partida parte del coste real y del avance registrado. «Ajustar» la sustituye a mano, y la cifra calculada se sigue mostrando junto a la ajustada.</div></div>` : ""}
+     ${f ? `<div class="daylist"><div class="it" style="color:var(--muted)">Las cifras de arriba son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. «Ajustar» abre la proyección a fin de obra de esa partida, que se calcula aparte a partir del coste real y del avance registrado.</div></div>` : ""}
     </div>
 
     <div class="card" style="margin-top:12px"><div class="ch"><h3>Pendiente de repartir</h3>

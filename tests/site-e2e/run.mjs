@@ -3185,6 +3185,65 @@ async function testVariationBudget(browser, base) {
       ok("5-6: the chapter table carries the variation row, marked with its pill");
     else bad("5-6: economics row", JSON.stringify(ecoRow));
 
+    /* PK12-S4 · EVERY NUMBER IN THE ROW IS THE SUBTRACTION IT LOOKS LIKE.
+       The operator circled «+483 €» against 531 presupuestado and 507
+       acumulado and said it does not add up. It did not: the column was
+       `proyectado − presupuestado`, where the projection is `coste real ÷
+       avance` and appeared in no column of the table — correct arithmetic on a
+       figure that was not on screen. Worse, with the capability bundle absent
+       the same column computed the literal difference instead, so it meant two
+       different things depending on what had loaded.
+
+       Asserted against the cells as RENDERED, not against the model, because
+       what was wrong was what a person read. */
+    const cells = await pg.evaluate((num) => {
+      const row = document.querySelector(`[data-chcosts="${num}"]`);
+      if (!row) return null;
+      const n = (t) =>
+        Math.round(
+          Number(
+            String(t)
+              .replace(/[^0-9,-]/g, "")
+              .replace(",", "."),
+          ),
+        );
+      const td = [...row.querySelectorAll("td")].map((x) => x.textContent.trim());
+      const model = erp.chapterEconomics(gProject).find((c) => String(c.num) === String(num));
+      return {
+        budget: n(td[1]),
+        actual: n(td[2]),
+        deviation: n(td[3]),
+        pct: td[4],
+        margin: n(td[5]),
+        marginPct: td[6],
+        wantBudget: Math.round(model.budgetCostCents / 100),
+        wantActual: Math.round(model.actualCents / 100),
+        wantDeviation: Math.round((model.actualCents - model.budgetCostCents) / 100),
+        wantMargin: Math.round((model.saleCents - model.actualCents) / 100),
+      };
+    }, joined.num);
+    if (
+      cells &&
+      cells.budget === cells.wantBudget &&
+      cells.actual === cells.wantActual &&
+      cells.deviation === cells.wantDeviation
+    )
+      ok(
+        `5-6: desviación is acumulado − presupuestado, on the screen (${cells.actual} − ${cells.budget} = ${cells.deviation})`,
+      );
+    else bad("5-6: deviation reads as the subtraction", JSON.stringify(cells));
+    if (cells && cells.margin === cells.wantMargin)
+      ok("5-6: …margen is venta − acumulado, on the same basis as the column beside it");
+    else bad("5-6: margin basis", JSON.stringify(cells));
+    // Both percentages are shares of something, so a zero denominator is a
+    // dash rather than a division.
+    const pctOk =
+      cells &&
+      /^(—|-?\d+([.,]\d+)?%)$/.test(cells.pct) &&
+      /^(—|-?\d+([.,]\d+)?%)$/.test(cells.marginPct);
+    if (pctOk) ok(`5-6: …and both percentages render (${cells.pct} · ${cells.marginPct})`);
+    else bad("5-6: percentage columns", JSON.stringify(cells));
+
     /* The FORECAST must see the same money the table does. `projectValue`
        used to iterate the baseline chapters alone, so a variation chapter's
        cost — the 120,00 € bill filed above — was silently absent from the
@@ -4923,10 +4982,20 @@ async function testProjectTracking(browser, base) {
     await pg.locator("#fc_why").fill("La parte cara ya está ejecutada");
     await pg.locator("#fc_save").click();
     await pg.waitForTimeout(500);
-    const adjusted = await pg.locator("#view").innerText();
-    if (/ajustada/i.test(adjusted) || /calculada/i.test(adjusted))
-      ok("economics: an adjustment is recorded against the chapter");
-    else bad("economics: adjustment recorded", adjusted.replace(/\n/g, " ").slice(0, 160));
+    /* The table stopped showing the projection — its six columns are the real
+       figures now, none of them a forecast — so «recorded» can no longer mean
+       «a number changed on screen». It means the ROW SAYS an adjustment
+       exists: a control that writes something no screen shows is a dead
+       control, and the full run caught this one the moment the columns
+       changed. The figure itself lives in the drawer behind the pill, with the
+       three inputs it was derived from. */
+    const adjusted = await pg.evaluate(() => ({
+      onScreen: /proyección ajustada/i.test(document.querySelector("#view").innerText),
+      stored: Object.keys(erp.project(gProject).forecastOverrides || {}).length,
+    }));
+    if (adjusted.onScreen && adjusted.stored === 1)
+      ok("economics: an adjustment is recorded against the chapter, and the row says so");
+    else bad("economics: adjustment recorded", JSON.stringify(adjusted));
 
     // ← Obras returns to the register, same as PRY-01's own back button.
     await pg.locator("#ecoBack").click();
@@ -13314,7 +13383,9 @@ async function testI18n(browser, base) {
     await openJobWithChapters(pg, "ecoQ");
     const ecoEnText = await pg.locator("#view").innerText();
     if (
-      /Accrued/i.test(ecoEnText) &&
+      // «Acumulado» became «Acumulado real» when the columns were restated to
+      // the operator's six, so the English it resolves to moved with it.
+      /Actual to date/i.test(ecoEnText) &&
       /By line item/i.test(ecoEnText) &&
       !/Pendiente de repartir/.test(ecoEnText)
     )
