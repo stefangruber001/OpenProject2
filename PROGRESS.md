@@ -2003,3 +2003,72 @@ operator's workspace are repaired by hand, through the screen the package adds,
 because only a person can say whether a given invoice is real-and-mis-attributed
 (reassign) or should never have been filed at all (delete). A migration that
 guessed between those two would be inventing accounting records.
+
+## Package 12 — the 02/09 working session (started 2026-09-02)
+
+A continuous stream of operator reports against the live server, each one worked
+from running code before it was written down. Twelve commits, every one green on
+the unfiltered battery before it landed.
+
+| Session | Scope                                                                         | Status                                                                                                            |
+| ------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| S1      | a refused deletion names the place, not just the step                         | **done** `d066601` — the refusal was right; it said what blocked and never where to go and undo it                |
+| S1b     | one register, not a tray beside it                                            | **done** `893f0c8` — Bandeja and the register were the same documents counted twice on one screen                 |
+| S2a     | «Pagar» goes; whether money moved is the question                             | **done** `889835a` — pressing it wrote a payment for an invoice nobody had paid, then refused to release the bill |
+| S6      | accounts belong to the company, and can finally be removed                    | **done** `20a4550` — created on a screen for reading balances, deleted nowhere at all                             |
+| S6b     | three buttons that went where the tab beside them goes                        | **done** `088ba2f` — each selected a tab already in the strip a centimetre above it                               |
+| S4      | the deviation column is the subtraction it looks like                         | **done** `fd893f5` — correct arithmetic on a projection that appeared in no column of the table                   |
+| S4b     | the same six columns one level down, at subpartida                            | **done** `9d122f1` — the table named the problem and could not locate it inside the chapter                       |
+| S5      | the panel after a match says so, and Cerrar is not the act                    | **done** `97f486b` — the match had already run a step earlier; Cerrar looked like the thing that did it           |
+| S2      | every euro on a job names its partida and its subpartida                      | **done** `03c7184` — `_lineAlloc` normalised the gap away; the seed held 479 violations and now holds none        |
+| S4c     | the budget is fixed — an adicional changes it, not a screen                   | **done** `ace7f15` — «Ajustar» was a second way to change a number the contract owns                              |
+| S10     | a document shows all its columns on a phone                                   | **done** `1e7d662` — the host's `table{min-width:520px}` inside a caged sheet that clips rather than scrolls      |
+| S6c+S9  | deactivating retires an account; one with history can be deleted; iOS imports | **done** `ae52d75` — `activeBankAccounts()` had zero callers; the delete refusal was computed and shown nowhere   |
+
+**What was measured.**
+
+1. **The assignment rule inverted a default.** `_lineAlloc` opened with
+   `if (!alloc.lineId) return { ...alloc, lineId: null }` — a missing
+   destination normalised away and nothing further asked. Turning that into a
+   refusal took the seed from **479 violations to 0** and surfaced five
+   pre-existing defects the targeted suites had all been passing over, among
+   them three data-entry screens with no subpartida control at all and
+   `repeatDay` silently dropping the field when it copied a day.
+2. **A method with no callers.** `activeBankAccounts()` was written to keep a
+   deactivated account out of the pickers, was correct, and was called by
+   nothing anywhere in `site/`. The operator switched accounts off and watched
+   them stay. The test that covered it asked the ENGINE whether the method
+   omitted them, which it always did — a test that questions the engine about a
+   screen's behaviour passes while the screen is broken.
+3. **A refusal computed and never spoken.** `bankAccountDeleteBlock` returned a
+   reason and the screen rendered a disabled button with no title, so a rule
+   became a dead control. The same shape as S1: the engine was right and the
+   screen was silent.
+4. **A screen floor inside a document.** `table{min-width:520px}` keeps a
+   register readable and is unscoped, so it also pinned a quote's line items at
+   520px inside a 278px column while `.sheet{overflow:hidden}` swallowed the
+   difference — the amounts, with nothing to scroll. The floor had been found
+   and answered twice before, for carded tables and for the document class this
+   renderer replaced; neither fix reached here.
+5. **Two iOS file inputs opened by script.** A hidden `<input>` driven by
+   `.click()` never produces a file dialog on iOS Safari. «Importar extracto»
+   did nothing on the operator's phone, and the visit screen's camera fallback
+   did the same from inside a `catch` block — the fallback for a failed camera,
+   silent on the device most likely to need it.
+6. **The mobile document check measured the paper.** It asserted the sheet's
+   left edge was reachable and its right edge on screen, and passed throughout
+   while the columns inside were being clipped. It now asks whether the sheet
+   hides its own content and whether any cell prints wider than its cell.
+
+**Still open at the end of the package.** S7 (cash as a bank withdrawal, and
+retiring the `till` kind the operator said is not needed), S8 (period lock with
+"everything in the period assigned" as its precondition), and the iOS parity and
+TestFlight request, which is the oldest open item and has never been answered in
+full.
+
+**Governance.** This section was written eleven commits late. `PROGRESS.md` had
+not been touched since Package 11 closed on 31 August while twelve commits
+shipped, which is the rule in `CLAUDE.md` §3 broken quietly for a whole package
+— the code was green every time and the record was not kept. Noted here rather
+than tidied away, because the Definition of Done asks for governance files that
+are honest and current, and for a while these were neither.
