@@ -5744,11 +5744,15 @@
         },
         {},
       );
-      if (rec.allocations.length) {
-        const s = sum(rec.allocations, (a) => a.amountCents);
-        if (Math.abs(s - rec.baseCents) > 1)
-          throw new Error("Bill allocations must total the taxable base");
-      }
+      /* A bill with no allocation used to be a legitimate state — filed, and
+         belonging to nothing. Under the rule it is a cost with no home, which
+         is the one thing that may not happen; the payables register flagged it,
+         and flagging is not refusing. */
+      if (!rec.allocations.length)
+        throw new Error("A bill must be allocated: to a project's subpartidas, or to overheads");
+      const allocSum = sum(rec.allocations, (a) => a.amountCents);
+      if (Math.abs(allocSum - rec.baseCents) > 1)
+        throw new Error("Bill allocations must total the taxable base");
       this.state.bills.push(rec);
       if (rec.capId) {
         const c = this.state.captured.find((x) => x.id === rec.capId);
@@ -6714,16 +6718,34 @@
       this._log(user, "resetAccountMovements", acc.name + " · " + here.length + " movs");
       return { deleted: here.length, unwound };
     }
-    allocateMovementToProject(movId, ref, kind, user) {
-      // BNK-02: enter a budget/project number → cost lands on the project
+    /**
+     * BNK-02: enter a budget/project number → the cost lands on the project.
+     *
+     * `where` carries the partida and subpartida. It is a fourth argument
+     * rather than a rewrite because the shape of this door is right — one
+     * movement, one project — and only the destination was underspecified.
+     *
+     * The allocation now goes through `withAccountCode` like every other. It
+     * used to be written straight onto the movement, which is exactly why it
+     * was the one door in seven that the assignment rule did not reach: a
+     * choke point only chokes what passes through it, and this did not.
+     */
+    allocateMovementToProject(movId, ref, kind, where, user) {
       const m = this.state.movements.find((x) => x.id === movId);
       const p =
         this.state.projects.find((x) => x.code === ref || x.budgetNumber === ref) ||
         this.project(ref);
       if (!LISTS.costKinds.includes(kind || "material")) throw new Error("Unknown cost kind");
+      const w = where || {};
       m.class = m.amountCents < 0 ? "projectCost" : "customerReceipt";
       m.allocations = [
-        { projectId: p.id, kind: kind || "material", amountCents: Math.abs(m.amountCents) },
+        this.withAccountCode({
+          projectId: p.id,
+          chapterNum: w.chapterNum || null,
+          lineId: w.lineId || null,
+          kind: kind || "material",
+          amountCents: Math.abs(m.amountCents),
+        }),
       ];
       m.status = "allocated";
       this._log(user, "allocateMovement", (m.merchantText || m.concept) + " → " + p.code);
@@ -6787,6 +6809,45 @@
      */
     _lineAlloc(alloc) {
       if (!alloc.lineId) {
+        /* EVERY EURO HAS A HOME, and for a project cost that home is a
+           subpartida. The operator's rule, in their words: a cost goes to a
+           project or to a general expense, and if it is a project it carries
+           partida AND subpartida by obligation.
+           
+           This line used to normalise the gap away — `lineId: null`, stored,
+           and nothing further asked. The consequence was money that reached a
+           job and stopped: `unassignedChapterCosts` exists to itemise exactly
+           that, and the per-subpartida table shows the whole cost of the demo
+           seed's Demoliciones sitting under «sin subpartida» with no budget to
+           compare it against. A total nobody can place is not a total.
+           
+           There is deliberately NO exception for a line with no natural
+           subpartida — a delivery charge, a whole-invoice discount. The answer
+           settled with the operator is that such a cost either belongs to a
+           partida the budget should carry (administrative expenses, with
+           logistics under it) or it is not a project cost at all and goes to
+           the general-expense list. Attributing it proportionally across the
+           lines it accompanies was the alternative, and it invents a
+           distribution nobody chose in order to satisfy a rule.
+           
+           An OVERHEAD cost still passes: it names no project, so there is no
+           subpartida for it to be missing. */
+        if (alloc.projectId) {
+          /* ONE EXEMPTION, AND IT IS NOT A LOOPHOLE. A quick repair job
+             (`createQuickProject`, PRJ-08) is created without a budget: its
+             baseline is a single chapter that IS the whole job, with no lines
+             at all. There is no subpartida to name and no finer place for the
+             money to hide — chapter level is already the finest grain that
+             exists on it, so demanding one would be ceremony that makes a
+             small repair unbookable.
+
+             Scoped to `budgetId`, not to the accepted version: every project
+             built through `createProjectFromAcceptance` has both, so this
+             admits quick jobs and nothing else. */
+          const proj = this.project(alloc.projectId);
+          if (proj.budgetId) throw new Error("A project cost must name its partida and subpartida");
+          return { ...alloc, lineId: null };
+        }
         // Normalised to null (not undefined, not "") so every stored
         // allocation has the same shape whichever door it came through.
         return { ...alloc, lineId: null };
@@ -7653,6 +7714,21 @@
           lineId: rec.lineId,
         });
         rec.chapterNum = a.chapterNum;
+      } else if (
+        rec.projectId &&
+        (this.state.projects.find((x) => x.id === rec.projectId) || {}).budgetId
+      ) {
+        /* Hours are a project cost like any other, and the rule covers them:
+           the operator was asked whether it applied to invoices only or to
+           every project cost, and answered both. This branch read
+           `rec.lineId = null` — the same silent normalisation `_lineAlloc`
+           performed one level up, and the reason 464 of the demo seed's labour
+           entries named a chapter and no line.
+
+           BOTH hours doors carry it. `correctHours` has the identical branch,
+           and guarding only the first would have left editing an entry as the
+           way around the rule — file it with a subpartida, then take it off. */
+        throw new Error("Hours on a project must name their partida and subpartida");
       } else rec.lineId = null;
       rec.rateCents = this.workerRateCents(rec.workerId, rec.date, rec.kind);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);
@@ -7986,6 +8062,13 @@
               workerId: l.workerId,
               projectId: l.projectId,
               chapterNum: l.chapterNum,
+              /* The WHOLE destination, not half of it. This copied the chapter
+                 and dropped the line, which was survivable while a subpartida
+                 was optional and is not now: repeating a day would refuse
+                 every entry it was asked to reproduce. The same shape as the
+                 capture→bill catch-22 — a destination carried partially
+                 between two doors that each demand all of it. */
+              lineId: l.lineId,
               hoursMilli: l.hoursMilli,
               kind: l.kind,
               date: toDate,
@@ -11037,6 +11120,21 @@
           lineId: rec.lineId,
         });
         rec.chapterNum = a.chapterNum;
+      } else if (
+        rec.projectId &&
+        (this.state.projects.find((x) => x.id === rec.projectId) || {}).budgetId
+      ) {
+        /* Hours are a project cost like any other, and the rule covers them:
+           the operator was asked whether it applied to invoices only or to
+           every project cost, and answered both. This branch read
+           `rec.lineId = null` — the same silent normalisation `_lineAlloc`
+           performed one level up, and the reason 464 of the demo seed's labour
+           entries named a chapter and no line.
+
+           BOTH hours doors carry it. `correctHours` has the identical branch,
+           and guarding only the first would have left editing an entry as the
+           way around the rule — file it with a subpartida, then take it off. */
+        throw new Error("Hours on a project must name their partida and subpartida");
       } else rec.lineId = null;
       rec.rateCents = this.workerRateCents(rec.workerId, rec.date, rec.kind);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);

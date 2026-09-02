@@ -20,6 +20,28 @@ const addDaysISO = (iso, n) => {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 };
+/**
+ * Where a project cost goes, since PK12: partida AND subpartida, by obligation.
+ *
+ * Spread into an ALLOCATION — `{ ...at(erp, prj.id), kind, amountCents }`. It
+ * names the first subpartida of the chapter asked for, or of the first
+ * chapter. These blocks are about paying, correcting and reporting costs
+ * rather than about where inside a job they land, so naming any real
+ * destination is enough; what they may no longer do is name none.
+ *
+ * Takes the engine explicitly because these blocks use `erp` and `e` for
+ * different instances, and a helper that guessed would file a cost against a
+ * project in the wrong workspace.
+ *
+ * Returns {} for a quick repair, which has no budget and therefore no
+ * subpartidas — the one case the rule exempts.
+ */
+const at = (engine, projectId, chapterNum) => {
+  const chapters = engine.projectChapters(projectId) || [];
+  const hit = chapters.find((x) => String(x.chapter.num) === String(chapterNum)) || chapters[0];
+  const line = hit && hit.chapter.lines[0];
+  return line ? { chapterNum: String(hit.chapter.num), lineId: line.id } : {};
+};
 const throws = (fn, name) => {
   try {
     fn();
@@ -609,7 +631,7 @@ const bill = erp.registerBill(
     number: "F-1",
     baseCents: 10000,
     vatBp: 2100,
-    allocations: [{ projectId: prj.id, kind: "material", amountCents: 10000 }],
+    allocations: [{ ...at(erp, prj.id), projectId: prj.id, kind: "material", amountCents: 10000 }],
   },
   "bo",
 );
@@ -619,7 +641,11 @@ assert(
   "correctBill recomputes VAT/total",
   erp.state.bills[0].totalCents,
 );
-erp.allocateBill(bill.id, [{ projectId: prj.id, kind: "material", amountCents: 9000 }], "bo");
+erp.allocateBill(
+  bill.id,
+  [{ ...at(erp, prj.id), projectId: prj.id, kind: "material", amountCents: 9000 }],
+  "bo",
+);
 const pay = erp.payBills(
   {
     amountCents: erp.state.bills[0].totalCents,
@@ -679,7 +705,10 @@ assert(
     erp.workerRateCents(w.id, "2026-02-01") === 1900,
   "addWorkerRate effective-dated",
 );
-const h = erp.recordHours({ workerId: w.id, projectId: prj.id, hoursMilli: 8000 }, "bo");
+const h = erp.recordHours(
+  { workerId: w.id, projectId: prj.id, ...at(erp, prj.id), hoursMilli: 8000 },
+  "bo",
+);
 erp.correctHours(h.id, { hoursMilli: 7000 }, "bo");
 assert(
   erp.state.labour[0].costCents === Math.round((7000 * 1900) / 1000),
@@ -780,7 +809,14 @@ const supIrpf = erp.addParty(
   "bo",
 );
 const billIrpf = erp.registerBill(
-  { supplierId: supIrpf.id, number: "A-1", baseCents: 100000, vatBp: 2100, date: "2026-03-02" },
+  {
+    supplierId: supIrpf.id,
+    number: "A-1",
+    baseCents: 100000,
+    vatBp: 2100,
+    date: "2026-03-02",
+    allocations: [{ overheadCategory: "office", kind: "material", amountCents: 100000 }],
+  },
   "bo",
 );
 assert(billIrpf.irpfCents === 15000, "bill withholding from supplier profile");
@@ -1642,7 +1678,11 @@ assert(
   );
   throws(
     () =>
-      erp.allocateCapture(cap.id, [{ projectId: prj.id, kind: "vibes", amountCents: 10000 }], "bo"),
+      erp.allocateCapture(
+        cap.id,
+        [{ ...at(erp, prj.id), projectId: prj.id, kind: "vibes", amountCents: 10000 }],
+        "bo",
+      ),
     "a cost kind the engine does not know is refused",
   );
   throws(
@@ -1650,17 +1690,27 @@ assert(
     "a project that is not there is refused, by the accessor that names it",
   );
   throws(
-    () => erp.allocateCapture(cap.id, [{ projectId: prj.id, amountCents: 9000 }], "bo"),
+    () =>
+      erp.allocateCapture(
+        cap.id,
+        [{ ...at(erp, prj.id), projectId: prj.id, amountCents: 9000 }],
+        "bo",
+      ),
     "a split that does not total the taxable base is refused",
   );
   throws(
-    () => erp.allocateCapture(cap.id, [{ projectId: prj.id, amountCents: 12100 }], "bo"),
+    () =>
+      erp.allocateCapture(
+        cap.id,
+        [{ ...at(erp, prj.id), projectId: prj.id, amountCents: 12100 }],
+        "bo",
+      ),
     "…and neither does one that totals the VAT-inclusive amount",
   );
   const split = erp.allocateCapture(
     cap.id,
     [
-      { projectId: prj.id, chapterNum: "1", kind: "material", amountCents: 8000 },
+      { ...at(erp, prj.id, "1"), projectId: prj.id, kind: "material", amountCents: 8000 },
       { overheadCategory: "office", amountCents: 2000 },
     ],
     "bo",
@@ -1741,12 +1791,22 @@ assert(
       number: "S8-1",
       baseCents: 30000,
       vatBp: 2100,
-      // Reaches the project and stops there: no chapterNum, which is exactly
-      // the row PRY-02's pending-assignment block exists to show.
-      allocations: [{ projectId: prj.id, amountCents: 30000 }],
+      allocations: [{ ...at(erp, prj.id), projectId: prj.id, amountCents: 30000 }],
     },
     "bo",
   );
+  /* A cost that reaches the project and stops there — no chapter — is what
+     PRY-02's pending-assignment block exists to show, and since PK12 the API
+     can no longer produce one: every project cost names its partida and
+     subpartida on the way in.
+     
+     So the state is written DIRECTLY onto the record here, which is honest
+     about what it now is: data from before the rule. The repair machinery is
+     not obsolete — a workspace that has been running carries exactly these
+     rows, and `unassignedChapterCosts` plus `assignChapterSplit` are the way
+     to clear them. What changed is that nothing new can join them. */
+  bill.allocations[0].chapterNum = null;
+  bill.allocations[0].lineId = null;
   const pending = erp.unassignedChapterCosts(prj.id);
   const row = pending.find((r) => r.ref === "S8-1");
   assert(!!row, "unassignedChapterCosts finds a cost that reached the project with no chapter");
@@ -2215,6 +2275,7 @@ assert(
       baseCents: 500000,
       date: addDaysISO(erp.today, -40),
       dueDate: addDaysISO(erp.today, -20),
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 500000 }],
     },
     "backoffice",
   );
@@ -2758,7 +2819,7 @@ assert(
   e.allocateCapture(
     cap.id,
     [
-      { projectId: job.id, kind: "material", amountCents: 75000 },
+      { ...at(e, job.id), projectId: job.id, kind: "material", amountCents: 75000 },
       { overheadCategory: "office", kind: "other", amountCents: 25000 },
     ],
     "bo",
@@ -2803,7 +2864,12 @@ assert(
 
   // A bill from before the stamp still names its issuer.
   const legacy = e.registerBill(
-    { supplierId: supplier.id, number: "OLD-1", baseCents: 5000 },
+    {
+      supplierId: supplier.id,
+      number: "OLD-1",
+      baseCents: 5000,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 5000 }],
+    },
     "bo",
   );
   delete legacy.supplierName;
@@ -2996,7 +3062,13 @@ assert(
      deleted; this is the control that keeps it deleted. */
   {
     const b2 = e.registerBill(
-      { supplierId: sup.id, number: "1F-M", baseCents: 4132, vatBp: 2100 },
+      {
+        supplierId: sup.id,
+        number: "1F-M",
+        baseCents: 4132,
+        vatBp: 2100,
+        allocations: [{ overheadCategory: "office", kind: "material", amountCents: 4132 }],
+      },
       "bo",
     );
     e.importMovements(
@@ -3078,7 +3150,7 @@ assert(
     legacyCap.id,
     {
       supplierId: sup.id,
-      allocations: [{ projectId: pj.id, kind: "material", amountCents: 12100 }],
+      allocations: [{ ...at(e, pj.id), projectId: pj.id, kind: "material", amountCents: 12100 }],
     },
     "bo",
   );
@@ -3126,7 +3198,13 @@ assert(
 
   // Matching a card purchase to its invoice records a CARD payment.
   const bill = e.registerBill(
-    { supplierId: sup.id, number: "T-88", baseCents: 10000, vatBp: 2100 },
+    {
+      supplierId: sup.id,
+      number: "T-88",
+      baseCents: 10000,
+      vatBp: 2100,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 10000 }],
+    },
     "bo",
   );
   e.matchMovement(purchases[0].id, { billId: bill.id }, "bo");
@@ -3229,7 +3307,13 @@ assert(
   // A movement already matched needs no excuse and is refused one.
   const sup = e.addParty({ roles: ["supplier"], name: "Prov 1D", taxId: "B12345674" }, "bo");
   const bill = e.registerBill(
-    { supplierId: sup.id, number: "D-1", baseCents: 4132, vatBp: 2100 },
+    {
+      supplierId: sup.id,
+      number: "D-1",
+      baseCents: 4132,
+      vatBp: 2100,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 4132 }],
+    },
     "bo",
   );
   e.matchMovement(mystery.id, { billId: bill.id }, "bo");
@@ -3279,7 +3363,15 @@ assert(
   );
 
   const sup = e.addParty({ roles: ["supplier"], name: "Prov 1E", taxId: "B12345674" }, "bo");
-  const bill = e.registerBill({ supplierId: sup.id, number: "E-1", baseCents: 1000 }, "bo");
+  const bill = e.registerBill(
+    {
+      supplierId: sup.id,
+      number: "E-1",
+      baseCents: 1000,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 1000 }],
+    },
+    "bo",
+  );
   e.attachBillDoc(
     bill.id,
     { storageKey: "bill_k1", name: "factura.pdf", type: "application/pdf" },
@@ -3301,6 +3393,13 @@ assert(
       vatCents: 210,
       totalCents: 1210,
     },
+    "bo",
+  );
+  /* Split before promoting: since PK12 a bill must be allocated, so a document
+     with no split cannot become one. That is the rule working, not a detour. */
+  e.allocateCapture(
+    cap.id,
+    [{ overheadCategory: "office", kind: "material", amountCents: 1000 }],
     "bo",
   );
   const promoted = e.billFromCapture(cap.id, { supplierId: sup.id }, "bo");
@@ -3363,7 +3462,14 @@ assert(
   );
 
   const hN = e.recordHours(
-    { workerId: w.id, projectId: pj.id, lineId: ln.id, hoursMilli: 8000, date: "2026-03-03" },
+    {
+      workerId: w.id,
+      projectId: pj.id,
+      ...at(e, pj.id),
+      lineId: ln.id,
+      hoursMilli: 8000,
+      date: "2026-03-03",
+    },
     "op",
   );
   assert(
@@ -3377,7 +3483,14 @@ assert(
     JSON.stringify({ lineId: hN.lineId, chapterNum: hN.chapterNum }),
   );
   const hX = e.recordHours(
-    { workerId: w.id, projectId: pj.id, kind: "extra", hoursMilli: 2000, date: "2026-03-03" },
+    {
+      workerId: w.id,
+      projectId: pj.id,
+      ...at(e, pj.id),
+      kind: "extra",
+      hoursMilli: 2000,
+      date: "2026-03-03",
+    },
     "op",
   );
   assert(
@@ -3390,7 +3503,14 @@ assert(
   const w2 = e.addWorker({ name: "Pau", kind: "employee" }, "bo");
   e.addWorkerRate(w2.id, { from: "2026-03-01", rateCentsPerHour: 1800 }, "bo");
   const hX2 = e.recordHours(
-    { workerId: w2.id, projectId: pj.id, kind: "extra", hoursMilli: 1000, date: "2026-03-04" },
+    {
+      workerId: w2.id,
+      projectId: pj.id,
+      ...at(e, pj.id),
+      kind: "extra",
+      hoursMilli: 1000,
+      date: "2026-03-04",
+    },
     "op",
   );
   assert(
@@ -3686,7 +3806,18 @@ assert(
     },
     "op",
   );
-  e.splitMovement(petty.id, [{ projectId: pj.id, kind: "material", amountCents: 3000 }], "op");
+  e.splitMovement(
+    petty.id,
+    [{ ...at(e, pj.id), projectId: pj.id, kind: "material", amountCents: 3000 }],
+    "op",
+  );
+  /* Then stripped back to the pre-PK12 shape. A project cost with no partida
+     can no longer be WRITTEN — every door names one now — but a workspace that
+     has been running carries rows like this, and the block below is about the
+     way to clear them. Building the state directly is honest about what it is:
+     data from before the rule, not something the product can still produce. */
+  petty.allocations[0].chapterNum = null;
+  petty.allocations[0].lineId = null;
   closes("petty cash on the job with no partida");
   assert(
     e.unassignedChapterCosts(pj.id).some((r) => r.source === "movement"),
@@ -3836,7 +3967,12 @@ assert(
   const acc = e.addBankAccount({ name: "Banco 7C", kind: "bank" }, "bo");
 
   const bill = e.registerBill(
-    { supplierId: sup.id, number: "7C-1", baseCents: 100000, allocations: [] },
+    {
+      supplierId: sup.id,
+      number: "7C-1",
+      baseCents: 100000,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 100000 }],
+    },
     "bo",
   );
   const full = e.billOutstandingCents(bill.id);
@@ -3915,11 +4051,21 @@ assert(
      order and the screen showed the first twelve of it — twelve documents
      chosen by age and unrelated to the movement in front of you. */
   const far = e.registerBill(
-    { supplierId: sup.id, number: "7C-FAR", baseCents: 500000, allocations: [] },
+    {
+      supplierId: sup.id,
+      number: "7C-FAR",
+      baseCents: 500000,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 500000 }],
+    },
     "bo",
   );
   const near = e.registerBill(
-    { supplierId: sup.id, number: "7C-NEAR", baseCents: 20000, allocations: [] },
+    {
+      supplierId: sup.id,
+      number: "7C-NEAR",
+      baseCents: 20000,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 20000 }],
+    },
     "bo",
   );
   e.importMovements(
@@ -4179,7 +4325,12 @@ assert(
      loop's own filter is the only thing standing between it and a shortcut
      the single-row panel would never permit. */
   const bill = e.registerBill(
-    { supplierId: sup.id, number: "7E-1", baseCents: 5000, allocations: [] },
+    {
+      supplierId: sup.id,
+      number: "7E-1",
+      baseCents: 5000,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 5000 }],
+    },
     "bo",
   );
   const owed = e.billOutstandingCents(bill.id);
@@ -4351,11 +4502,16 @@ assert(
     "the basis of a split is the taxable base, not the total",
   );
 
+  /* The operator's own distribution off a real invoice. Its third row was
+     «Sin partida (barras, excluidas)» — a cost on the job that no budgeted
+     chapter covered — and the engine allowed it, which is what this block used
+     to assert. The operator then ruled that out: a cost goes to a project with
+     partida and subpartida, or it is a general expense. Excluded bars are the
+     second case, so that is where the row goes now. */
   const split = (a, b, c) => [
-    { projectId: prj.id, chapterNum: "1", kind: "material", amountCents: a },
-    { projectId: prj.id, chapterNum: "2", kind: "material", amountCents: b },
-    // «Sin partida»: a real cost on the job that no budgeted chapter covers.
-    { projectId: prj.id, chapterNum: null, kind: "material", amountCents: c },
+    { ...at(erp, prj.id, "1"), projectId: prj.id, kind: "material", amountCents: a },
+    { ...at(erp, prj.id, "2"), projectId: prj.id, kind: "material", amountCents: b },
+    { overheadCategory: "otherOverhead", kind: "material", amountCents: c },
   ];
 
   throws(
@@ -4368,8 +4524,20 @@ assert(
     "…and the operator's own distribution, footing to the base, is accepted",
   );
   assert(
-    ok2.allocations[2].chapterNum === null,
-    "…including a row with no partida, which the engine has always allowed",
+    ok2.allocations[2].overheadCategory === "otherOverhead" && !ok2.allocations[2].projectId,
+    "…with the line no chapter covers filed as a general expense, not as a job cost with no home",
+  );
+  throws(
+    () =>
+      erp.allocateCapture(
+        cap.id,
+        [
+          { ...at(erp, prj.id, "1"), projectId: prj.id, kind: "material", amountCents: 230580 },
+          { projectId: prj.id, chapterNum: null, kind: "material", amountCents: 17800 },
+        ],
+        "bo",
+      ),
+    "…and a row that names the job and no partida is refused outright",
   );
 
   /* THE CATCH-22, stated as a test: the very rows this door accepted must be
@@ -4382,9 +4550,17 @@ assert(
       baseCents: 248380,
       vatCents: 52160,
       capId: cap.id,
+      /* The whole destination is carried across, subpartida included. Copying
+         only projectId and chapterNum was enough while a project cost could
+         have no line; since PK12 it cannot, so dropping `lineId` on the way
+         between the two doors would make the bill door refuse the very split
+         the capture door had just accepted — which is the catch-22 this block
+         exists to prevent, in a new costume. */
       allocations: ok2.allocations.map((a) => ({
         projectId: a.projectId,
+        overheadCategory: a.overheadCategory,
         chapterNum: a.chapterNum,
+        lineId: a.lineId,
         kind: a.kind,
         amountCents: a.amountCents,
       })),
@@ -4572,6 +4748,13 @@ assert(
     },
     "bo",
   );
+  // Split first: a bill must be allocated, so a document with none cannot
+  // become one. The wrong SUPPLIER is what this block is about, not the split.
+  e.allocateCapture(
+    c.id,
+    [{ overheadCategory: "office", kind: "material", amountCents: 248380 }],
+    "bo",
+  );
   const bill = e.billFromCapture(c.id, { supplierId: wrong.id }, "bo");
   assert(
     bill.supplierName === "Leroy Merlin 11",
@@ -4615,7 +4798,13 @@ assert(
 
   // ── and what may NOT go ──
   const paid = e.registerBill(
-    { supplierId: wrong.id, number: "PAID-11", baseCents: 10000, vatBp: 2100 },
+    {
+      supplierId: wrong.id,
+      number: "PAID-11",
+      baseCents: 10000,
+      vatBp: 2100,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 10000 }],
+    },
     "bo",
   );
   e.payBills(
@@ -4649,7 +4838,13 @@ assert(
 
   // Money that DID move is a different record, and stays refused.
   const real = e.registerBill(
-    { supplierId: wrong.id, number: "REAL-11", baseCents: 10000, vatBp: 2100 },
+    {
+      supplierId: wrong.id,
+      number: "REAL-11",
+      baseCents: 10000,
+      vatBp: 2100,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 10000 }],
+    },
     "bo",
   );
   const acc = e.addBankAccount({ name: "Banco 11", kind: "bank" }, "bo");
@@ -4669,11 +4864,23 @@ assert(
   // One payment can settle several invoices; releasing one must not un-pay
   // the rest behind the operator's back.
   const shA = e.registerBill(
-    { supplierId: wrong.id, number: "SH-A", baseCents: 5000, vatBp: 0 },
+    {
+      supplierId: wrong.id,
+      number: "SH-A",
+      baseCents: 5000,
+      vatBp: 0,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 5000 }],
+    },
     "bo",
   );
   const shB = e.registerBill(
-    { supplierId: wrong.id, number: "SH-B", baseCents: 5000, vatBp: 0 },
+    {
+      supplierId: wrong.id,
+      number: "SH-B",
+      baseCents: 5000,
+      vatBp: 0,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 5000 }],
+    },
     "bo",
   );
   e.payBills(
@@ -4700,7 +4907,13 @@ assert(
   );
 
   const credited = e.registerBill(
-    { supplierId: wrong.id, number: "CRED-11", baseCents: 5000, vatBp: 2100 },
+    {
+      supplierId: wrong.id,
+      number: "CRED-11",
+      baseCents: 5000,
+      vatBp: 2100,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 5000 }],
+    },
     "bo",
   );
   e.registerBill(
@@ -4710,6 +4923,7 @@ assert(
       baseCents: 5000,
       vatBp: 2100,
       creditNoteFor: credited.id,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 5000 }],
     },
     "bo",
   );
@@ -4747,7 +4961,9 @@ assert(
       number: "COST-11",
       baseCents: 10000,
       vatBp: 2100,
-      allocations: [{ projectId: proj.id, chapterNum: "1", kind: "material", amountCents: 10000 }],
+      allocations: [
+        { ...at(e, proj.id, "1"), projectId: proj.id, kind: "material", amountCents: 10000 },
+      ],
     },
     "bo",
   );
@@ -4786,7 +5002,13 @@ assert(
   );
   const movs = e.state.movements.filter((m) => m.accountId === bank.id);
   const bill = e.registerBill(
-    { supplierId: sup.id, number: "R-11", baseCents: 10000, vatBp: 2100 },
+    {
+      supplierId: sup.id,
+      number: "R-11",
+      baseCents: 10000,
+      vatBp: 2100,
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 10000 }],
+    },
     "bo",
   );
   e.matchMovement(movs[0].id, { billId: bill.id }, "bo");

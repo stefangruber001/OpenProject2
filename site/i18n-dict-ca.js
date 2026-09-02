@@ -582,6 +582,21 @@ window.CANEI_DICT.ca = {
   "La factura necesita una base imponible": "La factura necessita una base imposable",
   "El reparto debe sumar la base imponible": "El repartiment ha de sumar la base imposable",
   "Factura registrada": "Factura registrada",
+  "Las horas de obra necesitan partida y subpartida":
+    "Les hores d'obra necessiten partida i subpartida",
+  "⚠ Las horas de obra necesitan partida y subpartida":
+    "⚠ Les hores d'obra necessiten partida i subpartida",
+  "El coste de obra necesita partida y subpartida": "El cost d'obra necessita partida i subpartida",
+  "⚠ El coste de obra necesita partida y subpartida":
+    "⚠ El cost d'obra necessita partida i subpartida",
+  "Reparta la factura: a una obra o a gastos generales":
+    "Repartiu la factura: a una obra o a despeses generals",
+  "Cada línea de obra necesita partida y subpartida":
+    "Cada línia d'obra necessita partida i subpartida",
+  "⚠ Cada línea de obra necesita partida y subpartida":
+    "⚠ Cada línia d'obra necessita partida i subpartida",
+  "⚠ Reparta la factura: a una obra o a gastos generales":
+    "⚠ Repartiu la factura: a una obra o a despeses generals",
   "El movimiento ya está conciliado.": "El moviment ja està conciliat.",
   "Ha sido un pago parcial": "Ha estat un pagament parcial",
   "Deshacer la conciliación": "Desfer la conciliació",

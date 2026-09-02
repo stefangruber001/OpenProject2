@@ -455,8 +455,24 @@ const sup9 =
     },
     "bo",
   );
-const bA = e9.registerBill({ supplierId: sup9.id, number: "A-1", baseCents: 200000 }, "bo");
-const bB = e9.registerBill({ supplierId: sup9.id, number: "A-2", baseCents: 130578 }, "bo");
+const bA = e9.registerBill(
+  {
+    supplierId: sup9.id,
+    number: "A-1",
+    baseCents: 200000,
+    allocations: [{ overheadCategory: "office", kind: "material", amountCents: 200000 }],
+  },
+  "bo",
+);
+const bB = e9.registerBill(
+  {
+    supplierId: sup9.id,
+    number: "A-2",
+    baseCents: 130578,
+    allocations: [{ overheadCategory: "office", kind: "material", amountCents: 130578 }],
+  },
+  "bo",
+);
 const acc9 = e9.addBankAccount({ name: "BBVA", kind: "bank" }, "bo");
 const both = bA.totalCents + bB.totalCents;
 const [mov9] = e9.importMovements(
@@ -489,7 +505,15 @@ assert(
 
 // A4: a document can never be paid more than it owes. Before this the balance
 // simply went negative, which reads as a figure rather than as an error.
-const bC = e9.registerBill({ supplierId: sup9.id, number: "A-3", baseCents: 100000 }, "bo");
+const bC = e9.registerBill(
+  {
+    supplierId: sup9.id,
+    number: "A-3",
+    baseCents: 100000,
+    allocations: [{ overheadCategory: "office", kind: "material", amountCents: 100000 }],
+  },
+  "bo",
+);
 const [mov10] = e9.importMovements(
   acc9.id,
   [{ accountingDate: "2026-08-11", concept: "TRANSF GRANDE", amountCents: -300000 }],

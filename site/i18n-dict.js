@@ -688,6 +688,38 @@ window.CANEI_DICT = {
     ["La factura necesita una base imponible", "The invoice needs a taxable base"],
     ["El reparto debe sumar la base imponible", "The split must total the taxable base"],
     ["Factura registrada", "Invoice registered"],
+    [
+      "Las horas de obra necesitan partida y subpartida",
+      "Hours on a job need a line item and a sub-line item",
+    ],
+    [
+      "⚠ Las horas de obra necesitan partida y subpartida",
+      "⚠ Hours on a job need a line item and a sub-line item",
+    ],
+    [
+      "El coste de obra necesita partida y subpartida",
+      "A job cost needs a line item and a sub-line item",
+    ],
+    [
+      "⚠ El coste de obra necesita partida y subpartida",
+      "⚠ A job cost needs a line item and a sub-line item",
+    ],
+    [
+      "Reparta la factura: a una obra o a gastos generales",
+      "Allocate the invoice: to a job, or to general expenses",
+    ],
+    [
+      "Cada línea de obra necesita partida y subpartida",
+      "Every job line needs a line item and a sub-line item",
+    ],
+    [
+      "⚠ Cada línea de obra necesita partida y subpartida",
+      "⚠ Every job line needs a line item and a sub-line item",
+    ],
+    [
+      "⚠ Reparta la factura: a una obra o a gastos generales",
+      "⚠ Allocate the invoice: to a job, or to general expenses",
+    ],
     ["El movimiento ya está conciliado.", "The movement is already reconciled."],
     ["Ha sido un pago parcial", "It was a partial payment"],
     ["Deshacer la conciliación", "Undo the reconciliation"],

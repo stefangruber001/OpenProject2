@@ -8782,11 +8782,28 @@
       }
       function hourWhereCell(r, jobs, chaptersOf) {
         if (!r.entry) {
+          /* PARTIDA AND SUBPARTIDA, both. Since PK12 hours on a job carry a
+             subpartida like every other project cost, and this sheet offered
+             only the chapter — so entering a line from the day sheet failed
+             with the engine's English refusal on a Spanish screen. The two
+             selects sit together because they are one answer; the second
+             fills from the first. */
+          const first = jobs[0] && jobs[0].id;
           const opts =
-            chaptersOf(jobs[0] && jobs[0].id)
+            chaptersOf(first)
               .map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`)
               .join("") || '<option value="">—</option>';
-          return `<select class="inline" data-newchap="${r.workerId}">${opts}</select>`;
+          const firstChap = (chaptersOf(first)[0] || {}).num;
+          const lines = first ? lineOptionsFor(first, firstChap, "") : "";
+          /* Both halves built BEFORE the return, not joined with `+` in it. A
+             template literal spliced onto another with a conditional between
+             them reads to the translation audit as prose with no translation —
+             the trap CLAUDE.md records catching four earlier templates, and
+             this one made it five. */
+          const lineSel = lines
+            ? ` <select class="inline" data-newline="${r.workerId}">${lines}</select>`
+            : "";
+          return `<select class="inline" data-newchap="${r.workerId}">${opts}</select>${lineSel}`;
         }
         const line = hourLineLabel(r.entry);
         const chap = esc(r.entry.chapterNum || "—");
@@ -8958,6 +8975,34 @@
               (erp.state.projects.find((p) => !p.closed) || erp.state.projects[0] || {}).id,
           );
         $("#hAdd").onclick = () => newHoursDrawer(hDay);
+        /* The two selects are one answer, so they stay in step: choosing a
+           different partida refills the subpartidas under it, and choosing a
+           different job refills both. Without this the sheet would offer the
+           first job's subpartidas against whatever else was picked — a
+           destination that looks chosen and belongs to another obra. */
+        const refillWhere = (wid) => {
+          const proj = document.querySelector(`[data-newproj="${wid}"]`);
+          const chap = document.querySelector(`[data-newchap="${wid}"]`);
+          const line = document.querySelector(`[data-newline="${wid}"]`);
+          if (!proj || !chap) return;
+          const p = erp.state.projects.find((x) => x.id === proj.value);
+          const chapters = (p && p.baseline && p.baseline.chapters) || [];
+          chap.innerHTML =
+            chapters.map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`).join("") ||
+            '<option value="">—</option>';
+          if (line) line.innerHTML = lineOptionsFor(proj.value, chap.value, "") || "";
+        };
+        document.querySelectorAll("[data-newproj]").forEach(
+          (el) => (el.onchange = () => refillWhere(el.dataset.newproj)),
+        );
+        document.querySelectorAll("[data-newchap]").forEach(
+          (el) =>
+            (el.onchange = () => {
+              const line = document.querySelector(`[data-newline="${el.dataset.newchap}"]`);
+              const proj = document.querySelector(`[data-newproj="${el.dataset.newchap}"]`);
+              if (line && proj) line.innerHTML = lineOptionsFor(proj.value, el.value, "") || "";
+            }),
+        );
         document.querySelectorAll(".hsheet input.hin").forEach(
           (inp) =>
             (inp.onchange = () => {
@@ -8973,12 +9018,18 @@
                 const wid = inp.dataset.worker;
                 const proj = document.querySelector(`[data-newproj="${wid}"]`);
                 const chap = document.querySelector(`[data-newchap="${wid}"]`);
+                const line = document.querySelector(`[data-newline="${wid}"]`);
                 const knd = document.querySelector(`[data-newkind="${wid}"]`);
                 if (!proj || !proj.value) throw new Error("Selecciona el proyecto");
+                // Refused here, in the operator's language, before the engine
+                // says the same thing in English on a Spanish screen.
+                if (line && !line.value)
+                  throw new Error("Las horas de obra necesitan partida y subpartida");
                 erp.recordHours(
                   {
                     workerId: wid,
                     projectId: proj.value,
+                    lineId: (line && line.value) || null,
                     chapterNum: (chap && chap.value) || null,
                     // The kind chosen on the row prices the entry from its own
                     // rate band; without it every inline entry was a normal
@@ -9068,6 +9119,8 @@
           mutate(() => {
             const hrs = Number(String($("#nh_h").value).replace(",", "."));
             if (!(hrs > 0)) throw new Error("Indica las horas");
+            if ($("#nh_lwrap").style.display !== "none" && !$("#nh_l").value)
+              throw new Error("Las horas de obra necesitan partida y subpartida");
             erp.recordHours(
               {
                 workerId: $("#nh_w").value,
@@ -14936,6 +14989,10 @@
             toast("⚠ El reparto debe sumar la base imponible");
             return;
           }
+          if (capAlloc.some((a) => a.projectId && !a.lineId)) {
+            toast("⚠ Cada línea de obra necesita partida y subpartida");
+            return;
+          }
           mutate(() => {
             erp.allocateCapture(
               id,
@@ -15216,9 +15273,11 @@
             if (!(baseCents > 0)) throw new Error("La factura necesita una base imponible");
             const vatCents =
               Math.round(Number(String($("#bd_vat").value).replace(",", ".")) * 100) || 0;
-            // An unallocated bill is a legitimate state — the engine says so and
-            // the payables list flags it — so empty rows are dropped rather than
-            // refused, and a partial split is refused rather than filed wrong.
+            /* An unallocated bill USED to be a legitimate state, flagged by the
+               payables list and otherwise allowed. Since PK12 it is a cost that
+               belongs to nothing, which is the one thing the rule forbids — so
+               empty rows are still dropped, and a bill left with none is now
+               refused rather than filed homeless. */
             const rows = billAlloc
               .filter((a) => (a.projectId || a.overheadCategory) && a.amountCents > 0)
               .map((a) => ({
@@ -15229,8 +15288,14 @@
                 kind: a.kind || "material",
                 amountCents: a.amountCents,
               }));
+            if (!rows.length)
+              throw new Error("Reparta la factura: a una obra o a gastos generales");
+            // Refused HERE, in the operator's language, before the engine says
+            // the same thing in English on a Spanish screen.
+            if (rows.some((a) => a.projectId && !a.lineId))
+              throw new Error("Cada línea de obra necesita partida y subpartida");
             const total = rows.reduce((s, a) => s + a.amountCents, 0);
-            if (rows.length && Math.abs(total - baseCents) > 1)
+            if (Math.abs(total - baseCents) > 1)
               throw new Error("El reparto debe sumar la base imponible");
             const fields = {
               supplierId: $("#bd_sup").value,
@@ -23277,6 +23342,13 @@
               // BNK-07's own signature: the movement goes in through importMovements,
               // and NOT naming a supporting document is what flags it. There is no
               // second cash method — see the note in erp-engine.js.
+              /* A job cost names partida AND subpartida since PK12, so the
+                 select that was optional here is now required when the money
+                 goes to an obra — refused in the operator's language before
+                 the engine refuses it in English. A general expense names
+                 neither, and is untouched. */
+              if ($("#ca_linewrap").style.display !== "none" && !$("#ca_line").value)
+                throw new Error("El coste de obra necesita partida y subpartida");
               const rec = erp.recordCashMovement(
                 accountId,
                 {

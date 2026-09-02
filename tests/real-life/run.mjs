@@ -107,6 +107,16 @@ await pg.evaluate((id) => captureDrawer(id), capInfo.capId);
 await pg.waitForTimeout(400);
 await pg.click("#cd_bill");
 await pg.waitForTimeout(400);
+/* Since PK12 a bill must be allocated — a cost that belongs to nothing is the
+   one thing the rule forbids. An electricity bill is a general expense, so it
+   goes where general expenses go, and the drawer refuses before the engine if
+   it does not. */
+await pg.evaluate(() => {
+  const dest = document.querySelector('#bd_rows [data-ai="0"][data-k="dest"]');
+  dest.value = "o:office";
+  dest.dispatchEvent(new Event("change", { bubbles: true }));
+});
+await pg.waitForTimeout(300);
 await pg.click("#bd_go");
 await pg.waitForTimeout(600);
 const bill = await pg.evaluate(() => {
@@ -143,7 +153,15 @@ const card = await pg.evaluate(() => {
   );
   const sup = erp.state.parties.find((p) => (p.roles || []).includes("supplier"));
   const b = erp.registerBill(
-    { supplierId: sup.id, number: "RL-FERR-9", baseCents: 5000, vatBp: 2100 },
+    {
+      supplierId: sup.id,
+      number: "RL-FERR-9",
+      baseCents: 5000,
+      vatBp: 2100,
+      // This block is about the CARD path — purchase, match, settlement — not
+      // about where the cost lands, so it lands where a tool purchase does.
+      allocations: [{ overheadCategory: "fixedAsset", kind: "material", amountCents: 5000 }],
+    },
     "bo",
   );
   const mv = erp.state.movements.find((x) => x.accountId === c.id);

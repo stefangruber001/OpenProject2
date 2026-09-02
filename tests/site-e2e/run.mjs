@@ -2736,7 +2736,23 @@ async function testSupplierBillEntry(browser, base) {
     await pg.evaluate(() => {
       const sel = document.getElementById("bd_sup");
       sel.value = [...sel.options].find((o) => o.value)?.value || "";
+      /* Since PK12 a bill must be allocated: a cost that belongs to nothing is
+         the one thing the rule forbids. This block is about the SUPPLIER, so
+         the cost goes to a general expense and stays out of the way. */
+      const dest = document.querySelector('#bd_rows [data-ai="0"][data-k="dest"]');
+      dest.value = "o:office";
+      dest.dispatchEvent(new Event("change", { bubbles: true }));
+      /* The AMOUNT as well as the destination: a row seeded before the base
+         was typed carries zero, and a zero row is dropped rather than filed —
+         so setting only the destination leaves the bill with no allocation and
+         the drawer correctly refuses it. */
+      const amt = document.querySelector('#bd_rows [data-ai="0"][data-k="amountCents"]');
+      amt.value = String(
+        Number(String(document.getElementById("bd_base").value).replace(",", ".")),
+      );
+      amt.dispatchEvent(new Event("change", { bubbles: true }));
     });
+    await pg.waitForTimeout(300);
     await pg.click("#bd_go");
     await pg.waitForTimeout(700);
 
@@ -2816,6 +2832,21 @@ async function testSupplierBillEntry(browser, base) {
       ok("AP-01: the reading is carried into the form instead of being retyped");
     else bad("AP-01: capture prefills the bill", JSON.stringify(prefilled));
 
+    await pg.evaluate(() => {
+      const dest = document.querySelector('#bd_rows [data-ai="0"][data-k="dest"]');
+      dest.value = "o:office";
+      dest.dispatchEvent(new Event("change", { bubbles: true }));
+      /* The AMOUNT as well as the destination: a row seeded before the base
+         was typed carries zero, and a zero row is dropped rather than filed —
+         so setting only the destination leaves the bill with no allocation and
+         the drawer correctly refuses it. */
+      const amt = document.querySelector('#bd_rows [data-ai="0"][data-k="amountCents"]');
+      amt.value = String(
+        Number(String(document.getElementById("bd_base").value).replace(",", ".")),
+      );
+      amt.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(300);
     await pg.click("#bd_go");
     await pg.waitForTimeout(700);
     const linked = await pg.evaluate((id) => {
@@ -2922,6 +2953,21 @@ async function testSupplierBillEntry(browser, base) {
       ok("AP-01: created as a supplier, so it is there the next time");
     else bad("AP-01: created with the supplier role", JSON.stringify(created));
 
+    await pg.evaluate(() => {
+      const dest = document.querySelector('#bd_rows [data-ai="0"][data-k="dest"]');
+      dest.value = "o:office";
+      dest.dispatchEvent(new Event("change", { bubbles: true }));
+      /* The AMOUNT as well as the destination: a row seeded before the base
+         was typed carries zero, and a zero row is dropped rather than filed —
+         so setting only the destination leaves the bill with no allocation and
+         the drawer correctly refuses it. */
+      const amt = document.querySelector('#bd_rows [data-ai="0"][data-k="amountCents"]');
+      amt.value = String(
+        Number(String(document.getElementById("bd_base").value).replace(",", ".")),
+      );
+      amt.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(300);
     await pg.click("#bd_go");
     await pg.waitForTimeout(700);
     const strangerBill = await pg.evaluate(() => {
@@ -2955,6 +3001,18 @@ async function testSupplierBillEntry(browser, base) {
       };
       await set(0, "dest", "p:" + projects[0].id);
       await set(1, "dest", "p:" + projects[1].id);
+      /* Since PK12 a job cost names its partida AND subpartida, so choosing
+         the project is no longer the whole destination. The selects appear as
+         the level above is chosen, which is why they are set in order. */
+      const firstOption = (i, k) => {
+        const el = document.querySelector(`#bd_rows [data-ai="${i}"][data-k="${k}"]`);
+        const opt = el && [...el.options].find((o) => o.value);
+        return opt ? opt.value : null;
+      };
+      for (const i of [0, 1]) {
+        await set(i, "chapterNum", firstOption(i, "chapterNum"));
+        await set(i, "lineId", firstOption(i, "lineId"));
+      }
       // 33,3 / 66,7 — the case where naive rounding loses a cent.
       await set(0, "pct", "33.3");
       await set(1, "pct", "66.7");
@@ -3720,6 +3778,21 @@ async function testCapture(browser, base) {
     await pg.locator('#cd_rows input[data-k="amountCents"]').first().fill("1000.00");
     await pg.locator('#cd_rows input[data-k="amountCents"]').first().dispatchEvent("change");
     await pg.waitForTimeout(300);
+    /* And its partida and subpartida, which since PK12 are not optional on a
+       job cost. The selects appear as the level above is chosen, so they are
+       filled in order; the overhead row below needs none, because a general
+       expense has no partida to name. */
+    for (const k of ["chapterNum", "lineId"]) {
+      const v = await pg.evaluate((key) => {
+        const el = document.querySelector(`#cd_rows [data-ai="0"][data-k="${key}"]`);
+        const opt = el && [...el.options].find((o) => o.value);
+        return opt ? opt.value : null;
+      }, k);
+      if (v) {
+        await pg.locator(`#cd_rows [data-ai="0"][data-k="${k}"]`).selectOption(v);
+        await pg.waitForTimeout(250);
+      }
+    }
     await pg.click("#cd_add");
     await pg.waitForTimeout(300);
     await pg.locator('#cd_rows select[data-k="dest"]').nth(1).selectOption("o:office");
@@ -3870,6 +3943,14 @@ async function testCapture(browser, base) {
           vatCents: 4200,
           totalCents: 24200,
         },
+        "bo",
+      );
+      /* Split before promoting: a bill must be allocated, so a document with
+         none cannot become one. This block is about the ROUTE out of a
+         document held shut by its bill, not about where the cost lands. */
+      erp.allocateCapture(
+        c.id,
+        [{ overheadCategory: "office", kind: "material", amountCents: 20000 }],
         "bo",
       );
       erp.billFromCapture(c.id, { supplierId: sup.id }, "bo");
@@ -4906,16 +4987,34 @@ async function testProjectTracking(browser, base) {
     const seeded = await pg.evaluate(() => {
       const pid = gProject;
       const sup = erp.state.parties.find((p) => p.active && p.roles.includes("supplier"));
-      erp.registerBill(
+      /* Since PK12 a project cost names its partida and subpartida on the way
+         in, so a cost that reaches the job and stops there can no longer be
+         WRITTEN. It is filed properly and then stripped back, which is honest
+         about what such a row now is: data from before the rule. The block
+         below is about the screen that makes it visible and the way to clear
+         it, and that machinery is not obsolete — a running workspace holds
+         exactly these rows. */
+      const hit = (erp.projectChapters(pid) || [])[0];
+      const ln = hit && hit.chapter.lines[0];
+      const seededBill = erp.registerBill(
         {
           supplierId: sup.id,
           number: "E2E-SINCAP",
           baseCents: 50000,
           vatBp: 2100,
-          allocations: [{ projectId: pid, amountCents: 50000 }],
+          allocations: [
+            {
+              projectId: pid,
+              chapterNum: hit ? String(hit.chapter.num) : null,
+              lineId: ln ? ln.id : null,
+              amountCents: 50000,
+            },
+          ],
         },
         "bo",
       );
+      seededBill.allocations[0].chapterNum = null;
+      seededBill.allocations[0].lineId = null;
       const chapters = erp.chapterEconomics(pid).reduce((s, c) => s + c.actualCents, 0);
       return { chapters, project: erp.actualCostCents(pid), pid };
     });
@@ -6536,6 +6635,9 @@ async function testCashFlow(browser, base) {
           number: "E2E-CF-1",
           baseCents: 90000000,
           dueDate: erp.today,
+          // This block is about the cash-flow grid going red, not about where
+          // a cost lands — but since PK12 it must land somewhere.
+          allocations: [{ overheadCategory: "office", kind: "material", amountCents: 90000000 }],
         },
         "backoffice",
       );
@@ -9131,7 +9233,12 @@ async function testAdmin(browser, base) {
       const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
       const sup = erp.state.parties.find((p) => (p.roles || []).includes("supplier"));
       const bill = erp.registerBill(
-        { supplierId: sup.id, number: "E2E-A2", baseCents: 100000, allocations: [] },
+        {
+          supplierId: sup.id,
+          number: "E2E-A2",
+          baseCents: 100000,
+          allocations: [{ overheadCategory: "office", kind: "material", amountCents: 100000 }],
+        },
         "bo",
       );
       const full = erp.billOutstandingCents(bill.id);
@@ -9206,7 +9313,13 @@ async function testAdmin(browser, base) {
       );
       const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
       const bill = erp.registerBill(
-        { supplierId: sup.id, number: "E2E-S5", baseCents: 40000, vatBp: 0 },
+        {
+          supplierId: sup.id,
+          number: "E2E-S5",
+          baseCents: 40000,
+          vatBp: 0,
+          allocations: [{ overheadCategory: "office", kind: "material", amountCents: 40000 }],
+        },
         "bo",
       );
       const mv = erp.importMovements(
@@ -9278,7 +9391,12 @@ async function testAdmin(browser, base) {
       const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
       const sup = erp.state.parties.find((p) => (p.roles || []).includes("supplier"));
       const bill = erp.registerBill(
-        { supplierId: sup.id, number: "E2E-B1-9931", baseCents: 40000, allocations: [] },
+        {
+          supplierId: sup.id,
+          number: "E2E-B1-9931",
+          baseCents: 40000,
+          allocations: [{ overheadCategory: "office", kind: "material", amountCents: 40000 }],
+        },
         "bo",
       );
       const owed = erp.billOutstandingCents(bill.id);
@@ -9807,7 +9925,17 @@ async function testControlTowerAndDay(browser, base) {
           number: "E2E-OVERRUN",
           baseCents: e.currentRevenueCents,
           vatBp: 2100,
-          allocations: [{ projectId: open[0].id, amountCents: e.currentRevenueCents }],
+          allocations: [
+            {
+              projectId: open[0].id,
+              ...(() => {
+                const h = (erp.projectChapters(open[0].id) || [])[0];
+                const l = h && h.chapter.lines[0];
+                return l ? { chapterNum: String(h.chapter.num), lineId: l.id } : {};
+              })(),
+              amountCents: e.currentRevenueCents,
+            },
+          ],
         },
         "bo",
       );
@@ -12781,6 +12909,15 @@ async function testErp(browser, base) {
       chap.value = offered[0];
       chap.dispatchEvent(new Event("change", { bubbles: true }));
       await new Promise((r) => setTimeout(r, 300));
+      /* And the subpartida, which since PK12 is not optional on a job cost.
+         The select fills from the chapter above it, so it is set after. */
+      const ln = document.getElementById("ca_line");
+      const lnOpt = ln && [...ln.options].find((o) => o.value);
+      if (lnOpt) {
+        ln.value = lnOpt.value;
+        ln.dispatchEvent(new Event("change", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 250));
+      }
       document.getElementById("ca_c").value = "Tornillería E2E";
       document.getElementById("ca_a").value = "12.50";
       document.getElementById("ca_go").click();
