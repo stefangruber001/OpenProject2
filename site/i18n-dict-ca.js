@@ -582,6 +582,14 @@ window.CANEI_DICT.ca = {
   "La factura necesita una base imponible": "La factura necessita una base imposable",
   "El reparto debe sumar la base imponible": "El repartiment ha de sumar la base imposable",
   "Factura registrada": "Factura registrada",
+  "El movimiento ya está conciliado.": "El moviment ja està conciliat.",
+  "Ha sido un pago parcial": "Ha estat un pagament parcial",
+  "Deshacer la conciliación": "Desfer la conciliació",
+  "Conciliación deshecha": "Conciliació desfeta",
+  "El movimiento vuelve a la cola sin explicar y se anula el pago que creó la conciliación.":
+    "El moviment torna a la cua sense explicar i s'anul·la el pagament que va crear la conciliació.",
+  "Si ha sido un pago parcial no hay nada más que hacer: el resto sigue debiéndose y aparecerá como pendiente.":
+    "Si ha estat un pagament parcial no hi ha res més a fer: la resta continua devent-se i apareixerà com a pendent.",
   "Por subpartida": "Per subpartida",
   "Esta partida no tiene subpartidas en su línea base.":
     "Aquesta partida no té subpartides a la seva línia base.",

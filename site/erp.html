@@ -10764,7 +10764,7 @@
             closeDrawer();
             // A2: anything still owed after the match is a question, not a
             // silence. Asked once, about all of them, after the money moved.
-            setTimeout(() => shortfallDrawer(splits), 0);
+            setTimeout(() => shortfallDrawer(splits, m.id), 0);
           }, "Movimiento conciliado");
 
         db.querySelectorAll("[data-accept]").forEach(
@@ -10854,7 +10854,7 @@
    document driven to zero with no stated reason is indistinguishable from a
    mistake three months later — and the gestoría has to be able to tell a
    prompt-payment discount from a bank charge. */
-      function shortfallDrawer(splits) {
+      function shortfallDrawer(splits, movId) {
         const short = (splits || [])
           .map((s) => {
             const kind = s.billId ? "bill" : "invoice";
@@ -10871,10 +10871,19 @@
           .filter(Boolean);
         if (!short.length) return;
         const reasons = erp.listActive("settlementReasons");
-        const db = openDrawer("¿El resto sigue pendiente?");
+        /* THIS PANEL ARRIVES AFTER THE MATCH, NOT BEFORE IT.
+           `matchMovementSplit` has already run by the time this opens, and the
+           panel wore every affordance of a dialog you can back out of — a
+           question for a title, a Cerrar, two choices. The operator pressed
+           Cerrar expecting to cancel and the movement stayed reconciled, which
+           is the screen's fault: it asked a follow-up question in the costume
+           of a confirmation. So it now SAYS the match is done before it asks
+           anything, and offers the way back rather than leaving it to be found
+           on the next tab. */
+        const db = openDrawer("Movimiento conciliado");
         db.innerHTML = `<div class="it" style="margin-bottom:10px;color:var(--muted)">
-     El movimiento no cubre del todo ${short.length === 1 ? "este documento" : "estos documentos"}.
-     Si el resto sigue pendiente no hay nada que hacer; si se da por cerrado, di por qué.</div>
+     <span>El movimiento ya está conciliado.</span>
+     <span>No cubre del todo ${short.length === 1 ? "este documento" : "estos documentos"}, así que queda una diferencia.</span></div>
    ${short
      .map(
        (
@@ -10889,8 +10898,28 @@
      </div></div>`,
      )
      .join("")}
-   <div class="field full" style="margin-top:6px"><button class="btn primary" id="sfKeep">Sigue pendiente</button></div>`;
+   <div class="daylist" style="margin-top:6px"><div class="it" style="color:var(--muted)">Si ha sido un pago parcial no hay nada más que hacer: el resto sigue debiéndose y aparecerá como pendiente.</div></div>
+   <div class="field full" style="margin-top:6px;display:flex;gap:8px">
+     <button class="btn primary" id="sfKeep">Ha sido un pago parcial</button>
+     <span style="flex:1"></span>
+     <button class="btn danger" id="sfUndo">Deshacer la conciliación</button></div>`;
         $("#sfKeep").onclick = () => closeDrawer();
+        /* The SAME door the Conciliados tab uses, not a second one:
+           `unexplainMovement` dispatches to `unmatchMovement` for a matched
+           movement and voids the payment the match created. Two ways to undo
+           the same thing is how they come to behave differently. */
+        $("#sfUndo").onclick = async () => {
+          const yes = await askConfirm("Deshacer la conciliación", {
+            body: "El movimiento vuelve a la cola sin explicar y se anula el pago que creó la conciliación.",
+            okLabel: "Deshacer",
+            danger: true,
+          });
+          if (!yes) return;
+          mutate(() => {
+            erp.unexplainMovement(movId, "backoffice");
+            closeDrawer();
+          }, "Conciliación deshecha");
+        };
         db.querySelectorAll("[data-sfclose]").forEach(
           (b) =>
             (b.onclick = () => {
@@ -10900,7 +10929,7 @@
               mutate(() => {
                 erp.settleShortfall(d.kind, d.id, reason, "backoffice");
                 closeDrawer();
-                setTimeout(() => shortfallDrawer(splits), 0);
+                setTimeout(() => shortfallDrawer(splits, movId), 0);
               }, "Cerrado con su motivo");
             }),
         );

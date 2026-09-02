@@ -688,6 +688,18 @@ window.CANEI_DICT = {
     ["La factura necesita una base imponible", "The invoice needs a taxable base"],
     ["El reparto debe sumar la base imponible", "The split must total the taxable base"],
     ["Factura registrada", "Invoice registered"],
+    ["El movimiento ya está conciliado.", "The movement is already reconciled."],
+    ["Ha sido un pago parcial", "It was a partial payment"],
+    ["Deshacer la conciliación", "Undo the reconciliation"],
+    ["Conciliación deshecha", "Reconciliation undone"],
+    [
+      "El movimiento vuelve a la cola sin explicar y se anula el pago que creó la conciliación.",
+      "The movement goes back to the unexplained queue and the payment the reconciliation created is voided.",
+    ],
+    [
+      "Si ha sido un pago parcial no hay nada más que hacer: el resto sigue debiéndose y aparecerá como pendiente.",
+      "If it was a partial payment there is nothing more to do: the rest stays owed and shows as outstanding.",
+    ],
     ["Por subpartida", "By sub-line item"],
     [
       "Esta partida no tiene subpartidas en su línea base.",

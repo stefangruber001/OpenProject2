@@ -9192,6 +9192,82 @@ async function testAdmin(browser, base) {
       );
     else bad("A2: closed with a reason", JSON.stringify(shortfall));
 
+    /* PK12-S5 · THE PANEL ARRIVES AFTER THE MATCH, AND MUST SAY SO.
+       `matchMovementSplit` has already run by the time this opens, and it wore
+       every affordance of a dialog you can back out of: a question for a
+       title, a Cerrar, two choices. The operator pressed Cerrar expecting to
+       cancel and the movement stayed reconciled. So the panel states the match
+       is done, names the partial payment in those words — the case it was
+       silently the default for — and offers the way back through the SAME
+       door the Conciliados tab uses. */
+    const afterMatch = await pg.evaluate(async () => {
+      const sup = erp.state.parties.find((p) =>
+        (p.roles || []).some((r) => ["supplier", "subcontractor", "selfEmployed"].includes(r)),
+      );
+      const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
+      const bill = erp.registerBill(
+        { supplierId: sup.id, number: "E2E-S5", baseCents: 40000, vatBp: 0 },
+        "bo",
+      );
+      const mv = erp.importMovements(
+        acc.id,
+        [{ accountingDate: erp.state.today, concept: "PAGO PARCIAL E2E-S5", amountCents: -20000 }],
+        "bo",
+      )[0];
+      bankAcc = acc.id;
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 700));
+      matchDrawer(mv.id);
+      await new Promise((r) => setTimeout(r, 500));
+      /* The candidate list shows twelve and says so; by this point in the
+         suite there are more open documents than that. So the search box is
+         used, which is what it is for and what a person would do rather than
+         scrolling a list that tells them to narrow it. */
+      const qi = document.getElementById("rcCandQ");
+      qi.value = "E2E-S5";
+      qi.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 600));
+      const pick = [...document.querySelectorAll("#dbody [data-pick]")].find((b) =>
+        b.closest(".it").textContent.includes("E2E-S5"),
+      );
+      if (!pick)
+        return { found: false, candidates: document.querySelectorAll("#dbody [data-pick]").length };
+      pick.click();
+      await new Promise((r) => setTimeout(r, 800));
+      const text = document.querySelector(".drawer").innerText;
+      const out = {
+        found: true,
+        saysDone: /ya está conciliado/i.test(text),
+        namesPartial: /pago parcial/i.test(text),
+        offersUndo: !!document.getElementById("sfUndo"),
+        owedAfterMatch: erp.billOutstandingCents(bill.id),
+        matchedNow: !!mv.matched,
+      };
+      // And the way back actually goes back.
+      document.getElementById("sfUndo").click();
+      await new Promise((r) => setTimeout(r, 400));
+      const yes = [...document.querySelectorAll("button")].find((b) =>
+        /^deshacer$/i.test(b.textContent.trim()),
+      );
+      if (yes) yes.click();
+      await new Promise((r) => setTimeout(r, 800));
+      const after = erp.state.movements.find((x) => x.id === mv.id);
+      out.unmatched = !after.matched && after.status === "unallocated";
+      out.owedAgain = erp.billOutstandingCents(bill.id);
+      out.paymentVoided = !erp.state.payments.some((pp) =>
+        (pp.billAllocations || []).some((a) => a.billId === bill.id),
+      );
+      return out;
+    });
+    if (afterMatch.found && afterMatch.saysDone && afterMatch.namesPartial && afterMatch.offersUndo)
+      ok(
+        "A2: the panel says the match is done, names the partial payment, and offers the way back",
+      );
+    else bad("A2: panel states the outcome", JSON.stringify(afterMatch));
+    if (afterMatch.unmatched && afterMatch.owedAgain === 40000 && afterMatch.paymentVoided)
+      ok("A2: …and the way back returns the movement to the queue and voids the payment");
+    else bad("A2: undo from the panel", JSON.stringify(afterMatch));
+
     /* ── B1: one click needs the name, not just the number ────────────────
        An exact amount on the same day with the document's reference in the
        concept scores 0.95 against a threshold of 0.8 — and if the bank line
