@@ -4586,25 +4586,13 @@ assert(
     "a bill with no supplier is refused by the engine, not only by the form",
   );
 
-  // ── the correction ──
-  e.reassignBill(bill.id, right.id, "bo");
-  assert(
-    bill.supplierId === right.id &&
-      bill.supplierName === "SUMINISTROS CERDA 11, S.L." &&
-      bill.supplierTaxId === "B62889415",
-    "a bill can be re-filed against the company that actually issued it",
-    JSON.stringify({ name: bill.supplierName, taxId: bill.supplierTaxId }),
-  );
-  assert(
-    bill.irpfBp === 1500 && bill.irpfCents === 37257 && bill.totalCents === 263283,
-    "…and the withholding follows the new issuer's profile, so the total is theirs",
-    JSON.stringify({ bp: bill.irpfBp, irpf: bill.irpfCents, total: bill.totalCents }),
-  );
-  assert(
-    e.state.audit.some((a) => a.action === "reassignBill" && /Leroy Merlin 11/.test(a.ref)),
-    "…and the audit line names both companies, so the change is legible",
-  );
-  throws(() => e.reassignBill(bill.id, "", "bo"), "reassigning to nobody is refused");
+  /* `reassignBill` was here, and is deliberately gone. It repaired a bill's
+     issuer in place, and the operator's answer to that screen was that only
+     one action belongs on it: «The only option here is to Un-register.» A bill
+     filed against the wrong company is not corrected, it is taken out of the
+     ledger and re-filed from the document, which is one meaning instead of
+     two. The assertions that covered it went with the method rather than
+     being nudged to keep passing. */
 
   // ── the removal ──
   assert(e.billDeleteBlock(bill.id) === null, "nothing yet points at the bill, so it may go");
@@ -4638,9 +4626,78 @@ assert(
     },
     "bo",
   );
-  assert(e.billDeleteBlock(paid.id) === "paid", "a paid bill names its blocker rather than a wall");
-  throws(() => e.deleteBill(paid.id, "bo"), "…and removing it is refused");
-  throws(() => e.reassignBill(paid.id, right.id, "bo"), "…as is re-filing it against anyone else");
+  /* PAID IS NOT THE QUESTION — WHETHER MONEY MOVED IS. This payment names no
+     movement, so it never touched a bank: it is the entry the «Pagar» button
+     on the payables register used to write, and the operator pressed it. That
+     left an invoice marked «Pagada» against money that never moved, which
+     `billDeleteBlock` then refused to release while `voidPayment` was
+     reachable from no screen at all. A dead end built out of two reasonable
+     rules. Un-registering voids it. */
+  assert(
+    e.billDeleteBlock(paid.id) === null,
+    "a payment that never touched a bank does not block: it was a button press, not money",
+    String(e.billDeleteBlock(paid.id)),
+  );
+  const payId = e.state.payments.find((x) =>
+    (x.billAllocations || []).some((a) => a.billId === paid.id),
+  ).id;
+  e.deleteBill(paid.id, "bo");
+  assert(
+    !e.state.payments.some((x) => x.id === payId),
+    "…and un-registering takes that phantom payment with it",
+  );
+
+  // Money that DID move is a different record, and stays refused.
+  const real = e.registerBill(
+    { supplierId: wrong.id, number: "REAL-11", baseCents: 10000, vatBp: 2100 },
+    "bo",
+  );
+  const acc = e.addBankAccount({ name: "Banco 11", kind: "bank" }, "bo");
+  e.importMovements(
+    acc.id,
+    [{ accountingDate: "2026-09-19", concept: "PAGO REAL", amountCents: -12100 }],
+    "bo",
+  );
+  e.matchMovement(e.state.movements[0].id, { billId: real.id }, "bo");
+  assert(
+    e.billDeleteBlock(real.id) === "reconciled",
+    "a bill settled by a real bank line says so, and says where to undo it",
+    String(e.billDeleteBlock(real.id)),
+  );
+  throws(() => e.deleteBill(real.id, "bo"), "…and un-registering it is refused");
+
+  // One payment can settle several invoices; releasing one must not un-pay
+  // the rest behind the operator's back.
+  const shA = e.registerBill(
+    { supplierId: wrong.id, number: "SH-A", baseCents: 5000, vatBp: 0 },
+    "bo",
+  );
+  const shB = e.registerBill(
+    { supplierId: wrong.id, number: "SH-B", baseCents: 5000, vatBp: 0 },
+    "bo",
+  );
+  e.payBills(
+    {
+      amountCents: 10000,
+      method: "transfer",
+      billAllocations: [
+        { billId: shA.id, amountCents: 5000 },
+        { billId: shB.id, amountCents: 5000 },
+      ],
+    },
+    "bo",
+  );
+  assert(
+    e.billDeleteBlock(shA.id) === "shared-payment",
+    "a payment covering other invoices too is named, not silently voided",
+    String(e.billDeleteBlock(shA.id)),
+  );
+  throws(() => e.deleteBill(shA.id, "bo"), "…and un-registering it is refused");
+  assert(
+    e.billOutstandingCents(shB.id) === 0,
+    "…so the invoice beside it stays paid",
+    e.billOutstandingCents(shB.id),
+  );
 
   const credited = e.registerBill(
     { supplierId: wrong.id, number: "CRED-11", baseCents: 5000, vatBp: 2100 },

@@ -688,6 +688,29 @@ window.CANEI_DICT = {
     ["La factura necesita una base imponible", "The invoice needs a taxable base"],
     ["El reparto debe sumar la base imponible", "The split must total the taxable base"],
     ["Factura registrada", "Invoice registered"],
+    ["Anular registro", "Unregister"],
+    ["Anular el registro", "Unregister the invoice"],
+    ["Registro anulado", "Invoice unregistered"],
+    [
+      "Su pago liquida además otras facturas. Deshaga primero ese pago en Conciliación.",
+      "Its payment settles other invoices too. Undo that payment in Reconciliation first.",
+    ],
+    [
+      "La factura sale del registro y el documento archivado vuelve a quedar libre para volver a registrarlo.",
+      "The invoice leaves the register and the filed document is free to be registered again.",
+    ],
+    [
+      "La factura sale del registro con su reparto. No se puede deshacer.",
+      "The invoice leaves the register with its split. This cannot be undone.",
+    ],
+    [
+      "La factura sale del registro y el documento archivado vuelve a quedar sin registrar. No se puede deshacer.",
+      "The invoice leaves the register and the filed document goes back to unregistered. This cannot be undone.",
+    ],
+    [
+      "La factura sale del registro con su reparto a las obras. No se puede deshacer.",
+      "The invoice leaves the register with its allocation to the jobs. This cannot be undone.",
+    ],
     ["Ir a la factura", "Go to the invoice"],
     ["Corregir", "Fix"],
     ["Corregir la factura", "Fix the invoice"],

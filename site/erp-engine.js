@@ -10660,48 +10660,6 @@
       return b;
     }
     /**
-     * File a bill against the company that actually issued it.
-     *
-     * `correctBill` deliberately allows only the numbers on the page — base,
-     * rate, number, dates — because those are transcription. The issuer is not
-     * transcription, it is identity, and until now it was the one thing a bill
-     * could be wrong about with no way back: nothing changed it, nothing
-     * deleted the bill, and the captured document behind it was held shut by
-     * `deleteCapture` precisely BECAUSE a bill pointed at it. Three closed
-     * doors around a mistake the supplier picker used to make on its own.
-     *
-     * The withholding is RE-DERIVED, not carried across. Its rate is a
-     * property of who issued the document, so keeping the previous party's
-     * would leave the total describing neither company. This lands the record
-     * where it would have been had the right supplier been chosen at the
-     * start, and the audit line names both so the change is legible.
-     */
-    reassignBill(id, supplierId, user) {
-      const b = this.state.bills.find((x) => x.id === id);
-      if (!b) throw new Error("Bill not found");
-      if (!supplierId) throw new Error("A bill must name the supplier it belongs to");
-      const lock = this._billLocked(b);
-      if (lock)
-        throw new Error("Bill is locked (" + lock + ") — register a supplier credit note instead");
-      const was = this.billSupplier(b).name || b.supplierId;
-      const supplier = this.party(supplierId);
-      b.supplierId = supplier.id;
-      b.supplierName = supplier.name || "";
-      b.supplierTaxId = supplier.taxId || "";
-      b.irpfBp = supplier.irpfApplies ? supplier.irpfRateBp : 0;
-      b.irpfCents = pctOf(b.baseCents, b.irpfBp);
-      b.totalCents = b.baseCents + b.vatCents - b.irpfCents;
-      /* What makes two bills the same bill is the pair (issuer, number), and
-         the issuer just changed — so the standing verdict is about a document
-         that no longer exists and is re-derived rather than left to age. */
-      const dup = this.state.bills.find(
-        (x) => x.id !== b.id && x.supplierId === b.supplierId && x.number === b.number,
-      );
-      b.duplicateSuspect = dup ? dup.id : null;
-      this._log(user, "reassignBill", b.number + ": " + was + " → " + supplier.name);
-      return b;
-    }
-    /**
      * What still points at a bill, and therefore what must be undone first.
      *
      * A CODE, not a sentence, and returned rather than thrown — so a screen
@@ -10712,10 +10670,32 @@
     billDeleteBlock(id) {
       const b = this.state.bills.find((x) => x.id === id);
       if (!b) throw new Error("Bill not found");
-      const lock = this._billLocked(b);
-      if (lock) return lock;
-      if (this.state.payments.some((p) => (p.billAllocations || []).some((a) => a.billId === b.id)))
-        return "paid";
+      const q = quarterOf(b.date);
+      if ((this.state.packagesSent || []).some((p) => p.quarter === q)) return "quarter-sent";
+      /* PAID IS NOT THE QUESTION. WHETHER MONEY MOVED IS.
+         This used to refuse any bill with a payment against it, and that
+         conflated two records that look alike and are not. A payment that
+         names a `movementId` was created by reconciling a real bank line —
+         money left an account, and un-registering the invoice it settled has
+         to start in Conciliación. A payment with NO movement never touched a
+         bank: it is a bookkeeping entry somebody made by pressing a button,
+         and refusing to undo it left the operator holding an invoice marked
+         «Pagada» against money that never moved, undeletable, with
+         `voidPayment` reachable from no screen. That was a dead end this
+         method built. So it blocks on the first and voids the second. */
+      const pays = this._billPayments(id);
+      if (pays.some((p) => p.movementId)) return "reconciled";
+      /* One payment can settle SEVERAL invoices — `payBills` takes a list —
+         and voiding it whole to release one of them would quietly un-pay the
+         others. Nothing on any screen would say so. Refused by name instead,
+         so the operator undoes the payment deliberately rather than losing
+         three settlements to fix a fourth. */
+      if (
+        pays.some((p) =>
+          (p.billAllocations || []).some((a) => a.billId !== id && a.amountCents > 0),
+        )
+      )
+        return "shared-payment";
       if (
         this.state.movements.some(
           (m) =>
@@ -10727,6 +10707,12 @@
         return "reconciled";
       if (this.state.bills.some((x) => x.creditNoteFor === b.id)) return "credited";
       return null;
+    }
+    /** Every payment that allocates anything to this bill. */
+    _billPayments(billId) {
+      return this.state.payments.filter((p) =>
+        (p.billAllocations || []).some((a) => a.billId === billId),
+      );
     }
     /**
      * Remove a bill that should never have been filed at all.
@@ -10750,6 +10736,10 @@
       const b = this.state.bills[i];
       const block = this.billDeleteBlock(id);
       if (block) throw new Error("This invoice cannot be removed: " + block);
+      /* Voided BEFORE the bill goes, so `voidPayment` can still find what it
+         is undoing. Only unreconciled ones reach here — `billDeleteBlock`
+         refuses the rest — so this is never quietly reversing a bank line. */
+      for (const pay of this._billPayments(id)) this.voidPayment(pay.id, user);
       this.state.bills.splice(i, 1);
       const cap = b.capId ? this.state.captured.find((c) => c.id === b.capId) : null;
       if (cap) cap.billId = null;

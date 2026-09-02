@@ -3765,12 +3765,15 @@ async function testCapture(browser, base) {
       ok("ADM-03: …and that way lands on the drawer that can actually remove it");
     else bad("ADM-03: the route lands somewhere useful", JSON.stringify(routed));
 
-    // And the whole way out, end to end: remove the bill, then the document.
+    /* And the whole way out, end to end: un-register the bill, then delete the
+       document. The confirmation reads «Anular» rather than «Eliminar» since
+       the operator settled what this action is called — the invoice leaves the
+       register, it is not erased from history. */
     const freed = await pg.evaluate(async (capId) => {
       document.querySelector("#bf_del").click();
       await new Promise((r) => setTimeout(r, 300));
       const yes = [...document.querySelectorAll("button")].find((b) =>
-        /^eliminar$/i.test(b.textContent.trim()),
+        /^anular$/i.test(b.textContent.trim()),
       );
       if (!yes) return { err: "no confirmation offered" };
       yes.click();
@@ -3789,7 +3792,7 @@ async function testCapture(browser, base) {
       };
     }, routed.capId);
     if (freed.billGone && freed.released && freed.nowEnabled)
-      ok("ADM-03: removing the bill releases the document, which can then be deleted");
+      ok("ADM-03: un-registering the bill releases the document, which can then be deleted");
     else bad("ADM-03: the way out works end to end", JSON.stringify(freed));
 
     if (errs.length === 0) ok("ADM-03: no console errors");

@@ -14861,7 +14861,7 @@
            Reopening the drawer on the other document is the whole gesture:
            compare the two, then delete whichever one is the copy. */
         if ($("#cd_seeDup") && dupOther) $("#cd_seeDup").onclick = () => captureDrawer(dupOther.id);
-        if ($("#cd_gobill")) $("#cd_gobill").onclick = () => billFixDrawer(c.billId);
+        if ($("#cd_gobill")) $("#cd_gobill").onclick = () => billUnregisterDrawer(c.billId);
         if ($("#cd_del"))
           $("#cd_del").onclick = async () => {
             /* Two WHOLE sentences, chosen — not one sentence assembled from
@@ -15226,87 +15226,59 @@
          that must disable a button needs the reason before anybody presses
          it, and the sentence explaining it belongs where the sentences live. */
       const BILL_BLOCK = {
-        paid: "Ya tiene un pago registrado. Anule primero el pago.",
+        "shared-payment":
+          "Su pago liquida además otras facturas. Deshaga primero ese pago en Conciliación.",
         "quarter-sent": "Su trimestre ya se ha enviado al asesor. Registre un abono en su lugar.",
         reconciled: "Está casada con un movimiento bancario. Deshaga primero la conciliación.",
         credited: "Tiene un abono que la referencia. Elimine primero el abono.",
       };
 
       /**
-       * The two things a registered invoice could never be until now: filed
-       * against the wrong company, or filed by mistake.
+       * Un-register an invoice that should not be in the ledger.
        *
-       * It happened, on the operator's own workspace, and it was a dead end.
-       * `correctBill` allows the numbers on the page and not the issuer;
-       * nothing deleted a bill; and the photographed document behind it was
-       * held shut by `deleteCapture` precisely because a bill pointed at it.
-       * A mistake with no way back is worse than the mistake.
+       * This drawer used to offer two things — change the supplier, or delete
+       * — and the operator's answer was that only one of them belongs here:
+       * «The only option here is to Un-register.» They are right, and it is
+       * simpler than what it replaces. A bill filed against the wrong company
+       * is not repaired in place; it is taken out of the ledger, and the
+       * document it came from goes back to the archive to be filed again from
+       * what it actually says. One door, one meaning.
        *
-       * Correcting and removing sit in ONE drawer because they answer the same
-       * question — this invoice is wrong — and the right answer depends on
-       * something the operator knows and the screen does not: whether the
-       * document is real. A real invoice from the wrong company is reassigned.
-       * One that should never have been filed is removed, and its document
-       * goes back to the archive rather than down with it.
+       * What may NOT be un-registered is named rather than merely refused, so
+       * a disabled button is never a wall — see `billDeleteBlock`.
        */
-      function billFixDrawer(billId) {
+      function billUnregisterDrawer(billId) {
         const b = erp.state.bills.find((x) => x.id === billId);
         if (!b) return;
-        const suppliers = erp.state.parties.filter(
-          (p) => p.active !== false && (p.roles || []).some((r) => SUPPLIER_ROLES.includes(r)),
-        );
         const block = erp.billDeleteBlock(billId);
-        /* The bill's OWN supplier belongs in the list even when the party file
-           would not offer it — deactivated since, or no longer carrying a
-           supplier role. A picker that silently omits the current value is the
-           very defect this drawer exists to repair: nothing would be selected,
-           the browser would answer with whoever came first, and the operator
-           would never see what the bill actually says. When the party is gone
-           entirely there is nothing honest to preselect, so the drawer asks. */
-        const current = erp.state.parties.find((p) => p.id === b.supplierId);
-        const choices =
-          current && !suppliers.some((p) => p.id === b.supplierId)
-            ? [current, ...suppliers]
-            : suppliers;
-        const hasCurrent = choices.some((p) => p.id === b.supplierId);
-        const db = openDrawer("Corregir la factura");
-        db.innerHTML = `<div class="fgrid">
-   <div class="field full"><label>Proveedor</label><select id="bf_sup">
-     ${hasCurrent ? "" : `<option value="" selected>— Elija el proveedor —</option>`}
-     ${choices.map((p) => `<option value="${p.id}"${p.id === b.supplierId ? " selected" : ""}>${esc(p.name)}${p.taxId ? " · " + esc(p.taxId) : ""}</option>`).join("")}
-    </select></div>
-   <div class="field full"><span class="pill y">Al cambiar de proveedor se recalcula la retención según su perfil fiscal.</span></div>
-   <div class="field full"><button class="btn primary sm" id="bf_go">Cambiar el proveedor</button></div>
-  </div>
-  <div class="card" style="margin-top:10px"><div class="ch"><h3>Eliminar</h3></div>
-   <div style="padding:8px 12px 12px">
-    <div class="sub" style="margin-bottom:8px">${block ? esc(BILL_BLOCK[block] || block) : "Nadie ha tocado todavía esta factura. Al eliminarla, el documento archivado vuelve a quedar libre."}</div>
-    <button class="btn sm danger" id="bf_del"${block ? " disabled" : ""}>Eliminar la factura</button>
-   </div></div>`;
-        $("#bf_go").onclick = () =>
-          mutate(() => {
-            if (!$("#bf_sup").value)
-              throw new Error("Elija el proveedor al que pertenece la factura");
-            erp.reassignBill(billId, $("#bf_sup").value, "backoffice");
-            closeDrawer();
-          }, "Proveedor cambiado");
+        const db = openDrawer("Anular el registro");
+        db.innerHTML = `<div class="card"><div class="daylist">
+    <div class="it"><span>Proveedor</span><span style="flex:1"></span><b translate="no">${esc(erp.billSupplier(b).name)}</b></div>
+    <div class="it"><span>Nº factura</span><span style="flex:1"></span><b translate="no">${esc(b.number)}</b></div>
+    <div class="it"><span>Total</span><span style="flex:1"></span><b translate="no">${eur(b.totalCents)}</b></div>
+   </div></div>
+   <div class="card" style="margin-top:10px"><div class="ch"><h3>Anular el registro</h3></div>
+    <div style="padding:8px 12px 12px">
+     <div class="sub" style="margin-bottom:8px">${block ? esc(BILL_BLOCK[block] || block) : b.capId ? "La factura sale del registro y el documento archivado vuelve a quedar libre para volver a registrarlo." : "La factura sale del registro con su reparto. No se puede deshacer."}</div>
+     <button class="btn sm danger" id="bf_del"${block ? " disabled" : ""}>Anular el registro</button>
+    </div></div>`;
         const del = $("#bf_del");
         if (del && !block)
           del.onclick = async () => {
             // One whole sentence each, never assembled — a modal body is a
             // single text node and a concatenated one is untranslatable.
-            const yes = await askConfirm("Eliminar la factura", {
+            const yes = await askConfirm("Anular el registro", {
               body: b.capId
-                ? "Se borra la factura registrada y el documento archivado vuelve a quedar sin registrar. No se puede deshacer."
-                : "Se borra la factura registrada y su asignación a las obras. No se puede deshacer.",
-              okLabel: "Eliminar",
+                ? "La factura sale del registro y el documento archivado vuelve a quedar sin registrar. No se puede deshacer."
+                : "La factura sale del registro con su reparto a las obras. No se puede deshacer.",
+              okLabel: "Anular",
               danger: true,
             });
             if (!yes) return;
             mutate(() => {
               erp.deleteBill(billId, "backoffice");
               closeDrawer();
-            }, "Factura eliminada");
+            }, "Registro anulado");
           };
       }
 
@@ -19044,37 +19016,17 @@
        return `<tr><td class="k">${esc(r.supplier)}</td><td>${esc(r.number)}</td><td class="num">${eur(r.totalCents)}</td>
      <td class="num k">${r.outstandingCents > 0 ? eur(r.outstandingCents) : "—"}</td><td>${fmtD(r.dueDate)}</td>
      <td>${r.unallocated ? '<span class="pill r">Sin asignar</span>' : '<span class="pill g">Asignada</span>'}</td><td>${st}</td>
-     <td>${r.outstandingCents > 0 ? `<button class="btn sm" data-pay="${r.id}">Pagar</button>` : ""}
-      <button class="btn sm" data-billfix="${r.id}">Corregir</button>
+     <td><button class="btn sm" data-billfix="${r.id}">Anular registro</button>
       ${billDocCell(r.id)}</td></tr>`;
      })
      .join("")}
    </tbody></table></div></div>`;
           $("#sb_new").onclick = () => billDrawer(null);
           v.querySelectorAll("[data-billfix]").forEach(
-            (b) => (b.onclick = () => billFixDrawer(b.dataset.billfix)),
+            (b) => (b.onclick = () => billUnregisterDrawer(b.dataset.billfix)),
           );
           v.querySelectorAll("[data-billdoc]").forEach(
             (b) => (b.onclick = () => billDocDrawer(b.dataset.billdoc)),
-          );
-          v.querySelectorAll("[data-pay]").forEach(
-            (b) =>
-              (b.onclick = () => {
-                const bill = erp.state.bills.find((x) => x.id === b.dataset.pay);
-                const out = erp.billOutstandingCents(bill.id);
-                mutate(
-                  () =>
-                    erp.payBills(
-                      {
-                        amountCents: out,
-                        method: "transfer",
-                        billAllocations: [{ billId: bill.id, amountCents: out }],
-                      },
-                      "backoffice",
-                    ),
-                  "Pago registrado: " + eur(out),
-                );
-              }),
           );
         },
 

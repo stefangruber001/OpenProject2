@@ -582,6 +582,20 @@ window.CANEI_DICT.ca = {
   "La factura necesita una base imponible": "La factura necessita una base imposable",
   "El reparto debe sumar la base imponible": "El repartiment ha de sumar la base imposable",
   "Factura registrada": "Factura registrada",
+  "Anular registro": "Anul·lar registre",
+  "Anular el registro": "Anul·lar el registre",
+  Anular: "Anul·lar",
+  "Registro anulado": "Registre anul·lat",
+  "Su pago liquida además otras facturas. Deshaga primero ese pago en Conciliación.":
+    "El seu pagament liquida també altres factures. Desfeu primer aquest pagament a Conciliació.",
+  "La factura sale del registro y el documento archivado vuelve a quedar libre para volver a registrarlo.":
+    "La factura surt del registre i el document arxivat torna a quedar lliure per tornar a registrar-lo.",
+  "La factura sale del registro con su reparto. No se puede deshacer.":
+    "La factura surt del registre amb el seu repartiment. No es pot desfer.",
+  "La factura sale del registro y el documento archivado vuelve a quedar sin registrar. No se puede deshacer.":
+    "La factura surt del registre i el document arxivat torna a quedar sense registrar. No es pot desfer.",
+  "La factura sale del registro con su reparto a las obras. No se puede deshacer.":
+    "La factura surt del registre amb la seva assignació a les obres. No es pot desfer.",
   "Ir a la factura": "Anar a la factura",
   Corregir: "Corregir",
   "Corregir la factura": "Corregir la factura",
