@@ -1362,6 +1362,30 @@ async function testMobile(browser, base) {
           viewport: window.innerWidth,
           // The property a reader feels: is the whole document on screen?
           rightOfViewport: Math.round(s.right - window.innerWidth),
+          /* WHAT IS ON THE PAPER, not just where the paper is. Everything
+             above measures the sheet's own box, and the sheet passed all of
+             it while the operator was looking at a quote whose Precio and
+             Importe columns were not on the screen: `.sheet` clipped its own
+             overflow, so the amounts were gone and every number here still
+             said the document fitted. Measured at the time: a 520px
+             line-items table inside a 278px column, 242px of it swallowed.
+
+             So the two questions a reader actually asks. Does the sheet hide
+             any of its own content — and does any cell print wider than the
+             cell it is in, which is how a column comes to sit on top of the
+             one beside it. */
+          sheetHides: sheet.scrollWidth - sheet.clientWidth,
+          spill: [...sheet.querySelectorAll("th,td")]
+            .filter((n) => n.scrollWidth > n.clientWidth + 1)
+            .map(
+              (n) =>
+                (n.textContent || "").trim().slice(0, 24) +
+                " " +
+                n.clientWidth +
+                "<" +
+                n.scrollWidth,
+            )
+            .slice(0, 6),
         };
       });
       if (!opened || !fit) {
@@ -1370,9 +1394,14 @@ async function testMobile(browser, base) {
           `mobile: the ${what} sheet renders at 390px`,
           opened ? "no .cnsheet .sheet" : "no record",
         );
-      } else if (fit.clippedLeftBy <= 1 && fit.rightOfViewport <= 1) {
+      } else if (
+        fit.clippedLeftBy <= 1 &&
+        fit.rightOfViewport <= 1 &&
+        fit.sheetHides <= 1 &&
+        !fit.spill.length
+      ) {
         ok(
-          `mobile: the whole ${what} is on screen — ${fit.sheetW}px in a ${fit.viewport}px viewport`,
+          `mobile: the whole ${what} is on screen — ${fit.sheetW}px in a ${fit.viewport}px viewport, nothing clipped`,
         );
       } else {
         bad(`mobile: the ${what} on a phone`, JSON.stringify(fit));

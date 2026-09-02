@@ -5913,6 +5913,20 @@
       function autoCards(root) {
         root.querySelectorAll("table").forEach((t) => {
           if (t.hasAttribute("data-nocards")) return;
+          /* A GENERATED DOCUMENT IS NOT A REGISTER. Everything inside .cnsheet
+             is a rendered quote, contract, change order or invoice, and it
+             brings its own stylesheet, its own column widths and its own
+             mobile treatment. Carding it hid the `thead` outright — so the
+             contract's line items printed on a phone with no column headings
+             at all — and then re-labelled each cell from headings that were no
+             longer on screen.
+
+             Only the panes were affected, never the drawers: autoCards runs on
+             #view, so the same document read from a drawer kept its table and
+             the same document read from a pane did not. Two renderings of one
+             document, and the screenshot that starts a bug report only ever
+             shows one of them. */
+          if (t.closest(".cnsheet")) return;
           const heads = [...t.querySelectorAll("thead th")].map((th) => th.textContent.trim());
           // A headerless table still becomes cards, but only from three columns
           // up: a two-column key/value row already reads as one line, and
@@ -8988,13 +9002,14 @@
           const p = erp.state.projects.find((x) => x.id === proj.value);
           const chapters = (p && p.baseline && p.baseline.chapters) || [];
           chap.innerHTML =
-            chapters.map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`).join("") ||
-            '<option value="">—</option>';
+            chapters
+              .map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`)
+              .join("") || '<option value="">—</option>';
           if (line) line.innerHTML = lineOptionsFor(proj.value, chap.value, "") || "";
         };
-        document.querySelectorAll("[data-newproj]").forEach(
-          (el) => (el.onchange = () => refillWhere(el.dataset.newproj)),
-        );
+        document
+          .querySelectorAll("[data-newproj]")
+          .forEach((el) => (el.onchange = () => refillWhere(el.dataset.newproj)));
         document.querySelectorAll("[data-newchap]").forEach(
           (el) =>
             (el.onchange = () => {
@@ -12259,12 +12274,14 @@
         const sing = cfg.nounSingular || "registro",
           plur = cfg.nounPlural || "registros";
         v.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-    ${/* Controls that belong to the SCREEN rather than to the list — Gastos
+    ${
+      /* Controls that belong to the SCREEN rather than to the list — Gastos
           puts its capture buttons here. A slot rather than a second toolbar
           above: two rows of controls read as two unrelated groups, and the
           question «where do I upload a document» should not be answered in a
           different place from «where do I find one». Wiring is the caller's,
-          because these are the caller's buttons. */ cfg.leading || ""}
+          because these are the caller's buttons. */ cfg.leading || ""
+    }
     ${cfg.noNew ? "" : `<button class="btn primary sm" id="${ids.newBtn}">${cfg.newLabel || "＋ Nuevo"}</button>`}
     <input id="${ids.q}" placeholder="${esc(cfg.searchPlaceholder || "Buscar…")}" value="${esc(st.q)}"
       style="flex:0 1 280px;min-width:190px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)">
@@ -15266,7 +15283,8 @@
             // Refused HERE, in the operator's language. `billFromCapture` has
             // always guarded this, but a select that is never empty can never
             // reach it — the engine's rule was unreachable rather than absent.
-            if (!$("#bd_sup").value) throw new Error("Elija el proveedor al que pertenece la factura");
+            if (!$("#bd_sup").value)
+              throw new Error("Elija el proveedor al que pertenece la factura");
             const number = $("#bd_num").value.trim();
             if (!number) throw new Error("La factura necesita un número");
             const baseCents = readBase();
@@ -22128,7 +22146,35 @@
           CaneiSheet.scopedCss(".cnsheet") +
           /* app-side frame: a 210mm sheet scrolls inside a narrow pane
              rather than widening it, and loses its screen chrome in print */
-          "\n.cnsheet{overflow-x:auto}.cnsheet .sheet{margin:0 auto}";
+          "\n.cnsheet{overflow-x:auto}" +
+          /* THE HOST'S OWN FLOOR, KEPT OUT OF THE CAGE — third sighting.
+             `table{min-width:520px}` up at the top of this stylesheet is a
+             screen rule: it stops a register collapsing into unreadable
+             columns. It is unscoped, so it also lands on every table inside a
+             document, where it means nothing — a sheet declares its columns in
+             per-cent of a page it already owns.
+
+             PK5-A found this floor behind carded tables and answered it with
+             `table.cards{min-width:0}`; the old document class found it again
+             and answered it with `.cdoc table{min-width:0}`. Neither reached
+             here, because this renderer replaced .cdoc afterwards and the cage
+             sets no min-width of its own, so the host's is the only
+             declaration and wins by default. Measured on the seeded quote at
+             390px: the line-item table pinned at 520px inside a 278px column,
+             with `.sheet{overflow:hidden}` swallowing the 242px difference —
+             the amounts, silently, and with nothing to scroll because the
+             paper had already eaten the overflow.
+
+             Answered at the cage rather than in erp-sheet.js on purpose: the
+             floor is this file's, and the sheet renders standalone elsewhere
+             where it does not exist. */
+          "\n.cnsheet table{min-width:0}" +
+          /* Centring only where there is room to centre. Auto margins on a box
+             wider than its scroller put the left of that box out of reach —
+             you can scroll right and never get back. Below the sheet's own
+             breakpoint its mobile rule sets margin:0; this used to override it
+             from here by arriving later in the same stylesheet. */
+          "\n@media (min-width:701px){.cnsheet .sheet{margin:0 auto}}";
         document.head.appendChild(st);
       }
       function sheetDocHtml(kind, refs, lang) {
@@ -22937,7 +22983,9 @@
      ${
        tableRows
          .map(
-           (c) => `<tr class="click" data-chcosts="${c.chapter}"><td class="k">${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>
+           (
+             c,
+           ) => `<tr class="click" data-chcosts="${c.chapter}"><td class="k">${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>
         <td class="num">${eur0(c.budgetCents)}</td>
         <td class="num">${eur0(c.actualCents)}</td>
         <td class="num ${c.varianceCents > 0 ? "warn" : ""}">${c.varianceCents > 0 ? "+" : ""}${eur0(c.varianceCents)}</td>
