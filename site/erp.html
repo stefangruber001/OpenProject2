@@ -4922,6 +4922,10 @@
         }
       }
     </style>
+    <!-- The design system, loaded after the inline sheet so it refines by
+         cascade order rather than by specificity. Kept as its own file
+         because a change nobody can read is a change nobody can approve. -->
+    <link rel="stylesheet" href="erp-ds.css" />
     <script src="i18n-dict.js"></script>
     <script src="i18n-dict-ca.js"></script>
     <script src="i18n.js"></script>
