@@ -22833,43 +22833,6 @@
         const bdAns = $("#bdAnswer");
         if (bdAns) bdAns.onclick = () => budgetResponseDrawer(id, vsel);
       }
-      /** Adjust one chapter's projection. The reason is required, by the engine. */
-      function forecastDrawer(pid, chapterNum, name, row) {
-        const db = openDrawer(`Proyección · ${chapterNum}. ${name}`);
-        const stored = (erp.project(pid).forecastOverrides || {})[chapterNum];
-        db.innerHTML = `<div class="card"><div class="ch"><h3>Coste a fin de obra</h3><span class="tag">§4.4</span></div>
-   <div class="daylist">
-    <div class="it">Presupuestado <b>${eur(row.budgetCents)}</b> · real <b>${eur(row.actualCents)}</b> · avance <b>${row.progressPct}%</b></div>
-    <div class="it">Proyección calculada <b>${eur(row.calculatedCents)}</b>${row.provisional ? ' <span class="pill y">provisional — muy poco avance para extrapolar</span>' : ""}</div>
-    ${stored ? `<div class="it">Ajuste vigente <b>${eur(stored.costCents)}</b> · ${esc(stored.reason)} <span style="color:var(--muted)">(${esc(stored.by)}, ${fmtD(stored.at)})</span></div>` : ""}
-   </div></div>
-   <div class="card"><div class="ch"><h3>Ajustar</h3></div><div class="fgrid" style="padding:12px 16px">
-    <div class="field"><label>Coste a fin de obra (€)</label><input id="fc_amt" type="number" step="0.01" value="${((stored ? stored.costCents : row.calculatedCents) / 100).toFixed(2)}"></div>
-    <div class="field full"><label>Motivo * — se guarda con el ajuste y es lo único revisable después</label>
-      <input id="fc_why" placeholder="La parte cara ya está ejecutada" value="${esc(stored ? stored.reason : "")}"></div>
-    <div class="field full" style="margin-top:6px;display:flex;gap:8px">
-      <button class="btn primary" id="fc_save">Guardar ajuste</button>
-      ${stored ? '<button class="btn danger" id="fc_clear">Volver a la calculada</button>' : ""}</div>
-   </div></div>`;
-        $("#fc_save").onclick = () =>
-          mutate(() => {
-            erp.setForecastOverride(
-              pid,
-              chapterNum,
-              { costCents: Math.round(+$("#fc_amt").value * 100), reason: $("#fc_why").value },
-              "backoffice",
-            );
-            closeDrawer();
-          }, "Proyección ajustada");
-        const cl = $("#fc_clear");
-        if (cl)
-          cl.onclick = () =>
-            mutate(() => {
-              erp.clearForecastOverride(pid, chapterNum, "backoffice");
-              closeDrawer();
-            }, "Ajuste retirado");
-      }
-
       /* ================= PRY-01/PRY-02 · the two jobs' full-screen surfaces =====
    Both used to share `projectPanelHead` — one header, because a job that
    read differently depending on which of two adjacent screens you opened it
@@ -22886,10 +22849,6 @@
       function economicsPanel(body, id) {
         const p = erp.project(id);
         const e = erp.projectEconomics(id);
-        const f =
-          typeof ErpBridge !== "undefined" && ErpBridge.projects
-            ? ErpBridge.projects.forecast(erp, id)
-            : null;
         const names = {};
         const variationNums = new Set();
         try {
@@ -22928,13 +22887,6 @@
            real, avance and the calculated figure are shown together and it can
            be read. */
         const tableRows = erp.chapterEconomics(id).map((c) => {
-          /* An adjustment has to be VISIBLE from the table, or «Ajustar» is a
-             control that writes something no screen shows. The projection
-             itself is not a column — the operator asked for six and none of
-             them is a forecast — so the row says an adjustment exists and the
-             drawer behind it shows the figure with the three inputs it was
-             derived from. */
-          const adjusted = !!(p.forecastOverrides || {})[c.num];
           const budgetCents = c.budgetCostCents;
           const actualCents = c.actualCents;
           const saleCents = c.saleCents || 0;
@@ -22950,7 +22902,6 @@
             spentBp: budgetCents ? Math.round((actualCents / budgetCents) * 10000) : null,
             marginCents: marginCents2,
             marginBp: saleCents ? Math.round((marginCents2 / saleCents) * 10000) : null,
-            adjusted,
           };
         });
         /* «Cuadra» is a claim, not a pleasantry — measured before it is
@@ -22973,7 +22924,7 @@
       <div class="kpi click" id="ecoInvoices" title="Ver las facturas de esta obra"><div class="lab">Venta</div><div class="val">${eur0(e.currentRevenueCents)}</div>
         <div class="sub"><span>contratada más extras aprobados</span> <span>· ver facturas →</span></div></div>
       <div class="kpi"><div class="lab">Coste</div><div class="val">${eur0(e.actualCents)}</div>
-        <div class="sub"><span>comprometido</span> <span>${eur0(e.committedCents)}</span></div></div>
+        <div class="sub"><span>acumulado real</span></div></div>
       <div class="kpi ${marginCents < 0 ? "warn" : "hi"}"><div class="lab">Margen</div><div class="val">${eur0(marginCents)}</div>
         <div class="sub"><span>${marginPct}%</span> <span>sobre la venta</span></div></div>
     </div>
@@ -22982,7 +22933,7 @@
      <div class="scroll"><table><thead><tr>
        <th>Partida</th><th class="num">Presupuestado</th><th class="num">Acumulado real</th>
        <th class="num">Desviación</th><th class="num">%</th>
-       <th class="num">Margen</th><th class="num">Margen %</th><th></th></tr></thead><tbody>
+       <th class="num">Margen</th><th class="num">Margen %</th></tr></thead><tbody>
      ${
        tableRows
          .map(
@@ -22993,13 +22944,13 @@
         <td class="num">${c.spentBp === null ? "—" : (c.spentBp / 100).toFixed(1) + "%"}</td>
         <td class="num" style="color:${c.marginCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(c.marginCents)}</td>
         <td class="num" style="color:${c.marginCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${c.marginBp === null ? "—" : (c.marginBp / 100).toFixed(1) + "%"}</td>
-        <td>${c.adjusted ? '<span class="pill b">proyección ajustada</span> ' : ""}${f ? `<button class="btn sm" data-adj="${c.chapter}">Ajustar</button>` : ""}</td></tr>`,
+        </tr>`,
          )
          .join("") ||
-       '<tr><td colspan="8"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>'
+       '<tr><td colspan="7"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>'
      }
      </tbody></table></div>
-     ${f ? `<div class="daylist"><div class="it" style="color:var(--muted)">Las cifras de arriba son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. «Ajustar» abre la proyección a fin de obra de esa partida, que se calcula aparte a partir del coste real y del avance registrado.</div></div>` : ""}
+     <div class="daylist"><div class="it" style="color:var(--muted)">Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.</div></div>
     </div>
 
     <div class="card" style="margin-top:12px"><div class="ch"><h3>Pendiente de repartir</h3>
@@ -23048,23 +22999,19 @@
               chapterCostsDrawer(id, row.dataset.chcosts, names[row.dataset.chcosts] || "");
             }),
         );
-        // The manual forecast override kept its button. The doc's table does not
-        // mention one, but `setForecastOverride` is a real engine rule with a real
-        // reason ("the tiler quoted a fixed price, stop extrapolating") and this is
-        // its only interface — dropping it would un-cover it, which is the mistake
-        // S1b named when the subcontract screens went.
-        body
-          .querySelectorAll("[data-adj]")
-          .forEach(
-            (b) =>
-              (b.onclick = () =>
-                forecastDrawer(
-                  id,
-                  b.dataset.adj,
-                  names[b.dataset.adj] || "",
-                  f && f.byChapter.find((c) => String(c.chapter) === String(b.dataset.adj)),
-                )),
-          );
+        /* THE ADJUST BUTTON IS GONE, and with it the manual forecast
+           override's only interface. The comment here argued the opposite: that
+           `setForecastOverride` was a real engine rule whose sole door this
+           was, so removing the button would un-cover it. The operator settled
+           the question above that argument — the budget is FIXED, and the only
+           thing that changes it is an adicional to the contract. A screen that
+           let a chapter's figure be edited in place was a second way to change
+           a number the contract owns.
+
+           `setForecastOverride` and `clearForecastOverride` stay in the engine
+           and the bridge still reads what they wrote, so a workspace holding
+           overrides from before this change keeps resolving them. Nothing can
+           create a new one. */
       }
 
       /** The full-screen shell for a job's Avance económico — PK4-B's mirror of

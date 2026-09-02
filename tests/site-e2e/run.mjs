@@ -5106,41 +5106,39 @@ async function testProjectTracking(browser, base) {
       ok("PRY-02: the screen's «cuadra» claim is measured, and the card prints the engine's total");
     else bad("PRY-02: measured cuadra claim", JSON.stringify(honest));
 
-    // A projection is adjustable, and the reason is required by the engine.
-    await pg.locator("#view [data-adj]").first().click();
-    await pg.waitForTimeout(400);
-    await pg.locator("#fc_amt").fill("1234.00");
-    await pg.locator("#fc_why").fill("");
-    await pg.locator("#fc_save").click();
-    await pg.waitForTimeout(350);
-    // Assert the OUTCOME, not the wording: the engine's messages are English
-    // while the UI is Spanish, so matching the text would test the translation
-    // rather than the rule. What matters is that nothing was stored.
-    const refusal = await pg.locator("#toast").innerText();
-    const storedAnyway = await pg.evaluate(
-      () => Object.keys(erp.project(gProject).forecastOverrides || {}).length,
-    );
-    if (/^⚠/.test(refusal.trim()) && storedAnyway === 0)
-      ok("economics: an adjusted projection without a reason is refused and not stored");
-    else bad("economics: reason required", `toast="${refusal}" stored=${storedAnyway}`);
+    /* THE BUDGET IS FIXED. Two checks used to live here, both driving an
+       "Ajustar" button on each chapter row: one that a projection without a
+       reason was refused, one that an accepted adjustment showed on the row.
+       The operator removed the control itself — "we should not allow
+       adjustments to the budget. This is fixed. Adjustments can only be done
+       by contract modification (adicionales)" — so what is asserted now is
+       its absence, on the screen and in the data.
 
-    await pg.locator("#fc_why").fill("La parte cara ya está ejecutada");
-    await pg.locator("#fc_save").click();
-    await pg.waitForTimeout(500);
-    /* The table stopped showing the projection — its six columns are the real
-       figures now, none of them a forecast — so «recorded» can no longer mean
-       «a number changed on screen». It means the ROW SAYS an adjustment
-       exists: a control that writes something no screen shows is a dead
-       control, and the full run caught this one the moment the columns
-       changed. The figure itself lives in the drawer behind the pill, with the
-       three inputs it was derived from. */
-    const adjusted = await pg.evaluate(() => ({
-      onScreen: /proyección ajustada/i.test(document.querySelector("#view").innerText),
-      stored: Object.keys(erp.project(gProject).forecastOverrides || {}).length,
-    }));
-    if (adjusted.onScreen && adjusted.stored === 1)
-      ok("economics: an adjustment is recorded against the chapter, and the row says so");
-    else bad("economics: adjustment recorded", JSON.stringify(adjusted));
+       Absence is asserted on the RENDERED table, not on a selector alone: a
+       button renamed rather than removed would still pass a check that only
+       looked for [data-adj]. And the engine's setForecastOverride is
+       deliberately still there for workspaces holding older overrides, so the
+       test is that no screen can create one, not that the rule is gone. */
+    const noAdjust = await pg.evaluate(() => {
+      const view = document.querySelector("#view");
+      const text = view ? view.innerText : "";
+      return {
+        control: view.querySelectorAll("[data-adj]").length,
+        word: /ajustar/i.test(text),
+        rows: view.querySelectorAll("[data-chcosts]").length,
+        saysAdicional: /adicional al contrato/i.test(text),
+        stored: Object.keys(erp.project(gProject).forecastOverrides || {}).length,
+      };
+    });
+    if (
+      noAdjust.control === 0 &&
+      !noAdjust.word &&
+      noAdjust.rows > 0 &&
+      noAdjust.saysAdicional &&
+      noAdjust.stored === 0
+    )
+      ok("economics: the budget cannot be adjusted from the screen — only by an adicional");
+    else bad("economics: budget is fixed", JSON.stringify(noAdjust));
 
     // ← Obras returns to the register, same as PRY-01's own back button.
     await pg.locator("#ecoBack").click();

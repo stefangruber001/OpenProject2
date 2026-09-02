@@ -737,11 +737,11 @@ window.CANEI_DICT = {
       "Esta partida no tiene subpartidas en su línea base.",
       "This line item has no sub-line items in its baseline.",
     ],
-    ["proyección ajustada", "adjusted projection"],
     ["Acumulado real", "Actual to date"],
+    ["acumulado real", "actual to date"],
     [
-      "Las cifras de arriba son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. «Ajustar» abre la proyección a fin de obra de esa partida, que se calcula aparte a partir del coste real y del avance registrado.",
-      "The figures above are the real ones: budgeted, spent, and the difference between them. «Ajustar» opens that line item's cost-at-completion projection, which is worked out separately from the real cost and the recorded progress.",
+      "Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.",
+      "These figures are the real ones: budgeted, spent, and the difference between them. The budget is not adjusted here — it changes through a contract variation, which is what modifies it.",
     ],
     [
       "Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos",

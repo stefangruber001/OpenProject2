@@ -608,10 +608,10 @@ window.CANEI_DICT.ca = {
   "Por subpartida": "Per subpartida",
   "Esta partida no tiene subpartidas en su línea base.":
     "Aquesta partida no té subpartides a la seva línia base.",
-  "proyección ajustada": "projecció ajustada",
   "Acumulado real": "Acumulat real",
-  "Las cifras de arriba son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. «Ajustar» abre la proyección a fin de obra de esa partida, que se calcula aparte a partir del coste real y del avance registrado.":
-    "Les xifres de dalt són les reals: el pressupostat, el gastat i la diferència entre tots dos. «Ajustar» obre la projecció a fi d'obra d'aquesta partida, que es calcula a part a partir del cost real i de l'avanç registrat.",
+  "acumulado real": "acumulat real",
+  "Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.":
+    "Les xifres són les reals: el pressupostat, el gastat i la diferència entre tots dos. El pressupost no s'ajusta des d'aquí — es canvia amb un addicional al contracte, que és el que el modifica.",
   "Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos":
     "Per a una factura que no arriba com a document — la majoria es pugen o es fotografien a Documents",
   "Cuentas y tarjetas": "Comptes i targetes",
