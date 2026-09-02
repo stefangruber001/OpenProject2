@@ -688,6 +688,11 @@ window.CANEI_DICT = {
     ["La factura necesita una base imponible", "The invoice needs a taxable base"],
     ["El reparto debe sumar la base imponible", "The split must total the taxable base"],
     ["Factura registrada", "Invoice registered"],
+    ["Por subpartida", "By sub-line item"],
+    [
+      "Esta partida no tiene subpartidas en su línea base.",
+      "This line item has no sub-line items in its baseline.",
+    ],
     ["proyección ajustada", "adjusted projection"],
     ["Acumulado real", "Actual to date"],
     [

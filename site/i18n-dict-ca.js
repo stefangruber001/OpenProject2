@@ -582,6 +582,9 @@ window.CANEI_DICT.ca = {
   "La factura necesita una base imponible": "La factura necessita una base imposable",
   "El reparto debe sumar la base imponible": "El repartiment ha de sumar la base imposable",
   "Factura registrada": "Factura registrada",
+  "Por subpartida": "Per subpartida",
+  "Esta partida no tiene subpartidas en su línea base.":
+    "Aquesta partida no té subpartides a la seva línia base.",
   "proyección ajustada": "projecció ajustada",
   "Acumulado real": "Acumulat real",
   "Las cifras de arriba son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. «Ajustar» abre la proyección a fin de obra de esa partida, que se calcula aparte a partir del coste real y del avance registrado.":

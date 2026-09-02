@@ -17286,8 +17286,46 @@
           byLine.get(k).push(r);
         }
         const total = rows.reduce((s2, r) => s2 + r.amountCents, 0);
+        /* TWO CARDS, TWO QUESTIONS. The report was that this screen could not
+           say where inside a partida the problem was — a partida can be four
+           subpartidas with three of them exactly on budget, and a list of
+           documents does not name the one that moved. So the same six columns
+           the partida table carries appear here one level down, and the
+           documents stay underneath: once you know WHICH subpartida, you want
+           to know why.
+
+           Paraphrased, not quoted: the translation audit reads comments, and a
+           phrase in guillemets looks to it exactly like a string the screen
+           prints — which is how this very comment failed the gate once. */
+        const lines = erp.lineEconomics(projectId, chapterNum);
         const db = openDrawer("Costes · " + chapterNum + ". " + (chapterName || ""));
-        db.innerHTML = `<div class="card"><div class="ch"><h3>Coste acumulado</h3><span class="tag">${eur(total)}</span></div>
+        db.innerHTML = `<div class="card"><div class="ch"><h3>Por subpartida</h3><span class="tag">${eur(total)}</span></div>
+   <div class="scroll"><table><thead><tr>
+     <th>Subpartida</th><th class="num">Presupuestado</th><th class="num">Acumulado real</th>
+     <th class="num">Desviación</th><th class="num">%</th>
+     <th class="num">Margen</th><th class="num">Margen %</th></tr></thead><tbody>
+   ${
+     lines
+       .map((l) => {
+         const dev = l.actualCents - l.budgetCostCents;
+         const mg = l.saleCents - l.actualCents;
+         const spent = l.budgetCostCents
+           ? ((l.actualCents / l.budgetCostCents) * 100).toFixed(1) + "%"
+           : "—";
+         const mgPct = l.saleCents ? ((mg / l.saleCents) * 100).toFixed(1) + "%" : "—";
+         return `<tr><td class="k">${l.unassigned ? '<span class="pill y">sin subpartida</span>' : esc(l.num + " · " + l.name)}</td>
+      <td class="num">${eur0(l.budgetCostCents)}</td>
+      <td class="num">${eur0(l.actualCents)}</td>
+      <td class="num ${dev > 0 ? "warn" : ""}">${dev > 0 ? "+" : ""}${eur0(dev)}</td>
+      <td class="num">${spent}</td>
+      <td class="num" style="color:${mg < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(mg)}</td>
+      <td class="num" style="color:${mg < 0 ? "var(--danger)" : "var(--greenDeep)"}">${mgPct}</td></tr>`;
+       })
+       .join("") ||
+     '<tr><td colspan="7"><div class="empty">Esta partida no tiene subpartidas en su línea base.</div></td></tr>'
+   }
+   </tbody></table></div></div>
+   <div class="card" style="margin-top:10px"><div class="ch"><h3>Coste acumulado</h3><span class="tag">${eur(total)}</span></div>
    <div class="scroll"><table><thead><tr><th>Subpartida</th><th>Origen</th><th>Documento</th><th>Fecha</th><th class="num">Importe</th></tr></thead><tbody>
    ${
      [...byLine.entries()]

@@ -8156,6 +8156,68 @@
      * allocated tickets), so the drawer's sum can never disagree with the
      * chapter total above it. Each row carries its subpartida when it names one.
      */
+    /**
+     * One partida's economics, broken down by subpartida.
+     *
+     * `chapterEconomics` one level further in, and for the same reason: a
+     * chapter showing 596 spent against 280 budgeted does not say WHERE, and
+     * the operator reported exactly that — the table stopped at chapter level,
+     * so the line that moved stayed hidden. A chapter can be four lines with
+     * three of them exactly on budget.
+     *
+     * The reported words are paraphrased rather than quoted, deliberately: the
+     * translation audit reads comments, and a phrase inside guillemets is
+     * indistinguishable to it from a string the screen prints. That trap is
+     * recorded twice already in this repository.
+     *
+     * The figures come from the same place the chapter's do — the accepted
+     * version's own lines, priced the way `chapterEconomics` prices a
+     * variation chapter, so the two levels cannot disagree about what was
+     * budgeted. Actuals are `projectCostRows` grouped by `lineId`, which every
+     * allocation already carries.
+     *
+     * A cost naming no subpartida gets a row of its own with no budget behind
+     * it. That is not a rounding of the truth: money landed on the partida and
+     * this table cannot say where, which is exactly the state the assignment
+     * rule exists to make impossible. Until then it is a visible count rather
+     * than a silence, and the rows sum to the partida either way.
+     */
+    lineEconomics(projectId, chapterNum) {
+      const num = String(chapterNum);
+      const actualByLine = {};
+      for (const r of this.projectCostRows(projectId)) {
+        if (String(r.chapterNum) !== num) continue;
+        const k = r.lineId || "";
+        actualByLine[k] = (actualByLine[k] || 0) + r.amountCents;
+      }
+      const found = this.projectChapters(projectId).find((x) => String(x.chapter.num) === num);
+      const rows = ((found && found.chapter.lines) || []).map((l) => {
+        const qty = l.subLines && l.subLines.length ? this._aggSubLines(l.subLines) : l.qtyMilli;
+        const saleCents = l.lumpSum ? l.priceCents : mul(qty, l.priceCents);
+        const budgetCostCents = l.lumpSum ? l.costCents : mul(qty, l.costCents);
+        return {
+          lineId: l.id,
+          num: l.num,
+          name: l.desc || "",
+          saleCents,
+          budgetCostCents,
+          actualCents: actualByLine[l.id] || 0,
+          unassigned: false,
+        };
+      });
+      const orphan = actualByLine[""] || 0;
+      if (orphan)
+        rows.push({
+          lineId: null,
+          num: null,
+          name: null,
+          saleCents: 0,
+          budgetCostCents: 0,
+          actualCents: orphan,
+          unassigned: true,
+        });
+      return rows;
+    }
     chapterCosts(projectId, chapterNum) {
       const num = String(chapterNum);
       return this.projectCostRows(projectId)

@@ -3268,8 +3268,54 @@ async function testVariationBudget(browser, base) {
 
     await pg.click(`[data-chcosts="${joined.num}"]`);
     await pg.waitForTimeout(500);
+
+    /* PK12-S4b · «the view only allow you to see Partida level, so you don't
+       know where is the issue». A partida can be four subpartidas with three
+       of them exactly on budget, and a list of documents does not say which
+       one moved. The same six columns appear one level down, and they sum to
+       the partida — two levels that disagree about what was spent would be
+       worse than one level that cannot answer. */
+    const subLevel = await pg.evaluate((num) => {
+      const cards = [...document.querySelectorAll(".drawer .card")];
+      const head = cards.map((c) => (c.querySelector("h3") || {}).textContent || "");
+      const t = cards[0] && cards[0].querySelector("table");
+      const ths = t ? [...t.querySelectorAll("thead th")].map((x) => x.textContent.trim()) : [];
+      const model = erp.lineEconomics(gProject, num);
+      const chapter = erp.chapterEconomics(gProject).find((c) => String(c.num) === String(num));
+      return {
+        firstCard: head[0],
+        keepsDocuments: head.some((h) => /Coste acumulado/i.test(h)),
+        cols: ths.length,
+        heads: ths.join("|"),
+        rows: t ? t.querySelectorAll("tbody tr").length : 0,
+        modelRows: model.length,
+        linesSum: model.reduce((a, r) => a + r.actualCents, 0),
+        chapterActual: chapter ? chapter.actualCents : null,
+      };
+    }, joined.num);
+    if (
+      /Por subpartida/i.test(subLevel.firstCard) &&
+      subLevel.cols === 7 &&
+      subLevel.keepsDocuments
+    )
+      ok(
+        `5-6: the drill-down leads with the subpartida table and keeps the documents (${subLevel.heads})`,
+      );
+    else bad("5-6: subpartida table present", JSON.stringify(subLevel));
+    if (subLevel.rows === subLevel.modelRows && subLevel.linesSum === subLevel.chapterActual)
+      ok(
+        `5-6: …and the subpartidas sum to the partida exactly (${subLevel.linesSum}c across ${subLevel.rows})`,
+      );
+    else bad("5-6: subpartidas sum to the partida", JSON.stringify(subLevel));
+    /* The DOCUMENTS table, which is the second one now — «Por subpartida»
+       leads. `querySelector` took the first table in the drawer and would
+       silently have started asserting about the wrong one, so the card is
+       named rather than counted on to stay first. */
     const drill = await pg.evaluate(() => {
-      const t = document.querySelector(".drawer table tbody");
+      const card = [...document.querySelectorAll(".drawer .card")].find((c) =>
+        /Coste acumulado/i.test((c.querySelector("h3") || {}).textContent || ""),
+      );
+      const t = card && card.querySelector("table tbody");
       if (!t) return null;
       const rows = [...t.querySelectorAll("tr")];
       return {
