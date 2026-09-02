@@ -64,10 +64,14 @@ await pg.waitForTimeout(2800);
 
 // 1 · the BBVA statement, through the real file input, onto the bank account
 await pg.evaluate(() => {
-  const sel = document.getElementById("bkSel");
+  /* The account is chosen by clicking its row. The select this used to drive
+     went in PK12-S6c, at the operator's request — the rows were always the
+     same choice. Clicking TOGGLES, so only click when it is not already the
+     chosen one. */
   const bank = erp.state.bankAccounts.find((a) => a.kind === "bank");
-  sel.value = bank.id;
-  sel.dispatchEvent(new Event("change", { bubbles: true }));
+  if (bankAcc === bank.id) return;
+  const row = document.querySelector(`#view [data-acct="${bank.id}"]`);
+  if (row) row.click();
 });
 await pg.waitForTimeout(500);
 const movBefore = await pg.evaluate(() => erp.state.movements.length);
@@ -187,8 +191,8 @@ else bad("card", JSON.stringify(card));
 // 5 · a cash payment onto a partida, and an unexplained fee explained
 const cash = await pg.evaluate(() => {
   const till =
-    erp.state.bankAccounts.find((a) => a.kind === "till") ||
-    erp.addBankAccount({ name: "Caja RL", kind: "till" }, "bo");
+    erp.state.bankAccounts.find((a) => a.name === "Efectivo RL") ||
+    erp.addBankAccount({ name: "Efectivo RL", kind: "bank" }, "bo");
   const p = erp.state.projects.find(
     (x) =>
       x.budgetId &&

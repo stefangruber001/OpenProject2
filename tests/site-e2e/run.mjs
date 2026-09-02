@@ -1798,11 +1798,12 @@ async function testShell(browser, base) {
     }));
     if (
       shape.sections === 6 &&
-      shape.subs === 31 &&
+      // 30 since PK12-S7 took Caja chica out: cash is a bank withdrawal now.
+      shape.subs === 30 &&
       shape.hidden === "alerts,financials,price-list,purchasing"
     )
-      ok("shell: 6 secciones × 31 declared subs, 4 hidden by name");
-    else bad("shell: 6×31 (4 hidden)", JSON.stringify(shape));
+      ok("shell: 6 secciones × 30 declared subs, 4 hidden by name");
+    else bad("shell: 6×30 (4 hidden)", JSON.stringify(shape));
 
     /* The hidden three, both halves of the promise: the MENU no longer lists
        them, and the ROUTE still renders the screen — hiding that killed the
@@ -1838,7 +1839,7 @@ async function testShell(browser, base) {
     });
     if (
       adminOrder ===
-      "Ingresos · Gastos · Consolidación bancaria · Caja chica · Horas · Reporte a gestoría · Flujo de caja"
+      "Ingresos · Gastos · Consolidación bancaria · Horas · Reporte a gestoría · Flujo de caja"
     )
       ok("shell: Administración runs in money-flow order with the new names");
     else bad("shell: admin order", adminOrder);
@@ -5535,38 +5536,32 @@ async function testFirstRun(browser, base) {
       );
     else bad("first run: importer", JSON.stringify(importable));
 
-    // ---- petty cash: the till is created from the screen named after it ----
-    await pg.goto(`${base}/erp.html#petty-cash`, { waitUntil: "networkidle" });
-    await bootedShell(pg);
-    await emptyRegister();
-    await pg.waitForTimeout(400);
-
-    if (await pg.locator("#cashNew").isVisible())
-      ok("first run: with no till, Caja chica offers to create one");
-    else bad("first run: petty cash", "no #cashNew — the empty state is a dead end");
-
-    await pg.locator("#cashNew").click();
-    await pg.waitForTimeout(400);
-    // The kind is PRESELECTED: this button says "create a till", so landing on
-    // "bank account" would be a different promise than the one it made.
-    const preset = await pg.inputValue("#na_kind");
-    if (preset === "till") ok("first run: that button preselects «Caja de efectivo»");
-    else bad("first run: till preset", `kind=${preset}`);
-
-    await pg.fill("#na_name", "Caja obra");
-    await pg.locator("#na_go").click();
-    await pg.waitForTimeout(700);
-    // Geometry, not a count: the screen must now BE the petty-cash screen —
-    // entrada, salida and the arqueo — not merely hold one more record.
-    const usable = await pg.evaluate(() => ({
-      tills: erp.state.bankAccounts.filter((a) => a.kind === "till").length,
-      inBtn: !!document.querySelector("#cashIn"),
-      outBtn: !!document.querySelector("#cashOut"),
-      close: !!document.querySelector("#cashClose"),
-    }));
-    if (usable.tills === 1 && usable.inBtn && usable.outBtn && usable.close)
-      ok("first run: creating the till turns Caja chica into a working screen");
-    else bad("first run: petty cash after creation", JSON.stringify(usable));
+    /* PETTY CASH IS GONE, and the till kind with it — PK12-S7. The block
+       that stood here created a till from the screen named after it and then
+       checked that screen worked. The operator's account of how cash really
+       moves has no till in it: money is withdrawn from the bank, spent,
+       receipted, and what is left goes back in. So the assertion is that the
+       screen and the kind are both unreachable, and the flow that replaces
+       them is checked in testBankAndCash where the bank lines live. */
+    const cashGone = await pg.evaluate(() => {
+      location.hash = "petty-cash";
+      render();
+      return {
+        route: !document.documentElement.innerHTML.includes('id="cashNew"'),
+        nav: !/Caja chica/.test(document.querySelector("#p2list")?.textContent || ""),
+        kindRefused: (() => {
+          try {
+            erp.addBankAccount({ name: "E2E caja", kind: "till" }, "bo");
+            return false;
+          } catch (e) {
+            return true;
+          }
+        })(),
+      };
+    });
+    if (cashGone.route && cashGone.nav && cashGone.kindRefused)
+      ok("first run: Caja chica and the till kind are both gone — cash is a withdrawal now");
+    else bad("first run: petty cash removed", JSON.stringify(cashGone));
 
     /* ---- ORG-01 · the company's own record --------------------------------
        The operator asked where the company data is entered and the answer was
@@ -5873,135 +5868,122 @@ async function testBankAndCash(browser, base) {
   const errs = [];
   attachConsole(pg, errs);
   try {
-    // ---- ADM-06: the simplest screen, and the count that proves it ----
-    await pg.goto(`${base}/erp.html#petty-cash`, { waitUntil: "networkidle" });
+    /* ---- PK12-S7: cash is a withdrawal from the bank, not a till ----------
+       The operator's own account of how cash works, in order: money comes OUT
+       of the bank, gets spent, the receipts come back, and whatever was not
+       spent is paid back IN. What has to be true is that a bank line can be
+       declared a withdrawal, that what is still unaccounted for is a figure
+       the screen shows rather than a fault it hides, and that the deposit
+       returning the remainder is not counted as income.
+
+       Checked on the ENGINE and then on the SCREEN, because the defect this
+       package opened with was a method that was correct and called by nothing. */
+    await pg.goto(`${base}/erp.html#banking`, { waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(500);
 
-    const shape = await pg.evaluate(() => ({
-      strip: !!document.querySelector("#view .queuebar"),
-      inBtn: !!document.querySelector("#cashIn"),
-      outBtn: !!document.querySelector("#cashOut"),
-      close: document.querySelector("#cashClose")
-        ? document.querySelector("#cashClose").textContent
-        : null,
-    }));
-    if (shape.strip && shape.inBtn && shape.outBtn && shape.close)
-      ok("ADM-06: entrada/salida, the balance strip and the arqueo at the foot");
-    else bad("ADM-06: screen shape", JSON.stringify(shape));
-
-    // The arqueo has to agree with the account balance, or one is decoration.
-    const agrees = await pg.evaluate(() => {
-      const cc = erp.cashCount(cashAcc);
-      return cc.closingCents === erp.accountBalanceCents(cashAcc);
-    });
-    if (agrees) ok("ADM-06: the count agrees with the account balance");
-    else bad("ADM-06: count vs balance", "they disagree");
-
-    // A payment out with no receipt is counted, never hidden.
-    const before = await pg.evaluate(() => erp.cashCount(cashAcc).awaitingDoc);
-    await pg.locator("#cashOut").click();
-    await pg.waitForTimeout(400);
-    await pg.fill("#ca_c", "Ferretería E2E");
-    await pg.fill("#ca_a", "12.50");
-    await pg.locator("#ca_go").click();
-    await pg.waitForTimeout(600);
-    const after = await pg.evaluate(() => {
-      const cc = erp.cashCount(cashAcc);
-      return {
-        awaiting: cc.awaitingDoc,
-        closing: cc.closingCents,
-        bal: erp.accountBalanceCents(cashAcc),
-      };
-    });
-    if (after.awaiting === before + 1 && after.closing === after.bal)
-      ok(`ADM-06: a cash payment with no receipt is counted (${before} → ${after.awaiting})`);
-    else bad("ADM-06: undocumented cash", JSON.stringify({ before, ...after }));
-
-    // ── Block 2: a cash payment says WHERE it landed — project, chapter,
-    //    partida — through the same validation every other cost uses.
-    const cashDest = await pg.evaluate(() => {
-      document.getElementById("cashOut").click();
-      return new Promise((res) =>
-        setTimeout(() => {
-          const dest = document.getElementById("ca_dest");
-          if (!dest) return res(null);
-          const p = erp.state.projects.find(
-            (x) =>
-              x.budgetId &&
-              x.acceptedVersionId &&
-              !x.closed &&
-              erp.version(x.budgetId, x.acceptedVersionId).chapters.some((c) => c.lines.length),
-          );
-          if (!p) return res({ noProject: true });
-          document.getElementById("ca_c").value = "Tornillería obra";
-          document.getElementById("ca_a").value = "23.50";
-          dest.value = "p:" + p.id;
-          dest.dispatchEvent(new Event("change", { bubbles: true }));
-          setTimeout(() => {
-            const chap = document.getElementById("ca_chap");
-            const first = [...chap.options].find((o) => o.value);
-            chap.value = first.value;
-            chap.dispatchEvent(new Event("change", { bubbles: true }));
-            setTimeout(() => {
-              const line = document.getElementById("ca_line");
-              const lopt = [...line.options].find((o) => o.value);
-              if (lopt) line.value = lopt.value;
-              document.getElementById("ca_go").click();
-              setTimeout(() => {
-                const m = erp.state.movements.find((x) => x.concept === "Tornillería obra");
-                res(
-                  m && {
-                    alloc: m.allocations[0] || null,
-                    amount: m.amountCents,
-                  },
-                );
-              }, 500);
-            }, 250);
-          }, 250);
-        }, 400),
+    const cash = await pg.evaluate(() => {
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      if (!w) return { missing: true };
+      const st = erp.cashWithdrawalState(w.id);
+      const ret = erp.state.movements.find(
+        (m) => m.cashReturn && m.cashReturn.withdrawalId === w.id,
       );
+      return {
+        missing: false,
+        total: st.totalCents,
+        returned: st.returnedCents,
+        outstanding: st.outstandingCents,
+        adds: st.totalCents === st.documentedCents + st.returnedCents + st.outstandingCents,
+        // The returned cash is the company's own money coming home, not sales.
+        returnExcluded: !!ret && ret.excludedFromPL === true,
+        withdrawalExcluded: w.excludedFromPL === true,
+      };
     });
     if (
-      cashDest &&
-      cashDest.alloc &&
-      cashDest.alloc.projectId &&
-      cashDest.alloc.chapterNum &&
-      cashDest.alloc.lineId &&
-      cashDest.amount === -2350
+      !cash.missing &&
+      cash.adds &&
+      cash.returned > 0 &&
+      cash.outstanding > 0 &&
+      cash.returnExcluded &&
+      cash.withdrawalExcluded
     )
-      ok("block 2: a cash payment lands on project · chapter · partida from the drawer");
-    else bad("block 2: cash destination", JSON.stringify(cashDest));
-
-    // ── 1E: «Marcar justificado» now takes the FILE. The button used to flip
-    //    the flag with nothing behind it — the word without the receipt.
-    const docBtn = await pg.evaluate(() => {
-      const b = document.querySelector("[data-cashdoc]");
-      if (!b) return null;
-      const r = b.getBoundingClientRect();
-      return { w: Math.round(r.width), h: Math.round(r.height), id: b.dataset.cashdoc };
-    });
-    if (docBtn && docBtn.w > 60) ok("1E: the undocumented cash row offers its receipt");
-    else bad("1E: receipt button", JSON.stringify(docBtn));
-    await pg.click("[data-cashdoc]");
-    await pg.waitForTimeout(400);
-    await pg.setInputFiles('[data-ev="file"]', "tests/fixtures/receipt.png");
-    await pg.waitForTimeout(1200);
-    const attached = await pg.evaluate(async (id) => {
-      const m = erp.state.movements.find((x) => x.id === id);
-      if (!m || !m.supportingDoc) return { ok: false };
-      const blob = await ErpStore.getBlob(m.supportingDoc.storageKey);
-      return {
-        ok: m.needsDoc === false,
-        key: m.supportingDoc.storageKey,
-        bytes: blob ? blob.size : 0,
-      };
-    }, docBtn && docBtn.id);
-    if (attached.ok && attached.bytes > 0)
       ok(
-        `1E: the receipt is a real stored file (${attached.bytes} bytes behind ${attached.key.slice(0, 8)}…)`,
+        `PK12-S7: a withdrawal adds up — ${cash.total}c out, ${cash.returned}c back, ${cash.outstanding}c still in cash`,
       );
-    else bad("1E: file stored and flag cleared", JSON.stringify(attached));
+    else bad("PK12-S7: withdrawal arithmetic", JSON.stringify(cash));
+
+    // The refusals, both of them, and neither is negotiable.
+    const cashRefusals = await pg.evaluate(() => {
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      const inLine = erp.state.movements.find((m) => m.amountCents > 0 && !m.cashReturn);
+      const outLine = erp.state.movements.find((m) => m.amountCents < 0 && !m.cashWithdrawal);
+      const tries = (f) => {
+        try {
+          f();
+          return false;
+        } catch (e) {
+          return true;
+        }
+      };
+      return {
+        // More cannot come back than went out.
+        tooMuch: tries(() => {
+          const st = erp.cashWithdrawalState(w.id);
+          const big = erp.importMovements(
+            w.accountId,
+            [
+              {
+                accountingDate: erp.state.today,
+                concept: "E2E DEVOLUCION EXCESIVA",
+                amountCents: st.outstandingCents + 50000,
+              },
+            ],
+            "bo",
+          )[0];
+          erp.markCashReturn(big.id, w.id, "bo");
+        }),
+        // A withdrawal takes money out; an incoming line is not one.
+        wrongSign: tries(() => erp.markCashWithdrawal(inLine.id, "bo")),
+        // A deposit can only return to something that is a withdrawal.
+        notAWithdrawal: tries(() => erp.markCashReturn(inLine.id, outLine.id, "bo")),
+      };
+    });
+    if (cashRefusals.tooMuch && cashRefusals.wrongSign && cashRefusals.notAWithdrawal)
+      ok("PK12-S7: over-returning, the wrong sign and a non-withdrawal are all refused");
+    else bad("PK12-S7: cash refusals", JSON.stringify(cashRefusals));
+
+    /* And the SCREEN says it. The picker offers the withdrawal on money going
+       out, the state card prints the remainder, and neither exists because a
+       method exists — they are read off the rendered drawer. */
+    const cashScreen = await pg.evaluate(async () => {
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 700));
+      matchDrawer(w.id);
+      await new Promise((r) => setTimeout(r, 500));
+      const body = document.querySelector("#dbody");
+      const txt = body ? body.innerText : "";
+      const st = erp.cashWithdrawalState(w.id);
+      return {
+        card: /Reintegro de efectivo/.test(txt),
+        showsOutstanding: txt.includes(eur(st.outstandingCents)),
+        // Already a withdrawal, so the option to declare it again is not offered.
+        noRedeclare: !/>Reintegro de efectivo</.test(
+          (document.querySelector("#rcDest") || {}).innerHTML || "",
+        ),
+      };
+    });
+    if (cashScreen.card && cashScreen.showsOutstanding && cashScreen.noRedeclare)
+      ok("PK12-S7: the drawer prints what is still in cash, and will not redeclare a withdrawal");
+    else bad("PK12-S7: withdrawal on screen", JSON.stringify(cashScreen));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
+    /* Back to the accounts tab EXPLICITLY — the same rule written a few
+       hundred lines below. The tab choice is remembered, so a check that ends
+       on Conciliación hands the next one a screen with no account rows on it,
+       and ADM-05 then reports the balances screen as empty. */
+    await openTab(pg, "banking", "_bankAccounts");
 
     // ---- ADM-05: the screen answers "how much is where", and nothing else ----
     /* PK7-B. This screen used to carry the whole movement register with a
@@ -6104,13 +6086,19 @@ async function testBankAndCash(browser, base) {
         engineTotal: Math.round(erp.cashPosition().totalCents / 100) * 100,
       };
     });
+    /* «all the kinds there are», not a hard three. The three were bank, till
+       and card, and PK12-S7 retired the till: cash is a withdrawal from a bank
+       account now, so a workspace has two kinds and a check demanding three
+       was asserting the existence of the thing that went. What still matters
+       is unchanged — every account the register holds has one readable line
+       with a figure on it, whatever kind it is. */
     const linesOk =
       perAccount.shown.length === perAccount.accounts &&
       perAccount.shown.every((s) => s.wide && s.cents !== null) &&
-      perAccount.kinds >= 3;
+      perAccount.kinds >= 1;
     if (linesOk)
       ok(
-        `ADM-05: one visible line per account, all ${perAccount.kinds} kinds (${perAccount.shown.length} accounts)`,
+        `ADM-05: one visible line per account, every kind (${perAccount.shown.length} accounts, ${perAccount.kinds} kinds)`,
       );
     else bad("ADM-05: per-account lines", JSON.stringify(perAccount));
     // The rounding is the screen's own (eur0), so compare at that resolution.
@@ -6739,7 +6727,7 @@ async function testCashFlow(browser, base) {
     // A red cumulative cell is the point of the screen — seed a trough and
     // check it paints, rather than hoping the sample data happens to dip.
     const red = await pg.evaluate(() => {
-      const acc = erp.state.bankAccounts.find((a) => a.kind !== "till");
+      const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
       erp.registerBill(
         {
           supplierId: erp.state.parties.find((p) => p.roles.includes("supplier")).id,
@@ -8930,8 +8918,8 @@ async function testProcurement(browser, base) {
           "op",
         );
         const till =
-          erp.state.bankAccounts.find((a) => a.kind === "till") ||
-          erp.addBankAccount({ name: "Caja E2E", kind: "till" }, "bo");
+          erp.state.bankAccounts.find((a) => a.name === "Efectivo E2E") ||
+          erp.addBankAccount({ name: "Efectivo E2E", kind: "bank" }, "bo");
         erp.recordCashMovement(
           till.id,
           {
@@ -13592,12 +13580,25 @@ async function testI18n(browser, base) {
       ok("i18n: CA translates the PRY-03 register, its stages and its total");
     else bad("i18n: CA PRY-03", chgCaText.replace(/\n/g, " ").slice(0, 160));
 
-    await pg.evaluate(() => (location.hash = "petty-cash"));
-    await pg.waitForTimeout(700);
-    const cashCaText = await pg.locator("#view").innerText();
-    if (/a caixa|Entrades|Sortides/i.test(cashCaText) && !/Saldo final\nSaldo/.test(cashCaText))
-      ok("i18n: CA translates the ADM-06 cash screen");
+    /* The cash surface is the WITHDRAWAL panel now — Caja chica went with the
+       till in PK12-S7 — so the language check follows the screen rather than
+       the route it used to live on. */
+    await pg.evaluate(async () => {
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 700));
+      matchDrawer(w.id);
+    });
+    await pg.waitForTimeout(900);
+    const cashCaText = await pg.locator("#dbody").innerText();
+    if (
+      /Reintegrament|Retornat al banc|Encara en efectiu/i.test(cashCaText) &&
+      !/Devuelto al banco/.test(cashCaText)
+    )
+      ok("i18n: CA translates the cash-withdrawal panel");
     else bad("i18n: CA ADM-06", cashCaText.replace(/\n/g, " ").slice(0, 160));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
 
     // S12's three surfaces. Every string on them shipped with Catalan in the
     // same commit, and this is what proves it rather than the dictionary
@@ -13774,12 +13775,22 @@ async function testI18n(browser, base) {
       ok("i18n: EN translates the PRY-03 register, its stages and its total");
     else bad("i18n: EN PRY-03", chgEnText.replace(/\n/g, " ").slice(0, 160));
 
-    await pg.evaluate(() => (location.hash = "petty-cash"));
-    await pg.waitForTimeout(700);
-    const cashEnText = await pg.locator("#view").innerText();
-    if (/in the till|Cash in|Cash out/i.test(cashEnText) && !/Saldo final/.test(cashEnText))
-      ok("i18n: EN translates the ADM-06 cash screen");
+    await pg.evaluate(async () => {
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 700));
+      matchDrawer(w.id);
+    });
+    await pg.waitForTimeout(900);
+    const cashEnText = await pg.locator("#dbody").innerText();
+    if (
+      /Cash withdrawal|Returned to the bank|Still in cash/i.test(cashEnText) &&
+      !/Devuelto al banco/.test(cashEnText)
+    )
+      ok("i18n: EN translates the cash-withdrawal panel");
     else bad("i18n: EN ADM-06", cashEnText.replace(/\n/g, " ").slice(0, 160));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
 
     await pg.evaluate(() => (location.hash = "invoicing"));
     await pg.waitForTimeout(700);

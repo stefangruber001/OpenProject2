@@ -5591,7 +5591,6 @@
             { k: "invoicing", lab: "Ingresos", code: "ADM-01" },
             { k: "supplier-invoices", lab: "Gastos", code: "ADM-03" },
             { k: "banking", lab: "Consolidación bancaria", code: "ADM-05" },
-            { k: "petty-cash", lab: "Caja chica", code: "ADM-06" },
             { k: "labour", lab: "Horas", code: "ADM-04" },
             { k: "accountant", lab: "Reporte a gestoría", code: "ADM-07" },
             { k: "cash-flow", lab: "Flujo de caja", code: "ADM-08" },
@@ -10761,6 +10760,8 @@
      ${hidden > 0 ? moreNote : ""}
     </div></div>
 
+   ${cashWithdrawalCard(m)}
+
    ${
      closed
        ? ""
@@ -10776,6 +10777,7 @@
          .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
          .join("")}</optgroup>
        ${cardSettleGroup(m)}
+       ${cashGroup(m)}
      </select>
      <button class="btn sm" id="rcDestGo">Identificar</button>
      <span style="width:10px"></span>
@@ -10865,6 +10867,14 @@
             mutate(() => {
               if (val.startsWith("c:")) {
                 erp.markCardSettlement(m.id, val.slice(2), "backoffice");
+              } else if (val === "w:") {
+                /* The withdrawal is declared, not explained. What it bought is
+                   answered afterwards, by matching it against the receipts the
+                   way any other line is matched — and whatever is left over is
+                   either still in a pocket or came back as a deposit. */
+                erp.markCashWithdrawal(m.id, "backoffice");
+              } else if (val.startsWith("r:")) {
+                erp.markCashReturn(m.id, val.slice(2), "backoffice");
               } else {
                 erp.splitMovement(
                   m.id,
@@ -16609,7 +16619,11 @@
         partyNoTaxId: ["suppliers", "proveedores"],
         movUnallocated: ["banking", "banco"],
         receiptUnmatched: ["invoicing", "facturación"],
-        cashNoDoc: ["petty-cash", "caja chica"],
+        /* The cash exception used to point at Caja chica. There is no such
+           screen: an undocumented cash spend is now an unexplained part of a
+           withdrawal, and the place to answer it is the bank line it came
+           out of. */
+        cashNoDoc: ["banking", "conciliación"],
       };
       /** DMC-01: the selected chapter ("" = all), the tree's own search, and the drag. */
       let catChapter = "",
@@ -16880,6 +16894,58 @@
         if (!cards.length) return "";
         const opts = cards.map((c) => `<option value="c:${c.id}">${esc(c.name)}</option>`).join("");
         return `<optgroup label="Liquidación de tarjeta">${opts}</optgroup>`;
+      }
+      /* The cash options, in the same picker and for the same reason: this
+         panel says WHAT a line is, and «I took this out as cash» is exactly
+         that. Money out offers the withdrawal; money in offers to close a
+         withdrawal that is still owed an explanation, because a deposit is
+         only a return if there is something for it to return to. */
+      /* WHAT IS LEFT OF A WITHDRAWAL, said as three figures and a remainder.
+         Two hundred out, ninety of receipts against it, sixty back in, fifty
+         still in a pocket — the way the operator described cash working, and
+         the last figure is the one nothing could show before. (Written with
+         no apostrophes on purpose: the source audit pairs them as quotes and
+         reported the middle of this comment as a user-visible string.)
+         It is not an error state: cash in a pocket at the end of a week is
+         ordinary, and a screen that treats it as a fault teaches people to
+         make the number up. */
+      function cashWithdrawalCard(m) {
+        if (!m.cashWithdrawal) return "";
+        const c = erp.cashWithdrawalState(m.id);
+        const back = erp.state.movements.filter(
+          (x) => x.cashReturn && x.cashReturn.withdrawalId === m.id,
+        );
+        return `<div class="card" style="margin:0"><div class="ch"><h3>Reintegro de efectivo</h3>
+     <span class="tag">${c.outstandingCents > 0 ? "queda por justificar" : "todo justificado"}</span></div>
+    <div class="daylist" style="padding:10px 14px">
+     <div class="it"><span style="flex:1">Retirado</span><b>${eur(c.totalCents)}</b></div>
+     <div class="it"><span style="flex:1">Justificado con documentos</span><b>${eur(c.documentedCents)}</b></div>
+     <div class="it"><span style="flex:1">Devuelto al banco</span><b>${eur(c.returnedCents)}</b></div>
+     ${back
+       .map(
+         (x) =>
+           `<div class="it" style="color:var(--muted)"><span style="flex:1">${esc(fmtD(x.accountingDate))} · ${esc(movWho(x))}</span><span>${eur(x.amountCents)}</span></div>`,
+       )
+       .join("")}
+     <div class="it" style="border-top:1px solid var(--line)"><span style="flex:1">En efectivo todavía</span>
+      <b style="color:${c.outstandingCents > 0 ? "var(--amber)" : "var(--greenDeep)"}">${eur(c.outstandingCents)}</b></div>
+    </div></div>`;
+      }
+      function cashGroup(m) {
+        const acc = erp.state.bankAccounts.find((a) => a.id === m.accountId);
+        if (!acc || acc.kind === "card") return "";
+        if (m.amountCents < 0)
+          return m.cashWithdrawal
+            ? ""
+            : `<optgroup label="Efectivo"><option value="w:">Reintegro de efectivo</option></optgroup>`;
+        const open = erp.state.movements
+          .filter((x) => x.cashWithdrawal && erp.cashWithdrawalState(x.id).outstandingCents > 0)
+          .map(
+            (x) =>
+              `<option value="r:${x.id}">${esc(fmtD(x.accountingDate))} · ${eur(x.amountCents)}</option>`,
+          )
+          .join("");
+        return open ? `<optgroup label="Devolución de efectivo">${open}</optgroup>` : "";
       }
 
       /**
@@ -17176,7 +17242,7 @@
    <div class="field"><label>Tipo</label><select id="na_kind">
      <option value="bank"${k === "bank" ? " selected" : ""}>Cuenta bancaria</option>
      <option value="card"${k === "card" ? " selected" : ""}>Tarjeta de crédito</option>
-     <option value="till"${k === "till" ? " selected" : ""}>Caja de efectivo</option></select></div>
+</select></div>
    <div class="field"><label>Saldo inicial (€)</label><input id="na_open" type="number" step="0.01" value="0"></div>
    <div class="field full"><label>IBAN</label><input id="na_iban" placeholder="ES00 0000 0000 0000 0000 0000"></div>
    <div class="field full" style="margin-top:6px"><button class="btn primary" id="na_go">Crear cuenta</button></div>
@@ -18737,7 +18803,6 @@
     here would bury the rest of the map. */
         _reconcile: conciliacion,
         _reconciled: conciliados,
-        "petty-cash": cajaChica,
         "cash-flow": flujoCaja,
         messaging: comunicaciones,
 
@@ -23253,208 +23318,19 @@
         );
       }
 
-      /* ================= ADM-06 · Caja chica (S11) ==============================
-   "The simplest screen" (§3.2), and the one that most rewards not being
-   clever: a till is a bank account whose statement nobody imports, so entries
-   are typed and the arqueo at the foot is what proves them.
+      /* ADM-06 · Caja chica IS GONE, and the till kind with it.
+         The operator described how cash really moves — taken out of the bank,
+         spent, receipted, and the remainder paid back in — and then said of
+         cash-box accounts: no need for them. A till modelled that same money
+         as a second balance to keep and reconcile, so the cash sat in two
+         places at once and neither of them was the bank line it came from.
+         What replaces the screen is not another screen: it is
+         `markCashWithdrawal` on the bank line itself, the document matching
+         that already existed, and `markCashReturn` for what comes back.
 
-   The closing figure is COMPUTED from the opening balance and the period's
-   movements. A stored closing balance is a number nobody counted. */
-      let cashAcc = "",
-        bankAcc = "";
-      function cajaChica(v) {
-        $("#sub").textContent =
-          "Entradas y salidas de la caja en efectivo, y el arqueo que las prueba. Una salida sin justificante se cuenta aparte: es el agujero clásico en las cuentas de una empresa pequeña.";
-        const tills = erp.state.bankAccounts.filter((a) => a.kind === "till");
-        /* Same first-day trap as the bank screen: the till is created in the
-           account drawer, and this screen — the one named after it — used to
-           state the absence and offer no way out of it. */
-        if (!tills.length) {
-          v.innerHTML = `<div class="stepbar"><button class="btn primary sm" id="cashNew">＋ Crear caja</button></div>
-   <div class="card"><div class="empty">No hay ninguna caja en efectivo configurada.</div></div>`;
-          $("#cashNew").onclick = () => newAccountDrawer("till");
-          return;
-        }
-        if (!cashAcc || !tills.some((t) => t.id === cashAcc)) cashAcc = tills[0].id;
-        const r = periodRange();
-        const cc = erp.cashCount(cashAcc, r.from, r.to);
-        const movs = erp.state.movements
-          .filter((m) => m.accountId === cashAcc && inPeriod(m.accountingDate))
-          .slice()
-          .reverse();
-
-        v.innerHTML = `
-   <div class="stepbar">
-     ${tills.length > 1 ? `<select class="inline" id="cashSel">${tills.map((t) => `<option value="${t.id}"${t.id === cashAcc ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
-     <button class="btn primary sm" id="cashIn">＋ Entrada</button>
-     <button class="btn sm" id="cashOut">− Salida</button>
-   </div>
-   <div class="card"><div class="queuebar">
-     <span class="n">${eur(cc.closingCents)}</span><span>en caja</span>
-     <span style="flex:1"></span>
-     ${cc.awaitingDoc ? `<span class="pill r"><span>${cc.awaitingDoc}</span> <span>sin justificante</span></span>` : '<span class="pill g">Todo justificado</span>'}
-   </div></div>
-   <div class="card"><div class="ch"><h3>Movimientos</h3><span class="tag">${cc.count}</span></div>
-    <div class="scroll"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Justificante</th><th></th></tr></thead><tbody>
-    ${
-      movs
-        .map(
-          (m) => `<tr><td>${fmtD(m.accountingDate)}</td>
-      <td class="k">${esc(m.concept || m.merchantText || "—")}</td>
-      <td class="num" style="color:${m.amountCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur(m.amountCents)}</td>
-      <td>${m.needsDoc ? '<span class="pill r">Falta</span>' : '<span class="pill g">Sí</span>'}</td>
-      <td>${m.needsDoc ? `<button class="btn sm" data-cashdoc="${m.id}">Marcar justificado</button>` : ""}</td></tr>`,
-        )
-        .join("") ||
-      '<tr><td colspan="5"><div class="empty">Sin movimientos de caja en el periodo.</div></td></tr>'
-    }
-    </tbody></table></div>
-    <div class="daylist" style="border-top:1px solid var(--line)">
-      <div class="it"><span>Saldo inicial</span><span style="flex:1"></span><b>${eur(cc.openingCents)}</b></div>
-      <div class="it"><span>Entradas</span><span style="flex:1"></span><b>${eur(cc.inCents)}</b></div>
-      <div class="it"><span>Salidas</span><span style="flex:1"></span><b>${eur(-cc.outCents)}</b></div>
-      <div class="it"><span>Saldo final</span><span style="flex:1"></span><b id="cashClose">${eur(cc.closingCents)}</b></div>
-    </div>
-   </div>`;
-        const sel = $("#cashSel");
-        if (sel)
-          sel.onchange = () => {
-            cashAcc = sel.value;
-            render();
-          };
-        $("#cashIn").onclick = () => cashDrawer(cashAcc, 1);
-        $("#cashOut").onclick = () => cashDrawer(cashAcc, -1);
-        v.querySelectorAll("[data-cashdoc]").forEach(
-          (b) => (b.onclick = () => receiptDrawer(b.dataset.cashdoc)),
-        );
-      }
-      function cashDrawer(accountId, sign) {
-        const db = openDrawer(sign > 0 ? "Entrada de caja" : "Salida de caja");
-        /* Block 2 of the client review: a cash payment lands somewhere — a
-           project (down to its chapter and subpartida, on the same accepted-budget
-           validation every other cost uses) or an overhead — and until now this
-           drawer had nowhere to say so, even though the engine takes it. A cash
-           ENTRY (money in) is a float top-up, not a cost, so it gets no
-           destination. Optional on purpose: filing first and assigning later
-           in Conciliación stays legal, exactly as it is for a bank line. */
-        const destBlock =
-          sign < 0
-            ? `<div class="field full"><label>Destino</label><select id="ca_dest">
-      <option value="">— sin asignar todavía —</option>
-      <optgroup label="Obras">${erp.state.projects
-        .filter((p) => !p.closed)
-        .map((p) => `<option value="p:${p.id}">${esc(projectPickLabel(p))}</option>`)
-        .join("")}</optgroup>
-      <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL)
-        .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
-        .join("")}</optgroup>
-     </select></div>
-    <div class="field" id="ca_chapwrap" style="display:none"><label>Partida</label><select id="ca_chap"></select></div>
-    <div class="field" id="ca_linewrap" style="display:none"><label>Subpartida</label><select id="ca_line"></select></div>`
-            : "";
-        const wireCashDest = () => {
-          const dest = $("#ca_dest");
-          if (!dest) return;
-          const paint = () => {
-            const val = dest.value;
-            const pid = val.startsWith("p:") ? val.slice(2) : "";
-            $("#ca_chapwrap").style.display = pid ? "" : "none";
-            if (pid)
-              $("#ca_chap").innerHTML = '<option value="">—</option>' + chapterOptions(pid, "");
-            paintLine();
-          };
-          const paintLine = () => {
-            const val = dest.value;
-            const pid = val.startsWith("p:") ? val.slice(2) : "";
-            const ch = pid ? $("#ca_chap").value : "";
-            const opts = pid && ch ? lineOptionsFor(pid, ch, "") : "";
-            $("#ca_linewrap").style.display = opts ? "" : "none";
-            if (opts) $("#ca_line").innerHTML = '<option value="">—</option>' + opts;
-          };
-          dest.onchange = paint;
-          $("#ca_chap").onchange = paintLine;
-        };
-        db.innerHTML = `<div class="fgrid">
-   <div class="field full"><label>Concepto *</label><input id="ca_c" placeholder="${sign > 0 ? "Reposición de caja" : "Ferretería del barrio"}"></div>
-   <div class="field"><label>Importe (€)</label><input id="ca_a" type="number" step="0.01" min="0"></div>
-   <div class="field"><label>Fecha</label><input id="ca_d" type="date" value="${erp.today}"></div>
-   ${
-     sign < 0
-       ? `<div class="field full"><label style="display:flex;gap:6px;align-items:center">
-     <input type="checkbox" id="ca_doc" checked> <span>Falta el justificante</span></label></div>`
-       : ""
-   }
-   ${destBlock}
-   ${
-     sign < 0
-       ? `<div class="field full"><label>Trabajador (si es un pago a su nombre)</label><select id="ca_w">
-      <option value="">—</option>
-      ${erp.state.workers
-        .filter((w) => w.active !== false)
-        .map((w) => `<option value="${w.id}">${esc(w.name)}</option>`)
-        .join("")}
-     </select></div>`
-       : ""
-   }
-   <div class="field full" style="margin-top:6px"><button class="btn primary" id="ca_go">Registrar</button></div>
-  </div>`;
-        wireCashDest();
-        $("#ca_go").onclick = () =>
-          mutate(
-            () => {
-              const amt = Math.round(Number(String($("#ca_a").value).replace(",", ".")) * 100);
-              if (!(amt > 0)) throw new Error("Indica el importe");
-              const concept = $("#ca_c").value.trim();
-              if (!concept) throw new Error("El concepto es obligatorio");
-              const doc = $("#ca_doc");
-              // BNK-07's own signature: the movement goes in through importMovements,
-              // and NOT naming a supporting document is what flags it. There is no
-              // second cash method — see the note in erp-engine.js.
-              /* A job cost names partida AND subpartida since PK12, so the
-                 select that was optional here is now required when the money
-                 goes to an obra — refused in the operator's language before
-                 the engine refuses it in English. A general expense names
-                 neither, and is untouched. */
-              if ($("#ca_linewrap").style.display !== "none" && !$("#ca_line").value)
-                throw new Error("El coste de obra necesita partida y subpartida");
-              const rec = erp.recordCashMovement(
-                accountId,
-                {
-                  accountingDate: $("#ca_d").value || erp.today,
-                  concept,
-                  amountCents: sign * amt,
-                  supportingDocRef:
-                    sign < 0 && doc && doc.checked ? null : "registrado-en-pantalla",
-                  workerId: $("#ca_w") && $("#ca_w").value ? $("#ca_w").value : null,
-                },
-                "operations",
-              );
-              const dest = $("#ca_dest") ? $("#ca_dest").value : "";
-              if (dest) {
-                erp.splitMovement(
-                  rec.id,
-                  [
-                    dest.startsWith("p:")
-                      ? {
-                          projectId: dest.slice(2),
-                          chapterNum: $("#ca_chap").value || null,
-                          lineId:
-                            $("#ca_line") && $("#ca_linewrap").style.display !== "none"
-                              ? $("#ca_line").value || null
-                              : null,
-                          kind: "material",
-                          amountCents: amt,
-                        }
-                      : { overheadCategory: dest.slice(2), amountCents: amt },
-                  ],
-                  "operations",
-                );
-              }
-              closeDrawer();
-            },
-            sign > 0 ? "Entrada registrada" : "Salida registrada",
-          );
-      }
+         `bankAcc` was declared here beside a `cashAcc` that no longer has a
+         screen. It belongs to Consolidación bancaria and stays. */
+      let bankAcc = "";
 
       /* ================= ADM-08 · Flujo de caja (S12) ============================
    The last unbuilt subsección in the menu, and the only screen in the

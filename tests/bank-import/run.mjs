@@ -256,7 +256,7 @@ assert(
   JSON.stringify(e3.state.importBatches),
 );
 // A till entry is not a statement import and must not appear as one.
-const till3 = e3.addBankAccount({ name: "Caja", kind: "till" }, "bo");
+const till3 = e3.addBankAccount({ name: "Efectivo", kind: "bank" }, "bo");
 e3.recordCashMovement(
   till3.id,
   { concept: "Café", amountCents: -500, accountingDate: "2026-05-02" },

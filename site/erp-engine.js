@@ -6039,7 +6039,16 @@
          ledger of its own). The door stays open here until that replacement
          exists, because narrowing it first is what turns a rename into a
          half-migrated tree: the engine refusing what the seed still builds. */
-      if (!["bank", "till", "card"].includes(rec.kind))
+      /* «till» IS NO LONGER CREATABLE, and is deliberately still READABLE.
+         The operator's verdict on cash-box accounts was short — no need for
+         them — and cash is now a withdrawal from a bank account (PK12-S7). A
+         workspace saved before this, and the v1 migration fixture, still hold
+         accounts of kind till and must still load: this guard runs on
+         creation, never on read, so nothing stored is invalidated and no
+         migration retypes a record. That is the reversible half of the change;
+         an account somebody no longer wants is deleted through Configuración,
+         which since PK12-S6c can actually do it. */
+      if (!["bank", "card"].includes(rec.kind))
         throw new Error("Unknown account kind: " + rec.kind);
       this.state.bankAccounts.push(rec);
       this._log(user, "addBankAccount", rec.name);
@@ -6167,6 +6176,126 @@
       this._log(user, "markCardSettlement", movId + " → " + card.name);
       return m;
     }
+    /* =============== PK12-S7 — cash is a withdrawal, not an account ==========
+       The operator described how cash actually works, and it is not a till:
+       money is taken OUT of the bank, spent, and comes back as receipts; what
+       is not spent is paid back IN. So the thing to be explained is the
+       WITHDRAWAL, and it is explained by the documents it bought plus the
+       deposit that returned the rest.
+
+       A till account modelled the same money as a second balance to keep, and
+       the operator's verdict on that was short: no need for them. Nothing here
+       replaces the till with another container — the withdrawal is a bank line
+       like every other, and the only new fact is what closes it. */
+    /**
+     * Declare a bank line to be cash taken out of the bank.
+     *
+     * Classified an internal transfer for `markCardSettlement`'s reason: at
+     * the moment of the withdrawal nothing has been BOUGHT. The money is still
+     * the company's, in a pocket instead of an account, and counting the
+     * withdrawal as a cost would count it again when the receipts arrive.
+     */
+    markCashWithdrawal(movId, user) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      if (m.amountCents >= 0)
+        throw new Error("A cash withdrawal takes money out — pick the line that leaves the bank");
+      const acc = this.state.bankAccounts.find((a) => a.id === m.accountId);
+      if (acc && acc.kind === "card")
+        throw new Error("Cash comes out of an account, not off a card");
+      this.classifyMovement(m.id, "internalTransfer", user);
+      m.cashWithdrawal = { at: this.state.today, by: user || "backoffice" };
+      this._log(user, "markCashWithdrawal", movId);
+      return m;
+    }
+    /**
+     * What is still unexplained about a withdrawal.
+     *
+     * Three ways money leaves a withdrawal and they are added, not chosen
+     * between: the receipts it paid for, the cash handed back to the bank, and
+     * whatever is still in somebody's pocket. The last is the number the
+     * screen has to show, because "the rest is still out there" is a real and
+     * ordinary state, not an error.
+     */
+    cashWithdrawalState(movId) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      const totalCents = Math.abs(cents(m.amountCents));
+      const documentedCents = sum((m.matched && m.matched.documents) || [], (d) =>
+        cents(d.amountCents),
+      );
+      const returnedCents = sum(
+        this.state.movements.filter((x) => x.cashReturn && x.cashReturn.withdrawalId === movId),
+        (x) => Math.abs(cents(x.amountCents)),
+      );
+      return {
+        totalCents,
+        documentedCents,
+        returnedCents,
+        outstandingCents: totalCents - documentedCents - returnedCents,
+      };
+    }
+    /**
+     * The unspent cash going back in, tied to the withdrawal it closes.
+     *
+     * Classified an internal transfer, and that is the whole point: the
+     * company's own money returning to its own account is not revenue, and a
+     * deposit left unclassified reads as income in every report that sums
+     * incoming lines. The same trap `markCardSettlement` exists to avoid, at
+     * the other end of the same journey.
+     *
+     * Refuses to return more than is left. A withdrawal of 1.000 that already
+     * has 700 of receipts against it has 300 outstanding; a 400 deposit
+     * pointed at it is either the wrong deposit or the wrong withdrawal, and
+     * both are worth stopping before the arithmetic stops adding up.
+     */
+    markCashReturn(depositMovId, withdrawalMovId, user) {
+      const d = this.state.movements.find((x) => x.id === depositMovId);
+      const w = this.state.movements.find((x) => x.id === withdrawalMovId);
+      if (!d || !w) throw new Error("Movement not found");
+      if (d.id === w.id) throw new Error("A withdrawal cannot return to itself");
+      if (d.amountCents <= 0)
+        throw new Error("The return puts money back — pick the line that enters the bank");
+      if (!w.cashWithdrawal) throw new Error("That movement is not a cash withdrawal");
+      if (d.cashReturn && d.cashReturn.withdrawalId !== withdrawalMovId)
+        throw new Error("That deposit is already the return of another withdrawal");
+      const st = this.cashWithdrawalState(withdrawalMovId);
+      if (cents(d.amountCents) > st.outstandingCents + 1)
+        throw new Error("The return is larger than what is left of the withdrawal");
+      this.classifyMovement(d.id, "internalTransfer", user);
+      d.cashReturn = {
+        withdrawalId: withdrawalMovId,
+        at: this.state.today,
+        by: user || "backoffice",
+      };
+      this._log(user, "markCashReturn", depositMovId + " → " + withdrawalMovId);
+      return d;
+    }
+    /** Untie a return. The deposit goes back to being an unexplained line. */
+    clearCashReturn(depositMovId, user) {
+      const d = this.state.movements.find((x) => x.id === depositMovId);
+      if (!d) throw new Error("Movement not found");
+      if (!d.cashReturn) throw new Error("That movement is not the return of a withdrawal");
+      delete d.cashReturn;
+      d.class = null;
+      d.excludedFromPL = false;
+      d.status = "unallocated";
+      this._log(user, "clearCashReturn", depositMovId);
+      return d;
+    }
+    /**
+     * Every cash withdrawal in a quarter, with what explains it.
+     *
+     * This is what `cashRecords` in the quarterly package is derived from now.
+     * It used to be "every movement on an account of kind till", which asked
+     * the accounts what cash was instead of asking the money.
+     */
+    cashWithdrawals(quarter) {
+      return this.state.movements
+        .filter((m) => m.cashWithdrawal && quarterOf(m.accountingDate) === quarter)
+        .map((m) => ({ ...m, cash: this.cashWithdrawalState(m.id) }));
+    }
+
     /* ============ PK7-D — a transfer is a PAIR, and the product must hold it ==
        `findInternalTransfers` has always proposed pairs and the bulk button
        has always marked both legs. Everything else treated a transfer as two
@@ -8686,10 +8815,12 @@
       const invoices = this.state.invoices.filter((i) => inQ(i.date));
       const bills = this.state.bills.filter((b) => inQ(b.date));
       const movements = this.state.movements.filter((m) => inQ(m.accountingDate));
-      const tillIds = new Set(
-        this.state.bankAccounts.filter((a) => a.kind === "till").map((a) => a.id),
-      );
-      const cash = movements.filter((m) => tillIds.has(m.accountId));
+      /* Cash is the WITHDRAWALS now, not the movements that happened to sit
+         on an account of kind till. Asking the accounts what counted as cash
+         meant a company that took money out of its ordinary account — which is
+         what actually happens — had no cash records at all, while one that
+         kept a till had every internal movement of it counted twice. */
+      const cash = this.cashWithdrawals(quarter);
       const late = this.lateDocuments(quarter);
       const assets = this.fixedAssetRegister(quarter);
       const sev = (n) => (n > 0 ? "r" : "g");
@@ -8715,17 +8846,21 @@
         {
           key: "bank",
           label: "Movimientos bancarios",
-          count: movements.length - cash.length,
-          amountCents: sum(
-            movements.filter((m) => !tillIds.has(m.accountId)),
-            (m) => m.amountCents,
-          ),
+          /* EVERY movement, cash withdrawals included. It used to be every
+             movement that was not on a till, because a till's lines were a
+             separate register that the bank never saw. A withdrawal is a bank
+             line — it is on the statement — so subtracting it here would make
+             the bank block disagree with the statement it reports on. The two
+             blocks stopped being a partition when the till went: Efectivo is
+             now a LENS over these same lines, not a second set of them. */
+          count: movements.length,
+          amountCents: sum(movements, (m) => m.amountCents),
           issues: ex.unallocatedMovements.length,
           sev: sev(ex.unallocatedMovements.length),
         },
         {
           key: "cash",
-          label: "Caja",
+          label: "Efectivo retirado",
           count: cash.length,
           amountCents: sum(cash, (m) => m.amountCents),
           issues: ex.undocumentedCash.length,
@@ -8986,11 +9121,7 @@
         issuedInvoices: this.state.invoices.filter((i) => inQ(i.date)).map(txFromInvoice),
         receivedBills: this.state.bills.filter((b) => inQ(b.date)).map(txFromBill),
         bankMovements: this.state.movements.filter((m) => inQ(m.accountingDate)),
-        cashRecords: this.state.movements.filter(
-          (m) =>
-            inQ(m.accountingDate) &&
-            this.state.bankAccounts.find((a) => a.id === m.accountId && a.kind === "till"),
-        ),
+        cashRecords: this.cashWithdrawals(quarter),
         vat: this.vatSummary(quarter),
         irpf: this.irpfSummary(quarter),
         exceptions: this.exceptionList(quarter),

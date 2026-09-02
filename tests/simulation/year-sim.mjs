@@ -61,7 +61,7 @@ erp.state.clauseBlocks.push({
 
 // bank + till (BNK-06)
 const bank = erp.addBankAccount({ name: "Cuenta principal", kind: "bank", openingCents: 4200000 });
-const till = erp.addBankAccount({ name: "Caja efectivo", kind: "till", openingCents: 30000 });
+const till = erp.addBankAccount({ name: "Efectivo", kind: "bank", openingCents: 30000 });
 
 // suppliers (valid CIFs) — material supplier, subcontractor company, autónomo (IRPF)
 const supMat = erp.addParty({

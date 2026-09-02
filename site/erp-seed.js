@@ -60,7 +60,19 @@
       iban: "ES9121000418450200051332",
       openingCents: 6400000,
     });
-    const till = erp.addBankAccount({ name: "Caja efectivo", kind: "till", openingCents: 42000 });
+    /* A SECOND account, and it earns its place: §5.3's third fixture is an
+       equal-and-opposite pair across two accounts, which is what the internal
+       transfer matcher exists to spot. That pair used to cross the bank and
+       the till, and PK12-S7 retired the till — leaving the outgoing leg with
+       nowhere to land and the matcher with nothing to propose. Two accounts is
+       also the ordinary shape of a small company, so the fixture is more like
+       the thing it stands for than the till ever was. */
+    const bank2 = erp.addBankAccount({
+      name: "Cuenta de ahorro",
+      kind: "bank",
+      iban: "ES7100302053091234567895",
+      openingCents: 1200000,
+    });
 
     /* suppliers & subcontractors */
     const supMat = erp.addParty({
@@ -471,7 +483,6 @@
         suppliers: { material: supMat, electrical: supElec, plumbing: supFont, adviser: supArch },
         workers: [w1, w2],
         bank,
-        till,
         budgetWith,
       });
     }
@@ -1249,6 +1260,9 @@
       vatBp: 2100,
       allocations: [{ overheadCategory: "fixedAsset", kind: "material", amountCents: 148000 }],
     });
+    /* Held because the fixtures that explain it are staged further down: the
+       receipts it paid for, and the deposit that returns what was not spent. */
+    let cashOut;
     erp
       .importMovements(bank.id, [
         {
@@ -1259,17 +1273,22 @@
           card: "V-1234",
         }, // unallocated → exception
         { accountingDate: "2026-04-28", concept: "NOMINAS", amountCents: -1240000 },
-        { accountingDate: "2026-04-30", concept: "TRASPASO A CAJA", amountCents: -20000 },
+        {
+          accountingDate: "2026-04-30",
+          concept: "REINTEGRO EFECTIVO OFICINA",
+          amountCents: -20000,
+        },
       ])
       .forEach((m, i) => {
         if (i === 1) erp.classifyMovement(m.id, "salary");
-        if (i === 2) erp.classifyMovement(m.id, "internalTransfer");
+        /* THE CASH FIXTURE, and it is a withdrawal now rather than a till.
+           Two hundred euros come out of the bank; the screen has to be able to
+           show that some of it is documented, some came back, and some is
+           still in somebody's pocket — which is the ordinary state and the one
+           worth demonstrating. The receipts and the return are staged further
+           down, once the captures they refer to exist. */
+        if (i === 2) cashOut = erp.markCashWithdrawal(m.id, "seed");
       });
-    erp.recordCashMovement(till.id, {
-      accountingDate: "2026-05-02",
-      concept: "Compra pequeño material",
-      amountCents: -4200,
-    }); // cash without doc → flagged
 
     /* ---- §5.3: statement lines the reconciliation screen has to explain ----
        Three deliberate shapes, because a screen with nothing to match on is a
@@ -1294,9 +1313,19 @@
       },
       { accountingDate: "2026-05-04", concept: "TRASPASO ENTRE CUENTAS", amountCents: -60000 },
     ]);
-    erp.importMovements(till.id, [
+    // …and its other leg, on the second account: the pair the matcher proposes.
+    erp.importMovements(bank2.id, [
       { accountingDate: "2026-05-04", concept: "TRASPASO RECIBIDO", amountCents: 60000 },
     ]);
+    /* The return of the unspent cash — the last step the operator described,
+       and the one no screen could record before. 60 of the 200 never got
+       spent and goes back in; what is left is what the withdrawal still owes
+       an explanation for. */
+    erp
+      .importMovements(bank.id, [
+        { accountingDate: "2026-05-06", concept: "INGRESO EFECTIVO NO GASTADO", amountCents: 6000 },
+      ])
+      .forEach((m) => erp.markCashReturn(m.id, cashOut.id, "seed"));
     erp.registerBill({
       supplierId: supArch.id,
       number: "NC-88",

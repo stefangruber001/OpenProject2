@@ -2186,7 +2186,7 @@ assert(
   // ADM-06. Cash goes through the EXISTING recordCashMovement (BNK-07) —
   // this session briefly added a second one and the class silently kept the
   // old, which is why `cashCount` is the only new method here.
-  const till = erp.addBankAccount({ name: "Caja S11", kind: "till", openingCents: 20000 });
+  const till = erp.addBankAccount({ name: "Efectivo S11", kind: "bank", openingCents: 20000 });
   erp.recordCashMovement(
     till.id,
     { accountingDate: erp.today, concept: "Ferretería", amountCents: -4500 },
@@ -3334,7 +3334,7 @@ assert(
  */
 {
   const e = new ERP("2026-03-10");
-  const acc = e.addBankAccount({ name: "Caja", kind: "till" }, "bo");
+  const acc = e.addBankAccount({ name: "Efectivo", kind: "bank" }, "bo");
   e.recordCashMovement(acc.id, { concept: "Ferretería", amountCents: -2000 }, "bo");
   const m = e.state.movements[0];
   assert(m.needsDoc === true, "a cash entry without its receipt is flagged", m.needsDoc);
@@ -3547,7 +3547,7 @@ assert(
   );
 
   // The month's cash to the worker vs the month's hours by the worker.
-  const till = e.addBankAccount({ name: "Caja", kind: "till" }, "bo");
+  const till = e.addBankAccount({ name: "Efectivo", kind: "bank" }, "bo");
   e.recordCashMovement(
     till.id,
     {
@@ -3792,7 +3792,7 @@ assert(
   closes("a supplier invoice on a partida");
 
   const acc = e.addBankAccount({ name: "Banco 7B", kind: "bank" }, "bo");
-  const till = e.addBankAccount({ name: "Caja 7B", kind: "till" }, "bo");
+  const till = e.addBankAccount({ name: "Efectivo 7B", kind: "bank" }, "bo");
 
   /* Petty cash on site: a project, and no partida yet — the operator's own
      exception, and the case that used to vanish from both tables at once. */
@@ -4123,7 +4123,7 @@ assert(
   e.acceptVersion(bg.id, e.currentVersion(bg.id).id, { evidenceRef: "ok" }, "bo");
   const pj = e.createProjectFromAcceptance(bg.id, "bo");
   const bank = e.addBankAccount({ name: "Banco 7D", kind: "bank" }, "bo");
-  const till = e.addBankAccount({ name: "Caja 7D", kind: "till" }, "bo");
+  const till = e.addBankAccount({ name: "Efectivo 7D", kind: "bank" }, "bo");
 
   /* THE SAFETY PROPERTY THIS WHOLE PACKAGE RESTS ON.
      A matched movement contributes nothing to the project's cost — the BILL it
@@ -4307,7 +4307,7 @@ assert(
   const e = new ERP("2026-08-27");
   const sup = e.addParty({ roles: ["supplier"], name: "Prov 7E", taxId: "B12345674" }, "bo");
   const acc = e.addBankAccount({ name: "Banco 7E", kind: "bank" }, "bo");
-  const till = e.addBankAccount({ name: "Caja 7E", kind: "till" }, "bo");
+  const till = e.addBankAccount({ name: "Efectivo 7E", kind: "bank" }, "bo");
 
   const cards = e.importMovements(
     acc.id,
