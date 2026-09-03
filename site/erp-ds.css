@@ -3704,3 +3704,54 @@ td.num.late {
 .bell .badge {
   border-radius: 999px;
 }
+
+/* ------------------------------- 63 · one sheet, the same on every tab
+   Operator, with the panel finally opening on every tab: «harmonize the white
+   tiles and they should be connected at the bottom and not flying around, be
+   more structured and aligned across all tabs to ensure End2End intuitive
+   process.»
+
+   Two faults, both measured before touching anything. The sheet sat 84px above
+   the bottom of the web viewport on EVERY section, with a band of the page
+   showing underneath it — fixed at its source in the page, where the rail the
+   sheet hangs from was being lifted to clear a native tab bar that is outside
+   the web viewport entirely. And the sheet was a different height on every
+   tab: 172px on Datos maestros against 294.9px on Administración, a spread of
+   122.9px, so the top edge jumped as you moved between tabs and nothing held
+   still.
+
+   The height is now one number for all six. Sized to the tallest natural
+   sheet, which is reached twice over by different routes — four rows of
+   screens with no journey strip, and three rows with one — so it is the shape
+   the design already settles at, not a figure picked to look round.
+
+   The operator chose this over letting each sheet hug its contents: the cost
+   is empty space below the four items of Datos maestros, and the gain is that
+   the sheet opens in exactly the same place every time. A menu that lands
+   somewhere different on each tab is a menu you have to re-find; one that
+   always lands in the same place is one you learn once. The rows keep their
+   natural heights — stretching them to fill would trade the jumping outline
+   for tiles that change size between tabs, which is the same complaint
+   wearing a different coat.
+
+   The spare room is centred rather than left at the bottom. Pinned to the top
+   it made Datos maestros half sheet and half void, and Proyectos — two
+   screens, so a single row — would have been mostly nothing at all: it read
+   as a panel that had failed to finish loading. Centred, the same space sits
+   above and below, and the sheet reads as deliberately roomy. The tiles never
+   change size, which is the part that had to stay fixed. */
+@media (max-width: 860px) {
+  .p2 {
+    --sheet-h: 296px;
+    min-height: var(--sheet-h);
+    display: flex;
+    flex-direction: column;
+  }
+  /* The list takes the room the heading and the strip do not, and centres its
+     rows inside it. `flex` on the sheet is what gives it a height to centre
+     against; without it the grid is only as tall as its own rows. */
+  #p2list {
+    flex: 1 1 auto;
+    align-content: center;
+  }
+}

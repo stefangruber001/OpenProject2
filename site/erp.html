@@ -4768,13 +4768,22 @@
      from anywhere, to the same list the web bar used to show. */
       /* The five-icon strip stands down; the rail itself does NOT, because it
      is what panel 2 is positioned against — hiding it takes the subsection
-     list with it. It is lifted clear of the native tab bar and made
-     transparent to taps, so only the panel it carries is interactive. */
+     list with it. It is made transparent to taps, so only the panel it
+     carries is interactive.
+
+     It sits at bottom:0, NOT lifted clear of the native tab bar. It used to
+     be raised by 84px to do exactly that, and the raise was the reason the
+     sheet appeared to float: the shell adds its tab bar as a bottom
+     safeAreaInset, so the web view is laid out ABOVE the bar and the web
+     viewport never reaches it. Clearing a bar that is outside the viewport
+     counts it twice, and left a measured 84px band of the page showing under
+     every sheet. The rail is zero-height here (its strip is display:none), so
+     bottom:0 puts panel 2 exactly on the bottom edge. */
       body.native .p1 {
         display: none;
       }
       body.native .rail {
-        bottom: calc(84px + env(safe-area-inset-bottom));
+        bottom: 0;
         border-top: 0;
         background: transparent;
         pointer-events: none;

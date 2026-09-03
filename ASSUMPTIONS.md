@@ -7989,3 +7989,52 @@ bytes. So correctness costs a round trip, not the file.
 Host-layer change, deliberately: `apps/web` is a host, caching is
 infrastructure, and this is precisely the sort of concern that belongs there
 rather than in a capability or a pack.
+
+**S64 · One sheet, the same on every tab.** Operator, once the panel was
+finally opening on every tab: «harmonize the white tiles and they should be
+connected at the bottom and not flying around, be more structured and aligned
+across all tabs to ensure End2End intuitive process.»
+
+Measured before touching anything, which is what made both faults obvious.
+The sheet sat **84px above the bottom of the web viewport on every section**,
+with a band of the page showing underneath — and the sheet was a different
+height on each tab: 172px on Datos maestros against 294.9px on Administración,
+a spread of 122.9px, so the top edge jumped as you moved between tabs.
+
+The float had a single cause. `body.native .rail` — the element the sheet
+hangs from — was lifted `84px + safe-area` "to clear the native tab bar". But
+the shell adds its tab bar as a bottom `safeAreaInset`, so the web view is
+laid out ABOVE the bar and the viewport never reaches it. Clearing a bar that
+is outside the viewport counts it twice. `bottom: 0` now, and the rail is
+zero-height in the app (its strip is `display:none`), so the sheet lands
+exactly on the bottom edge.
+
+Decided with the operator: one height for all six tabs, 296px, sized to the
+tallest natural sheet — a figure the design reaches twice by different routes
+(four rows without a journey strip, three rows with one), so it is where the
+layout already settles rather than a round number. The cost is empty space on
+the short sections; the gain is that the sheet opens in the same place every
+time, and a menu that lands somewhere different on each tab is one you have to
+re-find.
+
+Decided against the operator's literal wording in one respect, and it proved
+necessary: the spare room is CENTRED, not left at the bottom. Pinned to the
+top, Datos maestros was half sheet and half void, and Proyectos — two screens,
+so a single row — was mostly nothing at all and read as a panel that had
+failed to load. Centring keeps the tiles at their natural size, which is the
+part that had to stay fixed.
+
+Also kept, as agreed: the journey strip stays on the three flow tabs only.
+Numbering Datos maestros and Configuración would place them at steps 4 and 5
+of a process they are not in — they are reference data used at every stage.
+
+Verified at 390x844 and 375x667 under the shell user agent, across all five
+multi-screen sections: height 296 on every one (spread **0.0px**, was 122.9),
+gap below the sheet **0** on every one (was 84), identical top edge at 548, and
+no section scrolls its own sheet.
+
+Noted and NOT changed: `body.native main` still reserves
+`104px + safe-area` of bottom padding for the same tab bar that is outside the
+viewport, so every screen carries dead scroll space at its foot. Same root
+cause, but it hides no content and the operator reported the sheet — left for
+a follow-up rather than widened into silently.
