@@ -71,6 +71,15 @@ apps/web/public/*
 # machine that built them and nowhere else. A shared link would have shown no
 # thumbnail, with the image 404ing on the server.
 !apps/web/public/brand/
+# …and except the navigation manifest. `gen-nav-manifest.mjs --check` compares
+# four committed copies against SECTIONS, and this one was swallowed by the
+# rule above: it existed on whichever machine last generated it and nowhere
+# else, so the check passed locally and failed on every clean checkout. The
+# directory has to be un-excluded before the file can be — git does not
+# descend into an excluded directory.
+!apps/web/public/workspace/
+apps/web/public/workspace/*
+!apps/web/public/workspace/nav.json
 
 # Generated document templates — rebuilt by tools/doc-templates/build.mjs
 dist/

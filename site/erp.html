@@ -5758,7 +5758,7 @@
         $("#p2h").textContent = s.lab;
 
         /* WHERE THIS SECTION SITS IN THE WHOLE. Three chips, numbered, the
-           current one filled: the panel answers "where am I in the process"
+           current one filled: the panel answers «where am I in the process»
            before it answers "which screen". A chip is a real control — it
            swings the panel to that section without closing it, which is how
            somebody follows the chain forwards or back. Sections outside the
@@ -5807,7 +5807,7 @@
         });
         list.classList.toggle("steps", step >= 0);
 
-        /* The hand-off. At the foot of Comercial: "→ Proyectos". It is the
+        /* The hand-off. At the foot of Comercial: «→ Proyectos». It is the
            one thing a menu of screens cannot say on its own — that when this
            section is done, the work continues in that one. No new wording:
            the next section's own name, which is already translated. */
@@ -11878,12 +11878,17 @@
             if (r.outstandingCents > 0 && r.daysOverdue > 0) overdue[r.number] = r.daysOverdue;
           });
         } catch (e) {}
+        /* THE NUMBER CARRIES NO UNIT — the column heading does.
+           «−239 d» put a bare «d» on screen in every language: the booted-
+           workspace gate allows exactly zero untranslated strings and counted
+           four of them, one per row. The heading already says Días / Days /
+           Dies, so the cell is a signed number and nothing else. */
         const plazo = (a) => {
           const od = a.ref && a.ref.invoice ? overdue[a.ref.invoice] : null;
-          if (od) return { d: `−${od} d`, late: true };
+          if (od) return { d: `−${od}`, late: true };
           if (!a.dueDate) return { d: "—", late: false };
           const delta = Math.round((Date.parse(a.dueDate) - Date.parse(erp.today)) / 86400000);
-          return { d: `${delta < 0 ? "−" : ""}${Math.abs(delta)} d`, late: delta < 0 };
+          return { d: `${delta < 0 ? "−" : ""}${Math.abs(delta)}`, late: delta < 0 };
         };
         const shown = alerts.filter((a) => towerSev === "all" || a.sev === towerSev);
         const top = [...shown].sort((a, b) => (rank[a.sev] ?? 9) - (rank[b.sev] ?? 9)).slice(0, 5);

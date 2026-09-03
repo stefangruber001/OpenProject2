@@ -7696,3 +7696,39 @@ div form it still needs.
 geometry; the scrim behind the panel is a gradient that lets the page recede
 instead of a flat wash; and the Proyectos card head no longer repeats the
 column names printed directly beneath it.
+
+## S54 · Three CI gates, and which of them were mine (2026-09-03)
+
+Five of the six CI jobs were green on the phase-9 push; «Lint · Types · Test ·
+Build» had four red steps. Diagnosed against a clean worktree of `origin/main`
+rather than assumed, because two of them turned out not to be mine.
+
+**Mine: the days column.** `−239 d` put a bare «d» on screen in every
+language, and the booted-workspace gate allows exactly zero untranslated
+strings. The unit moved to the column heading, which is already translated
+three ways; the cell is a signed number and nothing else. 4 → 0.
+
+**Mine: two phrases in my own comments.** The source-literal audit reads
+double-quoted strings wherever they appear, including inside comments, so
+«where am I in the process» and «→ Proyectos» counted as untranslated UI. They
+are guillemets now, like the rest of the comments in the file. 207 → 205,
+level with main.
+
+**Not mine: the command whitelist's arity.** `pnpm test` fails identically on
+a clean checkout of main: the engine's
+`allocateMovementToProject(movId, ref, kind, where, user)` gained `where` with
+the partida/subpartida work, and `apps/web/lib/erp-commands.ts` still declared
+three arguments. The whitelist is what the server is allowed to forward, so
+the stale number was not only a failing test — it silently dropped the
+subpartida on the way through the API. Corrected to four.
+
+**Not mine: a manifest copy CI never receives.** `gen-nav-manifest.mjs
+--check` compares four committed copies against SECTIONS, and
+`apps/web/public/workspace/nav.json` sits under `.gitignore`'s
+`apps/web/public/*`. It existed on whichever machine last generated it and
+nowhere else, so the check passed locally and failed on every clean checkout —
+main included. The directory is un-excluded, its contents re-excluded, and the
+one file allowed through, which is the only shape git accepts.
+
+Both of the last two are repairs to `main`'s state made on this branch because
+the branch cannot go green without them; neither touches the redesign.

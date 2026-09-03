@@ -53,7 +53,13 @@ export const COMMANDS = {
   // --- bank ------------------------------------------------------------
   allocateMovementToProject: {
     method: "allocateMovementToProject",
-    arity: 3,
+    /* FOUR, NOT THREE. The engine method is
+       `allocateMovementToProject(movId, ref, kind, where, user)` — `where`
+       arrived with the work that made every euro name its partida AND its
+       subpartida, and this number did not follow it. The whitelist is what
+       the server is allowed to forward, so a stale arity does not just fail a
+       test: it silently drops the subpartida on its way through the API. */
+    arity: 4,
     describes: "allocate a bank movement to a project",
   },
 
