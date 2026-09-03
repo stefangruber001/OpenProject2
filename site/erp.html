@@ -5806,6 +5806,16 @@
           list.appendChild(b);
         });
         list.classList.toggle("steps", step >= 0);
+        /* THE NUMBERS RUN DOWN, THEN ACROSS.
+           On a phone the screens sit in two columns, and a grid fills them
+           row by row unless told otherwise — so the eye read 1,2 / 3,4 / 5
+           across, which is not the order of the work. `grid-auto-flow: column`
+           fills downward instead, and it needs to know how many rows a column
+           has. CSS cannot count children, so the count is handed to it here:
+           half the items, rounded up. Written as a custom property rather
+           than a grid declaration, so the stylesheet keeps every other
+           decision about this list. */
+        list.style.setProperty("--steprows", String(Math.max(1, Math.ceil(n / 2))));
 
         /* The hand-off. At the foot of Comercial: «→ Proyectos». It is the
            one thing a menu of screens cannot say on its own — that when this

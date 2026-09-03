@@ -7830,3 +7830,29 @@ own phone treatment and its own tint. The heading went white, stopped looking
 like a heading, and the check that measures exactly that went red (692/693).
 Plain class selectors sit below the grid's own rules and above the page's
 generic ones, which is where these belong.
+
+## S59 · Phase 13 — four corrections from the phone (2026-09-03)
+
+**The steps run down, then across.** A grid fills row by row unless told
+otherwise, so the two-column panel read 1,2 / 3,4 / 5 across — not the order
+of the work. `grid-auto-flow: column` fills downward and needs to know how
+many rows a column has; CSS cannot count children, so `buildSubs` hands it
+half the item count, rounded up, as a custom property. Every other decision
+about the list stays in the stylesheet.
+
+**A step is not a quantity.** «3 Quotes 19» put two numbers on one row meaning
+different things: where the screen sits in the process, and how many
+documents are behind it. They now differ in shape AND colour — the step a
+plain disc, the count a capsule — so neither has to be read twice.
+
+**The card reads as one piece.** Operator, on a quote card: «make the tile
+more colour — the top line with PRE-xxxx maybe in a darker green, to ensure
+the tile looks like one piece.» The identity is a tinted band, its code in the
+deep green, and the facts sit under it rather than floating in white.
+
+**No box around the boxes.** A register on a phone is a stack of cards, and
+the panel that holds a table on a desktop had become a second frame drawn
+round all of them. The cards sit on the page's own light-green ground now.
+Scoped to registers by `:has(table.mlist.cards)`: the Torre's panels keep
+their surface, because their heading and filter belong to the panel rather
+than to any card.

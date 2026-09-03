@@ -3460,3 +3460,96 @@ td.num.late {
     box-shadow: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 13 · Four corrections from the phone
+   «Rearrange the sub names so 1,2,3 is vertical and then jumps to the second
+   column. Some numbers get confused with the amount of documents — for
+   quotes, distinguish better. Make the tile more colour: the top line with
+   PRE-xxxx in a darker green so the tile looks like one piece. And have the
+   light green in the background rather than this additional box around all
+   the boxes.»
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 700px) {
+  /* ---- 1 · the steps run down the column, then jump ---- */
+  #p2list {
+    grid-auto-flow: column;
+    grid-template-rows: repeat(var(--steprows, 3), minmax(0, auto));
+  }
+
+  /* ---- 2 · a step is not a quantity ----
+     «3 Quotes 19» put two numbers on one row that meant different things: one
+     is where this screen sits in the process, the other is how many documents
+     are behind it. They now differ in shape AND colour — the step is a plain
+     grey disc, the count a green capsule — so neither has to be read twice. */
+  .navitem .stp {
+    background: var(--bg);
+    color: var(--muted);
+    font-weight: 700;
+    border: 1px solid var(--line);
+  }
+  .navitem.on .stp {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .navitem .ct {
+    border-radius: 999px;
+    background: var(--accentSoft);
+    color: var(--accentDeep);
+    font-weight: 700;
+    padding: 2px 8px;
+    min-width: 22px;
+    text-align: center;
+  }
+
+  /* ---- 3 · the card reads as one piece ----
+     Operator, on a quote card: «make the tile more colour — the top line with
+     PRE-xxxx maybe in a darker green, to ensure the tile looks like one
+     piece.» The identity is a tinted band now, its code in the deep green,
+     and the facts sit under a single rule instead of floating in white. */
+  table.cards td.k {
+    background: var(--accentSoft);
+  }
+  table.cards td.k:first-child {
+    color: var(--greenDeep);
+    padding-top: 11px;
+  }
+  table.cards td.k:first-child:not(:has(+ td.k)) {
+    padding-bottom: 11px;
+    color: var(--greenDeep);
+  }
+  table.cards td.k:first-child + td.k {
+    color: var(--ink);
+    padding-bottom: 10px;
+  }
+  table.cards td.k + td:not(.k) {
+    border-top: 0;
+    margin-top: 0;
+    padding-top: 11px;
+  }
+  /* The tap feedback still reaches the whole card, band included. */
+  table.cards tr.click:hover td.k,
+  table.cards tr.click:active td.k {
+    background: var(--accentPale);
+  }
+
+  /* ---- 4 · no box around the boxes ----
+     A register on a phone is a stack of cards, and the panel that holds a
+     table on a desktop became a second frame drawn round all of them. The
+     cards sit on the page's own ground instead — which is the light green the
+     operator asked to see behind them. The Torre's panels keep their surface:
+     they have a heading and a filter that belong to the panel, not to a card. */
+  #view .card:has(> .scroll > table.mlist.cards),
+  #view .card:has(> table.mlist.cards) {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: 0;
+    overflow: visible;
+  }
+  #view .card:has(table.mlist.cards) > .scroll {
+    overflow: visible;
+  }
+}
