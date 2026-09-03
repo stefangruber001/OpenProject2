@@ -3355,12 +3355,20 @@ td.num.late {
 
    Every register on a phone is the same carded table, so this is one block
    for all of them rather than a rule per screen.
+
+   AND WITHOUT AN ID IN THE SELECTOR. The first version led with `#view`,
+   which gave every rule an id's weight and beat
+   `.bgrid table.cards tr.chaprow` — the quote's chapter heading, which has
+   its own phone treatment and its own tint. The heading went white, stopped
+   looking like a heading, and the check that measures exactly that went red.
+   Plain class selectors sit below the grid's own rules and above the page's
+   generic ones, which is the position these belong in.
    ═══════════════════════════════════════════════════════════════════════ */
 @media (max-width: 700px) {
-  #view table.cards {
+  table.cards {
     min-width: 0;
   }
-  #view table.cards tr {
+  table.cards tr {
     border: 1px solid var(--line);
     border-radius: 12px;
     background: var(--paper);
@@ -3376,10 +3384,10 @@ td.num.late {
   }
   /* The feedback, kept — and answered. `:hover` is the state a phone leaves
      behind after a tap; `:active` is the one it shows during it. */
-  #view table.cards tr.click:hover {
+  table.cards tr.click:hover {
     background: var(--accentPale);
   }
-  #view table.cards tr.click:active {
+  table.cards tr.click:active {
     background: var(--accentSoft);
     box-shadow: 0 1px 2px rgba(23, 32, 21, 0.06);
   }
@@ -3389,17 +3397,17 @@ td.num.late {
      has one, a name. The code becomes an eyebrow — small, spaced, in the
      accent — and the name the line you actually read. Their labels were
      already hidden; what they lacked was a hierarchy and a rule under them. */
-  #view table.cards td.k {
+  table.cards td.k {
     padding: 0 14px;
     font-variant-numeric: tabular-nums;
   }
-  #view table.cards td.k:first-child {
+  table.cards td.k:first-child {
     padding-top: 12px;
     font: 700 11px var(--sans);
     letter-spacing: 0.06em;
     color: var(--accentDeep);
   }
-  #view table.cards td.k:first-child + td.k {
+  table.cards td.k:first-child + td.k {
     padding-top: 1px;
     font: 700 15.5px var(--sans);
     letter-spacing: -0.012em;
@@ -3407,47 +3415,47 @@ td.num.late {
   }
   /* A register whose first cell is the only `.k` (the jobs list) reads that
      one as the title rather than as an eyebrow. */
-  #view table.cards td.k:first-child:not(:has(+ td.k)) {
+  table.cards td.k:first-child:not(:has(+ td.k)) {
     font: 700 15.5px var(--sans);
     letter-spacing: -0.012em;
     color: var(--accentDeep);
     padding-bottom: 2px;
   }
   /* The rule that separates who this is from what is known about it. */
-  #view table.cards td.k + td:not(.k) {
+  table.cards td.k + td:not(.k) {
     border-top: 1px solid var(--hair);
     margin-top: 10px;
     padding-top: 9px;
   }
 
   /* ---- the facts ---- */
-  #view table.cards td {
+  table.cards td {
     padding: 5px 14px;
     gap: 4px 14px;
     font-size: 13.5px;
     color: var(--ink);
     font-variant-numeric: tabular-nums;
   }
-  #view table.cards td:before {
+  table.cards td:before {
     font: 500 12px var(--sans);
     letter-spacing: 0;
     color: var(--muted);
   }
-  #view table.cards tr > td:last-child {
+  table.cards tr > td:last-child {
     padding-bottom: 12px;
   }
   /* The bar reads as a measure rather than a stripe: full height, its own
      track, and never squeezed to a sliver by a long label beside it. */
-  #view table.cards td .bar {
+  table.cards td .bar {
     min-width: 96px;
     height: 8px;
     border-radius: 4px;
   }
-  #view table.cards td .bar i {
+  table.cards td .bar i {
     border-radius: 4px;
   }
-  #view table.cards tr.tot,
-  #view table.cards tr.grouphd {
+  table.cards tr.tot,
+  table.cards tr.grouphd {
     background: var(--bg);
     box-shadow: none;
   }

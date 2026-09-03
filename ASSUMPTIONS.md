@@ -7822,3 +7822,11 @@ code (the jobs list) reads that one as the title instead of as an eyebrow.
 remodel and is untouched; a list card on a phone is the one place the mobile
 idiom argues the other way, and 12px is what every current mobile list uses.
 One token to reverse if the operator disagrees.
+
+**Correction, same phase.** The first version of the card block led every
+selector with `#view`, which gave each rule an id's weight and beat
+`.bgrid table.cards tr.chaprow` — the quote's chapter heading, which has its
+own phone treatment and its own tint. The heading went white, stopped looking
+like a heading, and the check that measures exactly that went red (692/693).
+Plain class selectors sit below the grid's own rules and above the page's
+generic ones, which is where these belong.
