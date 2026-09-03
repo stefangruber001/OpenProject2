@@ -3828,10 +3828,71 @@ td.num.late {
    same promise as 1, 2, 3 across it, and it is the reading order a phone
    already uses for everything else on the page. */
 @media (max-width: 700px) {
-  .steps {
+  /* `:not(#p2list)` because the subsection panel carries `steps` too, for its
+     own reasons. It is a grid, so `flex-direction` is inert there today — but
+     a rule that only misses by luck is one that lands the day the grid becomes
+     a flex column. Say which `steps` is meant. */
+  .steps:not(#p2list) {
     flex-direction: column;
   }
-  .steps .stp {
+  .steps:not(#p2list) .stp {
     flex: 0 0 auto;
+  }
+}
+
+/* ------------------------------- 66 · three corrections from the phone
+   Operator: «reduce height slightly of all 4 big boxes, so that cash is also
+   visible»; «remove in all menu the numbers in front of the sub page names and
+   make size of the menu similar to that actual setting menu»; «in control
+   tower the section projects looks a bit merged, remove the big white box with
+   heading projects so that each project looks on the green background».
+
+   ---- 1 · the four figures fit on one screen ----
+   Measured against the viewport the shell actually gives the page — 740px on a
+   390x844 phone, once its tab bar is taken as a bottom inset — Cash ended at
+   741px: cut by a single pixel, which is why it read as an accident rather
+   than a layout. Sixteen pixels off each tile puts it comfortably inside with
+   room left over, and the value keeps its weight because only the box shrank. */
+@media (max-width: 860px) {
+  .tcard {
+    min-height: 92px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+  .tcard .val {
+    font-size: 26px;
+  }
+}
+
+/* ---- 2 · the rail goes with the numbers ----
+   It tied one number to the next, so with the digits gone it ties nothing.
+   It was already hidden on a phone (a rail cannot cross two columns); this
+   retires it on the desktop list too, where the panel is now the same plain
+   list of names that Configuración always was. */
+#p2list.steps::before {
+  display: none;
+}
+
+/* ---- 3 · the jobs on the Torre sit on the page, not in a panel ----
+   The cards had a white surface behind them and their own tinted heads on top
+   of it, which is two frames for one list — «looks a bit merged». Registers
+   solved this already: on a phone the panel steps back and the cards sit on
+   the page's own ground. The Torre kept its surface because its panels carry a
+   heading and a filter; that reasoning still holds for the alerts panel, which
+   has the criticality chips, and no longer holds for this one, which has only
+   a title. The title stays — unboxed, it is the only thing naming the list. */
+@media (max-width: 700px) {
+  .towerpanes > .card.tproj {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+  .towerpanes > .card.tproj > .ch {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .towerpanes > .card.tproj > .scroll {
+    overflow: visible;
   }
 }
