@@ -7039,3 +7039,29 @@ the kind of change that has to be visible.
 
 This is the second non-CSS change on the branch (the first is S50's
 `data-sev`), and both are the operator's explicit instructions.
+
+## S52 · The header cluster, restructured (2026-09-03)
+
+Operator, with a crop of the header's right end: «this area looks not
+premium — redo with best practices, more modern and structured».
+
+**The pattern is the one Linear, Stripe and Atlassian's top navigation
+share:** one primary action; a group of identical 36px square icon buttons;
+the identity; hairline dividers between the groups; one height and one gap
+for everything. Section 48 of `site/erp-ds.css`.
+
+- The alert count moves to the button's corner instead of sitting on the
+  bell; the bell glyph is the conventional one.
+- The period is a bordered control again — calendar glyph left, chevron
+  right, a fixed 112px so the widest option no longer stretches it. On a
+  phone it is the calendar glyph alone; the native picker still opens with
+  every period.
+- The language switch becomes a small segmented control on the row's
+  geometry (28px, the current language in the green tint). The suite pins it
+  fixed, top right, three buttons — all still true.
+- The dividers are pseudo-elements on the first and last menu wrappers, so
+  the markup is untouched.
+
+The first build tiled the calendar glyph across the control: a shorthand
+with the colour in the wrong layer was invalid and left `background-repeat`
+at its default. Caught by the header screenshot before the suite ran.
