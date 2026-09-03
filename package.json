@@ -35,14 +35,14 @@
     "@tesseract.js-data/cat": "^1.0.0",
     "@tesseract.js-data/spa": "^1.0.0",
     "husky": "^9.1.7",
-    "lint-staged": "^15.5.2",
-    "pdfjs-dist": "6.2.108",
-    "prettier": "^3.7.4",
+    "lint-staged": "^17.4.1",
+    "pdfjs-dist": "6.3.289",
+    "prettier": "^3.9.6",
     "tesseract.js": "7.0.0",
     "tesseract.js-core": "7.0.0",
-    "tsx": "^4.19.2",
-    "turbo": "^2.10.5",
-    "typescript": "5.9.2"
+    "tsx": "^4.23.13",
+    "turbo": "^2.10.12",
+    "typescript": "7.0.2"
   },
   "packageManager": "pnpm@10.33.0",
   "engines": {
