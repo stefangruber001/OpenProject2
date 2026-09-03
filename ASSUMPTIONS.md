@@ -6871,3 +6871,34 @@ width, and this is the argument for keeping the screenshots in the loop.
 
 Full browser suite 648/648 with the layer applied; overflow 0px at
 1440/1024/390; no console errors in the self-contained preview build.
+
+## S47 · Redesign phase 3 — the full remodel the operator asked for (2026-09-03)
+
+The operator's second set of references (aufaitUX ERP dashboard, TalentIQ,
+renesis ERP management) and the instruction «no round edges, more colours,
+change font, feel free to remove items, drive it to the extreme». Sections
+23–33 of `site/erp-ds.css`; still no change to a single line of markup or
+engine code, so every screen keeps its logic and its interconnections.
+
+**Palette.** The interface accent moves to a blue (`#2563eb`) on a deep navy
+rail, with teal and a warm amber as secondary tile colours — the three
+references share exactly that scheme. The documents keep the brand green:
+what the company SENDS stays in its identity; what the operator LOOKS AT
+follows the references. Reversible by editing two tokens.
+
+**Radii to 2–3px, serif dropped.** Every radius token collapses to near
+square; Georgia is gone from headings; the rail labels lose their uppercase
+transform because `innerText` reports the transformed string and the suite
+pins `/Projectes/` and `/Mestres/` in body text (one check went red for
+exactly that, then was fixed by removing the transform, not the check).
+
+**Removed from view, never from the DOM.** Breadcrumbs, the brand strapline
+and the language pill's chrome are hidden with CSS; the language switch still
+works, it is just no longer the loudest control on the page.
+
+**Legend and tiles.** The KPI tiles become solid coloured blocks with a white
+mask icon and a translucent circle, the banking tile stays white to stand
+apart; legend swatches were inline colours and are overridden per position.
+
+Full browser suite 648/648 (`scratchpad/p3b-e2e.txt`); overflow 0px at
+1440/1024/390; no console errors in the preview build.

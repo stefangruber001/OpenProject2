@@ -819,3 +819,603 @@ main {
   --ic-out: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 17 17 7'/><path d='M7 7h10v10'/></svg>");
   --ic-bank: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 10 12 4l9 6'/><path d='M5 10v8M10 10v8M14 10v8M19 10v8'/><path d='M3 20h18'/></svg>");
 }
+
+/* =============================================================================
+   PHASE 3 — the remodel.
+
+   Brief (operator, 3 Sep, second set of references): «very unstructured,
+   remove items, add items, no round edges, more colours, change the font,
+   full remodel, super aligned with the screenshots, drive it to the extreme,
+   the language button need not be so prominent.»
+
+   The three references agree with each other: a blue-led palette on a cool
+   grey ground, a dark navy icon rail, KPI figures as SOLID coloured blocks
+   with a white icon in a circle, square corners, an all-sans typeface, status
+   as solid rectangular chips, one hero chart. That is what this phase is.
+
+   WHAT DOES NOT CHANGE. The brand green stays on every document the company
+   sends (those sheets have their own stylesheet); in the interface it keeps
+   only its meaning — positive, done, healthy. Every element id, route and
+   handler is where it was, and the four dashboard cards stay four.
+   ========================================================================== */
+
+/* ---------------------------------------------------- 23 · tokens, redone */
+:root {
+  --rail: 84px;
+  /* Palette. Blue leads, navy anchors, teal and amber colour the rest. */
+  --accent: #2563eb;
+  --accentDeep: #1d4ed8;
+  --accentSoft: #dbeafe;
+  --accentPale: #eff6ff;
+  --navy: #1b2a4a;
+  --navyDeep: #16213a;
+  --teal: #0d9488;
+  --tealSoft: #ccfbf1;
+  --amber: #d97706;
+  --amberSoft: #fef3c7;
+  --danger: #dc2626;
+  --dangerSoft: #fee2e2;
+  --green: #16a34a;
+  --greenDeep: #15803d;
+  --greenSoft: #dcfce7;
+  --greenPale: #bbf7d0;
+  --bg: #f3f5f9;
+  --paper: #ffffff;
+  --line: #e2e8f0;
+  --hair: #eef2f7;
+  --ink: #0f172a;
+  --body: #334155;
+  --muted: #64748b;
+  --faint: #94a3b8;
+  --blue: var(--accent);
+  --blueSoft: var(--accentSoft);
+  /* No round edges. Three on a card, two on a control, none on a chip. */
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 3px;
+  --r-full: 2px;
+  --ring: 0 0 0 3px rgba(37, 99, 235, 0.3);
+  --shadow: none;
+  --e-1: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --e-2: 0 2px 8px -2px rgba(15, 23, 42, 0.1);
+  --e-3: 0 12px 28px -12px rgba(15, 23, 42, 0.22);
+  /* The typeface. Inter throughout — the serif headings were the old look. */
+  --serif: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+body {
+  font-size: 14px;
+  letter-spacing: 0;
+  color: var(--body);
+}
+h1,
+h2,
+h3 {
+  font-family: var(--sans);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+/* --------------------------------------------------------- 24 · top bar */
+.topbar {
+  padding: 0 var(--s-6);
+  min-height: 60px;
+  gap: var(--s-5);
+}
+.brand .nm {
+  font: 700 15px var(--sans);
+  letter-spacing: -0.01em;
+}
+/* Removed: the strapline under the company name. It said what the page is
+   to someone who already opened it. */
+.brand .nm small {
+  display: none;
+}
+.gsearch input {
+  border-radius: var(--r-md);
+  background: var(--bg);
+  border: 1px solid transparent;
+  padding: 9px 12px 9px 36px;
+  font-size: 13px;
+}
+.gsearch input:focus {
+  background: #fff;
+  border-color: var(--accent);
+}
+.gsearch::before {
+  left: 12px;
+  width: 15px;
+  height: 15px;
+}
+.btn.primary,
+#btnCreate {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn.primary:hover:not([disabled]):not(:disabled),
+#btnCreate:hover {
+  background: var(--accentDeep);
+  border-color: var(--accentDeep);
+}
+.btn {
+  border-radius: var(--r-sm);
+  font-weight: 600;
+}
+.gactions .btn.sm {
+  height: 36px;
+  padding: 0 var(--s-4);
+}
+.gactions select {
+  height: 36px;
+  border-radius: var(--r-sm);
+  border-color: var(--line);
+  font-weight: 600;
+  font-size: 13px;
+}
+/* Demoted: the ES · CA · EN pill. It stays reachable — a preference has to be
+   findable — but it no longer competes with the buttons that do work. Text
+   only, small, grey; the active one just says so in the accent. */
+#canei-lang-pill {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  font: 600 10px var(--sans) !important;
+  letter-spacing: 0.08em !important;
+  gap: 2px !important;
+  opacity: 0.8;
+}
+#canei-lang-pill button {
+  padding: 4px 6px !important;
+  color: var(--faint) !important;
+  border-radius: 0 !important;
+}
+#canei-lang-pill button.on {
+  background: transparent !important;
+  color: var(--accent) !important;
+}
+
+/* --------------------------------------------------------- 25 · the rail
+   Navy, as the first reference draws it: white icons on dark, the active
+   section a solid blue block. Square. The sub-panel stays white so a list
+   of routes reads as a list. */
+.shell {
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: none;
+}
+.p1 {
+  background: var(--navyDeep);
+  border-right: 0;
+  padding: var(--s-4) var(--s-3);
+  gap: var(--s-2);
+}
+.secitem {
+  border-radius: var(--r-md);
+  color: rgba(255, 255, 255, 0.62);
+  padding: 10px 2px 8px;
+}
+.secitem:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.secitem.on {
+  background: var(--accent);
+  color: #fff;
+}
+.secitem.on::after {
+  display: none;
+}
+/* Sentence case, on purpose. `text-transform` rewrites what innerText
+   returns, and the suite reads the rail's labels to prove a Catalan user sees
+   Catalan — «Projectes», not «PROJECTES». The third reference's sidebar is
+   sentence case too. */
+.secitem .lb {
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+.secitem .dot {
+  background: var(--amber);
+  box-shadow: 0 0 0 2px var(--navyDeep);
+}
+.p2 {
+  left: var(--rail);
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+}
+.p2 .p2h {
+  color: var(--faint);
+}
+.navitem {
+  border-radius: var(--r-sm);
+  font-weight: 500;
+}
+.navitem.on {
+  background: var(--accentPale);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ----------------------------------------------------- 26 · page header
+   The breadcrumb is gone — the rail already says where you are. The title is
+   bold sans; the explanation is one line, and only one. */
+main {
+  padding: var(--s-6) var(--s-6) 96px;
+}
+.crumbs {
+  display: none;
+}
+.head {
+  margin-bottom: var(--s-4);
+}
+.head h1 {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.head .sub {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.torrebar {
+  margin-bottom: var(--s-5);
+}
+.torrebar .ts {
+  font-size: 11px;
+}
+.torrebar .btn.sm {
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+}
+/* The first action is the one the references make solid. */
+.torrebar #tNewOpp {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* --------------------------------------------- 27 · KPI figures as blocks
+   The third reference: navy, blue, teal, then a white one — each with the
+   icon in a circle, the figure large and white, the label beneath it. The
+   same four tiles, the same routes, a different weight of colour. */
+.tcards {
+  gap: var(--s-4);
+}
+.tcard {
+  border: 0;
+  border-radius: var(--r-md);
+  padding: var(--s-5) var(--s-5) var(--s-5) 78px;
+  min-height: 104px;
+  box-shadow: var(--e-2);
+  display: block;
+  color: #fff;
+  background: var(--tile-bg);
+}
+.tcard:hover {
+  box-shadow: var(--e-3);
+  transform: translateY(-1px);
+}
+.tcard::before {
+  content: "";
+  position: absolute;
+  left: var(--s-5);
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  transform: translateY(-50%);
+  border-radius: 50%; /* the one circle the references keep */
+  background: rgba(255, 255, 255, 0.16);
+  -webkit-mask: none;
+  mask: none;
+}
+.tcard::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--s-5) + 12px);
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translateY(-50%);
+  background: #fff;
+  -webkit-mask: var(--tile-ic) center / contain no-repeat;
+  mask: var(--tile-ic) center / contain no-repeat;
+}
+.tcard .lab {
+  font: 500 12px var(--sans);
+  color: rgba(255, 255, 255, 0.82);
+  text-transform: none;
+  letter-spacing: 0;
+  order: 2;
+}
+.tcard .val {
+  font: 700 26px / 1.1 var(--sans);
+  letter-spacing: -0.02em;
+  color: #fff;
+  margin: 0 0 3px;
+}
+.tcard .sub {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.72);
+  margin-top: 4px;
+}
+/* The overdue line is written inline in the alarm colour by the script that
+   fills the tile. On a navy, blue or teal block red is unreadable, so on those
+   it is white and bold — the block's own colour already says it is money —
+   and on the white tile it keeps the alarm red it was given. */
+.tcard .sub span[style*="danger"] {
+  color: #fff !important;
+  font-weight: 600;
+}
+.tcard[data-go="banking"] .sub span[style*="danger"] {
+  color: var(--danger) !important;
+}
+.tcard .dot {
+  background: var(--amber);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+.tcard[data-go="economics"] {
+  --tile-bg: var(--navy);
+  --tile-ic: var(--ic-trend);
+}
+.tcard[data-go="invoicing"] {
+  --tile-bg: var(--accent);
+  --tile-ic: var(--ic-in);
+}
+.tcard[data-go="supplier-invoices"] {
+  --tile-bg: var(--teal);
+  --tile-ic: var(--ic-out);
+}
+.tcard[data-go="banking"] {
+  --tile-bg: #fff;
+  --tile-ic: var(--ic-bank);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.tcard[data-go="banking"]::before {
+  background: var(--accentSoft);
+}
+.tcard[data-go="banking"]::after {
+  background: var(--accent);
+}
+.tcard[data-go="banking"] .lab {
+  color: var(--muted);
+}
+.tcard[data-go="banking"] .val {
+  color: var(--ink);
+}
+.tcard[data-go="banking"] .sub {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------- 28 · cards
+   Flat, square, hairline. The heading in bold sans at 15. */
+.card {
+  border-radius: var(--r-md);
+  box-shadow: none;
+  border: 1px solid var(--line);
+}
+.card > .ch {
+  padding: var(--s-4) var(--s-5);
+}
+.card > .ch h3 {
+  font: 700 15px var(--sans);
+  letter-spacing: -0.01em;
+}
+.tag {
+  border-radius: var(--r-sm);
+}
+
+/* ------------------------------------------------------ 29 · hero chart
+   Blue bars, a pale remainder, a navy budget mark, red past it. The hero
+   figure bold and large in the sans. */
+.perfhero b {
+  font: 700 30px / 1 var(--sans);
+  letter-spacing: -0.025em;
+}
+.perfhero .pct {
+  color: var(--accent);
+  font-weight: 700;
+}
+.blt {
+  height: 10px;
+  border-radius: var(--r-sm);
+  background: var(--hair);
+}
+.blt i {
+  border-radius: var(--r-sm);
+}
+.blt .spent {
+  background: var(--accent);
+}
+.blt .togo {
+  background: var(--accentSoft);
+}
+.blt .over {
+  background: var(--danger);
+}
+.blt .tick {
+  background: var(--navy);
+  opacity: 1;
+  top: -3px;
+  height: 16px;
+}
+.perfrow {
+  border-radius: 0;
+  margin: 0;
+}
+.perfrow:hover {
+  background: var(--accentPale);
+}
+.perfrow .fig {
+  color: var(--ink);
+}
+.perfkey span b {
+  border-radius: 0;
+  width: 10px;
+  height: 10px;
+}
+/* The swatches are coloured inline by the script that draws the chart, in
+   the old palette. Repainted here in the order the chart emits them, so the
+   key describes the bars beneath it and not the bars of two phases ago. */
+.perfkey span:nth-child(1) b {
+  background: var(--accent) !important;
+}
+.perfkey span:nth-child(2) b {
+  background: var(--accentSoft) !important;
+  outline: 1px solid var(--line);
+}
+.perfkey span:nth-child(3) b {
+  background: var(--danger) !important;
+}
+.perfkey span:nth-child(4) b {
+  background: var(--navy) !important;
+}
+.bar {
+  border-radius: var(--r-sm);
+}
+.bar i {
+  background: var(--accent);
+  border-radius: var(--r-sm);
+}
+
+/* --------------------------------------------------------- 30 · tables
+   The task table of the first reference: a light header band, sentence-case
+   labels, generous rows, and status as a solid rectangular chip. */
+thead th {
+  background: #f8fafc;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  padding: 10px var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+tbody td {
+  padding: 11px var(--s-4);
+  border-bottom: 1px solid var(--hair);
+  font-size: 13px;
+}
+tbody tr.click:hover {
+  background: var(--accentPale);
+}
+td.k,
+.k {
+  color: var(--accent);
+  font-weight: 600;
+}
+.pill {
+  border-radius: var(--r-sm);
+  font: 600 10.5px / 1.7 var(--sans);
+  padding: 2px 8px;
+  letter-spacing: 0.02em;
+  background: #e2e8f0;
+  color: var(--body);
+}
+.pill.g {
+  background: var(--teal);
+  color: #fff;
+}
+.pill.y {
+  background: var(--amber);
+  color: #fff;
+}
+.pill.r {
+  background: var(--danger);
+  color: #fff;
+}
+.pill.b {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* --------------------------------------------------- 31 · attention list */
+.alrow {
+  padding: 11px var(--s-5);
+  border-left: 3px solid var(--danger);
+}
+.alrow:hover {
+  background: var(--accentPale);
+}
+.alrow .meta {
+  color: var(--faint);
+}
+
+/* --------------------------------------------- 32 · forms, focus, misc */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border-radius: var(--r-sm);
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+}
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  border-radius: var(--r-sm);
+}
+a {
+  color: var(--accent);
+}
+.empty {
+  color: var(--faint);
+}
+
+/* ---------------------------------------------------------- 33 · phones */
+@media (max-width: 860px) {
+  /* Same lesson as phase 2, one phase later: the rail leaves the flow to be
+     the bottom bar, so the grid must be one column or `main` lands in the
+     rail's 84px. Restated here because section 25 above resets the grid. */
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .p1 {
+    background: var(--navyDeep);
+    border-top: 0;
+    box-shadow: 0 -8px 24px -16px rgba(15, 23, 42, 0.4);
+  }
+  .secitem {
+    border-radius: var(--r-md);
+    color: rgba(255, 255, 255, 0.62);
+  }
+  .secitem.on {
+    background: var(--accent);
+    color: #fff;
+  }
+  .secitem.on::after {
+    display: none;
+  }
+  .fab {
+    background: var(--accent);
+    border-radius: var(--r-md);
+  }
+  .tcard {
+    padding: var(--s-4) var(--s-4) var(--s-4) 70px;
+    min-height: 88px;
+  }
+  .tcard::before {
+    left: var(--s-4);
+    width: 42px;
+    height: 42px;
+  }
+  .tcard::after {
+    left: calc(var(--s-4) + 10px);
+  }
+  .tcard .val {
+    font-size: 22px;
+  }
+  .head .sub {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  #canei-lang-pill {
+    opacity: 0.7;
+  }
+}
