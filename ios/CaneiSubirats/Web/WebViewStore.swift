@@ -329,6 +329,44 @@ extension WebViewStore: WKNavigationDelegate {
         load(tab.url)
     }
 
+    /// Ask the page to open this section's panel — the same white sheet the web
+    /// shows when a section is tapped there.
+    ///
+    /// The shell keeps one web view per tab, each already parked on its
+    /// section's landing screen, so selecting a tab navigates nothing and the
+    /// page had no reason to open anything. Without this the app answered a tab
+    /// tap with a screen where the web answers it with a choice of screens.
+    ///
+    /// Safe against an old page: `caneiOpenSection` is guarded on the JS side,
+    /// so a shell newer than the server simply does nothing here. The id comes
+    /// from the bundled manifest and is matched against the page's own section
+    /// list before use, but it is still passed as a quoted literal with the two
+    /// characters that could end that literal removed — an injection through a
+    /// file we ship ourselves is not the point; not building a string that can
+    /// break the expression is.
+    func openSection(_ id: String) {
+        call("caneiOpenSection", id)
+    }
+
+    /// Open the section sheet, or dismiss it if it is already showing. Bound to
+    /// a re-tap of the active tab, where the same gesture has to do both.
+    func toggleSection(_ id: String) {
+        call("caneiToggleSection", id)
+    }
+
+    /// One place that builds these calls, so the escaping rule is stated once.
+    /// The id comes from the bundled manifest and the page checks it against
+    /// its own section list before use, but it is still stripped to letters,
+    /// digits, `-` and `_` here: the point is not to defend against a file we
+    /// ship ourselves, it is never to build a string that can break out of the
+    /// expression. A page older than the shell simply does nothing — both
+    /// names are guarded on the JS side.
+    private func call(_ fn: String, _ id: String) {
+        let safe = id.filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
+        guard !safe.isEmpty else { return }
+        webView.evaluateJavaScript("window.\(fn) && window.\(fn)('\(safe)')", completionHandler: nil)
+    }
+
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         showErrorIfNeeded(error)
     }

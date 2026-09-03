@@ -3566,6 +3566,13 @@ window.CANEI_DICT = {
       "Extras and variations across every job. Work that has not been approved is never billable — the amber bar says so from across the room.",
     ],
     ["Todas", "All"],
+    /* The Torre's criticality filter. Plural because the chip labels a GROUP
+       of alerts, not one — "Críticas 39", not "Crítica 39". */
+    ["Críticas", "Critical"],
+    ["Altas", "High"],
+    ["Medias", "Medium"],
+    /* The fifth alert family (ALERT_META type "permit"). */
+    ["Permisos", "Permits"],
     ["Detectada", "Identified"],
     ["Valorada", "Priced"],
     ["Ejecutada", "Executed"],
@@ -4330,7 +4337,7 @@ window.CANEI_DICT = {
     ["ERP › Principal", "ERP › Home"],
     ["Marcar prioritario", "Mark as priority"],
     ["Calculado a las", "Calculated at"],
-    ["↻ Recalcular", "↻ Recalculate"],
+    ["Recalcular", "Recalculate"],
     ["⚙ Tarjetas", "⚙ Cards"],
     ["⚙ Reglas", "⚙ Rules"],
     ["🖨️ Imprimir / PDF", "🖨️ Print / PDF"],

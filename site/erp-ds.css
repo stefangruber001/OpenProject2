@@ -1,0 +1,3837 @@
+/* =============================================================================
+   Canei ERP — design system.
+
+   WHY A SEPARATE FILE. erp.html carries ~4,900 lines of stylesheet inline, and
+   the point of a look-before-live step is that somebody can READ the change
+   before it reaches a customer. A refinement layer buried at line 4,700 of a
+   1.1 MB file is not reviewable; this is.
+
+   WHY A LAYER AND NOT A REWRITE. Every rule below refines what is already
+   there. The existing sheet keeps its structure, its class names and its
+   element ids — which is what lets a 642-check browser suite prove that a
+   visual pass changed nothing about how the system behaves. A rewrite would
+   have to re-earn that proof from zero, and the operator's instruction was
+   explicit: the logic and the interconnections do not move.
+
+   Loaded AFTER the inline sheet, so it wins on cascade order rather than on
+   specificity wars. Where a rule here has to be forceful it says why.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- 1 · scale
+   The sheet this refines has a palette but no SCALE: spacing, type sizes and
+   radii were chosen per component, so a card header, a drawer header and a
+   modal header each landed on a different rhythm. Numbers here are the whole
+   vocabulary; anything not on the scale is a decision that has to justify
+   itself. */
+:root {
+  /* Type. A fourth-based scale, tightened at the top where headings live.
+     Body stays where it was — this is not a licence to reflow every screen. */
+  --t-xs: 11px;
+  --t-sm: 12.5px;
+  --t-md: 14px;
+  --t-base: 14.5px;
+  --t-lg: 17px;
+  --t-xl: 21px;
+  --t-2xl: 27px;
+  --t-3xl: 34px;
+
+  /* Space. Eight-point, with a 6 for the tight seams inside controls. */
+  --s-1: 4px;
+  --s-2: 6px;
+  --s-3: 8px;
+  --s-4: 12px;
+  --s-5: 16px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 48px;
+
+  --r-sm: 0;
+  --r-md: 0;
+  --r-lg: 0;
+  --r-full: 0;
+
+  /* Elevation. ONE ramp, and the top of it is still quiet. The previous
+     shadow put a 40px blur under every card, which reads as float rather than
+     as paper and is the single most reliable way to make an interface look
+     cheap. */
+  --e-1: 0 1px 2px rgba(20, 26, 14, 0.04);
+  --e-2: 0 1px 2px rgba(20, 26, 14, 0.04), 0 4px 12px -4px rgba(20, 26, 14, 0.08);
+  --e-3: 0 1px 3px rgba(20, 26, 14, 0.05), 0 12px 28px -12px rgba(20, 26, 14, 0.16);
+
+  /* Motion. Short, and on a curve that decelerates: anything longer than
+     180ms on a pointer interface is felt as lag rather than as polish. */
+  --m-fast: 110ms cubic-bezier(0.2, 0, 0.1, 1);
+  --m-base: 170ms cubic-bezier(0.2, 0, 0.1, 1);
+
+  /* A quieter ground. The green wash stays as the brand's own light, but the
+     page under it moves closer to paper so the green means something when it
+     appears on a control. */
+  --bg: #f2f4f0;
+  --line: #e0e5db;
+  --hair: #ebefe7;
+
+  /* Focus. One ring, used everywhere, visible on both light and green. */
+  --ring: 0 0 0 3px rgba(72, 115, 60, 0.28);
+}
+
+/* ------------------------------------------------------------- 2 · surface
+   The body carried two radial gradients. They are the kind of decoration that
+   photographs well on a landing page and, on a screen somebody works in for
+   eight hours, quietly fights every card sitting on top of it. */
+body {
+  background: var(--bg);
+  font-size: var(--t-base);
+}
+
+/* Figures are read in columns and compared down the page, so they get the
+   font's tabular set: without it a 1 is narrower than a 7 and the decimal
+   points in a money column do not line up. This is the single change that
+   most makes a table look professionally typeset. */
+table,
+.money,
+.num,
+.kpi,
+.big,
+input[type="number"] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ------------------------------------------------------- 3 · focus, always
+   The sheet had no visible focus state, so a keyboard user could not see
+   where they were. `:focus-visible` shows the ring for keyboard and
+   programmatic focus and stays out of the way of a mouse. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--r-sm);
+}
+
+/* ------------------------------------------------------------- 4 · buttons
+   Three weights, one geometry. The previous sheet had a primary and an
+   everything-else, so a destructive action and a tertiary link were the same
+   object at different colours. */
+.btn {
+  font: 600 var(--t-sm) / 1 var(--sans);
+  border-radius: var(--r-sm);
+  padding: 0 var(--s-4);
+  height: 34px;
+  transition:
+    background var(--m-fast),
+    border-color var(--m-fast),
+    box-shadow var(--m-fast),
+    transform var(--m-fast);
+}
+.btn:hover:not([disabled]):not(:disabled) {
+  border-color: #cfd8c8;
+  background: #fbfcfa;
+}
+.btn:active:not([disabled]):not(:disabled) {
+  transform: translateY(0.5px);
+}
+.btn.primary {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+  box-shadow: var(--e-1);
+}
+.btn.primary:hover:not([disabled]):not(:disabled) {
+  background: var(--greenDeep);
+  border-color: var(--greenDeep);
+}
+.btn.sm {
+  height: 28px;
+  padding: 0 var(--s-3);
+  font-size: var(--t-xs);
+}
+/* A7's pin, restated here because this layer sets the geometry those rules
+   used to sit beside. A disabled control must look disabled, and the browser
+   suite asserts exactly these two values. */
+.btn[disabled],
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* --------------------------------------------------------------- 5 · cards
+   Less rounding, less shadow, more air. A 15px radius on a 1px hairline reads
+   as a bubble; 12px reads as a sheet of paper. */
+.card {
+  border-radius: var(--r-md);
+  box-shadow: var(--e-1);
+  border-color: var(--line);
+  margin-bottom: var(--s-4);
+}
+.card > .ch {
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--hair);
+}
+.card > .ch h3 {
+  font-size: var(--t-lg);
+  letter-spacing: -0.018em;
+}
+
+/* -------------------------------------------------------------- 6 · tables
+   The header row was a solid green band on every table on every screen, which
+   spends the brand colour on furniture and leaves nothing to say «this row
+   needs you». Neutral header, strong rule under it, and the emphasis moves to
+   the data. */
+thead th {
+  background: transparent;
+  color: var(--muted);
+  border-bottom: 1.5px solid var(--line);
+  padding: var(--s-3) var(--s-4);
+  font-size: var(--t-xs);
+  letter-spacing: 0.06em;
+}
+tbody td {
+  padding: var(--s-3) var(--s-4);
+}
+tbody tr {
+  transition: background var(--m-fast);
+}
+tbody tr.click:hover {
+  background: var(--greenSoft);
+}
+/* Money and quantities belong on the right, where the digits line up against
+   each other rather than against the label beside them. */
+td.r,
+th.r,
+td.money,
+th.money {
+  text-align: right;
+}
+
+/* --------------------------------------------------------------- 7 · pills
+   One status vocabulary. The colours already existed; what was missing was a
+   consistent WEIGHT, so a neutral tag and an alarm competed equally for the
+   eye. */
+.pill {
+  font: 600 var(--t-xs) / 1.6 var(--sans);
+  padding: 2px var(--s-3);
+  border-radius: var(--r-full);
+  letter-spacing: 0.01em;
+}
+.pill.r {
+  background: var(--dangerSoft);
+  color: var(--danger);
+}
+.tag {
+  font-size: var(--t-xs);
+  letter-spacing: 0.04em;
+}
+
+/* ---------------------------------------------------------------- 8 · form
+   Inputs sized to match the buttons beside them. A form where the control and
+   its button are two different heights is the detail that makes a screen look
+   assembled rather than designed. */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border-radius: var(--r-sm);
+  border-color: var(--line);
+  transition:
+    border-color var(--m-fast),
+    box-shadow var(--m-fast);
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--green);
+}
+label {
+  letter-spacing: 0.01em;
+}
+
+/* ------------------------------------------------------------ 9 · the shell
+   The top bar is the one piece of furniture present on every screen, so it is
+   the piece most worth calming down. */
+.topbar {
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--line);
+  padding: var(--s-3) var(--s-5);
+}
+
+/* --------------------------------------------------------- 10 · touch sizes
+   Below the tablet breakpoint every control the finger has to hit grows to
+   the 44px Apple and Google both settled on. Desktop density is a virtue;
+   on a phone it is a mis-tap. */
+@media (max-width: 820px) {
+  .btn {
+    height: 40px;
+    padding: 0 var(--s-4);
+  }
+  .btn.sm {
+    height: 34px;
+  }
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    min-height: 40px;
+    font-size: 16px; /* iOS zooms the page for anything smaller on focus */
+  }
+  .card > .ch {
+    padding: var(--s-4);
+  }
+}
+
+/* ------------------------------------------------------------- 11 · motion
+   Respected, not assumed. Somebody who has asked their system to stop moving
+   things has usually asked for a reason. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =============================================================================
+   PHASE 2 — the shell, the dashboard and the colour scheme.
+
+   Brief (operator, 3 Sep): make it look like the three references — a quiet
+   neutral ground, white surfaces, ONE accent, a proper sidebar with real
+   icons, KPI tiles with an icon in a tinted square, one dominant chart, an
+   action row. Applied to the screens that exist, with the element ids, the
+   routes and the handlers exactly where they were.
+   ========================================================================== */
+
+/* ------------------------------------------------------ 12 · colour scheme
+   The references share one discipline: the ground is neutral, the cards are
+   white, and a single accent does all the pointing. The brand green stays —
+   it is on every document this company sends — but it stops being the colour
+   of the wallpaper and becomes the colour of the thing you should press. */
+:root {
+  --rail: 92px;
+  --bg: #f4f5f7;
+  --paper: #ffffff;
+  --line: #e4e7ec;
+  --hair: #eef0f3;
+  --ink: #101828;
+  --body: #475467;
+  --muted: #667085;
+  --faint: #98a2b3;
+  --greenSoft: #eaf3e6;
+  --greenPale: #dfeed9;
+  --blue: #3b6fb6;
+  --blueSoft: #e8f0fb;
+  --amberSoft: #fdf3dc;
+  --dangerSoft: #fceceb;
+  --shadow: var(--e-1);
+  /* Tints for the KPI icon squares — the references use one pastel per tile
+     and let the icon carry the meaning. These are the existing semantic
+     colours at 12 % on white, so a tile still means what its number means. */
+  --tint-green: #e6f0e2;
+  --tint-amber: #fbf0d6;
+  --tint-red: #fae4e1;
+  --tint-blue: #e3ecf8;
+}
+body {
+  color: var(--body);
+}
+h1,
+h2,
+h3 {
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------- 13 · top bar
+   White, hairline, and the search as a pill with a glass in it — the one
+   thing every reference puts in the same place. */
+.topbar {
+  background: #fff;
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--line);
+  padding: var(--s-3) var(--s-6);
+  gap: var(--s-4);
+}
+.brand .nm {
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.brand .nm small {
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+.gsearch input {
+  border-radius: var(--r-full);
+  background: var(--bg);
+  border-color: transparent;
+  padding: 9px 14px 9px 38px;
+  font-size: var(--t-md);
+}
+.gsearch input:focus {
+  background: #fff;
+  border-color: var(--line);
+  box-shadow: var(--ring);
+}
+.gsearch::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  background: var(--muted);
+  pointer-events: none;
+  -webkit-mask: var(--ic-search) center / contain no-repeat;
+  mask: var(--ic-search) center / contain no-repeat;
+}
+.gactions .btn.sm {
+  height: 34px;
+}
+
+/* ------------------------------------------------------------ 14 · sidebar
+   The rail already existed — 76px of emoji. It becomes the sidebar the
+   references have: white, a little wider, each section a rounded target with
+   a monochrome icon, and the active one a filled pill with an accent bar on
+   its edge. The emoji stay in the DOM (the suite reads them); they are
+   painted over by a masked SVG so the icons take the text colour like any
+   other glyph and change with the state. */
+.shell {
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 1480px;
+}
+.p2 {
+  left: var(--rail);
+  border-right: 1px solid var(--line);
+  box-shadow: var(--e-3);
+}
+.p1 {
+  background: #fff;
+  border-right: 1px solid var(--line);
+  padding: var(--s-4) var(--s-3) var(--s-6);
+  gap: var(--s-1);
+}
+.secitem {
+  gap: 5px;
+  padding: 10px 4px 8px;
+  border-radius: var(--r-md);
+  color: var(--muted);
+  transition:
+    background var(--m-fast),
+    color var(--m-fast);
+}
+.secitem:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+.secitem.on {
+  background: var(--greenSoft);
+  color: var(--greenDeep);
+}
+.secitem.on::after {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0;
+  background: var(--green);
+}
+.secitem .ic {
+  width: 22px;
+  height: 22px;
+  font-size: 0; /* the emoji stays for the DOM, the mask paints the icon */
+  background: currentColor;
+  -webkit-mask: var(--ic) center / contain no-repeat;
+  mask: var(--ic) center / contain no-repeat;
+}
+.secitem .lb {
+  font: 600 10px var(--sans);
+  letter-spacing: 0.01em;
+}
+.secitem .dot {
+  top: 8px;
+  right: 12px;
+  box-shadow: 0 0 0 2px #fff;
+}
+.secitem[data-sec="tower"] .ic {
+  --ic: var(--ic-tower);
+}
+.secitem[data-sec="sales"] .ic {
+  --ic: var(--ic-sales);
+}
+.secitem[data-sec="projects"] .ic {
+  --ic: var(--ic-projects);
+}
+.secitem[data-sec="admin"] .ic {
+  --ic: var(--ic-admin);
+}
+.secitem[data-sec="master-data"] .ic {
+  --ic: var(--ic-master);
+}
+.secitem[data-sec="settings"] .ic {
+  --ic: var(--ic-settings);
+}
+/* A section this sheet has no icon for keeps its emoji rather than showing
+   an empty square. */
+.secitem:not([data-sec="tower"]):not([data-sec="sales"]):not([data-sec="projects"]):not(
+    [data-sec="admin"]
+  ):not([data-sec="master-data"]):not([data-sec="settings"])
+  .ic {
+  font-size: 17px;
+  background: none;
+  -webkit-mask: none;
+  mask: none;
+}
+.p2 .p2h {
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+.navitem {
+  border-radius: var(--r-sm);
+}
+.navitem.on {
+  background: var(--greenSoft);
+  color: var(--greenDeep);
+}
+
+/* -------------------------------------------------------- 15 · page header
+   Breadcrumb in small caps, the title in the serif, the explanation one
+   size down and kept to a readable measure. */
+main {
+  padding: var(--s-6) var(--s-7) 96px;
+}
+.crumbs {
+  font-size: var(--t-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: var(--s-2);
+}
+.head {
+  margin-bottom: var(--s-5);
+}
+.head h1 {
+  font-size: clamp(22px, 2.6vw, 30px);
+  letter-spacing: -0.025em;
+}
+.head .sub {
+  color: var(--muted);
+  font-size: var(--t-md);
+  max-width: 64ch;
+}
+
+/* ------------------------------------------------------ 16 · action row
+   The dashboard's buttons become the quick-action row every reference has:
+   quiet, on one line, the timestamp demoted to a caption. */
+.torrebar {
+  gap: var(--s-2);
+  margin-bottom: var(--s-5);
+}
+.torrebar .ts {
+  color: var(--faint);
+  font-size: var(--t-xs);
+}
+.torrebar .btn.sm {
+  height: 34px;
+  padding: 0 var(--s-4);
+  font-size: var(--t-sm);
+  background: #fff;
+}
+
+/* -------------------------------------------------------- 17 · KPI tiles
+   The four figures of the company, as the references draw them: an icon in a
+   tinted rounded square, the number large, the label beneath it in a calm
+   grey, the whole tile a quiet card. Each tile already knows where it goes
+   (data-go), which is also what chooses its icon and its tint. */
+.tcards {
+  gap: var(--s-4);
+  margin: 0 0 var(--s-5);
+}
+.tcard {
+  border-radius: var(--r-lg);
+  padding: var(--s-5);
+  box-shadow: var(--e-1);
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-areas:
+    "ic lab"
+    "ic val"
+    "ic sub";
+  column-gap: var(--s-4);
+  align-content: start;
+}
+.tcard:hover {
+  transform: none;
+  box-shadow: var(--e-2);
+  border-color: var(--line);
+}
+.tcard::before {
+  content: "";
+  grid-area: ic;
+  width: 44px;
+  height: 44px;
+  border-radius: 0;
+  background: var(--tile-bg, var(--tint-green));
+  -webkit-mask: none;
+  mask: none;
+  position: relative;
+}
+.tcard::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--s-5) + 11px);
+  top: calc(var(--s-5) + 11px);
+  width: 22px;
+  height: 22px;
+  background: var(--tile-fg, var(--greenDeep));
+  -webkit-mask: var(--tile-ic) center / contain no-repeat;
+  mask: var(--tile-ic) center / contain no-repeat;
+}
+.tcard .lab {
+  grid-area: lab;
+  font: 600 var(--t-xs) var(--sans);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+.tcard .val {
+  grid-area: val;
+  font: 600 var(--t-2xl) / 1.05 var(--serif);
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+}
+.tcard .sub {
+  grid-area: sub;
+  font-size: var(--t-xs);
+  margin-top: var(--s-1);
+}
+.tcard[data-go="economics"] {
+  --tile-bg: var(--tint-green);
+  --tile-fg: var(--greenDeep);
+  --tile-ic: var(--ic-trend);
+}
+.tcard[data-go="invoicing"] {
+  --tile-bg: var(--tint-amber);
+  --tile-fg: var(--amber);
+  --tile-ic: var(--ic-in);
+}
+.tcard[data-go="supplier-invoices"] {
+  --tile-bg: var(--tint-red);
+  --tile-fg: var(--danger);
+  --tile-ic: var(--ic-out);
+}
+.tcard[data-go="banking"] {
+  --tile-bg: var(--tint-blue);
+  --tile-fg: var(--blue);
+  --tile-ic: var(--ic-bank);
+}
+
+/* ------------------------------------------------- 18 · one dominant chart
+   The bullet chart kept four colours and a legend that needed reading. It
+   becomes what the references draw: a thin rounded bar per job, the spent
+   part in the accent, the remainder pale, the budget a hairline mark, the
+   overrun red — and the hero figure above it in the serif, large. */
+.perfhero {
+  padding: var(--s-4) var(--s-5) var(--s-5);
+  gap: var(--s-3);
+}
+.perfhero b {
+  font: 600 var(--t-3xl) / 1 var(--serif);
+  letter-spacing: -0.03em;
+}
+.perfkey {
+  font-size: var(--t-xs);
+  color: var(--muted);
+  padding: var(--s-3) var(--s-5) 0;
+}
+.perfrow {
+  padding: var(--s-3) var(--s-5);
+  border-radius: var(--r-sm);
+  margin: 0 var(--s-2);
+}
+.perfrow .code {
+  font-weight: 600;
+  color: var(--ink);
+}
+.perfrow .code .nm {
+  font-weight: 400;
+  color: var(--muted);
+}
+.blt {
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--hair);
+  overflow: visible;
+}
+.blt i {
+  border-radius: var(--r-full);
+}
+.blt .spent {
+  background: var(--green);
+}
+.blt .togo {
+  background: var(--greenPale);
+}
+.blt .over {
+  background: var(--danger);
+}
+.blt .tick {
+  top: -4px;
+  height: 16px;
+  width: 2px;
+  background: var(--ink);
+  opacity: 0.55;
+}
+.perfkey span b {
+  border-radius: 0;
+}
+.bar {
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--hair);
+}
+.bar i {
+  background: var(--green);
+  border-radius: var(--r-full);
+}
+
+/* --------------------------------------------------- 19 · attention list
+   The notifications panel of reference two: each item a row with a severity
+   mark on its edge, the message in the ink, the meta in grey. */
+.alrow {
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--hair);
+  font-size: var(--t-md);
+}
+.alrow b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.alrow .meta {
+  color: var(--muted);
+  font-size: var(--t-xs);
+  margin-top: 2px;
+}
+.alrow:hover {
+  background: var(--bg);
+}
+
+/* ---------------------------------------------------- 20 · empty & pills
+   An empty state that says so calmly; status pills that read as a system. */
+.empty {
+  padding: var(--s-8) var(--s-6);
+  color: var(--faint);
+  font-size: var(--t-md);
+}
+.pill.g {
+  background: var(--greenSoft);
+  color: var(--greenDeep);
+}
+.pill.b {
+  background: var(--blueSoft);
+  color: var(--blue);
+}
+
+/* --------------------------------------------------------- 21 · phones
+   The bottom bar keeps the same items; the active one becomes the filled
+   pill, the accent bar moves to the top edge, and the floating button takes
+   the accent because it is the one thing on a phone that creates. */
+@media (max-width: 860px) {
+  /* The page's own phone rule collapses the grid to one column because the
+     rail leaves the flow to become the bottom bar. This sheet's desktop rule
+     above would otherwise win by load order and leave `main` in a 92px
+     column — which is exactly what the first phone screenshot showed. */
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .p1 {
+    background: rgba(255, 255, 255, 0.97);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 24px -16px rgba(16, 24, 40, 0.18);
+    padding: 6px 6px calc(8px + env(safe-area-inset-bottom));
+    gap: 2px;
+  }
+  .secitem {
+    padding: 6px 2px;
+    border-radius: var(--r-sm);
+  }
+  .secitem.on::after {
+    left: 14px;
+    right: 14px;
+    top: -6px;
+    bottom: auto;
+    width: auto;
+    height: 3px;
+    border-radius: 0;
+  }
+  .secitem .ic {
+    width: 22px;
+    height: 22px;
+  }
+  main {
+    padding: var(--s-5) var(--s-4) 110px;
+  }
+  .tcard {
+    padding: var(--s-4);
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+  .tcard::before {
+    width: 40px;
+    height: 40px;
+  }
+  .tcard::after {
+    left: calc(var(--s-4) + 9px);
+    top: calc(var(--s-4) + 9px);
+  }
+  .tcard .val {
+    font-size: var(--t-xl);
+  }
+  .fab {
+    background: var(--green);
+    color: #fff;
+    box-shadow: var(--e-3);
+  }
+  .torrebar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .torrebar .btn {
+    flex: none;
+  }
+}
+
+/* ------------------------------------------------------------ 22 · icons
+   Monochrome, 24-unit, stroke-based — the vocabulary the references use.
+   Held as masks so they paint in the current text colour and switch with
+   the state like a glyph. Nothing is fetched: each is its own data URI. */
+:root {
+  --ic-search: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><path d='m20 20-3.5-3.5'/></svg>");
+  --ic-tower: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='7' height='9' rx='1.5'/><rect x='14' y='3' width='7' height='5' rx='1.5'/><rect x='14' y='12' width='7' height='9' rx='1.5'/><rect x='3' y='16' width='7' height='5' rx='1.5'/></svg>");
+  --ic-sales: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='7' width='18' height='13' rx='2'/><path d='M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/><path d='M3 12h18'/></svg>");
+  --ic-projects: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 21h18'/><path d='M5 21V8l7-4 7 4v13'/><path d='M9 21v-5h6v5'/><path d='M9 11h.01M15 11h.01M9 15h.01M15 15h.01'/></svg>");
+  --ic-admin: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z'/><path d='M14 3v6h6'/><path d='M9 13h6M9 17h6'/></svg>");
+  --ic-master: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><ellipse cx='12' cy='6' rx='8' ry='3'/><path d='M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6'/><path d='M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6'/></svg>");
+  --ic-settings: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 6h10M18 6h2M4 12h2M10 12h10M4 18h10M18 18h2'/><circle cx='16' cy='6' r='2'/><circle cx='8' cy='12' r='2'/><circle cx='16' cy='18' r='2'/></svg>");
+  --ic-trend: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 17l6-6 4 4 8-8'/><path d='M15 7h6v6'/></svg>");
+  --ic-in: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M17 7 7 17'/><path d='M17 17H7V7'/></svg>");
+  --ic-out: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 17 17 7'/><path d='M7 7h10v10'/></svg>");
+  --ic-bank: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 10 12 4l9 6'/><path d='M5 10v8M10 10v8M14 10v8M19 10v8'/><path d='M3 20h18'/></svg>");
+}
+
+/* =============================================================================
+   PHASE 3 — the remodel.
+
+   Brief (operator, 3 Sep, second set of references): «very unstructured,
+   remove items, add items, no round edges, more colours, change the font,
+   full remodel, super aligned with the screenshots, drive it to the extreme,
+   the language button need not be so prominent.»
+
+   The three references agree with each other: a blue-led palette on a cool
+   grey ground, a dark navy icon rail, KPI figures as SOLID coloured blocks
+   with a white icon in a circle, square corners, an all-sans typeface, status
+   as solid rectangular chips, one hero chart. That is what this phase is.
+
+   WHAT DOES NOT CHANGE. The brand green stays on every document the company
+   sends (those sheets have their own stylesheet); in the interface it keeps
+   only its meaning — positive, done, healthy. Every element id, route and
+   handler is where it was, and the four dashboard cards stay four.
+   ========================================================================== */
+
+/* ---------------------------------------------------- 23 · tokens, redone */
+:root {
+  --rail: 84px;
+  /* Palette. Blue leads, navy anchors, teal and amber colour the rest. */
+  --accent: #2563eb;
+  --accentDeep: #1d4ed8;
+  --accentSoft: #dbeafe;
+  --accentPale: #eff6ff;
+  --navy: #1b2a4a;
+  --navyDeep: #16213a;
+  --teal: #0d9488;
+  --tealSoft: #ccfbf1;
+  --amber: #d97706;
+  --amberSoft: #fef3c7;
+  --danger: #dc2626;
+  --dangerSoft: #fee2e2;
+  --green: #16a34a;
+  --greenDeep: #15803d;
+  --greenSoft: #dcfce7;
+  --greenPale: #bbf7d0;
+  --bg: #f3f5f9;
+  --paper: #ffffff;
+  --line: #e2e8f0;
+  --hair: #eef2f7;
+  --ink: #0f172a;
+  --body: #334155;
+  --muted: #64748b;
+  --faint: #94a3b8;
+  --blue: var(--accent);
+  --blueSoft: var(--accentSoft);
+  /* No round edges. Three on a card, two on a control, none on a chip. */
+  --r-sm: 0;
+  --r-md: 0;
+  --r-lg: 0;
+  --r-full: 0;
+  --ring: 0 0 0 3px rgba(37, 99, 235, 0.3);
+  --shadow: none;
+  --e-1: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --e-2: 0 2px 8px -2px rgba(15, 23, 42, 0.1);
+  --e-3: 0 12px 28px -12px rgba(15, 23, 42, 0.22);
+  /* The typeface. Inter throughout — the serif headings were the old look. */
+  --serif: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+body {
+  font-size: 14px;
+  letter-spacing: 0;
+  color: var(--body);
+}
+h1,
+h2,
+h3 {
+  font-family: var(--sans);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+/* --------------------------------------------------------- 24 · top bar */
+.topbar {
+  padding: 0 var(--s-6);
+  min-height: 60px;
+  gap: var(--s-5);
+}
+.brand .nm {
+  font: 700 15px var(--sans);
+  letter-spacing: -0.01em;
+}
+/* Removed: the strapline under the company name. It said what the page is
+   to someone who already opened it. */
+.brand .nm small {
+  display: none;
+}
+.gsearch input {
+  border-radius: var(--r-md);
+  background: var(--bg);
+  border: 1px solid transparent;
+  padding: 9px 12px 9px 36px;
+  font-size: 13px;
+}
+.gsearch input:focus {
+  background: #fff;
+  border-color: var(--accent);
+}
+.gsearch::before {
+  left: 12px;
+  width: 15px;
+  height: 15px;
+}
+.btn.primary,
+#btnCreate {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn.primary:hover:not([disabled]):not(:disabled),
+#btnCreate:hover {
+  background: var(--accentDeep);
+  border-color: var(--accentDeep);
+}
+.btn {
+  border-radius: var(--r-sm);
+  font-weight: 600;
+}
+.gactions .btn.sm {
+  height: 36px;
+  padding: 0 var(--s-4);
+}
+.gactions select {
+  height: 36px;
+  border-radius: var(--r-sm);
+  border-color: var(--line);
+  font-weight: 600;
+  font-size: 13px;
+}
+/* Demoted: the ES · CA · EN pill. It stays reachable — a preference has to be
+   findable — but it no longer competes with the buttons that do work. Text
+   only, small, grey; the active one just says so in the accent. */
+#canei-lang-pill {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0;
+  box-shadow: none !important;
+  font: 600 10px var(--sans) !important;
+  letter-spacing: 0.08em !important;
+  gap: 2px !important;
+  opacity: 0.8;
+}
+#canei-lang-pill button {
+  padding: 4px 6px !important;
+  color: var(--faint) !important;
+  border-radius: 0;
+}
+#canei-lang-pill button.on {
+  background: transparent !important;
+  color: var(--accent) !important;
+}
+
+/* --------------------------------------------------------- 25 · the rail
+   Navy, as the first reference draws it: white icons on dark, the active
+   section a solid blue block. Square. The sub-panel stays white so a list
+   of routes reads as a list. */
+.shell {
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: none;
+}
+.p1 {
+  background: var(--navyDeep);
+  border-right: 0;
+  padding: var(--s-4) var(--s-3);
+  gap: var(--s-2);
+}
+.secitem {
+  border-radius: var(--r-md);
+  color: rgba(255, 255, 255, 0.62);
+  padding: 10px 2px 8px;
+}
+.secitem:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.secitem.on {
+  background: var(--accent);
+  color: #fff;
+}
+.secitem.on::after {
+  display: none;
+}
+/* Sentence case, on purpose. `text-transform` rewrites what innerText
+   returns, and the suite reads the rail's labels to prove a Catalan user sees
+   Catalan — «Projectes», not «PROJECTES». The third reference's sidebar is
+   sentence case too. */
+.secitem .lb {
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+.secitem .dot {
+  background: var(--amber);
+  box-shadow: 0 0 0 2px var(--navyDeep);
+}
+.p2 {
+  left: var(--rail);
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+}
+.p2 .p2h {
+  color: var(--faint);
+}
+.navitem {
+  border-radius: var(--r-sm);
+  font-weight: 500;
+}
+.navitem.on {
+  background: var(--accentPale);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ----------------------------------------------------- 26 · page header
+   The breadcrumb is gone — the rail already says where you are. The title is
+   bold sans; the explanation is one line, and only one. */
+main {
+  padding: var(--s-6) var(--s-6) 96px;
+}
+.crumbs {
+  display: none;
+}
+.head {
+  margin-bottom: var(--s-4);
+}
+.head h1 {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.head .sub {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.torrebar {
+  margin-bottom: var(--s-5);
+}
+.torrebar .ts {
+  font-size: 11px;
+}
+.torrebar .btn.sm {
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+}
+/* The first action is the one the references make solid. */
+.torrebar #tNewOpp {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* --------------------------------------------- 27 · KPI figures as blocks
+   The third reference: navy, blue, teal, then a white one — each with the
+   icon in a circle, the figure large and white, the label beneath it. The
+   same four tiles, the same routes, a different weight of colour. */
+.tcards {
+  gap: var(--s-4);
+}
+.tcard {
+  border: 0;
+  border-radius: var(--r-md);
+  padding: var(--s-5) var(--s-5) var(--s-5) 78px;
+  min-height: 104px;
+  box-shadow: var(--e-2);
+  display: block;
+  color: #fff;
+  background: var(--tile-bg);
+}
+.tcard:hover {
+  box-shadow: var(--e-3);
+  transform: translateY(-1px);
+}
+.tcard::before {
+  content: "";
+  position: absolute;
+  left: var(--s-5);
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  transform: translateY(-50%);
+  border-radius: 50%; /* the one circle the references keep */
+  background: rgba(255, 255, 255, 0.16);
+  -webkit-mask: none;
+  mask: none;
+}
+.tcard::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--s-5) + 12px);
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translateY(-50%);
+  background: #fff;
+  -webkit-mask: var(--tile-ic) center / contain no-repeat;
+  mask: var(--tile-ic) center / contain no-repeat;
+}
+.tcard .lab {
+  font: 500 12px var(--sans);
+  color: rgba(255, 255, 255, 0.82);
+  text-transform: none;
+  letter-spacing: 0;
+  order: 2;
+}
+.tcard .val {
+  font: 700 26px / 1.1 var(--sans);
+  letter-spacing: -0.02em;
+  color: #fff;
+  margin: 0 0 3px;
+}
+.tcard .sub {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.72);
+  margin-top: 4px;
+}
+/* The overdue line is written inline in the alarm colour by the script that
+   fills the tile. On a navy, blue or teal block red is unreadable, so on those
+   it is white and bold — the block's own colour already says it is money —
+   and on the white tile it keeps the alarm red it was given. */
+.tcard .sub span[style*="danger"] {
+  color: #fff !important;
+  font-weight: 600;
+}
+.tcard[data-go="banking"] .sub span[style*="danger"] {
+  color: var(--danger) !important;
+}
+.tcard .dot {
+  background: var(--amber);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+.tcard[data-go="economics"] {
+  --tile-bg: var(--navy);
+  --tile-ic: var(--ic-trend);
+}
+.tcard[data-go="invoicing"] {
+  --tile-bg: var(--accent);
+  --tile-ic: var(--ic-in);
+}
+.tcard[data-go="supplier-invoices"] {
+  --tile-bg: var(--teal);
+  --tile-ic: var(--ic-out);
+}
+.tcard[data-go="banking"] {
+  --tile-bg: #fff;
+  --tile-ic: var(--ic-bank);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.tcard[data-go="banking"]::before {
+  background: var(--accentSoft);
+}
+.tcard[data-go="banking"]::after {
+  background: var(--accent);
+}
+.tcard[data-go="banking"] .lab {
+  color: var(--muted);
+}
+.tcard[data-go="banking"] .val {
+  color: var(--ink);
+}
+.tcard[data-go="banking"] .sub {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------- 28 · cards
+   Flat, square, hairline. The heading in bold sans at 15. */
+.card {
+  border-radius: var(--r-md);
+  box-shadow: none;
+  border: 1px solid var(--line);
+}
+.card > .ch {
+  padding: var(--s-4) var(--s-5);
+}
+.card > .ch h3 {
+  font: 700 15px var(--sans);
+  letter-spacing: -0.01em;
+}
+.tag {
+  border-radius: var(--r-sm);
+}
+
+/* ------------------------------------------------------ 29 · hero chart
+   Blue bars, a pale remainder, a navy budget mark, red past it. The hero
+   figure bold and large in the sans. */
+.perfhero b {
+  font: 700 30px / 1 var(--sans);
+  letter-spacing: -0.025em;
+}
+.perfhero .pct {
+  color: var(--accent);
+  font-weight: 700;
+}
+.blt {
+  height: 10px;
+  border-radius: var(--r-sm);
+  background: var(--hair);
+}
+.blt i {
+  border-radius: var(--r-sm);
+}
+.blt .spent {
+  background: var(--accent);
+}
+.blt .togo {
+  background: var(--accentSoft);
+}
+.blt .over {
+  background: var(--danger);
+}
+.blt .tick {
+  background: var(--navy);
+  opacity: 1;
+  top: -3px;
+  height: 16px;
+}
+.perfrow {
+  border-radius: 0;
+  margin: 0;
+}
+.perfrow:hover {
+  background: var(--accentPale);
+}
+.perfrow .fig {
+  color: var(--ink);
+}
+.perfkey span b {
+  border-radius: 0;
+  width: 10px;
+  height: 10px;
+}
+/* The swatches are coloured inline by the script that draws the chart, in
+   the old palette. Repainted here in the order the chart emits them, so the
+   key describes the bars beneath it and not the bars of two phases ago. */
+.perfkey span:nth-child(1) b {
+  background: var(--accent) !important;
+}
+.perfkey span:nth-child(2) b {
+  background: var(--accentSoft) !important;
+  outline: 1px solid var(--line);
+}
+.perfkey span:nth-child(3) b {
+  background: var(--danger) !important;
+}
+.perfkey span:nth-child(4) b {
+  background: var(--navy) !important;
+}
+.bar {
+  border-radius: var(--r-sm);
+}
+.bar i {
+  background: var(--accent);
+  border-radius: var(--r-sm);
+}
+
+/* --------------------------------------------------------- 30 · tables
+   The task table of the first reference: a light header band, sentence-case
+   labels, generous rows, and status as a solid rectangular chip. */
+thead th {
+  background: #f8fafc;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  padding: 10px var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+tbody td {
+  padding: 11px var(--s-4);
+  border-bottom: 1px solid var(--hair);
+  font-size: 13px;
+}
+tbody tr.click:hover {
+  background: var(--accentPale);
+}
+td.k,
+.k {
+  color: var(--accent);
+  font-weight: 600;
+}
+.pill {
+  border-radius: var(--r-sm);
+  font: 600 10.5px / 1.7 var(--sans);
+  padding: 2px 8px;
+  letter-spacing: 0.02em;
+  background: #e2e8f0;
+  color: var(--body);
+}
+.pill.g {
+  background: var(--teal);
+  color: #fff;
+}
+.pill.y {
+  background: var(--amber);
+  color: #fff;
+}
+.pill.r {
+  background: var(--danger);
+  color: #fff;
+}
+.pill.b {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* --------------------------------------------------- 31 · attention list */
+.alrow {
+  padding: 11px var(--s-5);
+  border-left: 3px solid var(--danger);
+}
+.alrow:hover {
+  background: var(--accentPale);
+}
+.alrow .meta {
+  color: var(--faint);
+}
+
+/* --------------------------------------------- 32 · forms, focus, misc */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border-radius: var(--r-sm);
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+}
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  border-radius: var(--r-sm);
+}
+a {
+  color: var(--accent);
+}
+.empty {
+  color: var(--faint);
+}
+
+/* ---------------------------------------------------------- 33 · phones */
+@media (max-width: 860px) {
+  /* Same lesson as phase 2, one phase later: the rail leaves the flow to be
+     the bottom bar, so the grid must be one column or `main` lands in the
+     rail's 84px. Restated here because section 25 above resets the grid. */
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .p1 {
+    background: var(--navyDeep);
+    border-top: 0;
+    box-shadow: 0 -8px 24px -16px rgba(15, 23, 42, 0.4);
+  }
+  .secitem {
+    border-radius: var(--r-md);
+    color: rgba(255, 255, 255, 0.62);
+  }
+  .secitem.on {
+    background: var(--accent);
+    color: #fff;
+  }
+  .secitem.on::after {
+    display: none;
+  }
+  .fab {
+    background: var(--accent);
+    border-radius: var(--r-md);
+  }
+  .tcard {
+    padding: var(--s-4) var(--s-4) var(--s-4) 70px;
+    min-height: 88px;
+  }
+  .tcard::before {
+    left: var(--s-4);
+    width: 42px;
+    height: 42px;
+  }
+  .tcard::after {
+    left: calc(var(--s-4) + 10px);
+  }
+  .tcard .val {
+    font-size: 22px;
+  }
+  .head .sub {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  #canei-lang-pill {
+    opacity: 0.7;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 4 · What the published design systems agree on
+   Read from the source repositories on GitHub (the doc sites are outside
+   this session's egress): Carbon's data-table style and status-indicator
+   pattern, Polaris' colour roles and badge content rules, GOV.UK's table
+   component, Lightning's data-table docs, Ant Design Pro's layout
+   conventions. Only the practices a stylesheet can honour are here; the
+   ones that need markup or logic (sortable headers, batch-action bars,
+   skeleton loading, table captions) are listed in the pull request as
+   later work, because this branch changes no behaviour.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ------------------------------------------------- 34 · column headers
+   Carbon: column header 600 weight at body size, sentence case, on a light
+   «layer-accent» band; GOV.UK and Carbon both: no letter-spaced capitals
+   over data. The suite reads header text through textContent or a
+   case-insensitive pattern, so the case change is invisible to it. */
+thead th {
+  text-transform: none;
+  font: 600 12px / 1.3 var(--sans);
+  letter-spacing: 0;
+  color: var(--ink);
+  background: #f1f5f9;
+  padding: 10px var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+
+/* ------------------------------------------------------- 35 · rows
+   Carbon's medium row is 40px: 10px of padding round 13px type lands
+   there. Column padding 16px (Carbon spacing-05). Row text sits one level
+   down the hierarchy and comes up to primary on hover, which is also
+   neutral — Polaris keeps the accent for the thing you press, not the row
+   you are over. Numbers are tabular everywhere so columns of figures line
+   up even in cells nobody marked `.num` (GOV.UK: right-align what is
+   compared). */
+tbody td {
+  padding: 10px var(--s-4);
+  color: var(--body);
+  font-variant-numeric: tabular-nums;
+}
+tbody tr.click:hover {
+  background: #f8fafc;
+}
+tbody tr.click:hover td {
+  color: var(--ink);
+}
+tr.tot td {
+  background: #f8fafc;
+  color: var(--ink);
+  border-top: 2px solid var(--line);
+}
+td.amt,
+td.tot,
+th.amt {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------- 36 · status: colour + shape
+   Carbon's status-indicator pattern: a status must carry at least two of
+   colour, shape and symbol, because colour alone fails a tenth of the
+   people reading it. Every pill therefore gets a dot of its own colour in
+   front of the word — a pseudo-element, so textContent and the checks that
+   read it are untouched. Polaris' badge is a soft fill with a paired
+   on-fill text colour; the solid chips of phase 3 shouted from every row,
+   and the references use the soft form in tables. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--r-sm);
+  font: 600 11px / 1.6 var(--sans);
+  padding: 2px 8px 2px 7px;
+  letter-spacing: 0.01em;
+  background: #f1f5f9;
+  color: var(--body);
+}
+.pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+.pill.g {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+.pill.y {
+  background: #fef3c7;
+  color: #b45309;
+}
+.pill.r {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.pill.b {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* -------------------------------------------------- 37 · empty states
+   Carbon's empty-state anatomy is glyph, title, body, action. The markup
+   here is one sentence, so the sheet supplies the glyph and a bounded
+   region — a dashed field says «nothing here yet» where an unbounded grey
+   sentence read like a caption. */
+:root {
+  --ic-empty: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M4 5h16v14H4z'/><path d='M4 13h4.5l1.5 2.5h4l1.5-2.5H20'/></svg>");
+}
+.empty {
+  padding: 26px 20px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-sm);
+  background: #fafbfc;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.empty::before {
+  content: "";
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin: 0 auto 8px;
+  background: currentColor;
+  opacity: 0.45;
+  -webkit-mask: var(--ic-empty) center / contain no-repeat;
+  mask: var(--ic-empty) center / contain no-repeat;
+}
+.card > .empty {
+  margin: var(--s-4);
+}
+td > .empty {
+  margin: var(--s-2) 0;
+}
+
+/* --------------------------------------------- 38 · cards and sections
+   Polaris: hierarchy by weight and contrast, «avoid divider lines outside
+   data tables». The card heading loses its rule; the table's own header
+   band, or the whitespace, does the separating. Ant Design Pro: the page
+   title carries the primary action at the right, the description below. */
+.card > .ch {
+  border-bottom: 0;
+  padding-bottom: var(--s-2);
+}
+.card > .ch + .scroll thead th,
+.card > .ch + table thead th {
+  border-top: 1px solid var(--line);
+}
+.head h1 {
+  letter-spacing: -0.02em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 5 · The premium pass — the operator's review of phase 3 on a phone
+   «Fix the header line to be top notch with the logo; the colour theme must
+   originate from the logo green; text sizes and font style are not aligned;
+   bell, year and profile look bad — integrate them; still far from premium.»
+   Everything below is the answer. Still CSS (plus one self-hosted font file
+   under site/fonts, SIL OFL). No markup, no handler, no id moved.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ------------------------------------------------ 39 · the typeface
+   Geist, variable, self-hosted: 68 KB, one file, weights 100–900, no call
+   to a third party (RGPD: no font requests leave the tenant's server). It
+   is the difference between «school project» and product — the system
+   font was doing all the talking before. */
+@font-face {
+  font-family: "Geist";
+  src: url("fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* -------------------------------------- 40 · the palette, from the logo
+   The mark is #48733c on a rounded square with a #f2c230 corner. The whole
+   interface now descends from those two: the green is the accent and the
+   active state, a near-black olive is the rail and the hero tile, the yellow
+   is the small signal (dots, the rail's attention mark). Nothing blue is
+   left; the reference dashboards' blue was borrowed, this is owned. */
+:root {
+  --accent: #48733c;
+  --accentDeep: #3a5f30;
+  --accentSoft: #e1eadb;
+  --accentPale: #f2f6ef;
+  --navy: #1c2a19;
+  --navyDeep: #151f13;
+  --gold: #f2c230;
+  --goldDeep: #a8741c;
+  --goldSoft: #fdf3cd;
+  --teal: #a8741c;
+  --tealSoft: #fdf3cd;
+  --bg: #f4f6f1;
+  --line: #e3e8dd;
+  --hair: #eef1e9;
+  --ink: #172015;
+  --body: #3a4537;
+  --muted: #6a7466;
+  --faint: #9aa394;
+  --green: #48733c;
+  --greenDeep: #3a5f30;
+  --greenSoft: #e1eadb;
+  --blue: #48733c;
+  --blueSoft: #e1eadb;
+  --ring: 0 0 0 3px rgba(72, 115, 60, 0.28);
+  --e-1: 0 1px 2px rgba(23, 32, 21, 0.04);
+  --e-2: 0 1px 2px rgba(23, 32, 21, 0.05), 0 10px 30px -24px rgba(23, 32, 21, 0.3);
+  --e-3: 0 14px 36px -16px rgba(23, 32, 21, 0.28);
+  --serif: "Geist", Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sans: "Geist", Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ic-bell: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9a6 6 0 0 1 12 0c0 6 2 8 2 8H4s2-2 2-8'/><path d='M10 21h4'/></svg>");
+  --ic-user: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='8' r='4'/><path d='M4 21a8 8 0 0 1 16 0'/></svg>");
+  --ic-chevron: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236a7466' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  --ic-plus: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round'><path d='M12 5v14M5 12h14'/></svg>");
+}
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* -------------------------------------------------- 41 · the header
+   One line, 64px, white on a hairline. Logo and name at the left as the
+   way home; search in the middle as a quiet field; at the right the four
+   controls the spec asks for, now as one cluster: Create in the green,
+   alerts as a bell glyph with its count, the period as a ghost control
+   with a chevron, the profile as an avatar disc. The emoji are still in
+   the DOM (the suite presses these buttons by id) and are painted over
+   exactly as the rail's are. */
+.topbar {
+  min-height: 64px;
+  padding: 0 var(--s-6);
+  gap: var(--s-5);
+  flex-wrap: nowrap;
+  background: #fff;
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  gap: 11px;
+}
+.brand svg {
+  width: 34px;
+  height: 34px;
+  flex: none;
+}
+.brand .nm {
+  font: 700 16px / 1 var(--sans);
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.brand:focus-visible {
+  outline-color: var(--accent);
+  border-radius: var(--r-md);
+}
+.gsearch {
+  flex: 1 1 320px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.gsearch input {
+  height: 40px;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  padding: 0 12px 0 38px;
+  font: 13.5px var(--sans);
+  color: var(--ink);
+}
+.gsearch input::placeholder {
+  color: var(--faint);
+}
+.gsearch input:focus {
+  background: #fff;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.gsearch::before {
+  left: 13px;
+  width: 16px;
+  height: 16px;
+  opacity: 0.6;
+}
+.gactions {
+  gap: 4px;
+  flex-wrap: nowrap;
+  flex: none;
+}
+.gactions .btn.sm,
+#btnCreate {
+  height: 38px;
+  border-radius: var(--r-md);
+  font: 600 13px var(--sans);
+}
+#btnCreate {
+  padding: 0 14px 0 12px;
+  margin-right: 6px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(23, 32, 21, 0.12);
+}
+#btnCreate:hover {
+  background: var(--accentDeep);
+  border-color: var(--accentDeep);
+}
+/* Bell and profile: square ghost buttons, glyph only. The badge keeps its
+   own font because the button's is zeroed to hide the emoji. */
+.gactions .btn.sm.bell,
+#btnUser {
+  width: 38px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--body);
+  font-size: 0;
+  position: relative;
+}
+.gactions .btn.sm.bell::before,
+#btnUser::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 20px;
+  height: 20px;
+  background: currentColor;
+  -webkit-mask: var(--ic-bell) center / contain no-repeat;
+  mask: var(--ic-bell) center / contain no-repeat;
+}
+.gactions .btn.sm.bell:hover {
+  background: var(--accentPale);
+  color: var(--ink);
+}
+.bell .badge {
+  top: 3px;
+  right: 3px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 0;
+  background: var(--danger);
+  color: #fff;
+  font: 700 9.5px / 16px var(--sans);
+  padding: 0 4px;
+  box-shadow: 0 0 0 2px #fff;
+}
+#btnUser {
+  width: 34px;
+  height: 34px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: var(--accentSoft);
+  color: var(--accentDeep);
+}
+#btnUser::before {
+  width: 18px;
+  height: 18px;
+  -webkit-mask-image: var(--ic-user);
+  mask-image: var(--ic-user);
+}
+#btnUser:hover {
+  background: var(--accent);
+  color: #fff;
+}
+.gactions select.period {
+  height: 38px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent var(--ic-chevron) no-repeat right 8px center / 13px;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0 26px 0 10px;
+  font: 600 13px var(--sans);
+  color: var(--body);
+  cursor: pointer;
+}
+.gactions select.period:hover {
+  background-color: var(--accentPale);
+  color: var(--ink);
+}
+.gactions select.period:focus-visible {
+  box-shadow: var(--ring);
+  outline: 0;
+}
+.gactions input.dt {
+  height: 38px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  font: 13px var(--sans);
+}
+/* The language pill: last in the row, small, grey, the current one green. */
+#canei-lang-pill {
+  order: 99;
+  margin-left: var(--s-2);
+  font-size: 10px !important;
+}
+#canei-lang-pill button.on {
+  color: var(--accent) !important;
+}
+.menu {
+  border-radius: var(--r-md);
+  box-shadow: var(--e-3);
+  border-color: var(--line);
+}
+
+/* --------------------------------------------- 42 · one type scale
+   Every size on the page now sits on one ramp of the one face. Page title
+   24/700, its line 13.5, card headings 15/600, table 13.5, figures
+   tabular. On a phone the ramp steps down one size, and the page's
+   description line goes — on a 390px screen it was three lines of grey
+   before the first number. */
+.head h1 {
+  font: 700 24px / 1.15 var(--sans);
+  letter-spacing: -0.022em;
+  color: var(--ink);
+}
+.head .sub {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.card > .ch h3 {
+  font: 600 15px / 1.3 var(--sans);
+  letter-spacing: -0.01em;
+}
+table {
+  font-size: 13.5px;
+}
+thead th {
+  background: #f3f5f0;
+  font: 600 12px / 1.3 var(--sans);
+}
+tbody tr.click:hover {
+  background: var(--accentPale);
+}
+tr.tot td {
+  background: #f3f5f0;
+}
+td.k,
+.k {
+  color: var(--accentDeep);
+}
+.btn {
+  font: 600 13px var(--sans);
+  border-color: var(--line);
+  color: var(--ink);
+  border-radius: var(--r-md);
+}
+.btn:hover:not([disabled]):not(:disabled):not(.primary):not(.danger) {
+  background: var(--accentPale);
+  border-color: var(--accentSoft);
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.secitem .lb {
+  font: 600 10.5px var(--sans);
+  letter-spacing: 0.01em;
+}
+.secitem .dot {
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--navyDeep);
+}
+
+/* ------------------------------------------- 43 · surfaces and tiles
+   White cards on the warm-grey ground, a hairline and a shadow that only
+   reads as depth up close. The four tiles: near-black olive for the margin,
+   the logo green for what is owed to us, the logo's gold deepened for what
+   we owe, white for the bank. The «overdue» dot is the logo's gold. */
+.card {
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  box-shadow: var(--e-2);
+}
+.tcard {
+  border-radius: var(--r-md);
+  box-shadow: var(--e-2);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 60%);
+}
+.tcard[data-go="economics"] {
+  --tile-bg: var(--navy);
+}
+.tcard[data-go="invoicing"] {
+  --tile-bg: var(--accent);
+}
+.tcard[data-go="supplier-invoices"] {
+  --tile-bg: var(--goldDeep);
+}
+.tcard[data-go="banking"] {
+  --tile-bg: #fff;
+  border: 1px solid var(--line);
+}
+.tcard .lb {
+  font: 500 12px var(--sans);
+  letter-spacing: 0;
+}
+.tcard .val {
+  font: 700 28px / 1.1 var(--sans);
+  letter-spacing: -0.025em;
+}
+.tcard .sub {
+  font-size: 12px;
+}
+.tcard .sub span[style*="danger"]::before {
+  background: var(--gold) !important;
+}
+.pill.g {
+  background: var(--accentSoft);
+  color: var(--accentDeep);
+}
+.pill.y {
+  background: var(--goldSoft);
+  color: #8a5a00;
+}
+.pill.b {
+  background: #e4ebf1;
+  color: #34506a;
+}
+.blt .spent {
+  background: var(--accent);
+}
+.blt .togo {
+  background: var(--accentSoft);
+}
+.blt .tick {
+  background: var(--navy);
+}
+.perfkey span:nth-child(1) b {
+  background: var(--accent) !important;
+}
+.perfkey span:nth-child(2) b {
+  background: var(--accentSoft) !important;
+}
+.perfkey span:nth-child(4) b {
+  background: var(--navy) !important;
+}
+.perfhero .pct {
+  color: var(--accent);
+}
+.bar i {
+  background: var(--accent);
+}
+.fab {
+  background: var(--accent);
+  box-shadow: var(--e-3);
+}
+.fab:hover {
+  background: var(--accentDeep);
+}
+a {
+  color: var(--accentDeep);
+}
+.alrow {
+  border-left-color: var(--danger);
+}
+.alrow:hover {
+  background: var(--accentPale);
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+/* --------------------------------------------------- 44 · the phone
+   The review was written on a phone, so this is where it counts. One
+   56px line: logo and name, then the cluster — Create as a round green
+   plus, bell, period, avatar. The search takes the whole second line at
+   38px. The language pill leaves the phone: the sign-in page and the
+   profile menu both still offer the choice, and a preference does not
+   need a permanent seat on a 390px screen. The Torre's action row becomes
+   a two-column grid so no button is cut in half. */
+@media (max-width: 860px) {
+  .topbar {
+    flex-wrap: wrap;
+    min-height: 0;
+    padding: 0 14px;
+    gap: 0 6px;
+  }
+  .brand {
+    order: 1;
+    height: 56px;
+    gap: 9px;
+  }
+  .brand svg {
+    width: 30px;
+    height: 30px;
+  }
+  .brand .nm {
+    font-size: 15px;
+  }
+  .tsp {
+    display: none;
+  }
+  .gactions {
+    order: 2;
+    margin-left: auto;
+    height: 56px;
+    gap: 2px;
+  }
+  #btnCreate {
+    width: 38px;
+    padding: 0;
+    margin-right: 2px;
+    font-size: 0;
+    border-radius: 50%;
+    position: relative;
+  }
+  #btnCreate::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 18px;
+    height: 18px;
+    background: var(--ic-plus) center / contain no-repeat;
+  }
+  .gactions select.period {
+    padding: 0 22px 0 6px;
+    font-size: 12.5px;
+    max-width: 86px;
+    text-overflow: ellipsis;
+  }
+  #btnUser {
+    margin-left: 2px;
+  }
+  .gsearch {
+    order: 3;
+    flex: 1 1 100%;
+    max-width: none;
+    margin: 0 0 10px;
+  }
+  .gsearch input {
+    height: 38px;
+  }
+  #canei-lang-pill {
+    display: none !important;
+  }
+  .head h1 {
+    font-size: 22px;
+  }
+  .head .sub {
+    display: none;
+  }
+  .torrebar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .torrebar .ts {
+    flex: 1 1 100%;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .torrebar > span:not(.ts) {
+    display: none;
+  }
+  .torrebar .btn {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+    height: 40px;
+  }
+  .tcard .val {
+    font-size: 26px;
+  }
+  .p1 {
+    background: var(--navyDeep);
+  }
+  .secitem.on {
+    background: var(--accent);
+  }
+}
+@media (max-width: 420px) {
+  /* 390px: brand and cluster must share one 56px line. Measured: the name at
+     15px plus four controls at their desktop widths overflowed by 8px and
+     wrapped the cluster under the logo. */
+  .topbar {
+    gap: 0 4px;
+    padding: 0 12px;
+  }
+  .brand .nm {
+    font-size: 14.5px;
+  }
+  #btnCreate,
+  .gactions .btn.sm.bell {
+    width: 36px;
+    height: 36px;
+  }
+  .gactions select.period {
+    max-width: 74px;
+    padding: 0 20px 0 4px;
+    background-position: right 5px center;
+  }
+  #btnUser {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 6 · Second premium pass
+   «Needs attention — the red signal is not looking premium; implement
+   another solution.» And the rest of the phone review, pushed further:
+   lighter action rows, more air, quieter chrome.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ------------------------------------------- 45 · the attention rows
+   The severity used to be a coloured emoji circle — a traffic light on
+   every row. It is now a 32px tinted square with a line glyph: red tint
+   and an alert circle for critical, gold tint and a flag for high, grey
+   and an info mark for the rest. The emoji stays in the DOM (the suite
+   and the message text are untouched); the row carries `data-sev`, which
+   the two templates now write, so the sheet can tell them apart without
+   reading text. The message drops to medium weight — a list of twenty
+   bold lines is shouting, not ranking. */
+:root {
+  --ic-alert: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M12 8v4.5M12 16h.01'/></svg>");
+  --ic-flag: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M5 21V4'/><path d='M5 4h12l-2.5 4 2.5 4H5'/></svg>");
+  --ic-info: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M12 11v5M12 8h.01'/></svg>");
+}
+.alrow {
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px var(--s-5);
+  border-left: 0;
+  font-size: 13.5px;
+}
+.alrow > div:first-child {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-md);
+  background: var(--hair);
+  font-size: 0;
+  position: relative;
+  align-self: start;
+}
+.alrow > div:first-child::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 17px;
+  height: 17px;
+  background: var(--muted);
+  -webkit-mask: var(--ic-info) center / contain no-repeat;
+  mask: var(--ic-info) center / contain no-repeat;
+}
+.alrow[data-sev="critical"] > div:first-child {
+  background: #fbeae7;
+}
+.alrow[data-sev="critical"] > div:first-child::before {
+  background: #c0392b;
+  -webkit-mask-image: var(--ic-alert);
+  mask-image: var(--ic-alert);
+}
+.alrow[data-sev="high"] > div:first-child {
+  background: var(--goldSoft);
+}
+.alrow[data-sev="high"] > div:first-child::before {
+  background: var(--goldDeep);
+  -webkit-mask-image: var(--ic-flag);
+  mask-image: var(--ic-flag);
+}
+.alrow b {
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.35;
+}
+.alrow b.click:hover {
+  color: var(--accentDeep);
+}
+.alrow .meta {
+  font-size: 12px;
+  margin-top: 3px;
+}
+.alrow:hover {
+  background: var(--accentPale);
+}
+.alrow .acts button {
+  height: 28px;
+  font-size: 11.5px;
+}
+.algroup {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--muted);
+  padding: 12px var(--s-5) 4px;
+}
+
+/* ------------------------------------------------ 46 · quieter chrome
+   The Torre's action row: one solid button, the rest as text buttons that
+   only grow a surface on hover. More air around the page and inside the
+   cards. Section-count tags as quiet chips. The phone's FAB a disc. */
+main {
+  padding: 28px 32px 96px;
+}
+.head {
+  margin-bottom: 18px;
+}
+.head h1 {
+  font-size: 26px;
+}
+.torrebar {
+  margin-bottom: 18px;
+  gap: 4px;
+}
+.torrebar .btn.sm {
+  height: 36px;
+  border-radius: var(--r-md);
+  font-size: 13px;
+}
+.torrebar .btn.sm:not(#tNewOpp) {
+  background: transparent;
+  border-color: transparent;
+  color: var(--body);
+}
+.torrebar .btn.sm:not(#tNewOpp):hover {
+  background: var(--accentPale);
+  border-color: transparent;
+  color: var(--ink);
+}
+.torrebar .ts {
+  margin-right: var(--s-3);
+}
+.card > .ch {
+  padding: 16px 20px 8px;
+}
+.card > .ch .tag {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--muted);
+  background: var(--hair);
+  border-radius: var(--r-sm);
+  padding: 3px 8px;
+}
+thead th,
+tbody td {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+.tcard {
+  padding: 18px 18px 18px 80px;
+  min-height: 108px;
+}
+.tcard .lb {
+  opacity: 0.82;
+}
+.tcard .val {
+  font-size: 30px;
+}
+.secitem:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.fab {
+  border-radius: 50%; /* the 56px target the spec (§3) and the suite ask for stays */
+}
+@media (max-width: 860px) {
+  main {
+    padding: 18px 14px 96px;
+  }
+  .head h1 {
+    font-size: 23px;
+  }
+  .torrebar .btn.sm:not(#tNewOpp) {
+    background: #fff;
+    border-color: var(--line);
+  }
+  .card > .ch {
+    padding: 14px 16px 6px;
+  }
+  thead th,
+  tbody td {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .alrow {
+    padding: 10px 14px;
+  }
+}
+
+/* ------------------------------------------- 47 · one «+», not two
+   Operator, on the phone: «keep only one + and ensure all functions from
+   both are there». The header's Create now lists the section's creations
+   and the site actions (renderCreateMenu); the floating button is hidden —
+   still in the DOM, still wired, one rule away from coming back. Menu rows
+   are 48px on a phone, the rule between the two groups is a hairline. */
+.fab {
+  display: none !important;
+}
+.menu .sep {
+  height: 1px;
+  background: var(--hair);
+  margin: 4px 6px;
+}
+@media (max-width: 860px) {
+  .menu button {
+    min-height: 48px;
+  }
+  main {
+    padding-bottom: 96px;
+  }
+}
+
+/* ------------------------------------------- 48 · the header cluster
+   Operator: «this area looks not premium — redo with best practices, more
+   modern and structured». The practice (Linear, Stripe, Atlassian's top
+   navigation): one primary action, then a group of identical square icon
+   buttons, then the identity, with hairline dividers between the groups,
+   everything on one 36px height and one gap. The period is a real control
+   again — bordered, a calendar glyph at the left, the chevron at the right,
+   a fixed width so the widest option does not stretch it. The alert count
+   sits on the button's corner, not on the bell. The language switch is a
+   small segmented control at the end of the row, on the same geometry. */
+:root {
+  --ic-bell: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'/><path d='M13.7 21a2 2 0 0 1-3.4 0'/></svg>");
+  --ic-calendar: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a4537' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='5' width='18' height='16' rx='2'/><path d='M16 3v4M8 3v4M3 10h18'/></svg>");
+}
+.gactions {
+  gap: 8px;
+  align-items: center;
+}
+.gactions .menuwrap {
+  display: flex;
+  align-items: center;
+}
+.gactions .btn.sm,
+#btnCreate,
+.gactions select.period,
+.gactions input.dt {
+  height: 36px;
+}
+#btnCreate {
+  margin-right: 4px;
+  padding: 0 14px 0 12px;
+  letter-spacing: 0;
+}
+/* A hairline after the primary action and before the identity. */
+#btnCreate + .menu {
+  margin-right: 0;
+}
+.gactions > .menuwrap:first-child::after,
+.gactions > .menuwrap:last-child::before {
+  content: "";
+  width: 1px;
+  height: 20px;
+  background: var(--line);
+  margin: 0 4px;
+}
+.gactions .btn.sm.bell,
+#btnUser {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: #fff;
+  color: var(--body);
+  margin: 0;
+}
+.gactions .btn.sm.bell::before {
+  width: 18px;
+  height: 18px;
+}
+.gactions .btn.sm.bell:hover,
+#btnUser:hover {
+  background: var(--accentPale);
+  border-color: var(--accentSoft);
+  color: var(--ink);
+}
+.bell .badge {
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 0;
+  font: 700 10px / 18px var(--sans);
+  padding: 0 5px;
+  box-shadow: 0 0 0 2px #fff;
+}
+.gactions select.period {
+  width: 112px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background-color: #fff;
+  background-image: var(--ic-calendar), var(--ic-chevron);
+  background-repeat: no-repeat, no-repeat;
+  background-position:
+    10px center,
+    right 8px center;
+  background-size: 15px, 13px;
+  padding: 0 24px 0 32px;
+  font: 600 12.5px var(--sans);
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gactions select.period:hover {
+  background-color: var(--accentPale);
+  border-color: var(--accentSoft);
+}
+.gactions input.dt {
+  width: 132px;
+  padding: 0 8px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+#btnUser {
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  background: var(--accentSoft);
+  border-color: transparent;
+  color: var(--accentDeep);
+}
+#btnUser:hover {
+  background: var(--accent);
+  color: #fff;
+}
+/* The language switch: a segmented control on the row's geometry. */
+#canei-lang-pill {
+  top: 18px !important;
+  right: 24px !important;
+  height: 28px;
+  align-items: center;
+  background: #fff !important;
+  border: 1px solid var(--line) !important;
+  border-radius: var(--r-md) !important;
+  overflow: hidden;
+  opacity: 1;
+  font: 600 10.5px var(--sans) !important;
+  letter-spacing: 0.04em !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+#canei-lang-pill button {
+  height: 26px;
+  line-height: 26px;
+  padding: 0 9px !important;
+  color: var(--muted) !important;
+}
+#canei-lang-pill button.on {
+  background: var(--accentSoft) !important;
+  color: var(--accentDeep) !important;
+}
+#canei-lang-spacer {
+  margin-left: 4px;
+}
+@media (max-width: 860px) {
+  .gactions {
+    gap: 6px;
+  }
+  .gactions > .menuwrap:first-child::after,
+  .gactions > .menuwrap:last-child::before {
+    display: none;
+  }
+  #btnCreate {
+    width: 36px;
+    height: 36px;
+    margin: 0;
+  }
+  /* The period on a phone: the calendar glyph alone; the native picker
+     still opens with the full list of periods. */
+  .gactions select.period {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    color: transparent;
+    background-image: var(--ic-calendar);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 16px;
+    max-width: none;
+  }
+  .gactions input.dt {
+    width: 118px;
+  }
+  #btnUser {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 9 · The flyout menus, the attention panel and the project overview
+   Nine comments the operator left on the preview. The headline one: «all the
+   white Klappmenü … research best practices and apply to make it more
+   structured and intuitive, also across the different Klappmenü to indicate
+   the end-to-end flow of the sections.»
+
+   The practice every published navigation pattern agrees on (Carbon's side
+   nav, Polaris' navigation sections, Material's drawer, Atlassian's side
+   navigation): a panel names where you are, groups what is inside it, marks
+   the current item by more than colour, keeps 44px targets, and — where the
+   items are a SEQUENCE rather than a set — says so. This one does the last
+   part twice: the three sections that carry the work are numbered and linked
+   across panels, and inside a flow section the screens are numbered steps.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* -------------------------------------------------- 49 · the panel shell */
+.p2 {
+  width: 274px;
+  padding: 16px 12px 20px;
+  box-shadow: 24px 0 48px -34px rgba(23, 32, 21, 0.45);
+}
+.p2 .p2h {
+  font: 700 15px var(--sans);
+  letter-spacing: -0.012em;
+  text-transform: none;
+  color: var(--ink);
+  margin: 0 6px 10px;
+}
+
+/* ------------------------------------------- 50 · the journey across panels
+   Three chips, numbered, connected: sold → built → settled. The current one
+   is filled, the ones behind it carry a green number, the one ahead is
+   quiet. It is the same strip in every flow panel, so moving between them
+   feels like moving along one line instead of opening three unrelated menus. */
+.p2flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  margin: 0 4px 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--hair);
+  position: relative;
+}
+.p2step {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  font: 600 10px var(--sans);
+  color: var(--faint);
+  letter-spacing: 0.01em;
+  min-width: 0;
+}
+.p2step .n {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font: 700 11px var(--sans);
+  position: relative;
+  z-index: 1;
+}
+.p2step .l {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.p2step.done .n {
+  background: var(--accentSoft);
+  border-color: var(--accentSoft);
+  color: var(--accentDeep);
+}
+.p2step.done .l {
+  color: var(--muted);
+}
+.p2step.on .n {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.p2step.on .l {
+  color: var(--ink);
+}
+.p2step:hover .l {
+  color: var(--ink);
+}
+/* The line that makes three chips one path. Drawn behind the numbers and
+   inset by half a chip so it never sticks out past the first or last. */
+.p2flow::before {
+  content: "";
+  position: absolute;
+  left: 16.6%;
+  right: 16.6%;
+  top: 15px;
+  height: 1px;
+  background: var(--line);
+}
+
+/* --------------------------------------------- 51 · the screens as steps */
+#p2list {
+  position: relative;
+}
+.navitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  text-align: left;
+}
+.navitem .nvl {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.navitem .stp {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  color: var(--muted);
+  font: 700 10px var(--sans);
+  font-variant-numeric: tabular-nums;
+  position: relative;
+  z-index: 1;
+}
+.navitem.on .stp {
+  background: var(--accent);
+  color: #fff;
+}
+.navitem .ct {
+  flex: none;
+  font: 600 10.5px var(--sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  background: var(--bg);
+  border-radius: var(--r-sm);
+  padding: 2px 6px;
+}
+.navitem.on .ct {
+  background: #fff;
+  color: var(--accentDeep);
+}
+/* The rail that ties the numbered steps into one column. Only in a flow
+   section: `steps` is set by the renderer, so Datos maestros and
+   Configuración stay plain lists and claim no sequence they do not have. */
+#p2list.steps::before {
+  content: "";
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  bottom: 22px;
+  width: 1px;
+  background: var(--line);
+}
+.navitem.on {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* ------------------------------------------------- 52 · the hand-off foot
+   «When this section is done, the work continues there.» The next section's
+   own name, no new wording invented for it. */
+.p2next {
+  margin: 14px 4px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+}
+.p2nextbtn {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  cursor: pointer;
+  font: 600 12.5px var(--sans);
+  color: var(--muted);
+}
+.p2nextbtn:hover {
+  border-style: solid;
+  border-color: var(--accentSoft);
+  background: var(--accentPale);
+  color: var(--accentDeep);
+}
+.p2nextbtn .ar {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ----------------------------------------------------------- 53 · the scrim
+   It was a flat grey wash. Now the page behind the panel recedes: a soft
+   vertical gradient, darker where the panel casts its shadow, and it fades
+   in with the panel instead of appearing. */
+#subscrim {
+  background: linear-gradient(
+    90deg,
+    rgba(21, 31, 19, 0.34),
+    rgba(21, 31, 19, 0.16) 40%,
+    rgba(21, 31, 19, 0.1)
+  );
+  backdrop-filter: saturate(0.9) blur(1.5px);
+  -webkit-backdrop-filter: saturate(0.9) blur(1.5px);
+  transition: opacity 0.18s ease;
+}
+
+/* --------------------------------------- 54 · Needs attention, as a table
+   «Make it more table structure so that I see immediately who is responsible
+   and overdue and how many days left.» Six columns, and a filter above them:
+   the counts that used to be a sentence are now the control that narrows the
+   list. */
+.sevbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 16px 12px;
+}
+.sevchip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: #fff;
+  cursor: pointer;
+  font: 600 12px var(--sans);
+  color: var(--body);
+}
+.sevchip .c {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  background: var(--bg);
+  border-radius: 0;
+  padding: 1px 5px;
+  font-size: 11px;
+}
+.sevchip:hover {
+  border-color: var(--accentSoft);
+  background: var(--accentPale);
+}
+.sevchip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.sevchip.on .c {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.altable td {
+  vertical-align: middle;
+}
+.altable td b {
+  font-weight: 500;
+  color: var(--ink);
+}
+.altable .cat {
+  display: inline-block;
+  font: 600 10.5px var(--sans);
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.altable td.num {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.altable td.num.late {
+  color: var(--danger);
+  font-weight: 700;
+}
+.altable td.alsev {
+  width: 34px;
+  padding-right: 0;
+}
+
+/* -------------------------------- 55 · one alarm sign per level, graded
+   «Different red alarm signs for different categories, most urgent to less
+   critical.» Four grades that differ in fill, colour AND glyph, so the order
+   survives a greyscale print and a colour-blind reader: critical is a solid
+   red square with an exclamation, high an amber square with a flag, medium a
+   slate square with an «i», low a hollow grey square with a dot. */
+:root {
+  --ic-excl: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round'><path d='M12 6v8'/><path d='M12 18h.01'/></svg>");
+  --ic-flag: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M5 21V4'/><path d='M5 5h11l-2 3.5L16 12H5'/></svg>");
+  --ic-info: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'><path d='M12 11v6'/><path d='M12 7h.01'/></svg>");
+  --ic-dot: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'><circle cx='12' cy='12' r='3.4'/></svg>");
+}
+.sevmark {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  position: relative;
+}
+.sevmark::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 15px;
+  height: 15px;
+  background: var(--muted);
+  -webkit-mask: var(--ic-dot) center / contain no-repeat;
+  mask: var(--ic-dot) center / contain no-repeat;
+}
+tr[data-sev="critical"] .sevmark {
+  background: var(--danger);
+}
+tr[data-sev="critical"] .sevmark::before {
+  background: #fff;
+  -webkit-mask-image: var(--ic-excl);
+  mask-image: var(--ic-excl);
+}
+tr[data-sev="high"] .sevmark {
+  background: var(--goldSoft);
+}
+tr[data-sev="high"] .sevmark::before {
+  background: var(--goldDeep);
+  -webkit-mask-image: var(--ic-flag);
+  mask-image: var(--ic-flag);
+}
+tr[data-sev="medium"] .sevmark {
+  background: #e7ecf2;
+}
+tr[data-sev="medium"] .sevmark::before {
+  background: #4a6076;
+  -webkit-mask-image: var(--ic-info);
+  mask-image: var(--ic-info);
+}
+tr[data-sev="low"] .sevmark {
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+/* ------------------------------------------ 56 · the project overview
+   «Way more visual and modern.» The same nine columns and the same figures;
+   what changed is that the three that carry the verdict are now drawn —
+   progress as a filled meter with its figure beside it, margin as a tinted
+   pill, deviation with the arrow that says which way. */
+.pcell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.meter {
+  flex: 1;
+  min-width: 54px;
+  max-width: 88px;
+  height: 8px;
+  border-radius: 0;
+  background: var(--hair);
+  overflow: hidden;
+}
+.meter i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 0;
+}
+.pcell b {
+  font: 600 12px var(--sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.mgn {
+  display: inline-block;
+  font: 600 12px var(--sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--accentDeep);
+  background: var(--accentSoft);
+  border-radius: 0;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.mgn.neg {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+td.num.late {
+  color: var(--danger);
+  font-weight: 600;
+}
+.pin {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  color: var(--faint);
+  font-size: 14px;
+  line-height: 1;
+}
+.pin:hover {
+  background: var(--accentPale);
+  color: var(--accent);
+}
+.pin.on {
+  color: var(--gold);
+}
+
+/* ------------------------------------------------------- 57 · the avatar
+   «Why a round circle — maybe square fits better?» Square, on the same
+   geometry as the two icon buttons beside it, which is what makes the four
+   controls read as one cluster rather than three buttons and a bubble. */
+#btnUser {
+  border-radius: var(--r-md);
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  background: var(--accentSoft);
+}
+@media (max-width: 860px) {
+  #btnUser {
+    width: 34px;
+    height: 34px;
+  }
+  .p2 {
+    width: auto;
+  }
+  .sevbar {
+    padding: 2px 12px 10px;
+  }
+}
+
+/* ------------------------------------------- 58 · two corrections, measured
+   Caught by the screenshot before the suite ran, which is the whole argument
+   for keeping screenshots in the loop: neither is something a check asserts.
+
+   The subsection list laid its items out in a ROW — the panel is a flex
+   container in the page's own sheet, and a full-width button inside a flex
+   row is still a column of one. It is a column now, explicitly.
+
+   The attention table put six columns in half a screen and the subject
+   wrapped one word per line. It is five columns (the job code was mine to
+   add and the subject already names the record), and the subject column is
+   given the width it needs. */
+#p2list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: stretch;
+}
+.altable {
+  min-width: 0;
+}
+.altable th:nth-child(2),
+.altable td:nth-child(2) {
+  min-width: 210px;
+  width: 46%;
+}
+.altable td:nth-child(2) b {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
+}
+.altable th:nth-child(3),
+.altable td:nth-child(3),
+.altable th:nth-child(4),
+.altable td:nth-child(4) {
+  white-space: nowrap;
+}
+.altable td:nth-child(4) {
+  color: var(--muted);
+}
+
+/* THE ROW IS A TABLE ROW — ON A DESKTOP.
+   `.alrow` was a grid when the attention list was a stack of divs, and the
+   class carries that layout wherever it appears. The Alertas screen still
+   uses the div form and still needs it; the Torre's row is a `<tr>` and must
+   be left to the table it sits in. Scoped by element, so both keep working
+   from the one class — and the shell check that counts `.alrow` on the Torre
+   still counts the same rows.
+
+   AND SCOPED TO THE DESKTOP, which the first version was not. Unqualified,
+   `display:table-cell` beat `table.cards td{display:block}` at every width:
+   the phone stopped carding this table and laid five columns across 390px,
+   so every cell wrapped one character per line. The suite's «cards fit their
+   container» check passed it — the table DID fit, by wrapping into a column
+   of single letters, which is the shape a width measurement cannot see and a
+   screenshot shows instantly. */
+@media (min-width: 701px) {
+  tr.alrow {
+    display: table-row;
+  }
+  tr.alrow > td {
+    display: table-cell;
+  }
+}
+
+/* The Torre's two lower panels, each on the full width (see the comment at
+   the markup). Its own class rather than a change to `.grid2`, which pairs
+   panels on half a dozen other screens where two halves are right. */
+.towerpanes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-4);
+}
+.towerpanes > .card {
+  margin: 0;
+}
+
+/* The step number sits in front of the label on screen and after it in the
+   markup — see the comment where the row is built. */
+.navitem .stp {
+  order: -1;
+}
+
+/* ON A PHONE THE ATTENTION TABLE IS CARDS, AND A CARD HAS NO COLUMNS.
+   The widths above are what make five columns readable on a desktop; carried
+   into card mode they forced the carded rows 145px wider than the scroller
+   they sit in, so every card scrolled sideways under the thumb. The suite
+   measures exactly that, and caught it. */
+@media (max-width: 700px) {
+  .altable th,
+  .altable td,
+  .altable th:nth-child(2),
+  .altable td:nth-child(2),
+  .altable th:nth-child(3),
+  .altable td:nth-child(3),
+  .altable th:nth-child(4),
+  .altable td:nth-child(4) {
+    min-width: 0;
+    width: auto;
+    white-space: normal;
+  }
+  .altable td:nth-child(2) b {
+    -webkit-line-clamp: 4;
+  }
+  .altable td.alsev {
+    width: auto;
+  }
+  .pcell {
+    white-space: normal;
+  }
+  .meter {
+    max-width: 140px;
+  }
+  .mgn {
+    white-space: normal;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 10 · The section panel on a phone: edge to edge, and a sheet
+   Operator: «the white tile which opens in each tab should be across the
+   full screen (left to right) and look way more modern, premium and
+   structured and process flow intuitive.»
+
+   IT WAS INSET BY THE WIDTH OF A RAIL THAT IS NOT THERE. `left: var(--rail)`
+   is right on a desktop, where the panel slides out beside the 84px rail, and
+   was written without a breakpoint. On a phone the rail leaves the flow to
+   become the bottom bar, so those 84px were empty screen the panel was
+   politely avoiding — the page's own phone rule said `left: 0` and this one
+   outranked it by load order. The same class of mistake as the row that
+   stopped carding: a desktop truth applied at every width.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 860px) {
+  .p2 {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: 62vh;
+    padding: 8px 16px calc(14px + env(safe-area-inset-bottom));
+    border-radius: 0;
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -26px 64px -30px rgba(23, 32, 21, 0.5);
+  }
+  /* A sheet says it is a sheet: the grab bar is the one piece of chrome that
+     tells a thumb this panel came up from the bottom and goes back down. */
+  .p2::before {
+    content: "";
+    display: block;
+    width: 40px;
+    height: 4px;
+    border-radius: 0;
+    background: var(--line);
+    margin: 1px auto 10px;
+  }
+  .p2 .p2h {
+    font: 700 16.5px var(--sans);
+    letter-spacing: -0.02em;
+    margin: 0 2px 11px;
+  }
+
+  /* The journey, given room: bigger numbers, the line behind them, the three
+     names legible rather than squeezed. */
+  .p2flow {
+    margin: 0 0 11px;
+    padding-bottom: 11px;
+    gap: 4px;
+  }
+  .p2step {
+    gap: 5px;
+    font-size: 10.5px;
+  }
+  .p2step .n {
+    width: 24px;
+    height: 24px;
+    font-size: 11.5px;
+  }
+  .p2flow::before {
+    top: 16px;
+  }
+
+  /* The screens: full-width rows a thumb can hit without aiming, the step
+     number and its rail carried through at the larger size. */
+  .navitem {
+    min-height: 46px;
+    padding: 6px 8px;
+    font-size: 14.5px;
+    gap: 11px;
+  }
+  .navitem .stp {
+    width: 23px;
+    height: 23px;
+    font-size: 11px;
+  }
+  #p2list.steps::before {
+    left: 19.5px;
+    top: 23px;
+    bottom: 24px;
+  }
+  .navitem .ct {
+    font-size: 12px;
+    padding: 3px 8px;
+  }
+  .p2next {
+    margin: 11px 0 0;
+    padding-top: 10px;
+  }
+  .p2nextbtn {
+    min-height: 44px;
+    font-size: 13.5px;
+    justify-content: center;
+  }
+}
+
+/* …and the sheet claims only the height its content needs. Operator: «the
+   white tile maybe should be maybe not too big.» Rows to 46px (still above
+   the 44px target), the journey numbers to 24, the title to 16.5, and the
+   paddings tightened throughout: the Comercial panel — the tallest, at five
+   screens — went from about 62% of a 390×844 phone to roughly half, so the
+   screen behind it is still legible as the place you came from. */
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 11 · The phone sheet, half the height
+   Operator: «the white tiles from the tabs are way too high, so you have the
+   feeling you are not seeing the screen anymore. Make it way less high, maybe
+   some sub tile names should be next to each other rather than all below each
+   other. Still apply the intuitive end-to-end flow.»
+
+   Two changes, both about spending vertical space only where it buys
+   something. The journey stops being three stacked circle-and-label columns
+   and becomes one line of pills. The screens stop being one tall column and
+   become two, which halves the rows without dropping a single item.
+
+   THE FLOW SURVIVES BOTH. A grid read left to right, top to bottom is still
+   an order — the numbers run 1→5 in exactly the order a person reads them,
+   and the section pills above still say which of the three movements this is.
+   What goes is the connector rail: a line down a single column meant «then»,
+   and the same line drawn down two columns would mean nothing.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 860px) {
+  /* ---- the journey, on one line ---- */
+  .p2flow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 10px;
+    padding-bottom: 10px;
+  }
+  .p2flow::before {
+    display: none; /* an inline row of pills carries its own order */
+  }
+  .p2step {
+    flex: 0 1 auto;
+    flex-direction: row;
+    gap: 6px;
+    padding: 5px 10px 5px 6px;
+    border-radius: var(--r-md);
+    background: var(--bg);
+    min-width: 0;
+  }
+  .p2step .n {
+    width: 19px;
+    height: 19px;
+    font-size: 10px;
+    border: 0;
+  }
+  .p2step .l {
+    font-size: 11.5px;
+  }
+  .p2step.on {
+    background: var(--accent);
+  }
+  .p2step.on .n {
+    background: rgba(255, 255, 255, 0.26);
+    color: #fff;
+  }
+  .p2step.on .l {
+    color: #fff;
+  }
+  .p2step.done {
+    background: var(--accentSoft);
+  }
+  .p2step.done .n {
+    background: transparent;
+    color: var(--accentDeep);
+  }
+  .p2step.done .l {
+    color: var(--accentDeep);
+  }
+
+  /* ---- the screens, two at a time ---- */
+  #p2list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    align-items: stretch;
+  }
+  #p2list.steps::before {
+    display: none; /* see the note above: no rail across two columns */
+  }
+  .navitem {
+    min-height: 50px;
+    padding: 8px 10px;
+    gap: 9px;
+    font-size: 13.5px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    align-items: center;
+  }
+  .navitem .nvl {
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.22;
+  }
+  .navitem .stp {
+    width: 21px;
+    height: 21px;
+    font-size: 10.5px;
+  }
+  .navitem.on {
+    border-color: var(--accentSoft);
+    background: var(--accentPale);
+  }
+  .navitem .ct {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  /* ---- and the rest, tighter ---- */
+  .p2 {
+    max-height: 56vh;
+    padding: 8px 14px calc(12px + env(safe-area-inset-bottom));
+  }
+  .p2::before {
+    margin: 1px auto 8px;
+  }
+  .p2 .p2h {
+    font-size: 15.5px;
+    margin: 0 2px 9px;
+  }
+  .p2next {
+    margin: 10px 0 0;
+    padding-top: 9px;
+  }
+  .p2nextbtn {
+    min-height: 42px;
+    font-size: 13px;
+  }
+}
+
+/* ------------------------------------------ 59 · the hand-off comes out
+   Operator: «the button at the end to move directly to Projects or
+   Administration is not needed — you can move anyway on the top 3 blocks or
+   below at the tabs.» Correct, and it was the tallest thing left in the
+   sheet: the journey pills at the head of the panel go to the same three
+   places, and on a phone so does the tab bar underneath it.
+
+   Hidden, not deleted — the same rule the floating «+» follows. `buildSubs`
+   still writes the footer, so bringing it back is this one rule, and the
+   next section it names is still computed from FLOW rather than from a list
+   somebody would have to remember to update. */
+.p2next {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 12 · The register cards — projects, customers, suppliers, all of them
+   Operator: «everywhere we have those tiles with the projects, customers,
+   suppliers … update all of them to look more premium and more state of the
+   art. Keep the haptic that they get a slight different colour when you use
+   them, in that existing way.»
+
+   THE TINT IS THE TAP STATE, NOT A STRIPE. There is no alternating-row rule
+   anywhere in this repo — what the screenshots show is `tr.click:hover`,
+   which a touch browser leaves on the last card the thumb touched. That is
+   why the tinted card is second in one list and first in the next. It is kept
+   exactly as it was and given a pressed state of its own, so the feedback now
+   answers the tap as well as outlasting it.
+
+   Every register on a phone is the same carded table, so this is one block
+   for all of them rather than a rule per screen.
+
+   AND WITHOUT AN ID IN THE SELECTOR. The first version led with `#view`,
+   which gave every rule an id's weight and beat
+   `.bgrid table.cards tr.chaprow` — the quote's chapter heading, which has
+   its own phone treatment and its own tint. The heading went white, stopped
+   looking like a heading, and the check that measures exactly that went red.
+   Plain class selectors sit below the grid's own rules and above the page's
+   generic ones, which is the position these belong in.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 700px) {
+  table.cards {
+    min-width: 0;
+  }
+  table.cards tr {
+    border: 1px solid var(--line);
+    border-radius: 0;
+    background: var(--paper);
+    box-shadow:
+      0 1px 2px rgba(23, 32, 21, 0.04),
+      0 10px 26px -22px rgba(23, 32, 21, 0.34);
+    padding: 0;
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition:
+      background 0.13s ease,
+      box-shadow 0.13s ease;
+  }
+  /* The feedback, kept — and answered. `:hover` is the state a phone leaves
+     behind after a tap; `:active` is the one it shows during it. */
+  table.cards tr.click:hover {
+    background: var(--accentPale);
+  }
+  table.cards tr.click:active {
+    background: var(--accentSoft);
+    box-shadow: 0 1px 2px rgba(23, 32, 21, 0.06);
+  }
+
+  /* ---- the head of the card ----
+     The leading `.k` cells are the identity: a code and, where the register
+     has one, a name. The code becomes an eyebrow — small, spaced, in the
+     accent — and the name the line you actually read. Their labels were
+     already hidden; what they lacked was a hierarchy and a rule under them. */
+  table.cards td.k {
+    padding: 0 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  table.cards td.k:first-child {
+    padding-top: 12px;
+    font: 700 11px var(--sans);
+    letter-spacing: 0.06em;
+    color: var(--accentDeep);
+  }
+  table.cards td.k:first-child + td.k {
+    padding-top: 1px;
+    font: 700 15.5px var(--sans);
+    letter-spacing: -0.012em;
+    color: var(--ink);
+  }
+  /* A register whose first cell is the only `.k` (the jobs list) reads that
+     one as the title rather than as an eyebrow. */
+  table.cards td.k:first-child:not(:has(+ td.k)) {
+    font: 700 15.5px var(--sans);
+    letter-spacing: -0.012em;
+    color: var(--accentDeep);
+    padding-bottom: 2px;
+  }
+  /* The rule that separates who this is from what is known about it. */
+  table.cards td.k + td:not(.k) {
+    border-top: 1px solid var(--hair);
+    margin-top: 10px;
+    padding-top: 9px;
+  }
+
+  /* ---- the facts ---- */
+  table.cards td {
+    padding: 5px 14px;
+    gap: 4px 14px;
+    font-size: 13.5px;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  table.cards td:before {
+    font: 500 12px var(--sans);
+    letter-spacing: 0;
+    color: var(--muted);
+  }
+  table.cards tr > td:last-child {
+    padding-bottom: 12px;
+  }
+  /* The bar reads as a measure rather than a stripe: full height, its own
+     track, and never squeezed to a sliver by a long label beside it. */
+  table.cards td .bar {
+    min-width: 96px;
+    height: 8px;
+    border-radius: 0;
+  }
+  table.cards td .bar i {
+    border-radius: 0;
+  }
+  table.cards tr.tot,
+  table.cards tr.grouphd {
+    background: var(--bg);
+    box-shadow: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 13 · Four corrections from the phone
+   «Rearrange the sub names so 1,2,3 is vertical and then jumps to the second
+   column. Some numbers get confused with the amount of documents — for
+   quotes, distinguish better. Make the tile more colour: the top line with
+   PRE-xxxx in a darker green so the tile looks like one piece. And have the
+   light green in the background rather than this additional box around all
+   the boxes.»
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 700px) {
+  /* ---- 1 · the steps run down the column, then jump ---- */
+  #p2list {
+    grid-auto-flow: column;
+    grid-template-rows: repeat(var(--steprows, 3), minmax(0, auto));
+  }
+
+  /* ---- 2 · a step is not a quantity ----
+     «3 Quotes 19» put two numbers on one row that meant different things: one
+     is where this screen sits in the process, the other is how many documents
+     are behind it. They now differ in shape AND colour — the step is a plain
+     grey disc, the count a green capsule — so neither has to be read twice. */
+  .navitem .stp {
+    background: var(--bg);
+    color: var(--muted);
+    font-weight: 700;
+    border: 1px solid var(--line);
+  }
+  .navitem.on .stp {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .navitem .ct {
+    border-radius: 999px;
+    background: var(--accentSoft);
+    color: var(--accentDeep);
+    font-weight: 700;
+    padding: 2px 8px;
+    min-width: 22px;
+    text-align: center;
+  }
+
+  /* ---- 3 · the card reads as one piece ----
+     Operator, on a quote card: «make the tile more colour — the top line with
+     PRE-xxxx maybe in a darker green, to ensure the tile looks like one
+     piece.» The identity is a tinted band now, its code in the deep green,
+     and the facts sit under a single rule instead of floating in white. */
+  table.cards td.k {
+    background: var(--accentSoft);
+  }
+  table.cards td.k:first-child {
+    color: var(--greenDeep);
+    padding-top: 11px;
+  }
+  table.cards td.k:first-child:not(:has(+ td.k)) {
+    padding-bottom: 11px;
+    color: var(--greenDeep);
+  }
+  table.cards td.k:first-child + td.k {
+    color: var(--ink);
+    padding-bottom: 10px;
+  }
+  table.cards td.k + td:not(.k) {
+    border-top: 0;
+    margin-top: 0;
+    padding-top: 11px;
+  }
+  /* The tap feedback still reaches the whole card, band included. */
+  table.cards tr.click:hover td.k,
+  table.cards tr.click:active td.k {
+    background: var(--accentPale);
+  }
+
+  /* ---- 4 · no box around the boxes ----
+     A register on a phone is a stack of cards, and the panel that holds a
+     table on a desktop became a second frame drawn round all of them. The
+     cards sit on the page's own ground instead — which is the light green the
+     operator asked to see behind them. The Torre's panels keep their surface:
+     they have a heading and a filter that belong to the panel, not to a card. */
+  #view .card:has(> .scroll > table.mlist.cards),
+  #view .card:has(> table.mlist.cards) {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: 0;
+    overflow: visible;
+  }
+  #view .card:has(table.mlist.cards) > .scroll {
+    overflow: visible;
+  }
+}
+
+/* ------------------------------- 60 · the identity band goes to the top
+   Operator, on the Leads register: «the date before the green part looks
+   strange — move the date below the green header of the tile.»
+
+   Not every register puts its identity first. Leads leads with the date, so
+   the band landed in the middle of the card and read as a divider rather
+   than a header. The card becomes a flex column and the identity cells take
+   `order:-1`, which lifts them — in their own order, whatever their position
+   in the markup — to the top of every card without touching a single
+   template. Scoped to `.mlist`, the registers: the quote's budget grid has
+   its own phone layout and must keep the block flow it was written for.
+
+   And the band's rules stop assuming the identity is the FIRST cell. They
+   key off the identity cells' relation to each other instead: the first of
+   them opens the band, the last closes it, and whether the first is an
+   eyebrow or the title depends on whether a second one follows it. */
+@media (max-width: 700px) {
+  table.mlist.cards tr {
+    display: flex;
+    flex-direction: column;
+  }
+  table.mlist.cards td.k {
+    order: -1;
+  }
+
+  table.cards td.k {
+    background: var(--accentSoft);
+    padding: 2px 14px;
+    color: var(--greenDeep);
+  }
+  /* opens the band */
+  table.cards td.k:first-child,
+  table.cards td:not(.k) + td.k {
+    padding-top: 11px;
+  }
+  /* closes it */
+  table.cards td.k:not(:has(+ td.k)) {
+    padding-bottom: 11px;
+  }
+  /* one identity cell: it is the title */
+  table.cards td.k:not(:has(+ td.k)) {
+    font: 700 15.5px var(--sans);
+    letter-spacing: -0.012em;
+  }
+  /* two: a code above a name */
+  table.cards td.k:has(+ td.k) {
+    font: 700 11px var(--sans);
+    letter-spacing: 0.06em;
+  }
+  table.cards td.k + td.k {
+    color: var(--ink);
+    font: 700 15.5px var(--sans);
+    letter-spacing: -0.012em;
+  }
+  /* the first fact sits under the band, not under a rule of its own */
+  table.cards td.k + td:not(.k),
+  table.cards tr > td:not(.k):first-child {
+    border-top: 0;
+    margin-top: 0;
+    padding-top: 11px;
+  }
+}
+
+/* ------------------------------- 61 · the favourite mark joins the band
+   Operator, on the job overview: «here it looks also strange with the star
+   above and not the green header — move the star into the green header on
+   the right side.»
+
+   The favourite toggle is the row's first cell, so on a phone it became a
+   card row of its own: an empty white strip sitting on top of the identity
+   band, which is exactly the shape of the complaint answered one section
+   above. Section 60 lifts the identity cells with `order`, but that works
+   only inside the flex cards, and this overview is a plain table — and even
+   there, `order` can only stack the star ABOVE or BELOW the band, never
+   inside it.
+
+   So the cell leaves the flow instead and is pinned to the band's top right.
+   Its box is given the band's own metrics — 14px of horizontal padding, the
+   same 11px above and below a 20px line — so the mark lands optically
+   centred on the identity without a magic offset to drift out of date. The
+   card already clips to its radius, so the corner stays round.
+
+   CSS only, and only on a phone: the desktop table keeps its narrow leading
+   column, which is the ordinary place for a row control and reads correctly
+   there. Moving the button in the template would have taken a column off a
+   nine-column table to fix a layout on one screen size. */
+@media (max-width: 700px) {
+  table.cards tr:has(> td > button.pin) {
+    position: relative;
+  }
+  /* `:not(.k)` is not decoration: the rule that opens a card's first fact
+     (section 60) is `td:not(.k):first-child`, and the star IS that cell. Its
+     `padding-top` is a longhand from a three-class selector, so a `padding`
+     shorthand here would lose to it and drop the mark 11px. Matching its
+     shape, plus the `:has`, outranks it. */
+  table.cards tr > td:not(.k):has(> button.pin) {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    width: auto;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: none;
+  }
+  table.cards td:has(> button.pin) button.pin {
+    display: block;
+    width: auto;
+    height: auto;
+    padding: 11px 14px;
+    font-size: 16px;
+    line-height: 20px;
+    border-radius: 0;
+  }
+  /* Nothing is left above the band in the flow, and the band already takes
+     its opening padding from `td:not(.k) + td.k` — the star cell still
+     matches that, out of flow or not. */
+}
+
+/* ------------------------------------------------- 62 · square, everywhere
+   Operator, on the job register in the native app: «all those boxes should
+   not have round corners.»
+
+   That closes a question this file had been carrying since phase 3, which
+   set the language to square corners and then kept a 12px radius on the
+   phone's cards because a card felt like it wanted one. It did not: with
+   every other surface square, the rounded cards were the odd shape on the
+   screen rather than the soft one.
+
+   So the radius scale itself is zero — `--r-sm`, `--r-md`, `--r-lg` and
+   `--r-full` all resolve to 0, in both the base block and phase 3's
+   tightening of it — and every hardcoded radius in the page and in this file
+   went with it, including the ones written inline inside template strings,
+   which no token could have reached.
+
+   Three things stay round, because they are not boxes:
+     · the primary «+», a circle with no corners to square;
+     · the status dots, likewise;
+     · the count pill on a subsection, which exists precisely to look
+       UNLIKE the bordered square that carries a step number — squaring it
+       would undo the distinction the operator asked for two changes ago.
+
+   And the notification badge, restored below. The sweep squared it as a
+   side effect; a count bubble belongs with the dots above rather than with
+   the panels, so it is put back as a circle deliberately instead of left
+   square by accident. */
+.bell .badge {
+  border-radius: 999px;
+}
+
+/* ------------------------------- 63 · one sheet, the same on every tab
+   Operator, with the panel finally opening on every tab: «harmonize the white
+   tiles and they should be connected at the bottom and not flying around, be
+   more structured and aligned across all tabs to ensure End2End intuitive
+   process.»
+
+   Two faults, both measured before touching anything. The sheet sat 84px above
+   the bottom of the web viewport on EVERY section, with a band of the page
+   showing underneath it — fixed at its source in the page, where the rail the
+   sheet hangs from was being lifted to clear a native tab bar that is outside
+   the web viewport entirely. And the sheet was a different height on every
+   tab: 172px on Datos maestros against 294.9px on Administración, a spread of
+   122.9px, so the top edge jumped as you moved between tabs and nothing held
+   still.
+
+   The height is now one number for all six. Sized to the tallest natural
+   sheet, which is reached twice over by different routes — four rows of
+   screens with no journey strip, and three rows with one — so it is the shape
+   the design already settles at, not a figure picked to look round.
+
+   The operator chose this over letting each sheet hug its contents: the cost
+   is empty space below the four items of Datos maestros, and the gain is that
+   the sheet opens in exactly the same place every time. A menu that lands
+   somewhere different on each tab is a menu you have to re-find; one that
+   always lands in the same place is one you learn once. The rows keep their
+   natural heights — stretching them to fill would trade the jumping outline
+   for tiles that change size between tabs, which is the same complaint
+   wearing a different coat.
+
+   The spare room is centred rather than left at the bottom. Pinned to the top
+   it made Datos maestros half sheet and half void, and Proyectos — two
+   screens, so a single row — would have been mostly nothing at all: it read
+   as a panel that had failed to finish loading. Centred, the same space sits
+   above and below, and the sheet reads as deliberately roomy. The tiles never
+   change size, which is the part that had to stay fixed. */
+@media (max-width: 860px) {
+  .p2 {
+    --sheet-h: 296px;
+    min-height: var(--sheet-h);
+    display: flex;
+    flex-direction: column;
+  }
+  /* The list takes the room the heading and the strip do not, and centres its
+     rows inside it. `flex` on the sheet is what gives it a height to centre
+     against; without it the grid is only as tall as its own rows. */
+  #p2list {
+    flex: 1 1 auto;
+    align-content: center;
+  }
+}
+
+/* ------------------------------- 64 · four things the Torre did not need
+   Operator, on the control tower: «remove those two items (print pdf, and
+   ERP-Tab name you can remove everywhere since clear since below it is marked
+   green in which tab I am on it) and make recalculate way smaller button and
+   also remove Calculated at since when I open this screen it is always the
+   latest status.»
+
+   All four are removals in the page rather than rules here; what belongs in
+   this file is the one that is a size. Recalculate becomes a glyph: it is a
+   repair for a session left open long enough to outlive its figures, not
+   something to reach for, and it was sitting at the head of the screen at the
+   same weight as the four things people actually come to do. Square, matched
+   to the header icon buttons, and it keeps a translated title and aria-label
+   so losing the word costs nothing to a screen reader or to the language
+   toggle. */
+.btn.sm.icon {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* `flex`, not just `width`: on a phone `.torrebar .btn` gives every button
+     `flex: 1 1 calc(50% - 4px)`, and a flex-basis beats a width outright — the
+     glyph came out 179px wide, which is the opposite of the request. This
+     takes it out of the half-width run and lets it size to itself. */
+  flex: 0 0 auto;
+}
+/* The screen-level action sits on the title line, hard right. It was tried in
+   the toolbar first, at the end of the four create buttons — and that cost the
+   bar a whole extra row for one 32px glyph, pushing every figure on the screen
+   further down. Beside the title it occupies a line that already existed. */
+.headrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.headrow h1 {
+  margin: 0;
+}
+#headact {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+#headact:empty {
+  display: none;
+}
+
+/* ------------------------------- 65 · the wizard steps stack on a phone
+   Operator, on the accountant report: «text outside of box - fix».
+
+   The step labels were running out of the bottom of their own boxes — «IVA,
+   IRPF y envío» sat 8px clear of the border on a phone, and step 1 was already
+   flush against it, one word away from the same fault. The cause was a fixed
+   `height: 48px` on a box whose text wraps to three lines at that width; that
+   is corrected at source, in the page, where a minimum replaces it.
+
+   Height alone was not enough. Three steps sharing 390px leaves about 53px of
+   text column each, which is narrower than the word «Exceptions» — so the
+   labels still had to break mid-word to fit. No amount of wrapping rescues a
+   column that narrow; the row itself is the thing that does not belong on a
+   phone. So below 700px the steps become one per line, each with the whole
+   width, and every label fits on a single line in all three languages.
+
+   A wizard reads as a sequence either way: 1, 2, 3 down the screen is the
+   same promise as 1, 2, 3 across it, and it is the reading order a phone
+   already uses for everything else on the page. */
+@media (max-width: 700px) {
+  .steps {
+    flex-direction: column;
+  }
+  .steps .stp {
+    flex: 0 0 auto;
+  }
+}

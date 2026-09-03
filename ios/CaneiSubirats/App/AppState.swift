@@ -47,6 +47,9 @@ final class AppState: ObservableObject {
     /// being opened is stale but no sign-in has happened to announce.
     func didSelect(_ id: String) {
         store(for: id).reloadIfShowingLogin()
+        // Match the web: a section tap opens that section's panel. The shell's
+        // tabs are the web's section bar, so they owe the same answer.
+        store(for: id).openSection(id)
     }
 
     func store(for id: String) -> WebViewStore {

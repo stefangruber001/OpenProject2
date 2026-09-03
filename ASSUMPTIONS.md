@@ -7394,7 +7394,728 @@ the operator opens here are the same document.
 files it, it does not print it, and a button to generate one would be
 inventing a document somebody else issued. The row says so instead.
 
-## S46 · PK12-S11 — Adicionales stays a view, not a second model (2026-09-03)
+## S46 · Redesign phase 2 — the shell and the dashboard, on the dev branch (2026-09-03)
+
+The operator supplied three reference dashboards and two articles on ERP
+interface practice; both article domains are blocked by this session's egress
+proxy, so the references and the established practice they embody were
+applied directly: a neutral ground with white surfaces and ONE accent, a
+sidebar with monochrome icons, KPI tiles with an icon in a tinted square, one
+dominant chart, and a quick-action row. All of it is `site/erp-ds.css`,
+sections 12–22, still the one reviewable file.
+
+**Icons without touching the DOM.** The rail's emoji stay in the markup — the
+suite reads them and the phone bar relies on the same buttons — and are
+painted over with masked SVGs keyed on `data-sec`, so they take the current
+text colour and change with state like any glyph. A section this sheet has
+no icon for keeps its emoji rather than showing an empty square. The KPI
+tiles choose their icon and tint from `data-go`, which they already carried.
+
+**The brand green stays, demoted to an accent.** It is on every document
+this company sends; it stops being the colour of the wallpaper and becomes
+the colour of the thing to press. Neutral surfaces are the discipline all
+three references share.
+
+**No greeting.** The references open with «Hi, Ronald»; this build has no
+signed-in identity in local mode and a greeting to nobody is fake
+functionality, which the brief forbids. It can be added the day the shell
+knows who is looking at it.
+
+**What broke first and why it matters.** The unconditional sidebar rule beat
+the page's own phone rule by load order, and because the rail leaves the
+flow to become the bottom bar, `main` landed in the 92px first column: a
+phone screen twelve characters wide. Caught by screenshots at three
+viewports before the suite ran — the suite has no check for a legible column
+width, and this is the argument for keeping the screenshots in the loop.
+
+Full browser suite 648/648 with the layer applied; overflow 0px at
+1440/1024/390; no console errors in the self-contained preview build.
+
+## S47 · Redesign phase 3 — the full remodel the operator asked for (2026-09-03)
+
+The operator's second set of references (aufaitUX ERP dashboard, TalentIQ,
+renesis ERP management) and the instruction «no round edges, more colours,
+change font, feel free to remove items, drive it to the extreme». Sections
+23–33 of `site/erp-ds.css`; still no change to a single line of markup or
+engine code, so every screen keeps its logic and its interconnections.
+
+**Palette.** The interface accent moves to a blue (`#2563eb`) on a deep navy
+rail, with teal and a warm amber as secondary tile colours — the three
+references share exactly that scheme. The documents keep the brand green:
+what the company SENDS stays in its identity; what the operator LOOKS AT
+follows the references. Reversible by editing two tokens.
+
+**Radii to 2–3px, serif dropped.** Every radius token collapses to near
+square; Georgia is gone from headings; the rail labels lose their uppercase
+transform because `innerText` reports the transformed string and the suite
+pins `/Projectes/` and `/Mestres/` in body text (one check went red for
+exactly that, then was fixed by removing the transform, not the check).
+
+**Removed from view, never from the DOM.** Breadcrumbs, the brand strapline
+and the language pill's chrome are hidden with CSS; the language switch still
+works, it is just no longer the loudest control on the page.
+
+**Legend and tiles.** The KPI tiles become solid coloured blocks with a white
+mask icon and a translucent circle, the banking tile stays white to stand
+apart; legend swatches were inline colours and are overridden per position.
+
+Full browser suite 648/648 (`scratchpad/p3b-e2e.txt`); overflow 0px at
+1440/1024/390; no console errors in the preview build.
+
+## S48 · Redesign phase 4 — what the published design systems agree on (2026-09-03)
+
+The operator asked for best practice «in GitHub or similar code space».
+The documentation sites of every major system are outside this session's
+egress, so the guidance was read from the systems' source repositories on
+GitHub: Carbon (data-table style and usage, status-indicator and tag
+patterns), Polaris (colour roles, badge content rules, resource-index
+layout), GOV.UK (table component), Salesforce Lightning (data-table docs)
+and Ant Design / Ant Design Pro (table and layout conventions). Sections
+34–38 of `site/erp-ds.css`; still CSS only.
+
+**Applied.** Sentence-case column headers at body size on a light band
+(Carbon, GOV.UK); 40px rows with 16px column padding and tabular figures
+in every cell (Carbon, GOV.UK); neutral row hover (Polaris keeps the accent
+for what you press); status pills as soft fill plus paired text colour
+(Polaris) with a dot in front of the word so a status carries colour AND
+shape (Carbon's status-indicator rule — a pseudo-element, so the text the
+suite reads is unchanged); empty states as a bounded dashed field with a
+glyph (Carbon's anatomy, minus the action the markup does not have); card
+headings without a divider, hierarchy by weight (Polaris).
+
+**Not applied, and why.** Sortable and filterable headers, batch-action
+bars, skeleton loading, table captions and `scope` attributes all need
+markup or logic; this branch changes neither. They are listed in the pull
+request as candidates for a later, tested phase.
+
+**The uppercase question, settled.** Header case is the one change that
+could have touched the suite. The six checks that read headers use
+`textContent` or a case-insensitive pattern, so none see the transform;
+verified before the run, confirmed by it. Full suite 648/648
+(`scratchpad/p4-e2e.txt`); overflow 0px at 1440/1024/390; no console
+errors on the dashboard, the quotes register and the leads register.
+
+**A canvas beside the preview.** The same redesign was also drawn as an
+editable design canvas (dashboard, quotes register, phone) from the exact
+values of the stylesheet, so the operator can move and retype things
+without waiting for a build. It is a mockup: nothing on it is wired.
+
+## S49 · Redesign phase 5 — the premium pass, after the operator's phone review (2026-09-03)
+
+The operator opened phase 3 on a phone: «looks like a school project, not a
+professional UI. Fix the header line to be top notch with the logo; the
+colour theme must originate from the logo green; text size and font style
+are not aligned; bell, year and profile look bad — integrate them; show the
+mockup in English only; still far from premium.» Sections 39–44 of
+`site/erp-ds.css` and one font file.
+
+**The palette is the logo's.** The mark is `#48733c` on a rounded square with
+a `#f2c230` corner. Interface accent, active states, the receivables tile and
+every green in the sheet now resolve to that green; the rail and the hero
+tile are the same green darkened to near black; the gold is the small signal
+(overdue dots, the rail's attention mark) and, deepened, the payables tile.
+Phase 3's blue was borrowed from the references and is gone. Reversible: two
+tokens.
+
+**A self-hosted typeface.** Geist (SIL OFL, licence beside the file) as a
+single 68 KB variable file under `site/fonts/`. Self-hosted rather than
+linked from a font CDN on purpose: a tenant's browser must not call a third
+party to draw a page (RGPD). The preview build inlines it as a data URI. The
+system font was doing more of the «school project» than any colour.
+
+**The header is one line.** Logo and name left, search centred, one cluster
+right: Create in the green, alerts as a bell glyph with its count, the period
+as a ghost control with a chevron, the profile as an avatar disc. The bell
+and profile emoji stay in the DOM — the suite presses those buttons by id —
+and are painted over with masked glyphs exactly as the rail's are. On a
+phone the same line is 56px with Create as a round plus, and the search
+takes the second line.
+
+**Two things leave the phone, both still reachable.** The page description
+under the title (three lines of grey before the first number on a 390px
+screen) and the ES · CA · EN pill (the sign-in page and Configuración ›
+Idioma both still offer the choice). Neither is removed from the DOM.
+
+**The preview opens in English** because the operator asked to see it so.
+The artifact wraps the page in its own `<html>` with no `lang` attribute, and
+i18n.js reads the page's base language from exactly that attribute — no
+attribute meant «English page, nothing to translate», which is why the first
+English build stayed Spanish. The preview restores `lang="es"` before the
+first script and records the English choice the way the sign-in page would.
+Production is not affected: this is the preview builder, not the site.
+
+Full browser suite 648/648; overflow 0px at 1440/1024/390/430; no console
+errors; header 64px on desktop and 56px + search line on a 390px phone.
+
+## S50 · Redesign phase 6 — the attention rows, and a second premium pass (2026-09-03)
+
+Operator, on the phase-5 preview: «Needs attention — the red signal is not
+looking premium; implement another solution.»
+
+**Severity as a tinted square with a line glyph.** The coloured emoji circle
+(🔴 🟡 🔵) was a traffic light on every row; twenty of them in a column is a
+warning sign, not a list. Each row now opens with a 32px square: red tint
+and an alert-circle glyph for critical, gold tint and a flag for high, grey
+and an info mark for the rest. The message drops to medium weight so the
+list ranks instead of shouting.
+
+**One attribute added to two templates.** The sheet cannot read the emoji
+to know a row's severity, so the two `.alrow` templates now write
+`data-sev="${a.sev}"` beside the `data-key` they already carried. That is
+markup, not logic: the value already existed on the alert, no handler or
+selector in the page reads it, and the emoji stays in the DOM for the suite.
+It is the first non-CSS change on this branch and is recorded as such.
+
+**Quieter chrome.** The Torre's action row keeps one solid button and turns
+the rest into text buttons that only grow a surface on hover (on a phone
+they keep a border, because a phone has no hover). More air around the page
+and inside the cards; count tags as quiet chips; the phone FAB as a disc.
+
+Full browser suite 648/648 (a first run caught the FAB shrunk to 54px against the spec's 56px target — restored, re-run green); overflow 0px at 1440/1024/390/430; no
+console errors in the preview build.
+
+## S51 · One «+», not two (2026-09-03)
+
+Operator, on the phone preview: «Keep only one + not two and ensure in the
+remaining + all functions are there from both.» The header's «+ Crear»
+offered the section's creations; the floating button at the bottom right
+offered the four site actions; «Nueva tarea» was in both.
+
+**The header keeps the plus; the floating button is hidden.** The header
+button is the one that exists on every screen size, so it is the one that
+survives. `renderCreateMenu` now lists the section's creations first, a
+hairline, then the site actions, and a label that both lists carry is
+offered once. The floating button stays in the DOM with its handler; the
+design sheet hides it, which is one rule to revert. Menu rows are 48px on a
+phone, the target the spec set for the floating button's own menu.
+
+**The suite follows the instruction, not the old spec.** §3's «56px floating
+button, four actions» checks now assert the opposite — the floating button
+hidden, the header's plus visible, all four site actions in the one menu
+with no label twice — and the Catalan and three-tap checks press the header
+button instead. Recorded here because a check that was changed to pass is
+the kind of change that has to be visible.
+
+This is the second non-CSS change on the branch (the first is S50's
+`data-sev`), and both are the operator's explicit instructions.
+
+## S52 · The header cluster, restructured (2026-09-03)
+
+Operator, with a crop of the header's right end: «this area looks not
+premium — redo with best practices, more modern and structured».
+
+**The pattern is the one Linear, Stripe and Atlassian's top navigation
+share:** one primary action; a group of identical 36px square icon buttons;
+the identity; hairline dividers between the groups; one height and one gap
+for everything. Section 48 of `site/erp-ds.css`.
+
+- The alert count moves to the button's corner instead of sitting on the
+  bell; the bell glyph is the conventional one.
+- The period is a bordered control again — calendar glyph left, chevron
+  right, a fixed 112px so the widest option no longer stretches it. On a
+  phone it is the calendar glyph alone; the native picker still opens with
+  every period.
+- The language switch becomes a small segmented control on the row's
+  geometry (28px, the current language in the green tint). The suite pins it
+  fixed, top right, three buttons — all still true.
+- The dividers are pseudo-elements on the first and last menu wrappers, so
+  the markup is untouched.
+
+The first build tiled the calendar glyph across the control: a shorthand
+with the colour in the wrong layer was invalid and left `background-repeat`
+at its default. Caught by the header screenshot before the suite ran.
+
+## S53 · Phase 9 — the flyout menus, the attention panel, the project overview (2026-09-03)
+
+Nine comments the operator left on the preview build, and the one repeated in
+chat: «all the white Klappmenü … research best practices and apply to make it
+more structured and intuitive, also across the different Klappmenü to indicate
+the end-to-end flow of the sections.»
+
+**The panel says where you are before it says what you can open.** Every
+published navigation pattern agrees on the same anatomy — name the place,
+group what is inside, mark the current item by more than colour, keep 44px
+targets. What none of them supply is the operator's actual ask: that the
+menus, plural, should show one process. So the three sections that carry the
+work — Comercial, Proyectos, Administración — are numbered 1·2·3 in a strip
+that appears in all three panels, connected by a line, the current one filled
+and the ones behind it green. A chip swings the panel to that section without
+closing it, and the foot of each panel offers the next one by name. Inside a
+flow section the screens are numbered steps down a rail; Datos maestros and
+Configuración get no numbers, because they serve all three and inventing a
+sequence for them would teach something untrue.
+
+**No new prose was invented for any of it.** The strip and the foot use the
+sections' own names, which are already translated; the steps are digits. The
+one place new words were unavoidable is the attention table, and those are
+four short pairs added to both dictionaries (Críticas · Altas · Medias ·
+Permisos).
+
+**The step number is the position in the panel, not the code.** Adicionales
+carries PRY-03 while sitting fifth under Comercial. A menu that counts
+1,2,3,4,3 teaches nobody anything; the codes still identify the screens.
+
+**A section with one screen opens the screen.** The Torre's panel was a menu
+of one — a tap asking the operator to confirm where they had already said they
+wanted to go. Written against the count of visible children, not against the
+word «tower», so the menu returns by itself the day the Torre gains a second
+screen.
+
+**Needs attention is a table, and the counts became the filter.** «39
+críticas · 16 altas» was a sentence that could not be acted on; it is now four
+chips that narrow the list. Five columns: a graded mark, the subject, the
+category, who is responsible, and the days. The four severities differ in
+fill, colour AND glyph — solid red exclamation, amber flag, slate «i», hollow
+grey dot — so the order survives greyscale and a colour-blind reader.
+
+**Where the numbers come from, and where they do not.** The days column reads
+the receivables ledger, which already knows how late an invoice is; anything
+else uses the due date somebody set on the Alertas screen. No date, no
+number — a dash says «nobody has put a deadline on this» rather than inventing
+one. Which is why most rows show a dash for «Responsable» today: assignee and
+deadline are management fields, and until they are filled in on the Alertas
+screen the honest answer is that nobody owns the alert. The category is read
+from ALERT_META through the alert itself, never guessed from the message.
+
+**The job code column was mine, and it went.** Six columns did not fit the
+half-width card; the subject already names the record. Removing it was
+cheaper than scrolling.
+
+**Both Torre panels are full width now.** Nine columns of job economics and
+five of alerts were sharing one row: the project code wrapped over three
+lines and the margin column fell off the edge. Stacked, neither wraps.
+
+**Two bugs the screenshots caught before the suite ran**, neither of which any
+check asserts: the subsection list laid its items out in a row (the panel is a
+flex container in the page's own sheet), and `.alrow` — a grid, written when
+the attention list was a stack of divs — turned the new `<tr>` into a grid and
+overlapped every cell. Both fixed by scoping, so the Alertas screen keeps the
+div form it still needs.
+
+**Also from the comments:** the avatar is square, on the icon buttons' own
+geometry; the scrim behind the panel is a gradient that lets the page recede
+instead of a flat wash; and the Proyectos card head no longer repeats the
+column names printed directly beneath it.
+
+## S54 · Three CI gates, and which of them were mine (2026-09-03)
+
+Five of the six CI jobs were green on the phase-9 push; «Lint · Types · Test ·
+Build» had four red steps. Diagnosed against a clean worktree of `origin/main`
+rather than assumed, because two of them turned out not to be mine.
+
+**Mine: the days column.** `−239 d` put a bare «d» on screen in every
+language, and the booted-workspace gate allows exactly zero untranslated
+strings. The unit moved to the column heading, which is already translated
+three ways; the cell is a signed number and nothing else. 4 → 0.
+
+**Mine: two phrases in my own comments.** The source-literal audit reads
+double-quoted strings wherever they appear, including inside comments, so
+«where am I in the process» and «→ Proyectos» counted as untranslated UI. They
+are guillemets now, like the rest of the comments in the file. 207 → 205,
+level with main.
+
+**Not mine: the command whitelist's arity.** `pnpm test` fails identically on
+a clean checkout of main: the engine's
+`allocateMovementToProject(movId, ref, kind, where, user)` gained `where` with
+the partida/subpartida work, and `apps/web/lib/erp-commands.ts` still declared
+three arguments. The whitelist is what the server is allowed to forward, so
+the stale number was not only a failing test — it silently dropped the
+subpartida on the way through the API. Corrected to four.
+
+**Not mine: a manifest copy CI never receives.** `gen-nav-manifest.mjs
+--check` compares four committed copies against SECTIONS, and
+`apps/web/public/workspace/nav.json` sits under `.gitignore`'s
+`apps/web/public/*`. It existed on whichever machine last generated it and
+nowhere else, so the check passed locally and failed on every clean checkout —
+main included. The directory is un-excluded, its contents re-excluded, and the
+one file allowed through, which is the only shape git accepts.
+
+Both of the last two are repairs to `main`'s state made on this branch because
+the branch cannot go green without them; neither touches the redesign.
+
+## S55 · Phase 10 — the section panel is a full-width sheet on a phone (2026-09-03)
+
+Operator, with two screenshots: «the white tile which opens in each tab should
+be across the full screen (left to right) and look way more modern, premium
+and structured and process flow intuitive.»
+
+**It was inset by the width of a rail that is not there.** `left: var(--rail)`
+is correct on a desktop, where the panel slides out beside the 84px rail, and
+it was written without a breakpoint. On a phone the rail leaves the flow to
+become the bottom bar, so those 84 pixels were empty screen the panel was
+politely avoiding — and the page's own phone rule already said `left: 0`, but
+the design layer loads after it. That is the third instance this week of one
+mistake: a desktop truth applied at every width. The other two were the row
+that stopped carding and the table-cell override. All three now sit behind
+breakpoints, and each carries the note next to it.
+
+**A sheet that says it is a sheet.** Rounded top corners, a grab bar, and the
+content given room to be read at arm's length: the journey numbers at 28px,
+the section title at 18, the screens as 54px rows on their connector rail,
+the hand-off centred at the foot. Nothing was added to the panel — the same
+four parts as on the desktop, sized for a thumb.
+
+Desktop untouched: the whole block is inside `@media (max-width: 860px)`.
+
+## S56 · Phase 11 — the phone sheet at half the height (2026-09-03)
+
+Operator: «the white tiles from the tabs are way too high, so you have the
+feeling you are not seeing the screen anymore. Make it way less high, maybe
+some sub tile names should be next to each other rather than all below each
+other. Still apply the intuitive end-to-end flow.»
+
+Two changes, both spending vertical space only where it buys something. The
+journey stops being three stacked circle-and-label columns and becomes one
+line of pills, 40px instead of ~90. The screens stop being one tall column and
+become two, which halves the rows without dropping an item. Comercial — the
+tallest panel at five screens — went 62% → 54% → **41%** of a 390×844 phone;
+Administración, at six, sits at 35%. Neither scrolls.
+
+**The flow survives the grid.** Read left to right, top to bottom is still an
+order: the numbers run 1→5 in exactly the order a person reads them, and the
+section pills above still say which of the three movements this is. What went
+is the connector rail — a line down a single column meant «then», and the same
+line drawn down two columns would have meant nothing. Removing it was the
+honest move; keeping it would have drawn a sequence the layout no longer has.
+
+## S57 · The hand-off button comes out (2026-09-03)
+
+Operator: «the button at the end to move directly to Projects or
+Administration is not needed — you can move anyway on the top 3 blocks or
+below at the tabs.» Correct on both counts: the journey pills at the head of
+the panel reach the same three sections, and on a phone the tab bar under the
+sheet does too. It was also the tallest thing left in it.
+
+Comercial goes 41% → **35%** of a 390×844 phone; Administración was already
+35% because, as the last of the three movements, it never had a next section
+to offer.
+
+Hidden, not deleted — the rule the floating «+» follows. `buildSubs` still
+writes the footer and still computes the next section from FLOW, so restoring
+it is one rule and not a list somebody has to remember to update.
+
+## S58 · Phase 12 — the register cards (2026-09-03)
+
+Operator: «everywhere we have those tiles with the projects, customers,
+suppliers … update all of them to look more premium and more state of the
+art. Keep the haptic that they get a slight different colour when you use
+them, in that existing way.»
+
+**The tint is the tap state, not a stripe.** There is no alternating-row rule
+anywhere in this repo — what the screenshots show is `tr.click:hover`, which a
+touch browser leaves on the last card the thumb touched. That is why the
+tinted card is second in one list and first in the next. Worth writing down,
+because reproducing it as a zebra would have looked identical in a screenshot
+and been wrong in the hand. It is kept exactly as it was, and given an
+`:active` state of its own so the feedback answers the tap as well as
+outlasting it.
+
+**One block for every register.** Each of them is the same carded table on a
+phone, so the styling is generic rather than a rule per screen: a white
+surface with a hairline and a soft shadow, the leading `.k` cells as the
+card's identity — the code as a small spaced eyebrow in the accent, the name
+as the line you read — a rule under them, and the facts beneath in a tight
+label/value rhythm with tabular figures. A register whose only `.k` is the
+code (the jobs list) reads that one as the title instead of as an eyebrow.
+
+**The radius stays round here.** «No round edges» was decided for the desktop
+remodel and is untouched; a list card on a phone is the one place the mobile
+idiom argues the other way, and 12px is what every current mobile list uses.
+One token to reverse if the operator disagrees.
+
+**Correction, same phase.** The first version of the card block led every
+selector with `#view`, which gave each rule an id's weight and beat
+`.bgrid table.cards tr.chaprow` — the quote's chapter heading, which has its
+own phone treatment and its own tint. The heading went white, stopped looking
+like a heading, and the check that measures exactly that went red (692/693).
+Plain class selectors sit below the grid's own rules and above the page's
+generic ones, which is where these belong.
+
+## S59 · Phase 13 — four corrections from the phone (2026-09-03)
+
+**The steps run down, then across.** A grid fills row by row unless told
+otherwise, so the two-column panel read 1,2 / 3,4 / 5 across — not the order
+of the work. `grid-auto-flow: column` fills downward and needs to know how
+many rows a column has; CSS cannot count children, so `buildSubs` hands it
+half the item count, rounded up, as a custom property. Every other decision
+about the list stays in the stylesheet.
+
+**A step is not a quantity.** «3 Quotes 19» put two numbers on one row meaning
+different things: where the screen sits in the process, and how many
+documents are behind it. They now differ in shape AND colour — the step a
+plain disc, the count a capsule — so neither has to be read twice.
+
+**The card reads as one piece.** Operator, on a quote card: «make the tile
+more colour — the top line with PRE-xxxx maybe in a darker green, to ensure
+the tile looks like one piece.» The identity is a tinted band, its code in the
+deep green, and the facts sit under it rather than floating in white.
+
+**No box around the boxes.** A register on a phone is a stack of cards, and
+the panel that holds a table on a desktop had become a second frame drawn
+round all of them. The cards sit on the page's own light-green ground now.
+Scoped to registers by `:has(table.mlist.cards)`: the Torre's panels keep
+their surface, because their heading and filter belong to the panel rather
+than to any card.
+
+**And the band goes to the top.** Not every register puts its identity first —
+Leads leads with the date, so the green band landed mid-card and read as a
+divider. The card is a flex column and the identity cells take `order:-1`,
+lifting them (in their own order) to the top of every card without touching a
+template. Scoped to `.mlist`: the quote's budget grid keeps the block flow its
+own phone layout was written for. The band's rules also stopped assuming the
+identity is the first cell — they key off the identity cells' relation to each
+other, so the first opens the band, the last closes it, and whether the first
+is an eyebrow or the title depends on whether a second follows it.
+
+**S60 · The favourite mark joins the band.** Operator, on the job overview:
+«here it looks also strange with the star above and not the green header —
+move the star into the green header on the right side.» The favourite toggle
+is the row's first cell, so on a phone it became a card row of its own: an
+empty white strip on top of the identity band. `order` could not fix this one
+— it stacks the star above or below the band, never inside it, and the
+overview is a plain table rather than one of the flex `.mlist` cards anyway.
+So the cell leaves the flow and is pinned to the band's top right, its box
+given the band's own metrics (14px horizontal, 11px above and below a 20px
+line) so the mark lands optically centred without a magic offset to drift out
+of date.
+
+Decided: CSS only, and only under 700px. Moving the button into the identity
+cell in the template would have taken a column off a nine-column desktop table
+to fix a layout on one screen size — the desktop's narrow leading column is
+the ordinary place for a row control and reads correctly there. Verified at
+1440/1024/701: the star is still a static first cell, left of the code, nine
+cells, no horizontal overflow.
+
+Noted while writing it: the reset needed `:not(.k)` in the selector, not for
+meaning but for weight. The rule that opens a card's first fact is
+`td:not(.k):first-child`, the star IS that cell, and its `padding-top`
+longhand from a three-class selector would have beaten a `padding` shorthand
+here and dropped the mark 11px. Specificity is load-bearing in this file in
+both directions now: too much of it lost the quote's chapter tint two
+sections ago, too little would have lost this.
+
+**S61 · Square, everywhere.** Operator, on the job register in the native
+app: «all those boxes should not have round corners.» That closes a question
+this design layer had been carrying since phase 3, which set the language to
+square corners and then kept a 12px radius on the phone's cards because a card
+felt like it wanted one. It did not: with every other surface square, the
+rounded cards were the odd shape on the screen rather than the soft one.
+
+Done as a sweep rather than by hand, because the radii were not in one place:
+113 declarations across `site/erp.html` and `site/erp-ds.css`, four of them
+written inline inside JavaScript template strings where no stylesheet rule
+could have reached them. The radius scale itself is now zero — `--r-sm`,
+`--r-md`, `--r-lg` and `--r-full`, in both the base block and phase 3's
+tightening of it, since leaving either non-zero would quietly re-round every
+element that reads a token.
+
+Kept round on purpose, because they are not boxes: the primary «+» (a circle
+has no corners to square), the status dots, and the count pill on a
+subsection — which exists precisely to look UNLIKE the bordered square that
+carries a step number, so squaring it would undo S58's distinction.
+
+Decided: the notification badge goes back to a circle. The sweep squared it as
+a side effect; a count bubble belongs with the dots rather than with the
+panels, so it is restored explicitly in section 62 instead of left square by
+accident. Reversible in one line if the operator prefers it square.
+
+Verified across five screens at 390 and 1440: no non-circular radius remains
+anywhere, zero horizontal overflow, zero page errors.
+
+**S62 · The app answers a tab tap the way the web does.** Operator, on the
+native app: «the tab click on the tabs in the app opens an old version since
+no white tile opens like in the web version. Ensure app is aligned with web
+version.»
+
+Not an old version — a different navigation model. The shell keeps one web
+view PER TAB, each loaded at startup and parked on the landing screen of its
+section, and selecting a tab only changes which view is visible. Nothing
+navigates, so nothing ever opened the section panel: the app answered a tap
+with a screen where the web answers it with a choice of screens. The panel
+was reachable only through the breadcrumb, which is not where anyone looks.
+
+Fixed in two halves. The page exposes `window.caneiOpenSection(key)` when it
+detects the shell, and the shell calls it from `didSelect`. `toggleSection`
+rather than `openSection`, so a one-screen section still goes straight
+through instead of offering a menu of one; re-selecting the open section is a
+no-op, because a tab tap must never be the thing that closes the panel; an
+unknown key falls back to `SECTIONS[0]` rather than throwing inside
+`evaluateJavaScript`.
+
+Decided: no load-time fallback for the shell already installed. The first
+attempt opened the panel on load so an older build would benefit, but `boot()`
+is async and its routing closes the panel again — the open was racing the
+boot and lost. Since `didSelect` fires on every tab CHANGE, and the only tab
+it skips is the one selected at launch — the Torre, a single-screen section
+that correctly shows no panel — the native call covers the whole ask on its
+own. So this needs a new TestFlight build; there is no robust
+over-the-air-only version, and shipping the racy one would have been a
+coin-toss dressed as a fix.
+
+Noted: the browser suite runs under an ordinary user agent, so it does not
+exercise this path. Verified instead with a probe under the shell user agent
+across all five multi-screen sections (5, 2, 6, 4 and 8 screens respectively),
+plus the Torre, which correctly refuses the menu of one. A suite check under
+a native user agent is the obvious follow-up.
+
+Also noted, the second time this has cost a gate: the source audit reads
+SINGLE-quoted spans inside comments. A heading written with two possessives
+turned the words between them into a user-visible literal and pushed the
+count 205 → 206. The comment now carries no apostrophes, and says why.
+
+**S63 · The workspace revalidates instead of being cached blind.** Chasing why
+the app still looked old, the phone showed something that should not be
+possible: the NEW `erp-ds.css` (square cards) against the OLD `erp.html` (the
+breadcrumb still a pill, though the source measures 0px). One file fresh, one
+file stale — which is exactly what an HTTP cache with no revalidation hint
+produces.
+
+`public/workspace/` is a build-time copy of `site/`, and Next serves files from
+`public/` without telling anyone when to check again. The phone shells keep a
+web view alive per tab for the life of the process, so nothing a person does
+refetches the page. The failure is silent and MIXED: half a redesign appears,
+and — worse — the page's SCRIPTS are the old ones too, so a native shell
+calling into a function the cached page does not define gets nothing at all,
+with no error to notice. S62's fix could have shipped and looked broken.
+
+Decided: `Cache-Control: no-cache, must-revalidate` on `/workspace/:path*` in
+`apps/web/next.config.js`. `no-cache` does not mean "do not store" — it means
+store it, but ask first. Verified against the real standalone build with
+`public/` copied in as the Dockerfile does it: the header is served on
+`erp.html`, `erp-ds.css` and `nav.json`, ETags are issued, and a conditional
+request answers **304 with a zero-byte body** where the full page is 1,155,814
+bytes. So correctness costs a round trip, not the file.
+
+Host-layer change, deliberately: `apps/web` is a host, caching is
+infrastructure, and this is precisely the sort of concern that belongs there
+rather than in a capability or a pack.
+
+**S64 · One sheet, the same on every tab.** Operator, once the panel was
+finally opening on every tab: «harmonize the white tiles and they should be
+connected at the bottom and not flying around, be more structured and aligned
+across all tabs to ensure End2End intuitive process.»
+
+Measured before touching anything, which is what made both faults obvious.
+The sheet sat **84px above the bottom of the web viewport on every section**,
+with a band of the page showing underneath — and the sheet was a different
+height on each tab: 172px on Datos maestros against 294.9px on Administración,
+a spread of 122.9px, so the top edge jumped as you moved between tabs.
+
+The float had a single cause. `body.native .rail` — the element the sheet
+hangs from — was lifted `84px + safe-area` "to clear the native tab bar". But
+the shell adds its tab bar as a bottom `safeAreaInset`, so the web view is
+laid out ABOVE the bar and the viewport never reaches it. Clearing a bar that
+is outside the viewport counts it twice. `bottom: 0` now, and the rail is
+zero-height in the app (its strip is `display:none`), so the sheet lands
+exactly on the bottom edge.
+
+Decided with the operator: one height for all six tabs, 296px, sized to the
+tallest natural sheet — a figure the design reaches twice by different routes
+(four rows without a journey strip, three rows with one), so it is where the
+layout already settles rather than a round number. The cost is empty space on
+the short sections; the gain is that the sheet opens in the same place every
+time, and a menu that lands somewhere different on each tab is one you have to
+re-find.
+
+Decided against the operator's literal wording in one respect, and it proved
+necessary: the spare room is CENTRED, not left at the bottom. Pinned to the
+top, Datos maestros was half sheet and half void, and Proyectos — two screens,
+so a single row — was mostly nothing at all and read as a panel that had
+failed to load. Centring keeps the tiles at their natural size, which is the
+part that had to stay fixed.
+
+Also kept, as agreed: the journey strip stays on the three flow tabs only.
+Numbering Datos maestros and Configuración would place them at steps 4 and 5
+of a process they are not in — they are reference data used at every stage.
+
+Verified at 390x844 and 375x667 under the shell user agent, across all five
+multi-screen sections: height 296 on every one (spread **0.0px**, was 122.9),
+gap below the sheet **0** on every one (was 84), identical top edge at 548, and
+no section scrolls its own sheet.
+
+Noted and NOT changed: `body.native main` still reserves
+`104px + safe-area` of bottom padding for the same tab bar that is outside the
+viewport, so every screen carries dead scroll space at its foot. Same root
+cause, but it hides no content and the operator reported the sheet — left for
+a follow-up rather than widened into silently.
+
+**S65 · Four things off the control tower, and the breadcrumb off every
+screen.** Operator: «remove those two items (print pdf, and ERP-Tab name you
+can remove everywhere since clear since below it is marked green in which tab
+I am on it) and make recalculate way smaller button and also remove Calculated
+at since when I open this screen it is always the latest status», then, on the
+result: «move this next to control tower, than the whole screen can move up?»
+
+Done as asked. The timestamp went because the screen recalculates on open, so
+it only ever said «now» in a way that invited doubt. Print/PDF went because
+the phone and the browser already print. The breadcrumb went everywhere: the
+tab bar shows the section in green, so «ERP › SECTION» restated it in grey
+above a title that said it a third time.
+
+Recalculate is a 32px glyph on the title line, in a new `#headact` slot that
+`render()` empties on every navigation — cleared centrally rather than by each
+view, because the view that must clear it is the one that does NOT use it, and
+that is the one nobody remembers. Verified that leaving the Torre empties the
+slot and returning leaves exactly one button.
+
+Two things had to be handled rather than deleted:
+
+The breadcrumb was doing a second job. In the shell it was the only route back
+to the section sheet for the tab already open — selecting a DIFFERENT tab
+opens that section, but a re-tap is reported separately. So re-tapping the
+active tab now toggles its sheet (`caneiToggleSection`, new alongside
+`caneiOpenSection`; both built by one `call()` in the store so the escaping
+rule is stated once). That replaces scroll-to-top on re-tap: reaching the
+other screens of the section you are in beats a scroll shortcut. Needs a
+TestFlight build; the web half stands alone.
+
+And the placement took three tries, which is worth recording because the first
+two were plausible. In the toolbar first, where the glyph broke the 2x2 the
+four create buttons make on a phone — one was dragged up beside it. Then at
+the end of the toolbar, which cost the bar a whole extra row for one 32px
+control and pushed every figure further down: the opposite of the request. On
+the title line it uses a line that already existed, which is the only reason
+the screen could move up at all — first KPI card from ~330px to 271px.
+
+Caught by a gate, and worth noting for next time: the dictionary held
+«↻ Recalcular» WITH the glyph, so the bare word in the new tooltip came back
+untranslated. `title` and `aria-label` are translated by i18n.js, so the fix
+was to retarget the pair in both dictionaries rather than to inline the word.
+
+**S66 · The wizard steps stack on a phone.** Operator, on the accountant
+report: «text outside of box - fix».
+
+Measured first: at 390px the third label sat **8px below the bottom border of
+its own box**, in both Spanish and English, and step 1 was already flush at 0 —
+one word away from the same fault. Desktop was fine, which is why it had
+survived.
+
+The cause was `height: 48px` on `.steps .stp` — a fixed height on a box whose
+label wraps to three lines at that width. Corrected at source in the page: a
+`min-height`, plus vertical padding so wrapped lines are not pressed against
+the edge. Because `.steps` is `align-items: stretch`, growing one grows all
+three and they stay a matched row.
+
+That alone was not enough, and the first attempt made a different mess. Three
+steps sharing 390px leaves roughly 53px of text column each — narrower than the
+word «Exceptions» — so with `overflow-wrap: anywhere` the labels simply broke
+mid-word: «Exceptio / ns», «submissi / on». `anywhere` also shrinks an item's
+min-content width, which is what let the boxes squeeze below their own labels
+in the first place; it is now `break-word`, which breaks only a word that
+genuinely cannot fit.
+
+Decided: below 700px the steps become one per line. No amount of wrapping
+rescues a 53px column — the row itself is what does not belong on a phone. At
+full width every label fits on one line in all three languages, and the boxes
+return to 48px. A wizard reads as a sequence either way: 1, 2, 3 down the
+screen is the same promise as 1, 2, 3 across it, and it is the reading order
+the rest of the page already uses.
+
+Verified at 390 in English and Spanish and at 1440: no label crosses its box
+in any of them, with 16px of vertical clearance and 120–250px of horizontal
+room to spare; desktop unchanged at 48px and three across.
+
+## S60 · PK12-S11 — Adicionales stays a view, not a second model (2026-09-03)
 
 The operator asked whether the Adicionales section could be removed entirely
 and extras handled through Presupuestos and Contratos alone. Measured first,

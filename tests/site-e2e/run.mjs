@@ -1230,32 +1230,42 @@ async function testMobile(browser, base) {
       ok("mobile: the forecast keeps its columns and scrolls inside its own card");
     else bad("mobile: grid opt-out", JSON.stringify(grid));
 
-    // §3's floating button: 56 px target, four actions, 48 px rows.
-    const fab = await pg.evaluate(() => {
-      const f = document.querySelector("#fab");
-      const r = f.getBoundingClientRect();
+    // ONE plus, not two (operator, 3 Sep): §3's floating button is hidden and
+    // the header's «+» carries the section's creations AND the four site
+    // actions, each label once, on 48 px rows.
+    const fab = await pg.evaluate(() => ({
+      display: getComputedStyle(document.querySelector("#fab")).display,
+      create: getComputedStyle(document.querySelector("#btnCreate")).display,
+    }));
+    if (fab.display === "none" && fab.create !== "none")
+      ok("mobile: one «+» — the floating button is hidden, the header's stays");
+    else bad("mobile: one plus", JSON.stringify(fab));
+
+    await pg.locator("#btnCreate").click();
+    await pg.waitForTimeout(300);
+    const menu = await pg.evaluate(() => {
+      const labels = [...document.querySelectorAll("#mCreate button")].map((b) =>
+        b.textContent.replace(/^[^\p{L}]+/u, "").trim(),
+      );
+      const site = [
+        "Foto y avance de obra",
+        "Parte de horas de hoy",
+        "Capturar un gasto",
+        "Nueva tarea",
+      ];
       return {
-        display: getComputedStyle(f).display,
-        w: Math.round(r.width),
-        h: Math.round(r.height),
+        open: document.querySelector("#mCreate").classList.contains("on"),
+        n: labels.length,
+        site: site.filter((s) => labels.includes(s)).length,
+        dupes: labels.length - new Set(labels).size,
+        small: [...document.querySelectorAll("#mCreate button")].filter(
+          (b) => b.getBoundingClientRect().height < 48,
+        ).length,
       };
     });
-    if (fab.display !== "none" && fab.w === 56 && fab.h === 56)
-      ok("mobile: the site-actions button is a 56 px target");
-    else bad("mobile: FAB size", JSON.stringify(fab));
-
-    await pg.locator("#fab").click();
-    await pg.waitForTimeout(300);
-    const menu = await pg.evaluate(() => ({
-      open: document.querySelector("#fabMenu").classList.contains("on"),
-      n: document.querySelectorAll("#fabMenu button").length,
-      small: [...document.querySelectorAll("#fabMenu button")].filter(
-        (b) => b.getBoundingClientRect().height < 48,
-      ).length,
-    }));
-    if (menu.open && menu.n === 4 && menu.small === 0)
-      ok("mobile: four site actions, none below a 48 px row");
-    else bad("mobile: site actions menu", JSON.stringify(menu));
+    if (menu.open && menu.site === 4 && menu.dupes === 0 && menu.small === 0)
+      ok(`mobile: the one menu offers all four site actions, no label twice (${menu.n} rows)`);
+    else bad("mobile: merged create menu", JSON.stringify(menu));
 
     // The site actions ship with Catalan like every other string — the rule
     // that has caught a gap in ten consecutive sessions. The language is a
@@ -1265,9 +1275,9 @@ async function testMobile(browser, base) {
     await pg.reload({ waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(900);
-    await pg.locator("#fab").click();
+    await pg.locator("#btnCreate").click();
     await pg.waitForTimeout(500);
-    const caMenu = await pg.locator("#fabMenu").innerText();
+    const caMenu = await pg.locator("#mCreate").innerText();
     if (/Part d'hores/i.test(caMenu) && !/Parte de horas/.test(caMenu))
       ok("i18n: CA translates the site-action button");
     else bad("i18n: CA site actions", caMenu.replace(/\n/g, " ").slice(0, 140));
@@ -1285,11 +1295,14 @@ async function testMobile(browser, base) {
     await pg.reload({ waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(900);
-    await pg.locator("#fab").click();
+    await pg.locator("#btnCreate").click();
     await pg.waitForTimeout(400);
 
     // Three taps to done: the button, the action, and the control it lands on.
-    await pg.locator("#fabMenu button").nth(1).click();
+    await pg
+      .locator("#mCreate button", { hasText: /Parte de horas/ })
+      .first()
+      .click();
     await pg.waitForTimeout(800);
     const landed = await pg.evaluate(() => ({
       hash: location.hash,
@@ -1578,7 +1591,12 @@ async function testNativeShell(browser, base) {
     else bad("native shell: FAB offset", `${nat.shape.fab} vs ${saf.shape.fab}`);
 
     // The one thing a six-tab native bar cannot do is reach 29 subsecciones.
-    await nat.pg.locator("#crumbs").click();
+    // The breadcrumb that used to open the sheet is gone — the tab bar already
+    // says which section you are in — so the shell drives it instead: a re-tap
+    // of the active tab calls this, which is the real code path now.
+    // The page is on #invoicing, so this is the real gesture: re-tapping the
+    // tab you are already in, to reach that section's other screens.
+    await nat.pg.evaluate(() => window.caneiToggleSection("admin"));
     await nat.pg.waitForTimeout(600);
     const subs = await nat.pg.evaluate(() => {
       const p2 = document.querySelector("#p2");
