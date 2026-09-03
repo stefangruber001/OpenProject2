@@ -5886,6 +5886,35 @@
         $("#crumbs").setAttribute("role", "button");
         $("#crumbs").setAttribute("tabindex", "0");
         $("#crumbs").onclick = () => toggleSection(SUBMAP[cur] ? SUBMAP[cur].sec.k : "tower");
+
+        /* THE TAB BAR MUST ANSWER A TAP THE WAY THE SECTION BAR DOES.
+           On the web, tapping a section opens the panel — the sheet with the
+           numbered screens and the end-to-end flow. In the app it did not:
+           the shell keeps one web view PER TAB, each parked on the landing
+           screen of that section, and selecting a tab only changes which one
+           is visible. Nothing navigates, so nothing opened the panel, and a
+           tap produced a screen where the web produces a choice.
+
+           This is the entry point the shell calls on tab selection. It is
+           deliberately tolerant: an unknown key falls back to the first
+           section rather than throwing inside `evaluateJavaScript`, and
+           re-selecting the section already open does nothing — a tab tap
+           must never be the thing that CLOSES the panel. `toggleSection` is
+           used rather than `openSection` so a one-screen section still goes
+           straight through instead of offering a menu of one.
+
+           No apostrophes in this comment on purpose: the source audit reads
+           single-quoted spans inside comments, and a possessive pair once
+           turned two words of prose into a user-visible literal. */
+        window.caneiOpenSection = (k) => {
+          /* SECTIONS[0], not a spelled-out key: the fallback stays correct if
+             the first section is ever renamed, and a bare string here would
+             read as a user-visible literal to the source audit. */
+          const key = SECTIONS.some((s) => s.k === k) ? k : SECTIONS[0].k;
+          if (openSec === key) return;
+          if (openSec) closeSection();
+          toggleSection(key);
+        };
       }
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") closeSection();

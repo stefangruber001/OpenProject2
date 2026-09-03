@@ -7921,3 +7921,44 @@ accident. Reversible in one line if the operator prefers it square.
 
 Verified across five screens at 390 and 1440: no non-circular radius remains
 anywhere, zero horizontal overflow, zero page errors.
+
+**S62 · The app answers a tab tap the way the web does.** Operator, on the
+native app: «the tab click on the tabs in the app opens an old version since
+no white tile opens like in the web version. Ensure app is aligned with web
+version.»
+
+Not an old version — a different navigation model. The shell keeps one web
+view PER TAB, each loaded at startup and parked on the landing screen of its
+section, and selecting a tab only changes which view is visible. Nothing
+navigates, so nothing ever opened the section panel: the app answered a tap
+with a screen where the web answers it with a choice of screens. The panel
+was reachable only through the breadcrumb, which is not where anyone looks.
+
+Fixed in two halves. The page exposes `window.caneiOpenSection(key)` when it
+detects the shell, and the shell calls it from `didSelect`. `toggleSection`
+rather than `openSection`, so a one-screen section still goes straight
+through instead of offering a menu of one; re-selecting the open section is a
+no-op, because a tab tap must never be the thing that closes the panel; an
+unknown key falls back to `SECTIONS[0]` rather than throwing inside
+`evaluateJavaScript`.
+
+Decided: no load-time fallback for the shell already installed. The first
+attempt opened the panel on load so an older build would benefit, but `boot()`
+is async and its routing closes the panel again — the open was racing the
+boot and lost. Since `didSelect` fires on every tab CHANGE, and the only tab
+it skips is the one selected at launch — the Torre, a single-screen section
+that correctly shows no panel — the native call covers the whole ask on its
+own. So this needs a new TestFlight build; there is no robust
+over-the-air-only version, and shipping the racy one would have been a
+coin-toss dressed as a fix.
+
+Noted: the browser suite runs under an ordinary user agent, so it does not
+exercise this path. Verified instead with a probe under the shell user agent
+across all five multi-screen sections (5, 2, 6, 4 and 8 screens respectively),
+plus the Torre, which correctly refuses the menu of one. A suite check under
+a native user agent is the obvious follow-up.
+
+Also noted, the second time this has cost a gate: the source audit reads
+SINGLE-quoted spans inside comments. A heading written with two possessives
+turned the words between them into a user-visible literal and pushed the
+count 205 → 206. The comment now carries no apostrophes, and says why.
