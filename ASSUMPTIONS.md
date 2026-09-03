@@ -8081,3 +8081,36 @@ Caught by a gate, and worth noting for next time: the dictionary held
 «↻ Recalcular» WITH the glyph, so the bare word in the new tooltip came back
 untranslated. `title` and `aria-label` are translated by i18n.js, so the fix
 was to retarget the pair in both dictionaries rather than to inline the word.
+
+**S66 · The wizard steps stack on a phone.** Operator, on the accountant
+report: «text outside of box - fix».
+
+Measured first: at 390px the third label sat **8px below the bottom border of
+its own box**, in both Spanish and English, and step 1 was already flush at 0 —
+one word away from the same fault. Desktop was fine, which is why it had
+survived.
+
+The cause was `height: 48px` on `.steps .stp` — a fixed height on a box whose
+label wraps to three lines at that width. Corrected at source in the page: a
+`min-height`, plus vertical padding so wrapped lines are not pressed against
+the edge. Because `.steps` is `align-items: stretch`, growing one grows all
+three and they stay a matched row.
+
+That alone was not enough, and the first attempt made a different mess. Three
+steps sharing 390px leaves roughly 53px of text column each — narrower than the
+word «Exceptions» — so with `overflow-wrap: anywhere` the labels simply broke
+mid-word: «Exceptio / ns», «submissi / on». `anywhere` also shrinks an item's
+min-content width, which is what let the boxes squeeze below their own labels
+in the first place; it is now `break-word`, which breaks only a word that
+genuinely cannot fit.
+
+Decided: below 700px the steps become one per line. No amount of wrapping
+rescues a 53px column — the row itself is what does not belong on a phone. At
+full width every label fits on one line in all three languages, and the boxes
+return to 48px. A wizard reads as a sequence either way: 1, 2, 3 down the
+screen is the same promise as 1, 2, 3 across it, and it is the reading order
+the rest of the page already uses.
+
+Verified at 390 in English and Spanish and at 1440: no label crosses its box
+in any of them, with 16px of vertical clearance and 120–250px of horizontal
+room to spare; desktop unchanged at 48px and three across.

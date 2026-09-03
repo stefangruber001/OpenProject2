@@ -3807,3 +3807,31 @@ td.num.late {
 #headact:empty {
   display: none;
 }
+
+/* ------------------------------- 65 · the wizard steps stack on a phone
+   Operator, on the accountant report: «text outside of box - fix».
+
+   The step labels were running out of the bottom of their own boxes — «IVA,
+   IRPF y envío» sat 8px clear of the border on a phone, and step 1 was already
+   flush against it, one word away from the same fault. The cause was a fixed
+   `height: 48px` on a box whose text wraps to three lines at that width; that
+   is corrected at source, in the page, where a minimum replaces it.
+
+   Height alone was not enough. Three steps sharing 390px leaves about 53px of
+   text column each, which is narrower than the word «Exceptions» — so the
+   labels still had to break mid-word to fit. No amount of wrapping rescues a
+   column that narrow; the row itself is the thing that does not belong on a
+   phone. So below 700px the steps become one per line, each with the whole
+   width, and every label fits on a single line in all three languages.
+
+   A wizard reads as a sequence either way: 1, 2, 3 down the screen is the
+   same promise as 1, 2, 3 across it, and it is the reading order a phone
+   already uses for everything else on the page. */
+@media (max-width: 700px) {
+  .steps {
+    flex-direction: column;
+  }
+  .steps .stp {
+    flex: 0 0 auto;
+  }
+}

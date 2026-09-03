@@ -3509,13 +3509,22 @@
         align-items: stretch;
         margin: 0 0 14px;
       }
+      /* A MINIMUM height, not a height. Fixed at 48px, a label that wrapped
+         to three lines ran straight out of the bottom of its own box — «IVA,
+         IRPF y envío» on a phone, 8px clear of the border, with step 1 already
+         flush against it and one word away from the same fate. The steps are
+         `align-items: stretch`, so growing one grows all three and they stay a
+         matched row. Vertical padding so wrapped lines are not pressed against
+         the edge, and `min-width: 0` because a flex item refuses to shrink
+         below its longest word without it. */
       .steps .stp {
         flex: 1 1 0;
-        height: 48px;
+        min-width: 0;
+        min-height: 48px;
         display: flex;
         align-items: center;
         gap: 10px;
-        padding: 0 14px;
+        padding: 9px 14px;
         border: 1px solid var(--line);
         border-radius: 0;
         background: var(--paper);
@@ -3555,6 +3564,12 @@
       .steps .stp .t {
         font: 600 12px var(--sans);
         letter-spacing: 0.02em;
+        min-width: 0;
+        /* `break-word`, not `anywhere`: `anywhere` also shrinks the item's
+           min-content width, which let the three boxes squeeze narrower than
+           their own labels and split them mid-word — «Exceptio / ns». This
+           only breaks a word that genuinely cannot fit. */
+        overflow-wrap: break-word;
       }
 
       /* .ctrbody survives PK4-B as the padding on a full-screen job surface's
