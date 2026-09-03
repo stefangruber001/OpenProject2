@@ -755,6 +755,21 @@ window.CANEI_DICT = {
     ],
     ["Desactivada", "Deactivated"],
     ["Borrar la cuenta", "Delete the account"],
+    ["Contraer todo", "Collapse all"],
+    ["Desplegar todo", "Expand all"],
+    ["Sin documentos todavía.", "No documents yet."],
+    [
+      "Todo el coste de esta obra tiene partida. La tabla cuadra con el proyecto.",
+      "Every cost on this site has a line item. The table agrees with the project.",
+    ],
+    [
+      "La tabla no cuadra con el coste del proyecto.",
+      "The table does not agree with the project's cost.",
+    ],
+    [
+      "Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y una subpartida para ver los documentos que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.",
+      "These figures are the real ones: budgeted, spent, and the difference between them. Click a line item to see its sub-line items, and a sub-line item to see the documents behind it. The budget is not adjusted here — it changes through a contract variation, which is what modifies it.",
+    ],
     ["Motivo del adicional", "Reason for the additional"],
     ["Días de plazo que añade", "Days it adds to the schedule"],
     ["Ampliación de la instalación eléctrica", "Extending the electrical installation"],

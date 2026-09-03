@@ -5863,7 +5863,11 @@
         foot.innerHTML = "";
         if (nextK) {
           const sec = SECTIONS.find((x) => x.k === nextK);
-          const b = el("button", "p2nextbtn", `<span class="ar">→</span><span>${esc(sec.lab)}</span>`);
+          const b = el(
+            "button",
+            "p2nextbtn",
+            `<span class="ar">→</span><span>${esc(sec.lab)}</span>`,
+          );
           b.onclick = () => openSection(nextK);
           foot.appendChild(b);
         }
@@ -17856,78 +17860,11 @@
          rows name one. Sums to the same figure as the chapter table above it
          BY CONSTRUCTION — chapterCosts mirrors actualCostCents' rules — so a
          disagreement between drawer and table is impossible rather than rare. */
-      function chapterCostsDrawer(projectId, chapterNum, chapterName) {
-        const rows = erp.chapterCosts(projectId, chapterNum);
-        const SRC = { bill: "Factura", labour: "Horas", movement: "Banco", capture: "Documento" };
-        const p = erp.project(projectId);
-        const lineName = {};
-        for (const { chapter } of erp.projectChapters(projectId))
-          for (const l of chapter.lines) lineName[l.id] = l.num + " · " + (l.desc || "");
-        const byLine = new Map();
-        for (const r of rows) {
-          const k = r.lineId || "";
-          if (!byLine.has(k)) byLine.set(k, []);
-          byLine.get(k).push(r);
-        }
-        const total = rows.reduce((s2, r) => s2 + r.amountCents, 0);
-        /* TWO CARDS, TWO QUESTIONS. The report was that this screen could not
-           say where inside a partida the problem was — a partida can be four
-           subpartidas with three of them exactly on budget, and a list of
-           documents does not name the one that moved. So the same six columns
-           the partida table carries appear here one level down, and the
-           documents stay underneath: once you know WHICH subpartida, you want
-           to know why.
-
-           Paraphrased, not quoted: the translation audit reads comments, and a
-           phrase in guillemets looks to it exactly like a string the screen
-           prints — which is how this very comment failed the gate once. */
-        const lines = erp.lineEconomics(projectId, chapterNum);
-        const db = openDrawer("Costes · " + chapterNum + ". " + (chapterName || ""));
-        db.innerHTML = `<div class="card"><div class="ch"><h3>Por subpartida</h3><span class="tag">${eur(total)}</span></div>
-   <div class="scroll"><table><thead><tr>
-     <th>Subpartida</th><th class="num">Presupuestado</th><th class="num">Acumulado real</th>
-     <th class="num">Desviación</th><th class="num">%</th>
-     <th class="num">Margen</th><th class="num">Margen %</th></tr></thead><tbody>
-   ${
-     lines
-       .map((l) => {
-         const dev = l.actualCents - l.budgetCostCents;
-         const mg = l.saleCents - l.actualCents;
-         const spent = l.budgetCostCents
-           ? ((l.actualCents / l.budgetCostCents) * 100).toFixed(1) + "%"
-           : "—";
-         const mgPct = l.saleCents ? ((mg / l.saleCents) * 100).toFixed(1) + "%" : "—";
-         return `<tr><td class="k">${l.unassigned ? '<span class="pill y">sin subpartida</span>' : esc(l.num + " · " + l.name)}</td>
-      <td class="num">${eur0(l.budgetCostCents)}</td>
-      <td class="num">${eur0(l.actualCents)}</td>
-      <td class="num ${dev > 0 ? "warn" : ""}">${dev > 0 ? "+" : ""}${eur0(dev)}</td>
-      <td class="num">${spent}</td>
-      <td class="num" style="color:${mg < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(mg)}</td>
-      <td class="num" style="color:${mg < 0 ? "var(--danger)" : "var(--greenDeep)"}">${mgPct}</td></tr>`;
-       })
-       .join("") ||
-     '<tr><td colspan="7"><div class="empty">Esta partida no tiene subpartidas en su línea base.</div></td></tr>'
-   }
-   </tbody></table></div></div>
-   <div class="card" style="margin-top:10px"><div class="ch"><h3>Coste acumulado</h3><span class="tag">${eur(total)}</span></div>
-   <div class="scroll"><table><thead><tr><th>Subpartida</th><th>Origen</th><th>Documento</th><th>Fecha</th><th class="num">Importe</th></tr></thead><tbody>
-   ${
-     [...byLine.entries()]
-       .map(([lid, list]) =>
-         list
-           .map(
-             (r, i) => `<tr>
-      <td>${i === 0 ? (lid ? esc(lineName[lid] || lid) : '<span class="pill y">sin subpartida</span>') : ""}</td>
-      <td>${SRC[r.source] || r.source}</td><td class="k">${esc(r.ref)}${r.desc ? " · " + esc(r.desc) : ""}</td>
-      <td>${r.date ? fmtD(r.date) : "—"}</td><td class="num">${eur(r.amountCents)}</td></tr>`,
-           )
-           .join(""),
-       )
-       .join("") ||
-     '<tr><td colspan="5"><div class="empty">Ningún coste imputado a esta partida todavía.</div></td></tr>'
-   }
-   </tbody></table></div></div>`;
-      }
+      /* `chapterCostsDrawer` is gone. Its subpartida table and its document
+         list are now rows of the partida table itself — see `ecoTreeRows`.
+         The operator on the drawer: "This should be a full table detail with
+         the option to hide all rows for a Partida. I don't like the lateral
+         menu view for this." */
 
       const VIEWS = {
         /* ---------- Torre de control · Mi día (DAS, spec §2.1/§2.2) ----------
@@ -23407,6 +23344,129 @@
         ecoFull = false;
 
       /** PRY-02's panel: three cards, the per-partida table, what is unassigned. */
+      /* WHICH ROWS ARE OPEN. Module state, not a local: the panel re-renders on
+         every toggle, and a set rebuilt each time would close what was just
+         opened. Keys are prefixed so a partida and a subpartida can never
+         collide on a shared number. */
+      const ecoOpen = new Set();
+      /**
+       * The per-partida table, three levels deep and all of it one table.
+       *
+       * It used to be a partida table whose rows opened a LATERAL DRAWER
+       * carrying the subpartidas and the documents. The operator's verdict:
+       * "This should be a full table detail with the option to hide all rows
+       * for a Partida (to hide all Subpartidas). I don't like the lateral menu
+       * view for this." A drawer also cost the comparison that matters — with
+       * the subpartidas in a panel over the top, you could not read one
+       * partida's lines against another's.
+       *
+       * So: partida → subpartida → the documents behind it, indented in place,
+       * each level collapsed until it is asked for. Same seven columns all the
+       * way down, because the question does not change with the depth.
+       *
+       * The costs that name NO partida get a row of their own at the foot
+       * rather than the separate card they used to have. That card is gone at
+       * the operator's request — assignment is decided in Gastos and Horas now
+       * and cannot be skipped — but the money still has to appear somewhere or
+       * the table stops footing to the project total, and this screen makes a
+       * claim about exactly that a few lines further down.
+       */
+      function ecoTreeRows(projectId, tableRows, names, variationNums, pend) {
+        const money = (cents, warn) =>
+          `<td class="num${warn ? " warn" : ""}">${warn && cents > 0 ? "+" : ""}${eur0(cents)}</td>`;
+        const signed = (cents) =>
+          `<td class="num" style="color:${cents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(cents)}</td>`;
+        const pct = (bp) =>
+          `<td class="num">${bp === null ? "—" : (bp / 100).toFixed(1) + "%"}</td>`;
+        /* The margin percentage takes its colour from the margin it describes,
+           not from its own sign — they always agree, and deriving it twice is
+           how two cells on one row come to disagree. */
+        const signedPct = (cents, bp) =>
+          `<td class="num" style="color:${cents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${bp === null ? "—" : (bp / 100).toFixed(1) + "%"}</td>`;
+        const SRC2 = { bill: "Factura", labour: "Horas", movement: "Banco", capture: "Documento" };
+        const out = [];
+        for (const c of tableRows) {
+          const key = "c:" + c.chapter;
+          const open = ecoOpen.has(key);
+          const caret = open ? "▾" : "▸";
+          out.push(
+            `<tr class="click" data-chcosts="${c.chapter}" data-ecotoggle="${esc(key)}"><td class="k"><span translate="no">${caret}</span> ${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>` +
+              money(c.budgetCents) +
+              money(c.actualCents) +
+              money(c.varianceCents, true) +
+              pct(c.spentBp) +
+              signed(c.marginCents) +
+              signedPct(c.marginCents, c.marginBp) +
+              `</tr>`,
+          );
+          if (!open) continue;
+          const lines = erp.lineEconomics(projectId, c.chapter);
+          if (!lines.length)
+            out.push(
+              `<tr><td colspan="7" style="padding-left:26px;color:var(--muted)">Esta partida no tiene subpartidas en su línea base.</td></tr>`,
+            );
+          for (const l of lines) {
+            /* `lineId`, not `id` — `lineEconomics` returns {lineId, num, name,
+               …} and reading the wrong key made every subpartida key on its
+               number alone and every document filter match nothing, so a
+               subpartida showing 1.330 € reported no documents behind it. */
+            const lkey = "l:" + c.chapter + ":" + (l.lineId || l.num || "x");
+            const lopen = ecoOpen.has(lkey);
+            const dev = l.actualCents - l.budgetCostCents;
+            const mg = l.saleCents - l.actualCents;
+            const spentBp = l.budgetCostCents
+              ? Math.round((l.actualCents / l.budgetCostCents) * 10000)
+              : null;
+            const mgBp = l.saleCents ? Math.round((mg / l.saleCents) * 10000) : null;
+            const label = l.unassigned
+              ? '<span class="pill y">sin subpartida</span>'
+              : esc(l.num + " · " + l.name);
+            out.push(
+              `<tr class="click" data-ecotoggle="${esc(lkey)}"><td style="padding-left:26px"><span translate="no">${lopen ? "▾" : "▸"}</span> ${label}</td>` +
+                money(l.budgetCostCents) +
+                money(l.actualCents) +
+                money(dev, true) +
+                pct(spentBp) +
+                signed(mg) +
+                signedPct(mg, mgBp) +
+                `</tr>`,
+            );
+            if (!lopen) continue;
+            const docs = erp
+              .chapterCosts(projectId, c.chapter)
+              .filter((r) => (l.unassigned ? !r.lineId : r.lineId === l.lineId));
+            if (!docs.length)
+              out.push(
+                `<tr><td colspan="7" style="padding-left:52px;color:var(--muted)">Sin documentos todavía.</td></tr>`,
+              );
+            for (const r of docs)
+              out.push(
+                `<tr><td style="padding-left:52px;color:var(--muted)">${esc(SRC2[r.source] || r.source)} · ${esc(r.ref || "—")}${r.party ? " · " + esc(r.party) : ""}</td>` +
+                  `<td class="num"></td>` +
+                  `<td class="num">${eur0(r.amountCents)}</td>` +
+                  `<td colspan="4" style="color:var(--muted)">${r.date ? fmtD(r.date) : ""}</td></tr>`,
+              );
+          }
+        }
+        /* The money that names no partida, at the foot and in the same table.
+           Without it the total below would not foot and the screen's own
+           «cuadra» claim would have nothing to point at. */
+        if (pend && pend.length) {
+          const sum2 = pend.reduce((a, r) => a + r.amountCents, 0);
+          /* One template, not literal + call + literal. A function call
+             between two template literals makes the source audit pair the
+             closing backtick of the first with the opening backtick of the
+             second and report the code between them as a user-visible string.
+             Fifth variant of that trap in this package. */
+          out.push(
+            `<tr><td class="k"><span class="pill y">Sin partida</span></td><td class="num">—</td><td class="num">${eur0(sum2)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`,
+          );
+        }
+        return (
+          out.join("") ||
+          `<tr><td colspan="7"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>`
+        );
+      }
       function economicsPanel(body, id) {
         const p = erp.project(id);
         const e = erp.projectEconomics(id);
@@ -23474,11 +23534,18 @@
           tableRows.reduce((sum2, r) => sum2 + (r.actualCents || 0), 0) +
           pend.reduce((sum2, r) => sum2 + r.amountCents, 0);
         const tableAgrees = tableCents === e.actualCents;
+        /* THE CLAIM SURVIVED THE CARD IT LIVED IN. It used to sit inside
+           «Pendiente de repartir», which the operator removed — and it is the
+           one thing on this screen that must not go with it: their own UAT
+           caught this panel saying the table agreed with the project while it
+           sat 45 € short of the card above it. It is a footer of the table it
+           makes a claim about now, which is closer to the figures it is
+           about than the separate card ever was. */
         const agreeNote = tableAgrees
-          ? '<div class="daylist"><div class="it">Todo el coste de esta obra tiene partida. La tabla de arriba cuadra con el proyecto.</div></div>'
-          : `<div class="daylist"><div class="it"><span class="pill r">No cuadra</span>
-        <span style="flex:1;margin-left:8px">La tabla de arriba no cuadra con el coste del proyecto.</span>
-        <b translate="no">${eur(tableCents)} / ${eur(e.actualCents)}</b></div></div>`;
+          ? `<div class="it"><span class="pill g">Cuadra</span><span style="flex:1;margin-left:8px">Todo el coste de esta obra tiene partida. La tabla cuadra con el proyecto.</span></div>`
+          : `<div class="it"><span class="pill r">No cuadra</span>
+        <span style="flex:1;margin-left:8px">La tabla no cuadra con el coste del proyecto.</span>
+        <b translate="no">${eur(tableCents)} / ${eur(e.actualCents)}</b></div>`;
 
         body.innerHTML = `
     <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
@@ -23490,78 +23557,47 @@
         <div class="sub"><span>${marginPct}%</span> <span>sobre la venta</span></div></div>
     </div>
 
-    <div class="card" style="margin-top:12px"><div class="ch"><h3>Por partida</h3></div>
+    <div class="card" style="margin-top:12px"><div class="ch"><h3>Por partida</h3>
+      <span style="flex:1"></span>
+      <button class="btn sm" id="ecoAll">${ecoOpen.size ? "Contraer todo" : "Desplegar todo"}</button></div>
      <div class="scroll"><table><thead><tr>
        <th>Partida</th><th class="num">Presupuestado</th><th class="num">Acumulado real</th>
        <th class="num">Desviación</th><th class="num">%</th>
        <th class="num">Margen</th><th class="num">Margen %</th></tr></thead><tbody>
-     ${
-       tableRows
-         .map(
-           (
-             c,
-           ) => `<tr class="click" data-chcosts="${c.chapter}"><td class="k">${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>
-        <td class="num">${eur0(c.budgetCents)}</td>
-        <td class="num">${eur0(c.actualCents)}</td>
-        <td class="num ${c.varianceCents > 0 ? "warn" : ""}">${c.varianceCents > 0 ? "+" : ""}${eur0(c.varianceCents)}</td>
-        <td class="num">${c.spentBp === null ? "—" : (c.spentBp / 100).toFixed(1) + "%"}</td>
-        <td class="num" style="color:${c.marginCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(c.marginCents)}</td>
-        <td class="num" style="color:${c.marginCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${c.marginBp === null ? "—" : (c.marginBp / 100).toFixed(1) + "%"}</td>
-        </tr>`,
-         )
-         .join("") ||
-       '<tr><td colspan="7"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>'
-     }
+     ${ecoTreeRows(id, tableRows, names, variationNums, pend)}
      </tbody></table></div>
-     <div class="daylist"><div class="it" style="color:var(--muted)">Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.</div></div>
+     <div class="daylist">${agreeNote}<div class="it" style="color:var(--muted)">Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y una subpartida para ver los documentos que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.</div></div>
     </div>
-
-    <div class="card" style="margin-top:12px"><div class="ch"><h3>Pendiente de repartir</h3>
-      ${pend.length ? `<span class="pill y">${pend.length}</span>` : '<span class="pill g">nada</span>'}</div>
-     ${
-       pend.length
-         ? `<div class="scroll"><table><thead><tr>
-       <th>Origen</th><th>Documento</th><th>Fecha</th><th class="num">Importe</th><th></th></tr></thead><tbody>
-      ${pend
-        .map(
-          (r) => `<tr><td>${esc(SRC[r.source] || r.source)}</td>
-        <td class="k">${esc(r.ref || "—")}${r.party ? `<br><span style="font-size:11px;color:var(--muted)">${esc(r.party)}</span>` : ""}</td>
-        <td>${r.date ? fmtD(r.date) : "—"}</td>
-        <td class="num">${eur(r.amountCents)}</td>
-        <td><span class="pill y">Sin repartir</span> <button class="btn sm" data-assign="${esc(r.id)}">Repartir</button></td></tr>`,
-        )
-        .join("")}
-     </tbody></table></div>`
-         : agreeNote
-     }
     </div>`;
 
-        body.querySelectorAll("[data-assign]").forEach(
-          (b) =>
-            (b.onclick = () =>
-              assignChapterDrawer(
-                id,
-                pend.find((r) => r.id === b.dataset.assign),
-              )),
-        );
-        /* Block 5's two click-throughs. Revenue walks to the invoice register
-           filtered on this job's code; a chapter row opens every cost behind
-           its figure — the drill-down whose absence meant the total could only
-           be believed, never checked. Grouped by subpartida when the costs name
-           one, because that is the level the client asked to see. */
+        /* Revenue still walks to the invoice register filtered on this job.
+           The chapter drill-down no longer walks anywhere: it opens IN THE
+           TABLE. The operator, on the drawer that used to carry it: "This
+           should be a full table detail with the option to hide all rows for a
+           Partida. I don't like the lateral menu view for this." */
         const eco = body.querySelector("#ecoInvoices");
         if (eco)
           eco.onclick = () => {
             Object.assign(getListState("invoices"), { q: p.code, page: 1 });
             go("invoicing");
           };
-        body.querySelectorAll("[data-chcosts]").forEach(
+        body.querySelectorAll("[data-ecotoggle]").forEach(
           (row) =>
             (row.onclick = (ev) => {
               if (ev.target.closest("button")) return;
-              chapterCostsDrawer(id, row.dataset.chcosts, names[row.dataset.chcosts] || "");
+              const k = row.dataset.ecotoggle;
+              if (ecoOpen.has(k)) ecoOpen.delete(k);
+              else ecoOpen.add(k);
+              render();
             }),
         );
+        const allBtn = body.querySelector("#ecoAll");
+        if (allBtn)
+          allBtn.onclick = () => {
+            if (ecoOpen.size) ecoOpen.clear();
+            else tableRows.forEach((c) => ecoOpen.add("c:" + c.chapter));
+            render();
+          };
         /* THE ADJUST BUTTON IS GONE, and with it the manual forecast
            override's only interface. The comment here argued the opposite: that
            `setForecastOverride` was a real engine rule whose sole door this
@@ -23604,54 +23640,13 @@
    three chapters — refusing to split it is how a chapter ends up carrying a
    bathroom's tiles and a kitchen's. */
       let chapSplit = [];
-      function assignChapterDrawer(pid, row) {
-        if (!row) return;
-        const p = erp.project(pid);
-        const chapters = p.baseline.chapters || [];
-        const db = openDrawer("Repartir · " + (row.ref || ""));
-        const single = row.source === "labour";
-        chapSplit = [
-          {
-            chapterNum: chapters.length ? String(chapters[0].num) : "",
-            amountCents: row.amountCents,
-          },
-        ];
-        db.innerHTML = `
-   <div class="card"><div class="daylist">
-     <div class="it"><span>Origen</span><span style="flex:1"></span><b>${esc(row.ref || "—")}</b></div>
-     <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${row.date ? fmtD(row.date) : "—"}</b></div>
-     <div class="it"><span>Importe</span><span style="flex:1"></span><b>${eur(row.amountCents)}</b></div>
-   </div></div>
-   <div class="card"><div class="ch"><h3>Partidas</h3><span class="tag" id="as_rest"></span></div>
-    <div id="as_rows" style="padding:6px 12px 12px"></div>
-    <div style="display:flex;gap:8px;padding:0 12px 12px">
-      ${single ? "" : '<button class="btn sm" id="as_add">＋ Otra partida</button>'}
-      <span style="flex:1"></span>
-      <button class="btn primary" id="as_go">Repartir</button>
-    </div>
-    ${single ? '<div class="daylist"><div class="it" style="color:var(--muted)">Un parte de horas va a una sola partida: son las horas de una persona en un día, y partirlas aquí sería inventar un segundo parte.</div></div>' : ""}
-   </div>`;
-        const add = $("#as_add");
-        if (add)
-          add.onclick = () => {
-            chapSplit.push({
-              chapterNum: chapters.length ? String(chapters[0].num) : "",
-              amountCents: 0,
-            });
-            chapSplitRows(pid, row, chapters);
-          };
-        $("#as_go").onclick = () =>
-          mutate(() => {
-            erp.assignChapterSplit(
-              pid,
-              row.id,
-              chapSplit.map((s) => ({ chapterNum: s.chapterNum, amountCents: s.amountCents })),
-              "backoffice",
-            );
-            closeDrawer();
-          }, "Coste repartido por partida");
-        chapSplitRows(pid, row, chapters);
-      }
+      /* `assignChapterDrawer` is gone with the panel that opened it. Its only
+         caller was «Pendiente de repartir», and the operator removed that:
+         "we don't need the Pendiente de repartir anymore; given that we
+         control de assignation of cost either on Suppliers invoices or
+         Hours." A cost that names no partida is repaired where it was filed —
+         a bill through Gastos, an hour through Horas — which since PK12-S2 is
+         also the only place one can be created. */
       function chapSplitRows(pid, row, chapters) {
         const host = $("#as_rows");
         if (!host) return;

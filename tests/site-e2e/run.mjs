@@ -3414,65 +3414,67 @@ async function testVariationBudget(browser, base) {
     await pg.click(`[data-chcosts="${joined.num}"]`);
     await pg.waitForTimeout(500);
 
-    /* PK12-S4b · «the view only allow you to see Partida level, so you don't
-       know where is the issue». A partida can be four subpartidas with three
-       of them exactly on budget, and a list of documents does not say which
-       one moved. The same six columns appear one level down, and they sum to
-       the partida — two levels that disagree about what was spent would be
-       worse than one level that cannot answer. */
+    /* PK12-S4b + PK12-S12 · the same two levels, now IN THE TABLE.
+       A partida can be four subpartidas with three of them exactly on budget,
+       and a list of documents does not say which one moved — so the same seven
+       columns appear one level down, and they sum to the partida. What changed
+       is where: the operator asked for the drawer to go. "This should be a
+       full table detail with the option to hide all rows for a Partida (to
+       hide all Subpartidas). I don't like the lateral menu view for this."
+       Read from the ONE table, and the absence of a drawer is asserted too —
+       a panel that merely stopped being used would come back. */
     const subLevel = await pg.evaluate((num) => {
-      const cards = [...document.querySelectorAll(".drawer .card")];
-      const head = cards.map((c) => (c.querySelector("h3") || {}).textContent || "");
-      const t = cards[0] && cards[0].querySelector("table");
-      const ths = t ? [...t.querySelectorAll("thead th")].map((x) => x.textContent.trim()) : [];
+      const drawerOpen = !!document.querySelector(".drawer.on .card");
+      const table = document.querySelector("#view table");
+      const ths = table
+        ? [...table.querySelectorAll("thead th")].map((x) => x.textContent.trim())
+        : [];
+      const rows = [...document.querySelectorAll("#view tbody tr")];
       const model = erp.lineEconomics(gProject, num);
       const chapter = erp.chapterEconomics(gProject).find((c) => String(c.num) === String(num));
+      // The subpartida rows of THIS partida are the ones its toggle key names.
+      const subRows = rows.filter((r) => (r.dataset.ecotoggle || "").startsWith("l:" + num + ":"));
       return {
-        firstCard: head[0],
-        keepsDocuments: head.some((h) => /Coste acumulado/i.test(h)),
+        drawerOpen,
         cols: ths.length,
         heads: ths.join("|"),
-        rows: t ? t.querySelectorAll("tbody tr").length : 0,
+        subRows: subRows.length,
         modelRows: model.length,
         linesSum: model.reduce((a, r) => a + r.actualCents, 0),
         chapterActual: chapter ? chapter.actualCents : null,
+        collapser: !!document.querySelector("#ecoAll"),
       };
     }, joined.num);
-    if (
-      /Por subpartida/i.test(subLevel.firstCard) &&
-      subLevel.cols === 7 &&
-      subLevel.keepsDocuments
-    )
+    if (!subLevel.drawerOpen && subLevel.cols === 7 && subLevel.collapser)
       ok(
-        `5-6: the drill-down leads with the subpartida table and keeps the documents (${subLevel.heads})`,
+        `5-6: the drill-down is the table itself — no drawer, and a control to collapse it (${subLevel.heads})`,
       );
     else bad("5-6: subpartida table present", JSON.stringify(subLevel));
-    if (subLevel.rows === subLevel.modelRows && subLevel.linesSum === subLevel.chapterActual)
+    if (subLevel.subRows === subLevel.modelRows && subLevel.linesSum === subLevel.chapterActual)
       ok(
-        `5-6: …and the subpartidas sum to the partida exactly (${subLevel.linesSum}c across ${subLevel.rows})`,
+        `5-6: …and the subpartidas sum to the partida exactly (${subLevel.linesSum}c across ${subLevel.subRows})`,
       );
     else bad("5-6: subpartidas sum to the partida", JSON.stringify(subLevel));
-    /* The DOCUMENTS table, which is the second one now — «Por subpartida»
-       leads. `querySelector` took the first table in the drawer and would
-       silently have started asserting about the wrong one, so the card is
-       named rather than counted on to stay first. */
-    const drill = await pg.evaluate(() => {
-      const card = [...document.querySelectorAll(".drawer .card")].find((c) =>
-        /Coste acumulado/i.test((c.querySelector("h3") || {}).textContent || ""),
+
+    /* THE DOCUMENTS, a third level down and in the same table. Opening a
+       subpartida shows what is behind its figure — the drill-down whose
+       absence meant a total could only be believed, never checked. */
+    const drill = await pg.evaluate(async (num) => {
+      const sub = [...document.querySelectorAll("#view tbody tr")].find((r) =>
+        (r.dataset.ecotoggle || "").startsWith("l:" + num + ":"),
       );
-      const t = card && card.querySelector("table tbody");
-      if (!t) return null;
-      const rows = [...t.querySelectorAll("tr")];
+      if (!sub) return null;
+      sub.click();
+      await new Promise((r) => setTimeout(r, 500));
+      const text = document.querySelector("#view").innerText;
       return {
-        rows: rows.length,
-        named: rows.some((r) => /E2E-VB/.test(r.textContent)),
-        partida: rows.some((r) => /Mueble alto extra|\d+\.\d+/.test(r.textContent)),
+        named: /E2E-VB/.test(text),
+        stillNoDrawer: !document.querySelector(".drawer.on .card"),
       };
-    });
-    if (drill && drill.rows >= 1 && drill.named && drill.partida)
-      ok("5-6: clicking the row opens every cost behind it, grouped by partida");
+    }, joined.num);
+    if (drill && drill.named && drill.stillNoDrawer)
+      ok("5-6: opening a subpartida lists the documents behind it, in place");
     else bad("5-6: cost drill-down", JSON.stringify(drill));
-    await pg.evaluate(() => closeDrawer());
 
     // Revenue click-through: lands on the invoice register filtered to the job.
     const jump = await pg.evaluate((projectId) => {
@@ -5107,68 +5109,60 @@ async function testProjectTracking(browser, base) {
     });
     await pg.evaluate(() => render());
     await pg.waitForTimeout(500);
-    const pendingText = await pg.locator("#ecoBody").innerText();
-    if (seeded.chapters < seeded.project && /sin repartir/i.test(pendingText))
-      ok("PRY-02: a cost with no chapter is in the project and in no chapter, and says so");
+    /* PK12-S12 · «Pendiente de repartir» IS GONE, at the operator's request:
+       "we don't need the Pendiente de repartir anymore; given that we control
+       de assignation of cost either on Suppliers invoices or Hours."
+
+       The card went; the MONEY did not. A cost written before PK12-S2 made
+       the destination mandatory can still name no partida, and if the table
+       simply omitted it the screen would stop footing to the project total
+       while claiming a few lines below that it agrees. So it is a row of the
+       same table now — and this checks exactly that: the row is there, the
+       separate card is not, and the repair is no longer offered here because
+       it belongs where the cost was filed. */
+    const pendingText = await pg.locator("#view").innerText();
+    const strayShape = await pg.evaluate(() => ({
+      card: /Pendiente de repartir/i.test(document.querySelector("#view").innerText),
+      row: /Sin partida/i.test(document.querySelector("#view").innerText),
+      assignButton: document.querySelectorAll("#view [data-assign]").length,
+    }));
+    if (
+      seeded.chapters < seeded.project &&
+      strayShape.row &&
+      !strayShape.card &&
+      strayShape.assignButton === 0
+    )
+      ok("PRY-02: a cost with no partida is a row of the table, not a panel beside it");
     else
       bad(
         "PRY-02: pending block",
-        `${seeded.chapters}/${seeded.project} · ${pendingText.slice(0, 90)}`,
+        `${seeded.chapters}/${seeded.project} · ${JSON.stringify(strayShape)} · ${pendingText.slice(0, 60)}`,
       );
 
-    // Split it across two chapters — the only place in the product that does.
-    await pg.locator("#view [data-assign]").first().click();
-    await pg.waitForTimeout(400);
-    const chapterCount = await pg.locator('#as_rows select[data-k="chapterNum"] option').count();
-    await pg.locator('#as_rows input[data-k="amountCents"]').first().fill("100.00");
-    await pg.locator('#as_rows input[data-k="amountCents"]').first().dispatchEvent("change");
-    await pg.waitForTimeout(300);
-    await pg.locator("#as_go").click();
-    await pg.waitForTimeout(400);
-    const shortSplit = await pg.evaluate(() => ({
-      open: document.querySelector("#drawer").classList.contains("on"),
-      assigned: erp.state.bills.find((b) => b.number === "E2E-SINCAP").allocations.length,
-    }));
-    if (shortSplit.open && shortSplit.assigned === 1)
-      ok("PRY-02: a chapter split that does not total the cost is refused");
-    else bad("PRY-02: short split refused", JSON.stringify(shortSplit));
-
-    await pg.locator('#as_rows input[data-k="amountCents"]').first().fill("300.00");
-    await pg.locator('#as_rows input[data-k="amountCents"]').first().dispatchEvent("change");
-    await pg.waitForTimeout(250);
-    if (chapterCount > 1) {
-      await pg.locator("#as_add").click();
-      await pg.waitForTimeout(300);
-      await pg.locator('#as_rows select[data-k="chapterNum"]').nth(1).selectOption({ index: 1 });
-      await pg.waitForTimeout(200);
-      await pg.locator('#as_rows input[data-k="amountCents"]').nth(1).fill("200.00");
-      await pg.locator('#as_rows input[data-k="amountCents"]').nth(1).dispatchEvent("change");
-      await pg.waitForTimeout(250);
-    } else {
-      await pg.locator('#as_rows input[data-k="amountCents"]').first().fill("500.00");
-      await pg.locator('#as_rows input[data-k="amountCents"]').first().dispatchEvent("change");
-      await pg.waitForTimeout(250);
-    }
-    await pg.locator("#as_go").click();
-    await pg.waitForTimeout(600);
-    const split = await pg.evaluate(() => {
+    /* …and once it IS assigned — through the engine, because the screen no
+       longer offers the repair — the table agrees with the project again. The
+       identity that matters is unchanged: chapters + unassigned = project. */
+    const split = await pg.evaluate((projectId) => {
       const b = erp.state.bills.find((x) => x.number === "E2E-SINCAP");
+      const hit = erp.projectChapters(projectId)[0];
+      b.allocations[0].chapterNum = String(hit.chapter.num);
+      b.allocations[0].lineId = hit.chapter.lines[0] ? hit.chapter.lines[0].id : null;
+      render();
       return {
-        parts: b.allocations.length,
         allHaveChapter: b.allocations.every((a) => !!a.chapterNum),
-        sum: b.allocations.reduce((s, a) => s + a.amountCents, 0),
-        chapters: erp.chapterEconomics(gProject).reduce((s, c) => s + c.actualCents, 0),
-        project: erp.actualCostCents(gProject),
-        stillPending: erp.unassignedChapterCosts(gProject).some((r) => r.ref === "E2E-SINCAP"),
+        sum: b.allocations.reduce((s2, a) => s2 + a.amountCents, 0),
+        chapters: erp.chapterEconomics(projectId).reduce((s2, c) => s2 + c.actualCents, 0),
+        project: erp.actualCostCents(projectId),
+        stillPending: erp.unassignedChapterCosts(projectId).some((r) => r.ref === "E2E-SINCAP"),
       };
-    });
+    }, seeded.pid);
     if (
       split.allHaveChapter &&
       split.sum === 50000 &&
       !split.stillPending &&
-      split.chapters === seeded.chapters + 50000
+      split.chapters === split.project
     )
-      ok(`PRY-02: splitting by capítulo makes the table agree with the project (${split.parts})`);
+      ok("PRY-02: once assigned, the table agrees with the project again");
     else bad("PRY-02: chapter split", JSON.stringify(split));
 
     /* Operator's UAT, CP 83 + CP 86 aftermath. The engine identity (chapters
