@@ -7460,6 +7460,115 @@
      * and the exception panel exists precisely so that this refusal is never a
      * surprise.
      */
+    /**
+     * Everything standing between a quarter and being locked, itemised.
+     *
+     * The operator asked for the lock and then asked for its rules: "I like
+     * the idea of locking but we have to improve on how we decide what to lock
+     * and the rules to lock — everything in the period to be locked should be
+     * assigned." Two changes follow from that sentence.
+     *
+     * The unit is a QUARTER, not a pair of dates somebody types. A period
+     * whose boundaries are chosen by hand can be drawn around the awkward
+     * week, and the quarter is the boundary the filings already use.
+     *
+     * And ASSIGNED is broader than reconciled. A movement nobody explained
+     * blocks the quarter, as before; so does a cost that names no destination,
+     * a project cost missing its partida and subpartida, an hour on a
+     * budgeted job with no subpartida, cash still out of the bank with
+     * nothing accounting for it, and a document captured and never filed.
+     * Those are the same rule PK12-S2 made mandatory going forward, applied
+     * to what is already stored — a workspace that predates the rule can hold
+     * every one of them.
+     *
+     * Returned as a LIST rather than thrown as a sentence, for
+     * `billDeleteBlock`'s reason: a screen has to show what is in the way
+     * before anybody presses the button, and one string cannot itemise six
+     * different things. Each entry carries its own count and its own
+     * references, so the refusal can be read AND acted on.
+     */
+    periodLockBlockers(quarter) {
+      const inQ = (d) => quarterOf(d) === quarter;
+      const budgeted = (projectId) => {
+        const p = this.state.projects.find((x) => x.id === projectId);
+        return !!(p && p.budgetId);
+      };
+      const billAllocs = [];
+      for (const b of this.state.bills.filter((x) => inQ(x.date)))
+        for (const a of b.allocations || []) billAllocs.push({ bill: b, alloc: a });
+
+      const out = [];
+      const add = (key, refs) => {
+        if (refs.length) out.push({ key, count: refs.length, refs: refs.slice(0, 20) });
+      };
+      add(
+        "unreconciled",
+        this.state.movements
+          .filter((m) => m.status === "unallocated" && !m.unbacked && inQ(m.accountingDate))
+          .map((m) => m.id),
+      );
+      add(
+        "costWithoutDestination",
+        billAllocs
+          .filter((x) => !x.alloc.projectId && !x.alloc.overheadCategory)
+          .map((x) => x.bill.number),
+      );
+      add(
+        "costWithoutLine",
+        billAllocs
+          .filter((x) => x.alloc.projectId && budgeted(x.alloc.projectId) && !x.alloc.lineId)
+          .map((x) => x.bill.number),
+      );
+      add(
+        "hoursWithoutLine",
+        this.state.labour
+          .filter((h) => inQ(h.date) && h.projectId && budgeted(h.projectId) && !h.lineId)
+          .map((h) => h.id),
+      );
+      add(
+        "cashOutstanding",
+        this.cashWithdrawals(quarter)
+          .filter((m) => m.cash.outstandingCents > 0)
+          .map((m) => m.id),
+      );
+      add(
+        "documentsPending",
+        this.state.captured
+          .filter((c) => c.confirmed && inQ(c.confirmed.date) && !c.billId)
+          .map((c) => c.id),
+      );
+      return out;
+    }
+    /** The quarter's first and last day — the only boundaries a lock may use. */
+    quarterRange(quarter) {
+      const [y, q] = String(quarter).split("-Q");
+      const first = (Number(q) - 1) * 3 + 1;
+      const last = first + 2;
+      const pad = (n) => String(n).padStart(2, "0");
+      /* No leap-year branch, and none is needed: a quarter ends in March,
+         June, September or December, so February is never the last month and
+         the 28th/29th question cannot arise. An earlier draft carried that
+         check and it was unreachable code pretending to be careful. */
+      const endDay = { 3: 31, 6: 30, 9: 30, 12: 31 }[last];
+      return { from: `${y}-${pad(first)}-01`, to: `${y}-${pad(last)}-${endDay}` };
+    }
+    /**
+     * Lock a whole quarter, or refuse and say everything that is in the way.
+     *
+     * `closeBankPeriod` stays underneath and keeps its own narrower guard —
+     * this is the door with the rules on it, that one is the mechanism.
+     */
+    closeQuarter(quarter, user) {
+      const blockers = this.periodLockBlockers(quarter);
+      if (blockers.length) {
+        const e = new Error("The quarter still has items that are not assigned");
+        e.blockers = blockers;
+        throw e;
+      }
+      const r = this.quarterRange(quarter);
+      return this.closeBankPeriod(r.from, r.to, user);
+    }
+
     closeBankPeriod(from, to, user) {
       const open = this.unreconciledMovements(from, to);
       /* The count is NOT in the message. It is already on screen, in the bar

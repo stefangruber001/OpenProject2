@@ -622,6 +622,22 @@ window.CANEI_DICT.ca = {
   Reactivar: "Reactivar",
   Desactivada: "Desactivada",
   "Borrar la cuenta": "Esborrar el compte",
+  "Bloquear el trimestre": "Bloquejar el trimestre",
+  "🔒 Bloquear trimestre": "🔒 Bloquejar trimestre",
+  "Trimestre bloqueado": "Trimestre bloquejat",
+  "Qué se bloquea": "Què es bloqueja",
+  "Este trimestre ya está bloqueado.": "Aquest trimestre ja està bloquejat.",
+  "Todo lo del trimestre está conciliado y asignado.":
+    "Tot el del trimestre està conciliat i assignat.",
+  "Movimientos sin conciliar": "Moviments sense conciliar",
+  "Costes sin destino — ni obra ni gasto general":
+    "Costos sense destí — ni obra ni despesa general",
+  "Costes de obra sin partida y subpartida": "Costos d'obra sense partida i subpartida",
+  "Horas de obra sin partida y subpartida": "Hores d'obra sense partida i subpartida",
+  "Efectivo retirado y todavía sin justificar": "Efectiu retirat i encara sense justificar",
+  "Documentos capturados y sin registrar": "Documents capturats i sense registrar",
+  "Bloquear un trimestre impide cambiar lo que hay dentro: conciliaciones, costes y horas quedan como están. Se puede reabrir, y la reapertura queda registrada con su motivo.":
+    "Bloquejar un trimestre impedeix canviar el que hi ha dins: conciliacions, costos i hores queden com estan. Es pot reobrir, i la reobertura queda registrada amb el seu motiu.",
   "Reintegro de efectivo": "Reintegrament d'efectiu",
   "Devolución de efectivo": "Devolució d'efectiu",
   "Devuelto al banco": "Retornat al banc",

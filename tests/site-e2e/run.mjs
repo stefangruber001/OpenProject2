@@ -9739,14 +9739,90 @@ async function testAdmin(browser, base) {
     await pg.evaluate(() => goTab("banking", "_reconcile"));
     await pg.waitForTimeout(600);
 
-    // Closing must REFUSE while anything is still unreconciled — the whole
-    // point of a closed period is that it cannot contain an open question.
+    /* PK12-S8 · THE LOCK IS A QUARTER, AND ITS RULES ARE ON SCREEN.
+       The operator: "I like the idea of locking but we have to improve on how
+       we decide what to lock and the rules to lock — everything in the period
+       to be locked should be assigned." Two things follow, and both are
+       checked here.
+
+       The old check pressed the button, let the engine refuse, and read the
+       toast. That was a refusal AFTER the press for a lock whose boundaries
+       came from the global period selector — a control meant for filtering, so
+       the period could be drawn around the awkward week. Now the button opens
+       the rules: every blocker is listed with its count before anything is
+       pressed, and the button that would do it is disabled while any remain. */
     await pg.click("#rcClose");
-    await pg.waitForTimeout(600);
-    const closeMsg = await pg.locator("#toast").innerText();
-    if (/^⚠/.test(closeMsg.trim()) && /sin conciliar/.test(closeMsg))
-      ok("conciliación: closing the period is refused while lines are unreconciled");
-    else bad("conciliación: close refuses", closeMsg.slice(0, 120));
+    await pg.waitForTimeout(700);
+    const lock = await pg.evaluate(async () => {
+      // The button opens the RULES for the quarter the period selector shows.
+      const wired = !!document.querySelector("#lkGo") || !!document.querySelector("#dbody");
+      const openedFor = lockQuarter();
+      /* Then read a quarter that is actually blocked. Whichever quarter the
+         selector happens to sit on may be clean — and a check that only ever
+         sees the clean one would pass while the refusal was broken, which is
+         the failure mode this whole package keeps finding. */
+      const q = ["2026-Q2", "2026-Q3", "2026-Q4"].find((x) => erp.periodLockBlockers(x).length > 0);
+      if (!q) return { noBlockedQuarter: true };
+      closeDrawer();
+      await new Promise((r) => setTimeout(r, 250));
+      periodLockDrawer(q);
+      await new Promise((r) => setTimeout(r, 400));
+      const body = document.querySelector("#dbody");
+      const txt = body ? body.innerText : "";
+      const blockers = erp.periodLockBlockers(q);
+      const go = document.querySelector("#lkGo");
+      return {
+        wired,
+        openedFor,
+        quarter: q,
+        blockerCount: blockers.length,
+        // Every blocker the engine knows is named on the screen, by its count.
+        allListed: blockers.every((b) => txt.includes(String(b.count))),
+        namesUnreconciled: /sin conciliar/i.test(txt),
+        // The lock is offered, and refused, before the press.
+        buttonDisabled: !!go && go.disabled,
+        // The dates are the quarter's, not whatever the period selector shows.
+        range: erp.quarterRange(q),
+        saysRange: txt.includes(erp.quarterRange(q).from),
+      };
+    });
+    if (
+      lock.wired &&
+      lock.blockerCount > 0 &&
+      lock.allListed &&
+      lock.namesUnreconciled &&
+      lock.buttonDisabled &&
+      lock.saysRange
+    )
+      ok(
+        `conciliación: the quarter lock lists all ${lock.blockerCount} blockers and stays disabled`,
+      );
+    else bad("conciliación: quarter lock rules", JSON.stringify(lock));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
+
+    /* …and a quarter with nothing outstanding LOCKS, sealing its own dates and
+       nobody else's. Asserted on a quarter the demo leaves clean, so the check
+       exercises the success path rather than only the refusal. */
+    const locked = await pg.evaluate(() => {
+      const clean = ["2026-Q1", "2025-Q4", "2025-Q3"].find(
+        (q) => erp.periodLockBlockers(q).length === 0,
+      );
+      if (!clean) return { none: true };
+      const r = erp.quarterRange(clean);
+      erp.closeQuarter(clean, "bo");
+      const after = erp.quarterRange("2026-Q2");
+      return {
+        none: false,
+        quarter: clean,
+        inside: erp.bankPeriodClosed(r.from) && erp.bankPeriodClosed(r.to),
+        // The neighbour is untouched — a lock seals its quarter, not the file.
+        outside: !erp.bankPeriodClosed(after.from),
+      };
+    });
+    if (!locked.none && locked.inside && locked.outside)
+      ok(`conciliación: a quarter with everything assigned locks (${locked.quarter})`);
+    else bad("conciliación: clean quarter locks", JSON.stringify(locked));
 
     // ---- §5.7 Comunicaciones: preview with real data, simulate, queue, approve
     await pg.evaluate(() => (location.hash = "messaging"));

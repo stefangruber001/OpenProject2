@@ -10105,7 +10105,7 @@
    <div class="card"><div class="queuebar">
      <span class="n">${open.length}</span><span>movimientos sin conciliar en el periodo</span>
      <span style="flex:1"></span>
-     <button class="btn sm" id="rcClose" title="Bloquea el periodo; exige cero movimientos sin conciliar">🔒 Cerrar periodo</button>
+     <button class="btn sm" id="rcClose" title="Bloquea el trimestre; exige que todo en él esté asignado">🔒 Bloquear trimestre</button>
    </div></div>
    ${transferCard(transfers)}
    ${!R ? '<div class="card"><div class="empty">El emparejamiento asistido necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>' : ""}
@@ -10194,8 +10194,13 @@
            no chance of the two disagreeing. */
         renderRcSelBar([...v.querySelectorAll("#rcList tr.click")].map((tr) => tr.dataset.id));
 
-        $("#rcClose").onclick = () =>
-          mutate(() => erp.closeBankPeriod(r.from, r.to, "backoffice"), "Periodo cerrado");
+        /* The button OPENS the rules rather than trying the lock. It used to
+           call `closeBankPeriod(r.from, r.to)` — the dates of whatever the
+           global period selector happened to be showing — so the boundaries of
+           a lock were chosen by a control meant for filtering, and a period
+           could be drawn around the awkward week. The operator asked for both
+           halves of this: lock by a real unit, and say what the rules are. */
+        $("#rcClose").onclick = () => periodLockDrawer(lockQuarter());
         /* One pair at a time, through the method that writes the LINK. The old
            bulk button called `classifyMovement` on each leg separately, which
            left two movements that happened to be classified the same way and
@@ -10480,6 +10485,72 @@
        * amounts produces — is marked as a guess, kept out of the bulk action,
        * and left for a person to decide one at a time.
        */
+      /* WHY A QUARTER CANNOT BE LOCKED YET, in the operator's terms. Six
+         reasons, each with its own count, because a bare refusal with nothing
+         after it is the wall PK12-S1 was about — and this one has more to say
+         than any single sentence can carry. (No quoted phrase in this comment:
+         the source audit reads one as a user-visible string, which it did.) */
+      const LOCK_BLOCKER = {
+        unreconciled: "Movimientos sin conciliar",
+        costWithoutDestination: "Costes sin destino — ni obra ni gasto general",
+        costWithoutLine: "Costes de obra sin partida y subpartida",
+        hoursWithoutLine: "Horas de obra sin partida y subpartida",
+        cashOutstanding: "Efectivo retirado y todavía sin justificar",
+        documentsPending: "Documentos capturados y sin registrar",
+      };
+      /** The quarter the lock acts on — the one the period selector is showing. */
+      function lockQuarter() {
+        return ErpEngine.quarterOf(periodRange().from);
+      }
+      /**
+       * The lock, its rules, and what is standing in the way of them.
+       *
+       * The button behind this used to attempt the close and report a single
+       * refusal after the fact. Everything that blocks it is knowable BEFORE
+       * anybody presses anything, so it is shown first and the button is
+       * disabled until the list is empty — the same shape as the delete
+       * refusals: the reason before the press, never a wall after it.
+       */
+      function periodLockDrawer(quarter) {
+        const db = openDrawer(`Bloquear el trimestre ${quarter}`);
+        const blockers = erp.periodLockBlockers(quarter);
+        const r = erp.quarterRange(quarter);
+        const already = (erp.state.bankPeriods || []).some(
+          (p) => p.from === r.from && !p.reopenedAt,
+        );
+        /* Built BEFORE the template, not inside it. Written as a ternary
+           between two literals it put the source audit's quote-pairing on the
+           code between them and reported the JavaScript as a user-visible
+           string — the third variant of that trap this package has hit, after
+           guillemets in a comment and a `+`-joined ternary. Out here each
+           literal stands alone. */
+        let blockerRows = blockers
+          .map((b) => {
+            const label = esc(LOCK_BLOCKER[b.key] || b.key);
+            return `<div class="it"><span class="pill r" translate="no">${b.count}</span><span style="flex:1;margin-left:8px">${label}</span></div>`;
+          })
+          .join("");
+        if (!blockerRows)
+          blockerRows = `<div class="it"><span class="pill g">✓</span><span style="flex:1;margin-left:8px">Todo lo del trimestre está conciliado y asignado.</span></div>`;
+        db.innerHTML = `<div class="card"><div class="ch"><h3>Qué se bloquea</h3>
+     <span class="tag" translate="no">${r.from} → ${r.to}</span></div>
+    <div class="daylist"><div class="it" style="color:var(--muted)">Bloquear un trimestre impide cambiar lo que hay dentro: conciliaciones, costes y horas quedan como están. Se puede reabrir, y la reapertura queda registrada con su motivo.</div></div></div>
+   <div class="card"><div class="ch"><h3>Requisitos</h3>
+     <span class="pill ${blockers.length ? "y" : "g"}">${blockers.length ? "Pendiente" : "Todo asignado"}</span></div>
+    <div class="daylist">${blockerRows}</div></div>`;
+        drawerFoot(
+          already
+            ? `<span style="color:var(--muted)">Este trimestre ya está bloqueado.</span>`
+            : `<button class="btn primary" id="lkGo"${blockers.length ? " disabled" : ""}>Bloquear el trimestre</button>`,
+        );
+        const go = $("#lkGo");
+        if (go)
+          go.onclick = () =>
+            mutate(() => {
+              erp.closeQuarter(quarter, "backoffice");
+              closeDrawer();
+            }, "Trimestre bloqueado");
+      }
       function transferCard(transfers) {
         if (!transfers.length) return "";
         const line = (id) => {

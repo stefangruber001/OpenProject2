@@ -5073,6 +5073,59 @@ assert(
   );
 }
 
+/* ── PK12-S8 · the quarter lock, and the rules the operator asked for ───────
+   "everything in the period to be locked should be assigned". Assigned is
+   wider than reconciled, and each way of failing it is its own blocker with
+   its own count — one sentence cannot itemise six things, and a refusal that
+   cannot be itemised cannot be acted on. */
+{
+  const e = new ERP("2026-05-20");
+  const acc = e.addBankAccount({ name: "Banco S8", kind: "bank" }, "bo");
+  assert(
+    e.periodLockBlockers("2026-Q2").length === 0,
+    "S8: an empty quarter has nothing standing in the way",
+  );
+  assert(
+    JSON.stringify(e.quarterRange("2026-Q2")) ===
+      JSON.stringify({ from: "2026-04-01", to: "2026-06-30" }),
+    "S8: a quarter's range is its own three months, not a pair of typed dates",
+  );
+  e.importMovements(
+    acc.id,
+    [{ accountingDate: "2026-04-10", concept: "SIN EXPLICAR", amountCents: -5000 }],
+    "bo",
+  );
+  const blocked = e.periodLockBlockers("2026-Q2");
+  assert(
+    blocked.length === 1 && blocked[0].key === "unreconciled" && blocked[0].count === 1,
+    "S8: an unexplained movement blocks its quarter, named and counted",
+  );
+  /* The refusal CARRIES the list. A thrown sentence would make the screen ask
+     the engine a second time to find out what it had just been refused for. */
+  let carried = null;
+  try {
+    e.closeQuarter("2026-Q2", "bo");
+  } catch (err) {
+    carried = err.blockers;
+  }
+  assert(
+    Array.isArray(carried) && carried.length === 1 && carried[0].key === "unreconciled",
+    "S8: the refusal carries its blockers, so the screen need not ask twice",
+  );
+  // A neighbouring quarter is unaffected and still locks.
+  e.closeQuarter("2026-Q1", "bo");
+  assert(
+    e.bankPeriodClosed("2026-02-15") && !e.bankPeriodClosed("2026-04-10"),
+    "S8: locking a quarter seals that quarter and leaves the next one open",
+  );
+  // …and explaining the line clears the way.
+  e.markMovementUnbacked(e.state.movements[0].id, "comision", "bo");
+  assert(
+    e.periodLockBlockers("2026-Q2").length === 0 && !!e.closeQuarter("2026-Q2", "bo"),
+    "S8: once the last item is explained the quarter locks",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);
