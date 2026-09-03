@@ -290,3 +290,532 @@ label {
     scroll-behavior: auto !important;
   }
 }
+
+/* =============================================================================
+   PHASE 2 — the shell, the dashboard and the colour scheme.
+
+   Brief (operator, 3 Sep): make it look like the three references — a quiet
+   neutral ground, white surfaces, ONE accent, a proper sidebar with real
+   icons, KPI tiles with an icon in a tinted square, one dominant chart, an
+   action row. Applied to the screens that exist, with the element ids, the
+   routes and the handlers exactly where they were.
+   ========================================================================== */
+
+/* ------------------------------------------------------ 12 · colour scheme
+   The references share one discipline: the ground is neutral, the cards are
+   white, and a single accent does all the pointing. The brand green stays —
+   it is on every document this company sends — but it stops being the colour
+   of the wallpaper and becomes the colour of the thing you should press. */
+:root {
+  --rail: 92px;
+  --bg: #f4f5f7;
+  --paper: #ffffff;
+  --line: #e4e7ec;
+  --hair: #eef0f3;
+  --ink: #101828;
+  --body: #475467;
+  --muted: #667085;
+  --faint: #98a2b3;
+  --greenSoft: #eaf3e6;
+  --greenPale: #dfeed9;
+  --blue: #3b6fb6;
+  --blueSoft: #e8f0fb;
+  --amberSoft: #fdf3dc;
+  --dangerSoft: #fceceb;
+  --shadow: var(--e-1);
+  /* Tints for the KPI icon squares — the references use one pastel per tile
+     and let the icon carry the meaning. These are the existing semantic
+     colours at 12 % on white, so a tile still means what its number means. */
+  --tint-green: #e6f0e2;
+  --tint-amber: #fbf0d6;
+  --tint-red: #fae4e1;
+  --tint-blue: #e3ecf8;
+}
+body {
+  color: var(--body);
+}
+h1,
+h2,
+h3 {
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------- 13 · top bar
+   White, hairline, and the search as a pill with a glass in it — the one
+   thing every reference puts in the same place. */
+.topbar {
+  background: #fff;
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--line);
+  padding: var(--s-3) var(--s-6);
+  gap: var(--s-4);
+}
+.brand .nm {
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.brand .nm small {
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+.gsearch input {
+  border-radius: var(--r-full);
+  background: var(--bg);
+  border-color: transparent;
+  padding: 9px 14px 9px 38px;
+  font-size: var(--t-md);
+}
+.gsearch input:focus {
+  background: #fff;
+  border-color: var(--line);
+  box-shadow: var(--ring);
+}
+.gsearch::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  background: var(--muted);
+  pointer-events: none;
+  -webkit-mask: var(--ic-search) center / contain no-repeat;
+  mask: var(--ic-search) center / contain no-repeat;
+}
+.gactions .btn.sm {
+  height: 34px;
+}
+
+/* ------------------------------------------------------------ 14 · sidebar
+   The rail already existed — 76px of emoji. It becomes the sidebar the
+   references have: white, a little wider, each section a rounded target with
+   a monochrome icon, and the active one a filled pill with an accent bar on
+   its edge. The emoji stay in the DOM (the suite reads them); they are
+   painted over by a masked SVG so the icons take the text colour like any
+   other glyph and change with the state. */
+.shell {
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 1480px;
+}
+.p2 {
+  left: var(--rail);
+  border-right: 1px solid var(--line);
+  box-shadow: var(--e-3);
+}
+.p1 {
+  background: #fff;
+  border-right: 1px solid var(--line);
+  padding: var(--s-4) var(--s-3) var(--s-6);
+  gap: var(--s-1);
+}
+.secitem {
+  gap: 5px;
+  padding: 10px 4px 8px;
+  border-radius: var(--r-md);
+  color: var(--muted);
+  transition:
+    background var(--m-fast),
+    color var(--m-fast);
+}
+.secitem:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+.secitem.on {
+  background: var(--greenSoft);
+  color: var(--greenDeep);
+}
+.secitem.on::after {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--green);
+}
+.secitem .ic {
+  width: 22px;
+  height: 22px;
+  font-size: 0; /* the emoji stays for the DOM, the mask paints the icon */
+  background: currentColor;
+  -webkit-mask: var(--ic) center / contain no-repeat;
+  mask: var(--ic) center / contain no-repeat;
+}
+.secitem .lb {
+  font: 600 10px var(--sans);
+  letter-spacing: 0.01em;
+}
+.secitem .dot {
+  top: 8px;
+  right: 12px;
+  box-shadow: 0 0 0 2px #fff;
+}
+.secitem[data-sec="tower"] .ic {
+  --ic: var(--ic-tower);
+}
+.secitem[data-sec="sales"] .ic {
+  --ic: var(--ic-sales);
+}
+.secitem[data-sec="projects"] .ic {
+  --ic: var(--ic-projects);
+}
+.secitem[data-sec="admin"] .ic {
+  --ic: var(--ic-admin);
+}
+.secitem[data-sec="master-data"] .ic {
+  --ic: var(--ic-master);
+}
+.secitem[data-sec="settings"] .ic {
+  --ic: var(--ic-settings);
+}
+/* A section this sheet has no icon for keeps its emoji rather than showing
+   an empty square. */
+.secitem:not([data-sec="tower"]):not([data-sec="sales"]):not([data-sec="projects"]):not(
+    [data-sec="admin"]
+  ):not([data-sec="master-data"]):not([data-sec="settings"])
+  .ic {
+  font-size: 17px;
+  background: none;
+  -webkit-mask: none;
+  mask: none;
+}
+.p2 .p2h {
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+.navitem {
+  border-radius: var(--r-sm);
+}
+.navitem.on {
+  background: var(--greenSoft);
+  color: var(--greenDeep);
+}
+
+/* -------------------------------------------------------- 15 · page header
+   Breadcrumb in small caps, the title in the serif, the explanation one
+   size down and kept to a readable measure. */
+main {
+  padding: var(--s-6) var(--s-7) 96px;
+}
+.crumbs {
+  font-size: var(--t-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: var(--s-2);
+}
+.head {
+  margin-bottom: var(--s-5);
+}
+.head h1 {
+  font-size: clamp(22px, 2.6vw, 30px);
+  letter-spacing: -0.025em;
+}
+.head .sub {
+  color: var(--muted);
+  font-size: var(--t-md);
+  max-width: 64ch;
+}
+
+/* ------------------------------------------------------ 16 · action row
+   The dashboard's buttons become the quick-action row every reference has:
+   quiet, on one line, the timestamp demoted to a caption. */
+.torrebar {
+  gap: var(--s-2);
+  margin-bottom: var(--s-5);
+}
+.torrebar .ts {
+  color: var(--faint);
+  font-size: var(--t-xs);
+}
+.torrebar .btn.sm {
+  height: 34px;
+  padding: 0 var(--s-4);
+  font-size: var(--t-sm);
+  background: #fff;
+}
+
+/* -------------------------------------------------------- 17 · KPI tiles
+   The four figures of the company, as the references draw them: an icon in a
+   tinted rounded square, the number large, the label beneath it in a calm
+   grey, the whole tile a quiet card. Each tile already knows where it goes
+   (data-go), which is also what chooses its icon and its tint. */
+.tcards {
+  gap: var(--s-4);
+  margin: 0 0 var(--s-5);
+}
+.tcard {
+  border-radius: var(--r-lg);
+  padding: var(--s-5);
+  box-shadow: var(--e-1);
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-areas:
+    "ic lab"
+    "ic val"
+    "ic sub";
+  column-gap: var(--s-4);
+  align-content: start;
+}
+.tcard:hover {
+  transform: none;
+  box-shadow: var(--e-2);
+  border-color: var(--line);
+}
+.tcard::before {
+  content: "";
+  grid-area: ic;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--tile-bg, var(--tint-green));
+  -webkit-mask: none;
+  mask: none;
+  position: relative;
+}
+.tcard::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--s-5) + 11px);
+  top: calc(var(--s-5) + 11px);
+  width: 22px;
+  height: 22px;
+  background: var(--tile-fg, var(--greenDeep));
+  -webkit-mask: var(--tile-ic) center / contain no-repeat;
+  mask: var(--tile-ic) center / contain no-repeat;
+}
+.tcard .lab {
+  grid-area: lab;
+  font: 600 var(--t-xs) var(--sans);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+.tcard .val {
+  grid-area: val;
+  font: 600 var(--t-2xl) / 1.05 var(--serif);
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+}
+.tcard .sub {
+  grid-area: sub;
+  font-size: var(--t-xs);
+  margin-top: var(--s-1);
+}
+.tcard[data-go="economics"] {
+  --tile-bg: var(--tint-green);
+  --tile-fg: var(--greenDeep);
+  --tile-ic: var(--ic-trend);
+}
+.tcard[data-go="invoicing"] {
+  --tile-bg: var(--tint-amber);
+  --tile-fg: var(--amber);
+  --tile-ic: var(--ic-in);
+}
+.tcard[data-go="supplier-invoices"] {
+  --tile-bg: var(--tint-red);
+  --tile-fg: var(--danger);
+  --tile-ic: var(--ic-out);
+}
+.tcard[data-go="banking"] {
+  --tile-bg: var(--tint-blue);
+  --tile-fg: var(--blue);
+  --tile-ic: var(--ic-bank);
+}
+
+/* ------------------------------------------------- 18 · one dominant chart
+   The bullet chart kept four colours and a legend that needed reading. It
+   becomes what the references draw: a thin rounded bar per job, the spent
+   part in the accent, the remainder pale, the budget a hairline mark, the
+   overrun red — and the hero figure above it in the serif, large. */
+.perfhero {
+  padding: var(--s-4) var(--s-5) var(--s-5);
+  gap: var(--s-3);
+}
+.perfhero b {
+  font: 600 var(--t-3xl) / 1 var(--serif);
+  letter-spacing: -0.03em;
+}
+.perfkey {
+  font-size: var(--t-xs);
+  color: var(--muted);
+  padding: var(--s-3) var(--s-5) 0;
+}
+.perfrow {
+  padding: var(--s-3) var(--s-5);
+  border-radius: var(--r-sm);
+  margin: 0 var(--s-2);
+}
+.perfrow .code {
+  font-weight: 600;
+  color: var(--ink);
+}
+.perfrow .code .nm {
+  font-weight: 400;
+  color: var(--muted);
+}
+.blt {
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--hair);
+  overflow: visible;
+}
+.blt i {
+  border-radius: var(--r-full);
+}
+.blt .spent {
+  background: var(--green);
+}
+.blt .togo {
+  background: var(--greenPale);
+}
+.blt .over {
+  background: var(--danger);
+}
+.blt .tick {
+  top: -4px;
+  height: 16px;
+  width: 2px;
+  background: var(--ink);
+  opacity: 0.55;
+}
+.perfkey span b {
+  border-radius: 3px;
+}
+.bar {
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--hair);
+}
+.bar i {
+  background: var(--green);
+  border-radius: var(--r-full);
+}
+
+/* --------------------------------------------------- 19 · attention list
+   The notifications panel of reference two: each item a row with a severity
+   mark on its edge, the message in the ink, the meta in grey. */
+.alrow {
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--hair);
+  font-size: var(--t-md);
+}
+.alrow b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.alrow .meta {
+  color: var(--muted);
+  font-size: var(--t-xs);
+  margin-top: 2px;
+}
+.alrow:hover {
+  background: var(--bg);
+}
+
+/* ---------------------------------------------------- 20 · empty & pills
+   An empty state that says so calmly; status pills that read as a system. */
+.empty {
+  padding: var(--s-8) var(--s-6);
+  color: var(--faint);
+  font-size: var(--t-md);
+}
+.pill.g {
+  background: var(--greenSoft);
+  color: var(--greenDeep);
+}
+.pill.b {
+  background: var(--blueSoft);
+  color: var(--blue);
+}
+
+/* --------------------------------------------------------- 21 · phones
+   The bottom bar keeps the same items; the active one becomes the filled
+   pill, the accent bar moves to the top edge, and the floating button takes
+   the accent because it is the one thing on a phone that creates. */
+@media (max-width: 860px) {
+  /* The page's own phone rule collapses the grid to one column because the
+     rail leaves the flow to become the bottom bar. This sheet's desktop rule
+     above would otherwise win by load order and leave `main` in a 92px
+     column — which is exactly what the first phone screenshot showed. */
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .p1 {
+    background: rgba(255, 255, 255, 0.97);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 24px -16px rgba(16, 24, 40, 0.18);
+    padding: 6px 6px calc(8px + env(safe-area-inset-bottom));
+    gap: 2px;
+  }
+  .secitem {
+    padding: 6px 2px;
+    border-radius: var(--r-sm);
+  }
+  .secitem.on::after {
+    left: 14px;
+    right: 14px;
+    top: -6px;
+    bottom: auto;
+    width: auto;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+  }
+  .secitem .ic {
+    width: 22px;
+    height: 22px;
+  }
+  main {
+    padding: var(--s-5) var(--s-4) 110px;
+  }
+  .tcard {
+    padding: var(--s-4);
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+  .tcard::before {
+    width: 40px;
+    height: 40px;
+  }
+  .tcard::after {
+    left: calc(var(--s-4) + 9px);
+    top: calc(var(--s-4) + 9px);
+  }
+  .tcard .val {
+    font-size: var(--t-xl);
+  }
+  .fab {
+    background: var(--green);
+    color: #fff;
+    box-shadow: var(--e-3);
+  }
+  .torrebar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .torrebar .btn {
+    flex: none;
+  }
+}
+
+/* ------------------------------------------------------------ 22 · icons
+   Monochrome, 24-unit, stroke-based — the vocabulary the references use.
+   Held as masks so they paint in the current text colour and switch with
+   the state like a glyph. Nothing is fetched: each is its own data URI. */
+:root {
+  --ic-search: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><path d='m20 20-3.5-3.5'/></svg>");
+  --ic-tower: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='7' height='9' rx='1.5'/><rect x='14' y='3' width='7' height='5' rx='1.5'/><rect x='14' y='12' width='7' height='9' rx='1.5'/><rect x='3' y='16' width='7' height='5' rx='1.5'/></svg>");
+  --ic-sales: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='7' width='18' height='13' rx='2'/><path d='M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/><path d='M3 12h18'/></svg>");
+  --ic-projects: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 21h18'/><path d='M5 21V8l7-4 7 4v13'/><path d='M9 21v-5h6v5'/><path d='M9 11h.01M15 11h.01M9 15h.01M15 15h.01'/></svg>");
+  --ic-admin: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z'/><path d='M14 3v6h6'/><path d='M9 13h6M9 17h6'/></svg>");
+  --ic-master: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><ellipse cx='12' cy='6' rx='8' ry='3'/><path d='M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6'/><path d='M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6'/></svg>");
+  --ic-settings: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 6h10M18 6h2M4 12h2M10 12h10M4 18h10M18 18h2'/><circle cx='16' cy='6' r='2'/><circle cx='8' cy='12' r='2'/><circle cx='16' cy='18' r='2'/></svg>");
+  --ic-trend: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 17l6-6 4 4 8-8'/><path d='M15 7h6v6'/></svg>");
+  --ic-in: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M17 7 7 17'/><path d='M17 17H7V7'/></svg>");
+  --ic-out: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 17 17 7'/><path d='M7 7h10v10'/></svg>");
+  --ic-bank: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 10 12 4l9 6'/><path d='M5 10v8M10 10v8M14 10v8M19 10v8'/><path d='M3 20h18'/></svg>");
+}

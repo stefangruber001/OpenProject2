@@ -6834,3 +6834,40 @@ the operator opens here are the same document.
 **A supplier's invoice is not offered.** It is THEIR document; this system
 files it, it does not print it, and a button to generate one would be
 inventing a document somebody else issued. The row says so instead.
+
+## S46 · Redesign phase 2 — the shell and the dashboard, on the dev branch (2026-09-03)
+
+The operator supplied three reference dashboards and two articles on ERP
+interface practice; both article domains are blocked by this session's egress
+proxy, so the references and the established practice they embody were
+applied directly: a neutral ground with white surfaces and ONE accent, a
+sidebar with monochrome icons, KPI tiles with an icon in a tinted square, one
+dominant chart, and a quick-action row. All of it is `site/erp-ds.css`,
+sections 12–22, still the one reviewable file.
+
+**Icons without touching the DOM.** The rail's emoji stay in the markup — the
+suite reads them and the phone bar relies on the same buttons — and are
+painted over with masked SVGs keyed on `data-sec`, so they take the current
+text colour and change with state like any glyph. A section this sheet has
+no icon for keeps its emoji rather than showing an empty square. The KPI
+tiles choose their icon and tint from `data-go`, which they already carried.
+
+**The brand green stays, demoted to an accent.** It is on every document
+this company sends; it stops being the colour of the wallpaper and becomes
+the colour of the thing to press. Neutral surfaces are the discipline all
+three references share.
+
+**No greeting.** The references open with «Hi, Ronald»; this build has no
+signed-in identity in local mode and a greeting to nobody is fake
+functionality, which the brief forbids. It can be added the day the shell
+knows who is looking at it.
+
+**What broke first and why it matters.** The unconditional sidebar rule beat
+the page's own phone rule by load order, and because the rail leaves the
+flow to become the bottom bar, `main` landed in the 92px first column: a
+phone screen twelve characters wide. Caught by screenshots at three
+viewports before the suite ran — the suite has no check for a legible column
+width, and this is the argument for keeping the screenshots in the loop.
+
+Full browser suite 648/648 with the layer applied; overflow 0px at
+1440/1024/390; no console errors in the self-contained preview build.
