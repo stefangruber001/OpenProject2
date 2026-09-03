@@ -3323,3 +3323,18 @@ td.num.late {
     font-size: 13px;
   }
 }
+
+/* ------------------------------------------ 59 · the hand-off comes out
+   Operator: «the button at the end to move directly to Projects or
+   Administration is not needed — you can move anyway on the top 3 blocks or
+   below at the tabs.» Correct, and it was the tallest thing left in the
+   sheet: the journey pills at the head of the panel go to the same three
+   places, and on a phone so does the tab bar underneath it.
+
+   Hidden, not deleted — the same rule the floating «+» follows. `buildSubs`
+   still writes the footer, so bringing it back is this one rule, and the
+   next section it names is still computed from FLOW rather than from a list
+   somebody would have to remember to update. */
+.p2next {
+  display: none;
+}

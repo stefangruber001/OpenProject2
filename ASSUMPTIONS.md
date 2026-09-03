@@ -7777,3 +7777,19 @@ section pills above still say which of the three movements this is. What went
 is the connector rail — a line down a single column meant «then», and the same
 line drawn down two columns would have meant nothing. Removing it was the
 honest move; keeping it would have drawn a sequence the layout no longer has.
+
+## S57 · The hand-off button comes out (2026-09-03)
+
+Operator: «the button at the end to move directly to Projects or
+Administration is not needed — you can move anyway on the top 3 blocks or
+below at the tabs.» Correct on both counts: the journey pills at the head of
+the panel reach the same three sections, and on a phone the tab bar under the
+sheet does too. It was also the tallest thing left in it.
+
+Comercial goes 41% → **35%** of a 390×844 phone; Administración was already
+35% because, as the last of the three movements, it never had a next section
+to offer.
+
+Hidden, not deleted — the rule the floating «+» follows. `buildSubs` still
+writes the footer and still computes the next section from FLOW, so restoring
+it is one rule and not a list somebody has to remember to update.
