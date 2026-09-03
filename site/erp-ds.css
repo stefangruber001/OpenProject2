@@ -3013,18 +3013,28 @@ td.num.late {
   color: var(--muted);
 }
 
-/* THE ROW IS A TABLE ROW NOW.
+/* THE ROW IS A TABLE ROW — ON A DESKTOP.
    `.alrow` was a grid when the attention list was a stack of divs, and the
    class carries that layout wherever it appears. The Alertas screen still
    uses the div form and still needs it; the Torre's row is a `<tr>` and must
    be left to the table it sits in. Scoped by element, so both keep working
    from the one class — and the shell check that counts `.alrow` on the Torre
-   still counts the same rows. */
-tr.alrow {
-  display: table-row;
-}
-tr.alrow > td {
-  display: table-cell;
+   still counts the same rows.
+
+   AND SCOPED TO THE DESKTOP, which the first version was not. Unqualified,
+   `display:table-cell` beat `table.cards td{display:block}` at every width:
+   the phone stopped carding this table and laid five columns across 390px,
+   so every cell wrapped one character per line. The suite's «cards fit their
+   container» check passed it — the table DID fit, by wrapping into a column
+   of single letters, which is the shape a width measurement cannot see and a
+   screenshot shows instantly. */
+@media (min-width: 701px) {
+  tr.alrow {
+    display: table-row;
+  }
+  tr.alrow > td {
+    display: table-cell;
+  }
 }
 
 /* The Torre's two lower panels, each on the full width (see the comment at
