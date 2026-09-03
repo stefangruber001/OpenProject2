@@ -2126,3 +2126,187 @@ textarea:focus {
     height: 32px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 6 · Second premium pass
+   «Needs attention — the red signal is not looking premium; implement
+   another solution.» And the rest of the phone review, pushed further:
+   lighter action rows, more air, quieter chrome.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ------------------------------------------- 45 · the attention rows
+   The severity used to be a coloured emoji circle — a traffic light on
+   every row. It is now a 32px tinted square with a line glyph: red tint
+   and an alert circle for critical, gold tint and a flag for high, grey
+   and an info mark for the rest. The emoji stays in the DOM (the suite
+   and the message text are untouched); the row carries `data-sev`, which
+   the two templates now write, so the sheet can tell them apart without
+   reading text. The message drops to medium weight — a list of twenty
+   bold lines is shouting, not ranking. */
+:root {
+  --ic-alert: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M12 8v4.5M12 16h.01'/></svg>");
+  --ic-flag: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M5 21V4'/><path d='M5 4h12l-2.5 4 2.5 4H5'/></svg>");
+  --ic-info: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M12 11v5M12 8h.01'/></svg>");
+}
+.alrow {
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px var(--s-5);
+  border-left: 0;
+  font-size: 13.5px;
+}
+.alrow > div:first-child {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-md);
+  background: var(--hair);
+  font-size: 0;
+  position: relative;
+  align-self: start;
+}
+.alrow > div:first-child::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 17px;
+  height: 17px;
+  background: var(--muted);
+  -webkit-mask: var(--ic-info) center / contain no-repeat;
+  mask: var(--ic-info) center / contain no-repeat;
+}
+.alrow[data-sev="critical"] > div:first-child {
+  background: #fbeae7;
+}
+.alrow[data-sev="critical"] > div:first-child::before {
+  background: #c0392b;
+  -webkit-mask-image: var(--ic-alert);
+  mask-image: var(--ic-alert);
+}
+.alrow[data-sev="high"] > div:first-child {
+  background: var(--goldSoft);
+}
+.alrow[data-sev="high"] > div:first-child::before {
+  background: var(--goldDeep);
+  -webkit-mask-image: var(--ic-flag);
+  mask-image: var(--ic-flag);
+}
+.alrow b {
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.35;
+}
+.alrow b.click:hover {
+  color: var(--accentDeep);
+}
+.alrow .meta {
+  font-size: 12px;
+  margin-top: 3px;
+}
+.alrow:hover {
+  background: var(--accentPale);
+}
+.alrow .acts button {
+  height: 28px;
+  font-size: 11.5px;
+}
+.algroup {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--muted);
+  padding: 12px var(--s-5) 4px;
+}
+
+/* ------------------------------------------------ 46 · quieter chrome
+   The Torre's action row: one solid button, the rest as text buttons that
+   only grow a surface on hover. More air around the page and inside the
+   cards. Section-count tags as quiet chips. The phone's FAB a disc. */
+main {
+  padding: 28px 32px 96px;
+}
+.head {
+  margin-bottom: 18px;
+}
+.head h1 {
+  font-size: 26px;
+}
+.torrebar {
+  margin-bottom: 18px;
+  gap: 4px;
+}
+.torrebar .btn.sm {
+  height: 36px;
+  border-radius: var(--r-md);
+  font-size: 13px;
+}
+.torrebar .btn.sm:not(#tNewOpp) {
+  background: transparent;
+  border-color: transparent;
+  color: var(--body);
+}
+.torrebar .btn.sm:not(#tNewOpp):hover {
+  background: var(--accentPale);
+  border-color: transparent;
+  color: var(--ink);
+}
+.torrebar .ts {
+  margin-right: var(--s-3);
+}
+.card > .ch {
+  padding: 16px 20px 8px;
+}
+.card > .ch .tag {
+  font: 600 11px var(--sans);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--muted);
+  background: var(--hair);
+  border-radius: var(--r-sm);
+  padding: 3px 8px;
+}
+thead th,
+tbody td {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+.tcard {
+  padding: 18px 18px 18px 80px;
+  min-height: 108px;
+}
+.tcard .lb {
+  opacity: 0.82;
+}
+.tcard .val {
+  font-size: 30px;
+}
+.secitem:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.fab {
+  border-radius: 50%; /* the 56px target the spec (§3) and the suite ask for stays */
+}
+@media (max-width: 860px) {
+  main {
+    padding: 18px 14px 96px;
+  }
+  .head h1 {
+    font-size: 23px;
+  }
+  .torrebar .btn.sm:not(#tNewOpp) {
+    background: #fff;
+    border-color: var(--line);
+  }
+  .card > .ch {
+    padding: 14px 16px 6px;
+  }
+  thead th,
+  tbody td {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .alrow {
+    padding: 10px 14px;
+  }
+}

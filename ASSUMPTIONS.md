@@ -6987,3 +6987,30 @@ Production is not affected: this is the preview builder, not the site.
 
 Full browser suite 648/648; overflow 0px at 1440/1024/390/430; no console
 errors; header 64px on desktop and 56px + search line on a 390px phone.
+
+## S50 · Redesign phase 6 — the attention rows, and a second premium pass (2026-09-03)
+
+Operator, on the phase-5 preview: «Needs attention — the red signal is not
+looking premium; implement another solution.»
+
+**Severity as a tinted square with a line glyph.** The coloured emoji circle
+(🔴 🟡 🔵) was a traffic light on every row; twenty of them in a column is a
+warning sign, not a list. Each row now opens with a 32px square: red tint
+and an alert-circle glyph for critical, gold tint and a flag for high, grey
+and an info mark for the rest. The message drops to medium weight so the
+list ranks instead of shouting.
+
+**One attribute added to two templates.** The sheet cannot read the emoji
+to know a row's severity, so the two `.alrow` templates now write
+`data-sev="${a.sev}"` beside the `data-key` they already carried. That is
+markup, not logic: the value already existed on the alert, no handler or
+selector in the page reads it, and the emoji stays in the DOM for the suite.
+It is the first non-CSS change on this branch and is recorded as such.
+
+**Quieter chrome.** The Torre's action row keeps one solid button and turns
+the rest into text buttons that only grow a surface on hover (on a phone
+they keep a border, because a phone has no hover). More air around the page
+and inside the cards; count tags as quiet chips; the phone FAB as a disc.
+
+Full browser suite 648/648 (a first run caught the FAB shrunk to 54px against the spec's 56px target — restored, re-run green); overflow 0px at 1440/1024/390/430; no
+console errors in the preview build.

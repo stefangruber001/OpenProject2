@@ -11401,7 +11401,7 @@
    <div class="almgr">${
      top
        .map(
-         (a) => `<div class="alrow">
+         (a) => `<div class="alrow" data-sev="${a.sev}">
      <div>${a.sev === "critical" ? "🔴" : a.sev === "high" ? "🟡" : "🔵"}</div>
      <div><b class="click" data-goref='${esc(JSON.stringify(a.ref))}'>${esc(a.msg)}</b>
       <div class="meta">${a.assignee ? `<span>👤 ${esc(a.assignee)}</span>` : ""}${a.dueDate ? `<span>📅 ${fmtD(a.dueDate)}</span>` : ""}</div></div>
@@ -11636,7 +11636,7 @@
       }
       function alertRowHtml(a) {
         const icon = a.sev === "critical" ? "🔴" : a.sev === "high" ? "🟡" : "🔵";
-        return `<div class="alrow" data-key="${esc(a.key)}">
+        return `<div class="alrow" data-key="${esc(a.key)}" data-sev="${a.sev}">
    <div>${icon}</div>
    <div><b class="click" data-goref='${esc(JSON.stringify(a.ref))}'>${esc(a.msg)}</b>
     <div class="meta">${a.assignee ? `<span>👤 ${esc(a.assignee)}</span>` : ""}${a.dueDate ? `<span>📅 ${fmtD(a.dueDate)}</span>` : ""}${a.snoozedUntil ? `<span>💤 hasta ${fmtD(a.snoozedUntil)}</span>` : ""}</div></div>
