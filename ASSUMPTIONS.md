@@ -7393,3 +7393,40 @@ the operator opens here are the same document.
 **A supplier's invoice is not offered.** It is THEIR document; this system
 files it, it does not print it, and a button to generate one would be
 inventing a document somebody else issued. The row says so instead.
+
+## S46 · PK12-S11 — Adicionales stays a view, not a second model (2026-09-03)
+
+The operator asked whether the Adicionales section could be removed entirely
+and extras handled through Presupuestos and Contratos alone. Measured first,
+because the answer turned on what the two paths actually were, and they were
+each half of the same chain:
+
+- an **approved change** (`state.changes`, PRY-03) wrote the contract annex
+  and never touched the job's completion date;
+- an **accepted variation budget** (`variationOf`) extended the completion
+  date and never wrote an annex — and the screen that creates one called
+  `createVariationBudget` with an empty options object, so its half could not
+  fire either.
+
+Both halves now run from both routes, through `extendProjectDeadline` and
+`writeContractAnnex` — one implementation each, so the answer to "does an
+extra move the end date, and does it produce an adenda?" cannot depend on
+which screen it was entered from.
+
+**The section itself stays, for now, as the register it already is.** Deleting
+a screen whose data model (`state.changes`) holds photographs, site-detection
+stages and an approval chain would mean migrating those records into budgets —
+which is the least reversible thing available and would rewrite history the
+mandate says to leave alone. Converging the two paths onto one rule is the
+reversible step and had to come first regardless: with both routes now
+producing the same consequences, folding the register into Obras becomes a
+presentation change rather than a data migration, and can be judged on its own
+afterwards.
+
+**What is still different between them, and deliberately so.** A change is a
+FIELD capture — something found on site, photographed, priced, approved,
+possibly verbally. A variation budget is a COMMERCIAL document — versioned,
+issued, signed, with its own PDF. Collapsing them would lose the first, and
+the operator's own workflow uses both. The next step, if it is wanted, is to
+let a priced change become a variation budget in one click rather than to
+delete either.

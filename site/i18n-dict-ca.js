@@ -622,6 +622,12 @@ window.CANEI_DICT.ca = {
   Reactivar: "Reactivar",
   Desactivada: "Desactivada",
   "Borrar la cuenta": "Esborrar el compte",
+  "Motivo del adicional": "Motiu de l'addicional",
+  "Días de plazo que añade": "Dies de termini que afegeix",
+  "Ampliación de la instalación eléctrica": "Ampliació de la instal·lació elèctrica",
+  "Se abre el presupuestador con una versión nueva sobre esa obra. Al aceptarse, sus partidas entran en la economía, el avance y la certificación, la fecha de fin se amplía con los días indicados y se añade la adenda al contrato.":
+    "S'obre el pressupostador amb una versió nova sobre aquesta obra. En acceptar-se, les seves partides entren a l'economia, l'avanç i la certificació, la data de fi s'amplia amb els dies indicats i s'afegeix l'addenda al contracte.",
+  Adicional: "Addicional",
   "Bloquear el trimestre": "Bloquejar el trimestre",
   "🔒 Bloquear trimestre": "🔒 Bloquejar trimestre",
   "Trimestre bloqueado": "Trimestre bloquejat",

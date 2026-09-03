@@ -8367,7 +8367,9 @@
                `<option value="${p.id}">${esc(p.code)} — ${esc(erp.party(p.partyId).name)}</option>`,
            )
            .join("")}</select></div>
-    <div class="field full"><p style="font-size:12.5px;color:var(--body);margin:0">Se abre el presupuestador con una versión nueva sobre esa obra. Al aceptarse, sus partidas entran en la economía, el avance y la certificación.</p></div>
+    <div class="field full"><label>Motivo del adicional</label><input id="vb_why" placeholder="Ampliación de la instalación eléctrica"></div>
+    <div class="field"><label>Días de plazo que añade</label><input id="vb_days" type="number" min="0" step="1" value="0"></div>
+    <div class="field full"><p style="font-size:12.5px;color:var(--body);margin:0">Se abre el presupuestador con una versión nueva sobre esa obra. Al aceptarse, sus partidas entran en la economía, el avance y la certificación, la fecha de fin se amplía con los días indicados y se añade la adenda al contrato.</p></div>
     <div class="field full"><button class="btn primary" id="vb_save">Crear y abrir</button></div>`
        : '<div class="field full"><div class="empty">No hay obras abiertas sobre las que crear un presupuesto de variación.</div></div>'
    }
@@ -8376,7 +8378,20 @@
         if (b)
           b.onclick = () =>
             mutate(() => {
-              const rec = erp.createVariationBudget($("#vb_prj").value, {}, "backoffice");
+              /* The days, at last. `createVariationBudget` has taken
+                 `scheduleImpactDays` since it was written and this call passed
+                 `{}` — so the acceptance hook that extends the completion date
+                 could never fire, and the operator reported exactly that: no
+                 way to load extra days as a consequence of the adicional. The
+                 rule was right and nothing ever called it with a number. */
+              const rec = erp.createVariationBudget(
+                $("#vb_prj").value,
+                {
+                  reason: $("#vb_why").value,
+                  scheduleImpactDays: Number($("#vb_days").value) || 0,
+                },
+                "backoffice",
+              );
               closeDrawer();
               go("quotes", rec.id);
             }, "Presupuesto de variación creado");
@@ -13218,7 +13233,27 @@
           baseRows,
           matches: (b, q) => (b.number + " " + erp.party(b.partyId).name).toLowerCase().includes(q),
           columns: [
-            { label: "Número", primary: true, get: (b) => b.number },
+            {
+              /* AN ADICIONAL SAYS SO, in the register and not only inside the
+                 builder. The operator: "I have created a budget of additional
+                 which brings me to the same Budget section, exactly the same
+                 workflow, but it does not identify as an Additional Budget."
+                 It was true — `variationOf` was printed in the full-screen
+                 header of the builder and nowhere a list could show it, so two
+                 rows that mean very different things read identically. */
+              label: "Número",
+              primary: true,
+              html: (b) => {
+                const num = esc(b.number);
+                if (!b.variationOf) return num;
+                let code = "";
+                try {
+                  code = erp.project(b.variationOf).code;
+                } catch (e) {}
+                return `${num} <span class="pill b">Adicional</span>${code ? ` <span style="color:var(--muted)">${esc(code)}</span>` : ""}`;
+              },
+              get: (b) => b.number,
+            },
             { label: "Cliente", get: (b) => erp.party(b.partyId).name },
             {
               label: "Versión",

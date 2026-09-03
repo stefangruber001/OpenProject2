@@ -2881,16 +2881,18 @@
         // over — once where it belongs and never where it is.
         o.decidedAt = when; // DAS-01: "contratadas/perdidas últimos 12 meses"
       }
-      if (b.variationOf && b.scheduleImpactDays > 0) {
-        const pj = this.state.projects.find((x) => x.id === b.variationOf);
-        if (pj && pj.dates && pj.dates.targetEnd) {
-          pj.dates.targetEnd = addDays(pj.dates.targetEnd, b.scheduleImpactDays);
-          this._log(
-            user,
-            "variationExtendsDeadline",
-            pj.code + " +" + b.scheduleImpactDays + "d → " + pj.dates.targetEnd,
-          );
-        }
+      /* An accepted adicional does BOTH things now, through the same two
+         methods the change register uses. It used to extend the deadline and
+         write no annex, while an approved change wrote the annex and left the
+         deadline alone — so whichever route was taken, half the consequence
+         was missing and the contract had to be drawn up by hand. */
+      if (b.variationOf) {
+        this.extendProjectDeadline(b.variationOf, b.scheduleImpactDays, b.number, user);
+        this.writeContractAnnex(
+          b.variationOf,
+          { valueCents: this.budgetTotals(b.id, v.id).baseCents || 0, budgetId: b.id },
+          user,
+        );
       }
       this._log(user, "acceptVersion", b.number + " v" + v.vNumber);
       return v;
@@ -4007,20 +4009,80 @@
       c.approvedAt = this.state.today;
       c.evidenceRef = evidenceRef || null;
       c.evidence = evidence || null;
-      const p = this.project(c.projectId);
-      const con = p.contractId ? this.state.contracts.find((x) => x.id === p.contractId) : null;
-      if (con) {
-        // CON-12 annex chain
-        c.annexNumber = con.number + "-A" + (con.annexes.length + 1);
-        con.annexes.push({
-          number: c.annexNumber,
-          changeId: c.id,
-          valueCents: c.priceCents,
-          date: this.state.today,
-        });
-      }
+      const annex = this.writeContractAnnex(
+        c.projectId,
+        { valueCents: c.priceCents, changeId: c.id },
+        user,
+      );
+      if (annex) c.annexNumber = annex.number;
+      /* …and the days it recorded finally reach the job. `priceChange` has
+         taken `scheduleImpactDays` since CHG-02 and the screen has asked for
+         it just as long; approving the change moved the Gantt bars and left
+         the project's completion date exactly where it was. Measured on the
+         seeded job: +7 days approved, target end unchanged. */
+      this.extendProjectDeadline(c.projectId, c.scheduleImpactDays, c.annexNumber || c.desc, user);
       this._log(user, "approveChange", changeId);
       return c;
+    }
+    /**
+     * Push a project's completion date out, once, from one place.
+     *
+     * Both kinds of adicional record days and only one of them ever applied
+     * them: an accepted variation budget extended the date, an approved change
+     * did not, and neither knew the other existed. Same rule, two callers, one
+     * implementation — so the answer to "does an extra move the end date?"
+     * cannot depend on which screen it was entered from.
+     *
+     * Silent when the project has no completion date: extending a date that
+     * was never set would be inventing one.
+     */
+    extendProjectDeadline(projectId, days, ref, user) {
+      const n = Math.round(days || 0);
+      if (n <= 0) return null;
+      const pj = this.state.projects.find((x) => x.id === projectId);
+      if (!pj || !pj.dates || !pj.dates.targetEnd) return null;
+      pj.dates.targetEnd = addDays(pj.dates.targetEnd, n);
+      this._log(
+        user,
+        "variationExtendsDeadline",
+        pj.code + " +" + n + "d → " + pj.dates.targetEnd + (ref ? " · " + ref : ""),
+      );
+      return pj.dates.targetEnd;
+    }
+    /**
+     * The CON-12 annex chain, from one place too.
+     *
+     * `approveChange` built this inline, so an accepted variation budget — the
+     * other way of agreeing an extra — produced no annex at all and the
+     * contract had to be drawn up by hand outside the product. The operator
+     * described exactly that: "you can upload the contract like any other
+     * contract". Nothing needs uploading if the chain writes itself.
+     *
+     * Returns null rather than throwing when the project has no contract: an
+     * extra agreed before the contract exists is ordinary, and refusing it
+     * would block the work for a document that is still being drafted.
+     */
+    writeContractAnnex(projectId, { valueCents, changeId, budgetId }, user) {
+      const p = this.state.projects.find((x) => x.id === projectId);
+      if (!p || !p.contractId) return null;
+      const con = this.state.contracts.find((x) => x.id === p.contractId);
+      if (!con) return null;
+      con.annexes = con.annexes || [];
+      // Never twice for the same source — acceptance can be re-run.
+      const already = con.annexes.find(
+        (a) => (changeId && a.changeId === changeId) || (budgetId && a.budgetId === budgetId),
+      );
+      if (already) return already;
+      const rec = {
+        number: con.number + "-A" + (con.annexes.length + 1),
+        changeId: changeId || null,
+        budgetId: budgetId || null,
+        valueCents: valueCents || 0,
+        date: this.state.today,
+      };
+      con.annexes.push(rec);
+      this._log(user, "writeContractAnnex", rec.number);
+      return rec;
     }
     /**
      * The extras of one obra — or, with no argument, of every obra.

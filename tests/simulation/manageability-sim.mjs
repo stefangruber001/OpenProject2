@@ -5126,6 +5126,115 @@ assert(
   );
 }
 
+/* ── PK12-S11 · an adicional does the SAME thing whichever way it is agreed ──
+   The operator: an additional budget "does not identify as an Additional
+   Budget", and once accepted "you can not load any extra days as a consequence
+   of the Additional". Measured, both routes were half-built and each was
+   missing the other's half: an approved change wrote the contract annex and
+   left the completion date alone, an accepted variation budget moved the date
+   and wrote no annex — and the screen that creates one never asked for the
+   days at all, so its half could not fire either. */
+{
+  const e = new ERP("2026-03-01");
+  const cust = e.addParty(
+    {
+      roles: ["customer"],
+      partyType: "individual",
+      name: "Cli S11",
+      email: "cli.s11@example.com",
+      mobile: "600000011",
+      taxId: "12345678Z",
+      billStreet: "C/ Prova 1",
+      billPostalCode: "08001",
+      billCity: "Barcelona",
+      billProvince: "Barcelona",
+    },
+    "bo",
+  );
+  const b = e.createBudget({ partyId: cust.id, activityLine: "renovation" }, "bo");
+  const ch = e.addChapter(b.id, { name: "Base", section: "base" });
+  e.addLine(b.id, ch.id, {
+    code: "B1",
+    desc: "base",
+    unit: "ud",
+    qtyMilli: 1000,
+    priceCents: 100000,
+    costCents: 60000,
+  });
+  e.issueVersion(b.id, {}, "bo");
+  const v0 = b.versions[b.versions.length - 1];
+  e.acceptVersion(b.id, v0.id, {}, "bo");
+  const prj = e.createProjectFromAcceptance(b.id, "bo");
+  prj.dates = prj.dates || {};
+  prj.dates.targetEnd = "2026-06-30";
+  const con = e.createContract(
+    b.id,
+    {
+      installments: [{ pct: 100, trigger: "onSignature", expectedDate: e.today }],
+      duration: { estimatedDays: 30 },
+    },
+    "bo",
+  );
+  prj.contractId = con.id;
+  const annexesBefore = (con.annexes || []).length;
+
+  // Route 1 — the change register.
+  const c = e.addChange(prj.id, { desc: "Extra detectado", chapterNum: "1" }, "bo");
+  e.priceChange(c.id, 50000, 30000, 7, "bo");
+  e.approveChange(c.id, "bo", {});
+  assert(
+    prj.dates.targetEnd === "2026-07-07",
+    "S11: approving a change extends the completion date by the days it recorded",
+  );
+  assert(
+    (con.annexes || []).length === annexesBefore + 1 && !!c.annexNumber,
+    "S11: …and still writes its annex to the contract",
+  );
+
+  // Route 2 — the variation budget, the other way of agreeing the same thing.
+  const vb = e.createVariationBudget(
+    prj.id,
+    { reason: "Ampliación", scheduleImpactDays: 10 },
+    "bo",
+  );
+  assert(vb.variationOf === prj.id, "S11: a variation budget names the job it belongs to");
+  const vch = e.addChapter(vb.id, { name: "Extra", section: "base" });
+  e.addLine(vb.id, vch.id, {
+    code: "X1",
+    desc: "extra",
+    unit: "ud",
+    qtyMilli: 1000,
+    priceCents: 40000,
+    costCents: 20000,
+  });
+  e.issueVersion(vb.id, {}, "bo");
+  const v1 = e.budget(vb.id).versions[e.budget(vb.id).versions.length - 1];
+  e.acceptVersion(vb.id, v1.id, {}, "bo");
+  assert(
+    prj.dates.targetEnd === "2026-07-17",
+    "S11: accepting a variation budget extends the date by ITS days too",
+  );
+  assert(
+    (con.annexes || []).length === annexesBefore + 2 &&
+      (con.annexes || []).some((a) => a.budgetId === vb.id),
+    "S11: …and writes the adenda instead of leaving it to be drawn up by hand",
+  );
+  /* Never twice for the same source. Acceptance is re-runnable in principle
+     and an annex chain that grows on every re-read is a contract nobody can
+     reconcile against. */
+  e.writeContractAnnex(prj.id, { valueCents: 40000, budgetId: vb.id }, "bo");
+  assert(
+    (con.annexes || []).length === annexesBefore + 2,
+    "S11: the same source never writes a second annex",
+  );
+  // A job with no completion date is left alone rather than given an invented one.
+  const e2 = new ERP("2026-03-01");
+  assert(
+    e2.extendProjectDeadline("nope", 5, "x", "bo") === null,
+    "S11: extending a job that has no completion date invents nothing",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

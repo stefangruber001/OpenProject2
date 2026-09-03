@@ -755,6 +755,13 @@ window.CANEI_DICT = {
     ],
     ["Desactivada", "Deactivated"],
     ["Borrar la cuenta", "Delete the account"],
+    ["Motivo del adicional", "Reason for the additional"],
+    ["Días de plazo que añade", "Days it adds to the schedule"],
+    ["Ampliación de la instalación eléctrica", "Extending the electrical installation"],
+    [
+      "Se abre el presupuestador con una versión nueva sobre esa obra. Al aceptarse, sus partidas entran en la economía, el avance y la certificación, la fecha de fin se amplía con los días indicados y se añade la adenda al contrato.",
+      "The quote builder opens with a new version on that site. On acceptance its line items enter the economics, the progress and the valuations, the completion date extends by the days given, and the annex is added to the contract.",
+    ],
     ["Bloquear el trimestre", "Lock the quarter"],
     ["🔒 Bloquear trimestre", "🔒 Lock quarter"],
     ["Trimestre bloqueado", "Quarter locked"],

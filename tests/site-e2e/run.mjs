@@ -3192,6 +3192,16 @@ async function testVariationBudget(browser, base) {
       return sel.value === projectId;
     }, pid);
     if (!picked) bad("5-6: the drawer offers the obra", "no #vb_prj, or the job is not listed");
+    /* THE DAYS, which the drawer never asked for. `createVariationBudget` has
+       taken `scheduleImpactDays` from the day it was written and the
+       acceptance hook extends the job's completion date by it — and this
+       drawer called it with an empty options object, so the rule could never
+       fire. The operator reported precisely that: no way to load extra days as
+       a consequence of the adicional. */
+    const asksDays = await pg.evaluate(() => !!document.querySelector("#vb_days"));
+    if (asksDays) ok("5-6: the drawer asks how many days the adicional adds");
+    else bad("5-6: schedule days field", "no #vb_days — the engine rule has no caller");
+    await pg.fill("#vb_days", "9");
     await pg.click("#vb_save");
     await pg.waitForTimeout(800);
     const inBuilder = await pg.evaluate((projectId) => {
@@ -3207,6 +3217,35 @@ async function testVariationBudget(browser, base) {
     if (inBuilder.created && /quotes/.test(inBuilder.hash) && inBuilder.badge)
       ok("5-6: creating one lands in the SAME builder, labelled as a variation of its job");
     else bad("5-6: builder handoff", JSON.stringify(inBuilder));
+
+    /* …and it is identifiable from the REGISTER, not only from inside the
+       builder. The operator: it "brings me to the same Budget section, exactly
+       the same workflow, but it does not identify as an Additional Budget."
+       True — `variationOf` was printed in the full-screen header and nowhere a
+       list could show it, so two rows meaning very different things read the
+       same. Asserted on the rendered row, and on the days actually reaching
+       the record. */
+    const marked = await pg.evaluate(async (projectId) => {
+      const b = erp.state.budgets.find((x) => x.variationOf === projectId);
+      /* Out of the builder the way a reader leaves it. Setting the hash is not
+         enough: the quotes route renders the FULL-SCREEN builder while a
+         budget is open, so a check that only changed the hash kept reading the
+         builder and reported an empty register. */
+      const back = document.querySelector("#bBack");
+      if (back) back.click();
+      await new Promise((r) => setTimeout(r, 700));
+      const row = [...document.querySelectorAll("#view tbody tr")].find((tr) =>
+        tr.textContent.includes(b.number),
+      );
+      return {
+        days: b.scheduleImpactDays,
+        rowFound: !!row,
+        saysAdicional: row ? /Adicional/i.test(row.textContent) : false,
+      };
+    }, pid);
+    if (marked.days === 9 && marked.rowFound && marked.saysAdicional)
+      ok("5-6: the register says «Adicional» on the row, and the days reached the record");
+    else bad("5-6: adicional identified in the register", JSON.stringify(marked));
 
     // Build and accept through the engine — the builder's own UI is already
     // covered by two suites; what is NEW is the join on acceptance.
