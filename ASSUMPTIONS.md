@@ -7856,3 +7856,13 @@ round all of them. The cards sit on the page's own light-green ground now.
 Scoped to registers by `:has(table.mlist.cards)`: the Torre's panels keep
 their surface, because their heading and filter belong to the panel rather
 than to any card.
+
+**And the band goes to the top.** Not every register puts its identity first —
+Leads leads with the date, so the green band landed mid-card and read as a
+divider. The card is a flex column and the identity cells take `order:-1`,
+lifting them (in their own order) to the top of every card without touching a
+template. Scoped to `.mlist`: the quote's budget grid keeps the block flow its
+own phone layout was written for. The band's rules also stopped assuming the
+identity is the first cell — they key off the identity cells' relation to each
+other, so the first opens the band, the last closes it, and whether the first
+is an eyebrow or the title depends on whether a second follows it.

@@ -3553,3 +3553,66 @@ td.num.late {
     overflow: visible;
   }
 }
+
+/* ------------------------------- 60 · the identity band goes to the top
+   Operator, on the Leads register: «the date before the green part looks
+   strange — move the date below the green header of the tile.»
+
+   Not every register puts its identity first. Leads leads with the date, so
+   the band landed in the middle of the card and read as a divider rather
+   than a header. The card becomes a flex column and the identity cells take
+   `order:-1`, which lifts them — in their own order, whatever their position
+   in the markup — to the top of every card without touching a single
+   template. Scoped to `.mlist`, the registers: the quote's budget grid has
+   its own phone layout and must keep the block flow it was written for.
+
+   And the band's rules stop assuming the identity is the FIRST cell. They
+   key off the identity cells' relation to each other instead: the first of
+   them opens the band, the last closes it, and whether the first is an
+   eyebrow or the title depends on whether a second one follows it. */
+@media (max-width: 700px) {
+  table.mlist.cards tr {
+    display: flex;
+    flex-direction: column;
+  }
+  table.mlist.cards td.k {
+    order: -1;
+  }
+
+  table.cards td.k {
+    background: var(--accentSoft);
+    padding: 2px 14px;
+    color: var(--greenDeep);
+  }
+  /* opens the band */
+  table.cards td.k:first-child,
+  table.cards td:not(.k) + td.k {
+    padding-top: 11px;
+  }
+  /* closes it */
+  table.cards td.k:not(:has(+ td.k)) {
+    padding-bottom: 11px;
+  }
+  /* one identity cell: it is the title */
+  table.cards td.k:not(:has(+ td.k)) {
+    font: 700 15.5px var(--sans);
+    letter-spacing: -0.012em;
+  }
+  /* two: a code above a name */
+  table.cards td.k:has(+ td.k) {
+    font: 700 11px var(--sans);
+    letter-spacing: 0.06em;
+  }
+  table.cards td.k + td.k {
+    color: var(--ink);
+    font: 700 15.5px var(--sans);
+    letter-spacing: -0.012em;
+  }
+  /* the first fact sits under the band, not under a rule of its own */
+  table.cards td.k + td:not(.k),
+  table.cards tr > td:not(.k):first-child {
+    border-top: 0;
+    margin-top: 0;
+    padding-top: 11px;
+  }
+}
