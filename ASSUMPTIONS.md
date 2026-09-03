@@ -7014,3 +7014,28 @@ and inside the cards; count tags as quiet chips; the phone FAB as a disc.
 
 Full browser suite 648/648 (a first run caught the FAB shrunk to 54px against the spec's 56px target — restored, re-run green); overflow 0px at 1440/1024/390/430; no
 console errors in the preview build.
+
+## S51 · One «+», not two (2026-09-03)
+
+Operator, on the phone preview: «Keep only one + not two and ensure in the
+remaining + all functions are there from both.» The header's «+ Crear»
+offered the section's creations; the floating button at the bottom right
+offered the four site actions; «Nueva tarea» was in both.
+
+**The header keeps the plus; the floating button is hidden.** The header
+button is the one that exists on every screen size, so it is the one that
+survives. `renderCreateMenu` now lists the section's creations first, a
+hairline, then the site actions, and a label that both lists carry is
+offered once. The floating button stays in the DOM with its handler; the
+design sheet hides it, which is one rule to revert. Menu rows are 48px on a
+phone, the target the spec set for the floating button's own menu.
+
+**The suite follows the instruction, not the old spec.** §3's «56px floating
+button, four actions» checks now assert the opposite — the floating button
+hidden, the header's plus visible, all four site actions in the one menu
+with no label twice — and the Catalan and three-tap checks press the header
+button instead. Recorded here because a check that was changed to pass is
+the kind of change that has to be visible.
+
+This is the second non-CSS change on the branch (the first is S50's
+`data-sev`), and both are the operator's explicit instructions.

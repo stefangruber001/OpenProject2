@@ -6307,17 +6307,30 @@
       function renderCreateMenu() {
         const secKey = SUBMAP[cur] ? SUBMAP[cur].sec.k : "tower";
         const items = CREATE[secKey] || [];
-        $("#btnCreate").hidden = !items.length;
         const m = $("#mCreate");
         m.innerHTML = "";
-        items.forEach(([lab, fn]) => {
+        const add = (lab, fn) => {
           const b = el("button", null, lab);
           b.onclick = () => {
             closeMenus();
             fn();
           };
           m.appendChild(b);
-        });
+        };
+        items.forEach(([lab, fn]) => add(lab, fn));
+        /* ONE «+», NOT TWO. The site actions (photo and progress, today's hours,
+           an expense, a task) used to live only behind the floating button at
+           the bottom of a phone screen, while the header's «+ Crear» offered
+           the section's own creations — two plus signs, two different lists,
+           and «Nueva tarea» in both. The operator: "keep only one + and ensure
+           all functions from both are there." The header button now carries
+           both lists, the section's first and the site's after a rule, with a
+           duplicate label offered once. The floating button stays in the DOM
+           and keeps its handler; the design sheet hides it. */
+        const site = SITE_ACTIONS.filter(([, lab]) => !items.some(([l]) => l.includes(lab)));
+        if (items.length && site.length) m.appendChild(el("div", "sep"));
+        site.forEach(([ic, lab, fn]) => add(`${ic} ${lab}`, fn));
+        $("#btnCreate").hidden = !m.children.length;
       }
       $("#btnCreate").onclick = () => toggleMenu("#btnCreate", "#mCreate");
       $("#brandHome").onclick = () => go("tower");

@@ -2310,3 +2310,26 @@ tbody td {
     padding: 10px 14px;
   }
 }
+
+/* ------------------------------------------- 47 · one «+», not two
+   Operator, on the phone: «keep only one + and ensure all functions from
+   both are there». The header's Create now lists the section's creations
+   and the site actions (renderCreateMenu); the floating button is hidden —
+   still in the DOM, still wired, one rule away from coming back. Menu rows
+   are 48px on a phone, the rule between the two groups is a hairline. */
+.fab {
+  display: none !important;
+}
+.menu .sep {
+  height: 1px;
+  background: var(--hair);
+  margin: 4px 6px;
+}
+@media (max-width: 860px) {
+  .menu button {
+    min-height: 48px;
+  }
+  main {
+    padding-bottom: 96px;
+  }
+}
