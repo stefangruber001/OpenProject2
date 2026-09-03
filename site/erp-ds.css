@@ -45,10 +45,10 @@
   --s-7: 32px;
   --s-8: 48px;
 
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 16px;
-  --r-full: 999px;
+  --r-sm: 0;
+  --r-md: 0;
+  --r-lg: 0;
+  --r-full: 0;
 
   /* Elevation. ONE ramp, and the top of it is still quiet. The previous
      shadow put a 40px blur under every card, which reads as float rather than
@@ -433,7 +433,7 @@ h3 {
   top: 12px;
   bottom: 12px;
   width: 3px;
-  border-radius: 0 3px 3px 0;
+  border-radius: 0;
   background: var(--green);
 }
 .secitem .ic {
@@ -570,7 +570,7 @@ main {
   grid-area: ic;
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--tile-bg, var(--tint-green));
   -webkit-mask: none;
   mask: none;
@@ -683,7 +683,7 @@ main {
   opacity: 0.55;
 }
 .perfkey span b {
-  border-radius: 3px;
+  border-radius: 0;
 }
 .bar {
   height: 6px;
@@ -762,7 +762,7 @@ main {
     bottom: auto;
     width: auto;
     height: 3px;
-    border-radius: 0 0 3px 3px;
+    border-radius: 0;
   }
   .secitem .ic {
     width: 22px;
@@ -870,10 +870,10 @@ main {
   --blue: var(--accent);
   --blueSoft: var(--accentSoft);
   /* No round edges. Three on a card, two on a control, none on a chip. */
-  --r-sm: 2px;
-  --r-md: 3px;
-  --r-lg: 3px;
-  --r-full: 2px;
+  --r-sm: 0;
+  --r-md: 0;
+  --r-lg: 0;
+  --r-full: 0;
   --ring: 0 0 0 3px rgba(37, 99, 235, 0.3);
   --shadow: none;
   --e-1: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -960,7 +960,7 @@ h3 {
 #canei-lang-pill {
   background: transparent !important;
   border: 0 !important;
-  border-radius: 0 !important;
+  border-radius: 0;
   box-shadow: none !important;
   font: 600 10px var(--sans) !important;
   letter-spacing: 0.08em !important;
@@ -970,7 +970,7 @@ h3 {
 #canei-lang-pill button {
   padding: 4px 6px !important;
   color: var(--faint) !important;
-  border-radius: 0 !important;
+  border-radius: 0;
 }
 #canei-lang-pill button.on {
   background: transparent !important;
@@ -1765,7 +1765,7 @@ body {
   right: 3px;
   min-width: 16px;
   height: 16px;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--danger);
   color: #fff;
   font: 700 9.5px / 16px var(--sans);
@@ -2404,7 +2404,7 @@ tbody td {
   right: -6px;
   min-width: 18px;
   height: 18px;
-  border-radius: 9px;
+  border-radius: 0;
   font: 700 10px / 18px var(--sans);
   padding: 0 5px;
   box-shadow: 0 0 0 2px #fff;
@@ -2769,7 +2769,7 @@ tbody td {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
   background: var(--bg);
-  border-radius: 2px;
+  border-radius: 0;
   padding: 1px 5px;
   font-size: 11px;
 }
@@ -2800,7 +2800,7 @@ tbody td {
   color: var(--muted);
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 2px;
+  border-radius: 0;
   padding: 2px 7px;
   white-space: nowrap;
 }
@@ -2893,7 +2893,7 @@ tr[data-sev="low"] .sevmark {
   min-width: 54px;
   max-width: 88px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: 0;
   background: var(--hair);
   overflow: hidden;
 }
@@ -2901,7 +2901,7 @@ tr[data-sev="low"] .sevmark {
   display: block;
   height: 100%;
   background: var(--accent);
-  border-radius: 2px;
+  border-radius: 0;
 }
 .pcell b {
   font: 600 12px var(--sans);
@@ -2914,7 +2914,7 @@ tr[data-sev="low"] .sevmark {
   font-variant-numeric: tabular-nums;
   color: var(--accentDeep);
   background: var(--accentSoft);
-  border-radius: 2px;
+  border-radius: 0;
   padding: 2px 7px;
   white-space: nowrap;
 }
@@ -3111,7 +3111,7 @@ td.num.late {
     width: auto;
     max-height: 62vh;
     padding: 8px 16px calc(14px + env(safe-area-inset-bottom));
-    border-radius: 16px 16px 0 0;
+    border-radius: 0;
     border-top: 1px solid var(--line);
     box-shadow: 0 -26px 64px -30px rgba(23, 32, 21, 0.5);
   }
@@ -3122,7 +3122,7 @@ td.num.late {
     display: block;
     width: 40px;
     height: 4px;
-    border-radius: 2px;
+    border-radius: 0;
     background: var(--line);
     margin: 1px auto 10px;
   }
@@ -3370,7 +3370,7 @@ td.num.late {
   }
   table.cards tr {
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: 0;
     background: var(--paper);
     box-shadow:
       0 1px 2px rgba(23, 32, 21, 0.04),
@@ -3449,10 +3449,10 @@ td.num.late {
   table.cards td .bar {
     min-width: 96px;
     height: 8px;
-    border-radius: 4px;
+    border-radius: 0;
   }
   table.cards td .bar i {
-    border-radius: 4px;
+    border-radius: 0;
   }
   table.cards tr.tot,
   table.cards tr.grouphd {
@@ -3672,4 +3672,35 @@ td.num.late {
   /* Nothing is left above the band in the flow, and the band already takes
      its opening padding from `td:not(.k) + td.k` — the star cell still
      matches that, out of flow or not. */
+}
+
+/* ------------------------------------------------- 62 · square, everywhere
+   Operator, on the job register in the native app: «all those boxes should
+   not have round corners.»
+
+   That closes a question this file had been carrying since phase 3, which
+   set the language to square corners and then kept a 12px radius on the
+   phone's cards because a card felt like it wanted one. It did not: with
+   every other surface square, the rounded cards were the odd shape on the
+   screen rather than the soft one.
+
+   So the radius scale itself is zero — `--r-sm`, `--r-md`, `--r-lg` and
+   `--r-full` all resolve to 0, in both the base block and phase 3's
+   tightening of it — and every hardcoded radius in the page and in this file
+   went with it, including the ones written inline inside template strings,
+   which no token could have reached.
+
+   Three things stay round, because they are not boxes:
+     · the primary «+», a circle with no corners to square;
+     · the status dots, likewise;
+     · the count pill on a subsection, which exists precisely to look
+       UNLIKE the bordered square that carries a step number — squaring it
+       would undo the distinction the operator asked for two changes ago.
+
+   And the notification badge, restored below. The sweep squared it as a
+   side effect; a count bubble belongs with the dots above rather than with
+   the panels, so it is put back as a circle deliberately instead of left
+   square by accident. */
+.bell .badge {
+  border-radius: 999px;
 }

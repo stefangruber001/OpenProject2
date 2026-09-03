@@ -7893,3 +7893,31 @@ longhand from a three-class selector would have beaten a `padding` shorthand
 here and dropped the mark 11px. Specificity is load-bearing in this file in
 both directions now: too much of it lost the quote's chapter tint two
 sections ago, too little would have lost this.
+
+**S61 · Square, everywhere.** Operator, on the job register in the native
+app: «all those boxes should not have round corners.» That closes a question
+this design layer had been carrying since phase 3, which set the language to
+square corners and then kept a 12px radius on the phone's cards because a card
+felt like it wanted one. It did not: with every other surface square, the
+rounded cards were the odd shape on the screen rather than the soft one.
+
+Done as a sweep rather than by hand, because the radii were not in one place:
+113 declarations across `site/erp.html` and `site/erp-ds.css`, four of them
+written inline inside JavaScript template strings where no stylesheet rule
+could have reached them. The radius scale itself is now zero — `--r-sm`,
+`--r-md`, `--r-lg` and `--r-full`, in both the base block and phase 3's
+tightening of it, since leaving either non-zero would quietly re-round every
+element that reads a token.
+
+Kept round on purpose, because they are not boxes: the primary «+» (a circle
+has no corners to square), the status dots, and the count pill on a
+subsection — which exists precisely to look UNLIKE the bordered square that
+carries a step number, so squaring it would undo S58's distinction.
+
+Decided: the notification badge goes back to a circle. The sweep squared it as
+a side effect; a count bubble belongs with the dots rather than with the
+panels, so it is restored explicitly in section 62 instead of left square by
+accident. Reversible in one line if the operator prefers it square.
+
+Verified across five screens at 390 and 1440: no non-circular radius remains
+anywhere, zero horizontal overflow, zero page errors.
