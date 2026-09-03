@@ -6940,3 +6940,50 @@ errors on the dashboard, the quotes register and the leads register.
 editable design canvas (dashboard, quotes register, phone) from the exact
 values of the stylesheet, so the operator can move and retype things
 without waiting for a build. It is a mockup: nothing on it is wired.
+
+## S49 · Redesign phase 5 — the premium pass, after the operator's phone review (2026-09-03)
+
+The operator opened phase 3 on a phone: «looks like a school project, not a
+professional UI. Fix the header line to be top notch with the logo; the
+colour theme must originate from the logo green; text size and font style
+are not aligned; bell, year and profile look bad — integrate them; show the
+mockup in English only; still far from premium.» Sections 39–44 of
+`site/erp-ds.css` and one font file.
+
+**The palette is the logo's.** The mark is `#48733c` on a rounded square with
+a `#f2c230` corner. Interface accent, active states, the receivables tile and
+every green in the sheet now resolve to that green; the rail and the hero
+tile are the same green darkened to near black; the gold is the small signal
+(overdue dots, the rail's attention mark) and, deepened, the payables tile.
+Phase 3's blue was borrowed from the references and is gone. Reversible: two
+tokens.
+
+**A self-hosted typeface.** Geist (SIL OFL, licence beside the file) as a
+single 68 KB variable file under `site/fonts/`. Self-hosted rather than
+linked from a font CDN on purpose: a tenant's browser must not call a third
+party to draw a page (RGPD). The preview build inlines it as a data URI. The
+system font was doing more of the «school project» than any colour.
+
+**The header is one line.** Logo and name left, search centred, one cluster
+right: Create in the green, alerts as a bell glyph with its count, the period
+as a ghost control with a chevron, the profile as an avatar disc. The bell
+and profile emoji stay in the DOM — the suite presses those buttons by id —
+and are painted over with masked glyphs exactly as the rail's are. On a
+phone the same line is 56px with Create as a round plus, and the search
+takes the second line.
+
+**Two things leave the phone, both still reachable.** The page description
+under the title (three lines of grey before the first number on a 390px
+screen) and the ES · CA · EN pill (the sign-in page and Configuración ›
+Idioma both still offer the choice). Neither is removed from the DOM.
+
+**The preview opens in English** because the operator asked to see it so.
+The artifact wraps the page in its own `<html>` with no `lang` attribute, and
+i18n.js reads the page's base language from exactly that attribute — no
+attribute meant «English page, nothing to translate», which is why the first
+English build stayed Spanish. The preview restores `lang="es"` before the
+first script and records the English choice the way the sign-in page would.
+Production is not affected: this is the preview builder, not the site.
+
+Full browser suite 648/648; overflow 0px at 1440/1024/390/430; no console
+errors; header 64px on desktop and 56px + search line on a 390px phone.

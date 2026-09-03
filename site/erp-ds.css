@@ -1574,3 +1574,555 @@ td > .empty {
 .head h1 {
   letter-spacing: -0.02em;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 5 · The premium pass — the operator's review of phase 3 on a phone
+   «Fix the header line to be top notch with the logo; the colour theme must
+   originate from the logo green; text sizes and font style are not aligned;
+   bell, year and profile look bad — integrate them; still far from premium.»
+   Everything below is the answer. Still CSS (plus one self-hosted font file
+   under site/fonts, SIL OFL). No markup, no handler, no id moved.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ------------------------------------------------ 39 · the typeface
+   Geist, variable, self-hosted: 68 KB, one file, weights 100–900, no call
+   to a third party (RGPD: no font requests leave the tenant's server). It
+   is the difference between «school project» and product — the system
+   font was doing all the talking before. */
+@font-face {
+  font-family: "Geist";
+  src: url("fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* -------------------------------------- 40 · the palette, from the logo
+   The mark is #48733c on a rounded square with a #f2c230 corner. The whole
+   interface now descends from those two: the green is the accent and the
+   active state, a near-black olive is the rail and the hero tile, the yellow
+   is the small signal (dots, the rail's attention mark). Nothing blue is
+   left; the reference dashboards' blue was borrowed, this is owned. */
+:root {
+  --accent: #48733c;
+  --accentDeep: #3a5f30;
+  --accentSoft: #e1eadb;
+  --accentPale: #f2f6ef;
+  --navy: #1c2a19;
+  --navyDeep: #151f13;
+  --gold: #f2c230;
+  --goldDeep: #a8741c;
+  --goldSoft: #fdf3cd;
+  --teal: #a8741c;
+  --tealSoft: #fdf3cd;
+  --bg: #f4f6f1;
+  --line: #e3e8dd;
+  --hair: #eef1e9;
+  --ink: #172015;
+  --body: #3a4537;
+  --muted: #6a7466;
+  --faint: #9aa394;
+  --green: #48733c;
+  --greenDeep: #3a5f30;
+  --greenSoft: #e1eadb;
+  --blue: #48733c;
+  --blueSoft: #e1eadb;
+  --ring: 0 0 0 3px rgba(72, 115, 60, 0.28);
+  --e-1: 0 1px 2px rgba(23, 32, 21, 0.04);
+  --e-2: 0 1px 2px rgba(23, 32, 21, 0.05), 0 10px 30px -24px rgba(23, 32, 21, 0.3);
+  --e-3: 0 14px 36px -16px rgba(23, 32, 21, 0.28);
+  --serif: "Geist", Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sans: "Geist", Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ic-bell: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9a6 6 0 0 1 12 0c0 6 2 8 2 8H4s2-2 2-8'/><path d='M10 21h4'/></svg>");
+  --ic-user: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='8' r='4'/><path d='M4 21a8 8 0 0 1 16 0'/></svg>");
+  --ic-chevron: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236a7466' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  --ic-plus: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round'><path d='M12 5v14M5 12h14'/></svg>");
+}
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* -------------------------------------------------- 41 · the header
+   One line, 64px, white on a hairline. Logo and name at the left as the
+   way home; search in the middle as a quiet field; at the right the four
+   controls the spec asks for, now as one cluster: Create in the green,
+   alerts as a bell glyph with its count, the period as a ghost control
+   with a chevron, the profile as an avatar disc. The emoji are still in
+   the DOM (the suite presses these buttons by id) and are painted over
+   exactly as the rail's are. */
+.topbar {
+  min-height: 64px;
+  padding: 0 var(--s-6);
+  gap: var(--s-5);
+  flex-wrap: nowrap;
+  background: #fff;
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  gap: 11px;
+}
+.brand svg {
+  width: 34px;
+  height: 34px;
+  flex: none;
+}
+.brand .nm {
+  font: 700 16px / 1 var(--sans);
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.brand:focus-visible {
+  outline-color: var(--accent);
+  border-radius: var(--r-md);
+}
+.gsearch {
+  flex: 1 1 320px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.gsearch input {
+  height: 40px;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  padding: 0 12px 0 38px;
+  font: 13.5px var(--sans);
+  color: var(--ink);
+}
+.gsearch input::placeholder {
+  color: var(--faint);
+}
+.gsearch input:focus {
+  background: #fff;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.gsearch::before {
+  left: 13px;
+  width: 16px;
+  height: 16px;
+  opacity: 0.6;
+}
+.gactions {
+  gap: 4px;
+  flex-wrap: nowrap;
+  flex: none;
+}
+.gactions .btn.sm,
+#btnCreate {
+  height: 38px;
+  border-radius: var(--r-md);
+  font: 600 13px var(--sans);
+}
+#btnCreate {
+  padding: 0 14px 0 12px;
+  margin-right: 6px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(23, 32, 21, 0.12);
+}
+#btnCreate:hover {
+  background: var(--accentDeep);
+  border-color: var(--accentDeep);
+}
+/* Bell and profile: square ghost buttons, glyph only. The badge keeps its
+   own font because the button's is zeroed to hide the emoji. */
+.gactions .btn.sm.bell,
+#btnUser {
+  width: 38px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--body);
+  font-size: 0;
+  position: relative;
+}
+.gactions .btn.sm.bell::before,
+#btnUser::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 20px;
+  height: 20px;
+  background: currentColor;
+  -webkit-mask: var(--ic-bell) center / contain no-repeat;
+  mask: var(--ic-bell) center / contain no-repeat;
+}
+.gactions .btn.sm.bell:hover {
+  background: var(--accentPale);
+  color: var(--ink);
+}
+.bell .badge {
+  top: 3px;
+  right: 3px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--danger);
+  color: #fff;
+  font: 700 9.5px / 16px var(--sans);
+  padding: 0 4px;
+  box-shadow: 0 0 0 2px #fff;
+}
+#btnUser {
+  width: 34px;
+  height: 34px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: var(--accentSoft);
+  color: var(--accentDeep);
+}
+#btnUser::before {
+  width: 18px;
+  height: 18px;
+  -webkit-mask-image: var(--ic-user);
+  mask-image: var(--ic-user);
+}
+#btnUser:hover {
+  background: var(--accent);
+  color: #fff;
+}
+.gactions select.period {
+  height: 38px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent var(--ic-chevron) no-repeat right 8px center / 13px;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0 26px 0 10px;
+  font: 600 13px var(--sans);
+  color: var(--body);
+  cursor: pointer;
+}
+.gactions select.period:hover {
+  background-color: var(--accentPale);
+  color: var(--ink);
+}
+.gactions select.period:focus-visible {
+  box-shadow: var(--ring);
+  outline: 0;
+}
+.gactions input.dt {
+  height: 38px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  font: 13px var(--sans);
+}
+/* The language pill: last in the row, small, grey, the current one green. */
+#canei-lang-pill {
+  order: 99;
+  margin-left: var(--s-2);
+  font-size: 10px !important;
+}
+#canei-lang-pill button.on {
+  color: var(--accent) !important;
+}
+.menu {
+  border-radius: var(--r-md);
+  box-shadow: var(--e-3);
+  border-color: var(--line);
+}
+
+/* --------------------------------------------- 42 · one type scale
+   Every size on the page now sits on one ramp of the one face. Page title
+   24/700, its line 13.5, card headings 15/600, table 13.5, figures
+   tabular. On a phone the ramp steps down one size, and the page's
+   description line goes — on a 390px screen it was three lines of grey
+   before the first number. */
+.head h1 {
+  font: 700 24px / 1.15 var(--sans);
+  letter-spacing: -0.022em;
+  color: var(--ink);
+}
+.head .sub {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.card > .ch h3 {
+  font: 600 15px / 1.3 var(--sans);
+  letter-spacing: -0.01em;
+}
+table {
+  font-size: 13.5px;
+}
+thead th {
+  background: #f3f5f0;
+  font: 600 12px / 1.3 var(--sans);
+}
+tbody tr.click:hover {
+  background: var(--accentPale);
+}
+tr.tot td {
+  background: #f3f5f0;
+}
+td.k,
+.k {
+  color: var(--accentDeep);
+}
+.btn {
+  font: 600 13px var(--sans);
+  border-color: var(--line);
+  color: var(--ink);
+  border-radius: var(--r-md);
+}
+.btn:hover:not([disabled]):not(:disabled):not(.primary):not(.danger) {
+  background: var(--accentPale);
+  border-color: var(--accentSoft);
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.secitem .lb {
+  font: 600 10.5px var(--sans);
+  letter-spacing: 0.01em;
+}
+.secitem .dot {
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--navyDeep);
+}
+
+/* ------------------------------------------- 43 · surfaces and tiles
+   White cards on the warm-grey ground, a hairline and a shadow that only
+   reads as depth up close. The four tiles: near-black olive for the margin,
+   the logo green for what is owed to us, the logo's gold deepened for what
+   we owe, white for the bank. The «overdue» dot is the logo's gold. */
+.card {
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  box-shadow: var(--e-2);
+}
+.tcard {
+  border-radius: var(--r-md);
+  box-shadow: var(--e-2);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 60%);
+}
+.tcard[data-go="economics"] {
+  --tile-bg: var(--navy);
+}
+.tcard[data-go="invoicing"] {
+  --tile-bg: var(--accent);
+}
+.tcard[data-go="supplier-invoices"] {
+  --tile-bg: var(--goldDeep);
+}
+.tcard[data-go="banking"] {
+  --tile-bg: #fff;
+  border: 1px solid var(--line);
+}
+.tcard .lb {
+  font: 500 12px var(--sans);
+  letter-spacing: 0;
+}
+.tcard .val {
+  font: 700 28px / 1.1 var(--sans);
+  letter-spacing: -0.025em;
+}
+.tcard .sub {
+  font-size: 12px;
+}
+.tcard .sub span[style*="danger"]::before {
+  background: var(--gold) !important;
+}
+.pill.g {
+  background: var(--accentSoft);
+  color: var(--accentDeep);
+}
+.pill.y {
+  background: var(--goldSoft);
+  color: #8a5a00;
+}
+.pill.b {
+  background: #e4ebf1;
+  color: #34506a;
+}
+.blt .spent {
+  background: var(--accent);
+}
+.blt .togo {
+  background: var(--accentSoft);
+}
+.blt .tick {
+  background: var(--navy);
+}
+.perfkey span:nth-child(1) b {
+  background: var(--accent) !important;
+}
+.perfkey span:nth-child(2) b {
+  background: var(--accentSoft) !important;
+}
+.perfkey span:nth-child(4) b {
+  background: var(--navy) !important;
+}
+.perfhero .pct {
+  color: var(--accent);
+}
+.bar i {
+  background: var(--accent);
+}
+.fab {
+  background: var(--accent);
+  box-shadow: var(--e-3);
+}
+.fab:hover {
+  background: var(--accentDeep);
+}
+a {
+  color: var(--accentDeep);
+}
+.alrow {
+  border-left-color: var(--danger);
+}
+.alrow:hover {
+  background: var(--accentPale);
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+/* --------------------------------------------------- 44 · the phone
+   The review was written on a phone, so this is where it counts. One
+   56px line: logo and name, then the cluster — Create as a round green
+   plus, bell, period, avatar. The search takes the whole second line at
+   38px. The language pill leaves the phone: the sign-in page and the
+   profile menu both still offer the choice, and a preference does not
+   need a permanent seat on a 390px screen. The Torre's action row becomes
+   a two-column grid so no button is cut in half. */
+@media (max-width: 860px) {
+  .topbar {
+    flex-wrap: wrap;
+    min-height: 0;
+    padding: 0 14px;
+    gap: 0 6px;
+  }
+  .brand {
+    order: 1;
+    height: 56px;
+    gap: 9px;
+  }
+  .brand svg {
+    width: 30px;
+    height: 30px;
+  }
+  .brand .nm {
+    font-size: 15px;
+  }
+  .tsp {
+    display: none;
+  }
+  .gactions {
+    order: 2;
+    margin-left: auto;
+    height: 56px;
+    gap: 2px;
+  }
+  #btnCreate {
+    width: 38px;
+    padding: 0;
+    margin-right: 2px;
+    font-size: 0;
+    border-radius: 50%;
+    position: relative;
+  }
+  #btnCreate::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 18px;
+    height: 18px;
+    background: var(--ic-plus) center / contain no-repeat;
+  }
+  .gactions select.period {
+    padding: 0 22px 0 6px;
+    font-size: 12.5px;
+    max-width: 86px;
+    text-overflow: ellipsis;
+  }
+  #btnUser {
+    margin-left: 2px;
+  }
+  .gsearch {
+    order: 3;
+    flex: 1 1 100%;
+    max-width: none;
+    margin: 0 0 10px;
+  }
+  .gsearch input {
+    height: 38px;
+  }
+  #canei-lang-pill {
+    display: none !important;
+  }
+  .head h1 {
+    font-size: 22px;
+  }
+  .head .sub {
+    display: none;
+  }
+  .torrebar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .torrebar .ts {
+    flex: 1 1 100%;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .torrebar > span:not(.ts) {
+    display: none;
+  }
+  .torrebar .btn {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+    height: 40px;
+  }
+  .tcard .val {
+    font-size: 26px;
+  }
+  .p1 {
+    background: var(--navyDeep);
+  }
+  .secitem.on {
+    background: var(--accent);
+  }
+}
+@media (max-width: 420px) {
+  /* 390px: brand and cluster must share one 56px line. Measured: the name at
+     15px plus four controls at their desktop widths overflowed by 8px and
+     wrapped the cluster under the logo. */
+  .topbar {
+    gap: 0 4px;
+    padding: 0 12px;
+  }
+  .brand .nm {
+    font-size: 14.5px;
+  }
+  #btnCreate,
+  .gactions .btn.sm.bell {
+    width: 36px;
+    height: 36px;
+  }
+  .gactions select.period {
+    max-width: 74px;
+    padding: 0 20px 0 4px;
+    background-position: right 5px center;
+  }
+  #btnUser {
+    width: 32px;
+    height: 32px;
+  }
+}
