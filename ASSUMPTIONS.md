@@ -7732,3 +7732,27 @@ one file allowed through, which is the only shape git accepts.
 
 Both of the last two are repairs to `main`'s state made on this branch because
 the branch cannot go green without them; neither touches the redesign.
+
+## S55 · Phase 10 — the section panel is a full-width sheet on a phone (2026-09-03)
+
+Operator, with two screenshots: «the white tile which opens in each tab should
+be across the full screen (left to right) and look way more modern, premium
+and structured and process flow intuitive.»
+
+**It was inset by the width of a rail that is not there.** `left: var(--rail)`
+is correct on a desktop, where the panel slides out beside the 84px rail, and
+it was written without a breakpoint. On a phone the rail leaves the flow to
+become the bottom bar, so those 84 pixels were empty screen the panel was
+politely avoiding — and the page's own phone rule already said `left: 0`, but
+the design layer loads after it. That is the third instance this week of one
+mistake: a desktop truth applied at every width. The other two were the row
+that stopped carding and the table-cell override. All three now sit behind
+breakpoints, and each carries the note next to it.
+
+**A sheet that says it is a sheet.** Rounded top corners, a grab bar, and the
+content given room to be read at arm's length: the journey numbers at 28px,
+the section title at 18, the screens as 54px rows on their connector rail,
+the hand-off centred at the foot. Nothing was added to the panel — the same
+four parts as on the desktop, sized for a thumb.
+
+Desktop untouched: the whole block is inside `@media (max-width: 860px)`.

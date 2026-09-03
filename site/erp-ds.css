@@ -3089,3 +3089,98 @@ td.num.late {
     white-space: normal;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 10 · The section panel on a phone: edge to edge, and a sheet
+   Operator: «the white tile which opens in each tab should be across the
+   full screen (left to right) and look way more modern, premium and
+   structured and process flow intuitive.»
+
+   IT WAS INSET BY THE WIDTH OF A RAIL THAT IS NOT THERE. `left: var(--rail)`
+   is right on a desktop, where the panel slides out beside the 84px rail, and
+   was written without a breakpoint. On a phone the rail leaves the flow to
+   become the bottom bar, so those 84px were empty screen the panel was
+   politely avoiding — the page's own phone rule said `left: 0` and this one
+   outranked it by load order. The same class of mistake as the row that
+   stopped carding: a desktop truth applied at every width.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 860px) {
+  .p2 {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: 74vh;
+    padding: 10px 16px calc(20px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0;
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -26px 64px -30px rgba(23, 32, 21, 0.5);
+  }
+  /* A sheet says it is a sheet: the grab bar is the one piece of chrome that
+     tells a thumb this panel came up from the bottom and goes back down. */
+  .p2::before {
+    content: "";
+    display: block;
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--line);
+    margin: 2px auto 14px;
+  }
+  .p2 .p2h {
+    font: 700 18px var(--sans);
+    letter-spacing: -0.02em;
+    margin: 0 2px 14px;
+  }
+
+  /* The journey, given room: bigger numbers, the line behind them, the three
+     names legible rather than squeezed. */
+  .p2flow {
+    margin: 0 0 16px;
+    padding-bottom: 16px;
+    gap: 4px;
+  }
+  .p2step {
+    gap: 7px;
+    font-size: 11.5px;
+  }
+  .p2step .n {
+    width: 28px;
+    height: 28px;
+    font-size: 12.5px;
+  }
+  .p2flow::before {
+    top: 18px;
+  }
+
+  /* The screens: full-width rows a thumb can hit without aiming, the step
+     number and its rail carried through at the larger size. */
+  .navitem {
+    min-height: 54px;
+    padding: 10px 8px;
+    font-size: 15.5px;
+    gap: 12px;
+  }
+  .navitem .stp {
+    width: 26px;
+    height: 26px;
+    font-size: 11.5px;
+  }
+  #p2list.steps::before {
+    left: 21px;
+    top: 26px;
+    bottom: 28px;
+  }
+  .navitem .ct {
+    font-size: 12px;
+    padding: 3px 8px;
+  }
+  .p2next {
+    margin: 16px 0 0;
+    padding-top: 14px;
+  }
+  .p2nextbtn {
+    min-height: 50px;
+    font-size: 14px;
+    justify-content: center;
+  }
+}
