@@ -3616,3 +3616,60 @@ td.num.late {
     padding-top: 11px;
   }
 }
+
+/* ------------------------------- 61 · the favourite mark joins the band
+   Operator, on the job overview: «here it looks also strange with the star
+   above and not the green header — move the star into the green header on
+   the right side.»
+
+   The favourite toggle is the row's first cell, so on a phone it became a
+   card row of its own: an empty white strip sitting on top of the identity
+   band, which is exactly the shape of the complaint answered one section
+   above. Section 60 lifts the identity cells with `order`, but that works
+   only inside the flex cards, and this overview is a plain table — and even
+   there, `order` can only stack the star ABOVE or BELOW the band, never
+   inside it.
+
+   So the cell leaves the flow instead and is pinned to the band's top right.
+   Its box is given the band's own metrics — 14px of horizontal padding, the
+   same 11px above and below a 20px line — so the mark lands optically
+   centred on the identity without a magic offset to drift out of date. The
+   card already clips to its radius, so the corner stays round.
+
+   CSS only, and only on a phone: the desktop table keeps its narrow leading
+   column, which is the ordinary place for a row control and reads correctly
+   there. Moving the button in the template would have taken a column off a
+   nine-column table to fix a layout on one screen size. */
+@media (max-width: 700px) {
+  table.cards tr:has(> td > button.pin) {
+    position: relative;
+  }
+  /* `:not(.k)` is not decoration: the rule that opens a card's first fact
+     (section 60) is `td:not(.k):first-child`, and the star IS that cell. Its
+     `padding-top` is a longhand from a three-class selector, so a `padding`
+     shorthand here would lose to it and drop the mark 11px. Matching its
+     shape, plus the `:has`, outranks it. */
+  table.cards tr > td:not(.k):has(> button.pin) {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    width: auto;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: none;
+  }
+  table.cards td:has(> button.pin) button.pin {
+    display: block;
+    width: auto;
+    height: auto;
+    padding: 11px 14px;
+    font-size: 16px;
+    line-height: 20px;
+    border-radius: 0;
+  }
+  /* Nothing is left above the band in the flow, and the band already takes
+     its opening padding from `td:not(.k) + td.k` — the star cell still
+     matches that, out of flow or not. */
+}

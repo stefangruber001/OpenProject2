@@ -7866,3 +7866,30 @@ own phone layout was written for. The band's rules also stopped assuming the
 identity is the first cell — they key off the identity cells' relation to each
 other, so the first opens the band, the last closes it, and whether the first
 is an eyebrow or the title depends on whether a second follows it.
+
+**S60 · The favourite mark joins the band.** Operator, on the job overview:
+«here it looks also strange with the star above and not the green header —
+move the star into the green header on the right side.» The favourite toggle
+is the row's first cell, so on a phone it became a card row of its own: an
+empty white strip on top of the identity band. `order` could not fix this one
+— it stacks the star above or below the band, never inside it, and the
+overview is a plain table rather than one of the flex `.mlist` cards anyway.
+So the cell leaves the flow and is pinned to the band's top right, its box
+given the band's own metrics (14px horizontal, 11px above and below a 20px
+line) so the mark lands optically centred without a magic offset to drift out
+of date.
+
+Decided: CSS only, and only under 700px. Moving the button into the identity
+cell in the template would have taken a column off a nine-column desktop table
+to fix a layout on one screen size — the desktop's narrow leading column is
+the ordinary place for a row control and reads correctly there. Verified at
+1440/1024/701: the star is still a static first cell, left of the code, nine
+cells, no horizontal overflow.
+
+Noted while writing it: the reset needed `:not(.k)` in the selector, not for
+meaning but for weight. The rule that opens a card's first fact is
+`td:not(.k):first-child`, the star IS that cell, and its `padding-top`
+longhand from a three-class selector would have beaten a `padding` shorthand
+here and dropped the mark 11px. Specificity is load-bearing in this file in
+both directions now: too much of it lost the quote's chapter tint two
+sections ago, too little would have lost this.
