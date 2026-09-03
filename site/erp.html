@@ -5061,7 +5061,13 @@
         <nav class="p1" id="p1" aria-label="Secciones"></nav>
         <aside class="p2" id="p2" aria-label="Subsecciones">
           <div class="p2h" id="p2h">—</div>
+          <!-- The end-to-end flow, drawn where the operator chooses a screen.
+               Both live OUTSIDE #p2list on purpose: the shell tests count the
+               subsecciones by `#p2list .navitem`, and a chip that is not a
+               subsección must not be counted as one. -->
+          <div class="p2flow" id="p2flow" hidden></div>
           <div id="p2list"></div>
+          <div class="p2next" id="p2next" hidden></div>
         </aside>
       </div>
       <main>
@@ -5715,6 +5721,15 @@
         } catch (e) {}
         return "";
       }
+      /* THE END-TO-END FLOW, NAMED ONCE.
+         The business runs in three movements: what is sold (Comercial)
+         becomes a job (Proyectos) and a job becomes money in and out
+         (Administración). Those three are STEPS — they have an order, and the
+         panel numbers them and offers the next one. Datos maestros and
+         Configuración serve all three and are lists, not steps; numbering them
+         would invent a sequence nobody follows. Derived from this constant
+         alone, so the day a section moves there is one line to change. */
+      const FLOW = ["sales", "projects", "admin"];
       let openSec = null; // section whose panel 2 is out
       function buildSections() {
         const p1 = $("#p1");
@@ -5733,19 +5748,56 @@
           p1.appendChild(b);
         });
       }
+      function visibleSubs(s) {
+        return s.subs.filter((x) => !HIDDEN_SUBS.has(x.k));
+      }
       function buildSubs(secKey) {
         const s = SECTIONS.find((x) => x.k === secKey);
         if (!s) return;
+        const step = FLOW.indexOf(secKey);
         $("#p2h").textContent = s.lab;
+
+        /* WHERE THIS SECTION SITS IN THE WHOLE. Three chips, numbered, the
+           current one filled: the panel answers "where am I in the process"
+           before it answers "which screen". A chip is a real control — it
+           swings the panel to that section without closing it, which is how
+           somebody follows the chain forwards or back. Sections outside the
+           flow show no strip rather than a strip with nothing marked. */
+        const strip = $("#p2flow");
+        strip.hidden = step < 0;
+        strip.innerHTML =
+          step < 0
+            ? ""
+            : FLOW.map((k, i) => {
+                const sec = SECTIONS.find((x) => x.k === k);
+                return `<button class="p2step${k === secKey ? " on" : ""}${i < step ? " done" : ""}" data-flow="${k}"><span class="n">${i + 1}</span><span class="l">${esc(sec.short)}</span></button>`;
+              }).join("");
+        strip.querySelectorAll("[data-flow]").forEach((b) => {
+          b.onclick = () => openSection(b.dataset.flow);
+        });
+
         const list = $("#p2list");
         list.innerHTML = "";
-        s.subs.forEach((x) => {
+        let n = 0;
+        visibleSubs(s).forEach((x) => {
           // The one place menu hiding happens. Route, SUBMAP entry, aliases
           // and the screen itself all stay live; only the row is withheld.
-          if (HIDDEN_SUBS.has(x.k)) return;
           const b = el("button", "navitem" + (x.k === cur ? " on" : ""));
           const c = counts(x.k);
-          b.innerHTML = `<span>${x.lab}</span>${x.href ? '<span class="ext">↗</span>' : c !== "" ? `<span class="ct${x.k === "torre" && c ? " alert" : ""}">${c}</span>` : ""}`;
+          n += 1;
+          /* The step number is the POSITION IN THIS PANEL, not the digits in
+             the specification code: Adicionales carries PRY-03 while sitting
+             fifth under Comercial, and a menu that counts 1,2,3,4,3 teaches
+             nobody anything. The codes still identify the screens; this
+             numbers the path through them. */
+          /* THE LABEL IS THE FIRST SPAN, AND STAYS THE FIRST SPAN.
+             The shell tests read a subsection's name as `b.querySelector("span")`
+             — the first one in the markup — so the step number is written
+             AFTER the label and moved in front of it by the stylesheet
+             (`order:-1`). Putting the number first in the DOM renamed every
+             subsection to a digit as far as three checks were concerned, which
+             is exactly the kind of silent rename a test exists to catch. */
+          b.innerHTML = `<span class="nvl">${x.lab}</span>${step >= 0 ? `<span class="stp">${n}</span>` : ""}${x.href ? '<span class="ext">↗</span>' : c !== "" ? `<span class="ct${x.k === "torre" && c ? " alert" : ""}">${c}</span>` : ""}`;
           b.dataset.k = x.k;
           b.onclick = () => {
             closeSection();
@@ -5753,12 +5805,24 @@
           };
           list.appendChild(b);
         });
-      }
-      function toggleSection(secKey) {
-        if (openSec === secKey) {
-          closeSection();
-          return;
+        list.classList.toggle("steps", step >= 0);
+
+        /* The hand-off. At the foot of Comercial: "→ Proyectos". It is the
+           one thing a menu of screens cannot say on its own — that when this
+           section is done, the work continues in that one. No new wording:
+           the next section's own name, which is already translated. */
+        const nextK = step >= 0 && step < FLOW.length - 1 ? FLOW[step + 1] : null;
+        const foot = $("#p2next");
+        foot.hidden = !nextK;
+        foot.innerHTML = "";
+        if (nextK) {
+          const sec = SECTIONS.find((x) => x.k === nextK);
+          const b = el("button", "p2nextbtn", `<span class="ar">→</span><span>${esc(sec.lab)}</span>`);
+          b.onclick = () => openSection(nextK);
+          foot.appendChild(b);
         }
+      }
+      function openSection(secKey) {
         openSec = secKey;
         buildSubs(secKey);
         $("#p2").classList.add("on");
@@ -5766,6 +5830,29 @@
         document
           .querySelectorAll(".secitem")
           .forEach((b) => b.classList.toggle("on", b.dataset.sec === secKey));
+      }
+      function toggleSection(secKey) {
+        if (openSec === secKey) {
+          closeSection();
+          return;
+        }
+        /* A SECTION WITH ONE SCREEN OPENS THE SCREEN.
+           The Torre has a single page, so its panel was a menu of one: a tap
+           that asked the operator to confirm where they had already said they
+           wanted to go. It now goes there. (Operator, on the preview: "only
+           control tower one page so no need for klappmenu for control
+           tower.") Written against the count, not against the word "tower",
+           so the day the Torre gains a second screen the menu comes back by
+           itself — and any other section that loses one stops showing a menu
+           of one. */
+        const s = SECTIONS.find((x) => x.k === secKey);
+        const only = s && visibleSubs(s).length === 1 ? visibleSubs(s)[0] : null;
+        if (only) {
+          closeSection();
+          go(only.k);
+          return;
+        }
+        openSection(secKey);
       }
       function closeSection() {
         openSec = null;
@@ -11664,8 +11751,14 @@
    }).join("")}
    </div>
    ${torrePerformance()}
-   <div class="grid2">
-    <div class="card"><div class="ch"><h3>Proyectos</h3><span class="tag">avance · venta · coste · margen · desviación</span></div>
+   <!-- TWO FULL-WIDTH PANELS, NOT TWO HALVES.
+        Nine columns of job economics and five of alerts were sharing a
+        1440px row, so both were cramped: the project code wrapped over three
+        lines and the margin column fell off the edge. Stacked, each gets the
+        whole width and neither wraps — the operator scrolls a little instead
+        of reading a table through a letterbox. -->
+   <div class="towerpanes">
+    <div class="card"><div class="ch"><h3>Proyectos</h3><span class="tag">${erp.state.projects.filter((p) => !p.closed).length}</span></div>
       <div class="scroll"><table><thead><tr><th></th><th>Proyecto</th><th>Cliente</th><th>Avance</th>
        <th class="num">Venta</th><th class="num">Coste real</th><th class="num">Margen acum.</th><th class="num">Desviación</th><th>Próx. fecha</th></tr></thead><tbody>
       ${
@@ -11684,12 +11777,19 @@
               )
               .filter(Boolean)
               .sort()[0];
-            return `<tr><td><button class="btn sm" data-pin="${p.id}" title="Marcar prioritario">${p.priority ? "★" : "☆"}</button></td>
+            /* The three numbers that decide whether a job is in trouble are
+               drawn, not just printed: progress as a filled meter with its own
+               figure, margin as a tinted pill that is green or red, deviation
+               with the arrow that says which way it went. Same columns and the
+               same values as before — this is how they LOOK, not what they
+               say. */
+            const neg = e.marginForecastCents < 0;
+            return `<tr data-proj="${p.code}"><td><button class="pin${p.priority ? " on" : ""}" data-pin="${p.id}" title="Marcar prioritario">${p.priority ? "★" : "☆"}</button></td>
          <td class="k click" data-go="progress" data-arg="${p.code}">${p.code}</td><td>${esc(erp.party(p.partyId).name)}</td>
-         <td><div class="bar"><i style="width:${e.progressPct}%"></i></div> ${e.progressPct}%</td>
+         <td class="pcell"><div class="meter"><i style="width:${e.progressPct}%"></i></div><b>${e.progressPct}%</b></td>
          <td class="num">${eur0(e.currentRevenueCents)}</td><td class="num">${eur0(e.actualCents)}</td>
-         <td class="num" style="color:${e.marginForecastCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(e.marginForecastCents)} · ${e.marginForecastPct}%</td>
-         <td class="num" style="color:${dev > 0 ? "var(--danger)" : "var(--muted)"}">${eur0(dev)}</td>
+         <td class="num"><span class="mgn${neg ? " neg" : ""}">${eur0(e.marginForecastCents)} · ${e.marginForecastPct}%</span></td>
+         <td class="num${dev > 0 ? " late" : ""}">${dev > 0 ? "▲" : "▼"} ${eur0(Math.abs(dev))}</td>
          <td>${nextDate ? fmtD(nextDate) : "—"}</td></tr>`;
           })
           .join("") ||
@@ -11700,6 +11800,17 @@
    </div>`;
         v.querySelectorAll("[data-go]").forEach(
           (n) => (n.onclick = () => go(n.dataset.go, n.dataset.arg)),
+        );
+        /* The criticality filter. It re-renders the Torre rather than hiding
+           rows in place, so the five rows shown are the five most serious of
+           the SELECTED severity — hiding would have left "the top five, some
+           of them invisible", which is a different and useless list. */
+        v.querySelectorAll("[data-sevf]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              towerSev = b.dataset.sevf;
+              go("tower");
+            }),
         );
         // A bullet row opens the job it describes. The chart says which job is
         // losing money; the next question is always "why", and that is one
@@ -11737,24 +11848,66 @@
    rather than by age, each opening the record that caused it — and everything
    one actually DOES about an alert (assign, postpone, resolve, turn into a
    task, change the rule) happens in Configuración › Alertas. */
+      /* The five families an alert can belong to, as the engine types them.
+         The word is the CATEGORY the operator asked to see on every row —
+         read from ALERT_META through the alert itself, never guessed from the
+         message. An unknown type falls through to its own raw word rather
+         than to a wrong one. */
+      const ALERT_CATS = {
+        economica: "Económica",
+        tecnica: "Técnica",
+        documental: "Documental",
+        fiscal: "Fiscal",
+        permit: "Permisos",
+      };
+      /* Which criticality the Torre is showing. Module-level because the
+         panel re-renders through the ordinary view render, so the chip has to
+         survive it — the same way the labour screen keeps its day and tab. */
+      let towerSev = "all";
       function torreAlerts(alerts) {
         const rank = { critical: 0, high: 1, medium: 2, low: 3 };
-        const top = [...alerts].sort((a, b) => (rank[a.sev] ?? 9) - (rank[b.sev] ?? 9)).slice(0, 5);
+        const n = (sev) => alerts.filter((a) => a.sev === sev).length;
+        /* DAYS, FROM A REAL DATE — never parsed out of the message.
+           An overdue receivable already knows how late it is, so the number
+           comes from the ledger that computed it; anything else uses the due
+           date somebody set on the Alertas screen. No date, no number: a dash
+           says "nobody has put a deadline on this" instead of inventing one. */
+        const overdue = {};
+        try {
+          erp.receivables().forEach((r) => {
+            if (r.outstandingCents > 0 && r.daysOverdue > 0) overdue[r.number] = r.daysOverdue;
+          });
+        } catch (e) {}
+        const plazo = (a) => {
+          const od = a.ref && a.ref.invoice ? overdue[a.ref.invoice] : null;
+          if (od) return { d: `−${od} d`, late: true };
+          if (!a.dueDate) return { d: "—", late: false };
+          const delta = Math.round((Date.parse(a.dueDate) - Date.parse(erp.today)) / 86400000);
+          return { d: `${delta < 0 ? "−" : ""}${Math.abs(delta)} d`, late: delta < 0 };
+        };
+        const shown = alerts.filter((a) => towerSev === "all" || a.sev === towerSev);
+        const top = [...shown].sort((a, b) => (rank[a.sev] ?? 9) - (rank[b.sev] ?? 9)).slice(0, 5);
+        const chip = (k, lab, ct) =>
+          `<button class="sevchip${towerSev === k ? " on" : ""}" data-sevf="${k}" data-sevk="${k}">${lab}<span class="c">${ct}</span></button>`;
         return `<div class="card" style="margin:0"><div class="ch"><h3>Necesita atención</h3>
-    <span class="tag">${alerts.filter((a) => a.sev === "critical").length} críticas · ${alerts.filter((a) => a.sev === "high").length} altas</span>
     <span style="flex:1"></span>
     ${alerts.length > 5 ? `<button class="btn sm" id="tAllAlerts">Ver las ${alerts.length}</button>` : ""}</div>
-   <div class="almgr">${
+   <div class="sevbar">${chip("all", "Todas", alerts.length)}${chip("critical", "Críticas", n("critical"))}${chip("high", "Altas", n("high"))}${chip("medium", "Medias", n("medium"))}</div>
+   <div class="almgr scroll"><table class="altable"><thead><tr><th></th><th>Asunto</th><th>Categoría</th><th>Responsable</th><th class="num">Días</th></tr></thead><tbody>${
      top
-       .map(
-         (a) => `<div class="alrow" data-sev="${a.sev}">
-     <div>${a.sev === "critical" ? "🔴" : a.sev === "high" ? "🟡" : "🔵"}</div>
-     <div><b class="click" data-goref='${esc(JSON.stringify(a.ref))}'>${esc(a.msg)}</b>
-      <div class="meta">${a.assignee ? `<span>👤 ${esc(a.assignee)}</span>` : ""}${a.dueDate ? `<span>📅 ${fmtD(a.dueDate)}</span>` : ""}</div></div>
-    </div>`,
-       )
-       .join("") || '<div class="empty">Sin alertas. Todo en orden.</div>'
-   }</div></div>`;
+       .map((a) => {
+         const pl = plazo(a);
+         return `<tr class="alrow" data-sev="${a.sev}">
+     <td class="alsev"><span class="sevmark"></span></td>
+     <td><b class="click" data-goref='${esc(JSON.stringify(a.ref))}'>${esc(a.msg)}</b></td>
+     <td><span class="cat">${esc(ALERT_CATS[a.type] || a.type || "—")}</span></td>
+     <td>${a.assignee ? esc(a.assignee) : "—"}</td>
+     <td class="num${pl.late ? " late" : ""}">${pl.d}</td>
+    </tr>`;
+       })
+       .join("") ||
+     '<tr><td colspan="5"><div class="empty">Sin alertas. Todo en orden.</div></td></tr>'
+   }</tbody></table></div></div>`;
       }
       /** §2.1 "exportar la vista a PDF/Excel" — a real CSV download; print (Ctrl+P) covers PDF honestly via the browser's own dialog. */
       /* ===================== table export: CSV and real .xlsx =====================

@@ -7624,3 +7624,75 @@ for everything. Section 48 of `site/erp-ds.css`.
 The first build tiled the calendar glyph across the control: a shorthand
 with the colour in the wrong layer was invalid and left `background-repeat`
 at its default. Caught by the header screenshot before the suite ran.
+
+## S53 · Phase 9 — the flyout menus, the attention panel, the project overview (2026-09-03)
+
+Nine comments the operator left on the preview build, and the one repeated in
+chat: «all the white Klappmenü … research best practices and apply to make it
+more structured and intuitive, also across the different Klappmenü to indicate
+the end-to-end flow of the sections.»
+
+**The panel says where you are before it says what you can open.** Every
+published navigation pattern agrees on the same anatomy — name the place,
+group what is inside, mark the current item by more than colour, keep 44px
+targets. What none of them supply is the operator's actual ask: that the
+menus, plural, should show one process. So the three sections that carry the
+work — Comercial, Proyectos, Administración — are numbered 1·2·3 in a strip
+that appears in all three panels, connected by a line, the current one filled
+and the ones behind it green. A chip swings the panel to that section without
+closing it, and the foot of each panel offers the next one by name. Inside a
+flow section the screens are numbered steps down a rail; Datos maestros and
+Configuración get no numbers, because they serve all three and inventing a
+sequence for them would teach something untrue.
+
+**No new prose was invented for any of it.** The strip and the foot use the
+sections' own names, which are already translated; the steps are digits. The
+one place new words were unavoidable is the attention table, and those are
+four short pairs added to both dictionaries (Críticas · Altas · Medias ·
+Permisos).
+
+**The step number is the position in the panel, not the code.** Adicionales
+carries PRY-03 while sitting fifth under Comercial. A menu that counts
+1,2,3,4,3 teaches nobody anything; the codes still identify the screens.
+
+**A section with one screen opens the screen.** The Torre's panel was a menu
+of one — a tap asking the operator to confirm where they had already said they
+wanted to go. Written against the count of visible children, not against the
+word «tower», so the menu returns by itself the day the Torre gains a second
+screen.
+
+**Needs attention is a table, and the counts became the filter.** «39
+críticas · 16 altas» was a sentence that could not be acted on; it is now four
+chips that narrow the list. Five columns: a graded mark, the subject, the
+category, who is responsible, and the days. The four severities differ in
+fill, colour AND glyph — solid red exclamation, amber flag, slate «i», hollow
+grey dot — so the order survives greyscale and a colour-blind reader.
+
+**Where the numbers come from, and where they do not.** The days column reads
+the receivables ledger, which already knows how late an invoice is; anything
+else uses the due date somebody set on the Alertas screen. No date, no
+number — a dash says «nobody has put a deadline on this» rather than inventing
+one. Which is why most rows show a dash for «Responsable» today: assignee and
+deadline are management fields, and until they are filled in on the Alertas
+screen the honest answer is that nobody owns the alert. The category is read
+from ALERT_META through the alert itself, never guessed from the message.
+
+**The job code column was mine, and it went.** Six columns did not fit the
+half-width card; the subject already names the record. Removing it was
+cheaper than scrolling.
+
+**Both Torre panels are full width now.** Nine columns of job economics and
+five of alerts were sharing one row: the project code wrapped over three
+lines and the margin column fell off the edge. Stacked, neither wraps.
+
+**Two bugs the screenshots caught before the suite ran**, neither of which any
+check asserts: the subsection list laid its items out in a row (the panel is a
+flex container in the page's own sheet), and `.alrow` — a grid, written when
+the attention list was a stack of divs — turned the new `<tr>` into a grid and
+overlapped every cell. Both fixed by scoping, so the Alertas screen keeps the
+div form it still needs.
+
+**Also from the comments:** the avatar is square, on the icon buttons' own
+geometry; the scrim behind the panel is a gradient that lets the page recede
+instead of a flat wash; and the Proyectos card head no longer repeats the
+column names printed directly beneath it.

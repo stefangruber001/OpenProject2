@@ -1315,6 +1315,10 @@ window.CANEI_DICT.ca = {
   "Extras y modificaciones de todas las obras. El trabajo no aprobado nunca es facturable — la barra ámbar lo dice desde lejos.":
     "Extres i modificacions de totes les obres. El treball no aprovat mai és facturable — la barra ambre ho diu des de lluny.",
   Todas: "Totes",
+  Críticas: "Crítiques",
+  Altas: "Altes",
+  Medias: "Mitjanes",
+  Permisos: "Permisos",
   Detectada: "Detectada",
   Valorada: "Valorada",
   Ejecutada: "Executada",
