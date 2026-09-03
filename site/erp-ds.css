@@ -3191,3 +3191,135 @@ td.num.late {
    paddings tightened throughout: the Comercial panel — the tallest, at five
    screens — went from about 62% of a 390×844 phone to roughly half, so the
    screen behind it is still legible as the place you came from. */
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 11 · The phone sheet, half the height
+   Operator: «the white tiles from the tabs are way too high, so you have the
+   feeling you are not seeing the screen anymore. Make it way less high, maybe
+   some sub tile names should be next to each other rather than all below each
+   other. Still apply the intuitive end-to-end flow.»
+
+   Two changes, both about spending vertical space only where it buys
+   something. The journey stops being three stacked circle-and-label columns
+   and becomes one line of pills. The screens stop being one tall column and
+   become two, which halves the rows without dropping a single item.
+
+   THE FLOW SURVIVES BOTH. A grid read left to right, top to bottom is still
+   an order — the numbers run 1→5 in exactly the order a person reads them,
+   and the section pills above still say which of the three movements this is.
+   What goes is the connector rail: a line down a single column meant «then»,
+   and the same line drawn down two columns would mean nothing.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 860px) {
+  /* ---- the journey, on one line ---- */
+  .p2flow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 10px;
+    padding-bottom: 10px;
+  }
+  .p2flow::before {
+    display: none; /* an inline row of pills carries its own order */
+  }
+  .p2step {
+    flex: 0 1 auto;
+    flex-direction: row;
+    gap: 6px;
+    padding: 5px 10px 5px 6px;
+    border-radius: var(--r-md);
+    background: var(--bg);
+    min-width: 0;
+  }
+  .p2step .n {
+    width: 19px;
+    height: 19px;
+    font-size: 10px;
+    border: 0;
+  }
+  .p2step .l {
+    font-size: 11.5px;
+  }
+  .p2step.on {
+    background: var(--accent);
+  }
+  .p2step.on .n {
+    background: rgba(255, 255, 255, 0.26);
+    color: #fff;
+  }
+  .p2step.on .l {
+    color: #fff;
+  }
+  .p2step.done {
+    background: var(--accentSoft);
+  }
+  .p2step.done .n {
+    background: transparent;
+    color: var(--accentDeep);
+  }
+  .p2step.done .l {
+    color: var(--accentDeep);
+  }
+
+  /* ---- the screens, two at a time ---- */
+  #p2list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    align-items: stretch;
+  }
+  #p2list.steps::before {
+    display: none; /* see the note above: no rail across two columns */
+  }
+  .navitem {
+    min-height: 50px;
+    padding: 8px 10px;
+    gap: 9px;
+    font-size: 13.5px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    align-items: center;
+  }
+  .navitem .nvl {
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.22;
+  }
+  .navitem .stp {
+    width: 21px;
+    height: 21px;
+    font-size: 10.5px;
+  }
+  .navitem.on {
+    border-color: var(--accentSoft);
+    background: var(--accentPale);
+  }
+  .navitem .ct {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  /* ---- and the rest, tighter ---- */
+  .p2 {
+    max-height: 56vh;
+    padding: 8px 14px calc(12px + env(safe-area-inset-bottom));
+  }
+  .p2::before {
+    margin: 1px auto 8px;
+  }
+  .p2 .p2h {
+    font-size: 15.5px;
+    margin: 0 2px 9px;
+  }
+  .p2next {
+    margin: 10px 0 0;
+    padding-top: 9px;
+  }
+  .p2nextbtn {
+    min-height: 42px;
+    font-size: 13px;
+  }
+}

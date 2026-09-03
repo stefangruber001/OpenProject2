@@ -7756,3 +7756,24 @@ the hand-off centred at the foot. Nothing was added to the panel — the same
 four parts as on the desktop, sized for a thumb.
 
 Desktop untouched: the whole block is inside `@media (max-width: 860px)`.
+
+## S56 · Phase 11 — the phone sheet at half the height (2026-09-03)
+
+Operator: «the white tiles from the tabs are way too high, so you have the
+feeling you are not seeing the screen anymore. Make it way less high, maybe
+some sub tile names should be next to each other rather than all below each
+other. Still apply the intuitive end-to-end flow.»
+
+Two changes, both spending vertical space only where it buys something. The
+journey stops being three stacked circle-and-label columns and becomes one
+line of pills, 40px instead of ~90. The screens stop being one tall column and
+become two, which halves the rows without dropping an item. Comercial — the
+tallest panel at five screens — went 62% → 54% → **41%** of a 390×844 phone;
+Administración, at six, sits at 35%. Neither scrolls.
+
+**The flow survives the grid.** Read left to right, top to bottom is still an
+order: the numbers run 1→5 in exactly the order a person reads them, and the
+section pills above still say which of the three movements this is. What went
+is the connector rail — a line down a single column meant «then», and the same
+line drawn down two columns would have meant nothing. Removing it was the
+honest move; keeping it would have drawn a sequence the layout no longer has.
