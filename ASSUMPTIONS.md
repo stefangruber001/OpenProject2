@@ -8115,7 +8115,47 @@ Verified at 390 in English and Spanish and at 1440: no label crosses its box
 in any of them, with 16px of vertical clearance and 120–250px of horizontal
 room to spare; desktop unchanged at 48px and three across.
 
-## S60 · PK12-S11 — Adicionales stays a view, not a second model (2026-09-03)
+**S67 · Three corrections from the phone.** Operator: «reduce hight slightly of
+all 4 big boxes, so that cash is also visible»; «remove in all menu the numbers
+in front of the sub page names and make size of the menu similar to that actual
+setting menu»; «in control tower the section projects looks a bit merged,
+remove the big white box with heading projects».
+
+**The four figures.** Measured against the viewport the shell actually gives
+the page — 740px on a 390x844 phone, once its tab bar is taken as a bottom
+inset — Cash ended at **741px: cut by one pixel**, which is why it read as an
+accident rather than a layout. 16px off each tile (min-height 108 → 92, value
+30px → 26px) puts it at 690 with 50px to spare. Only the box shrank.
+
+**The numbers.** Gone from every panel; each now reads like the Configuración
+one, a name and a count where there is something to count. The sequence is
+still carried by the order of the tiles — down the first column, on to the
+second — and by the numbered strip above, which says which of the three stages
+you are in. That is where the process needed marking; a digit on every row said
+it a second time and made the widest element in each tile a badge rather than a
+word. Verified: 0 step numbers, every tile 50px, and the label is still the
+first span, which is what three shell checks read a subsection's name from.
+
+Kept: the count pill. It answers «how many are waiting», a different question
+from «which step is this», and it exists precisely so the two cannot be
+confused. Kept too: the 1·2·3 on the section strip — those number sections, not
+sub-pages, which is what the operator asked about.
+
+**The jobs on the Torre.** The cards had a white panel behind them and their
+own tinted heads on top of it — two frames for one list. Registers solved this
+in S59; the Torre was excluded then because its panels carry a heading AND a
+filter. That reasoning still holds for the alerts panel, which has the
+criticality chips, and no longer holds for this one, which has only a title. So
+the projects panel steps back and its cards sit on the page ground; the alerts
+panel keeps its surface, and the two now differ for a stated reason rather than
+by oversight.
+
+Noted while there: the wizard rule from S66 was written against `.steps`, and
+`#p2list` carries that class too. It was inert only because `#p2list` is a
+grid — a rule that misses by luck lands the day the grid becomes a flex column.
+Scoped to `.steps:not(#p2list)`.
+
+## S68 · PK12-S11 — Adicionales stays a view, not a second model (2026-09-03)
 
 The operator asked whether the Adicionales section could be removed entirely
 and extras handled through Presupuestos and Contratos alone. Measured first,

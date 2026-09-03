@@ -5821,19 +5821,19 @@
           const b = el("button", "navitem" + (x.k === cur ? " on" : ""));
           const c = counts(x.k);
           n += 1;
-          /* The step number is the POSITION IN THIS PANEL, not the digits in
-             the specification code: Adicionales carries PRY-03 while sitting
-             fifth under Comercial, and a menu that counts 1,2,3,4,3 teaches
-             nobody anything. The codes still identify the screens; this
-             numbers the path through them. */
-          /* THE LABEL IS THE FIRST SPAN, AND STAYS THE FIRST SPAN.
-             The shell tests read a subsection's name as `b.querySelector("span")`
-             — the first one in the markup — so the step number is written
-             AFTER the label and moved in front of it by the stylesheet
-             (`order:-1`). Putting the number first in the DOM renamed every
-             subsection to a digit as far as three checks were concerned, which
-             is exactly the kind of silent rename a test exists to catch. */
-          b.innerHTML = `<span class="nvl">${x.lab}</span>${step >= 0 ? `<span class="stp">${n}</span>` : ""}${x.href ? '<span class="ext">↗</span>' : c !== "" ? `<span class="ct${x.k === "torre" && c ? " alert" : ""}">${c}</span>` : ""}`;
+          /* No number in front of the name (operator). Every panel now reads
+             like the Configuración one: a name, and a count where there is
+             something to count. The order of the tiles still carries the
+             sequence — the eye reads down the first column and on to the
+             second — and the numbered strip above still says which of the
+             three stages you are in, which is where the process actually
+             needed marking. Digits on every row said it a second time and
+             made the widest tile in each panel a badge rather than a word.
+
+             The count pill stays: it answers «how many are waiting», which is
+             a different question from «which step is this», and it was added
+             precisely so the two could not be confused. */
+          b.innerHTML = `<span class="nvl">${x.lab}</span>${x.href ? '<span class="ext">↗</span>' : c !== "" ? `<span class="ct${x.k === "torre" && c ? " alert" : ""}">${c}</span>` : ""}`;
           b.dataset.k = x.k;
           b.onclick = () => {
             closeSection();
@@ -11866,7 +11866,7 @@
         whole width and neither wraps — the operator scrolls a little instead
         of reading a table through a letterbox. -->
    <div class="towerpanes">
-    <div class="card"><div class="ch"><h3>Proyectos</h3><span class="tag">${erp.state.projects.filter((p) => !p.closed).length}</span></div>
+    <div class="card tproj"><div class="ch"><h3>Proyectos</h3><span class="tag">${erp.state.projects.filter((p) => !p.closed).length}</span></div>
       <div class="scroll"><table><thead><tr><th></th><th>Proyecto</th><th>Cliente</th><th>Avance</th>
        <th class="num">Venta</th><th class="num">Coste real</th><th class="num">Margen acum.</th><th class="num">Desviación</th><th>Próx. fecha</th></tr></thead><tbody>
       ${
