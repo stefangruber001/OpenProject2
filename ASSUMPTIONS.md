@@ -7962,3 +7962,30 @@ Also noted, the second time this has cost a gate: the source audit reads
 SINGLE-quoted spans inside comments. A heading written with two possessives
 turned the words between them into a user-visible literal and pushed the
 count 205 → 206. The comment now carries no apostrophes, and says why.
+
+**S63 · The workspace revalidates instead of being cached blind.** Chasing why
+the app still looked old, the phone showed something that should not be
+possible: the NEW `erp-ds.css` (square cards) against the OLD `erp.html` (the
+breadcrumb still a pill, though the source measures 0px). One file fresh, one
+file stale — which is exactly what an HTTP cache with no revalidation hint
+produces.
+
+`public/workspace/` is a build-time copy of `site/`, and Next serves files from
+`public/` without telling anyone when to check again. The phone shells keep a
+web view alive per tab for the life of the process, so nothing a person does
+refetches the page. The failure is silent and MIXED: half a redesign appears,
+and — worse — the page's SCRIPTS are the old ones too, so a native shell
+calling into a function the cached page does not define gets nothing at all,
+with no error to notice. S62's fix could have shipped and looked broken.
+
+Decided: `Cache-Control: no-cache, must-revalidate` on `/workspace/:path*` in
+`apps/web/next.config.js`. `no-cache` does not mean "do not store" — it means
+store it, but ask first. Verified against the real standalone build with
+`public/` copied in as the Dockerfile does it: the header is served on
+`erp.html`, `erp-ds.css` and `nav.json`, ETags are issued, and a conditional
+request answers **304 with a zero-byte body** where the full page is 1,155,814
+bytes. So correctness costs a round trip, not the file.
+
+Host-layer change, deliberately: `apps/web` is a host, caching is
+infrastructure, and this is precisely the sort of concern that belongs there
+rather than in a capability or a pack.
