@@ -1419,3 +1419,158 @@ a {
     opacity: 0.7;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PHASE 4 · What the published design systems agree on
+   Read from the source repositories on GitHub (the doc sites are outside
+   this session's egress): Carbon's data-table style and status-indicator
+   pattern, Polaris' colour roles and badge content rules, GOV.UK's table
+   component, Lightning's data-table docs, Ant Design Pro's layout
+   conventions. Only the practices a stylesheet can honour are here; the
+   ones that need markup or logic (sortable headers, batch-action bars,
+   skeleton loading, table captions) are listed in the pull request as
+   later work, because this branch changes no behaviour.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ------------------------------------------------- 34 · column headers
+   Carbon: column header 600 weight at body size, sentence case, on a light
+   «layer-accent» band; GOV.UK and Carbon both: no letter-spaced capitals
+   over data. The suite reads header text through textContent or a
+   case-insensitive pattern, so the case change is invisible to it. */
+thead th {
+  text-transform: none;
+  font: 600 12px / 1.3 var(--sans);
+  letter-spacing: 0;
+  color: var(--ink);
+  background: #f1f5f9;
+  padding: 10px var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+
+/* ------------------------------------------------------- 35 · rows
+   Carbon's medium row is 40px: 10px of padding round 13px type lands
+   there. Column padding 16px (Carbon spacing-05). Row text sits one level
+   down the hierarchy and comes up to primary on hover, which is also
+   neutral — Polaris keeps the accent for the thing you press, not the row
+   you are over. Numbers are tabular everywhere so columns of figures line
+   up even in cells nobody marked `.num` (GOV.UK: right-align what is
+   compared). */
+tbody td {
+  padding: 10px var(--s-4);
+  color: var(--body);
+  font-variant-numeric: tabular-nums;
+}
+tbody tr.click:hover {
+  background: #f8fafc;
+}
+tbody tr.click:hover td {
+  color: var(--ink);
+}
+tr.tot td {
+  background: #f8fafc;
+  color: var(--ink);
+  border-top: 2px solid var(--line);
+}
+td.amt,
+td.tot,
+th.amt {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------- 36 · status: colour + shape
+   Carbon's status-indicator pattern: a status must carry at least two of
+   colour, shape and symbol, because colour alone fails a tenth of the
+   people reading it. Every pill therefore gets a dot of its own colour in
+   front of the word — a pseudo-element, so textContent and the checks that
+   read it are untouched. Polaris' badge is a soft fill with a paired
+   on-fill text colour; the solid chips of phase 3 shouted from every row,
+   and the references use the soft form in tables. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--r-sm);
+  font: 600 11px / 1.6 var(--sans);
+  padding: 2px 8px 2px 7px;
+  letter-spacing: 0.01em;
+  background: #f1f5f9;
+  color: var(--body);
+}
+.pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+.pill.g {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+.pill.y {
+  background: #fef3c7;
+  color: #b45309;
+}
+.pill.r {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.pill.b {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* -------------------------------------------------- 37 · empty states
+   Carbon's empty-state anatomy is glyph, title, body, action. The markup
+   here is one sentence, so the sheet supplies the glyph and a bounded
+   region — a dashed field says «nothing here yet» where an unbounded grey
+   sentence read like a caption. */
+:root {
+  --ic-empty: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M4 5h16v14H4z'/><path d='M4 13h4.5l1.5 2.5h4l1.5-2.5H20'/></svg>");
+}
+.empty {
+  padding: 26px 20px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-sm);
+  background: #fafbfc;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.empty::before {
+  content: "";
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin: 0 auto 8px;
+  background: currentColor;
+  opacity: 0.45;
+  -webkit-mask: var(--ic-empty) center / contain no-repeat;
+  mask: var(--ic-empty) center / contain no-repeat;
+}
+.card > .empty {
+  margin: var(--s-4);
+}
+td > .empty {
+  margin: var(--s-2) 0;
+}
+
+/* --------------------------------------------- 38 · cards and sections
+   Polaris: hierarchy by weight and contrast, «avoid divider lines outside
+   data tables». The card heading loses its rule; the table's own header
+   band, or the whitespace, does the separating. Ant Design Pro: the page
+   title carries the primary action at the right, the description below. */
+.card > .ch {
+  border-bottom: 0;
+  padding-bottom: var(--s-2);
+}
+.card > .ch + .scroll thead th,
+.card > .ch + table thead th {
+  border-top: 1px solid var(--line);
+}
+.head h1 {
+  letter-spacing: -0.02em;
+}

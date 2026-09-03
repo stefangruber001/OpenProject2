@@ -6902,3 +6902,41 @@ apart; legend swatches were inline colours and are overridden per position.
 
 Full browser suite 648/648 (`scratchpad/p3b-e2e.txt`); overflow 0px at
 1440/1024/390; no console errors in the preview build.
+
+## S48 · Redesign phase 4 — what the published design systems agree on (2026-09-03)
+
+The operator asked for best practice «in GitHub or similar code space».
+The documentation sites of every major system are outside this session's
+egress, so the guidance was read from the systems' source repositories on
+GitHub: Carbon (data-table style and usage, status-indicator and tag
+patterns), Polaris (colour roles, badge content rules, resource-index
+layout), GOV.UK (table component), Salesforce Lightning (data-table docs)
+and Ant Design / Ant Design Pro (table and layout conventions). Sections
+34–38 of `site/erp-ds.css`; still CSS only.
+
+**Applied.** Sentence-case column headers at body size on a light band
+(Carbon, GOV.UK); 40px rows with 16px column padding and tabular figures
+in every cell (Carbon, GOV.UK); neutral row hover (Polaris keeps the accent
+for what you press); status pills as soft fill plus paired text colour
+(Polaris) with a dot in front of the word so a status carries colour AND
+shape (Carbon's status-indicator rule — a pseudo-element, so the text the
+suite reads is unchanged); empty states as a bounded dashed field with a
+glyph (Carbon's anatomy, minus the action the markup does not have); card
+headings without a divider, hierarchy by weight (Polaris).
+
+**Not applied, and why.** Sortable and filterable headers, batch-action
+bars, skeleton loading, table captions and `scope` attributes all need
+markup or logic; this branch changes neither. They are listed in the pull
+request as candidates for a later, tested phase.
+
+**The uppercase question, settled.** Header case is the one change that
+could have touched the suite. The six checks that read headers use
+`textContent` or a case-insensitive pattern, so none see the transform;
+verified before the run, confirmed by it. Full suite 648/648
+(`scratchpad/p4-e2e.txt`); overflow 0px at 1440/1024/390; no console
+errors on the dashboard, the quotes register and the leads register.
+
+**A canvas beside the preview.** The same redesign was also drawn as an
+editable design canvas (dashboard, quotes register, phone) from the exact
+values of the stylesheet, so the operator can move and retype things
+without waiting for a build. It is a mockup: nothing on it is wired.
