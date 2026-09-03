@@ -7793,3 +7793,32 @@ to offer.
 Hidden, not deleted — the rule the floating «+» follows. `buildSubs` still
 writes the footer and still computes the next section from FLOW, so restoring
 it is one rule and not a list somebody has to remember to update.
+
+## S58 · Phase 12 — the register cards (2026-09-03)
+
+Operator: «everywhere we have those tiles with the projects, customers,
+suppliers … update all of them to look more premium and more state of the
+art. Keep the haptic that they get a slight different colour when you use
+them, in that existing way.»
+
+**The tint is the tap state, not a stripe.** There is no alternating-row rule
+anywhere in this repo — what the screenshots show is `tr.click:hover`, which a
+touch browser leaves on the last card the thumb touched. That is why the
+tinted card is second in one list and first in the next. Worth writing down,
+because reproducing it as a zebra would have looked identical in a screenshot
+and been wrong in the hand. It is kept exactly as it was, and given an
+`:active` state of its own so the feedback answers the tap as well as
+outlasting it.
+
+**One block for every register.** Each of them is the same carded table on a
+phone, so the styling is generic rather than a rule per screen: a white
+surface with a hairline and a soft shadow, the leading `.k` cells as the
+card's identity — the code as a small spaced eyebrow in the accent, the name
+as the line you read — a rule under them, and the facts beneath in a tight
+label/value rhythm with tabular figures. A register whose only `.k` is the
+code (the jobs list) reads that one as the title instead of as an eyebrow.
+
+**The radius stays round here.** «No round edges» was decided for the desktop
+remodel and is untouched; a list card on a phone is the one place the mobile
+idiom argues the other way, and 12px is what every current mobile list uses.
+One token to reverse if the operator disagrees.
