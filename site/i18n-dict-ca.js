@@ -1957,7 +1957,7 @@ window.CANEI_DICT.ca = {
   "ERP › Principal": "ERP › Principal",
   "Marcar prioritario": "Marcar com a prioritari",
   "Calculado a las": "Calculat a les",
-  "↻ Recalcular": "↻ Recalcular",
+  Recalcular: "Recalcular",
   "⚙ Tarjetas": "⚙ Targetes",
   "⚙ Reglas": "⚙ Regles",
   "🖨️ Imprimir / PDF": "🖨️ Imprimir / PDF",

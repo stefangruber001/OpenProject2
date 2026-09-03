@@ -345,12 +345,26 @@ extension WebViewStore: WKNavigationDelegate {
     /// file we ship ourselves is not the point; not building a string that can
     /// break the expression is.
     func openSection(_ id: String) {
+        call("caneiOpenSection", id)
+    }
+
+    /// Open the section sheet, or dismiss it if it is already showing. Bound to
+    /// a re-tap of the active tab, where the same gesture has to do both.
+    func toggleSection(_ id: String) {
+        call("caneiToggleSection", id)
+    }
+
+    /// One place that builds these calls, so the escaping rule is stated once.
+    /// The id comes from the bundled manifest and the page checks it against
+    /// its own section list before use, but it is still stripped to letters,
+    /// digits, `-` and `_` here: the point is not to defend against a file we
+    /// ship ourselves, it is never to build a string that can break out of the
+    /// expression. A page older than the shell simply does nothing — both
+    /// names are guarded on the JS side.
+    private func call(_ fn: String, _ id: String) {
         let safe = id.filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
         guard !safe.isEmpty else { return }
-        webView.evaluateJavaScript(
-            "window.caneiOpenSection && window.caneiOpenSection('\(safe)')",
-            completionHandler: nil
-        )
+        webView.evaluateJavaScript("window.\(fn) && window.\(fn)('\(safe)')", completionHandler: nil)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

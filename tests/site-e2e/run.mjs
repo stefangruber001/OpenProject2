@@ -1591,7 +1591,12 @@ async function testNativeShell(browser, base) {
     else bad("native shell: FAB offset", `${nat.shape.fab} vs ${saf.shape.fab}`);
 
     // The one thing a six-tab native bar cannot do is reach 29 subsecciones.
-    await nat.pg.locator("#crumbs").click();
+    // The breadcrumb that used to open the sheet is gone — the tab bar already
+    // says which section you are in — so the shell drives it instead: a re-tap
+    // of the active tab calls this, which is the real code path now.
+    // The page is on #invoicing, so this is the real gesture: re-tapping the
+    // tab you are already in, to reach that section's other screens.
+    await nat.pg.evaluate(() => window.caneiToggleSection("admin"));
     await nat.pg.waitForTimeout(600);
     const subs = await nat.pg.evaluate(() => {
       const p2 = document.querySelector("#p2");

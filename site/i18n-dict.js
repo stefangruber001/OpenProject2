@@ -4330,7 +4330,7 @@ window.CANEI_DICT = {
     ["ERP › Principal", "ERP › Home"],
     ["Marcar prioritario", "Mark as priority"],
     ["Calculado a las", "Calculated at"],
-    ["↻ Recalcular", "↻ Recalculate"],
+    ["Recalcular", "Recalculate"],
     ["⚙ Tarjetas", "⚙ Cards"],
     ["⚙ Reglas", "⚙ Rules"],
     ["🖨️ Imprimir / PDF", "🖨️ Print / PDF"],

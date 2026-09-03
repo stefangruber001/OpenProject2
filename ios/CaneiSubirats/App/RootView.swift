@@ -34,9 +34,18 @@ struct RootView: View {
             // best-in-class layout. It stays put when the keyboard appears.
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 TabBar(tabs: Config.tabs, selection: $app.selection) { id in
-                    // Re-tapping the active tab scrolls it back to the top,
-                    // preserving any in-progress page state.
-                    app.store(for: id).scrollToTop()
+                    // Re-tapping the active tab opens (or dismisses) that
+                    // section's sheet of screens.
+                    //
+                    // It used to scroll the page back to the top. That is the
+                    // usual iOS idiom, but the breadcrumb that used to open the
+                    // sheet has been removed from the page, and selecting a
+                    // DIFFERENT tab is the only other thing that opens one — so
+                    // without this there is no way back to the list of screens
+                    // for the section you are already in, short of leaving it
+                    // and returning. Reaching the other screens of the section
+                    // you are working in beats a scroll shortcut.
+                    app.store(for: id).toggleSection(id)
                 }
             }
             .ignoresSafeArea(.keyboard, edges: .bottom)

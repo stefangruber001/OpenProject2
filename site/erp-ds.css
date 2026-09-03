@@ -3755,3 +3755,55 @@ td.num.late {
     align-content: center;
   }
 }
+
+/* ------------------------------- 64 · four things the Torre did not need
+   Operator, on the control tower: «remove those two items (print pdf, and
+   ERP-Tab name you can remove everywhere since clear since below it is marked
+   green in which tab I am on it) and make recalculate way smaller button and
+   also remove Calculated at since when I open this screen it is always the
+   latest status.»
+
+   All four are removals in the page rather than rules here; what belongs in
+   this file is the one that is a size. Recalculate becomes a glyph: it is a
+   repair for a session left open long enough to outlive its figures, not
+   something to reach for, and it was sitting at the head of the screen at the
+   same weight as the four things people actually come to do. Square, matched
+   to the header icon buttons, and it keeps a translated title and aria-label
+   so losing the word costs nothing to a screen reader or to the language
+   toggle. */
+.btn.sm.icon {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* `flex`, not just `width`: on a phone `.torrebar .btn` gives every button
+     `flex: 1 1 calc(50% - 4px)`, and a flex-basis beats a width outright — the
+     glyph came out 179px wide, which is the opposite of the request. This
+     takes it out of the half-width run and lets it size to itself. */
+  flex: 0 0 auto;
+}
+/* The screen-level action sits on the title line, hard right. It was tried in
+   the toolbar first, at the end of the four create buttons — and that cost the
+   bar a whole extra row for one 32px glyph, pushing every figure on the screen
+   further down. Beside the title it occupies a line that already existed. */
+.headrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.headrow h1 {
+  margin: 0;
+}
+#headact {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+#headact:empty {
+  display: none;
+}

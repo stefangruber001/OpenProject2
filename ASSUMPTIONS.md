@@ -8038,3 +8038,46 @@ Noted and NOT changed: `body.native main` still reserves
 viewport, so every screen carries dead scroll space at its foot. Same root
 cause, but it hides no content and the operator reported the sheet — left for
 a follow-up rather than widened into silently.
+
+**S65 · Four things off the control tower, and the breadcrumb off every
+screen.** Operator: «remove those two items (print pdf, and ERP-Tab name you
+can remove everywhere since clear since below it is marked green in which tab
+I am on it) and make recalculate way smaller button and also remove Calculated
+at since when I open this screen it is always the latest status», then, on the
+result: «move this next to control tower, than the whole screen can move up?»
+
+Done as asked. The timestamp went because the screen recalculates on open, so
+it only ever said «now» in a way that invited doubt. Print/PDF went because
+the phone and the browser already print. The breadcrumb went everywhere: the
+tab bar shows the section in green, so «ERP › SECTION» restated it in grey
+above a title that said it a third time.
+
+Recalculate is a 32px glyph on the title line, in a new `#headact` slot that
+`render()` empties on every navigation — cleared centrally rather than by each
+view, because the view that must clear it is the one that does NOT use it, and
+that is the one nobody remembers. Verified that leaving the Torre empties the
+slot and returning leaves exactly one button.
+
+Two things had to be handled rather than deleted:
+
+The breadcrumb was doing a second job. In the shell it was the only route back
+to the section sheet for the tab already open — selecting a DIFFERENT tab
+opens that section, but a re-tap is reported separately. So re-tapping the
+active tab now toggles its sheet (`caneiToggleSection`, new alongside
+`caneiOpenSection`; both built by one `call()` in the store so the escaping
+rule is stated once). That replaces scroll-to-top on re-tap: reaching the
+other screens of the section you are in beats a scroll shortcut. Needs a
+TestFlight build; the web half stands alone.
+
+And the placement took three tries, which is worth recording because the first
+two were plausible. In the toolbar first, where the glyph broke the 2x2 the
+four create buttons make on a phone — one was dragged up beside it. Then at
+the end of the toolbar, which cost the bar a whole extra row for one 32px
+control and pushed every figure further down: the opposite of the request. On
+the title line it uses a line that already existed, which is the only reason
+the screen could move up at all — first KPI card from ~330px to 271px.
+
+Caught by a gate, and worth noting for next time: the dictionary held
+«↻ Recalcular» WITH the glyph, so the bare word in the new tooltip came back
+untranslated. `title` and `aria-label` are translated by i18n.js, so the fix
+was to retarget the pair in both dictionaries rather than to inline the word.

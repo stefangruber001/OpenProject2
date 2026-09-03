@@ -5080,9 +5080,21 @@
         </aside>
       </div>
       <main>
-        <div class="crumbs" id="crumbs">ERP</div>
+        <!-- The breadcrumb is gone (operator): the tab bar already shows which
+             section you are in, in green, so «ERP › SECTION» restated it in
+             smaller grey type directly above the title that said it a third
+             time. In the app it doubled as the opener for the subsection
+             sheet; that job moved to re-tapping the active tab, which is
+             where a thumb already is. -->
         <div class="head">
-          <h1 id="ttl">—</h1>
+          <!-- `#headact` is a slot for the one control that belongs to the
+               screen as a whole rather than to anything on it. Cleared on every
+               navigation in render(), so a view that does not fill it leaves no
+               trace of the last one that did. -->
+          <div class="headrow">
+            <h1 id="ttl">—</h1>
+            <span id="headact"></span>
+          </div>
           <div class="sub" id="sub"></div>
         </div>
         <!-- Project context (spec §4): the selector and the fixed header strip.
@@ -5892,9 +5904,20 @@
       const IN_NATIVE_SHELL = / CaneiApp\//.test(navigator.userAgent);
       if (IN_NATIVE_SHELL) {
         document.body.classList.add("native");
-        $("#crumbs").setAttribute("role", "button");
-        $("#crumbs").setAttribute("tabindex", "0");
-        $("#crumbs").onclick = () => toggleSection(SUBMAP[cur] ? SUBMAP[cur].sec.k : "tower");
+
+        /* Re-tapping the tab you are already on toggles its sheet. This is the
+           route the breadcrumb used to provide, and it had to be replaced
+           rather than dropped: selecting a DIFFERENT tab opens that section,
+           but the shell reports a re-tap separately, so without this there was
+           no way back to the list of screens for the section already open —
+           you would have had to leave it and come back.
+
+           It toggles rather than opens, because the same tap is the obvious
+           way to dismiss the sheet again. */
+        window.caneiToggleSection = (k) => {
+          const key = SECTIONS.some((s) => s.k === k) ? k : SECTIONS[0].k;
+          toggleSection(key);
+        };
 
         /* THE TAB BAR MUST ANSWER A TAP THE WAY THE SECTION BAR DOES.
            On the web, tapping a section opens the panel — the sheet with the
@@ -5957,13 +5980,13 @@
         buildSections();
         if (openSec) buildSubs(openSec);
         const meta = SUBMAP[cur] || { lab: "—", sec: { lab: "ERP" } };
-        // The section name goes in its own element. Concatenated into one text node
-        // it was a string no dictionary could ever hold — "ERP › Torre de control" —
-        // so the breadcrumb was the one part of the shell the language toggle could
-        // not reach.
-        $("#crumbs").innerHTML = `ERP › <span>${esc(meta.sec.lab)}</span>`;
         $("#ttl").textContent = meta.lab;
         $("#sub").textContent = "";
+        // The screen-level action slot belongs to whichever view is about to
+        // draw, so it starts empty on every navigation. Cleared here rather
+        // than by each view, because the view that must clear it is the one
+        // that does NOT use it — and that is the one nobody remembers.
+        $("#headact").innerHTML = "";
         renderBell();
         renderCreateMenu();
         renderProjectBar();
@@ -11781,14 +11804,17 @@
           "Los cuatro indicadores de la empresa, el estado de cada proyecto y lo que necesita atención. Todo abre su detalle; aquí no se edita nada.";
         const ct = erp.controlTower();
         v.innerHTML = `${importConflictsBanner()}
+   <!-- No timestamp and no print row (operator): the screen recalculates on
+        open, so «calculated at» only ever said «now» in a way that invited
+        doubt, and the print button duplicated what the phone and the browser
+        already do. Recalculate stays because a long session can outlive its
+        figures, but as a glyph — it is a repair, not a thing to reach for. -->
    <div class="torrebar">
-    <span class="ts">Calculado a las ${fmtD(ct.lastCalculatedAt)} · <button class="btn sm" id="tRefresh">↻ Recalcular</button></span>
     <span style="flex:1"></span>
     <button class="btn sm" id="tNewOpp">＋ Oportunidad/visita</button>
     <button class="btn sm" id="tNewTask">＋ Tarea</button>
     <button class="btn sm" id="tNewBudget">＋ Presupuesto</button>
     <button class="btn sm" id="tNewInvoice">＋ Factura</button>
-    <button class="btn sm" id="tPrint">🖨️ Imprimir / PDF</button>
    </div>
    <div class="tcards">${TORRE_CARDS.map((c) => {
      const small = c.small(ct.cards);
@@ -11877,6 +11903,14 @@
               );
             }),
         );
+        /* Recalculate sits beside the screen title, not in the row of create
+           buttons (operator). It is the only control that acts on the whole
+           screen rather than on one thing in it, and standing it next to the
+           four «＋» actions both overstated it and cost the toolbar a row —
+           removing that row lifts everything below it up the screen, which is
+           what was actually being asked for. */
+        $("#headact").innerHTML =
+          `<button class="btn sm icon" id="tRefresh" title="Recalcular" aria-label="Recalcular">↻</button>`;
         $("#tRefresh").onclick = () => render();
         $("#tNewOpp").onclick = () => newOpportunityDrawer();
         $("#tNewTask").onclick = () => newTaskDrawer();
@@ -11885,7 +11919,6 @@
         // that took you to a register with no create button on it. It now opens
         // the generator, which is what it always looked like it did.
         $("#tNewInvoice").onclick = () => newInvoiceDrawer();
-        $("#tPrint").onclick = () => window.print();
         v.querySelectorAll("[data-goref]").forEach(
           (n) => (n.onclick = () => gotoAlert(JSON.parse(n.dataset.goref))),
         );
